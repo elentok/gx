@@ -14,9 +14,9 @@ Each fix removes its cause. gx also notices a failed launch and recovers by itse
 
 - Every gx-launched Claude starts in normal editor mode, and gx no longer guesses at vim mode by typing into the box.
 - A launch prompt counts as delivered only when it started a turn. gx resends for a short grace period, then retries in a fresh session, then pauses (`agent_prompt_stalled` or `iteration-error`).
-- A ticket that paused for an answer on the herdr runner keeps its worktree. The relaunch reuses it as is. Closing a ticket and merging its epic remove leftover iteration worktrees.
+- A ticket that paused for an answer on the herdr runner keeps its worktree. The relaunch reuses it as is. Cancelling a ticket and merging its epic remove leftover iteration worktrees. The same keep applies to every run with `KeepAskedAgent == false` (herdr, empty and the commitless ask path), Codex included.
 - One wait gate (a file lock) guards every disk-cleaner cache clean. A new `gx brief go-clean-cache` command uses the same gate. `gx check` and every `gx brief go-*` tool retry once on a lost cache and say so when it fails again.
-- The PTY holder reports why it failed to start, and the fixtures use short paths. The sandbox cause is still unconfirmed. The next failing run names the blocked operation, and a ticket in `agent-lifecycle-impl`, blocked until then, adds the sandbox allowance.
+- The PTY holder reports why it failed to start, and the fixtures use short paths. The sandbox cause is still unconfirmed. The next failing run names the blocked operation, and a `draft` ticket in `agent-lifecycle-impl` adds the sandbox allowance once a person promotes it.
 
 ## User Stories
 
@@ -41,8 +41,8 @@ Kept worktree (the `KeepAskedAgent == false` path: the herdr runner and an empty
 14. As an agent, I want the relaunch to reuse the worktree as it is (no reset, no clean), so that nothing I left is touched.
 15. As an agent, I want the handoff prompt not to claim that uncommitted work is lost, so that I am not told to commit half-done edits.
 16. As a person, I want a paused ticket to hold no permit, so that a ticket waiting for my answer does not block the queue.
-17. As a person, I want only a done merge, start over, close and an epic merge to remove a kept worktree, so that no timer deletes work I have not looked at.
-18. As a person, I want closing a ticket to remove its leftover iteration worktree, so that a ticket I gave up on does not leave a worktree behind.
+17. As a person, I want only a done merge, start over, cancel and an epic merge to remove a kept worktree, so that no timer deletes work I have not looked at.
+18. As a person, I want cancelling a ticket to remove its leftover iteration worktree, so that a ticket I gave up on does not leave a worktree behind.
 19. As a person, I want merging an epic to remove the leftover iteration worktrees of its tickets, so that a merged epic leaves no worktree behind.
 20. As a person, I want a worktree I removed by hand to be recreated from the iteration branch, so that this stays as it is today.
 21. As a person, I want the iteration branch to stay when the worktree is kept, so that commits are never at risk.
@@ -74,7 +74,7 @@ Launch input
 44. As a person starting a server-launched session (the first prompt of an interactive or design session), I want the same post-send check, so that a rejected first prompt there is not silent.
 45. As a person, I want the PTY runner not to report success when a person typed over gx's prompt, and the herdr runner not to report success when a turn passed unseen, without a delivery proof, so that "unconfirmed" is never reported as "delivered".
 46. As a maintainer, I want real captures of the NORMAL, mid-turn and post-interrupt Claude screens kept as test fixtures, so that the probe is tested against what Claude draws.
-47. As a person who runs Codex, I want nothing to change for Codex sessions, so that a Claude-only fix does not touch a harness that has no vim step.
+47. As a person who runs Codex, I want no change to Codex launch input or prompt delivery, so that a Claude-only fix does not touch a harness that has no vim step. The kept worktree (stories 12 to 19) applies to Codex runs with `KeepAskedAgent == false`, because it does not depend on the harness.
 
 Sandbox tests
 
@@ -82,7 +82,7 @@ Sandbox tests
 49. As a maintainer, I want the holder's stderr kept in a file in the agent directory, so that the cause survives after the launch error scrolls away.
 50. As an agent, I want the lifecycle e2e and the fixture roots to use short paths, so that the holder socket stays under the unix-socket path limit.
 51. As an agent, I want no skip for the tests that start `fakeclaude` through the PTY holder, and a failure there to name the blocked operation, so that I can tell what to allow.
-52. As a maintainer, I want one ticket for the sandbox allowance (unix-socket bind in the agent directory, a pty), blocked until a first failing run with `holder.err` names the blocked operation, so that the fix follows the evidence and the epic closes only when the sandbox goal holds.
+52. As a maintainer, I want one ticket for the sandbox allowance (unix-socket bind in the agent directory, a pty), filed as `draft` and naming verification 51 as its trigger, so that the fix follows the evidence. A person promotes it to `open` once `holder.err` names the blocked operation, or cancels it as not needed if 51 passes. The epic can close either way.
 
 ## Implementation Decisions
 
@@ -98,18 +98,18 @@ Go build cache
 
 Kept worktree
 
-- Today `KeepAskedAgent` (`ralphloop/launch.go`, set by `keepsAskedAgent` in `server/runner.go`) is true for Claude on a native runner (PTY, headless) and for Codex on the PTY runner. Those runs already keep the worktree, pane and session after an adopted ask and return before `finishCleanup`. Only the herdr runner and an empty runner (`KeepAskedAgent == false`) reach `finishCleanup`, which removes the worktree. This change applies only to that path.
+- Today `KeepAskedAgent` (`ralphloop/launch.go`, set by `keepsAskedAgent` in `server/runner.go`) is true for Claude on a native runner (PTY, headless) and for Codex on the PTY runner. Those runs already keep the worktree, pane and session after an adopted ask and return before `finishCleanup`. Only runs with `KeepAskedAgent == false` (herdr, an empty runner, Codex off PTY) lose the worktree: through `finishCleanup`, and through `cleanupCommitless` (`ralphloop/commitless.go`, about line 90) for a commitless ticket that asks. This change applies only to those two paths, and to every harness on them. Both keep the worktree on an adopted ask.
 - On an adopted ask with `KeepAskedAgent == false`, gx stops removing the worktree and drops only the agent session and its tab. The iteration branch stays. The keep-agent runs keep their session as today.
 - The relaunch reuses the kept worktree as is. The handoff prompt does not say uncommitted work is lost.
 - The pause holds no permit.
-- What removes a kept iteration worktree: a done merge (`finishCleanup` through the merge queue), start over (`repair/startover.go` `clearIteration`), closing a ticket, and merging its epic. No timer does. A worktree removed by hand is recreated from the iteration branch, as today.
-- Close path, as it exists in code: the web serves no close verb (`server/web.go`). The only close is `gx tickets close` (`cmd/tickets_close.go`), which works on tickets in a `follow-ups` epic, refuses an active ticket, and removes no worktree. The implementer adds removal of the ticket's leftover iteration worktree there, through one helper that finds the worktree from the ticket's iteration path and removes it when present. If a web close verb is added later, it calls the same helper.
+- What removes a kept iteration worktree: a done merge (`finishCleanup` through the merge queue), start over (`repair/startover.go` `clearIteration`), cancelling a ticket, and merging its epic. No timer does. A worktree removed by hand is recreated from the iteration branch, as today.
+- Cancel path, as it exists in code: `gx tickets close` (`cmd/tickets_close.go`) only takes draft or open tickets in a `follow-ups` epic and refuses an active ticket, so it never meets a kept worktree. Giving up on a paused ticket is a cancel (`gx server cancel` and the TUI tickets menu, through `ticketCancel` and `markCancelled` in `server/ticketwrites.go`), which removes no worktree today. The implementer adds removal of the ticket's leftover iteration worktree in `markCancelled`, through one helper that finds the worktree from the ticket's iteration path and removes it when present. This also covers cancelled fork descendants.
 - Epic merge path: `mergeEpic` (`server/epicmerge_root.go`) merges the epic and removes no iteration worktree. After a successful epic merge, the implementer removes every leftover iteration worktree of that epic's tickets through the same helper. The branch is left to the existing branch cleanup.
 - No WIP commit. No new pause kind or way into a pause. No schema change.
 
 Launch input
 
-- Scope: this covers every Claude gx launches (headless runner, PTY runner, herdr runner, and server-launched sessions). Codex is unchanged: it has a no-op input-ready step and no vim mode.
+- Scope: the vim fix covers every Claude gx launches (headless runner, PTY runner, herdr runner, and server-launched sessions). Codex launch input is unchanged: it has a no-op input-ready step and no vim mode. The kept-worktree change is separate and applies to Codex too, on runs with `KeepAskedAgent == false`.
 - Headless runner (traced): `Headless.Prompt` sends a slash command as a stream-json user message and calls `awaitSlash` (`nativerunner/headless.go`). `awaitSlash` never resends. It counts the command as delivered when the uuid started, the turn counter moved, a dialog blocked claude, or claude is still idle after `WaitN`. That last case counts "idle, no turn" as delivered, so a rejected skill passes today. Change: a launch prompt passes a flag (a prompt option) that makes "idle after N with no started uuid and no new turn" return `ErrNotDelivered`, which starts the fresh-session retry. A launch prompt also fails when the output events carry `Unknown command:`. Commands that really start no turn (compaction) keep the single-send, idle-counts rule. A headless test with a rejected-skill fake asserts this.
 - Editor mode: every gx-launched Claude gets `"editorMode":"normal"` merged into the existing `--settings` JSON on every launch path. `agentArgs` (`ralphloop/loop.go`) already passes `--settings claudeGuardSettings` and `nativerunner/pty.go` passes its own `--settings`; a second flag could replace the first and drop the `gx agent guard-bash` hook, so there is one flag with merged JSON. The implementer first verifies with a real Claude that this setting beats the person's own setting.
 - Vim probe (backstop for a `/config` toggle mid-session, and for the case that the launch setting does not override): it runs only when the editor-mode settings say vim, not before every send. Snapshot the input, press `i`, re-read after a short settle. The probe records each `i` press per session. If the input grew by `i`, send Backspace, unless person input was seen since the snapshot (the PTY runner tracks that through `errPersonInput`); then skip the Backspace and report unknown. If the result is unclear, give up and leave nothing behind. A missing "INSERT" marker is never read as NORMAL. The probe reads the styled screen on herdr.
@@ -132,7 +132,7 @@ Sandbox tests
 - The lifecycle e2e and the fixture roots use short paths, so the holder socket path stays under about 100 bytes. The fixture root already uses a short path; the e2e root follows the temp-dir variable and may be long.
 - No skip-with-reason: the tests are meant to run in the agent sandbox. A failure there names the blocked operation (story 51).
 - Cause note: the sandbox cause is unconfirmed, and it is not Codex-specific (the failing runs were Claude). The session that hit it was not sandboxed, and no sandbox setting exists in the repo or in the person's Claude settings. By hand, a denied unix-socket bind, a denied pty and an over-long socket path each make the holder exit with a different message. The sandbox kind is unconfirmed.
-- The sandbox allowance (unix-socket bind in the agent directory, a pty) is one ticket in `agent-lifecycle-impl`. It is blocked until a first failing run with `holder.err` names the blocked operation. The epic closes only when that ticket is done and the sandbox goal holds.
+- The sandbox allowance (unix-socket bind in the agent directory, a pty) is one ticket in `agent-lifecycle-impl`. It is filed as `draft` (a ticket can be blocked only by another ticket, and an open one with no blocker starts at once), with a note naming verification 51 as the trigger. A person promotes it to `open` once `holder.err` names the blocked operation, or cancels it as not needed if 51 passes after the short paths of story 50.
 
 Schema
 
@@ -156,7 +156,7 @@ Needed tests and prior art:
 - A fake whose skill registry is empty for the first N seconds: assert `prompt-nudged`, then success. An always-unknown skill: assert the fresh-session retry, then the pause. Prior art: the existing nudge and launch tests in the loop and herdr runner.
 - Transcript proof: a session with no user record gets the original skill prompt from the stall nudge. A transcript that shows the command is never resent.
 - Headless runner with a rejected skill: assert it does not report success.
-- Worktree kept (herdr runner fake, `KeepAskedAgent == false`): write an uncommitted file, ask, answer, relaunch, assert the file exists and no permit is held. Merge, start over, close and epic merge remove the worktree. A PTY run is not a valid scenario for this test.
+- Worktree kept (herdr runner fake, `KeepAskedAgent == false`): write an uncommitted file, ask, answer, relaunch, assert the file exists and no permit is held. Merge, start over, cancel and epic merge remove the worktree. A PTY run is not a valid scenario for this test. A commitless ticket that asks on the herdr fake also keeps its worktree.
 - Cleaner gate: a registered run and a fake `go` process hold the clean; the cap (test hook) lets it go ahead and logs it; `gx brief go-clean-cache` waits on the same gate; a custom `disk-space.cleanup-command` is gated too. A lost-cache error is retried once; a second one prints the lost-cache message. Prior art: the disk-space tests for the cleaner.
 - Holder failure: a holder that cannot bind (forced in the test) puts its error text in the launch error and in the file in the agent directory.
 - Sandbox: no test skips for the sandbox. Passing in the sandbox is checked by the epic's verification.
@@ -182,7 +182,7 @@ No stored mocks exist for this map, so there is no Mock states list. "Flow 3" is
 15. Same scenario as 13; check the relaunch prompt (in the agent fake's received input) has no "nothing uncommitted survives" text.
 16. `gx server queue` and slot counts while the ticket waits show the queue not blocked: a second ticket starts (scenario 13).
 17. After a done merge and after start over, the worktree is gone; before them, it is present. Run `git worktree list` in the fixture (scenario 13). No timer removes it: advance the clock and assert it is present.
-18. `gx tickets close` on a ticket with a leftover iteration worktree removes the worktree. New test at seam 1 or the CLI.
+18. Cancelling a paused ticket with a kept worktree through `gx server cancel` removes the worktree. Run `git worktree list` before and after in the fixture. A commitless ticket that asks on the herdr fake keeps its worktree (new scenario).
 19. Merging an epic whose ticket left an iteration worktree removes it. Run `git worktree list` before and after in the fixture. New scenario.
 20. Remove the worktree by hand, then Retry; expected: a recreated worktree on the iteration branch (same scenario as 13).
 21. The iteration branch exists while the worktree is kept (`git branch --list` in the fixture).
@@ -215,14 +215,14 @@ No stored mocks exist for this map, so there is no Mock states list. "Flow 3" is
 48. A holder that fails to start: the launch error contains the holder's stderr text, not "holder.sock never answered". Seam 4.
 49. The same failure leaves a holder error file in the agent directory (check by listing the directory).
 50. The lifecycle e2e and `gxfixture` roots: the holder socket path is under 100 bytes with a long temp-dir variable. New test with a long `TMPDIR`.
-51. Run `GX_E2E=1 go test ./e2e -run TestServerLifecycle` and the `gxfixture` tests that launch an agent inside the ralph-loop sandbox: expected: they run, with no skip. Manual until the cause is known; if they still fail, the launch error names the blocked operation (see 52).
-52. If 51 fails in the sandbox: the error names the blocked operation, and the sandbox-allowance ticket in `agent-lifecycle-impl` (blocked until this capture exists) is unblocked. Manual.
+51. Run `GX_E2E=1 go test ./e2e -run TestServerLifecycle` and the `gxfixture` tests that launch an agent from a ralph-loop ticket agent on the same runner and harness as the failing runs: expected: they run, with no skip. Record the runner, the harness and the result in the allowance ticket. Manual until the cause is known; if they still fail, the launch error names the blocked operation (see 52).
+52. If 51 fails in the sandbox: the error names the blocked operation, and a person promotes the draft sandbox-allowance ticket in `agent-lifecycle-impl` to open. Manual.
 
 ## Out of Scope
 
 - A private per-run build cache.
 - A skip-with-reason for sandboxed runs of the holder tests.
-- Any change to Codex sessions, including proof that a Codex launch prompt was delivered. No Codex incident exists. A follow-up will be filed for the delivery proof.
+- Any change to Codex launch input, including proof that a Codex launch prompt was delivered. No Codex incident exists. The delivery proof is filed as gx:follow-ups/198.
 - Reading Claude's `vim.mode` from the statusline as a signal.
 - An atomic refresh of the skills directory, until a person confirms that a refresh caused the lost-prompt incident.
 - A WIP commit, a timer, or a permit held while a ticket waits for an answer.
@@ -234,11 +234,11 @@ No stored mocks exist for this map, so there is no Mock states list. "Flow 3" is
 - The lost-prompt incident was first read as "prompt never arrived". The research shows it arrived and was rejected. A bare retry on the loud error would not have helped; the delivery proof does.
 - The stray `i` research could not confirm which caller sent the `i` in the live runs. The new logging is meant to answer that.
 - Implementer's choices left open: the lost-cache message and match, the probe decision names and caller label, the positive ready signal, the settle time, and the new fake knobs.
-- Tickets to create (for the gx-to-tickets breakdown): the sandbox allowance is one ticket in `agent-lifecycle-impl`, blocked until a first failing run with `holder.err` names the blocked operation (stories 51 and 52). The epic closes only when it is done. A separate follow-up (outside this epic) covers Codex delivery proof.
+- Tickets to create (for the gx-to-tickets breakdown): the sandbox allowance is one `draft` ticket in `agent-lifecycle-impl`, triggered by verification 51 (stories 51 and 52). gx:follow-ups/198 (outside this epic) covers Codex delivery proof.
 
 ## Self-decided design questions
 
 - Question: where does the headless runner tell a launch prompt from a no-turn command? Choice: a prompt option set by the launch path; without it `awaitSlash` keeps its rule. Reason: compaction must keep the single-send rule.
-- Question: does a closed ticket's iteration branch go with its worktree? Choice: worktree only. Reason: the branch holds commits, and the spec promises commits are never at risk.
+- Question: does a cancelled ticket's iteration branch go with its worktree? Choice: worktree only. Reason: the branch holds commits, and the spec promises commits are never at risk.
 - Question: what happens when the lock file cannot be opened? Choice: the build runs unregistered and logs it. Reason: a build must not fail because the gate is unavailable.
-- Question: where does the close removal go, since no web close verb exists? Choice: one helper used by `gx tickets close`, reusable by a future web verb. Reason: it is the only close in code.
+- Question: where does the give-up removal go? Choice: one helper called from `markCancelled`. Reason: cancel is the real give-up path for a paused ticket, and `gx tickets close` refuses active tickets.
