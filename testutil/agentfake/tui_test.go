@@ -402,6 +402,77 @@ func TestTUIClaude_SlashPromptWithNothingArmedStartsNoTurn(t *testing.T) {
 	}
 }
 
+func (f *tuiFake) transcriptLines() []string {
+	f.t.Helper()
+	raw, err := os.ReadFile(f.transcriptPath())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return strings.Split(strings.TrimSpace(string(raw)), "\n")
+}
+
+func TestTUIClaude_UnknownSkillKnobDrawsTheErrorAndWritesNoUserRecord(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUIUnknownSkillEnv+"=1")
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitScreen("Unknown command: /gx-implement")
+	lines := f.transcriptLines()
+	if len(lines) != 1 || !strings.Contains(lines[0], `"type":"system"`) || !strings.Contains(lines[0], `"content":"Unknown command: /gx-implement"`) {
+		t.Fatalf("transcript = %q, want one system record", lines)
+	}
+	if m := f.pidFile(); m["status"] != StatusIdle {
+		t.Fatalf("status = %v, want idle", m["status"])
+	}
+}
+
+func TestTUIClaude_RegistryDelayKnobKnowsTheSkillOnlyAfterTheDelay(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUIRegistryDelayEnv+"=1s", TUILaunchRecordEnv+"=1")
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitScreen("Unknown command: /gx-implement")
+	time.Sleep(1100 * time.Millisecond)
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitFor("a user record", func() bool {
+		return slices.ContainsFunc(f.transcriptLines(), func(l string) bool { return strings.Contains(l, `"type":"user"`) })
+	})
+}
+
+func TestTUIClaude_NoTurnKnobStaysIdleAndWritesNothing(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUINoTurnEnv+"=1")
+	f.waitStatus(StatusIdle, "")
+	f.control(Control{Action: ActionFast})
+	f.typeLine("/gx-implement gx:epic/01")
+	time.Sleep(200 * time.Millisecond)
+	if m := f.pidFile(); m["status"] != StatusIdle {
+		t.Fatalf("status = %v, want idle", m["status"])
+	}
+	if lines := f.transcriptLines(); len(lines) != 0 {
+		t.Fatalf("transcript = %q, want none", lines)
+	}
+}
+
+func TestTUIClaude_LaunchRecordKnobWritesTheCommandAsTheFirstUserRecord(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUILaunchRecordEnv+"=1")
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitFor("a user record", func() bool { return len(f.transcriptLines()) > 0 })
+	var rec struct {
+		Type    string `json:"type"`
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(f.transcriptLines()[0]), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Type != "user" || !strings.Contains(rec.Message.Content, "<command-name>/gx-implement</command-name>") {
+		t.Fatalf("first record = %+v", rec)
+	}
+}
+
 func TestTUIClaude_ClearStillChangesTheSessionIDWhenArmed(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")

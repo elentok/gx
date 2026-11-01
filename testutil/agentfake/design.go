@@ -311,6 +311,11 @@ func writeEntry(path, role string, message, extra map[string]any) error {
 	for k, v := range extra {
 		entry[k] = v
 	}
+	return appendLine(path, entry)
+}
+
+// appendLine appends entry as one JSON line to the transcript at path.
+func appendLine(path string, entry map[string]any) error {
 	line, err := json.Marshal(entry)
 	if err != nil {
 		return err

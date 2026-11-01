@@ -46,7 +46,23 @@ const (
 	// the input row as claude does: a styled marker, and a dim placeholder while
 	// empty, so a draft check can decide.
 	TUIDraftEnv = "GX_AGENTFAKE_TUI_DRAFT"
+	// TUIRegistryDelayEnv, a Go duration, keeps the skill registry empty for
+	// that long after start: a skill prompt typed earlier is an unknown command.
+	TUIRegistryDelayEnv = "GX_AGENTFAKE_TUI_REGISTRY_DELAY"
+	// TUIUnknownSkillEnv, set to "1", makes every skill prompt an unknown
+	// command: the pane draws "Unknown command: /<skill>" and the transcript
+	// gets a system record and no user record.
+	TUIUnknownSkillEnv = "GX_AGENTFAKE_TUI_UNKNOWN_SKILL"
+	// TUINoTurnEnv, set to "1", leaves the agent idle after a skill prompt: no
+	// turn, no transcript record.
+	TUINoTurnEnv = "GX_AGENTFAKE_TUI_NO_TURN"
+	// TUILaunchRecordEnv, set to "1", makes a skill prompt's first transcript
+	// record the user record claude writes for the command.
+	TUILaunchRecordEnv = "GX_AGENTFAKE_TUI_LAUNCH_RECORD"
 )
+
+// UnknownCommandText is what claude draws, and records, for a skill it doesn't know.
+func UnknownCommandText(skill string) string { return "Unknown command: " + skill }
 
 // PermissionPromptPrefix, at the start of a submitted prompt, makes the TUI
 // fake ask permission to run the rest of the prompt as a Bash command, with no
@@ -233,6 +249,12 @@ type tuiOptions struct {
 	mouse     bool
 	// draft seeds the input; a non-empty one also styles the input row.
 	draft string
+	// registryDelay, unknownSkill, noTurn and launchRecord are the skill-prompt
+	// knobs; see the TUI...Env consts.
+	registryDelay time.Duration
+	unknownSkill  bool
+	noTurn        bool
+	launchRecord  bool
 	// model is --model, reported on every reply.
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
@@ -273,15 +295,20 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	if *sessionID == "" {
 		return tuiOptions{}, errors.New("agentfake: --session-id or --resume is required")
 	}
+	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
 	return tuiOptions{
-		sessionID: *sessionID,
-		trust:     os.Getenv(TUITrustEnv) == "1",
-		dropKey:   os.Getenv(TUITrustDropKeyEnv) == "1",
-		noPidFile: os.Getenv(TUINoPidFileEnv) == "1",
-		mouse:     os.Getenv(TUIMouseEnv) == "1",
-		draft:     os.Getenv(TUIDraftEnv),
-		model:     cmp.Or(*model, ReportedModel),
-		settings:  settings,
+		sessionID:     *sessionID,
+		trust:         os.Getenv(TUITrustEnv) == "1",
+		dropKey:       os.Getenv(TUITrustDropKeyEnv) == "1",
+		noPidFile:     os.Getenv(TUINoPidFileEnv) == "1",
+		mouse:         os.Getenv(TUIMouseEnv) == "1",
+		draft:         os.Getenv(TUIDraftEnv),
+		registryDelay: registryDelay,
+		unknownSkill:  os.Getenv(TUIUnknownSkillEnv) == "1",
+		noTurn:        os.Getenv(TUINoTurnEnv) == "1",
+		launchRecord:  os.Getenv(TUILaunchRecordEnv) == "1",
+		model:         cmp.Or(*model, ReportedModel),
+		settings:      settings,
 	}, nil
 }
 
@@ -348,6 +375,7 @@ func runTUIClaude() (int, error) {
 		out:        os.Stdout,
 		ack:        ack,
 		opts:       opts,
+		started:    now,
 		pidPath:    pidPathFor(home, os.Getpid()),
 		ctlPath:    ctlPath,
 		transcript: transcript.PathIn(home, cwd, opts.sessionID),
@@ -369,8 +397,11 @@ func runTUIClaude() (int, error) {
 type tui struct {
 	out io.Writer
 	// ack gets one byte after each handled control.
-	ack        io.Writer
-	opts       tuiOptions
+	ack     io.Writer
+	opts    tuiOptions
+	started time.Time
+	// notice is a line drawn under the input, such as an unknown-command error.
+	notice     string
 	pidPath    string
 	ctlPath    string
 	transcript string
@@ -609,6 +640,9 @@ func (t *tui) submit() error {
 	}
 	switch t.pid.Status {
 	case StatusIdle:
+		if handled, err := t.skillPromptKnobs(text); handled || err != nil {
+			return err
+		}
 		if w := t.resume; w != nil && text != "" {
 			t.resume = nil
 			t.prompt = text
@@ -667,6 +701,42 @@ func (t *tui) submit() error {
 		return t.setStatus(StatusBusy, "")
 	}
 	return nil
+}
+
+// skillPromptKnobs applies the launch-proof knobs to a skill prompt and reports
+// whether it handled the prompt. The launch-record knob only writes the user
+// record and leaves the rest to the normal path.
+func (t *tui) skillPromptKnobs(text string) (bool, error) {
+	if !strings.HasPrefix(text, "/") || text == "/clear" || text == "/exit" || text == "/compact" {
+		return false, nil
+	}
+	o := t.opts
+	if !o.unknownSkill && o.registryDelay == 0 && !o.noTurn && !o.launchRecord {
+		return false, nil
+	}
+	skill, _, _ := strings.Cut(text, " ")
+	path, err := t.transcriptPath()
+	if err != nil {
+		return false, err
+	}
+	switch {
+	case t.opts.unknownSkill || time.Since(t.started) < t.opts.registryDelay:
+		t.notice = UnknownCommandText(skill)
+		t.draw()
+		return true, appendLine(path, map[string]any{
+			"type":      "system",
+			"subtype":   "informational",
+			"content":   t.notice,
+			"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	case t.opts.noTurn:
+		return true, nil
+	case t.opts.launchRecord:
+		name := strings.TrimPrefix(skill, "/")
+		args := strings.TrimSpace(strings.TrimPrefix(text, skill))
+		return false, appendEntry(path, "user", "<command-message>"+name+"</command-message>\n<command-name>"+skill+"</command-name>\n<command-args>"+args+"</command-args>", nil)
+	}
+	return false, nil
 }
 
 // promptKind is how an idle fake handles a submitted prompt.
@@ -974,6 +1044,9 @@ func (t *tui) draw() {
 		rows = []string{colored("✻ Welcome to Claude Code"), "", input}
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
+	}
+	if t.notice != "" && t.pid.Status == StatusIdle {
+		rows = append(rows, t.notice)
 	}
 	if t.opts.mouse {
 		rows = append(rows, fmt.Sprintf("wheel up %d down %d", t.wheelUp, t.wheelDown))
