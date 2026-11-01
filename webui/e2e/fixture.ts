@@ -48,6 +48,8 @@ interface FixtureOutput {
   agent_transcript?: string;
   /** Only the restart scenarios have the fake restart binary's control dir. */
   restart_dir?: string;
+  /** Only the migrate scenarios have the migration control files and the bare-server script. */
+  migrate_dir?: string;
 }
 
 export interface Fixture {
@@ -78,6 +80,13 @@ export interface Fixture {
   clearRestartControl(name: string): Promise<void>;
   /** Stops the fixture server mid-flow. Teardown skips a server that is already stopped. */
   stopServer(): Promise<void>;
+  /**
+   * Controls the bare `gx server` process of a migrate scenario: `pid`, `kill` (SIGKILL, waits for exit)
+   * or `start` (a new bare process, as launchd starts one). Returns the script's output.
+   */
+  serverCtl(verb: "pid" | "kill" | "start"): Promise<string>;
+  /** Writes the migrate scenarios' inject.json (extra test steps), read when the server starts. */
+  setInject(steps: Array<{ name: string; fail?: string; notes?: string[] }>): Promise<void>;
   /** The parsed `$HOME/.config/gx/config.json`, read fresh on every call. */
   globalConfig(): Promise<Record<string, any>>;
   /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. */
@@ -137,6 +146,11 @@ function runWithInput(bin: string, args: string[], env: NodeJS.ProcessEnv, input
 function restartDir(out: FixtureOutput): string {
   if (!out.restart_dir) throw new Error("this scenario has no fake restart binary");
   return out.restart_dir;
+}
+
+function migrateDir(out: FixtureOutput): string {
+  if (!out.migrate_dir) throw new Error("this scenario has no migration control files");
+  return out.migrate_dir;
 }
 
 /** Starts a fresh fixture server for `scenario` and signs the page in. */
@@ -212,6 +226,11 @@ async function startFixture(
     setRestartControl: (name, value) => writeControl(restartDir(out), name, value),
     clearRestartControl: (name) => rm(join(restartDir(out), name), { force: true }),
     stopServer: stop,
+    async serverCtl(verb) {
+      const { stdout } = await run(join(migrateDir(out), "server"), [verb]);
+      return stdout.trim();
+    },
+    setInject: (steps) => writeControl(migrateDir(out), "inject.json", JSON.stringify(steps)),
     async globalConfig() {
       return JSON.parse(await readFile(join(env.HOME!, ".config", "gx", "config.json"), "utf8"));
     },

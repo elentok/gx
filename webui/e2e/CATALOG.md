@@ -21,7 +21,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121), `migration.e2e.ts` (flows 161, 163, 168), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -1647,3 +1647,21 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 - **Pass:**
   - The epic page shows one "Long-running" badge; its tooltip reads "120 assistant turns (threshold N)".
   - Ticket 01's page shows the badge; ticket 02's page shows none.
+
+## 161. Server migrates on start
+
+- **Scenario:** `migrate-pending` (the real server, no flag, a ticket in the old shape in `demo`).
+- **Steps:** wait until the handshake stops saying migrating. Read the ticket and `gx tickets show`. Read `demo`'s list file. Kill the bare server and start it again.
+- **Pass:** the ticket is in the new shape (`status: paused`). The list has step names, one per line, no repeat. After the second start the server log holds no new migration note and the list is unchanged.
+
+## 163. Per-project list
+
+- **Scenario:** `migrate-pending`, plus a project `other` written into the store with an old-shape ticket and no list (`demo` already has the full list).
+- **Steps:** kill the bare server and start it again.
+- **Pass:** `other`'s ticket is migrated. Both lists hold the same full set of names, and `demo`'s list is unchanged.
+
+## 168. Crash restart and login start
+
+- **Scenario:** `migrate-pending`, started as a bare `gx server` process (no `start` or `restart` command code, as launchd does).
+- **Steps:** wait for the first migration. Add a notes step through inject-step. Kill the process and start it again the same way.
+- **Pass:** the first start migrated the ticket. After the second start every list is the earlier list plus the added name, and the server log holds that step's note once per project and no other new note.
