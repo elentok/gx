@@ -1875,3 +1875,28 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - A key and typed text each stop the countdown and clear the Continue.
   - Close dialog, Deny and Allow once leave the same deadline and "Continuing in" stays.
   - With the countdown off no countdown shows and Continue still works.
+
+## 155. Command output in the chat
+
+- **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-commands-output.e2e.ts`; `fixture.controlClaude` arms the output (ANSI codes, 15 lines), `fixture.input` is the fake's input log.
+- **Steps:**
+  1. In an Idle Claude session arm a 15-line output with ANSI codes and send `/cost`. Leave and come back.
+  2. Click "Show all (15 lines)".
+  3. In two other Idle Claude sessions send `/model` (empty output) and `/compact` (the "Compacted" line).
+  4. In the Idle Codex session send `/status`.
+  5. On the design page `demo:design-auto`, after a run ends, send `/cost` with a 14-line output from Note. Leave and come back, then Show all.
+- **Pass:**
+  - The `/cost` pill shows with a muted monospace block cut at 12 lines; "Show all" expands to every line.
+  - No ANSI code and no caveat line show; the fake's input log holds no output text; the session stays read (no actionable reason).
+  - `/model`, `/compact` and the Codex `/status` show the pill alone, with no output block.
+  - The design page shows the same block, cut at 12 lines, expanded by Show all.
+
+## 159. Exit with /exit
+
+- **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-commands-output.e2e.ts`.
+- **Steps:**
+  1. In an Idle Claude session send `/exit`.
+  2. On the design page `demo:design-auto`, after a run ends, send `/exit` from Note.
+- **Pass:**
+  - The Agents session turns Exited, keeps its chat, and shows "Exited. Restore it in gx, Agents tab." with Send off.
+  - The design page keeps its chat and shows Restore and New session.
