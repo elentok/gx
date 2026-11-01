@@ -151,6 +151,19 @@ func (s *Server) Rescan() {
 	s.rescan()
 }
 
+// SetTokensOf swaps how a session's cumulative tokens and cost are read.
+func (s *Server) SetTokensOf(f TokenReader) { s.tokenPoll.read = f }
+
+// PollTokensAt runs one token poll as of now.
+func (s *Server) PollTokensAt(now time.Time) { s.pollTokens(now) }
+
+// TokenTranscriptPath is the file whose change makes the token poll read
+// address's session; false when the ticket has no live session.
+func (s *Server) TokenTranscriptPath(address string) (string, bool) {
+	ts, ok := s.tokenSessionOf(address)
+	return ts.path, ok
+}
+
 // PollBudget runs one budget poll now.
 func (s *Server) PollBudget() { s.pollBudget(time.Now()) }
 

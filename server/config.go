@@ -92,6 +92,8 @@ type Config struct {
 
 	BudgetPollInterval time.Duration // zero means the default
 
+	TokenPollInterval time.Duration // zero means the budget default
+
 	// LimitsEventInterval is the coalescing window of limits-changed; zero
 	// means DefaultLimitsEventInterval.
 	LimitsEventInterval time.Duration

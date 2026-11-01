@@ -325,6 +325,7 @@ type Server struct {
 	viMode       *viModeState
 	ledger       *budgetLedger
 	tokens       *tokenledger.Ledger
+	tokenPoll    tokenPoller
 	usage        *usageSamples // Claude's
 	limits       *limitsStore
 	limitHistory *limitHistory
@@ -910,6 +911,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(pruneDone); s.keepPruned(freshCtx) }()
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
+	tokensDone := make(chan struct{})
+	go func() { defer close(tokensDone); s.keepTokensPolled(freshCtx) }()
 	gatesDone := make(chan struct{})
 	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
 	cpuDone := make(chan struct{})
@@ -950,6 +953,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-claimDone
 	<-pruneDone
 	<-budgetDone
+	<-tokensDone
 	<-gatesDone
 	<-cpuDone
 	<-disksDone
