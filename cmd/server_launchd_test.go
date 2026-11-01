@@ -133,3 +133,37 @@ func TestLaunchdInstall_RetriesBootstrapWhileBootoutFinishes(t *testing.T) {
 		t.Errorf("bootstrap was not retried: %d failures left", failures)
 	}
 }
+
+// kickstart succeeds even when launchd refuses to spawn the binary, and the job
+// stays refused until it is loaded again.
+func TestLaunchdStart_ReloadsTheJobWhenLaunchdRefusesToSpawn(t *testing.T) {
+	a, calls := newTestAgent(t)
+	a.output = func(args ...string) (string, error) {
+		return "\tstate = spawn scheduled\n\tjob state = spawn failed\n", nil
+	}
+
+	if err := a.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	var verbs []string
+	for _, c := range *calls {
+		verbs = append(verbs, c[0])
+	}
+	if want := []string{"kickstart", "bootout", "bootstrap"}; !reflect.DeepEqual(verbs, want) {
+		t.Errorf("launchctl verbs = %v, want %v", verbs, want)
+	}
+}
+
+func TestLaunchdStart_LeavesARunningJobAlone(t *testing.T) {
+	a, calls := newTestAgent(t)
+	a.output = func(args ...string) (string, error) { return "\tstate = running\n", nil }
+
+	if err := a.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(*calls) != 1 {
+		t.Errorf("launchctl calls = %v, want only the kickstart", *calls)
+	}
+}

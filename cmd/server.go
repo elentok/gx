@@ -439,7 +439,10 @@ func hasPushRemote(storePath string) bool {
 type spawnFunc func() error
 
 // runServerStart is idempotent: a server that already answers is left alone.
-func runServerStart(ctx context.Context, c *apiclient.Client, w io.Writer, spawn spawnFunc) error {
+//
+// diagnose, when not nil, runs once if the server never answers and returns the
+// path of a report to name in the error.
+func runServerStart(ctx context.Context, c *apiclient.Client, w io.Writer, spawn spawnFunc, diagnose func() string) error {
 	if h, err := c.Handshake(ctx); err == nil {
 		_, werr := fmt.Fprintf(w, "already running (pid %d)\n", h.Pid)
 		return werr
@@ -454,6 +457,11 @@ func runServerStart(ctx context.Context, c *apiclient.Client, w io.Writer, spawn
 			return werr
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+	if diagnose != nil {
+		if report := diagnose(); report != "" {
+			return fmt.Errorf("server did not answer within %s (launchd state saved to %s)", stopTimeout, report)
+		}
 	}
 	return fmt.Errorf("server did not answer within %s", stopTimeout)
 }
@@ -535,15 +543,18 @@ func runServerStartCmd(ctx context.Context, d deps, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return runServerStart(ctx, c, w, serverSpawn(dirs, stateDir))
+	spawn, diagnose := serverSpawn(dirs, stateDir)
+	return runServerStart(ctx, c, w, spawn, diagnose)
 }
 
 // serverSpawn is the installed service when there is one, else a detached child.
-func serverSpawn(dirs config.Dirs, stateDir string) spawnFunc {
+// The second result saves the service's state after a failed start; it is nil
+// without a service.
+func serverSpawn(dirs config.Dirs, stateDir string) (spawnFunc, func() string) {
 	if svc := installedService(dirs, stateDir); svc != nil {
-		return svc.Start
+		return svc.Start, func() string { return saveStartFailure(stateDir, svc) }
 	}
-	return spawnDetached(dirs.Environ(), stateDir)
+	return spawnDetached(dirs.Environ(), stateDir), nil
 }
 
 // serverStarter is runServerStart without output, for the TUI.
@@ -553,7 +564,8 @@ func serverStarter(dirs config.Dirs, c *apiclient.Client) func(context.Context) 
 		if err != nil {
 			return err
 		}
-		return runServerStart(ctx, c, io.Discard, serverSpawn(dirs, stateDir))
+		spawn, diagnose := serverSpawn(dirs, stateDir)
+		return runServerStart(ctx, c, io.Discard, spawn, diagnose)
 	}
 }
 

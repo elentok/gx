@@ -27,6 +27,9 @@ type serviceManager interface {
 	Install() error
 	Start() error
 	Stop() error
+	// Status describes the job as the supervisor sees it, for the report
+	// saved after a start that never answered.
+	Status() string
 }
 
 // launchdAgent manages the gx server's launchd agent. run executes launchctl
@@ -40,6 +43,8 @@ type launchdAgent struct {
 	// /usr/bin:/bin:/usr/sbin:/sbin, which has neither herdr nor the agents.
 	environ map[string]string
 	run     func(args ...string) error
+	// output runs launchctl and returns its combined output.
+	output func(args ...string) (string, error)
 }
 
 // launchdEnvKeys are the installing shell's variables the server needs: PATH
@@ -77,11 +82,21 @@ func newLaunchdAgent(dirs config.Dirs, stateDir string) (*launchdAgent, error) {
 		uid:       os.Getuid(),
 		environ:   launchdEnviron(dirs.Getenv),
 		run:       runLaunchctl(dirs.Environ()),
+		output:    outputLaunchctl(dirs.Environ()),
 	}, nil
 }
 
 func runLaunchctl(env []string) func(args ...string) error {
 	return func(args ...string) error { return launchctl(env, args...) }
+}
+
+func outputLaunchctl(env []string) func(args ...string) (string, error) {
+	return func(args ...string) (string, error) {
+		cmd := exec.Command("launchctl", args...)
+		cmd.Env = env
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
 }
 
 func launchctl(env []string, args ...string) error {
@@ -234,6 +249,50 @@ func (a *launchdAgent) bootstrap() error {
 	return err
 }
 
-func (a *launchdAgent) Start() error { return a.run("kickstart", a.target()) }
+// startCheckAttempts and startCheckDelay bound how long Start watches the job
+// after a kickstart for launchd refusing to spawn it.
+var (
+	startCheckAttempts = 20
+	startCheckDelay    = 250 * time.Millisecond
+)
+
+// Start kickstarts the job. kickstart succeeds even when launchd then refuses
+// to spawn the binary (job state "spawn failed", exit 78), and a refused job
+// stays refused until it is loaded again. So Start watches the job briefly and
+// falls back to Install, which re-reads the plist and reloads the job.
+func (a *launchdAgent) Start() error {
+	if err := a.run("kickstart", a.target()); err != nil {
+		return err
+	}
+	if a.output == nil {
+		return nil
+	}
+	for i := 0; i < startCheckAttempts; i++ {
+		out, err := a.output("print", a.target())
+		if err == nil {
+			switch {
+			case strings.Contains(out, "spawn failed"):
+				return a.Install()
+			case strings.Contains(out, "state = running"):
+				return nil
+			}
+		}
+		time.Sleep(startCheckDelay)
+	}
+	return nil
+}
+
+// Status is `launchctl print` for the job: its state, last exit code and
+// launch constraints, which is what shows a spawn that launchd refused.
+func (a *launchdAgent) Status() string {
+	if a.output == nil {
+		return ""
+	}
+	out, err := a.output("print", a.target())
+	if err != nil {
+		return fmt.Sprintf("launchctl print %s: %v\n%s", a.target(), err, out)
+	}
+	return out
+}
 
 func (a *launchdAgent) Stop() error { return a.run("kill", "SIGTERM", a.target()) }

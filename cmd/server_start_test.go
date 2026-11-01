@@ -15,7 +15,7 @@ func TestServerStart_AlreadyRunningReportsPidAndDoesNotSpawn(t *testing.T) {
 	var out bytes.Buffer
 	spawn := func() error { t.Error("spawned a second server"); return nil }
 
-	if err := runServerStart(context.Background(), h.Client, &out, spawn); err != nil {
+	if err := runServerStart(context.Background(), h.Client, &out, spawn, nil); err != nil {
 		t.Fatal(err)
 	}
 	if want := "already running (pid " + strconv.Itoa(os.Getpid()) + ")\n"; out.String() != want {
