@@ -182,6 +182,13 @@ func runServer(ctx context.Context, d deps) error {
 			return fmt.Errorf("GX_AUTO_ADVANCE_DELAY: %w", err)
 		}
 	}
+	// Test hook: gxfixture shortens how long a command list is cached.
+	var commandListAge time.Duration
+	if v := os.Getenv("GX_COMMAND_LIST_AGE"); v != "" {
+		if commandListAge, err = time.ParseDuration(v); err != nil {
+			return fmt.Errorf("GX_COMMAND_LIST_AGE: %w", err)
+		}
+	}
 	// Test hook: gxfixture shortens the stalled-session threshold for the stalled failure flow.
 	var stallThreshold time.Duration
 	if v := os.Getenv("GX_STALL_THRESHOLD"); v != "" {
@@ -247,7 +254,7 @@ func runServer(ctx context.Context, d deps) error {
 	}
 	srv, err := server.New(server.Config{Migrations: migrationReg, Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
-		AutoAdvanceDelay: autoAdvanceDelay, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
+		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval,
 		ProcessSource: processSource})
 	if err != nil {

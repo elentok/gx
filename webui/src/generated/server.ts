@@ -1834,6 +1834,29 @@ export interface SessionChatResponse {
 }
 
 //////////
+// source: sessioncommands.go
+
+/**
+ * SessionCommandEntry is one row of the command menu. Name has no leading
+ * "/" or "$".
+ */
+export interface SessionCommandEntry {
+  name: string;
+  arg_hint: string;
+  description: string;
+  source: string; // built-in, skill or mcp
+  aliases: string[];
+}
+/**
+ * SessionCommandsResponse is the menu for one session or project dir. Degraded
+ * means the harness did not answer and Entries are only the built-ins.
+ */
+export interface SessionCommandsResponse {
+  entries: SessionCommandEntry[];
+  degraded: boolean;
+}
+
+//////////
 // source: sessionfailure.go
 
 export const FailureKindCrashed = "crashed";

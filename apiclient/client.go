@@ -732,6 +732,25 @@ func (c *Client) SessionScreen(ctx context.Context, id string) (server.SessionSc
 	return res, err
 }
 
+// SessionCommands reads the command menu of a session (id set) or of a First
+// prompt in a project dir (id empty). kind is "/" or "$"; empty means "/".
+func (c *Client) SessionCommands(ctx context.Context, id, project, dir, kind string) (server.SessionCommandsResponse, error) {
+	q := url.Values{}
+	if id != "" {
+		q.Set("session", id)
+	}
+	if project != "" {
+		q.Set("project", project)
+		q.Set("dir", dir)
+	}
+	if kind != "" {
+		q.Set("kind", kind)
+	}
+	var res server.SessionCommandsResponse
+	err := c.get(ctx, "/v1/sessions/commands?"+q.Encode(), &res)
+	return res, err
+}
+
 // TicketScreen reads a loop ticket agent's screen as plain text rows.
 func (c *Client) TicketScreen(ctx context.Context, address string) (server.SessionScreenResponse, error) {
 	var res server.SessionScreenResponse

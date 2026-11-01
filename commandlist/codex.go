@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os/exec"
 	"time"
 )
 
@@ -40,9 +39,8 @@ func ProbeCodexSkills(ctx context.Context, dir string, env []string) ([]Entry, e
 	ctx, cancel := context.WithTimeout(ctx, codexProbeTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "codex", "app-server")
+	cmd := commandIn(ctx, env, "codex", "app-server")
 	cmd.Dir = dir
-	cmd.Env = env
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err

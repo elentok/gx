@@ -94,6 +94,9 @@ func RunSessionProcesses() {
 	if os.Getenv(agentfake.TUIEnv) == "1" {
 		agentfake.TUIClaude()
 	}
+	if os.Getenv(agentfake.CodexEnv) == "1" {
+		agentfake.TUICodex()
+	}
 }
 
 // exitWithTest ends the holder once the test process pid is gone. The

@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/brief"
 )
 
 // claudeProbeTimeout bounds one probe. The user's SessionStart hooks run
@@ -46,11 +48,11 @@ func probeClaude(ctx context.Context, dir string, env []string, timeout time.Dur
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "claude", "-p",
+	env = withoutGXAgentVars(env)
+	cmd := commandIn(ctx, env, "claude", "-p",
 		"--input-format", "stream-json", "--output-format", "stream-json",
 		"--verbose", "--no-session-persistence")
 	cmd.Dir = dir
-	cmd.Env = withoutGXAgentVars(env)
 	// A stub or hook may leave a grandchild holding the pipes after the kill.
 	cmd.WaitDelay = time.Second
 	stdin, err := cmd.StdinPipe()
@@ -103,6 +105,17 @@ func probeClaude(ctx context.Context, dir string, env []string, timeout time.Dur
 		return nil, readErr
 	}
 	return Merge(reply, claudeBuiltins), nil
+}
+
+// commandIn builds the command for program with env as its environment. The
+// program is found over env's PATH, not the process's, as a harness launch is.
+func commandIn(ctx context.Context, env []string, program string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, program, args...)
+	cmd.Env = env
+	if path, err := brief.LookPath(env, program); err == nil {
+		cmd.Path, cmd.Err = path, nil
+	}
+	return cmd
 }
 
 // withoutGXAgentVars drops GX_AGENT_SESSION and every GX_*AGENT_DIR variable:

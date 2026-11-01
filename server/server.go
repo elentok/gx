@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
@@ -267,6 +268,8 @@ type Server struct {
 	chats chatCache
 	// transcripts caches where each conversation's transcript is.
 	transcripts transcriptPaths
+	// commandLists caches the harnesses' command lists.
+	commandLists *commandlist.Cache
 	// autoAdvances holds the running auto-advance countdowns.
 	autoAdvances autoAdvances
 	// authFailures caches whether each transcript ends in an auth error.
@@ -516,6 +519,7 @@ func New(cfg Config) (*Server, error) {
 		migrationsDone: make(chan struct{}),
 		startupDone:    make(chan struct{}),
 		cfg:            cfg,
+		commandLists:   commandlist.NewCache(cfg.CommandListAge, nil),
 		lock:           lock,
 		ln:             ln,
 		tcp:            tcp,
@@ -651,6 +655,7 @@ var routeTable = []struct {
 	{"GET /v1/sessions/chat", (*Server).sessionChatRead},
 	{"GET /v1/sessions/chat/archive", (*Server).sessionChatArchiveRead},
 	{"GET /v1/sessions/screen", (*Server).sessionScreenRead},
+	{"GET /v1/sessions/commands", (*Server).sessionCommandsRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
 	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},
 	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},

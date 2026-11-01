@@ -27,6 +27,7 @@ packages:
       - restartcheck.go
       - sessionautoadvance.go
       - sessionchat.go
+      - sessioncommands.go
       - sessionfailure.go
       - sessionfocus.go
       - sessionprompt.go

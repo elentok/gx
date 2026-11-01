@@ -210,4 +210,7 @@ type Config struct {
 	// Continue; zero means DefaultAutoAdvanceDelay and a negative value turns
 	// auto-advance off.
 	AutoAdvanceDelay time.Duration
+	// CommandListAge is how long a command list is served from the cache;
+	// zero means commandlist.DefaultMaxAge.
+	CommandListAge time.Duration
 }
