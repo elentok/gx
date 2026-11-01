@@ -73,18 +73,34 @@ export function ScreenModal({
   const problem = refusal ? refusalText(refusal) : sendError;
 
   return (
-    <Modal label="Screen" onClose={onClose}>
-      <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="secondary" disabled={loading} onClick={load}>
-          Refresh
-        </Button>
-        <Button emphasis="ghost" onClick={onClose}>
-          Close
-        </Button>
+    <Modal label="Screen" onClose={onClose} w={{ md: "720px" }} px={{ md: "5" }} py={{ md: "4.5" }} gap={{ md: "3" }}>
+      <Box display="flex" gap="2" alignItems="center" justifyContent="space-between">
+        <Text as="h3" m="0" fontFamily="condensed" fontSize="22px" textTransform="uppercase" letterSpacing="0.02em">
+          Screen
+        </Text>
+        <Box display="flex" gap="2">
+          <Button emphasis="secondary" disabled={loading} onClick={load}>
+            Refresh
+          </Button>
+          <Button emphasis="ghost" tone="muted" onClick={onClose}>
+            Close
+          </Button>
+        </Box>
       </Box>
       {error && <Text role="alert">{error}</Text>}
       {rows && (
-        <Box as="pre" aria-label="Screen rows" fontSize="xs" overflow="auto" m="0" p="3" borderWidth="1px" borderRadius="8px" bg="surface.raised">
+        <Box
+          as="pre"
+          aria-label="Screen rows"
+          fontSize="xs"
+          overflow="auto"
+          maxH={{ md: "180px" }}
+          m="0"
+          p="3"
+          borderWidth="1px"
+          borderRadius="8px"
+          bg="surface.raised"
+        >
           {rows.join("\n")}
         </Box>
       )}
@@ -101,10 +117,12 @@ export function ScreenModal({
                   emphasis="secondary"
                   aria-label={keyLabel(label)}
                   disabled={pending}
-                  h="44px"
+                  h={{ base: "44px", md: "40px" }}
                   minW="44px"
                   flex={{ base: "1 0 20%", md: "0 0 auto" }}
                   fontFamily="mono"
+                  fontWeight="400"
+                  fontSize="13px"
                   onClick={() => send({ key })}
                 >
                   {label}
@@ -139,7 +157,7 @@ export function ScreenModal({
                 borderRadius="8px"
                 bg="surface.raised"
               />
-              <Button type="submit" emphasis="secondary" disabled={pending} h="44px">
+              <Button type="submit" emphasis="secondary" disabled={pending} h={{ base: "44px", md: "40px" }} fontWeight="400" fontSize="13px">
                 Type
               </Button>
             </Box>
