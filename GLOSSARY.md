@@ -574,8 +574,8 @@ _Avoid_: unclean trunk, trunk conflict (a conflict is between branches, not with
 **Missing trunk** — a project whose **Trunk** names no local branch, whether set or detected. gx
 never falls back to another branch: the server claims nothing for the project until the branch
 exists, then carries on by itself. A ticket whose merge finds trunk missing is **Paused** with reason `trunk-missing`.
-_Avoid_: held, paused or blocked project (a project is never Paused; blocked is a ticket's
-`blocked_by` edges).
+_Avoid_: held or paused project (a project is never Paused; a ticket is Blocked by its `blocked_by`
+edges; a project with a failed migration is in **Migration block**).
 
 **Fix ticket** — a ticket a code-review ticket opens to repair what the review found. Its `parent`
 is the code-review ticket, so it sits in that ticket's fork subtree.
@@ -936,9 +936,18 @@ bare "rule".
 `--front`, and is commitless by type, so nothing it commits can merge. Its report is its `## Result`.
 It is never itself recovered; any other ticket opts out with `recover: false`.
 
+**Migration step** — a named, ordered entry in the one registry of ticket-store migrations. Each
+project records the steps it has applied, and the server runs the ones a project lacks at start.
+_Avoid_: migration version, schema version.
+
+**Migration block** — the state of a project whose ticket migration failed: the server claims none
+of its tickets until the saved failure clears, then carries on by itself. A person can still
+answer, edit and land its tickets. Not **Paused**, and not **Missing trunk**. _Avoid_: held project,
+paused project.
+
 **Fix agent** — an interactive session a person starts to fix one thing gx could not: a ticket that
 is paused or in error (it runs `gx-investigate`, from the web "Fix agent" button, the TUI's
-Investigate item, or `gx agents fix`), or a project whose ticket migration failed in a web restart
+Investigate item, or `gx agents fix`), or a project whose ticket migration failed at server start
 (from the web "Fix agent" button). One per ticket or project. Not an **Investigate ticket**, which
 the server queues by itself and runs unattended. _Avoid_: investigate session, investigate tab.
 
