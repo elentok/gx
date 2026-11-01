@@ -36,6 +36,7 @@ type tokenPoller struct {
 	read    TokenReader
 	sigs    map[string]transcriptSig // session key -> last polled signature
 	rollout map[string]string        // Codex session id -> rollout path
+	groups  map[string]string        // interactive session key -> group, fixed at first sight
 }
 
 // tokenSession is one iteration session to meter.
@@ -152,37 +153,111 @@ func (s *Server) pollTokens(now time.Time) {
 		if t.Status != "claimed" && !s.registry.has(t.Address) {
 			continue
 		}
-		ts, ok := s.tokenSessionOf(t.Address)
-		if !ok || !s.tokenPoll.changed(ts) {
-			continue
-		}
-		tokens, cost, err := s.readTokens(ts.ref)
-		if err != nil {
-			continue
-		}
-		cur := tokenledger.Seen{Tokens: tokens, Dollars: cost}
-		prev, seen, err := s.tokens.Seen(ts.key)
-		if err != nil {
-			s.log.Error("read token ledger", "err", err)
-			continue
-		}
-		if seen {
-			d := tokenledger.Delta{
-				Key:    tokenledger.Key{Day: day, Project: ts.project, Group: ts.group, Harness: ts.harness},
-				Tokens: tokens - prev.Tokens, Dollars: cost - prev.Dollars,
-			}
-			if d.Tokens < 0 || d.Dollars < 0 {
-				d.Tokens, d.Dollars = max(d.Tokens, 0), max(d.Dollars, 0)
-			}
-			if err := s.tokens.Add(d); err != nil {
-				s.log.Error("save token ledger", "err", err)
-				continue
-			}
-		}
-		if err := s.tokens.SetSeen(ts.key, cur); err != nil {
-			s.log.Error("save token ledger", "err", err)
+		if ts, ok := s.tokenSessionOf(t.Address); ok {
+			s.pollSession(ts, day)
 		}
 	}
+	s.pollInteractiveTokens(day)
+}
+
+// pollSession adds one session's change since its last poll to the ledger.
+func (s *Server) pollSession(ts tokenSession, day string) {
+	if !s.tokenPoll.changed(ts) {
+		return
+	}
+	tokens, cost, err := s.readTokens(ts.ref)
+	if err != nil {
+		return
+	}
+	cur := tokenledger.Seen{Tokens: tokens, Dollars: cost}
+	prev, seen, err := s.tokens.Seen(ts.key)
+	if err != nil {
+		s.log.Error("read token ledger", "err", err)
+		return
+	}
+	if seen {
+		d := tokenledger.Delta{
+			Key:    tokenledger.Key{Day: day, Project: ts.project, Group: ts.group, Harness: ts.harness},
+			Tokens: max(tokens-prev.Tokens, 0), Dollars: max(cost-prev.Dollars, 0),
+		}
+		if err := s.tokens.Add(d); err != nil {
+			s.log.Error("save token ledger", "err", err)
+			return
+		}
+	}
+	if err := s.tokens.SetSeen(ts.key, cur); err != nil {
+		s.log.Error("save token ledger", "err", err)
+	}
+}
+
+// pollInteractiveTokens meters every live interactive session. Its group is
+// fixed at first sight: Design when its Session ticket is on a map, else Other.
+func (s *Server) pollInteractiveTokens(day string) {
+	infos, err := s.listSessionMetas()
+	if err != nil {
+		s.log.Error("list sessions for token poll", "err", err)
+		return
+	}
+	for _, m := range infos {
+		if m.Stopped || m.Exit != "" || m.ConversationID == "" {
+			continue
+		}
+		ts, ok := s.interactiveTokenSession(m)
+		if ok {
+			s.pollSession(ts, day)
+		}
+	}
+}
+
+func (s *Server) interactiveTokenSession(m sessionMeta) (tokenSession, bool) {
+	ts := tokenSession{
+		key:     "session/" + m.ID + "@" + m.ConversationID,
+		project: m.Project,
+		harness: m.Harness,
+		ref:     ralphloop.SessionRef{Agent: ralphloop.AgentFor(m.Harness), Cwd: m.Dir, SessionID: m.ConversationID},
+	}
+	if agentrunner.Kind(m.Harness) == harness.Codex {
+		home, err := s.codexHome()
+		if err != nil {
+			return tokenSession{}, false
+		}
+		path, ok := s.rolloutPath(home, m.ConversationID)
+		if !ok {
+			return tokenSession{}, false
+		}
+		ts.path = path
+	} else {
+		home, err := s.envHome()
+		if err != nil {
+			return tokenSession{}, false
+		}
+		ts.path = transcript.PathIn(home, m.Dir, m.ConversationID)
+	}
+	ts.group = s.tokenPoll.groupOf(ts.key, func() string {
+		if m.Ticket != "" && s.onMapEpic(m.Ticket) {
+			return tokenledger.GroupDesign
+		}
+		return tokenledger.GroupOther
+	})
+	return ts, true
+}
+
+// groupOf returns key's group, computing it once.
+func (p *tokenPoller) groupOf(key string, compute func() string) string {
+	p.mu.Lock()
+	if g, ok := p.groups[key]; ok {
+		p.mu.Unlock()
+		return g
+	}
+	p.mu.Unlock()
+	g := compute()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.groups == nil {
+		p.groups = map[string]string{}
+	}
+	p.groups[key] = g
+	return g
 }
 
 // keepTokensPolled polls once the migrations end, passed or failed: the ledger

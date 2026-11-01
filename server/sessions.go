@@ -505,9 +505,22 @@ func writeSessionMeta(dir string, meta sessionMeta) error {
 // listSessions reads every session dir, oldest first. A dir without a
 // readable meta is skipped: it is a create still in flight or a torn one.
 func (s *Server) listSessions() ([]SessionInfo, error) {
+	metas, err := s.listSessionMetas()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SessionInfo, len(metas))
+	for i, m := range metas {
+		out[i] = s.sessionInfo(m)
+	}
+	return out, nil
+}
+
+// listSessionMetas is listSessions before the info is built.
+func (s *Server) listSessionMetas() ([]sessionMeta, error) {
 	entries, err := os.ReadDir(s.cfg.SessionsDir)
 	if errors.Is(err, fs.ErrNotExist) {
-		return []SessionInfo{}, nil
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err
@@ -528,11 +541,7 @@ func (s *Server) listSessions() ([]SessionInfo, error) {
 		metas = append(metas, meta)
 	}
 	slices.SortFunc(metas, func(a, b sessionMeta) int { return a.CreatedAt.Compare(b.CreatedAt) })
-	out := make([]SessionInfo, len(metas))
-	for i, m := range metas {
-		out[i] = s.sessionInfo(m)
-	}
-	return out, nil
+	return metas, nil
 }
 
 func readSessionMeta(dir string) (sessionMeta, error) {

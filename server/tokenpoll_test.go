@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tokenledger"
+	"github.com/elentok/gx/transcript"
 )
 
 var pollDay1 = time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
@@ -259,6 +261,177 @@ func TestTokenPoll_CodexAddsTokensWithoutDollars(t *testing.T) {
 	appendLine(t, rollout)
 	f.h.Server.PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "codex", 300, 0)
+}
+
+// sessionFixture meters interactive sessions written straight to the sessions dir.
+type sessionFixture struct {
+	h      *servertest.Harness
+	mu     sync.Mutex
+	totals map[string]int64 // conversation id -> cumulative tokens
+}
+
+func newSessionFixture(t *testing.T) *sessionFixture {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	if err := os.MkdirAll(filepath.Join(store, "proj", "design", "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store, "proj", "design", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.TokenPollInterval = time.Hour })
+	// The socket answers only after the startup restore of sessions, which would
+	// end the holderless sessions written below.
+	if _, err := h.Client.Snapshot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f := &sessionFixture{h: h, totals: map[string]int64{}}
+	h.Server.SetTokensOf(func(ref ralphloop.SessionRef) (int64, float64, error) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return f.totals[ref.SessionID], 0, nil
+	})
+	return f
+}
+
+// add writes a session's meta; its transcript starts empty.
+func (f *sessionFixture) add(t *testing.T, id, harnessName, project, ticket string, extra map[string]any) {
+	t.Helper()
+	dir := t.TempDir()
+	meta := map[string]any{
+		"id": id, "harness": harnessName, "project": project, "dir": dir, "ticket": ticket,
+		"conversation_id": "conv-" + id, "created_at": pollDay1,
+	}
+	for k, v := range extra {
+		meta[k] = v
+	}
+	data, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sdir := filepath.Join(f.h.SessionsDir, id)
+	if err := os.MkdirAll(sdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sdir, "meta.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if harnessName == "codex" {
+		appendLine(t, filepath.Join(f.h.Env("HOME"), ".codex", "sessions", "2026", "10", "06", "rollout-2026-10-06T00-00-00-conv-"+id+".jsonl"))
+		return
+	}
+	appendLine(t, transcript.PathIn(f.h.Env("HOME"), dir, "conv-"+id))
+}
+
+// grow sets the session's total and touches its transcript.
+func (f *sessionFixture) grow(t *testing.T, id, harnessName string, tokens int64) {
+	t.Helper()
+	f.mu.Lock()
+	f.totals["conv-"+id] = tokens
+	f.mu.Unlock()
+	meta := map[string]any{}
+	data, err := os.ReadFile(filepath.Join(f.h.SessionsDir, id, "meta.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &meta); err != nil {
+		t.Fatal(err)
+	}
+	if harnessName == "codex" {
+		appendLine(t, filepath.Join(f.h.Env("HOME"), ".codex", "sessions", "2026", "10", "06", "rollout-2026-10-06T00-00-00-conv-"+id+".jsonl"))
+		return
+	}
+	appendLine(t, transcript.PathIn(f.h.Env("HOME"), meta["dir"].(string), "conv-"+id))
+}
+
+func (f *sessionFixture) rows(t *testing.T) map[string]tokenledger.Row {
+	t.Helper()
+	l, err := tokenledger.Open(f.h.StateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := l.Day(pollDay1.Format(tokenledger.DayLayout))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]tokenledger.Row{}
+	for _, r := range rows {
+		out[r.Project+"/"+r.Group+"/"+r.Harness] = r
+	}
+	return out
+}
+
+func (f *sessionFixture) poll(t *testing.T, id, harnessName string, first, second int64) {
+	t.Helper()
+	f.grow(t, id, harnessName, first)
+	f.h.Server.PollTokensAt(pollDay1)
+	f.grow(t, id, harnessName, second)
+	f.h.Server.PollTokensAt(pollDay1)
+}
+
+func TestTokenPoll_InteractiveSessionGroups(t *testing.T) {
+	t.Parallel()
+	f := newSessionFixture(t)
+	f.add(t, "d", "claude", "proj", "proj:design", nil)
+	f.add(t, "dt", "claude", "proj", "proj:design/01", nil)
+	f.add(t, "o", "claude", "proj", "proj:epic-a/01", nil)
+	f.add(t, "n", "claude", "proj", "", nil)
+	f.add(t, "np", "claude", "", "", nil)
+	f.add(t, "cx", "codex", "proj", "", nil)
+	for _, id := range []string{"d", "dt", "o", "n", "np"} {
+		f.grow(t, id, "claude", 100)
+	}
+	f.grow(t, "cx", "codex", 100)
+	f.h.Server.PollTokensAt(pollDay1)
+	for _, id := range []string{"d", "dt", "o", "n", "np"} {
+		f.grow(t, id, "claude", 130)
+	}
+	f.grow(t, "cx", "codex", 150)
+	f.h.Server.PollTokensAt(pollDay1)
+
+	rows := f.rows(t)
+	want := map[string]int64{
+		"proj/Design/claude": 60,
+		"proj/Other/claude":  60,
+		"/Other/claude":      30,
+		"proj/Other/codex":   50,
+	}
+	if len(rows) != len(want) {
+		t.Fatalf("rows = %+v", rows)
+	}
+	for k, tokens := range want {
+		if r, ok := rows[k]; !ok || r.Tokens != tokens || r.Dollars != 0 {
+			t.Errorf("%s = %+v (found %v), want %d tokens, $0", k, r, ok, tokens)
+		}
+	}
+}
+
+func TestTokenPoll_InteractiveGroupIsFixedAtFirstSight(t *testing.T) {
+	t.Parallel()
+	f := newSessionFixture(t)
+	f.add(t, "s", "claude", "proj", "", nil)
+	f.poll(t, "s", "claude", 100, 150)
+	// The person links the session to a map ticket later.
+	f.add(t, "s", "claude", "proj", "proj:design/01", map[string]any{"conversation_id": "conv-s"})
+	f.grow(t, "s", "claude", 200)
+	f.h.Server.PollTokensAt(pollDay1)
+	rows := f.rows(t)
+	if r := rows["proj/Other/claude"]; r.Tokens != 100 || len(rows) != 1 {
+		t.Fatalf("rows = %+v, want 100 Other tokens only", rows)
+	}
+}
+
+func TestTokenPoll_ExitedSessionsAreNotPolled(t *testing.T) {
+	t.Parallel()
+	f := newSessionFixture(t)
+	f.add(t, "x", "claude", "proj", "", map[string]any{"exit": "exited"})
+	f.add(t, "st", "claude", "proj", "", map[string]any{"stopped": true})
+	f.poll(t, "x", "claude", 100, 200)
+	f.poll(t, "st", "claude", 100, 200)
+	if rows := f.rows(t); len(rows) != 0 {
+		t.Fatalf("rows = %+v, want none", rows)
+	}
 }
 
 // Seam: nothing is polled before the migrations end, and polling starts after.
