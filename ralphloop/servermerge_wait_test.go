@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -188,6 +189,70 @@ func TestWaitIterationFinished_CodexBackToWorkDuringDelayGetsNoErrorAndOneNudge(
 	}
 	if evs := stallNudgeEvents(t, one); len(evs) != 1 {
 		t.Errorf("stall-nudged events = %+v, want one (the skipped try is not logged)", evs)
+	}
+}
+
+// A session whose transcript has no user record never got its task: the nudge
+// resends the launch prompt, and the run log carries that text.
+func TestWaitIterationFinished_NoUserRecordResendsSkillPrompt(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	d.ReadHasUserRecord = func(string, string) (bool, bool, error) { return false, true, nil }
+	waitStallFixture(t, d, one)
+	want := skillPrompt(one.Agent, launchSkill(one.Ticket, defaultWorkerSkill), ticketAddress(one.Ticket))
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != want {
+		t.Errorf("prompts = %q, want the launch prompt %q", got, want)
+	}
+	if evs := stallNudgeEvents(t, one); len(evs) != 1 || evs[0].Text != want {
+		t.Errorf("stall-nudged events = %+v, want one with the launch prompt", evs)
+	}
+}
+
+func TestWaitIterationFinished_UserRecordKeepsGenericNudge(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	d.ReadHasUserRecord = func(string, string) (bool, bool, error) { return true, true, nil }
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+		t.Errorf("prompts = %q, want the generic nudge", got)
+	}
+}
+
+func inputNotEmptyErr() error {
+	return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, claudeui.ErrInputNotEmpty)
+}
+
+// One input-not-empty failure is retried before any pause.
+func TestWaitIterationFinished_InputNotEmptyIsRetriedOnce(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	r.FailNextPrompts("iter-01", 1, inputNotEmptyErr())
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+		t.Errorf("prompts = %q, want the nudge delivered once after the retry", got)
+	}
+	evs, _, err := ReadEvents(one.ScratchDir, one.Epic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retries := 0
+	for _, ev := range evs {
+		if ev.Type == string(events.PromptNudged) && strings.Contains(ev.Reason, "input not empty") {
+			retries++
+		}
+	}
+	if retries != 1 {
+		t.Errorf("logged retries = %d, want 1", retries)
+	}
+}
+
+func TestWaitIterationFinished_InputNotEmptyTwicePauses(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	r.FailNextPrompts("iter-01", 2, inputNotEmptyErr())
+	err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"})
+	if !errors.Is(err, claudeui.ErrInputNotEmpty) {
+		t.Fatalf("err = %v, want the input-not-empty failure", err)
 	}
 }
 

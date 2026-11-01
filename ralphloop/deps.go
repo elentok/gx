@@ -160,6 +160,10 @@ type Deps struct {
 	// used by finishIteration's zero-commit path to distinguish that bare
 	// model glitch from a genuine stall before pausing paused (answer).
 	ReadUnexecutedToolCall func(cwd, sessionID string) (bool, error)
+	// ReadHasUserRecord reports whether the Claude Code session's transcript
+	// holds a user record; known is false while there is no transcript to
+	// read. Nil counts as a record, which keeps the generic stall nudge.
+	ReadHasUserRecord func(cwd, sessionID string) (has, known bool, err error)
 	// ReadCodexContext returns the latest context-token count for the Codex
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
@@ -343,6 +347,22 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return false, nil
 			}
 			return transcript.ReadUnexecutedToolCall(path)
+		},
+		ReadHasUserRecord: func(cwd, sessionID string) (bool, bool, error) {
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return false, false, nil
+			}
+			msgs, ok, err := transcript.ReadChat(path)
+			if err != nil || !ok {
+				return false, ok, err
+			}
+			for _, m := range msgs {
+				if m.Role == transcript.ChatRolePerson {
+					return true, true, nil
+				}
+			}
+			return false, true, nil
 		},
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
 			if overrides.CodexHome == "" {

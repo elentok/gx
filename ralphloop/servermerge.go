@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -444,7 +445,17 @@ func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree
 		}
 		return false, false, err
 	}
-	if err := d.Runner.Prompt(s, StallNudgeText); err != nil {
+	text := stallNudgeText(d, o, w, s)
+	err = d.Runner.Prompt(s, text)
+	// A not-delivered prompt started no turn, so one retry cannot double-send.
+	if errors.Is(err, agentrunner.ErrNotDelivered) && errors.Is(err, claudeui.ErrInputNotEmpty) {
+		_ = logEvent(o.ScratchDir, o.Epic, Event{
+			Type: string(events.PromptNudged), Ticket: o.Ticket.Identifier, Label: w.Label, Attempt: 1,
+			Reason: "stall nudge retried: " + err.Error(),
+		})
+		err = d.Runner.Prompt(s, text)
+	}
+	if err != nil {
 		// A refusal means the agent went back to work after the wait: skip the nudge.
 		if errors.Is(err, agentrunner.ErrNotReady) {
 			if st, statusErr := d.Runner.Status(s); statusErr == nil && st.State == agentrunner.StateWorking {
@@ -454,9 +465,27 @@ func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree
 		return false, false, fmt.Errorf("stall nudge for %s: %w", w.Label, err)
 	}
 	err = logEvent(o.ScratchDir, o.Epic, Event{
-		Type: string(events.StallNudged), Ticket: o.Ticket.Identifier, Label: w.Label, Text: StallNudgeText,
+		Type: string(events.StallNudged), Ticket: o.Ticket.Identifier, Label: w.Label, Text: text,
 	})
 	return true, true, err
+}
+
+// stallNudgeText is the launch prompt again for a session whose transcript has
+// no user record (it never got its task), else the generic nudge. An unreadable
+// or missing transcript keeps the generic text.
+func stallNudgeText(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) string {
+	if d.ReadHasUserRecord == nil {
+		return StallNudgeText
+	}
+	status, err := d.Runner.Status(s)
+	if err != nil || status.SessionID == "" {
+		return StallNudgeText
+	}
+	has, known, err := d.ReadHasUserRecord(w.Path, status.SessionID)
+	if err != nil || !known || has {
+		return StallNudgeText
+	}
+	return skillPrompt(o.Agent, launchSkill(o.Ticket, defaultWorkerSkill), ticketAddress(o.Ticket))
 }
 
 // agentReported reports whether the ticket carries an agent report: a question
