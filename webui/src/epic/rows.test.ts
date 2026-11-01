@@ -20,7 +20,7 @@ const row = (over: Partial<EpicDetailRow>): EpicDetailRow => ({ address: "gx:e/0
 const NOW = Date.parse("2026-01-01T00:10:00Z");
 
 test.each([
-  ["waiting, follows the default", { harness_note: "follows default" }, { harness: "", tierLabel: "", model: "", effort: "", note: "follows default" }],
+  ["waiting, follows the default", { harness_note: "follows default" }, undefined],
   ["waiting, pinned", { harness: "codex", harness_note: "pinned" }, { harness: "codex", tierLabel: "", model: "", effort: "", note: "pinned" }],
   [
     "running",

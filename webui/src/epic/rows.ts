@@ -230,7 +230,8 @@ export function rowChips(row: EpicDetailRow): RowChips | undefined {
       note: "",
     };
   }
-  if (bucketOf(row) !== "waiting" || !row.harness_note) return undefined;
+  // "follows default" is the common case, so it is not worth a line on the card.
+  if (bucketOf(row) !== "waiting" || !row.harness_note || row.harness_note === "follows default") return undefined;
   return { harness: row.harness ?? "", tierLabel: "", model: "", effort: "", note: row.harness_note };
 }
 

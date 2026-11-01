@@ -210,7 +210,7 @@ test("loop rows show harness chips and queue notes; done rows and map rows show 
     tk("05", { rendered_status: "done", harness: "codex", harness_note: "pinned" }),
   ]);
   const chips = async (id: string) => (await cardOf(id)).querySelector("[data-chips]")?.textContent;
-  expect(await chips("01")).toBe("follows default");
+  expect(await chips("01")).toBeUndefined();
   expect(await chips("02")).toBe("Codexpinned");
   expect(await chips("03")).toBe("Claudekeeps Claude (ran before)");
   expect(await chips("04")).toBe("CodexStrongest · gpt-x · high");

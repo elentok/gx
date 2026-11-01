@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 const NAMES: Record<string, string> = { claude: "Claude", codex: "Codex" };
 
@@ -54,21 +54,33 @@ export function HarnessLabel({
   const modelText = [model, effort].filter(Boolean).join(" · ");
   const known = tierLabel || model || effort;
   if (plain) {
+    // The harness dot already says "Claude", so `claude-sonnet-5-5` reads `sonnet-5-5`.
+    const shortModel = [model.replace(/^claude-/, ""), effort].filter(Boolean).join(" · ");
     const parts = [
       known && model && tierLabel ? tierLabel : "",
-      known && model ? modelText : "",
+      known && model ? shortModel : "",
       known && !model ? [tierLabel, "CLI default", effort].filter(Boolean).join(" · ") : "",
       note ?? "",
     ].filter(Boolean);
+    // One inline flow: it wraps between words (a real space), never inside the harness or a word.
+    const words = parts.flatMap((part) => part.split(" · "));
     return (
-      <Text as="span" display="inline-flex" alignItems="center" gap="2" fontFamily="mono" fontSize="12px" color="text.dim">
+      <Text as="span" fontFamily="mono" fontSize="12px" color="text.dim">
         {harness && (
-          <Box as="span" display="inline-flex" alignItems="center" gap="5px">
+          <Box as="span" display="inline-flex" alignItems="center" gap="5px" whiteSpace="nowrap" mr="2">
             <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
             {NAMES[harness] ?? harness}
           </Box>
         )}
-        {parts.length > 0 && <span>{parts.join(" · ")}</span>}
+        {words.map((word, i, rest) => (
+          <Fragment key={i}>
+            {i > 0 && " "}
+            <Box as="span" whiteSpace="nowrap">
+              {word}
+              {i < rest.length - 1 ? " ·" : ""}
+            </Box>
+          </Fragment>
+        ))}
       </Text>
     );
   }
