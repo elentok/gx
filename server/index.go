@@ -49,6 +49,9 @@ type TicketInfo struct {
 	ActualCost            float64 `json:"actual_cost,omitempty"`
 	HadCodex              bool    `json:"had_codex,omitempty"`
 	Compactions           int     `json:"compactions,omitempty"`
+	// ModelRan and ModelExpected are the two model names a model-mismatch pause shows.
+	ModelRan      string `json:"model_ran,omitempty"`
+	ModelExpected string `json:"model_expected,omitempty"`
 
 	// HarnessLabel is filled by the snapshot handler for open, blocked and claimed tickets.
 	HarnessLabel `tstype:",extends"`
@@ -323,6 +326,8 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		ActualCost:            t.ActualCost,
 		HadCodex:              t.HadCodex,
 		Compactions:           t.Compactions,
+		ModelRan:              t.ModelRan,
+		ModelExpected:         t.ModelExpected,
 
 		Category:   t.Category,
 		ExportedAt: t.ExportedAt,

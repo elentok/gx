@@ -65,6 +65,20 @@ func TestPauseRows_TableMatchesSpec(t *testing.T) {
 	}
 }
 
+func TestPauseModelMismatch(t *testing.T) {
+	r := PauseModelMismatch
+	if !r.Valid() || r.Class() != PauseClassAnswer || r.Label() != "Wrong model" {
+		t.Errorf("valid=%v class=%q label=%q", r.Valid(), r.Class(), r.Label())
+	}
+	row, ok := r.Row()
+	if !ok || row.Receiver != ReceiverGx || !slices.Equal(row.Verbs, []PauseVerb{VerbResumeOnWorker}) {
+		t.Errorf("row = %+v, ok=%v", row, ok)
+	}
+	if VerbResumeOnWorker.Word() != "resume-on-worker" {
+		t.Errorf("word = %q", VerbResumeOnWorker.Word())
+	}
+}
+
 func TestPausedAskingAndForRepair(t *testing.T) {
 	cases := []struct {
 		reason         PauseReason

@@ -40,6 +40,7 @@ const (
 	PauseManual             PauseReason = "manual"
 	PauseNeedsRebase        PauseReason = "needs-rebase"
 	PauseConflictMarkers    PauseReason = "conflict-markers"
+	PauseModelMismatch      PauseReason = "model-mismatch"
 )
 
 // PauseClass says what a person does about a pause: answer a question, or
@@ -62,6 +63,7 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseStrandedCommits:    PauseClassAnswer,
 	PauseManual:             PauseClassAnswer,
 	PauseDirtyTrunk:         PauseClassAnswer,
+	PauseModelMismatch:      PauseClassAnswer,
 
 	PauseMergeUnreported:    PauseClassRepair,
 	PauseSpinning:           PauseClassRepair,
@@ -118,6 +120,7 @@ var pauseLabels = map[PauseReason]string{
 	PauseBudgetKilled:   "Daily budget reached",
 	PauseIterationError: "Run failed",
 	PauseManual:         "Paused by you",
+	PauseModelMismatch:  "Wrong model",
 }
 
 // Label is r's plain-words label, or "" for an empty or unknown reason.

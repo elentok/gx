@@ -15,7 +15,7 @@ func TestPauseReasonLabelGroups(t *testing.T) {
 			PauseStrandedCommits, PauseMergeError, PauseNeedsRebase, PauseConflictMarkers,
 		},
 		"ticket graph":     {PauseBlockedCycle, PauseParentDefect},
-		"limits and other": {PauseBudgetKilled, PauseIterationError, PauseManual},
+		"limits and other": {PauseBudgetKilled, PauseIterationError, PauseManual, PauseModelMismatch},
 	}
 	seen := 0
 	for group, reasons := range groups {

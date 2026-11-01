@@ -19,6 +19,10 @@ const (
 	VerbAllowDeny   PauseVerb = "allow-deny"
 	VerbReopenRetry PauseVerb = "reopen-retry"
 	VerbStashMerge  PauseVerb = "stash-merge"
+
+	// VerbResumeOnWorker ends a model-mismatch pause by running the ticket
+	// again on the model its tier resolved to.
+	VerbResumeOnWorker PauseVerb = "resume-on-worker"
 )
 
 // PauseReceiver says who gets the reply to an answer-class pause.
@@ -49,6 +53,8 @@ var pauseVerbs = map[PauseVerb]VerbInfo{
 	VerbAllowDeny:   {Word: "approve", Label: "Allow / Deny", Tooltip: "Answer the agent's permission request. The agent goes on from where it stopped."},
 	VerbReopenRetry: {Word: "reopen-and-retry", Label: "Reopen and retry", Tooltip: "Reopen the ticket and start a fresh agent on the stranded commits."},
 	VerbStashMerge:  {Word: "stash-merge", Label: "Stash, merge and restore", Tooltip: "Set your changes aside, merge, then put them back. Conflicts are left for you to fix."},
+
+	VerbResumeOnWorker: {Word: "resume-on-worker", Label: "Resume on worker", Tooltip: "Lift the pause and run the ticket again on the model its tier names."},
 }
 
 // Label is v's button text, or "" for an unknown verb.
@@ -132,6 +138,7 @@ var pauseRows = map[PauseReason]PauseRow{
 	PauseStrandedCommits:    verbs(VerbReopenRetry).from(ReceiverAgent),
 	PauseManual:             verbs(VerbResume, VerbStartOver).from(ReceiverGx),
 	PauseDirtyTrunk:         verbs(VerbStashMerge, VerbMergeAgain).from(ReceiverGx),
+	PauseModelMismatch:      verbs(VerbResumeOnWorker).from(ReceiverGx),
 
 	PauseMergeUnreported: verbs(VerbRetry, VerbMergeAgain, VerbStartOver),
 	PauseMergeConflict:   verbs(VerbMergeAgain, VerbStartOver),

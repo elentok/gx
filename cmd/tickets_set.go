@@ -40,6 +40,9 @@ Settable fields:
     subtree (that would make the fork graph cyclic) — both are rejected.
   type (enum, --type): task, research, prototype, grilling, code-review
   expected_context_window (non-negative int, --expected-context-window)
+  model_ran (string, --model-ran): the model the session ran on. Set with model_expected
+    by a model-mismatch pause.
+  model_expected (string, --model-expected): the model the ticket's tier resolved to.
   commitless (bool, --commitless): true/false. Set true when you intentionally finish an
     iteration with no commit (e.g. exploration concluded no code change was warranted) —
     pair it with a status that doesn't leave the ticket claimed (done),
@@ -147,6 +150,8 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&parent, "parent", "", "set parent")
 	cmd.Flags().StringVar(&ticketType, "type", "", "set the type field")
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
+	cmd.Flags().String("model-ran", "", "set model_ran")
+	cmd.Flags().String("model-expected", "", "set model_expected")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, asking, finished)")
 	cmd.Flags().String("check-failures", "", "with --iteration-status finished: follow-up addresses (comma-separated), one per failing test of the last `gx check` run")
@@ -287,6 +292,8 @@ var ticketSetFields = []ticketSetField{
 		n, _ := strconv.Atoi(v)
 		t.ExpectedContextWindow = n
 	}},
+	{"model-ran", "model_ran", func(t *schema.Ticket, v string) { t.ModelRan = v }},
+	{"model-expected", "model_expected", func(t *schema.Ticket, v string) { t.ModelExpected = v }},
 	{"commitless", "commitless", func(t *schema.Ticket, v string) {
 		b, _ := strconv.ParseBool(v)
 		t.Commitless = b

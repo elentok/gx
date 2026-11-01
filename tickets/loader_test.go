@@ -139,6 +139,20 @@ func TestLoad_MirrorsMutes(t *testing.T) {
 	}
 }
 
+func TestLoad_MirrorsModelFields(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-ticket.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: implement\nmodel_ran: opus\nmodel_expected: sonnet\n---\nBody.\n")
+
+	epics, err := Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := epics[0].Tickets[0]; got.ModelRan != "opus" || got.ModelExpected != "sonnet" {
+		t.Errorf("model fields = %q, %q; want opus, sonnet", got.ModelRan, got.ModelExpected)
+	}
+}
+
 func TestLoad_StrayMapMdIsNotAMapEpic(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "old-shape-epic")

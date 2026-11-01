@@ -31,6 +31,8 @@ type ticketYAML struct {
 	Recover               *bool            `yaml:"recover,omitempty"`
 	Unique                string           `yaml:"unique,omitempty"`
 	Agent                 string           `yaml:"agent,omitempty"`
+	ModelRan              string           `yaml:"model_ran,omitempty"`
+	ModelExpected         string           `yaml:"model_expected,omitempty"`
 	SessionIDs            []string         `yaml:"session_ids,omitempty"`
 	IterationStatus       string           `yaml:"iteration_status,omitempty"`
 	IterationFinishedAt   time.Time        `yaml:"iteration_finished_at,omitempty"`
@@ -94,6 +96,8 @@ func (w ticketYAML) toTicket() Ticket {
 		NoRecover:             w.Recover != nil && !*w.Recover,
 		Unique:                w.Unique,
 		Agent:                 w.Agent,
+		ModelRan:              w.ModelRan,
+		ModelExpected:         w.ModelExpected,
 		SessionIDs:            copyStrings(w.SessionIDs),
 		IterationStatus:       normalizeIterationStatus(IterationStatus(w.IterationStatus)),
 		IterationFinishedAt:   w.IterationFinishedAt,
@@ -140,6 +144,8 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Manual:                t.Manual,
 		Unique:                t.Unique,
 		Agent:                 t.Agent,
+		ModelRan:              t.ModelRan,
+		ModelExpected:         t.ModelExpected,
 		SessionIDs:            copyStrings(t.SessionIDs),
 		IterationStatus:       string(t.IterationStatus),
 		IterationFinishedAt:   t.IterationFinishedAt,

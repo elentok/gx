@@ -102,6 +102,24 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsSet_ModelFields(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
+	if err := execute([]string{"tickets", "set", path, "--model-ran=opus", "--model-expected=sonnet"}, d); err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+	got, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ModelRan != "opus" || got.ModelExpected != "sonnet" {
+		t.Errorf("model fields = %q, %q; want opus, sonnet", got.ModelRan, got.ModelExpected)
+	}
+}
+
 func TestExecute_TicketsSet_Parent(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

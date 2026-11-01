@@ -289,6 +289,10 @@ type Ticket struct {
 	// The server reads it at claim; empty or unknown falls back to the queue
 	// item's agent, then the project default.
 	Agent string
+	// ModelRan and ModelExpected are the two model names a model-mismatch pause
+	// shows: the model the session ran on, and the one its tier resolved to.
+	ModelRan      string
+	ModelExpected string
 	// IterationStatus is the agent's latest self-reported claim state (see
 	// the IterationStatus type doc). Never checked by Validate: the enum rule
 	// is enforced only by the CLI write path that sets it.

@@ -1381,6 +1381,11 @@ export interface TicketInfo extends HarnessLabel {
   actual_cost?: number /* float64 */;
   had_codex?: boolean;
   compactions?: number /* int */;
+  /**
+   * ModelRan and ModelExpected are the two model names a model-mismatch pause shows.
+   */
+  model_ran?: string;
+  model_expected?: string;
   category?: string;
   exported_at?: string;
   /**

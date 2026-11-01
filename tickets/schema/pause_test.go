@@ -9,7 +9,7 @@ import (
 
 func TestPauseClasses_MatchEventKinds(t *testing.T) {
 	// Answer class with gx as receiver, but still written as a repair round.
-	gxAnswers := map[PauseReason]bool{PauseManual: true, PauseDirtyTrunk: true}
+	gxAnswers := map[PauseReason]bool{PauseManual: true, PauseDirtyTrunk: true, PauseModelMismatch: true}
 	for r, class := range pauseClasses {
 		k := events.Kind(r)
 		if !k.Valid() {

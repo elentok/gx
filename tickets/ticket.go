@@ -97,6 +97,10 @@ type Ticket struct {
 	// Agent mirrors schema.Ticket.Agent.
 	Agent string
 
+	// ModelRan and ModelExpected mirror the schema.Ticket fields of the same name.
+	ModelRan      string
+	ModelExpected string
+
 	// PauseReason mirrors schema.Ticket.PauseReason: why a Paused ticket is
 	// paused.
 	PauseReason schema.PauseReason
