@@ -1,5 +1,6 @@
 import { Box, Link, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { hasChat, useSessionChat, type FetchChat } from "../design/chat";
 import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner";
@@ -17,6 +18,7 @@ import { AgentComposer } from "./AgentComposer";
 import { stateLabel, statusMark } from "./rules";
 import { SessionHarnessLabel } from "./SessionHarnessLabel";
 import { StatusMark } from "./SessionGlyphs";
+import { SessionActions } from "./SessionActions";
 import { SessionSwitcher } from "./SessionSwitcher";
 
 function DesignLink({ map, ml }: { map: string; ml?: string }) {
@@ -28,6 +30,8 @@ function DesignLink({ map, ml }: { map: string; ml?: string }) {
 }
 
 function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
+  const navigate = useNavigate();
+  const actions = <SessionActions session={s} onRemoved={() => navigate("/agents")} />;
   const { tone } = statusMark(s);
   const map = designOf(s);
   const wide = useWide();
@@ -46,6 +50,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
           <SessionHarnessLabel session={s} />
         </Box>
         {map && <DesignLink map={map} ml="auto" />}
+        <Box ml={map ? undefined : "auto"}>{actions}</Box>
       </Box>
     );
   }
@@ -66,6 +71,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
         </Text>
       )}
       {map && <DesignLink map={map} ml="auto" />}
+      <Box ml={map ? undefined : "auto"}>{actions}</Box>
     </Box>
   );
 }

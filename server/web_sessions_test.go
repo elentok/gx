@@ -75,7 +75,6 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 	for _, tc := range []struct{ name, id, state, want string }{
 		{"no token", design, "", server.ReasonStale},
 		{"old token", design, design + ":starting:1", server.ReasonStale},
-		{"plain session", plain, sessionToken(ctx, t, h, plain), server.ReasonSessionNotDesign},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "stop", tc.id, tc.state)
 		if code != http.StatusOK || reasonOf(t, body) != tc.want {
@@ -96,6 +95,37 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 	}
 	if code, body := webSessionWrite(t, base, cookie, "resume", design, sessionToken(ctx, t, h, design)); code != http.StatusOK || reasonOf(t, body) != "" {
 		t.Errorf("restore with a fresh token = %d %s, want it to succeed", code, body)
+	}
+}
+
+func TestWebSessions_StopThenRemoveAPlainSession(t *testing.T) {
+	t.Parallel()
+	h, base, cookie, ctx, evs, _, plain := startWebDesign(t)
+	waitForHolder(t, filepath.Join(h.SessionsDir, plain))
+
+	live := sessionToken(ctx, t, h, plain)
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != server.ReasonSessionLive {
+		t.Fatalf("remove of a live session = %d %s, want session-live", code, body)
+	}
+	if code, body := webSessionWrite(t, base, cookie, "stop", plain, live); code != http.StatusOK || reasonOf(t, body) != "" {
+		t.Fatalf("stop of a plain session = %d %s, want it to succeed", code, body)
+	}
+	waitForSession(ctx, t, h, evs, plain, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+		t.Errorf("remove with the pre-stop token = %d %s, want stale", code, body)
+	}
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != "" {
+		t.Fatalf("remove with a fresh token = %d %s, want it to succeed", code, body)
+	}
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range snap.Sessions {
+		if s.ID == plain {
+			t.Errorf("session %s is still listed after remove", plain)
+		}
 	}
 }
 

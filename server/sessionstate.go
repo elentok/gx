@@ -42,3 +42,26 @@ func (s *Server) checkDesignWrite(req SessionRequest) (SessionResult, error) {
 	}
 	return SessionResult{}, nil
 }
+
+// sessionWriteAgentWeb is sessionWrite for a web stop or remove: any session
+// except a Queue agent, which ralph-loop drives, and only with the state token
+// of the session the page saw.
+func (s *Server) sessionWriteAgentWeb(do func(SessionRequest) (SessionResult, error)) http.HandlerFunc {
+	return sessionWriteAs(s.checkAgentWrite, do)
+}
+
+// checkAgentWrite returns the refusal for a web write on a Queue session or on
+// a session whose state moved since the page saw it.
+func (s *Server) checkAgentWrite(req SessionRequest) (SessionResult, error) {
+	_, meta, res, err := s.sessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	if meta.info().Queue {
+		return sessionRefusal(ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent; ralph-loop drives it", req.ID)), nil
+	}
+	if req.State != SessionStateToken(meta.info()) {
+		return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil
+	}
+	return SessionResult{}, nil
+}

@@ -46,6 +46,7 @@ const (
 	ReasonSessionNoResume       = "no-resume"
 	ReasonSessionNotDesign      = "not-design-session"
 	ReasonSessionNameTaken      = "name-taken"
+	ReasonSessionQueue          = "queue-session"
 )
 
 // errSessionNameTaken is saveNewSession's refusal of a unique name that a live

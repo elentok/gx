@@ -196,9 +196,29 @@ func (s *Server) scanDesignCleanups() {
 				continue
 			}
 			s.log.Info("design step moved past branch", "map", project+":"+epic, "step", step)
-			s.goSettle(func() { s.cleanupDesign(project, epic) })
+			s.goSettle(func() {
+				if step == tickets.StepDone {
+					s.stopFinishedDesign(project, epic)
+				}
+				s.cleanupDesign(project, epic)
+			})
 		}
 	}
+}
+
+// stopFinishedDesign ends the map's live design session once its design_step is
+// done: the agent has nothing left to do and would otherwise stay in the list.
+// Branch is not enough, as the agent still runs the last step then.
+func (s *Server) stopFinishedDesign(project, epic string) {
+	live, err := s.liveDesignSession(project + ":" + epic)
+	if err != nil || live == nil {
+		return
+	}
+	if res, err := s.stopSession(SessionRequest{ID: live.ID}); err != nil || res.Refused {
+		s.log.Warn("could not stop the finished design session", "map", project+":"+epic, "session", live.ID, "err", err, "refused", res.Message)
+		return
+	}
+	s.log.Info("stopped the finished design session", "map", project+":"+epic, "session", live.ID)
 }
 
 // ensureDesignWorktree makes sure the map's design worktree exists and returns

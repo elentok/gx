@@ -73,7 +73,7 @@ export function startNew(
 }
 
 /** The popover's positioner, or on a phone a dimmed backdrop that holds the menu as a bottom sheet and closes it on a press. */
-function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode }) {
+export function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode }) {
   if (!sheet) return <Menu.Positioner>{children}</Menu.Positioner>;
   return (
     <Menu.Context>
@@ -96,7 +96,7 @@ function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode })
   );
 }
 
-const menuItemStyle = (sheetMode: boolean) =>
+export const menuItemStyle = (sheetMode: boolean) =>
   ({
     cursor: "pointer",
     color: "text",

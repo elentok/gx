@@ -183,3 +183,13 @@ test("shows the spinner until the snapshot lands, then follows it", () => {
   setSessions([session("s-1", "p", { name: "one" }), session("s-2", "p", { name: "two" })]);
   expect(rows()).toHaveLength(2);
 });
+
+test("the sidebar offers to remove exited design agents and hides the button when none is left", () => {
+  localStorage.setItem("gx.agents.design", "1");
+  render([
+    session("1", "p", { name: "live design", design: true }),
+    session("2", "p", { name: "old design", design: true, status: { state: "exited" } }),
+    session("3", "p", { name: "old plain", status: { state: "exited" } }),
+  ]);
+  expect(screen.getByRole("button", { name: "Remove 1 exited design agent" })).toBeTruthy();
+});

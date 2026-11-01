@@ -160,13 +160,15 @@ func TestDesignCleanup_DesignOpenAfterBranchRunsTheCheck(t *testing.T) {
 	waitFor(t, func() bool { return f.designGone(t, dir) })
 }
 
-func (f designsFixture) setDesignStepBranch(t *testing.T) {
+func (f designsFixture) setDesignStepBranch(t *testing.T) { f.setDesignStep(t, "branch") }
+
+func (f designsFixture) setDesignStep(t *testing.T, step string) {
 	t.Helper()
 	ticketMD := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
 	// Rename, not WriteFile: a truncating write can be rescanned half-written
 	// as an empty step, and the next rescan then sees a fresh transition.
 	tmp := ticketMD + ".tmp"
-	if err := os.WriteFile(tmp, []byte("---\nkind: map\ndesign_step: branch\n---\n"), 0o644); err != nil {
+	if err := os.WriteFile(tmp, []byte("---\nkind: map\ndesign_step: "+step+"\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(tmp, ticketMD); err != nil {
@@ -252,5 +254,48 @@ func TestDesignCleanup_LiveSessionKeepsTheWorktree(t *testing.T) {
 	}
 	if !f.designKept(t, dir) {
 		t.Errorf("design worktree or branch removed under a live session")
+	}
+}
+
+func (f designsFixture) sessionExited(t *testing.T, id string) bool {
+	t.Helper()
+	snap, err := f.h.Client.Snapshot(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range snap.Sessions {
+		if s.ID == id {
+			return s.Status.State == server.SessionExited
+		}
+	}
+	return false
+}
+
+func TestDesignCleanup_StepMovingToDoneStopsTheLiveDesignSession(t *testing.T) {
+	t.Parallel()
+	f := startDesignsAt(t, "create-tickets")
+	dir, _ := f.openDesignWorktree(t, true)
+	res := f.open(t, "proj:map", false)
+	if res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	gitOut(t, f.repo, "branch", "map-impl", "map-design")
+	f.setDesignStep(t, "done")
+	waitFor(t, func() bool { return f.sessionExited(t, res.Session.ID) })
+	waitFor(t, func() bool { return f.designGone(t, dir) })
+}
+
+func TestDesignCleanup_StepMovingToBranchLeavesTheLiveDesignSession(t *testing.T) {
+	t.Parallel()
+	f := startDesignsAt(t, "create-tickets")
+	f.openDesignWorktree(t, true)
+	res := f.open(t, "proj:map", false)
+	if res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	f.setDesignStepBranch(t)
+	f.waitForLog(t, "design step moved past branch", 1)
+	if f.sessionExited(t, res.Session.ID) {
+		t.Errorf("the design session was stopped at the branch step")
 	}
 }

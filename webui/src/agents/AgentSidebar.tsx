@@ -3,9 +3,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { SessionWorking, type SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
+import { useWrite } from "../useWrite";
 import { useWide } from "../useWide";
+import { Button } from "../ui/button/Button";
 import { groupSessions, liveCount } from "./rules";
 import { SessionBadges, SessionGlyphs } from "./SessionGlyphs";
+import { exitedDesigns, postRemoveSession, removeSession, type RemoveSession } from "./sessionWrites";
 
 function Row({ session: s, current }: { session: SessionInfo; current: boolean }) {
   const navigate = useNavigate();
@@ -86,6 +89,37 @@ function GroupSwitch({ label, on, hidden, tone, onChange, bordered }: { label: s
       {label}
       {hidden > 0 && <Text as="span" color="text.dim">· {hidden} hidden</Text>}
     </chakra.label>
+  );
+}
+
+/** Removes every Exited design agent, one by one, after a confirmation. Nothing when none is left. */
+function ClearExitedDesigns({ sessions, remove = postRemoveSession }: { sessions: SessionInfo[]; remove?: RemoveSession }) {
+  const { run, pending } = useWrite();
+  const [confirming, setConfirming] = useState(false);
+  const exited = exitedDesigns(sessions);
+  if (exited.length === 0) return null;
+  const clear = () =>
+    run(async () => {
+      for (const s of exited) {
+        const res = await removeSession(s, { remove });
+        if (res.refused) return res;
+      }
+      return {};
+    });
+  return (
+    <Box display="flex" alignItems="center" gap="2" px="3.5" pb="2.5" fontSize="sm">
+      {confirming ? (
+        <>
+          <Text as="span" color="text.muted">Remove {exited.length}?</Text>
+          <Button size="sm" tone="paused" disabled={pending} onClick={() => { setConfirming(false); clear(); }}>Remove</Button>
+          <Button size="sm" emphasis="secondary" onClick={() => setConfirming(false)}>Keep</Button>
+        </>
+      ) : (
+        <Button size="sm" emphasis="ghost" tone="muted" disabled={pending} onClick={() => setConfirming(true)}>
+          Remove {exited.length} exited design {exited.length === 1 ? "agent" : "agents"}
+        </Button>
+      )}
+    </Box>
   );
 }
 
@@ -185,6 +219,7 @@ export function AgentSidebar({
         <>
           <GroupSwitch label="Queue agents" on={showQueue} hidden={hiddenIn((s) => s.queue)} tone="tone.running.fg" onChange={setShowQueue} bordered={wide} />
           <GroupSwitch label="Design agents" on={showDesign} hidden={hiddenIn((s) => s.design)} tone="kind.design.fg" onChange={setShowDesign} bordered={false} />
+          <ClearExitedDesigns sessions={sessions} />
         </>
       )}
     </Box>
