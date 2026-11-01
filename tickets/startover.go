@@ -30,6 +30,7 @@ func StartOver(path string, now time.Time, note, source string) error {
 		t.PauseReason = ""
 		t.SessionIDs = nil
 		t.ActualContextWindow = 0
+		t.PrefixTokens = 0
 		t.ElapsedTime = 0
 		t.ActualCost = 0
 		t.TotalTokens = nil

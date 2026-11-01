@@ -65,6 +65,8 @@ Agent-only settable fields:
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
   actual_context_window — stamped by ralphloop at merge time
+  prefix_tokens — context every session starts with, stamped by gx; actual minus
+    prefix is the ticket's work
   elapsed_time — stamped by ralphloop at merge time
   mutes — notification throttles tripped for this ticket (event type + timestamp),
     machine-written only

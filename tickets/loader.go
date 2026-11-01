@@ -185,6 +185,7 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 		ticket.Title = heading
 	}
 	ticket.ActualContextWindow = parsed.ActualContextWindow
+	ticket.PrefixTokens = parsed.PrefixTokens
 	ticket.ExpectedContextWindow = parsed.ExpectedContextWindow
 	ticket.ElapsedTime = parsed.ElapsedTime
 	ticket.ActualCost = parsed.ActualCost

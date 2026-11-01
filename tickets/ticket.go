@@ -52,6 +52,9 @@ type Ticket struct {
 	// finished before metrics existed (report.go's readSessionStats found
 	// nothing to stamp).
 	ActualContextWindow int
+	// PrefixTokens mirrors schema.Ticket.PrefixTokens: the context every
+	// session starts with. Zero means it was never stamped (see Work).
+	PrefixTokens int
 	// ExpectedContextWindow mirrors schema.Ticket.ExpectedContextWindow: the
 	// ticket author's up-front estimate, shown in the preview only until
 	// ActualContextWindow is populated (see ui/tickets/preview_frontmatter.go).

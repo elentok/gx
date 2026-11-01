@@ -251,7 +251,10 @@ type Ticket struct {
 	// MinExpectedContextWindow are rejected: they are K-unit typos.
 	ExpectedContextWindow int
 	ActualContextWindow   int
-	ElapsedTime           int
+	// PrefixTokens is the context every session starts with, stamped by gx.
+	// Zero means unstamped.
+	PrefixTokens int
+	ElapsedTime  int
 	// ActualCost is the USD cost of the session(s) that finished this ticket,
 	// summed across every assistant turn and priced by each turn's own model
 	// (see ralphloop's turnCost). Zero for tickets finished before this field
@@ -424,6 +427,9 @@ func Validate(t Ticket) error {
 	}
 	if t.ActualContextWindow < 0 {
 		errs = append(errs, fmt.Errorf("actual_context_window: must be non-negative, got %d", t.ActualContextWindow))
+	}
+	if t.PrefixTokens < 0 {
+		errs = append(errs, fmt.Errorf("prefix_tokens: must be non-negative, got %d", t.PrefixTokens))
 	}
 	if t.ElapsedTime < 0 {
 		errs = append(errs, fmt.Errorf("elapsed_time: must be non-negative, got %d", t.ElapsedTime))

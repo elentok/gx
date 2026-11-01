@@ -202,6 +202,14 @@ func TestValidate_NegativeActualContextWindow(t *testing.T) {
 	}
 }
 
+func TestValidate_NegativePrefixTokens(t *testing.T) {
+	tk := validTicket()
+	tk.PrefixTokens = -1
+	if err := Validate(tk); err == nil {
+		t.Fatal("expected error for negative prefix_tokens, got nil")
+	}
+}
+
 func TestValidate_NegativeElapsedTime(t *testing.T) {
 	tk := validTicket()
 	tk.ElapsedTime = -1

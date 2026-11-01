@@ -133,6 +133,37 @@ func TestEvolveInputs_SmallEstimateBelowBaselineNotOverrun(t *testing.T) {
 	}
 }
 
+func TestEvolveInputs_OverrunUsesWorkNotPeak(t *testing.T) {
+	t.Parallel()
+	f := inputsFixture(t)
+	// Estimate 20K: work 50K (2.5x) overruns, work 30K (1.5x) does not.
+	// 09 has a stamped 40K prefix, 10 and 11 use the 48K fallback.
+	for name, fm := range map[string]string{
+		"09-stamped.md":      "id: \"09\"\nstatus: done\ntype: implement\nexpected_context_window: 20000\nprefix_tokens: 40000\nactual_context_window: 90000\nelapsed_time: 100\nactual_cost: 1\n",
+		"10-fallback.md":     "id: \"10\"\nstatus: done\ntype: implement\nexpected_context_window: 20000\nactual_context_window: 98000\nelapsed_time: 100\nactual_cost: 1\n",
+		"11-under.md":        "id: \"11\"\nstatus: done\ntype: implement\nexpected_context_window: 20000\nactual_context_window: 78000\nelapsed_time: 100\nactual_cost: 1\n",
+		"12-prefix-under.md": "id: \"12\"\nstatus: done\ntype: implement\nexpected_context_window: 20000\nprefix_tokens: 40000\nactual_context_window: 70000\nelapsed_time: 100\nactual_cost: 1\n",
+	} {
+		if err := os.WriteFile(filepath.Join(f.epic, "issues", name), []byte("---\n"+fm+"---\nBody.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var out bytes.Buffer
+	if err := runEvolveInputs(f.env, &out, "proj:epic", true); err != nil {
+		t.Fatal(err)
+	}
+	var table InputsTable
+	if err := json.Unmarshal(out.Bytes(), &table); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"09": true, "10": true, "11": false, "12": false}
+	for _, r := range table.Rows {
+		if exp, ok := want[r.ID]; ok && slices.Contains(r.Flags, "context-overrun") != exp {
+			t.Errorf("ticket %s flags = %v, overrun want %v", r.ID, r.Flags, exp)
+		}
+	}
+}
+
 func TestEvolveInputs_TableOutput(t *testing.T) {
 	t.Parallel()
 	f := inputsFixture(t)

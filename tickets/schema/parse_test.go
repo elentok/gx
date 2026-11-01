@@ -168,6 +168,27 @@ func TestParseTicket_LegacySplitKeysIgnored(t *testing.T) {
 	}
 }
 
+func TestParseTicket_PrefixTokensRoundTrip(t *testing.T) {
+	path := writeTemp(t, "04c-prefix.md", "---\nid: \"04c\"\nstatus: done\ntype: implement\nprefix_tokens: 45000\n---\nbody\n")
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.PrefixTokens != 45000 {
+		t.Fatalf("PrefixTokens = %d, want 45000", got.PrefixTokens)
+	}
+	marshaled, err := MarshalTicket(got, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if !strings.Contains(string(marshaled), "prefix_tokens: 45000") {
+		t.Errorf("marshaled ticket = %q, want prefix_tokens written back", string(marshaled))
+	}
+	if err := Validate(validTicket()); err != nil {
+		t.Errorf("ticket without prefix_tokens must validate: %v", err)
+	}
+}
+
 func TestParseTicket_CommitlessRoundTrip(t *testing.T) {
 	content := "---\nid: \"04b\"\nstatus: done\ntype: implement\ncommitless: true\n---\nbody\n"
 	path := writeTemp(t, "04b-commitless.md", content)
