@@ -1,0 +1,12 @@
+# synthetic: hand-made from startup-w250.screen.txt, NOT a capture. Vim NORMAL mode, idle input box.
+
+ ▐▛███▛█   Claude Code v2.1.296
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   ~/work/project
+
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 · 🙂 0 · [············] 0% · main
+  ⏵⏵ auto mode on (shift+tab to cycle)

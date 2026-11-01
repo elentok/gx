@@ -1,0 +1,17 @@
+# synthetic: hand-made from startup-w250.screen.txt, NOT a capture. Vim INSERT mode, turn running, ANSI SGR (ESC bytes written as ␛).
+
+␛[38;5;216m ▐▛███▛█␛[0m   ␛[1mClaude Code␛[0m v2.1.296
+␛[38;5;216m▝▜██████▀␛[0m  Haiku 5.5 · Claude Max
+␛[38;5;216m ▝▝   ▝▝␛[0m   ␛[2m~/work/project␛[0m
+
+␛[2m❯ summarize the repo␛[0m
+
+␛[38;5;216m⏺␛[0m Reading the project layout first.
+
+␛[38;5;216m✻ Working…␛[0m ␛[2m(12s · ↓ 340 tokens · esc to interrupt)␛[0m
+
+␛[2m────────────────────────────────────────────────────────────────────────────────␛[0m
+␛[1m❯␛[0m and the tests too␛[7m ␛[0m
+␛[2m────────────────────────────────────────────────────────────────────────────────␛[0m
+  ␛[2mHaiku 5.5 · 🙂 0 · [············] 0% · main␛[0m
+  ␛[1m-- INSERT --␛[0m ␛[38;5;141m⏵⏵ auto mode on␛[0m ␛[2m(shift+tab to cycle)␛[0m

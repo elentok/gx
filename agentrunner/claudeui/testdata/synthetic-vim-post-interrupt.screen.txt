@@ -1,0 +1,16 @@
+# synthetic: hand-made from startup-w250.screen.txt, NOT a capture. Vim INSERT mode right after an interrupt.
+
+ ▐▛███▛█   Claude Code v2.1.296
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   ~/work/project
+
+❯ summarize the repo
+
+⏺ Reading the project layout first.
+  ⎿  Interrupted · What should Claude do instead?
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 · 🙂 0 · [············] 0% · main
+  -- INSERT -- ⏵⏵ auto mode on (shift+tab to cycle)
