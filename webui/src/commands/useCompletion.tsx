@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { CommandMenu, type CommandMenuRow, type CommandMenuStatus } from "../ui/command-menu/CommandMenu";
 import { useWide } from "../useWide";
 import { fillCommand, matchCommands, openToken } from "./match";
@@ -13,10 +13,13 @@ export interface CompletionConfig {
   off?: boolean;
 }
 
+/** The part of a keydown the menu reads: React's and the DOM's both fit. */
+export type MenuKey = Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "preventDefault">;
+
 export interface Completion {
   menu: ReactNode;
   /** True when the key was used by the menu; the caller then skips its own handling. */
-  onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => boolean;
+  onKeyDown: (e: MenuKey) => boolean;
 }
 
 /** The completion menu for a text field: open state, selection and keys. The field passes its text and cursor and applies `fill`. */
@@ -52,7 +55,7 @@ export function useCompletion(
     fill(out.text, out.cursor);
   };
 
-  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (e: MenuKey) => {
     if (!open || !token) return false;
     if (e.key === "Escape") {
       e.preventDefault();

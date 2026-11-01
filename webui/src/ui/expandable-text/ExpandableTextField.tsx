@@ -1,7 +1,8 @@
 import { Box, chakra, Textarea } from "@chakra-ui/react";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MutableRefObject, type ReactNode } from "react";
-import { useCompletion, type CompletionConfig } from "../../commands/useCompletion";
-import { LargeEditor, type Selection } from "./LargeEditor";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCompletion, type CompletionConfig, type MenuKey } from "../../commands/useCompletion";
+import type { ViMode } from "./CodeEditor";
+import { LargeEditor, type EditorMenu, type Selection } from "./LargeEditor";
 import { fieldLook } from "./look";
 import { isMac } from "../../platform";
 import { useViMode } from "../../vimode";
@@ -41,23 +42,22 @@ export function ExpandableTextField(props: FieldProps) {
   return completion ? <Completing {...rest} config={completion} /> : <Field {...rest} />;
 }
 
-interface Menu {
-  node: ReactNode;
-  onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => boolean;
-  onCursor: (cursor: number) => void;
-  /** Where the cursor goes once the filled text has rendered. */
-  pending: MutableRefObject<number | null>;
+interface Menu extends EditorMenu {
+  onKeyDown: (e: MenuKey) => boolean;
 }
 
 function Completing({ config, ...rest }: Omit<FieldProps, "completion"> & { config: CompletionConfig }) {
   const [cursor, setCursor] = useState(0);
+  // The large editor's vi mode; null while it is closed or vi is off. The menu stays shut outside INSERT.
+  const [editorMode, setEditorMode] = useState<ViMode | null>(null);
   const pending = useRef<number | null>(null);
-  const c = useCompletion(config, rest.value, cursor, rest.disabled, (text, at) => {
+  const off = config.off || (editorMode !== null && editorMode !== "INSERT");
+  const c = useCompletion({ ...config, off }, rest.value, cursor, rest.disabled, (text, at) => {
     pending.current = at;
     rest.onChange(text);
     setCursor(at);
   });
-  return <Field {...rest} menu={{ node: c.menu, onKeyDown: c.onKeyDown, onCursor: setCursor, pending }} />;
+  return <Field {...rest} menu={{ node: c.menu, onKeyDown: c.onKeyDown, onCursor: setCursor, onMode: setEditorMode, pending }} />;
 }
 
 function Field({
@@ -75,13 +75,15 @@ function Field({
   menu,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
   const area = useRef<HTMLTextAreaElement>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
   useLayoutEffect(() => {
+    // While the editor is open it places the caret itself.
+    if (selection) return;
     const at = menu?.pending.current;
     if (at == null) return;
     menu!.pending.current = null;
     area.current?.setSelectionRange(at, at);
-  }, [value, menu]);
-  const [selection, setSelection] = useState<Selection | null>(null);
+  }, [value, menu, selection]);
   const open = () =>
     setSelection({
       start: area.current?.selectionStart ?? 0,
@@ -130,7 +132,7 @@ function Field({
         onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
         onKeyDown={onKeyDown}
       />
-      {menu?.node}
+      {!selection && menu?.node}
       <chakra.button
         type="button"
         position="absolute"
@@ -164,6 +166,7 @@ function Field({
           selection={selection}
           onClose={close}
           onSubmit={onSubmit}
+          menu={menu}
         />
       )}
     </Box>

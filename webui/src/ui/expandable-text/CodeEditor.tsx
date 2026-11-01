@@ -3,7 +3,8 @@ import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view";
 import { getCM, vim, Vim } from "@replit/codemirror-vim";
 import { Box } from "@chakra-ui/react";
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, type MutableRefObject, type Ref } from "react";
+import type { MenuKey } from "../../commands/useCompletion";
 import type { Selection } from "./LargeEditor";
 import { fieldLook } from "./look";
 
@@ -75,6 +76,8 @@ export default function CodeEditor({
   onZZ,
   onSubmit,
   onToggle,
+  onMenuKey,
+  caret,
   handle,
 }: {
   label: string;
@@ -94,12 +97,16 @@ export default function CodeEditor({
   onSubmit?: () => void;
   /** Mod-g. Left unhandled when absent. */
   onToggle?: () => void;
+  /** Every keydown first; true means the host used it (a completion menu), so the editor skips it. */
+  onMenuKey?: (e: MenuKey) => boolean;
+  /** Where the caret goes after the next outside edit, then cleared. */
+  caret?: MutableRefObject<number | null>;
   handle?: Ref<CodeEditorHandle>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const callbacks = useRef({ onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle });
-  callbacks.current = { onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle };
+  const callbacks = useRef({ onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle, onMenuKey });
+  callbacks.current = { onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle, onMenuKey };
   const external = useRef(false);
   const viSlot = useRef(new Compartment());
   const stopVi = useRef<(() => void) | null>(null);
@@ -165,6 +172,8 @@ export default function CodeEditor({
               },
             ]),
           ),
+          // Before vim, so Escape closes an open menu before it leaves insert mode.
+          Prec.highest(EditorView.domEventHandlers({ keydown: (e) => callbacks.current.onMenuKey?.(e) ?? false })),
           viSlot.current.of(viMode ? vim() : []),
           history(),
           // No indentWithTab: Tab and Shift-Tab keep moving focus.
@@ -225,7 +234,9 @@ export default function CodeEditor({
     if (current === value) return;
     external.current = true;
     try {
-      v.dispatch({ changes: diff(current, value) });
+      const at = caret?.current;
+      caret && (caret.current = null);
+      v.dispatch({ changes: diff(current, value), ...(at == null ? {} : { selection: { anchor: Math.min(at, value.length) } }) });
     } finally {
       external.current = false;
     }

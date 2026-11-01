@@ -291,3 +291,72 @@ test("Done, a backdrop press and ZZ each refocus the field with the editor's sel
     vi.restoreAllMocks();
   }
 });
+
+const entries = ["compact", "context", "help"].map((name) => ({ name, aliases: [], arg_hint: "", description: name, source: "built-in" }));
+const fetcher = async () => ({ degraded: false, entries }) as never;
+
+function Completing({ harness }: { harness: string }) {
+  const [text, setText] = useState("");
+  return (
+    <ExpandableTextField
+      label="Note"
+      title={TITLE}
+      value={text}
+      onChange={setText}
+      completion={{ target: { sessionId: `s-${harness}` }, harness, fetcher }}
+    />
+  );
+}
+
+const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
+
+async function openEditor(harness = "claude") {
+  withVi(true, <Completing harness={harness} />);
+  fireEvent.click(expand());
+  return findLargeEditor(TITLE);
+}
+
+test("the menu opens in the large editor on /, Down then Enter fills it", async () => {
+  const editor = await openEditor();
+  await typeInLargeEditor(TITLE, "/co");
+  await waitFor(() => expect(options()).toHaveLength(2));
+  fireEvent.keyDown(editor, { key: "ArrowDown" });
+  fireEvent.keyDown(editor, { key: "Enter" });
+  expect(largeEditorText(TITLE)).toBe("/context ");
+  expect(viewOf(TITLE).state.selection.main.head).toBe("/context ".length);
+  expect(screen.queryByRole("listbox")).toBeNull();
+});
+
+test("Escape closes the menu first and a second Escape leaves INSERT", async () => {
+  const editor = await openEditor();
+  await typeInLargeEditor(TITLE, "/co");
+  await waitFor(() => expect(options()).toHaveLength(2));
+  fireEvent.keyDown(editor, { key: "Escape" });
+  expect(screen.queryByRole("listbox")).toBeNull();
+  expect(screen.getByText("INSERT")).toBeTruthy();
+  act(() => void Vim.handleKey(getCM(viewOf(TITLE))!, "<Esc>", "user"));
+  expect(screen.getByText("NORMAL")).toBeTruthy();
+});
+
+test("the menu stays shut in NORMAL and returns in INSERT", async () => {
+  await openEditor();
+  await typeInLargeEditor(TITLE, "/co");
+  await waitFor(() => expect(options()).toHaveLength(2));
+  const cm = getCM(viewOf(TITLE))!;
+  act(() => void Vim.handleKey(cm, "<Esc>", "user"));
+  await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  act(() => void Vim.handleKey(cm, "j", "user"));
+  expect(screen.queryByRole("listbox")).toBeNull();
+  act(() => void Vim.handleKey(cm, "i", "user"));
+  await waitFor(() => expect(options()).toHaveLength(2));
+});
+
+test("$ opens the menu in the editor for Codex only", async () => {
+  await openEditor("codex");
+  await typeInLargeEditor(TITLE, "$co");
+  await waitFor(() => expect(options()).toHaveLength(2));
+  cleanup();
+  await openEditor("claude");
+  await typeInLargeEditor(TITLE, "$co");
+  expect(screen.queryByRole("listbox")).toBeNull();
+});
