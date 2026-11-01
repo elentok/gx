@@ -1,0 +1,73 @@
+package commandlist
+
+// codexVersion is the Codex release whose TUI command enum codexBuiltins
+// mirrors (codex-rs/tui/src/slash_command.rs at tag rust-v0.166.0).
+const codexVersion = "rust-v0.166.0"
+
+// codexBuiltins follows the enum's presentation order. It omits the commands
+// release builds hide (rollout, test-approval) and the debug commands
+// (debug-m-drop, debug-m-update). "app" is filtered by BuiltinsFor.
+var codexBuiltins = []Entry{
+	{Name: "model", Description: "choose what model and reasoning effort to use", Source: SourceBuiltIn},
+	{Name: "presets", Description: "run or save reusable prompts and slash commands", Source: SourceBuiltIn},
+	{Name: "daybreak", Description: "turn Daybreak on or off", Source: SourceBuiltIn},
+	{Name: "ide", Description: "include current selection, open files, and other context from your IDE", Source: SourceBuiltIn},
+	{Name: "permissions", Description: "choose what Codex is allowed to do", Source: SourceBuiltIn},
+	{Name: "keymap", Description: "remap TUI shortcuts", Source: SourceBuiltIn},
+	{Name: "vim", Description: "toggle Vim mode for the composer", Source: SourceBuiltIn},
+	{Name: "setup-default-sandbox", Description: "set up elevated agent sandbox", Source: SourceBuiltIn},
+	{Name: "experimental", Description: "toggle experimental features", Source: SourceBuiltIn},
+	{Name: "approve", Description: "approve one retry of a recent auto-review denial", Source: SourceBuiltIn},
+	{Name: "memories", Description: "configure memory use and generation", Source: SourceBuiltIn},
+	{Name: "skills", Description: "use skills to improve how Codex performs specific tasks", Source: SourceBuiltIn},
+	{Name: "import", Description: "import setup, this project, and recent chats from Claude Code", Source: SourceBuiltIn},
+	{Name: "hooks", Description: "view and manage lifecycle hooks", Source: SourceBuiltIn},
+	{Name: "review", Description: "review my current changes and find issues", Source: SourceBuiltIn},
+	{Name: "rename", Description: "rename the current thread", Source: SourceBuiltIn},
+	{Name: "new", Description: "start a new chat during a conversation", Source: SourceBuiltIn},
+	{Name: "archive", Description: "archive this session", Source: SourceBuiltIn},
+	{Name: "delete", Description: "permanently delete this session", Source: SourceBuiltIn},
+	{Name: "resume", Description: "resume a saved chat", Source: SourceBuiltIn},
+	{Name: "fork", Description: "fork the current chat", Source: SourceBuiltIn},
+	{Name: "worktree", Description: "start or continue a conversation in a new worktree", Source: SourceBuiltIn},
+	{Name: "app", Description: "continue this session in the Desktop app", Source: SourceBuiltIn},
+	{Name: "init", Description: "create an AGENTS.md file with instructions for Codex", Source: SourceBuiltIn},
+	{Name: "compact", Description: "summarize conversation to prevent hitting the context limit", Source: SourceBuiltIn},
+	{Name: "config", Description: "configure Codex preferences", Source: SourceBuiltIn},
+	{Name: "recap", Description: "summarize the current conversation now", Source: SourceBuiltIn},
+	{Name: "plan", Description: "switch to Plan mode", Source: SourceBuiltIn},
+	{Name: "voice", Description: "start or stop voice; use /voice settings to choose a voice", Source: SourceBuiltIn},
+	{Name: "goal", Description: "set or view the goal for a long-running task", Source: SourceBuiltIn},
+	{Name: "agents", Description: "open the agent command center", Source: SourceBuiltIn},
+	{Name: "side", Description: "start a side conversation in an ephemeral fork", Source: SourceBuiltIn},
+	{Name: "btw", Description: "start a side conversation in an ephemeral fork", Source: SourceBuiltIn},
+	{Name: "copy", Description: "copy the last response or part of it", Source: SourceBuiltIn},
+	{Name: "export", Description: "export the conversation as markdown", Source: SourceBuiltIn},
+	{Name: "raw", Description: "toggle raw scrollback mode for copy-friendly terminal selection", Source: SourceBuiltIn},
+	{Name: "tui", Description: "choose the TUI mode for the next launch", Source: SourceBuiltIn},
+	{Name: "diff", Description: "show git diff (including untracked files)", Source: SourceBuiltIn},
+	{Name: "mention", Description: "mention a file", Source: SourceBuiltIn},
+	{Name: "status", Description: "show current session configuration and token usage", Source: SourceBuiltIn},
+	{Name: "daemon", Description: "Manage the local background server", Source: SourceBuiltIn},
+	{Name: "warnings", Description: "view retained warnings and diagnostic details", Source: SourceBuiltIn},
+	{Name: "cd", Description: "change the current working directory", Source: SourceBuiltIn},
+	{Name: "pwd", Description: "show the current working directory", Source: SourceBuiltIn, Aliases: []string{"cwd"}},
+	{Name: "usage", Description: "view account usage or use a usage limit reset", Source: SourceBuiltIn},
+	{Name: "debug-config", Description: "show config layers and requirement sources for debugging", Source: SourceBuiltIn},
+	{Name: "title", Description: "configure which items appear in the terminal title", Source: SourceBuiltIn},
+	{Name: "statusline", Description: "configure which items appear in the status line", Source: SourceBuiltIn},
+	{Name: "theme", Description: "choose a syntax highlighting theme", Source: SourceBuiltIn},
+	{Name: "pets", Description: "choose or hide the terminal pet", Source: SourceBuiltIn, Aliases: []string{"pet"}},
+	{Name: "mcp", Description: "list MCP tools; use /mcp verbose or /mcp login <name>", Source: SourceBuiltIn},
+	{Name: "apps", Description: "manage apps", Source: SourceBuiltIn},
+	{Name: "plugins", Description: "browse plugins", Source: SourceBuiltIn},
+	{Name: "logout", Description: "log out of Codex", Source: SourceBuiltIn},
+	// The enum has quit and exit as two commands with one description; one
+	// entry with an alias keeps the list free of duplicates.
+	{Name: "exit", Description: "exit Codex", Source: SourceBuiltIn, Aliases: []string{"quit"}},
+	{Name: "feedback", Description: "send logs to maintainers", Source: SourceBuiltIn},
+	{Name: "ps", Description: "list background terminals", Source: SourceBuiltIn},
+	{Name: "stop", Description: "stop all background terminals", Source: SourceBuiltIn, Aliases: []string{"clean"}},
+	{Name: "clear", Description: "clear the terminal and start a new chat", Source: SourceBuiltIn},
+	{Name: "subagents", Description: "switch between this session's subagents", Source: SourceBuiltIn},
+}
