@@ -58,13 +58,13 @@ test("86. Create in a new worktree", async ({ page, start }) => {
   await expect(worktreeBox(page)).toHaveValue("bad name");
   expect(await sessions(fixture)).toHaveLength(before.length);
 
-  // A first prompt that starts with / is refused too.
+  // A first prompt that starts with ! is refused too.
   await worktreeBox(page).fill("fresh-tree");
   await page.getByRole("option", { name: /Create worktree/ }).click();
-  await promptBox(page).fill("/clear");
+  await promptBox(page).fill("!ls");
   await createButton(page).click();
   await expect(newForm(page).getByRole("alert")).toBeVisible();
-  await expect(promptBox(page)).toHaveValue("/clear");
+  await expect(promptBox(page)).toHaveValue("!ls");
   await expect(worktreeBox(page)).toHaveValue("fresh-tree");
   expect(await sessions(fixture)).toHaveLength(before.length);
 

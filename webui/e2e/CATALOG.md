@@ -1036,7 +1036,7 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   5. On `agents`, open the crashed session.
 - **Pass:**
   - Stalled shows "No progress for 15 min" with only Screen, which opens the screen dialog.
-  - Blocked shows "Waiting at a prompt in the terminal" with only Screen.
+  - Blocked at a permission prompt shows "The session asks for permission." with Screen, Deny and Allow once.
   - Auth shows "Claude login needed" with only Retry, and Send is on once there is a draft.
   - Rate limit shows "Rate limited" and the reset text, no buttons, and the composer reads "Rate limited. Send turns on when the session is idle." with Send off.
   - Crashed shows "Agent crashed" and the composer reads "Exited. Restore it in gx, Agents tab." There is no Restore or New session button, and Send is off.
@@ -1086,9 +1086,9 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `agents`
 - **Steps:**
   1. At 1280px press "New session in demo". Type `bad name` in Worktree, pick "+ Create worktree", press Create session.
-  2. Type `fresh-tree`, pick "+ Create worktree", type `/clear` as the first prompt and press Create session.
+  2. Type `fresh-tree`, pick "+ Create worktree", type `!ls` as the first prompt and press Create session.
   3. Replace the prompt with `hello` and press Create session.
-- **Pass:** the bad name and the `/` prompt each show a refusal in the form and keep the input. No session is created for either. The last create makes one session whose dir ends in `fresh-tree`, opens it and closes the form.
+- **Pass:** the bad name and the `!` prompt each show a refusal in the form and keep the input. No session is created for either. The last create makes one session whose dir ends in `fresh-tree`, opens it and closes the form.
 
 ## 87. Create entry points
 

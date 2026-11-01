@@ -139,10 +139,10 @@ test("80. Failure notices", async ({ page, start }) => {
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // Blocked: Screen only.
+  // Blocked at a permission prompt: Screen, then Deny and Allow once.
   await open("blocked");
-  await expect(failure(page).getByText("Waiting at a prompt in the terminal")).toBeVisible();
-  expect(await buttons("blocked")).toEqual(["Screen"]);
+  await expect(failure(page).getByText("The session asks for permission.")).toBeVisible();
+  await expect.poll(() => buttons("blocked")).toEqual(["Screen", "Deny", "Allow once"]);
 
   // Auth: Retry, and Send stays on.
   await open("auth");
