@@ -64,6 +64,11 @@ func Load(scratchDir string) ([]Epic, error) {
 
 const loadEpicWorkers = 8
 
+// LoadEpicAt loads the one epic at epicPath, tickets included.
+func LoadEpicAt(epicPath string) Epic {
+	return loadEpic(filepath.Dir(epicPath), filepath.Base(epicPath))
+}
+
 func loadEpic(scratchDir, name string) Epic {
 	epicPath := filepath.Join(scratchDir, name)
 	epic := Epic{Name: name, Path: epicPath, forks: &forkCache{}}

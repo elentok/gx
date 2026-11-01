@@ -329,6 +329,7 @@ log shows no open question on the web. A second run changes nothing.`,
 			return runTicketsEnsureVerify(epicPath, out)
 		}))
 	cmd.AddCommand(newTicketsPublishCmd(d))
+	cmd.AddCommand(newTicketsLintClaimsCmd(d))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "print the ticket frontmatter schema (settable and read-only fields)",
