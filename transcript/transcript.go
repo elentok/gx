@@ -404,6 +404,42 @@ func CountCompactionsAfter(lines []Line, since time.Time) int {
 	return n
 }
 
+// Turns is what a launch's assistant turns say about the session: the model of
+// the first one and how many there were.
+type Turns struct {
+	Model string
+	Count int
+}
+
+// CountTurns counts the assistant lines of lines written at or after since and
+// reports the first one's model. A zero since counts every line. An undated
+// line counts, as in CountCompactionsAfter: a missed turn is the worse error.
+// Sidechain (subagent) lines are not marked on Line, so they count too.
+func CountTurns(lines []Line, since time.Time) Turns {
+	var t Turns
+	for _, l := range lines {
+		if l.Type != "assistant" || (!l.Timestamp.IsZero() && l.Timestamp.Before(since)) {
+			continue
+		}
+		if t.Count == 0 {
+			t.Model = l.Usage.Model
+		}
+		t.Count++
+	}
+	return t
+}
+
+// ReadTurns reads the transcript at path and returns CountTurns of it, or
+// ok=false when the file is missing or has no assistant line in the launch.
+func ReadTurns(path string, since time.Time) (Turns, bool, error) {
+	lines, ok, err := ReadAll(path)
+	if err != nil || !ok {
+		return Turns{}, false, err
+	}
+	t := CountTurns(lines, since)
+	return t, t.Count > 0, nil
+}
+
 // Compactions is a convenience wrapper combining PathIn, ReadAll, and
 // CountCompactions: it returns how many compaction boundaries the session
 // launched in cwd hit, or ok=false if its transcript can't be found yet.

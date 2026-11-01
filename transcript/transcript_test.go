@@ -61,6 +61,44 @@ func TestLastAssistantUsage_ReturnsOnlyTheLastAssistantLine(t *testing.T) {
 	}
 }
 
+func turnsFixture(t *testing.T) string {
+	return writeTranscript(t,
+		`{"type":"user","timestamp":"2026-01-01T10:00:00Z","message":{}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T10:00:01Z","message":{"model":"claude-opus-5"}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T10:00:02Z","isSidechain":true,"message":{"model":"claude-haiku-5"}}`,
+		`{"type":"assistant","timestamp":"2026-01-01T10:05:00Z","message":{"model":"claude-sonnet-5"}}`,
+	)
+}
+
+// Line does not mark sidechain lines, so a subagent turn counts.
+func TestReadTurns_CountsAssistantLinesAndTakesFirstModel(t *testing.T) {
+	turns, ok, err := ReadTurns(turnsFixture(t), time.Time{})
+	if err != nil || !ok {
+		t.Fatalf("ReadTurns() ok = %v, err = %v", ok, err)
+	}
+	if turns.Count != 3 || turns.Model != "claude-opus-5" {
+		t.Errorf("turns = %+v, want 3 turns, first model claude-opus-5", turns)
+	}
+}
+
+func TestReadTurns_ResumedLaunchCountsFromSince(t *testing.T) {
+	since := time.Date(2026, 1, 1, 10, 3, 0, 0, time.UTC)
+	turns, ok, err := ReadTurns(turnsFixture(t), since)
+	if err != nil || !ok {
+		t.Fatalf("ReadTurns() ok = %v, err = %v", ok, err)
+	}
+	if turns.Count != 1 || turns.Model != "claude-sonnet-5" {
+		t.Errorf("turns = %+v, want 1 turn on claude-sonnet-5", turns)
+	}
+}
+
+func TestReadTurns_NoAssistantLineIsNotOK(t *testing.T) {
+	path := writeTranscript(t, `{"type":"user","timestamp":"2026-01-01T10:00:00Z","message":{}}`)
+	if _, ok, err := ReadTurns(path, time.Time{}); ok || err != nil {
+		t.Errorf("ReadTurns() ok = %v, err = %v; want not ok, no error", ok, err)
+	}
+}
+
 func TestLastAssistantUsage_NoAssistantLines_NotOK(t *testing.T) {
 	path := writeTranscript(t, `{"type":"user","message":{}}`)
 

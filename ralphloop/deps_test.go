@@ -196,6 +196,21 @@ func TestDefaultDepsWithOverrides_NoHomeReadsNoTranscript(t *testing.T) {
 	}
 }
 
+func TestDefaultDepsWithOverrides_ReadTurnsResolvesPathLikeReadOccupancy(t *testing.T) {
+	t.Parallel()
+	const cwd, session = "/work/tree", "sess-1"
+	home := t.TempDir()
+	writeFakeTranscript(t, home, cwd, session, time.Now(), [3]any{"claude-sonnet-5", 1000, 0})
+
+	turns, ok, err := DefaultDepsWithOverrides(DepsOverrides{Home: home}).ReadTurns(cwd, session, time.Time{})
+	if err != nil || !ok || turns.Model != "claude-sonnet-5" || turns.Count != 1 {
+		t.Fatalf("ReadTurns() = %+v, %v, %v; want the transcript's first model and 1 turn", turns, ok, err)
+	}
+	if _, ok, err := DefaultDepsWithOverrides(DepsOverrides{}).ReadTurns(cwd, session, time.Time{}); err != nil || ok {
+		t.Errorf("ReadTurns() with no home = ok %v, err %v; want not found", ok, err)
+	}
+}
+
 func TestDefaultDepsWithOverrides_RunnerWaitReachesRunner(t *testing.T) {
 	t.Parallel()
 	runner := DefaultDepsWithOverrides(DepsOverrides{RunnerWait: 7 * time.Second}).Runner.(*herdrrunner.Runner)

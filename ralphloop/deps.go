@@ -124,6 +124,11 @@ type Deps struct {
 	// Code session launched in cwd, or ok=false if its transcript has no
 	// assistant turn yet.
 	ReadOccupancy func(cwd, sessionID string) (occupancy int, ok bool, err error)
+	// ReadTurns returns the model of the first assistant turn and the
+	// assistant-turn count of the launch that began at since, or ok=false until
+	// a turn has landed. Codex reports its latest turn's model and no count.
+	// Nil means not available; callers skip the check.
+	ReadTurns func(cwd, sessionID string, since time.Time) (turns transcript.Turns, ok bool, err error)
 	// ReadOccupancyReading returns the same occupancy plus whether a
 	// compaction boundary has merged since the turn it came from. Only the
 	// smart-zone breach check wants that second answer (see
@@ -279,6 +284,22 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return 0, ok, err
 			}
 			return usage.Occupancy(), true, nil
+		},
+		ReadTurns: func(cwd, sessionID string, since time.Time) (transcript.Turns, bool, error) {
+			if path, found := transcriptPath(overrides.Home, cwd, sessionID); found {
+				if turns, ok, err := transcript.ReadTurns(path, since); err != nil || ok {
+					return turns, ok, err
+				}
+			}
+			if overrides.CodexHome == "" {
+				return transcript.Turns{}, false, nil
+			}
+			path, ok, err := codexsession.RolloutPathIn(overrides.CodexHome, sessionID)
+			if err != nil || !ok {
+				return transcript.Turns{}, false, err
+			}
+			m, ok, err := codexsession.ReadTurnModel(path)
+			return transcript.Turns{Model: m.Model}, ok, err
 		},
 		ReadOccupancyReading: func(cwd, sessionID string) (transcript.OccupancyReading, error) {
 			path, found := transcriptPath(overrides.Home, cwd, sessionID)
