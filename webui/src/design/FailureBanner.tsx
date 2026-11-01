@@ -212,7 +212,9 @@ export function FailureBanner({
               <Button
                 key={name}
                 emphasis={main ? "main" : "secondary"}
-                tone={name === "New session" && restoreHidden ? "running" : name === "Deny" ? "deadlocked" : undefined}
+                tone={name === "New session" && restoreHidden ? "running" : undefined}
+                // The mock outlines Deny in the error colour; a secondary button ignores its tone.
+                {...(name === "Deny" ? { borderColor: "tone.deadlocked.fg", css: { color: "{colors.tone.deadlocked.fg}" } } : {})}
                 disabled={busy(name)}
                 onClick={onClick[name]}
               >
