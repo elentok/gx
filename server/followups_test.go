@@ -181,6 +181,54 @@ func TestFileFollowUp_HumanOnlyFilesNothing(t *testing.T) {
 	}
 }
 
+func TestWriteFollowUp_GuardBodyAndDedupeKey(t *testing.T) {
+	t.Parallel()
+	s, store, _, _ := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
+	first := tickets.Address{Project: "proj", Epic: "epic-a", ID: "03"}
+	second := tickets.Address{Project: "proj", Epic: "epic-a", ID: "04"}
+	spec := followUp{Slug: "guard", Title: "Guard fired", Source: "Source text.", Problem: "Problem text.", SuggestedFix: "Fix text.", Key: "guard/a"}
+
+	if _, err := s.writeFollowUp(first, spec); err != nil {
+		t.Fatal(err)
+	}
+	got := followUpTickets(t, store)
+	if len(got) != 1 {
+		t.Fatalf("follow-ups has %d tickets, want 1", len(got))
+	}
+	raw, err := os.ReadFile(got[0].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, body, _ := schema.SplitFrontmatter(string(raw))
+	for h, want := range map[string]string{"Source": "Source text.", "Problem": "Problem text.", "Suggested fix": "Fix text."} {
+		if g := strings.TrimSpace(schema.Section(body, h)); g != want {
+			t.Errorf("## %s = %q, want %q", h, g, want)
+		}
+	}
+	if !strings.Contains(schema.Section(body, "Evidence"), "Dedupe key: guard/a") {
+		t.Errorf("Evidence has no dedupe key:\n%s", raw)
+	}
+
+	if _, err := s.writeFollowUp(second, spec); err != nil {
+		t.Fatal(err)
+	}
+	if got = followUpTickets(t, store); len(got) != 1 {
+		t.Fatalf("same key filed a second draft: %d tickets", len(got))
+	}
+	raw, _ = os.ReadFile(got[0].Path)
+	if n := strings.Count(string(raw), "Seen again in proj:epic-a/04"); n != 1 {
+		t.Errorf("seen-again lines naming 04 = %d, want 1:\n%s", n, raw)
+	}
+
+	spec.Key = "guard/b"
+	if _, err := s.writeFollowUp(second, spec); err != nil {
+		t.Fatal(err)
+	}
+	if got = followUpTickets(t, store); len(got) != 2 {
+		t.Errorf("other key: %d tickets, want 2", len(got))
+	}
+}
+
 func TestProposalClass_AmbiguousOrMissingFilesNothing(t *testing.T) {
 	t.Parallel()
 	for name, result := range map[string]string{

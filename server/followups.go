@@ -66,7 +66,7 @@ func (s *Server) fileFollowUp(addr tickets.Address, ticketPath string) {
 		return
 	}
 	key := dedupeKey(string(raw), class)
-	path, err := s.writeFollowUp(addr, class, key, result)
+	path, err := s.writeFollowUp(addr, investigateFollowUp(addr, class, key, result))
 	if errors.Is(err, errNoFollowUpProject) {
 		// The proposal must not be lost with its filing place: the escalation
 		// message carries it instead (it already does when the submit asked for
@@ -121,9 +121,27 @@ func (s *Server) followUpsEpicPath(fromProject string) (string, error) {
 	return filepath.Join(dir, epic), nil
 }
 
+// followUp is what a caller supplies to file a follow-up: the title and the
+// text of each section, plus the key that makes two filings the same problem.
+type followUp struct {
+	Slug, Title, Source, Problem, SuggestedFix, Key string
+}
+
+// investigateFollowUp is the follow-up for an investigate ticket's proposal.
+func investigateFollowUp(from tickets.Address, class, key, result string) followUp {
+	return followUp{
+		Slug:         class,
+		Title:        fmt.Sprintf("Follow up on %s (%s)", from, class),
+		Source:       fmt.Sprintf("Investigate ticket %s, which proposed a %s.", from, class),
+		Problem:      result,
+		SuggestedFix: fmt.Sprintf("Assess the %s proposal in the Problem section; build it or drop it.", class),
+		Key:          key,
+	}
+}
+
 // writeFollowUp files the follow-up, or adds an occurrence line to the open
-// draft that already has the same key.
-func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) (string, error) {
+// draft that already has the same key. from is the ticket the repeat is seen in.
+func (s *Server) writeFollowUp(from tickets.Address, f followUp) (string, error) {
 	epicPath, err := s.followUpsEpicPath(from.Project)
 	if err != nil {
 		return "", err
@@ -132,14 +150,14 @@ func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) 
 		return "", err
 	}
 	line := fmt.Sprintf("Seen again in %s on %s.", from, time.Now().Format("2006-01-02"))
-	if path, found, err := noteOccurrence(epicPath, key, line); found || err != nil {
+	if path, found, err := noteOccurrence(epicPath, f.Key, line); found || err != nil {
 		return path, err
 	}
-	path, _, err := writeNewTicket(epicPath, "", class, func(id string) (schema.Ticket, string) {
+	path, _, err := writeNewTicket(epicPath, "", f.Slug, func(id string) (schema.Ticket, string) {
 		body := fmt.Sprintf(
 			// The dedupe line sits in Evidence, the section a repeat appends to.
-			"\n# %s — Follow up on %s (%s)\n\n## Source\n\nInvestigate ticket %s, which proposed a %s.\n\n## Problem\n\n%s\n\n## Evidence\n\n%s\n\n## Suggested fix\n\nAssess the %s proposal in the Problem section; build it or drop it.\n",
-			id, from, class, from, class, result, dedupeLine(key), class,
+			"\n# %s — %s\n\n## Source\n\n%s\n\n## Problem\n\n%s\n\n## Evidence\n\n%s\n\n## Suggested fix\n\n%s\n",
+			id, f.Title, f.Source, f.Problem, dedupeLine(f.Key), f.SuggestedFix,
 		)
 		return schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusDraft, Type: schema.TypeResearch, Category: schema.CategoryBug}, body
 	})
