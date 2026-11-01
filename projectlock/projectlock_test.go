@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -192,7 +194,10 @@ func TestWaitHookFiresOnce(t *testing.T) {
 		}
 		close(done)
 	}()
-	time.Sleep(300 * time.Millisecond)
+	deadline := time.Now().Add(5 * time.Second)
+	for calls.Load() == 0 && time.Now().Before(deadline) {
+		runtime.Gosched()
+	}
 	unlockEx()
 	<-done
 	if n := calls.Load(); n != 1 {
@@ -214,7 +219,9 @@ func TestHelperHoldExclusive(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Stdout.WriteString("locked\n")
-	time.Sleep(time.Minute)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	<-stop
 }
 
 func TestExclusiveReleasesWhenHolderDies(t *testing.T) {

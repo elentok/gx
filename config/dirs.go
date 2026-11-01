@@ -156,3 +156,12 @@ func DataDir() (string, error) { return DirsFrom(os.Environ()).DataDir() }
 
 // StateDir is DirsFrom(os.Environ()).StateDir.
 func StateDir() (string, error) { return DirsFrom(os.Environ()).StateDir() }
+
+// EnsuredStateDir is StateDir, created if missing.
+func EnsuredStateDir() (string, error) {
+	dir, err := StateDir()
+	if err != nil {
+		return "", err
+	}
+	return dir, os.MkdirAll(dir, 0o700)
+}

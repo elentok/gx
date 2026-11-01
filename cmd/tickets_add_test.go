@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -39,10 +40,9 @@ func TestRunTicketsAdd_WaitsForProjectMigrationAndSaysSo(t *testing.T) {
 	go func() {
 		done <- runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "new-thing", &stdout)
 	}()
-	deadline := time.Now().Add(3 * time.Second)
-	for notice.String() == "" && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	waitFor(t, ctx, func() bool { return notice.String() != "" })
 	select {
 	case err := <-done:
 		t.Fatalf("add returned while the project migrated: %v", err)

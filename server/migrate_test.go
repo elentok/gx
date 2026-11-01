@@ -220,17 +220,10 @@ func TestMigrate_StartupStepsWaitForMigrations(t *testing.T) {
 	}
 	close(release)
 	waitMigrations(t, h)
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	waitFor(t, func() bool {
 		snap, err = h.Client.Snapshot(ctx)
-		if err == nil && len(snap.Tickets) > 0 && startupSteps(t, h.StateDir)["reclaim-runs"] > 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("not ready: tickets=%v err=%v steps=%v", snap.Tickets, err, startupSteps(t, h.StateDir))
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return err == nil && len(snap.Tickets) > 0 && startupSteps(t, h.StateDir)["reclaim-runs"] > 0
+	})
 	for step, n := range startupSteps(t, h.StateDir) {
 		if n != 1 {
 			t.Errorf("%s ran %d times, want 1", step, n)

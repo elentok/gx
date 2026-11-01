@@ -108,11 +108,8 @@ func Exclusive(projectDir string) (unlock func(), err error) {
 // the state dir, not os.TempDir(): a process with another $TMPDIR would open a
 // different file, and macOS deletes old temp files under a live lock.
 func lockPath(projectDir string) (string, error) {
-	stateDir, err := config.StateDir()
+	stateDir, err := config.EnsuredStateDir()
 	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(stateDir, 0o700); err != nil {
 		return "", err
 	}
 	if resolved, err := filepath.EvalSymlinks(projectDir); err == nil {

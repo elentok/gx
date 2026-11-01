@@ -74,7 +74,6 @@ var allowed = map[string]allowance{
 	// Legacy section headings and statuses that old tickets still carry; the
 	// code demotes, migrates or recognises them.
 	"cmd/commands.go":             allow("migrate help names the legacy Needs Answer section", "needsanswer"),
-	"cmd/tickets_migrate.go":      allow("migrate doc names the legacy statuses and MigrateParkSections", "park", "needsanswer", "needsrepair"),
 	"ralphloop/claim.go":          allow("demotes the legacy Needs Repair section", "needsrepair"),
 	"ralphloop/pauseticket.go":    allow("names the legacy Needs Repair section", "needsrepair"),
 	"ralphloop/resumeticket.go":   allow("demotes the legacy Needs Answer and Needs Repair sections", "needsanswer", "needsrepair"),
@@ -110,7 +109,11 @@ var allowed = map[string]allowance{
 	"ralphloop/claim_test.go":                  allow("tests demoting the legacy Needs Answer and Needs Repair sections", "park", "needsanswer", "needsrepair"),
 	"ralphloop/resumeticket_test.go":           allow("tests demoting the legacy Needs Answer and Needs Repair sections", "needsanswer", "needsrepair"),
 	"tickets/loader_test.go":                   allow("loads legacy statuses, park_kind and headings", "land", "needsanswer", "needsrepair"),
-	"tickets/log_test.go":                      allow("reads legacy park.* log events", "park"),
+	"tickets/log_test.go":                      allow("reads legacy park.* log events and writes under a legacy needs-answer ticket", "park", "needsanswer"),
+	"migrations/steps.go":                      allow("comment names the legacy Needs Answer heading the question step reads", "needsanswer"),
+	"cmd/server_restart_test.go":               allow("legacy needs-answer ticket the migration must rewrite", "needsanswer"),
+	"testutil/gxfixture/scenarios.go":          allow("fixture writes a pause status of the old shape for the migration scenario", "needsanswer"),
+	"webui/e2e/migration.e2e.ts":               allow("writes a broken-shape needs-answer ticket the migration must handle", "needsanswer"),
 	"tickets/schema/parse_test.go":             allow("reads the legacy iteration_status needs-answer", "needsanswer"),
 	"tickets/schema/pause_test.go":             allow("tests the legacy heading and kind shim", "park", "needsrepair", "land"),
 	"tickets/schema/pause_write_test.go":       allow("asserts the old words are never written", "park", "needsanswer", "needsrepair", "land"),
@@ -133,7 +136,6 @@ var allowed = map[string]allowance{
 	"webui/src/epics/MergeButton.tsx":          allow("reads the kept parked wire field", "park"),
 	"webui/src/epics/EpicCard.test.tsx":        allow("mocks the kept parked wire field", "park"),
 	"server/repair_test.go":                    allow("tests the hidden unpark verb alias", "park"),
-	"cmd/server_restart_migrate_test.go":       allow("migration fixture uses the legacy needs-answer status", "needsanswer"),
 	"server/epicsummary_test.go":               allow("summary reads only the legacy Needs headings", "needsanswer", "needsrepair"),
 	"server/ticketwrites_test.go":              allow("unmute demotes only the legacy Needs Repair heading", "needsrepair"),
 	"server/recovery_notify_test.go":           allow("snapshot status is the legacy wire word", "needsanswer", "needsrepair"),
