@@ -1783,3 +1783,32 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - Cmd/Ctrl+Enter posts the typed text, with the menu closed and with it open; the box empties.
   - The Exited session shows no menu.
   - In vi mode, typing in INSERT opens the menu; in NORMAL the menu is closed and `0` opens nothing; `i` returns to INSERT.
+
+## 149. Command list freshness and failure
+
+- **Scenario:** `agents-commands-slow`, `agents-commands-failed`, and `agents-commands` started with `--command-list-age 1s`; an idle Claude session at 1280px.
+- **Steps:**
+  1. On `agents-commands-slow`, type `/` on the first open.
+  2. On `agents-commands-failed`, type `/co`, then type `/cost` and press Cmd/Ctrl+Enter.
+  3. On `agents-commands`, type `/`. Write a new skill into the session's directory, switch to another session, wait past the server age, move the page clock on 61 seconds, hold the commands request, return to the first session and type `/`. Release the request.
+- **Pass:**
+  - The first open shows "Loading commands…" and no rows.
+  - The failed list shows the built-ins (`/compact`, `/cost`) and "Skills could not load"; `/cost` still posts and the box empties.
+  - A description with `<template>` shows as plain text; the `deploy-notes` skill (disable-model-invocation) is listed.
+  - On the reopen the cached rows show at once without the new skill; after the request ends the new skill shows and the old rows are replaced.
+
+## 150. Codex command menu
+
+- **Scenario:** `agents-commands`, an idle Codex session and an idle Claude session at 1280px.
+- **Steps:**
+  1. In the Codex session type `/`.
+  2. Type `$review-s` and press Enter.
+  3. Type `use $htm` and press Tab.
+  4. In the Claude session type `$re`.
+  5. Back in the Codex session type `/gx-triage`.
+- **Pass:**
+  - `/` lists built-ins (`/status`) and no skills.
+  - `$review-s` lists `$review-skill` once; Enter fills `$review-skill `.
+  - `use $htm` lists `$html-skill`; Tab fills `use $html-skill ` and closes the menu.
+  - `$re` in the Claude session opens no menu and no "No command matches" line.
+  - The `/gx-` draft shows "Codex skills start with $. Type $gx-... instead."

@@ -170,6 +170,7 @@ async function startFixture(
   stallThreshold?: string,
   fakecodex = true,
   shape?: string,
+  commandListAge?: string,
 ): Promise<{ fixture: Fixture; stop: () => Promise<void> }> {
   const proc = spawn(
     process.env.GX_E2E_GXFIXTURE!,
@@ -182,6 +183,7 @@ async function startFixture(
       ...(hold ? ["--hold"] : []),
       ...(autoAdvanceDelay ? ["--auto-advance-delay", autoAdvanceDelay] : []),
       ...(stallThreshold ? ["--stall-threshold", stallThreshold] : []),
+      ...(commandListAge ? ["--command-list-age", commandListAge] : []),
       ...(shape ? ["--shape", shape] : []),
       ...Object.entries(config).flatMap(([key, value]) => ["--config", `${key}=${value}`]),
       scenario,
@@ -340,6 +342,8 @@ export const test = base.extend<{
       config?: Record<string, string>;
       fakecodex?: boolean;
       shape?: string;
+      /** How long the server serves a command list from its cache. */
+      commandListAge?: string;
       /** How many page reloads the flow expects (a restart reloads the tab once); more fail the test. */
       reloads?: number;
     },
@@ -350,7 +354,7 @@ export const test = base.extend<{
     let allowedReloads = 0;
     await use(async (scenario, opts) => {
       allowedReloads = opts?.reloads ?? 0;
-      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold, opts?.fakecodex, opts?.shape);
+      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold, opts?.fakecodex, opts?.shape, opts?.commandListAge);
       stops.push(stop);
       return fixture;
     });
