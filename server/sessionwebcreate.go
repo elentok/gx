@@ -44,25 +44,40 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
+// checkProjectDir returns a refusal when project is not configured or a
+// non-empty dir is neither its root nor one of its worktrees; nil means ok.
+func (s *Server) checkProjectDir(project, dir string) (*SessionResult, error) {
+	list, err := s.listProjectWorktrees()
+	if err != nil {
+		return nil, err
+	}
+	i := slices.IndexFunc(list, func(p ProjectWorktrees) bool { return p.Project == project })
+	if i < 0 {
+		res := sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %q is not configured", project))
+		return &res, nil
+	}
+	if dir != "" {
+		clean := filepath.Clean(dir)
+		known := filepath.Clean(list[i].Root) == clean || slices.ContainsFunc(list[i].Worktrees, func(wt string) bool { return filepath.Clean(wt) == clean })
+		if !known {
+			res := sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s is not the root or a worktree of %s", dir, project))
+			return &res, nil
+		}
+	}
+	return nil, nil
+}
+
 func (s *Server) createWebSession(req WebCreateSessionRequest) (SessionResult, error) {
 	prompt, refusal := validatePromptText(req.Prompt, "the first prompt")
 	if refusal != nil {
 		return *refusal, nil
 	}
-	list, err := s.listProjectWorktrees()
+	refusal, err := s.checkProjectDir(req.Project, req.Dir)
 	if err != nil {
 		return SessionResult{}, err
 	}
-	i := slices.IndexFunc(list, func(p ProjectWorktrees) bool { return p.Project == req.Project })
-	if i < 0 {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %q is not configured", req.Project)), nil
-	}
-	if req.Dir != "" {
-		dir := filepath.Clean(req.Dir)
-		known := filepath.Clean(list[i].Root) == dir || slices.ContainsFunc(list[i].Worktrees, func(wt string) bool { return filepath.Clean(wt) == dir })
-		if !known {
-			return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s is not the root or a worktree of %s", req.Dir, req.Project)), nil
-		}
+	if refusal != nil {
+		return *refusal, nil
 	}
 	return s.createSession(CreateSessionRequest{
 		Project:  req.Project,
