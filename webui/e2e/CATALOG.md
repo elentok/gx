@@ -1690,3 +1690,44 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - No `demo` write ends during the hold. The CLI-side writes (epic setting, move, epic creation) print "waiting for the migration of demo"; answer and ask wait in the server and print nothing.
   - After the release every write ends, the old ticket is `paused` and the new epic exists.
 - **Not covered:** the write during Retry migration, and a migration with the pause unit (no hook to hold either one).
+
+## 172. A failed step is not recorded, skip notes stay in the log
+
+- **Scenario:** `migrate-pending`.
+- **Steps:** wait for the first migration. Inject a passing step and a failing step, restart the bare server. Then inject a step with a skip note and restart again.
+- **Pass:**
+  - The list holds the passing step and not the failing one; the earlier names are unchanged. The strip of `demo` shows the failure text.
+  - After the notes step the list holds its name, the server log holds the note and no strip shows.
+
+## 173. Failed start and Migration block
+
+- **Scenario:** `migrate-broken`.
+- **Steps:** wait for the migration to end. Read `gx server status --json`, both projects' tickets and the page.
+- **Pass:**
+  - The server is running. `demo`'s ticket is claimed; `broken`'s ready ticket is not.
+  - The strip reads "broken: Migration blocked" with the error, the `gx tickets migrate` command, "Retry migration" and "Fix agent". It does not say "Paused" or "Missing trunk".
+
+## 174. Retry migration button ends the block
+
+- **Scenario:** `migrate-broken`.
+- **Steps:** fix `broken`'s bad ticket on disk. Click "Retry migration". Then inject a failing step and restart the bare server.
+- **Pass:** the strip goes with the server pid unchanged and `broken`'s ticket is claimed. After the failing start the strip is back with the new error.
+
+## 175. The retry command by hand ends the block
+
+- **Scenario:** `migrate-broken`.
+- **Steps:** fix the ticket. Run the strip's `gx tickets migrate '<dir>'` in a shell.
+- **Pass:** the strip goes with the pid unchanged and `broken`'s ticket is claimed.
+
+## 176. The Fix agent route ends the block
+
+- **Scenario:** `migrate-broken`.
+- **Steps:** fix the ticket. Click "Fix agent", then "Start gx agent". Run the retry command the way the session would (the fake agent runs none).
+- **Pass:** the dialog says "Agent started."; the strip goes with the pid unchanged and `broken`'s ticket is claimed.
+
+## 177. A stale failure record is cleared by the start-up run
+
+- **Scenario:** `migrate-broken`.
+- **Steps:** with the strip showing, fix the ticket and restart the bare server.
+- **Pass:** the start-up run passes and the strip goes.
+- **Not covered:** a click on Retry while a retry runs (no hook to hold a retry; server tests cover the refusal).

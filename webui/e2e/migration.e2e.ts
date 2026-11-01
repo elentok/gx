@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { expect, test, type Fixture } from "./fixture";
 
 // Flows for the migration the server runs when it starts (no flag, no command code). They run on the
@@ -125,7 +126,120 @@ test("171. Writes wait for the migration", async ({ start }) => {
   });
 });
 
-test("161. Server migrates on start", async ({ start }) => {
+const strip = (page: Page) => page.getByRole("status").filter({ hasText: "Migration blocked" });
+
+test("172. A failed step is not recorded, skip notes stay in the log", async ({ start, page }) => {
+  const fixture = await start("migrate-pending");
+  await migrated(fixture);
+  const first = await names(fixture, "demo");
+
+  await test.step("a failing step is left out of the list, the steps before it are in", async () => {
+    await fixture.setInject([{ name: "e2e-before" }, { name: "e2e-fails", fail: "e2e step failed" }]);
+    await restartBare(fixture);
+    const listed = await names(fixture, "demo");
+    expect(listed).toContain("e2e-before");
+    expect(listed).not.toContain("e2e-fails");
+    expect(listed).toEqual([...first, "e2e-before"]);
+    await expect(strip(page).filter({ hasText: "demo:" })).toContainText("e2e step failed");
+  });
+
+  await test.step("a step with skip notes puts them in the log and shows nothing on the strip", async () => {
+    await fixture.setInject([{ name: "e2e-noted", notes: ["e2e skip note"] }]);
+    await restartBare(fixture);
+    expect(await names(fixture, "demo")).toContain("e2e-noted");
+    expect(await serverLog(fixture)).toContain("e2e skip note");
+    await expect(strip(page)).toHaveCount(0, { timeout: 15_000 });
+  });
+});
+
+const brokenTicket = "broken/broken-epic/issues/90-bad.md";
+const goodTicket = "---\nid: \"90\"\nstatus: open\ntype: implement\n---\n# Bad\n";
+const brokenStrip = (page: Page) => strip(page).filter({ hasText: "broken:" });
+const pidOf = (fixture: Fixture) => fixture.serverCtl("pid");
+
+test("173. Failed start and Migration block", async ({ start, page }) => {
+  const fixture = await start("migrate-broken");
+  await migrated(fixture);
+
+  await test.step("the server runs and the other project works", async () => {
+    expect(JSON.parse(await fixture.cli("server", "status", "--json")).running).toBe(true);
+    await expect.poll(() => fixture.cli("tickets", "show", "demo:demo-epic/01"), { timeout: 30_000 }).toContain("claimed");
+  });
+
+  await test.step("the broken project's ready ticket is not claimed", async () => {
+    expect(await fixture.cli("tickets", "show", "broken:broken-epic/01")).not.toContain("claimed");
+  });
+
+  await test.step("the strip says Migration blocked with the error, the command and both buttons", async () => {
+    await expect(brokenStrip(page)).toBeVisible();
+    await expect(brokenStrip(page)).toContainText("broken: Migration blocked");
+    await expect(brokenStrip(page).locator("code")).toContainText("gx tickets migrate");
+    await expect(brokenStrip(page).locator("p").nth(1)).not.toBeEmpty();
+    await expect(brokenStrip(page).getByRole("button", { name: "Retry migration" })).toBeVisible();
+    await expect(brokenStrip(page).getByRole("button", { name: "Fix agent" })).toBeVisible();
+    await expect(page.getByRole("status").getByText("Paused")).toHaveCount(0);
+    await expect(page.getByRole("status").getByText("Missing trunk")).toHaveCount(0);
+  });
+});
+
+/** A migrate-broken fixture whose strip is showing. */
+const startBlocked = async (start: (scenario: string) => Promise<Fixture>, page: Page) => {
+  const fixture = await start("migrate-broken");
+  await migrated(fixture);
+  await expect(brokenStrip(page)).toBeVisible();
+  return fixture;
+};
+
+/** Ends a block the way `end` says, with no restart. */
+const endsBlock = async (name: string, page: Page, start: (scenario: string) => Promise<Fixture>, end: (fixture: Fixture) => Promise<void>) => {
+  const fixture = await startBlocked(start, page);
+  const pid = await pidOf(fixture);
+  await fixture.writeStoreFile(brokenTicket, goodTicket);
+  await end(fixture);
+  await expect(brokenStrip(page), name).toHaveCount(0, { timeout: 30_000 });
+  expect(await pidOf(fixture), `${name}: pid`).toBe(pid);
+  await expect.poll(() => fixture.cli("tickets", "show", "broken:broken-epic/01"), { timeout: 30_000 }).toContain("claimed");
+  return fixture;
+};
+
+test("174. Retry migration button ends the block", async ({ start, page }) => {
+  const fixture = await endsBlock("retry", page, start, async () => {
+    await brokenStrip(page).getByRole("button", { name: "Retry migration" }).click();
+  });
+  await test.step("the block comes back on the next failing start", async () => {
+    // Applied steps are not run again: the new failure needs a new step.
+    await fixture.setInject([{ name: "e2e-fails-again", fail: "e2e step failed again" }]);
+    await restartBare(fixture);
+    await expect(brokenStrip(page)).toContainText("e2e step failed again");
+  });
+});
+
+test("175. The retry command by hand ends the block", async ({ start, page }) => {
+  await endsBlock("by hand", page, start, async (fixture) => {
+    const dir = (await brokenStrip(page).locator("code").textContent())!.match(/gx tickets migrate '(.+)'/)![1];
+    await fixture.cli("tickets", "migrate", dir);
+  });
+});
+
+test("176. The Fix agent route ends the block", async ({ start, page }) => {
+  await endsBlock("fix agent", page, start, async (fixture) => {
+    const command = (await brokenStrip(page).locator("code").textContent())!;
+    await brokenStrip(page).getByRole("button", { name: "Fix agent" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Start gx agent" }).click();
+    await expect(page.getByText("Agent started.")).toBeVisible();
+    // The fake agent runs no command: run the one the session is told to run.
+    await fixture.cli("tickets", "migrate", command.match(/gx tickets migrate '(.+)'/)![1]);
+  });
+});
+
+test("177. A stale failure record is cleared by the start-up run", async ({ start, page }) => {
+  const fixture = await startBlocked(start, page);
+  await fixture.writeStoreFile(brokenTicket, goodTicket);
+  await restartBare(fixture);
+  await expect(brokenStrip(page)).toHaveCount(0, { timeout: 30_000 });
+});
+
+test("161. Server migrates on start",async ({ start }) => {
   const fixture = await start("migrate-pending");
   await migrated(fixture);
 
