@@ -109,6 +109,49 @@ func TestRun_GoToolsHoldCacheGateWhileRunning(t *testing.T) {
 	}
 }
 
+func TestRun_LostGoCacheRetriesOnce(t *testing.T) {
+	const lost = "pkg/a.go:3:2: could not import fmt (open /home/u/.cache/go-build/ab/abcd-d: no such file or directory)"
+	const compileErr = "pkg/a.go:3:2: undefined: x"
+	for _, name := range []string{"go-build", "go-vet", "go-test"} {
+		for _, tc := range []struct {
+			label     string
+			failures  int // runs that print msg and exit 1 before the tool passes
+			msg       string
+			wantExit  int
+			wantCalls int
+			wantLost  bool
+		}{
+			{"lost once then pass", 1, lost, ExitPass, 2, false},
+			{"lost twice", 2, lost, ExitFail, 2, true},
+			{"compile error", 1, compileErr, ExitFail, 1, false},
+		} {
+			t.Run(name+"/"+tc.label, func(t *testing.T) {
+				calls := filepath.Join(t.TempDir(), "calls")
+				script := `echo x >> '` + calls + `'; n=$(wc -l < '` + calls + `'); ` +
+					`if [ "$n" -le ` + string(rune('0'+tc.failures)) + ` ]; then echo '` + tc.msg + `'; exit 1; fi`
+				var out bytes.Buffer
+				o := Options{Dir: t.TempDir(), DataDir: t.TempDir(), Out: &out}
+				if got := Run(shellTool{name: name, script: script}, o); got != tc.wantExit {
+					t.Errorf("exit = %d, want %d\n%s", got, tc.wantExit, out.String())
+				}
+				data, err := os.ReadFile(calls)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if n := strings.Count(string(data), "\n"); n != tc.wantCalls {
+					t.Errorf("tool ran %d times, want %d", n, tc.wantCalls)
+				}
+				if got := strings.Contains(out.String(), "build cache was lost"); got != tc.wantLost {
+					t.Errorf("lost-cache message = %v, want %v\n%s", got, tc.wantLost, out.String())
+				}
+				if entries, _ := ReadIndex(o.DataDir); len(entries) != 1 {
+					t.Errorf("index lines = %d, want 1", len(entries))
+				}
+			})
+		}
+	}
+}
+
 func TestRun_UnavailableGateDoesNotFailGoTool(t *testing.T) {
 	blocker := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(blocker, nil, 0o644); err != nil {

@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -167,11 +168,24 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	branch, _ := git.CurrentBranch(dir)
 	treeID, _ := git.TreeID(dir)
 
-	releaseGate := registerGoBuild(tool, o.StateDir)
-	out, exit, err := execute(plan.Bin, plan.Argv, dir, withDefaults(o.Env, plan.Env), logFile)
-	releaseGate()
+	run := func() ([]byte, int, error) {
+		releaseGate := registerGoBuild(tool, o.StateDir)
+		defer releaseGate()
+		return execute(plan.Bin, plan.Argv, dir, withDefaults(o.Env, plan.Env), logFile)
+	}
+	out, exit, err := run()
+	cacheLost := false
+	if err == nil && exit != 0 && isGoTool(tool) && lostCache(out) {
+		// Another process cleaned the Go build cache mid-run. One retry
+		// rebuilds it; both runs share one log and one index line.
+		out, exit, err = run()
+		cacheLost = err == nil && exit != 0 && lostCache(out)
+	}
 	if err != nil {
 		return cantRun(o.Out, err.Error()), Outcome{}
+	}
+	if cacheLost {
+		fmt.Fprintln(o.Out, lostCacheMessage)
 	}
 	elapsed := time.Since(start)
 
@@ -203,11 +217,21 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	return report(tool, o, outcome, out, entry), outcome
 }
 
+func isGoTool(tool Tool) bool { return strings.HasPrefix(tool.Name(), "go-") }
+
+const lostCacheMessage = "brief: the Go build cache was lost (deleted while the build ran), twice. This is not a code error: run the command again."
+
+// lostCacheRe matches `could not import <pkg> (open <GOCACHE>/..-d: no such
+// file or directory)`.
+var lostCacheRe = regexp.MustCompile(`could not import [^\n]*\(open [^\n]*go-build[^\n]*: no such file or directory\)`)
+
+func lostCache(out []byte) bool { return lostCacheRe.Match(out) }
+
 // registerGoBuild holds the cache gate shared for a Go tool's run. Other tools
 // and an empty stateDir take no lock. The gate never fails a build: a state dir
 // that cannot be made leaves the run unregistered.
 func registerGoBuild(tool Tool, stateDir string) (release func()) {
-	if stateDir == "" || !strings.HasPrefix(tool.Name(), "go-") {
+	if stateDir == "" || !isGoTool(tool) {
 		return func() {}
 	}
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {

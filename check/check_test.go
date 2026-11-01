@@ -166,6 +166,39 @@ func TestRunGoStepHoldsCacheGate(t *testing.T) {
 	}
 }
 
+func TestRunGoStepRetriesLostCache(t *testing.T) {
+	for _, tc := range []struct {
+		failures  int
+		wantExit  int
+		wantCalls int
+	}{{1, 0, 2}, {2, 1, 2}} {
+		repo := testutil.TempRepo(t)
+		testutil.WriteFile(t, repo, "pkg/a.go", "package pkg\n")
+		bin := t.TempDir()
+		calls := filepath.Join(t.TempDir(), "calls")
+		testutil.WriteFile(t, bin, "go", "#!/bin/sh\necho x >> '"+calls+"'\nn=$(wc -l < '"+calls+"')\n"+
+			"if [ \"$n\" -le "+string(rune('0'+tc.failures))+" ]; then echo 'a.go:1:1: could not import fmt (open /c/go-build/ab/cd-d: no such file or directory)'; exit 1; fi\n")
+		if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		env := append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		res, err := Run(Options{Dir: repo, DataDir: t.TempDir(), StateDir: filepath.Join(t.TempDir(), "state"), Kinds: []string{"test"}, Env: env})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Exit != tc.wantExit {
+			t.Errorf("failures=%d: exit = %d, want %d", tc.failures, res.Exit, tc.wantExit)
+		}
+		data, err := os.ReadFile(calls)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := strings.Count(string(data), "\n"); n != tc.wantCalls {
+			t.Errorf("failures=%d: go ran %d times, want %d", tc.failures, n, tc.wantCalls)
+		}
+	}
+}
+
 func TestRunFailingBatchFailsTheKind(t *testing.T) {
 	repo := repoWithChecks(t, `{"format":"for f in {files}; do test \"$f\" != 'three.txt' || exit 1; done"}`)
 	for _, n := range []string{"one.txt", "two.txt", "three.txt", "four.txt"} {
