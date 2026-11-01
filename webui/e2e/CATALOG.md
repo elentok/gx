@@ -1908,6 +1908,38 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - The error-blocked notice has Screen only and Send stays off ("Blocked."); Type plus Enter leaves Blocked.
 - **Reach:** only a Blocked or stalled session's notice opens Screen on the Agents page, so the other states are driven through the CLI route the buttons call.
 
+## 157. Close dialog
+
+- **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-permission.e2e.ts`; `fixture.controlClaude` blocks the session at a question dialog, `fixture.input` is the fake's input log. The test stops the page's `/v1/snapshot` reads after it opened, so the notice outlives the Blocked state.
+- **Steps:**
+  1. Open an Idle Claude session blocked at a dialog; click Close dialog.
+  2. Click Close dialog again on the same notice.
+  3. Repeat on the design page `demo:design-auto`.
+- **Pass:**
+  - The first click sends Esc alone and the session turns Idle.
+  - The second click sends nothing and the notice shows a refusal.
+  - The design page does the same.
+
+## 158. Allow once and Deny
+
+- **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-permission.e2e.ts`; the seeded Blocked sessions cover a Claude prompt gx cannot read, one whose first option is "Yes, and don't ask again", one that ignores Enter, and three Codex ones (hook, screen only, unreadable screen). `fixture.controlClaude` blocks Idle Claude sessions at a readable Bash prompt; `fixture.input` and `fixture.codexDecisions` are the fakes' logs.
+- **Steps:**
+  1. Block two Idle Claude sessions at a Bash prompt; read the notice, press Allow once on one and Deny on the other.
+  2. On the unreadable Claude prompt press Allow once, then Deny.
+  3. On the "don't ask again" prompt press Allow once.
+  4. On a readable prompt press Down in the Screen key bar, redraw the dialog with the cursor on option 2, close Screen and press Allow once.
+  5. On the session that ignores Enter press Allow once.
+  6. On the Codex hook session press Allow once. On the Codex screen-only session press Deny. On the Codex unreadable session press Allow once, then Deny.
+  7. On the design page block the design session at a readable prompt and press Allow once; then at an unreadable one and press Allow once, then Deny.
+- **Pass:**
+  - The notice shows the prompt text with Screen, Deny and Allow once; Allow once sends Enter alone, Deny sends Esc alone.
+  - An unreadable Claude prompt shows no text; Allow once reads "This request needs a real answer. Use the key bar in Screen." and sends nothing; Deny works.
+  - The "don't ask again" prompt and the cursor on option 2 give the same refusal and the fake reads no Enter.
+  - The ignored Enter reads "The answer did not reach the session. Check Screen." after the server's 45s grace, and the session stays Blocked.
+  - Codex: the hook decision is `allow`; screen-only Deny leaves Blocked; on the unreadable screen Allow once is refused and Deny leaves Blocked.
+  - The design page shows the same text, buttons and refusals.
+- **Reach:** the fake claude draws no cursor, so step 4 arms the redrawn dialog by hand after Down has reached the fake.
+
 ## 159. Exit with /exit
 
 - **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-commands-output.e2e.ts`.

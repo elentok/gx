@@ -342,7 +342,12 @@ func (c *codexFake) permissionScreen(command string, rows []string, resume func(
 			return nil
 		case codexui.DenyKey:
 			fmt.Fprint(c.out, "denied by the person\r\n")
-			return c.finishTurn()
+			if err := c.finishTurn(); err != nil {
+				return err
+			}
+			// A dialog opened by a control has no turn to finish, which is what reports idle.
+			c.report("idle")
+			return nil
 		}
 		c.onKey = wait
 		return nil
