@@ -234,10 +234,12 @@ There is no efficiency ratio. Limit burn and tokens are separate charts on the s
     names the harness, and the rest in Other, so that Codex history is not dropped.
 76. As the person running gx, I want a dry run and a printed summary, so that I see what the step
     would write before it writes.
-77. As the person running gx, I want the step reachable through `gx server restart --migrate` like the
-    other steps, so that an upgrade can run it.
-78. As the person running gx, I want the release notes to tell me to run the step soon after
-    upgrading, so that transcripts do not age out before the rebuild reads them.
+77. As the person running gx, I want the rebuild to be a named migration step that the server applies
+    at its first start after the upgrade (ADR 0045, auto-migration), so that I run nothing by hand
+    and transcripts do not age out before the rebuild reads them.
+78. As the person running gx, I want the rebuild to finish before the token poll starts, and a manual
+    `gx tickets migrate <path>` while the server runs to skip every day the live poll already wrote,
+    so that a live day is never rewritten.
 
 **Records and parity**
 
@@ -415,8 +417,9 @@ There is no efficiency ratio. Limit burn and tokens are separate charts on the s
 
 **Migration step**
 
-- One `gx tickets migrate` step (also reachable through `gx server restart --migrate`), run once by
-  the person, with a dry run and a printed summary like the other steps. It rebuilds daily tokens and
+- One named, per-project step in the migration registry (ADR 0045, auto-migration). The server applies
+  it at start-up and records it on the project's applied list, so it runs once. `gx tickets migrate
+  <path>` reruns it by hand, with a dry run and a printed summary like the other steps. It rebuilds daily tokens and
   dollars from transcripts, up to the transcript age limit (about 30 days), into the token ledger.
 - It skips every day that already has live rows, so a live day is never rewritten and a second run
   changes nothing. It covers only days before the ledger's first live row.
@@ -425,7 +428,11 @@ There is no efficiency ratio. Limit burn and tokens are separate charts on the s
   are included where session metadata or a ticket log names the harness; the rest go to Other.
 - Each rebuilt bucket is flagged "rebuilt". The step sets the ledger's first rebuilt day. Dollars use
   the same pricing code. It never writes limit history.
-- How the step writes the ledger safely when a server is running is the implementer's choice.
+- The server runs the step before the token poll starts, because no work is scheduled until all
+  migrations end. The ledger file has its own file lock, which the poll and the step both take. A
+  manual run while the server is up takes that lock and skips every day the live poll already wrote.
+  A failure saves a Migration block like any other step. The step keys rows by project, so it runs per
+  project; transcripts with no project are rebuilt once, by the first project run of the pass.
 
 **Parity and contracts**
 
@@ -448,7 +455,6 @@ There is no efficiency ratio. Limit burn and tokens are separate charts on the s
   and the tooltip text beyond the quoted lines.
 - Whether a ledger change publishes a throttled event so the open Stats page refreshes, and the
   interval.
-- How the migrate step coordinates with a running server.
 
 ## Testing Decisions
 
@@ -564,7 +570,7 @@ CLI and server verb checks:
 
 - `gx server stats --json` on `limit-burn` (shape `stats`) has the four limit burn series, the weekly
   forecasts and the Tokens and Spend series by agent group, and matches what Flow C and Flow D read.
-- `gx budget usage --json` on shape `menu` carries the weekly burn comparison and forecast.
+- `gx usage summary --json` on shape `menu` carries the weekly burn comparison and forecast.
 - `gx tickets migrate --dry-run` on a fixture store prints the summary and writes nothing; the real
   run writes rebuilt days; a second run prints no changes and exits 0.
 - Restart the server on the same state directory (Go test, seam 1): the ledger and limit history
@@ -665,10 +671,10 @@ Story entries:
 74. Go test (seam 3): the project source and "no project".
 75. Go test (seam 3): Codex where named, Other for the rest.
 76. CLI check: `--dry-run` writes nothing and prints the summary.
-77. CLI check: `gx server restart --migrate` runs the step.
-78. Release notes check (verify ticket reads the release notes text for the instruction).
+77. Go test (seam 1): a server start on a store without the step on its applied list runs it and records it; the token poll starts after it.
+78. Go test (seam 3): a manual run with live rows present skips those days.
 79. CLI check: `gx server stats --json`.
-80. CLI check: `gx budget usage --json`.
+80. CLI check: `gx usage summary --json`.
 81. Check the new ADR exists and states that it supersedes the "no precomputed daily table" part of
     ADR 0041 for tokens and spend.
 82. Check the glossary has the token ledger entry and the agent group word, and does not use "kind".
