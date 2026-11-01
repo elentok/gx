@@ -1,4 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
 import type { Tone } from "../tone";
 
 export interface CommandMenuSegment {
@@ -55,7 +56,7 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
         <Note>{compact ? "Send sends it as typed." : `No command matches ${typed}. Cmd/Ctrl+Enter sends it as typed.`}</Note>
       )}
       {showRows && rows.length > 0 && (
-        <Box role="listbox" aria-label="Commands" display="flex" flexDirection="column" p="1.5" gap="1px">
+        <Box role="listbox" aria-label="Commands" display="flex" flexDirection="column" p="1.5" gap="1px" maxH="352px" overflowY="auto">
           {rows.map((row, i) => (
             <Row key={`${row.source}:${row.name}`} row={row} active={i === selected} compact={compact} tone={tone} onPick={() => onPick(i)} />
           ))}
@@ -82,8 +83,14 @@ function Note({ warn = false, children }: { warn?: boolean; children: string }) 
 }
 
 function Row({ row, active, compact, tone, onPick }: { row: CommandMenuRow; active: boolean; compact: boolean; tone: Tone; onPick: () => void }) {
+  // The list scrolls inside the menu, so the arrow keys keep the selected row in view.
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [active]);
   return (
     <Box
+      ref={ref}
       role="option"
       aria-selected={active}
       onMouseDown={(e) => e.preventDefault()}
