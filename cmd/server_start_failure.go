@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/server"
 )
 
 const (
@@ -25,11 +27,21 @@ func saveStartFailure(stateDir string, svc serviceManager) string {
 		return ""
 	}
 	defer f.Close()
+	status := svc.Status()
+	saveStartIncident(stateDir, status)
 	fmt.Fprintf(f, "=== %s: server did not answer ===\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(f, "--- supervisor state ---\n%s\n", strings.TrimSpace(svc.Status()))
+	fmt.Fprintf(f, "--- supervisor state ---\n%s\n", strings.TrimSpace(status))
 	fmt.Fprintf(f, "--- last %d lines of server.stderr ---\n%s\n\n",
 		startFailureStderrLines, tailLines(filepath.Join(stateDir, "server.stderr"), startFailureStderrLines))
 	return path
+}
+
+// saveStartIncident leaves the note the next server turns into a ticket. It
+// overwrites: one open incident is enough.
+func saveStartIncident(stateDir, status string) {
+	note := fmt.Sprintf("Time: %s\n\n%s\n", time.Now().Format(time.RFC3339), strings.TrimSpace(status))
+	_ = os.MkdirAll(stateDir, 0o700)
+	_ = os.WriteFile(server.StartIncidentPath(stateDir), []byte(note), 0o600)
 }
 
 func tailLines(path string, n int) string {

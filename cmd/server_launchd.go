@@ -272,6 +272,7 @@ func (a *launchdAgent) Start() error {
 		if err == nil {
 			switch {
 			case strings.Contains(out, "spawn failed"):
+				saveStartIncident(a.stateDir, out)
 				return a.Install()
 			case strings.Contains(out, "state = running"):
 				return nil

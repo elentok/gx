@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server"
 )
 
 func newTestAgent(t *testing.T) (*launchdAgent, *[][]string) {
@@ -165,5 +167,19 @@ func TestLaunchdStart_LeavesARunningJobAlone(t *testing.T) {
 
 	if len(*calls) != 1 {
 		t.Errorf("launchctl calls = %v, want only the kickstart", *calls)
+	}
+}
+
+func TestLaunchdStart_LeavesAnIncidentNoteWhenItReloadsTheJob(t *testing.T) {
+	a, _ := newTestAgent(t)
+	a.output = func(args ...string) (string, error) { return "job state = spawn failed\n", nil }
+
+	if err := a.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	note, err := os.ReadFile(server.StartIncidentPath(a.stateDir))
+	if err != nil || !strings.Contains(string(note), "spawn failed") {
+		t.Fatalf("incident note = %q, %v; want the launchd state", note, err)
 	}
 }

@@ -885,6 +885,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(usageDone); s.keepUsageScanned(freshCtx) }()
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
+	s.fileStartIncident(time.Now())
 	var err error
 	select {
 	case <-ctx.Done():
