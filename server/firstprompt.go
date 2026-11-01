@@ -5,14 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/transcript"
 )
 
 // signalFirstIdle names the fallback in the debug line when no ready report
@@ -149,6 +152,8 @@ func failureReason(err error) (reason string, clearNeeded bool) {
 		return withClearHint("input not empty"), false
 	case errors.Is(err, claudeui.ErrStartTimeout):
 		return "agent never started", true
+	case errors.Is(err, agentrunner.ErrNotDelivered):
+		return "prompt not delivered: " + strings.TrimPrefix(err.Error(), agentrunner.ErrNotDelivered.Error()+": "), true
 	}
 	return "prompt never reached the input", true
 }
@@ -227,7 +232,8 @@ func (f *firstPrompt) start(signal, prompt string) {
 			f.log.Info("draft would not clear")
 			f.s.raiseGxActionable(f.dir, draftReason, []string{prompt})
 		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
-			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked):
+			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked),
+			errors.Is(err, agentrunner.ErrNotDelivered):
 			f.failed(prompt, err)
 		case err != nil:
 			f.log.Warn("type first prompt", "err", err)
@@ -295,8 +301,65 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 	case <-f.cancel:
 		return errNudgeCancelled
 	default:
+	}
+	return f.proveDelivered(run, prompt)
+}
+
+// proveDelivered checks that a claude session's slash prompt reached its
+// transcript, resending while it did not. Other harnesses write no such
+// transcript, so they keep the unchecked send.
+func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
+	meta, err := readSessionMeta(f.dir)
+	if err != nil || (meta.Harness != "" && meta.Harness != string(harness.Claude)) {
 		return nil
 	}
+	// Claude slugs its resolved cwd, so a symlinked session dir needs resolving.
+	cwd, err := filepath.EvalSymlinks(meta.Dir)
+	if err != nil {
+		cwd = meta.Dir
+	}
+	path, err := f.s.transcriptPath(cwd, meta.ConversationID)
+	if err != nil {
+		f.log.Warn("first prompt proof skipped", "err", err)
+		return nil
+	}
+	caps := claudeui.DefaultLaunchProofCaps
+	caps.Grace = cmp.Or(f.s.cfg.LaunchProofCaps.Grace, caps.Grace)
+	caps.UnknownGrace = cmp.Or(f.s.cfg.LaunchProofCaps.UnknownGrace, caps.UnknownGrace)
+	caps.Poll = cmp.Or(f.s.cfg.LaunchProofCaps.Poll, caps.Poll)
+	caps.ResendEvery = cmp.Or(f.s.cfg.LaunchProofCaps.ResendEvery, caps.ResendEvery)
+	p := claudeui.LaunchProof{
+		FirstUser: func() (string, bool, error) {
+			msgs, _, err := transcript.ReadChat(path)
+			if err != nil {
+				return "", false, err
+			}
+			for _, m := range msgs {
+				if m.Role == transcript.ChatRolePerson {
+					return m.Text, true, nil
+				}
+			}
+			return "", false, nil
+		},
+		Pane: func() (string, error) {
+			rows, _, err := run.holder.Screen(0)
+			return strings.Join(rows, "\n"), err
+		},
+		Resend: func() error {
+			select {
+			case <-f.cancel:
+				return errNudgeCancelled
+			case <-f.s.sessionWatches.stop:
+				return errServerStopping
+			default:
+			}
+			return run.typeStep(0, prompt)
+		},
+		Report: func(d claudeui.NudgeDecision) { f.log.Debug("first prompt nudge", "decision", string(d)) },
+		Now:    time.Now,
+		Sleep:  time.Sleep,
+	}
+	return claudeui.CheckLaunchDelivered(p, prompt, caps)
 }
 
 // holderPrompter is the part of claudeui.Prompter every typed prompt shares:

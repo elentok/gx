@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 )
 
@@ -22,6 +23,7 @@ func TestFailureReason(t *testing.T) {
 		{"input not empty", fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, claudeui.ErrInputNotEmpty), "input not empty." + clearInputHint, false},
 		{"start timeout", claudeui.ErrStartTimeout, "agent never started", true},
 		{"stuck", claudeui.ErrStuckSubmission, "prompt never reached the input", true},
+		{"launch prompt not delivered", fmt.Errorf("%w: %q: Unknown command:", agentrunner.ErrNotDelivered, "/x"), `prompt not delivered: "/x": Unknown command:`, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

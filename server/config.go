@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/sound"
@@ -168,6 +169,10 @@ type Config struct {
 	// PromptGrace bounds each wait for a typed prompt's turn to start
 	// before it is nudged; zero means claudeui.DefaultNudgeCaps.
 	PromptGrace time.Duration
+	// LaunchProofCaps bound the check that a claude session's first slash
+	// prompt reached the transcript; a zero field means the matching
+	// claudeui.DefaultLaunchProofCaps one.
+	LaunchProofCaps claudeui.LaunchProofCaps
 
 	// CompactRewaitTimeout bounds recovery's R7 wait; zero means
 	// DefaultCompactRewaitTimeout.
