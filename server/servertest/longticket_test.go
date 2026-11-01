@@ -72,6 +72,77 @@ func TestLongTicket_AlertsOnceMarksTheTicketAndKeepsTheSessionRunning(t *testing
 	}
 }
 
+func longTicketBanners(h *Harness) int {
+	n := 0
+	for _, b := range h.Banners.Sent() {
+		if strings.Contains(b.Title, "Long ticket") {
+			n++
+		}
+	}
+	return n
+}
+
+func TestLongTicket_ASecondLongTicketAddsSeenAgainNotANewDraft(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	WriteTicketWith(t, store, "proj", "epic-a", "01", "first", TicketOpts{})
+	WriteTicketWith(t, store, "proj", "epic-b", "01", "second", TicketOpts{})
+	SetProjectRepo(t, store, "proj", repo)
+	h := StartWithStore(t, store, func(c *server.Config) {
+		c.LongTicketTurns = longTicketTurns
+		c.RecoverySettings.FollowUps = "proj:follow-ups"
+	})
+	longSession(h, longTicketTurns)
+	for _, addr := range []string{"proj:epic-a/01", "proj:epic-b/01"} {
+		if res, err := h.Client.QueueAdd(context.Background(), addr, "claude"); err != nil || res.Refused {
+			t.Fatalf("add %s: %+v, %v", addr, res, err)
+		}
+	}
+
+	WaitFor(t, 120*time.Second, "both tickets marked and the repeat noted", func() bool {
+		return strings.Contains(ticketFile(t, store, "epic-a"), "long_ticket_turns: 3") &&
+			strings.Contains(ticketFile(t, store, "epic-b"), "long_ticket_turns: 3") &&
+			strings.Contains(ticketFile(t, store, "follow-ups"), "Seen again")
+	})
+	followUps := ticketFile(t, store, "follow-ups")
+	if n := strings.Count(followUps, "Seen again"); n != 1 {
+		t.Errorf("Seen again lines = %d, want 1:\n%s", n, followUps)
+	}
+	files, _ := filepath.Glob(filepath.Join(store, "proj", "follow-ups", "issues", "*.md"))
+	if len(files) != 1 {
+		t.Errorf("follow-up drafts = %d, want 1: %v", len(files), files)
+	}
+}
+
+func TestLongTicket_ANonImplementTicketGetsNoMarkBannerOrDraft(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	WriteTicketWith(t, store, "proj", "epic-a", "01", "research", TicketOpts{Type: "research"})
+	SetProjectRepo(t, store, "proj", repo)
+	h := StartWithStore(t, store, func(c *server.Config) {
+		c.LongTicketTurns = longTicketTurns
+		c.RecoverySettings.FollowUps = "proj:follow-ups"
+	})
+	longSession(h, longTicketTurns*2)
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	WaitFor(t, 30*time.Second, "the session to start", func() bool {
+		return strings.Contains(ticketFile(t, store, "epic-a"), "status: claimed")
+	})
+	// The guards tick once per 30s poll; wait past the first tick.
+	time.Sleep(35 * time.Second)
+	if strings.Contains(ticketFile(t, store, "epic-a"), "long_ticket_turns") {
+		t.Error("the research ticket was marked")
+	}
+	if n := longTicketBanners(h); n != 0 {
+		t.Errorf("long-ticket banners = %d, want 0", n)
+	}
+	if files, _ := filepath.Glob(filepath.Join(store, "proj", "follow-ups", "issues", "*.md")); len(files) != 0 {
+		t.Errorf("follow-up drafts = %v, want none", files)
+	}
+}
+
 func TestLongTicket_ALaunchClearsTheMarkOfAnEarlierOne(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
