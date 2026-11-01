@@ -294,10 +294,9 @@ func run(args []string) (err error) {
 	if err := f.seed(sc); err != nil {
 		return err
 	}
-	if sc.migrate {
-		if err := f.commitStore(); err != nil {
-			return fmt.Errorf("commit store: %w", err)
-		}
+	// The server migrates on every start, and its steps read the store's git log.
+	if err := f.commitStore(); err != nil {
+		return fmt.Errorf("commit store: %w", err)
 	}
 	if hideCodex {
 		if err := os.Remove(filepath.Join(binDir, "codex")); err != nil {

@@ -14,12 +14,23 @@ const goodTicket = "---\nid: \"90\"\nstatus: open\ntype: implement\n---\n# Bad\n
 const demoEpic = "demo/demo-epic/ticket.md";
 const legacyKey = "provisional_destination";
 
+/** Applied steps are not run again: empty the lists so the next server start runs them all on both projects. */
+const forgetApplied = async (fixture: Fixture) => {
+  for (const project of ["demo", "broken"]) await fixture.writeStoreFile(`${project}/applied-migrations.txt`, "");
+};
+
+/** Puts the bad ticket in `broken` and makes the next server start try to migrate it. */
+const breakBroken = async (fixture: Fixture) => {
+  await fixture.writeStoreFile(brokenTicket, badTicket);
+  await forgetApplied(fixture);
+};
+
 /** A restart-projects fixture ready to restart through the real gx, with `broken` unable to migrate. */
 const startBroken = async (start: (scenario: string, opts?: { reloads?: number }) => Promise<Fixture>, reloads: number) => {
   const fixture = await start("restart-projects", { reloads });
   await fixture.setRestartControl("check.json", passing("fixture-next"));
   await fixture.setRestartControl("start", "up");
-  await fixture.writeStoreFile(brokenTicket, badTicket);
+  await breakBroken(fixture);
   const epic = await fixture.readStoreFile(demoEpic);
   await fixture.writeStoreFile(demoEpic, epic.replace(/^---\n/, `---\n${legacyKey}: main\n`));
   return fixture;
@@ -31,10 +42,10 @@ const restartNow = async (page: Page) => {
   await expectReloaded(page);
 };
 
-const strip = (page: Page) => page.getByRole("status").filter({ hasText: "broken: migration failed" });
+const strip = (page: Page) => page.getByRole("status").filter({ hasText: "broken: Migration blocked" });
 
 test("139. Restart with a failed migration", async ({ page, start }) => {
-  const fixture = await startBroken(start, 3);
+  const fixture = await startBroken(start, 4);
   const before = await pidLine(fixture);
 
   await test.step("the server comes back although broken fails", async () => {
@@ -49,29 +60,39 @@ test("139. Restart with a failed migration", async ({ page, start }) => {
     expect(epic).not.toContain(legacyKey);
   });
 
-  await test.step("the strip shows on two pages", async () => {
-    await expect(strip(page)).toBeVisible();
+  await test.step("the strip shows on two pages, with Retry migration", async () => {
+    await expect(strip(page)).toBeVisible({ timeout: 30_000 });
     await expect(strip(page)).toContainText("status");
     await expect(strip(page).locator("code")).toContainText("gx tickets migrate");
+    await expect(strip(page).getByRole("button", nav("Retry migration"))).toBeVisible();
     await page.getByRole("link", { name: "demo-epic" }).first().click();
     await expect(strip(page)).toBeVisible();
     await expect(strip(page).locator("code")).toContainText("gx tickets migrate");
   });
 
-  await test.step("fixing the project and migrating clears the strip", async () => {
+  await test.step("fixing the project and Retry migration clears the strip", async () => {
+    await fixture.writeStoreFile(brokenTicket, goodTicket);
+    await strip(page).getByRole("button", nav("Retry migration")).click();
+    await expect(strip(page)).toHaveCount(0, { timeout: 30_000 });
+  });
+
+  await test.step("the command by hand clears it too", async () => {
+    await breakBroken(fixture);
+    await restartNow(page);
+    await expect(strip(page)).toBeVisible({ timeout: 30_000 });
     const dir = (await strip(page).locator("code").textContent())!.match(/gx tickets migrate '(.+)'/)![1];
     await fixture.writeStoreFile(brokenTicket, goodTicket);
     await fixture.cli("tickets", "migrate", dir);
-    await expect(strip(page)).toHaveCount(0, { timeout: 15_000 });
+    await expect(strip(page)).toHaveCount(0, { timeout: 30_000 });
   });
 
   await test.step("a passing restart clears it too", async () => {
-    await fixture.writeStoreFile(brokenTicket, badTicket);
+    await breakBroken(fixture);
     await restartNow(page);
-    await expect(strip(page)).toBeVisible();
+    await expect(strip(page)).toBeVisible({ timeout: 30_000 });
     await fixture.writeStoreFile(brokenTicket, goodTicket);
     await restartNow(page);
-    await expect(strip(page)).toHaveCount(0, { timeout: 15_000 });
+    await expect(strip(page)).toHaveCount(0, { timeout: 30_000 });
   });
 });
 
@@ -81,7 +102,7 @@ test("140. Fix agent for a failed migration", async ({ page, context, start }) =
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const fixture = await startBroken(start, 1);
   await restartNow(page);
-  await expect(strip(page)).toBeVisible();
+  await expect(strip(page)).toBeVisible({ timeout: 30_000 });
   const error = (await strip(page).locator("p").nth(1).textContent())!;
   const before = (await sessions(fixture)).length;
 
@@ -174,7 +195,7 @@ test("143. Restart server, server does not return", async ({ page, start }) => {
   await openDialog(page);
   await restartButton(page).click();
   await expect(dialog(page)).toContainText("Restarting...");
-  await expect(dialog(page)).toContainText("The server did not return. It may still be migrating.", { timeout: 75_000 });
+  await expect(dialog(page)).toContainText("The server did not return. It may have failed to start.", { timeout: 75_000 });
   await expect(dialog(page)).toContainText("gx server start");
   expect(logs.length).toBeGreaterThan(0);
   const shown = (await dialog(page).textContent())!.match(/restart log at (.+?), or run/)![1];

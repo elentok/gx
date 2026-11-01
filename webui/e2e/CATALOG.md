@@ -1559,32 +1559,33 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 ## 137. Restart dialog, running agents
 
 - **Scenario:** `restart-agents` (held, one running agent), `start` = `up`; one reload allowed.
-- **Steps:** open the dialog until its check counts the agent; click Restart.
-- **Pass:** the dialog reads "1 agent is running. Agents keep running through the restart." and "A migration runs while the agents work."; the restart completes (reload, new pid).
+- **Steps:** open the dialog until its check counts the agent; read it. Rewrite `check.json` with a pending step in `demo`, reopen, read it; click Restart.
+- **Pass:** the dialog reads "1 agent is running. Agents keep running through the restart."; with nothing pending it does not read "A migration runs while the agents work."; with a pending step it does; the restart completes (reload, new pid).
 
 ## 138. Restart dialog, dry run
 
 - **Scenario:** `restart-projects` (project `broken` fails its dry run), `start` = `up`; one reload allowed.
 - **Steps:** open the dialog; click "Restart anyway".
-- **Pass:** the alert shows "broken: fixture migration failed"; the button reads "Restart anyway" (no plain "Restart"); the click restarts (reload, new pid).
+- **Pass:** the alert shows "broken: fixture migration failed" and says the project will be in Migration block after the restart and can be retried from the strip; the button reads "Restart anyway" (no plain "Restart"); the click restarts (reload, new pid). Nothing is saved as a failure by the restart.
 
 ## 139. Restart with a failed migration
 
-- **Scenario:** `restart-projects`, `start` = `up`; three reloads allowed (three restarts). The flow writes a ticket with `status: bogus` into `broken`'s epic, so the real migration of `broken` fails, and `provisional_destination` into `demo`'s epic ticket.md.
+- **Scenario:** `restart-projects`, `start` = `up`; four reloads allowed. The flow writes a ticket with `status: bogus` into `broken`'s epic, so the migration of `broken` fails when the new server starts, and `provisional_destination` into `demo`'s epic ticket.md.
 - **Steps:**
-  1. Restart; wait for the reload.
+  1. Empty the projects' applied-migrations lists (applied steps do not rerun), then restart; wait for the reload. Each later break empties the lists again.
   2. On the Epics page and on the demo-epic page, read the strip.
-  3. Rewrite the bad ticket to valid and run `gx tickets migrate '<dir from the strip>'`.
-  4. Break it again and restart; then fix it and restart again.
+  3. Rewrite the bad ticket to valid and click Retry migration.
+  4. Break it again and restart; rewrite it to valid and run `gx tickets migrate '<dir from the strip>'`.
+  5. Break it again and restart; then fix it and restart again.
 - **Pass:**
   - The pid changes and `gx server status` says running although `broken` failed.
-  - `demo`'s epic ticket.md now has `destination_unconfirmed` and no `provisional_destination`.
-  - On both pages a strip reads "broken: migration failed" with the error and a `gx tickets migrate` command.
-  - The strip is gone after the manual migrate, shows again after the failing restart, and is gone after the passing restart.
+  - `demo`'s epic ticket.md now has `destination_unconfirmed` and no `provisional_destination` (rewritten at start).
+  - On both pages a strip reads "broken: Migration blocked" with the error, a `gx tickets migrate` command and a Retry migration button.
+  - The strip is gone after Retry migration and after the manual migrate, shows again after each failing restart, and is gone after the passing restart.
 
 ## 140. Fix agent for a failed migration
 
-- **Scenario:** `restart-projects` with the failed `broken` migration of flow 139; one reload allowed (the restart).
+- **Scenario:** `restart-projects` with the failed start of `broken` from flow 139; one reload allowed (the restart).
 - **Steps:** click "Fix agent" on the strip; Copy; Start; open the Agents tab; in a second page click Fix agent and Start again.
 - **Pass:**
   - The dialog shows "The migration of project broken failed with:" and the error; Copy reads "Copied" and the clipboard holds the prompt.
@@ -1609,7 +1610,7 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 - **Scenario:** `restart-projects`, `start` unset (the fake refuses, so no new server comes up); one reload allowed; the test timeout is 180 s.
 - **Steps:** open the dialog; click Restart; wait for the 60 s timeout; set `start` = `up` and run `gx server restart --continue` by hand.
 - **Pass:**
-  - After 60 s the dialog says "The server did not return. It may still be migrating." and names the restart log and `gx server start`.
+  - After 60 s the dialog says "The server did not return. It may have failed to start." and names the restart log and `gx server start`.
   - The log path shown equals `restart_log` in the check and restart responses.
   - After the hand start the tab reloads by itself.
 
@@ -1731,3 +1732,12 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 - **Steps:** with the strip showing, fix the ticket and restart the bare server.
 - **Pass:** the start-up run passes and the strip goes.
 - **Not covered:** a click on Retry while a retry runs (no hook to hold a retry; server tests cover the refusal).
+
+## 178. Restart dialog with and without pending steps
+
+- **Scenario:** `restart-projects` (project `broken` has pending steps and fails its dry run).
+- **Steps:** open the dialog; close it; rewrite `check.json` with nothing pending and every project ok; open it again.
+- **Pass:**
+  - With a pending step the alert names "broken: fixture migration failed" and the button reads "Restart anyway".
+  - With nothing pending the check answers at once, there is no alert and the button reads "Restart".
+  - The line "A migration runs while the agents work." shows only when an agent runs and some project has pending steps (flow 137).

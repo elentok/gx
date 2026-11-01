@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test, type Fixture } from "./fixture";
+import { dialog, openDialog, passing, restartButton } from "./restart-helpers";
 
 // Flows for the migration the server runs when it starts (no flag, no command code). They run on the
 // migrate-* scenarios: the real `gx server` runs on the store, and `fixture.serverCtl` kills and starts
@@ -237,6 +238,30 @@ test("177. A stale failure record is cleared by the start-up run", async ({ star
   await fixture.writeStoreFile(brokenTicket, goodTicket);
   await restartBare(fixture);
   await expect(brokenStrip(page)).toHaveCount(0, { timeout: 30_000 });
+});
+
+test("178. Restart dialog with and without pending steps", async ({ start, page }) => {
+  const fixture = await start("restart-projects");
+  const alert = () => dialog(page).getByRole("alert");
+
+  await test.step("a project with a pending step reports its dry-run failure", async () => {
+    await openDialog(page);
+    await expect(alert()).toContainText("broken: fixture migration failed");
+    await expect(restartButton(page)).toHaveText("Restart anyway");
+  });
+
+  await test.step("with nothing pending the check is ok at once and the button is plain", async () => {
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toHaveCount(0);
+    await fixture.setRestartControl("check.json", passing("fixture-next"));
+    const began = Date.now();
+    await openDialog(page);
+    await expect(restartButton(page)).toHaveText("Restart");
+    await expect(restartButton(page)).toBeEnabled();
+    expect(Date.now() - began).toBeLessThan(10_000);
+    await expect(dialog(page).getByRole("alert")).toHaveCount(0);
+    await expect(dialog(page)).not.toContainText("A migration runs while the agents work.");
+  });
 });
 
 test("161. Server migrates on start",async ({ start }) => {

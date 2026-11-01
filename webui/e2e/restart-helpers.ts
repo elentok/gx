@@ -32,14 +32,15 @@ export const buildText = async (page: Page) => {
 };
 
 /** What `restart-check` prints when every project passes, on restart-projects (projects demo and broken). */
-export const passing = (version: string, config: { ok: boolean; error?: string } = { ok: true }) =>
+export const passing = (
+  version: string,
+  config: { ok: boolean; error?: string } = { ok: true },
+  pending: Record<string, number> = {},
+) =>
   JSON.stringify({
     version,
     config,
-    projects: [
-      { name: "demo", ok: true, files: [] },
-      { name: "broken", ok: true, files: [] },
-    ],
+    projects: ["demo", "broken"].map((name) => ({ name, ok: true, files: [], pending: pending[name] ?? 0 })),
   });
 
 /** The pid line of `gx server status` (it has no start time): it changes on every restart. */

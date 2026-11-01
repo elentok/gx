@@ -35,6 +35,9 @@ var shellName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // commitStore gives the ticket store the history a real one has: the history
 // backfill steps read the store's git log, and fail on a repo with no commit.
 func (f *fixture) commitStore() error {
+	if _, err := os.Stat(f.store); err != nil {
+		return nil // a scenario with no tickets has no store to commit
+	}
 	for _, args := range [][]string{{"init", "-b", "main"}, {"add", "."}, {"commit", "-m", "fixture store"}} {
 		if err := f.git(f.store, args...); err != nil {
 			return err

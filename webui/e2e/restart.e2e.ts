@@ -135,11 +135,21 @@ test("137. Restart dialog, running agents", async ({ page, start }) => {
   const before = await pidLine(fixture);
 
   // The queue starts the agent after the page loads: reopen the dialog until its check counts it.
-  await expect(async () => {
-    await openDialog(page);
-    await expect(dialog(page)).toContainText("1 agent is running", { timeout: 2_000 });
-  }).toPass();
-  await expect(dialog(page)).toContainText("Agents keep running through the restart");
+  const counted = async () => {
+    await expect(async () => {
+      await openDialog(page);
+      await expect(dialog(page)).toContainText("1 agent is running", { timeout: 2_000 });
+    }).toPass();
+    await expect(dialog(page)).toContainText("Agents keep running through the restart");
+  };
+
+  await counted();
+  await expect(dialog(page)).not.toContainText("A migration runs while the agents work.");
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+
+  await fixture.setRestartControl("check.json", passing("fixture-next", { ok: true }, { demo: 1 }));
+  await counted();
   await expect(dialog(page)).toContainText("A migration runs while the agents work.");
 
   await restartButton(page).click();
@@ -154,6 +164,8 @@ test("138. Restart dialog, dry run", async ({ page, start }) => {
 
   await openDialog(page);
   await expect(dialog(page).getByRole("alert")).toContainText("broken: fixture migration failed");
+  await expect(dialog(page).getByRole("alert")).toContainText("Migration block");
+  await expect(dialog(page).getByRole("alert")).toContainText("retry the migration from the strip");
   await expect(dialog(page).getByRole("button", nav("Restart"))).toHaveCount(0);
   await restartButton(page).click();
   await expectReloaded(page);
