@@ -35,6 +35,25 @@ func TestParseCodexSkills_Recording(t *testing.T) {
 	}
 }
 
+// A skill the user cannot run (off-skill is enabled:false in the recording) is
+// left out of the command list.
+func TestParseCodexSkills_LeavesOutDisabledSkill(t *testing.T) {
+	f, err := os.Open("testdata/codex-skills-list.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	got, err := parseCodexSkills(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range got {
+		if e.Name == "off-skill" {
+			t.Errorf("entries hold the disabled skill: %+v", got)
+		}
+	}
+}
+
 func TestParseCodexSkills_ErrorReply(t *testing.T) {
 	_, err := parseCodexSkills(strings.NewReader(`{"id":2,"error":{"message":"boom"}}` + "\n"))
 	if err == nil || !strings.Contains(err.Error(), "boom") {

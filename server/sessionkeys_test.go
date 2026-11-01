@@ -98,6 +98,17 @@ func TestSessionKeys_Refusals(t *testing.T) {
 	}
 }
 
+// The refusal comes from the state, not from a failed dial of the holder.
+func TestSessionKeys_StartingSessionRefusesKeys(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	seedSession(t, f, "seeded-starting-only", server.SessionStarting)
+	got := f.keys(t, server.SessionKeysRequest{ID: "seeded-starting-only", Key: "Esc"})
+	if !got.Refused || got.Reason != server.ReasonSessionNotLive || !strings.Contains(got.Message, "is starting") {
+		t.Errorf("keys = %+v, want %s naming the starting state", got, server.ReasonSessionNotLive)
+	}
+}
+
 func TestSessionKeys_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
 	h, row, release := startQueueChat(t, "hello")
