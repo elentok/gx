@@ -37,6 +37,12 @@ type Env struct {
 	// SkipApplied skips the steps named in the list at AppliedPath. The manual
 	// `gx tickets migrate` leaves it false and reruns every step.
 	SkipApplied bool
+	// StateDir is where the token ledger lives. The server sets it from
+	// Config.StateDir, the command from Dirs.StateDir().
+	StateDir string
+	// Pass is shared by the project runs of one pass (see Pass). Nil means this
+	// run is a pass of its own.
+	Pass *Pass
 }
 
 // StepFunc runs one step and returns the files it changed.

@@ -53,6 +53,7 @@ func init() {
 	Default.Register(Step{Name: "model-fields", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	Default.Register(Step{Name: ledgerStepName, Append: true, Run: rebuildLedger})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the
