@@ -215,6 +215,56 @@ test("an event for the session refetches and a new conversation replaces the cha
   expect(screen.queryByText("old talk")).toBeNull();
 });
 
+test("a new conversation sticks the scroller to the bottom again, even after the reader scrolled up", async () => {
+  const sets: [Element, number][] = [];
+  let top = 0;
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(1000);
+  vi.spyOn(HTMLElement.prototype, "scrollTop", "get").mockImplementation(() => top);
+  vi.spyOn(HTMLElement.prototype, "scrollTop", "set").mockImplementation(function (this: Element, v: number) {
+    top = v;
+    sets.push([this, v]);
+  });
+  try {
+    let n = 0;
+    const fetchChat = vi.fn<FetchChat>(async () => ({
+      kind: "ok",
+      detail: ++n === 1 ? chatOf([msg({ text: "old talk" })]) : chatOf([msg({ text: "new talk" })], { conversation_id: "c2" }),
+    }));
+    const { emit } = renderChat([session()], fetchChat);
+    await screen.findByText("old talk");
+    const scroller = sets.at(-1)![0];
+    expect(sets.at(-1)![1]).toBe(1000);
+    top = 0;
+    fireEvent.scroll(scroller);
+    sets.length = 0;
+    await emit("s-a");
+    await screen.findByText("new talk");
+    expect(sets.at(-1)?.[1]).toBe(1000);
+  } finally {
+    vi.restoreAllMocks();
+  }
+});
+
+test("a new conversation drops a decoded archive", async () => {
+  const archive = vi.fn(async (_url: string) => new Response(JSON.stringify(chatOf([msg({ text: "from the archive" })])), { status: 200 }));
+  vi.stubGlobal("fetch", archive);
+  try {
+    let n = 0;
+    const fetchChat = vi.fn<FetchChat>(async () => ({
+      kind: "ok",
+      detail: ++n === 1 ? chatOf([], { archived: true }) : chatOf([msg({ text: "fresh start" })], { conversation_id: "c2" }),
+    }));
+    const { emit } = renderChat([session({ harness: "codex" })], fetchChat);
+    fireEvent.click(await screen.findByRole("button", { name: "Decode" }));
+    await screen.findByText("from the archive");
+    await emit("s-a");
+    await screen.findByText("fresh start");
+    expect(screen.queryByText("from the archive")).toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("a harness with no chat shows the fixed text and loads no chat", async () => {
   const fetchChat = vi.fn<FetchChat>(okChat(chatOf([])));
   renderChat([session({ harness: "other" })], fetchChat);

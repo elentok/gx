@@ -213,14 +213,23 @@ export function ChatMessages({
   /** The session the chat belongs to: the archive route needs it. */
   sessionId: string;
 }) {
-  const [decoded, setDecoded] = useState<{ sessionId: string; messages: SessionChatMessage[] }>();
-  const messages = decoded?.sessionId === sessionId ? decoded.messages : chat.messages;
+  // /clear keeps the session and changes the conversation: the decoded archive is dropped and the scroller
+  // remounts, so it sticks to the bottom again. The draft lives with the session and is untouched.
+  const conversationId = chat.conversation_id;
+  const [decoded, setDecoded] = useState<{ sessionId: string; conversationId: string; messages: SessionChatMessage[] }>();
+  const messages =
+    decoded?.sessionId === sessionId && decoded.conversationId === conversationId ? decoded.messages : chat.messages;
   return (
     <ChatScroller
+      key={conversationId}
       signal={`${messages.length}|${chat.background.length}|${busy}`}
     >
       {messages.length === 0 && (
-        <CodexNotices chat={chat} sessionId={sessionId} onDecoded={(m) => setDecoded({ sessionId, messages: m })} />
+        <CodexNotices
+          chat={chat}
+          sessionId={sessionId}
+          onDecoded={(m) => setDecoded({ sessionId, conversationId, messages: m })}
+        />
       )}
       {chat.truncated && (
         <Text fontSize="xs" color="text.dim" textAlign="center">

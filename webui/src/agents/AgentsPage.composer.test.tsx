@@ -72,6 +72,32 @@ test("stale refetches the chat and keeps the draft", async () => {
   expect((await composerBox()).value).toBe("keep me");
 });
 
+test("stale with a new conversation (/clear) replaces the messages and keeps the draft", async () => {
+  stubPrompt(refused("stale"));
+  let calls = 0;
+  render([session("s-1", "p")], "/agents/s-1", true, {
+    chat: async () => {
+      calls++;
+      return {
+        kind: "ok",
+        detail:
+          calls === 1
+            ? chat()
+            : chat({
+                conversation_id: "c2",
+                messages: [{ id: "n1", role: "agent", kind: "text", text: "after clear", at: "2026-01-01T00:00:00Z" }],
+              }),
+      };
+    },
+  });
+  await screen.findByText("hello there");
+  await type("keep me");
+  fireEvent.click(sendButton());
+  await screen.findByText("after clear");
+  expect(screen.queryByText("hello there")).toBeNull();
+  expect((await composerBox()).value).toBe("keep me");
+});
+
 test("a Codex session shows its chat, and Send follows the idle rule", async () => {
   prompts.length = 0;
   stubPrompt(accepted);
