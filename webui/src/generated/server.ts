@@ -2453,6 +2453,7 @@ export interface Stats {
   cost: StatsCost;
   friction: StatsFriction;
   grilling: StatsGrilling;
+  limit_burn: StatsLimitBurns;
 }
 
 //////////
@@ -2466,6 +2467,33 @@ export interface Stats {
 export interface StatsGrilling {
   words: StatsAmount[];
   questions: StatsAmount[];
+}
+
+//////////
+// source: statslimitburn.go
+
+/**
+ * StatsLimitBurn is one limit's burn over the range: one Days point per entry
+ * of Stats.Days. Sum and Average cover the days with data; StartDay is the first
+ * day with data and is set only when the range reaches before it. Forecast is
+ * set on weekly limits that have a reading.
+ */
+export interface StatsLimitBurn {
+  days: LimitBurnDay[];
+  sum: number /* float64 */;
+  average: number /* float64 */;
+  start_day?: string;
+  forecast?: LimitForecast;
+}
+/**
+ * StatsLimitBurns is the Limit burn section. It is account-wide: the project
+ * filter does not change it.
+ */
+export interface StatsLimitBurns {
+  claude_5h: StatsLimitBurn;
+  claude_weekly: StatsLimitBurn;
+  codex_5h: StatsLimitBurn;
+  codex_weekly: StatsLimitBurn;
 }
 
 //////////

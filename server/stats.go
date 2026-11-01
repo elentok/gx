@@ -72,6 +72,7 @@ type Stats struct {
 	Cost       StatsCost       `json:"cost"`
 	Friction   StatsFriction   `json:"friction"`
 	Grilling   StatsGrilling   `json:"grilling"`
+	LimitBurn  StatsLimitBurns `json:"limit_burn"`
 }
 
 func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
@@ -97,5 +98,6 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().In(time.Local)
 	out := buildStats(all, n, project, now)
 	out.Grilling = buildGrilling(recs, s.onMapEpic, newStatsWindow(n, now), project)
+	out.LimitBurn = s.buildLimitBurns(n, now)
 	writeJSON(w, out)
 }

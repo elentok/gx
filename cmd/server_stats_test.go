@@ -21,6 +21,25 @@ func TestServerStats_HasJSONRangeAndProjectFlags(t *testing.T) {
 	}
 }
 
+func TestServerStats_JSONHoldsLimitBurnSeries(t *testing.T) {
+	s := server.Stats{LimitBurn: server.StatsLimitBurns{
+		ClaudeWeekly: server.StatsLimitBurn{
+			Days:     []server.LimitBurnDay{{Date: "2026-11-01", Burn: 7}},
+			Sum:      7,
+			Forecast: &server.LimitForecast{Status: server.LimitForecastProjected, Pace: 7},
+		},
+	}}
+	var buf bytes.Buffer
+	if err := encodeProvenance(&buf, s, viaServer, callerActor(func() (string, error) { return "", nil })); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"limit_burn"`, `"claude_weekly"`, `"codex_5h"`, `"reset_day"`, `"forecast"`} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("--json output lacks %s: %s", want, buf.String())
+		}
+	}
+}
+
 func TestServerStats_JSONHoldsGrillingSeries(t *testing.T) {
 	s := server.Stats{Grilling: server.StatsGrilling{
 		Words:     []server.StatsAmount{{Value: 12}},

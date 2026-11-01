@@ -53,6 +53,12 @@ const statsOf = (over: Partial<Stats["throughput"]> = {}, extra: Partial<Stats> 
   cost: { tokens_design: [], tokens_implementation: [], spend_design: [], spend_implementation: [] },
   friction: { pause_reasons: [], pauses_by_reason: [], run_events: [], pause_endings: [] },
   grilling: { words: [], questions: [] },
+  limit_burn: {
+    claude_5h: { days: [], sum: 0, average: 0 },
+    claude_weekly: { days: [], sum: 0, average: 0 },
+    codex_5h: { days: [], sum: 0, average: 0 },
+    codex_weekly: { days: [], sum: 0, average: 0 },
+  },
   ...extra,
 });
 

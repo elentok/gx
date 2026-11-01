@@ -41,6 +41,7 @@ packages:
       - sessiontypes.go
       - stats.go
       - statsgrilling.go
+      - statslimitburn.go
       - limitsstore.go
       - migrate.go
       - limitsevents.go
