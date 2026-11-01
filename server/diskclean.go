@@ -12,6 +12,7 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -98,6 +99,20 @@ func (s *Server) runCleanWork(work []cleanCmd) (failed string) {
 	run := s.cfg.CleanupRunner
 	if run == nil {
 		run = RunCleanupCommand
+	}
+	if len(work) > 0 {
+		// The gate wraps whatever the commands are, so a custom command waits too.
+		gate := gocachegate.Deps{Cap: s.cfg.CacheGateCap, Scan: s.cfg.CacheGateScan, Logf: func(format string, args ...any) {
+			s.log.Info(fmt.Sprintf(format, args...))
+		}}
+		release, capPassed, err := gate.WaitExclusive(context.Background(), s.cfg.StateDir)
+		if err != nil {
+			s.log.Warn("disk clean runs ungated", "err", err)
+		}
+		defer release()
+		if capPassed {
+			s.log.Warn("disk clean went ahead after the build wait cap")
+		}
 	}
 	for _, c := range work {
 		ctx, cancel := context.WithTimeout(context.Background(), limit)

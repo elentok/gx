@@ -74,6 +74,11 @@ type Config struct {
 	CleanupRunner func(ctx context.Context, argv []string, dir string) ([]byte, error)
 	// CleanupTimeout is the time limit per cleanup command; zero means ten minutes.
 	CleanupTimeout time.Duration
+	// CacheGateCap bounds the wait for running Go builds before a clean; zero
+	// means ten minutes. CacheGateScan replaces the `go` process scan; nil
+	// lists real processes. Both are test hooks.
+	CacheGateCap  time.Duration
+	CacheGateScan func() (bool, error)
 
 	// Runner is the configured agent runner; nil means herdr. Herdr health
 	// is only probed when it reports health (agentrunner.HealthChecker).

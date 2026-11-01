@@ -266,9 +266,12 @@ gx also stops the three leaks:
   never clear the hold; the end-of-clean rule does.
 - Nothing is claimed for a project while any of its disks is held. An automatic clean always runs
   on a held disk, so dispatch stays held for the whole automatic clean.
-- Running builds are not stopped during a clean. `go clean -cache` can delete cache entries that a
-  running `go build` or `go test` is reading. gx accepts that. Such a failure looks like any failed
-  build, and the ticket's normal retry and pause handling covers it.
+- A clean waits for running Go builds. Before the cleanup command runs (whatever it is, so a custom
+  `disk-space.cleanup-command` too), the clean takes the Go build-cache gate: it waits until no
+  build holds the gate and no `go` process runs. New builds queue behind it while it holds the gate.
+  After 10 minutes the clean goes ahead anyway and the server logs that it did (see
+  `gx server logs`). Builds can then still fail, like any failed build, and the ticket's normal
+  retry and pause handling covers it. The wait is a constant, not a setting.
 - The cleanup runs outside the server's request path, with a timeout. A failure logs the command,
   the working directory, its exit code and the tail of its output. The clean notice says it failed.
   The end-of-clean rule then sets the hold from the new reading, so a disk that is still low stays
