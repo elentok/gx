@@ -26,7 +26,11 @@ func newTicketsLintClaimsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			report, err := lintEpicClaims(d, cwd, resolveEpicArg(d.dirs(), args[0], cwd), manifest, c.OutOrStdout())
+			commit, err := shortHeadAt(cwd)
+			if err != nil {
+				return err
+			}
+			report, err := lintEpicClaims(d, cwd, commit, resolveEpicArg(d.dirs(), args[0], cwd), manifest, c.OutOrStdout())
 			if err != nil {
 				return err
 			}
@@ -40,14 +44,19 @@ func newTicketsLintClaimsCmd(d deps) *cobra.Command {
 	return c
 }
 
-// lintEpicClaims lints the epic's open tickets, or the manifest's entries when
-// manifestPath is set, against the checkout at cwd, and prints the report.
-func lintEpicClaims(d deps, cwd, epicPath, manifestPath string, w io.Writer) (tickets.LintReport, error) {
+// shortHeadAt is the short commit of the checkout at cwd.
+func shortHeadAt(cwd string) (string, error) {
 	root, err := git.Toplevel(cwd)
 	if err != nil {
-		return tickets.LintReport{}, err
+		return "", err
 	}
-	commit, err := git.ShortHead(root)
+	return git.ShortHead(root)
+}
+
+// lintEpicClaims lints the epic's open tickets, or the manifest's entries when
+// manifestPath is set, against the checkout at cwd, and prints the report.
+func lintEpicClaims(d deps, cwd, commit, epicPath, manifestPath string, w io.Writer) (tickets.LintReport, error) {
+	root, err := git.Toplevel(cwd)
 	if err != nil {
 		return tickets.LintReport{}, err
 	}

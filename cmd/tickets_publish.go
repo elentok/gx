@@ -30,13 +30,16 @@ type plannedTicket struct {
 	publishedTicket
 	ID    string
 	Path  string
+	Type  string
+	Body  string
 	Draft []byte
 	Open  []byte
 }
 
 type publishPlan struct {
-	EpicPath string
-	Tickets  []plannedTicket
+	EpicPath         string
+	Tickets          []plannedTicket
+	AllowCheckMisses bool
 }
 
 func (p *publishPlan) paths() []string {
@@ -60,6 +63,22 @@ func (p *publishPlan) rows() []publishedTicket {
 // are added here.
 var publishPreWriteChecks = []func(*publishPlan) []error{
 	checkRenderedTickets,
+	checkPublishShape,
+}
+
+// checkPublishShape refuses implement tickets missing a required section or over
+// the split limit, unless --allow-check-misses. It has no bearing on claim lint.
+func checkPublishShape(p *publishPlan) []error {
+	if p.AllowCheckMisses {
+		return nil
+	}
+	var errs []error
+	for _, t := range p.Tickets {
+		for _, miss := range tickets.PublishShapeMisses(t.Type, t.Body, t.Window) {
+			errs = append(errs, fmt.Errorf("%s: %s (--allow-check-misses publishes anyway)", t.Slug, miss))
+		}
+	}
+	return errs
 }
 
 // checkRenderedTickets runs the ticket validation of `gx tickets validate` over
@@ -75,8 +94,9 @@ func checkRenderedTickets(p *publishPlan) []error {
 }
 
 // planPublish reads and checks the manifest against the epic's current tickets
-// and renders every ticket, assigning IDs in manifest order. Nothing is written.
-func planPublish(epicPath, manifestPath string, epic tickets.Epic) (*publishPlan, error) {
+// and renders every ticket, assigning IDs in manifest order and stamping
+// {{commit}} with commit. Nothing is written.
+func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, epic tickets.Epic) (*publishPlan, error) {
 	var epicIDs []string
 	for _, t := range epic.Tickets {
 		epicIDs = append(epicIDs, t.Identifier)
@@ -98,7 +118,13 @@ func planPublish(epicPath, manifestPath string, epic tickets.Epic) (*publishPlan
 		ids[e.Slug] = fmt.Sprintf("%02d", start+i)
 	}
 
-	plan := &publishPlan{EpicPath: epicPath}
+	// The renderer's one pass also stamps {{commit}}; the slug "commit" is reserved.
+	bodyIDs := map[string]string{tickets.CommitSlug: commit}
+	for slug, id := range ids {
+		bodyIDs[slug] = id
+	}
+
+	plan := &publishPlan{EpicPath: epicPath, AllowCheckMisses: allowCheckMisses}
 	now := time.Now().UTC()
 	for _, e := range m.Entries {
 		id := ids[e.Slug]
@@ -120,7 +146,8 @@ func planPublish(epicPath, manifestPath string, epic tickets.Epic) (*publishPlan
 			t.BlockedBy = append(t.BlockedBy, schema.TicketID(ref))
 		}
 		t.StampCreated(now, address.String())
-		text := "\n" + strings.Trim(tickets.RenderManifestBody(e.Body, ids), "\n") + "\n"
+		rendered := tickets.RenderManifestBody(e.Body, bodyIDs)
+		text := "\n" + strings.Trim(rendered, "\n") + "\n"
 		draft, err := schema.MarshalTicket(t, text)
 		if err != nil {
 			return nil, fmt.Errorf("marshaling %s: %w", e.Slug, err)
@@ -134,6 +161,8 @@ func planPublish(epicPath, manifestPath string, epic tickets.Epic) (*publishPlan
 			publishedTicket: publishedTicket{Slug: e.Slug, Address: address.String(), Window: e.ExpectedContextWindow},
 			ID:              id,
 			Path:            path,
+			Type:            e.Type,
+			Body:            rendered,
 			Draft:           draft,
 			Open:            open,
 		})
@@ -161,8 +190,13 @@ func (d deps) fileWriter() func(string, []byte, os.FileMode) error {
 // every ticket is written as draft, checked, then all are opened in one pass at
 // the end. Any failure removes what this run wrote (and the epic, if it created
 // it), so a retry assigns the same IDs.
-func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses bool, w io.Writer) (err error) {
+func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) (err error) {
 	cwd, err := d.getwd()
+	if err != nil {
+		return err
+	}
+	// One commit per run: it stamps {{commit}} and heads the lint report.
+	commit, err := shortHeadAt(cwd)
 	if err != nil {
 		return err
 	}
@@ -183,10 +217,10 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 			return err
 		}
 		defer func() { unlock() }()
-		if plan, err = planPublish(epicPath, manifestPath, *epic); err != nil {
+		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic); err != nil {
 			return err
 		}
-	} else if plan, err = planPublish(epicPath, manifestPath, tickets.Epic{}); err != nil {
+	} else if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, tickets.Epic{}); err != nil {
 		return err
 	}
 
@@ -195,7 +229,7 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	if jsonOut && d.stderr != nil {
 		lintOut = d.stderr
 	}
-	report, err := lintEpicClaims(d, cwd, epicPath, manifestPath, lintOut)
+	report, err := lintEpicClaims(d, cwd, commit, epicPath, manifestPath, lintOut)
 	if err != nil {
 		return err
 	}
@@ -222,7 +256,7 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 			return err
 		}
 		defer func() { unlock() }()
-		if plan, err = planPublish(epicPath, manifestPath, *epic); err != nil {
+		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic); err != nil {
 			return err
 		}
 	}
@@ -293,19 +327,20 @@ func printPublished(w io.Writer, rows []publishedTicket, jsonOut bool) error {
 
 func newTicketsPublishCmd(d deps) *cobra.Command {
 	var manifest string
-	var dryRun, jsonOut, allowClaimMisses bool
+	var dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool
 	cmd := &cobra.Command{
 		Use:   "publish <project:epic>",
 		Short: "write a manifest's tickets into an epic as draft, then open them all at once",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsPublish(d, args[0], manifest, dryRun, jsonOut, allowClaimMisses, c.OutOrStdout())
+			return runTicketsPublish(d, args[0], manifest, dryRun, jsonOut, allowClaimMisses, allowCheckMisses, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringVar(&manifest, "manifest", "", "manifest file (YAML list of slug, type, blocked_by, expected_context_window, body)")
 	_ = cmd.MarkFlagRequired("manifest")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the IDs that would be assigned and write nothing")
 	cmd.Flags().BoolVar(&allowClaimMisses, "allow-claim-misses", false, "publish even when the claim lint finds a miss in an implement or research ticket")
+	cmd.Flags().BoolVar(&allowCheckMisses, "allow-check-misses", false, "publish even when an implement ticket lacks ## Test seams or ## Where to look, or its window is over the split limit")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit [{slug, address, window}] JSON instead of a table")
 	return cmd
 }

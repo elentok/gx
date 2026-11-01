@@ -4,11 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/tickets"
 )
+
+// shapeSections are the sections an implement ticket needs to pass the publish checks.
+const shapeSections = "\n## Test seams\n\nnone — covered elsewhere\n\n## Where to look\n\nnowhere\n"
 
 // setupPublish is project "mine" with a manifest of three tickets (b waits on a,
 // c on b) and their body files in a temp dir.
@@ -18,7 +25,7 @@ func setupPublish(t *testing.T) (d deps, project, manifest string) {
 	d = deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }, env: envFor(t)}
 	dir := t.TempDir()
 	for _, n := range []string{"a", "b", "c"} {
-		writeTicketFile(t, filepath.Join(dir, n+".md"), "# "+n+"\n\nsee {{a}}\n")
+		writeTicketFile(t, filepath.Join(dir, n+".md"), "# "+n+"\n\nsee {{a}}\n"+shapeSections)
 	}
 	manifest = writeManifest(t, dir, `- slug: a
   type: implement
@@ -267,7 +274,7 @@ func publishLint(t *testing.T, typ, body string, extra ...string) (d deps, proje
 	t.Helper()
 	d, project, manifest := setupPublish(t)
 	dir := filepath.Dir(manifest)
-	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n"+body+"\n")
+	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n"+body+"\n"+shapeSections)
 	writeManifest(t, dir, "- {slug: a, type: "+typ+", body: a.md}\n")
 	err = execute(append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d)
 	return d, project, err
@@ -321,13 +328,102 @@ func TestPublishVerifyMissIsAWarning(t *testing.T) {
 func TestPublishPlannedNameDoesNotRefuse(t *testing.T) {
 	d, project, manifest := setupPublish(t)
 	dir := filepath.Dir(manifest)
-	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n## What to build\n\nAdd `docs/nowhere.md`.\n")
-	writeTicketFile(t, filepath.Join(dir, "b.md"), "# b\n\n## Test seams\n\nuse `docs/nowhere.md`\n")
+	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n## What to build\n\nAdd `docs/nowhere.md`.\n"+shapeSections)
+	writeTicketFile(t, filepath.Join(dir, "b.md"), "# b\n\n## Test seams\n\nuse `docs/nowhere.md`\n\n## Where to look\n\nnowhere\n")
 	writeManifest(t, dir, "- {slug: a, type: implement, body: a.md}\n- {slug: b, type: implement, blocked_by: [a], body: b.md}\n")
 	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
 		t.Fatalf("publish: %v\n%s", err, publishOut(d))
 	}
 	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-a.md 02-b.md" {
 		t.Errorf("issues = %s", got)
+	}
+}
+
+// publishShape publishes one ticket whose body is exactly body.
+func publishShape(t *testing.T, typ string, window int, body string, extra ...string) (d deps, project string, err error) {
+	t.Helper()
+	d, project, manifest := setupPublish(t)
+	dir := filepath.Dir(manifest)
+	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n"+body)
+	writeManifest(t, dir, fmt.Sprintf("- {slug: a, type: %s, expected_context_window: %d, body: a.md}\n", typ, window))
+	err = execute(append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d)
+	return d, project, err
+}
+
+func TestPublishShapeChecks(t *testing.T) {
+	const where = "\n## Where to look\n\nhere\n"
+	cases := []struct {
+		name    string
+		typ     string
+		window  int
+		body    string
+		wantErr string // empty: publish passes
+	}{
+		{"no test seams", "implement", 1000, where, "a: no ## Test seams"},
+		{"empty test seams", "implement", 1000, "\n## Test seams\n\n\n## Where to look\n\nhere\n", "a: ## Test seams is empty"},
+		{"none with reason", "implement", 1000, "\n## Test seams\n\nnone — pure docs\n" + where, ""},
+		{"bare none", "implement", 1000, "\n## Test seams\n\nnone\n" + where, ""},
+		{"no where to look", "implement", 1000, "\n## Test seams\n\nnone\n", "a: no ## Where to look"},
+		{"over the limit", "implement", tickets.SplitLimitTokens + 1, "\n## Test seams\n\nnone\n" + where, fmt.Sprintf("split limit %d", tickets.SplitLimitTokens)},
+		{"verify exempt from sections", "verify", 1000, "nothing\n", ""},
+		{"research exempt from sections", "research", 1000, "nothing\n", ""},
+		{"verify exempt from the cap", "verify", tickets.SplitLimitTokens + 1, "nothing\n", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, project, err := publishShape(t, tc.typ, tc.window, tc.body)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("publish: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("err = %v, want it to contain %q", err, tc.wantErr)
+			}
+			if _, statErr := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(statErr) {
+				t.Errorf("epic left behind: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestPublishAllowFlagsAreIndependent(t *testing.T) {
+	// A shape miss (no Test seams) and a claim miss together.
+	body := "see `docs/nowhere.md`\n\n## Where to look\n\nhere\n"
+	if _, _, err := publishShape(t, "implement", 1000, body, "--allow-check-misses"); err == nil {
+		t.Error("--allow-check-misses overrode a claim miss")
+	}
+	if _, _, err := publishShape(t, "implement", 1000, body, "--allow-claim-misses"); err == nil {
+		t.Error("--allow-claim-misses overrode a check miss")
+	}
+	if _, _, err := publishShape(t, "implement", 1000, body, "--allow-check-misses", "--allow-claim-misses"); err != nil {
+		t.Errorf("both flags: %v", err)
+	}
+	if _, _, err := publishShape(t, "implement", tickets.SplitLimitTokens+1, "\n## Test seams\n\nnone\n\n## Where to look\n\nx\n", "--allow-check-misses"); err != nil {
+		t.Errorf("--allow-check-misses over the cap: %v", err)
+	}
+}
+
+func TestPublishStampsCommit(t *testing.T) {
+	d, project, err := publishShape(t, "implement", 1000, "verified at {{commit}}, keep \\{{commit}}\n"+shapeSections)
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	cwd, _ := d.getwd()
+	out, err := exec.Command("git", "-C", cwd, "rev-parse", "--short", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := strings.TrimSpace(string(out))
+	raw, err := os.ReadFile(filepath.Join(project, "e", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "verified at " + commit + ", keep {{commit}}"; !strings.Contains(string(raw), want) {
+		t.Errorf("ticket want %q:\n%s", want, raw)
+	}
+	if !strings.Contains(publishOut(d), commit) {
+		t.Errorf("lint header lacks %s:\n%s", commit, publishOut(d))
 	}
 }
