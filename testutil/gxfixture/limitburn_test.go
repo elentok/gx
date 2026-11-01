@@ -210,8 +210,8 @@ func TestLimitBurnFixture_StatsShape(t *testing.T) {
 	if len(harnesses) != 2 {
 		t.Errorf("harnesses in the ledger days = %v, want claude and codex", harnesses)
 	}
-	if q := groups["Queue"].Tokens; q[0].Value == 0 || q[4].Value != 0 {
-		t.Errorf("stamp days: day 0 = %v (want stamped), day 4 = %v (want none)", q[0], q[4])
+	if q := groups["Queue"].Tokens; q[0].Value == 0 || q[0].NoData || !q[4].NoData {
+		t.Errorf("stamp days: day 0 = %v (want stamped), day 4 = %v (want no data)", q[0], q[4])
 	}
 	for _, g := range st.Cost.Groups {
 		var sum float64

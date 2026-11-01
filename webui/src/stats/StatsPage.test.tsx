@@ -137,6 +137,20 @@ test("the Cost cards hatch a no-data day and say partial", async () => {
   expect(spend).toContain("Queue");
 });
 
+test("a stamp day where only one group is no-data is hatched whole", async () => {
+  const zero = [amount(0), amount(0)];
+  const cost = costOf({
+    Queue: { tokens: [amount(5), amount(0, true)], spend: [amount(1), amount(0, true)] },
+    Design: { tokens: zero, spend: zero },
+    "One-off": { tokens: zero, spend: zero },
+    Other: { tokens: zero, spend: zero },
+  });
+  renderStats(async () => statsOf({}, { cost }));
+  const card = await cardEl("Tokens");
+  expect(card.querySelectorAll("[data-nodata]")).toHaveLength(1);
+  expect(card.querySelectorAll("[data-nodata='1']")).toHaveLength(1);
+});
+
 test("Cost cards with data on every day are not partial", async () => {
   const full = [amount(1), amount(1), amount(1)];
   renderStats(async () => statsOf({}, { cost: costOf({ Design: { tokens: full, spend: full }, Queue: { tokens: full, spend: full } }) }));

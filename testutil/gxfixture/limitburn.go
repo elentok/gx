@@ -92,7 +92,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 	// stats: 30 days of cost data and 23 days (22 days ago to today) of history
 	// for all four limits, so the head of a 30-day range has no limit data. Each
 	// history has reset days. The ledger has stamp-only days (29 to 21 days ago,
-	// one with no ticket), rebuilt days (20 to 11) and live days (10 to today,
+	// one with an unstamped ticket, so no data), rebuilt days (20 to 11) and live days (10 to today,
 	// 5 days ago quiet), across four groups, both harnesses and two projects.
 	"stats": func(now time.Time) limitBurnSeed {
 		const historyDays = 22
@@ -279,7 +279,11 @@ func statsLedger(now time.Time) *ledgerSeed {
 				}
 				k.Day = day(ago)
 				tokens := int64(40_000 + ago*3_100 + i*17_000)
-				out = append(out, tokenledger.Row{Key: k, Tokens: tokens, Dollars: float64(tokens) / 80_000})
+				dollars := float64(tokens) / 80_000
+				if k.Harness == ledgerCodex {
+					dollars = 0 // Codex reports tokens, not a price.
+				}
+				out = append(out, tokenledger.Row{Key: k, Tokens: tokens, Dollars: dollars})
 			}
 		}
 		return out
@@ -290,10 +294,11 @@ func statsLedger(now time.Time) *ledgerSeed {
 		liveSince: localMidnight(now).AddDate(0, 0, -10).Add(time.Hour),
 	}
 	for ago := 29; ago >= 21; ago-- {
-		if ago == 25 {
-			continue
-		}
 		tokens := int64(60_000 + ago*2_300)
+		if ago == 25 {
+			// Finished without a stamp: a no-data day, not a zero one.
+			tokens = 0
+		}
 		l.stamped = append(l.stamped, ticket{fmt.Sprintf("%02d", 30-ago), fmt.Sprintf("stamped-%d-days-ago", ago), servertest.TicketOpts{
 			Status:      "done",
 			DoneAt:      localMidnight(now).AddDate(0, 0, -ago).Add(14 * time.Hour).Format(time.RFC3339),

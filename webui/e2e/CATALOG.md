@@ -25,7 +25,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121, 180, 181), `migration.e2e.ts` (flows 161, 163, 168, 169, 170, 171), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121, 180, 181), `stats.e2e.ts` (flows 57, 182, 183), `migration.e2e.ts` (flows 161, 163, 168, 169, 170, 171), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -653,6 +653,29 @@ an exited session.
   - At 7d the headlines are 260 and 6, with no hatched days.
   - Project `demo` shows 310 and 7; the 4 hatched days stay the same.
   - At phone width the cards stack in one column with no horizontal scroll.
+
+## 182. Stats limit burn
+
+- **Scenario:** `limit-burn` (shape `stats`). `stats.e2e.ts`; run with `-g "Stats limit burn"`; the phone test runs at 375 px wide.
+- **Steps:** open `#/stats`; hover days; pick project `demo`, then back to all; pick range 7d, then 90d.
+- **Pass:**
+  - Four cards: Claude weekly, Codex weekly, Claude 5-hour, Codex 5-hour burn, each "partial" with "starts ..." and 7 hatched days before history.
+  - Weekly cards show the 7-day average and "~N% at reset"; 5-hour cards show "Reset days are marked ↺ in the tooltip." and no forecast.
+  - A reset day's tooltip has "↺ window reset"; an ordinary day's does not; a hatched day says "no data".
+  - Project `demo` keeps every number and adds "All projects" and "The limit counts all use on your account"; no tag without a filter.
+  - 7d has no hatched days and no "partial"; 90d hatches 67 days.
+  - At phone width the four cards stack in one column with no horizontal scroll.
+
+## 183. Stats tokens and spend by group
+
+- **Scenario:** `limit-burn` (shape `stats`). `stats.e2e.ts`; run with `-g "Stats tokens and spend"`.
+- **Steps:** open `#/stats`; hover days; pick project `demo`.
+- **Pass:**
+  - Tokens and Spend stack Queue, Design, One-off, Other and say "partial"; Tokens says "older days from ticket stamps (lighter)", Spend says "Codex counts $0".
+  - A live day lists all four groups and a Claude and a Codex row; rebuilt days are lighter with "rebuilt from transcripts", stamp days lighter with "ticket stamps only".
+  - A finished ticket without a stamp is one hatched "no data" day; the quiet live day is a zero day, not hatched.
+  - A Codex day shows Codex tokens but "Codex: $0" on Spend.
+  - Project `demo` lowers the Tokens total and bar count (the "no project" rows drop out) and changes Spend.
 
 ## 58. Dirty trunk on the Epic page
 

@@ -82,12 +82,14 @@ const compact = (n: number) => (n < 1000 ? String(Math.round(n)) : compactFormat
 function Cost({ stats, project }: { stats: Stats; project: string }) {
   const { days, cost: c } = stats;
   const card = (title: string, pick: (g: StatsCostGroup) => StatsAmount[], share: (h: StatsHarnessAmount) => number, fmt: (n: number) => string, note: (stampDays: boolean) => string) => {
+    // The server marks only the groups that stamps cover (Queue, Design); the other groups read 0 that day. One no-data group makes the whole day no-data.
+    const noData = days.map((_, i) => c.groups.some((g) => pick(g)[i]?.no_data));
     const series: DaySeries[] = c.groups.map((g) => ({
       key: g.group,
       label: g.group,
       tone: "muted",
       color: GROUP_COLORS[g.group] ?? "muted",
-      values: amounts(pick(g)),
+      values: amounts(pick(g)).map((v, i) => (noData[i] ? null : v)),
     }));
     const total = sum(series.map((s) => sumNullable(s.values)));
     const dataDays = days.filter((_, i) => series.some((s) => s.values[i] !== null)).length;
