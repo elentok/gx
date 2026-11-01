@@ -27,6 +27,17 @@ describe("StatCard", () => {
     expect(queryByText("8")).toBeNull();
   });
 
+  it("overrides the partial badge and renders a footer", () => {
+    const { getByText, queryByText } = renderThemed(<StatCard title="Merged" days={days} series={one([3, null, 5, 0])} partial={false} footer={<p>note</p>} />);
+    expect(queryByText("partial")).toBeNull();
+    expect(getByText("note")).toBeTruthy();
+  });
+
+  it("forces the partial badge on", () => {
+    const { getByText } = renderThemed(<StatCard title="Merged" days={days} series={one([3, 5, 5, 0])} partial />);
+    expect(getByText("partial")).toBeTruthy();
+  });
+
   it("lists each series in the legend", () => {
     const series = [...one([1, 1, 1, 1]), { key: "b", label: "Epics", tone: "done" as const, values: [1, 1, 1, 1] }];
     const { getByLabelText } = renderThemed(<StatCard title="Merged" days={days} series={series} chart="stacked" />);

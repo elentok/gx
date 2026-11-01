@@ -68,6 +68,39 @@ describe("DayChart", () => {
     expect(a.getAttribute("y")).toBe(b.getAttribute("y"));
   });
 
+  it("draws a series in a chart color token", () => {
+    const { container } = renderThemed(<DayChart days={days} series={[{ key: "a", label: "A", tone: "running", color: "codex", values: [1, 1, 1] }]} />);
+    expect(container.querySelector('[data-bar="0"]')!.getAttribute("fill")).toBe("var(--chakra-colors-chart-codex)");
+  });
+
+  it("dims or hatches a styled day and leaves others alone", () => {
+    const { container } = renderThemed(
+      <DayChart days={days} series={[{ key: "a", label: "A", tone: "running", values: [1, 1, 1] }]} dayStyles={["dim", "hatch", undefined]} />,
+    );
+    const bar = (i: number) => container.querySelector(`[data-bar="${i}"]`)!;
+    expect(bar(0).getAttribute("opacity")).not.toBeNull();
+    expect(bar(1).getAttribute("opacity")).not.toBeNull();
+    expect(bar(2).getAttribute("opacity")).toBeNull();
+    expect(container.querySelector('[data-hatch="1"]')!.getAttribute("fill")).toMatch(/^url\(#/);
+    expect(container.querySelector('[data-hatch="0"]')).toBeNull();
+    expect(container.querySelector('[data-hatch="2"]')).toBeNull();
+  });
+
+  it("shows per-day notes and extra rows in the tooltip", () => {
+    const { container, getByRole } = renderThemed(
+      <DayChart
+        days={days}
+        series={[{ key: "a", label: "A", tone: "running", values: [1, 1, 1] }]}
+        dayNotes={[["rebuilt from transcripts"], undefined, undefined]}
+        extraRows={[[{ label: "Limit", value: "40%" }], undefined, undefined]}
+      />,
+    );
+    fireEvent.mouseEnter(container.querySelector("[data-hit='0']")!);
+    expect(getByRole("tooltip").textContent).toBe("MonA: 1Limit: 40%rebuilt from transcripts");
+    fireEvent.mouseEnter(container.querySelector("[data-hit='1']")!);
+    expect(getByRole("tooltip").textContent).toBe("TueA: 1");
+  });
+
   it("shows the date, each value and folded series on hover, and no data for a gap", () => {
     const { container, getByRole, queryByRole } = renderThemed(
       <DayChart

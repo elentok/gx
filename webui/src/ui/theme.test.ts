@@ -18,6 +18,17 @@ describe("theme", () => {
     expect(system.token(`colors.kind.${kind}.bg`)).toBeTruthy();
   });
 
+  it.each([
+    ["claude", "#6cb4ff"],
+    ["codex", "#b48cff"],
+    ["blue", "#6cb4ff"],
+    ["purple", "#b48cff"],
+    ["green", "#5fd39a"],
+    ["muted", "#6b7584"],
+  ])("has chart color %s", (name, value) => {
+    expect(system.token(`colors.chart.${name}`)).toBe(value);
+  });
+
   it("defines every token group", () => {
     for (const group of ["colors", "fonts", "fontSizes", "spacing", "radii", "sizes"] as const) {
       expect(Object.keys(tokens[group] ?? {}), group).not.toHaveLength(0);

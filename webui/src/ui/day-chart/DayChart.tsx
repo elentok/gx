@@ -6,8 +6,20 @@ export interface DaySeries {
   key: string;
   label: string;
   tone: Tone;
+  // A theme color token under `chart` (e.g. "claude"); wins over the tone when drawing.
+  color?: ChartColor;
   // One value per day; null means no data for that day.
   values: (number | null)[];
+}
+
+export type ChartColor = "claude" | "codex" | "blue" | "purple" | "green" | "muted";
+
+// "dim" draws a lighter bar; "hatch" draws it lighter with diagonal stripes over it.
+export type DayStyle = "dim" | "hatch";
+
+export interface ExtraRow {
+  label: string;
+  value: string;
 }
 
 // "stacked" and "side-by-side" share one scale; "diverging" draws the second series below the baseline.
@@ -20,13 +32,20 @@ interface DayChartProps {
   // Series the chart folded into "other": listed in the tooltip, never drawn.
   folded?: Omit<DaySeries, "tone">[];
   height?: number;
+  // Per-day extras, indexed like `days`: a bar style, tooltip notes and extra tooltip rows.
+  dayStyles?: (DayStyle | undefined)[];
+  dayNotes?: (string[] | undefined)[];
+  extraRows?: (ExtraRow[] | undefined)[];
 }
 
 const SLOT = 10;
 const BAR = 8;
+const DIM_OPACITY = 0.45;
 const toneVar = (tone: Tone) => `var(--chakra-colors-tone-${tone}-fg)`;
+export const seriesColor = (s: Pick<DaySeries, "tone" | "color">) =>
+  s.color ? `var(--chakra-colors-chart-${s.color})` : toneVar(s.tone);
 
-export function DayChart({ days, series, kind = "bars", folded = [], height = 110 }: DayChartProps) {
+export function DayChart({ days, series, kind = "bars", folded = [], height = 110, dayStyles, dayNotes, extraRows }: DayChartProps) {
   const patternId = useId();
   const [hover, setHover] = useState<number | null>(null);
   const width = days.length * SLOT;
@@ -52,9 +71,24 @@ export function DayChart({ days, series, kind = "bars", folded = [], height = 11
       marks.push(<rect key={`nd${i}`} data-nodata={i} x={x} y={0} width={BAR} height={height} fill={`url(#${patternId})`} />);
       return;
     }
+    const style = dayStyles?.[i];
     const bar = (s: DaySeries, bx: number, y: number, w: number, h: number, below = false) =>
       h > 0 && (
-        <rect key={`${i}-${s.key}`} data-bar={i} data-series={s.key} data-below={below || undefined} x={bx} y={y} width={w} height={h} fill={toneVar(s.tone)} />
+        <g key={`${i}-${s.key}`}>
+          <rect
+            data-bar={i}
+            data-series={s.key}
+            data-below={below || undefined}
+            data-style={style}
+            x={bx}
+            y={y}
+            width={w}
+            height={h}
+            fill={seriesColor(s)}
+            opacity={style ? DIM_OPACITY : undefined}
+          />
+          {style === "hatch" && <rect data-hatch={i} x={bx} y={y} width={w} height={h} fill={`url(#${patternId})`} />}
+        </g>
       );
     if (kind === "side-by-side") {
       const w = BAR / series.length;
@@ -123,11 +157,22 @@ export function DayChart({ days, series, kind = "bars", folded = [], height = 11
           ) : (
             rows.map((s) => (
               <Text key={s.key} whiteSpace="nowrap">
-                <Box as="span" display="inline-block" w="8px" h="8px" borderRadius="sm" mr="1" style={{ background: toneVar(s.tone) }} />
+                <Box as="span" display="inline-block" w="8px" h="8px" borderRadius="sm" mr="1" style={{ background: seriesColor(s) }} />
                 {s.label}: {fmtValue(s.values[hover])}
               </Text>
             ))
           )}
+          {!noData(hover) &&
+            extraRows?.[hover]?.map((r) => (
+              <Text key={r.label} whiteSpace="nowrap">
+                {r.label}: {r.value}
+              </Text>
+            ))}
+          {dayNotes?.[hover]?.map((note) => (
+            <Text key={note} color="text.dim" whiteSpace="nowrap">
+              {note}
+            </Text>
+          ))}
         </Box>
       )}
     </Box>

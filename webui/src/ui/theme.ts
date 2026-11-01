@@ -68,6 +68,16 @@ export const themeConfig = defineConfig({
         },
         tone: toneTokens,
         kind: kindTokens,
+        // Day-chart series: Claude blue, Codex purple, then the group colors. Not the harness
+        // colors, which are orange and green.
+        chart: {
+          claude: { value: "#6cb4ff" },
+          codex: { value: "#b48cff" },
+          blue: { value: "#6cb4ff" },
+          purple: { value: "#b48cff" },
+          green: { value: "#5fd39a" },
+          muted: { value: "#6b7584" },
+        },
         harness: { claude: { value: "#c2622d" }, codex: { value: "#2a8a6a" } },
       },
       fonts: {
