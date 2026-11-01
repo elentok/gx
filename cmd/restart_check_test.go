@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/migrations"
 )
 
 func writeRestartCheckConfig(t *testing.T, dirs config.Dirs, body string) {
@@ -97,6 +98,33 @@ func TestRestartCheck_BrokenConfigReportsStartupErrorText(t *testing.T) {
 	if err == nil || err.Error() != wantErr.Error() || out.Len() != 0 {
 		t.Errorf("config-only = %v, out %q; want the startup error and no output", err, out.String())
 	}
+}
+
+func TestRestartCheck_DryRunsOnlyThePendingSteps(t *testing.T) {
+	t.Parallel()
+	dirs := config.DirsFrom(tempEnv(t))
+	store := t.TempDir()
+	full := writeStoreProject(t, store, "full", map[string]string{"01-a.md": legacyStatusTicket})
+	if err := migrations.WriteFullApplied(full); err != nil {
+		t.Fatal(err)
+	}
+	writeStoreProject(t, store, "nolist", map[string]string{"01-a.md": legacyStatusTicket})
+	writeRestartCheckConfig(t, dirs, `{"ticket-store": {"path": "`+store+`"}}`)
+	before := snapshotTree(t, full)
+
+	got := runRestartCheckJSON(t, dirs)
+
+	byName := map[string]restartCheckProject{}
+	for _, p := range got.Projects {
+		byName[p.Name] = p
+	}
+	if p := byName["full"]; !p.OK || len(p.Files) != 0 || p.Pending != 0 {
+		t.Errorf("full = %+v, want ok, no files, 0 pending", p)
+	}
+	if p := byName["nolist"]; !p.OK || len(p.Files) == 0 || p.Pending != len(migrations.Default.Names()) {
+		t.Errorf("nolist = %+v, want the whole chain pending and files reported", p)
+	}
+	assertTreeUnchanged(t, full, before)
 }
 
 func TestRestartCheck_FailingMigrationShowsAsFailedAndWritesNothing(t *testing.T) {

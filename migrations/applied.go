@@ -79,6 +79,22 @@ func WriteFullApplied(projectDir string) error {
 	return Default.WriteFullApplied(projectDir)
 }
 
+// PendingCount is how many registered steps the project's applied list lacks:
+// the steps a server-side run (SkipApplied) would still run.
+func (r *Registry) PendingCount(projectDir string) (int, error) {
+	applied, err := readApplied(filepath.Join(projectDir, AppliedFile))
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, name := range r.Names() {
+		if !slices.Contains(applied, name) {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // UnknownApplied returns the sorted names, across the lists in the given
 // project directories, that no registered step has. Callers warn once per run
 // with the result; the names stay in the files.

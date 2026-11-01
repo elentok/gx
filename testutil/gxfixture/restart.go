@@ -47,6 +47,8 @@ type restartSpec struct {
 	configError string
 	// failing maps a project to its dry-run error; the other projects pass.
 	failing map[string]string
+	// pending maps a project to its pending step count; the others report 0.
+	pending map[string]int
 	// old makes the binary reject restart-check, as a binary older than the command does.
 	old bool
 	// slow is how long restart-check takes, in seconds ("0.5").
@@ -96,7 +98,7 @@ func (r restartSpec) checkOutput(projects []string) server.RestartCheckOutput {
 	}
 	out := server.RestartCheckOutput{Version: version, Config: server.RestartCheckConfig{OK: r.configError == "", Error: r.configError}}
 	for _, name := range projects {
-		p := server.RestartCheckProject{Name: name, OK: true, Files: []string{}}
+		p := server.RestartCheckProject{Name: name, OK: true, Files: []string{}, Pending: r.pending[name]}
 		if msg, bad := r.failing[name]; bad {
 			p.OK, p.Error = false, msg
 		}

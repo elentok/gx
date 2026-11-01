@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
@@ -67,14 +68,21 @@ func dryRunProjects(dirs config.Dirs, storePath string) []restartCheckProject {
 	}
 	for _, dir := range dirList {
 		p := restartCheckProject{Name: tickets.ProjectName(dir), Files: []string{}}
-		changes, err := dryRunChanges(dirs, dir)
+		pending, err := migrations.Default.PendingCount(dir)
+		p.Pending = pending
+		// Nothing pending: skip the scratch copy.
+		if err == nil && pending > 0 {
+			var changes []tickets.MigrationChange
+			if changes, err = dryRunChanges(dirs, dir, true); err == nil {
+				for _, c := range changes {
+					p.Files = append(p.Files, c.Path)
+				}
+			}
+		}
 		if err != nil {
 			p.Error = err.Error()
 		} else {
 			p.OK = true
-			for _, c := range changes {
-				p.Files = append(p.Files, c.Path)
-			}
 		}
 		projects = append(projects, p)
 	}

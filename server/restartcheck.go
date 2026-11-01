@@ -35,6 +35,9 @@ type RestartCheckProject struct {
 	OK    bool     `json:"ok"`
 	Error string   `json:"error,omitempty"`
 	Files []string `json:"files"`
+	// Pending is how many migration steps the new binary would still run for
+	// the project (its registry minus the project's applied list).
+	Pending int `json:"pending"`
 }
 
 // Restart check statuses.

@@ -118,7 +118,7 @@ func clearMigrationFailure(dirs config.Dirs, projectDir string) error {
 // tracker root, so each step reads the previous step's output and the real
 // files are never written. Any failure is returned with the real paths in it.
 func runTicketsMigrateDry(dirs config.Dirs, scratchRoot string, w io.Writer) error {
-	changes, err := dryRunChanges(dirs, scratchRoot)
+	changes, err := dryRunChanges(dirs, scratchRoot, false)
 	if err != nil {
 		return err
 	}
@@ -129,8 +129,10 @@ func runTicketsMigrateDry(dirs config.Dirs, scratchRoot string, w io.Writer) err
 }
 
 // dryRunChanges runs the migration chain on a scratch copy of scratchRoot and
-// returns the files it would change, with real paths.
-func dryRunChanges(dirs config.Dirs, scratchRoot string) ([]tickets.MigrationChange, error) {
+// returns the files it would change, with real paths. With skipApplied the steps
+// in the project's applied list are skipped, as the server's own run skips them.
+// The list is read from the copy, so a run never touches the real one.
+func dryRunChanges(dirs config.Dirs, scratchRoot string, skipApplied bool) ([]tickets.MigrationChange, error) {
 	tmp, err := os.MkdirTemp("", "gx-migrate-dry-")
 	if err != nil {
 		return nil, err
@@ -147,7 +149,11 @@ func dryRunChanges(dirs config.Dirs, scratchRoot string) ([]tickets.MigrationCha
 		}
 	}
 
-	changes, _, err := migrations.Run(migrations.Env{Dirs: dirs, Root: work, LookupRoot: scratchRoot, DryRun: true})
+	env := migrations.Env{Dirs: dirs, Root: work, LookupRoot: scratchRoot, DryRun: true}
+	if skipApplied {
+		env.SkipApplied, env.AppliedPath = true, filepath.Join(work, migrations.AppliedFile)
+	}
+	changes, _, err := migrations.Run(env)
 	if err != nil {
 		return nil, errors.New(strings.ReplaceAll(err.Error(), work, scratchRoot))
 	}

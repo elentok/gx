@@ -1709,6 +1709,11 @@ export interface RestartCheckProject {
   ok: boolean;
   error?: string;
   files: string[];
+  /**
+   * Pending is how many migration steps the new binary would still run for
+   * the project (its registry minus the project's applied list).
+   */
+  pending: number /* int */;
 }
 export const RestartCheckOK = "ok";
 export const RestartCheckUnreadable = "unreadable";

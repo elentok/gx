@@ -57,7 +57,7 @@ describe("RestartDialog", () => {
   });
 
   it("labels the button Restart anyway when a dry run failed", async () => {
-    const { findByRole, getByText } = open(report({ projects: [{ name: "p", ok: false, error: "boom", files: [] }] }));
+    const { findByRole, getByText } = open(report({ projects: [{ name: "p", ok: false, error: "boom", files: [], pending: 1 }] }));
     expect((await findByRole("button", { name: "Restart anyway" }) as HTMLButtonElement).disabled).toBe(false);
     expect(getByText("p: boom")).toBeTruthy();
   });
@@ -73,7 +73,7 @@ describe("RestartDialog", () => {
   });
 
   it("re-sends the confirmed values and shows Restarting", async () => {
-    const { findByRole, restart, findByText } = open(report({ projects: [{ name: "p", ok: false, files: [] }] }));
+    const { findByRole, restart, findByText } = open(report({ projects: [{ name: "p", ok: false, files: [], pending: 1 }] }));
     fireEvent.click(await findByRole("button", { name: "Restart anyway" }));
     await findByText(/Restarting/);
     expect(restart).toHaveBeenCalledWith({ new_version: "v2", config_ok: true, failing_projects: ["p"] });

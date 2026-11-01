@@ -88,6 +88,9 @@ func TestRestartProjects_ReportsTheMigrationError(t *testing.T) {
 	if broken == nil || broken.OK || broken.Error != "fixture migration failed" {
 		t.Errorf("broken project = %+v, want the fixture error", broken)
 	}
+	if broken != nil && broken.Pending != 2 {
+		t.Errorf("broken pending = %d, want 2", broken.Pending)
+	}
 	if len(rep.Projects) != 2 {
 		t.Errorf("projects = %+v, want demo and broken", rep.Projects)
 	}

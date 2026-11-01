@@ -51,7 +51,7 @@ func restartCheckOver(t *testing.T, h *servertest.Harness, base string) server.R
 
 const okCheckScript = `[ "$1" = restart-check ] || exit 2
 cat <<'EOF'
-{"version":"new-2","config":{"ok":false,"error":"bad key"},"projects":[{"name":"p","ok":true,"files":["a.md"]},{"name":"q","ok":false,"error":"boom","files":[]}]}
+{"version":"new-2","config":{"ok":false,"error":"bad key"},"projects":[{"name":"p","ok":true,"files":["a.md"],"pending":3},{"name":"q","ok":false,"error":"boom","files":[]}]}
 EOF`
 
 func TestRestartCheck_ReportsVersionsConfigDryRunAgentsInstanceAndLog(t *testing.T) {
@@ -65,7 +65,7 @@ func TestRestartCheck_ReportsVersionsConfigDryRunAgentsInstanceAndLog(t *testing
 	if rep.Config.OK || rep.Config.Error != "bad key" {
 		t.Errorf("config = %+v", rep.Config)
 	}
-	if len(rep.Projects) != 2 || !rep.Projects[0].OK || rep.Projects[1].Error != "boom" || rep.Projects[0].Files[0] != "a.md" {
+	if len(rep.Projects) != 2 || !rep.Projects[0].OK || rep.Projects[1].Error != "boom" || rep.Projects[0].Files[0] != "a.md" || rep.Projects[0].Pending != 3 {
 		t.Errorf("projects = %+v", rep.Projects)
 	}
 	if rep.Agents != 0 || rep.Instance == "" || rep.Binary != bin {

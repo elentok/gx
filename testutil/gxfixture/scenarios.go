@@ -202,7 +202,7 @@ var scenarios = map[string]scenario{
 			{"broken", "broken-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
 		},
 		ownRepos: []string{"broken"},
-		restart:  &restartSpec{failing: map[string]string{"broken": "fixture migration failed"}},
+		restart:  &restartSpec{failing: map[string]string{"broken": "fixture migration failed"}, pending: map[string]int{"broken": 2}},
 	},
 	// migrate-pending: a project with no applied list and a ticket in the old shape.
 	"migrate-pending": {
