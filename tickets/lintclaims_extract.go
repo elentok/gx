@@ -39,7 +39,7 @@ type Claim struct {
 // Fixed lists for span classification. Every skip and extension rule lives here.
 var (
 	claimExtensions = []string{"go", "md", "yaml", "yml", "json", "ts", "tsx", "js", "py", "sh", "sql", "toml"}
-	// A span containing any of these is never a claim.
+	// A path, line-ref or file:func span containing any of these is never a claim.
 	claimSkipMarkers = []string{"*", "~", "$", "://"}
 )
 
@@ -73,15 +73,20 @@ func ExtractClaims(body string, topDirs []string) []Claim {
 	return claims
 }
 
+// stripFences drops fenced code blocks, except ```text fences: verify-plan
+// wraps each copied Verification entry in one, and those spans must be linted.
 func stripFences(text string) string {
 	var out []string
-	inFence := false
+	inFence, keep := false, false
 	for _, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "```") {
+			if !inFence {
+				keep = strings.TrimSpace(strings.TrimPrefix(trimmed, "```")) == "text"
+			}
 			inFence = !inFence
 			continue
 		}
-		if !inFence {
+		if !inFence || keep {
 			out = append(out, line)
 		}
 	}
@@ -104,18 +109,16 @@ func classifySpan(span string, topDirs []string) (Claim, bool) {
 	span = strings.TrimSpace(span)
 	isGx := strings.HasPrefix(span, "gx ")
 	run := runFormRe.FindStringSubmatch(span)
-	if slices.ContainsFunc(claimSkipMarkers, func(m string) bool { return strings.Contains(span, m) }) {
-		return Claim{}, false
-	}
-	if strings.Contains(span, " ") && !isGx && run == nil {
-		return Claim{}, false
-	}
 	switch {
 	case isGx:
 		words, flags := commandParts(span)
 		return Claim{Kind: ClaimCommand, Text: span, Words: words, Flags: flags}, true
 	case run != nil:
 		return Claim{Kind: ClaimTestPattern, Text: span, Pattern: run[1] + run[2]}, true
+	}
+	// The skip rule is about paths only.
+	if strings.Contains(span, " ") || slices.ContainsFunc(claimSkipMarkers, func(m string) bool { return strings.Contains(span, m) }) {
+		return Claim{}, false
 	}
 	if m := fileLineRe.FindStringSubmatch(span); m != nil && hasKnownExt(m[1]) {
 		return Claim{Kind: ClaimLineRef, Text: span, File: m[1]}, true
@@ -152,7 +155,7 @@ func commandParts(span string) (words, flags []string) {
 			inWords = false
 			flags = append(flags, strings.SplitN(tok, "=", 2)[0])
 		case !inWords:
-		case strings.ContainsAny(tok[:1], "-<[\"'"):
+		case strings.ContainsAny(tok[:1], "-<[$\"'"):
 			inWords = false
 		default:
 			words = append(words, tok)

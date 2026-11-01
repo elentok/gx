@@ -37,6 +37,12 @@ func TestExtractClaims_Spans(t *testing.T) {
 		{"flow inside a span is not prose", "`flow 7`", nil},
 		{"prose line", "see line 42", []Claim{{Kind: ClaimLineRef, Text: "line 42"}}},
 		{"fenced block skipped", "```\n`tickets/in-fence.go` flow 3\n```", nil},
+		{"go fence skipped", "```go\n`tickets/in-fence.go`\n```", nil},
+		{"text fence read", "```text\n`tickets/in-fence.go`\n```", []Claim{{Kind: ClaimPath, Text: "tickets/in-fence.go", File: "tickets/in-fence.go"}}},
+		{"run with dollar anchor", "`-run 'TestX$'`", []Claim{{Kind: ClaimTestPattern, Text: "-run 'TestX$'", Pattern: "TestX$"}}},
+		{"run with star", "`-run 'Test.*'`", []Claim{{Kind: ClaimTestPattern, Text: "-run 'Test.*'", Pattern: "Test.*"}}},
+		{"command stops at $ argument", "`gx tickets show $E`", []Claim{{Kind: ClaimCommand, Text: "gx tickets show $E", Words: []string{"tickets", "show"}}}},
+		{"path with star or dollar skipped", "`tickets/*.go` `tickets/$X.go`", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
