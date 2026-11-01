@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tokenledger"
 )
 
 var (
@@ -153,6 +154,9 @@ func (s *Server) Rescan() {
 
 // SetTokensOf swaps how a session's cumulative tokens and cost are read.
 func (s *Server) SetTokensOf(f TokenReader) { s.tokenPoll.read = f }
+
+// AddLedgerTokens writes a live delta straight into the token ledger.
+func (s *Server) AddLedgerTokens(d tokenledger.Delta) error { return s.tokens.Add(d) }
 
 // PollTokensAt runs one token poll as of now.
 func (s *Server) PollTokensAt(now time.Time) { s.pollTokens(now) }

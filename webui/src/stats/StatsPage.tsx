@@ -6,7 +6,7 @@ import { DetailPage } from "../page/DetailPage";
 import { SectionHeading } from "../page/SectionHeading";
 import { Button } from "../ui/button/Button";
 import type { ReactNode } from "react";
-import type { StatsAmount } from "../generated/server";
+import type { StatsAmount, StatsCostGroup } from "../generated/server";
 import type { DaySeries } from "../ui/day-chart/DayChart";
 import { Spinner } from "../ui/spinner/Spinner";
 import { StatCard } from "../ui/stat-card/StatCard";
@@ -76,11 +76,14 @@ const sumNullable = (values: (number | null)[]) => sum(values.map((v) => v ?? 0)
 
 function Cost({ stats }: { stats: Stats }) {
   const { days, cost: c } = stats;
-  const card = (title: string, design: StatsAmount[], impl: StatsAmount[], fmt: (n: number) => string) => {
-    const series: DaySeries[] = [
-      { key: "design", label: "Design", tone: "waiting", values: amounts(design) },
-      { key: "implementation", label: "Implementation", tone: "running", values: amounts(impl) },
-    ];
+  const tones = ["running", "waiting", "done", "deadlocked"] as const;
+  const card = (title: string, pick: (g: StatsCostGroup) => StatsAmount[], fmt: (n: number) => string) => {
+    const series: DaySeries[] = c.groups.map((g, i) => ({
+      key: g.group,
+      label: g.group,
+      tone: tones[i % tones.length],
+      values: amounts(pick(g)),
+    }));
     const total = sum(series.map((s) => sumNullable(s.values)));
     const dataDays = days.filter((_, i) => series.some((s) => s.values[i] !== null)).length;
     return (
@@ -89,8 +92,8 @@ function Cost({ stats }: { stats: Stats }) {
   };
   return (
     <Section id="stats-cost" title="Cost and effort" tone="waiting">
-      {card("Tokens", c.tokens_design, c.tokens_implementation, thousands)}
-      {card("Spend", c.spend_design, c.spend_implementation, (n) => `$${n.toFixed(2)}`)}
+      {card("Tokens", (g) => g.tokens, thousands)}
+      {card("Spend", (g) => g.spend, (n) => `$${n.toFixed(2)}`)}
     </Section>
   );
 }

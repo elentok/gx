@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tokenledger"
 )
 
 // statsNoon is local noon n days before today: a stamp that stays on its day in any zone.
@@ -267,6 +268,71 @@ func statsAmountAt(t *testing.T, s server.Stats, series []server.StatsAmount, n 
 	return series[i]
 }
 
+func costGroupOf(t *testing.T, s server.Stats, name string) server.StatsCostGroup {
+	t.Helper()
+	for _, g := range s.Cost.Groups {
+		if g.Group == name {
+			return g
+		}
+	}
+	t.Fatalf("no cost group %q in %+v", name, s.Cost.Groups)
+	return server.StatsCostGroup{}
+}
+
+func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
+	t.Parallel()
+	h, base := startEpicDetail(t, func(string) {})
+	today := time.Now().Format("2006-01-02")
+	add := func(project, group, harness string, tokens int64, dollars float64) {
+		t.Helper()
+		err := h.Server.AddLedgerTokens(tokenledger.Delta{
+			Key:    tokenledger.Key{Day: today, Project: project, Group: group, Harness: harness},
+			Tokens: tokens, Dollars: dollars,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	add("proj", tokenledger.GroupQueue, "claude", 100, 1)
+	add("proj", tokenledger.GroupQueue, "codex", 50, 0)
+	add("other", tokenledger.GroupOneOff, "claude", 7, 0.5)
+	get := func(query string) server.Stats {
+		t.Helper()
+		code, body := webDo(t, h, http.MethodGet, base+"/v1/stats"+query)
+		if code != http.StatusOK {
+			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
+		}
+		var s server.Stats
+		if err := json.Unmarshal([]byte(body), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	last := func(a []server.StatsAmount) server.StatsAmount { return a[len(a)-1] }
+
+	all := get("")
+	if q := costGroupOf(t, all, tokenledger.GroupQueue); last(q.Tokens).Value != 150 || last(q.Spend).Value != 1 || q.Harness[len(q.Harness)-1]["codex"].Tokens != 50 {
+		t.Errorf("queue today = %+v", q)
+	}
+	if o := costGroupOf(t, all, tokenledger.GroupOneOff); last(o.Tokens).Value != 7 {
+		t.Errorf("one-off today = %+v", o)
+	}
+	if got := all.Cost.Sources[len(all.Cost.Sources)-1]; got != "live" {
+		t.Errorf("today source = %q, want live", got)
+	}
+	if !all.Cost.Partial || all.Cost.Sources[0] != "stamp" {
+		t.Errorf("partial = %v, first source = %q, want partial stamp days", all.Cost.Partial, all.Cost.Sources[0])
+	}
+
+	filtered := get("?project=proj")
+	if o := costGroupOf(t, filtered, tokenledger.GroupOneOff); last(o.Tokens).Value != 0 {
+		t.Errorf("one-off under project=proj = %+v, want none", o)
+	}
+	if q := costGroupOf(t, filtered, tokenledger.GroupQueue); last(q.Tokens).Value != 150 {
+		t.Errorf("queue under project=proj = %+v", q)
+	}
+}
+
 func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 	t.Parallel()
 	stamp := func(tokens int, cost string) string {
@@ -287,25 +353,26 @@ func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 			"05-e.md": issueMD("05", "done", done(7)+stamp(0, "0"), "E"),
 		})
 	})("")
+	design, queue := costGroupOf(t, s, tokenledger.GroupDesign), costGroupOf(t, s, tokenledger.GroupQueue)
 	cases := []struct {
 		name   string
 		series []server.StatsAmount
 		day    int
 		want   server.StatsAmount
 	}{
-		{"design tokens: ticket", s.Cost.TokensDesign, 3, server.StatsAmount{Value: 30}},
-		{"design tokens: ticket plus map remainder", s.Cost.TokensDesign, 2, server.StatsAmount{Value: 70}},
-		{"design spend: ticket plus map remainder", s.Cost.SpendDesign, 2, server.StatsAmount{Value: 0.7}},
-		{"design: unstamped pre-recording map", s.Cost.TokensDesign, 8, server.StatsAmount{NoData: true}},
-		{"design: no finished items", s.Cost.TokensDesign, 4, server.StatsAmount{}},
-		{"impl tokens: mixed day is data", s.Cost.TokensImplementation, 4, server.StatsAmount{Value: 100}},
-		{"impl spend: mixed day is data", s.Cost.SpendImplementation, 4, server.StatsAmount{Value: 1}},
-		{"impl: only unstamped is no data", s.Cost.TokensImplementation, 5, server.StatsAmount{NoData: true}},
-		{"impl spend: only unstamped is no data", s.Cost.SpendImplementation, 5, server.StatsAmount{NoData: true}},
-		{"impl: only a cancel is zero", s.Cost.TokensImplementation, 6, server.StatsAmount{}},
-		{"impl: stamped zero is data", s.Cost.TokensImplementation, 7, server.StatsAmount{}},
-		{"impl: no finished items", s.Cost.TokensImplementation, 9, server.StatsAmount{}},
-		{"impl: map days are not implementation", s.Cost.TokensImplementation, 2, server.StatsAmount{}},
+		{"design tokens: ticket", design.Tokens, 3, server.StatsAmount{Value: 30}},
+		{"design tokens: ticket plus map remainder", design.Tokens, 2, server.StatsAmount{Value: 70}},
+		{"design spend: ticket plus map remainder", design.Spend, 2, server.StatsAmount{Value: 0.7}},
+		{"design: unstamped pre-recording map", design.Tokens, 8, server.StatsAmount{NoData: true}},
+		{"design: no finished items", design.Tokens, 4, server.StatsAmount{}},
+		{"queue tokens: mixed day is data", queue.Tokens, 4, server.StatsAmount{Value: 100}},
+		{"queue spend: mixed day is data", queue.Spend, 4, server.StatsAmount{Value: 1}},
+		{"queue: only unstamped is no data", queue.Tokens, 5, server.StatsAmount{NoData: true}},
+		{"queue spend: only unstamped is no data", queue.Spend, 5, server.StatsAmount{NoData: true}},
+		{"queue: only a cancel is zero", queue.Tokens, 6, server.StatsAmount{}},
+		{"queue: stamped zero is data", queue.Tokens, 7, server.StatsAmount{}},
+		{"queue: no finished items", queue.Tokens, 9, server.StatsAmount{}},
+		{"queue: map days are not queue", queue.Tokens, 2, server.StatsAmount{}},
 	}
 	for _, c := range cases {
 		got := statsAmountAt(t, s, c.series, c.day)

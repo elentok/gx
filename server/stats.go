@@ -40,13 +40,28 @@ type StatsThroughput struct {
 	WaitingForDesign  []int `json:"waiting_for_design"`
 }
 
-// StatsCost is the Tokens and spend section, each split into Design (map
-// epics and their tickets) and Implementation (everything else).
+// StatsHarnessAmount is one harness's share of a group's day, for tooltips.
+type StatsHarnessAmount struct {
+	Tokens  int64   `json:"tokens"`
+	Dollars float64 `json:"dollars"`
+}
+
+// StatsCostGroup is one agent group's series, one point per entry of
+// Stats.Days. Harness is empty on stamp days: stamps do not record it.
+type StatsCostGroup struct {
+	Group   string                          `json:"group"`
+	Tokens  []StatsAmount                   `json:"tokens"`
+	Spend   []StatsAmount                   `json:"spend"`
+	Harness []map[string]StatsHarnessAmount `json:"harness"`
+}
+
+// StatsCost is the Tokens and spend section: Queue, Design, One-off and Other.
+// Sources names each day's source (live, rebuilt or stamp). Partial is set when
+// any day is not live.
 type StatsCost struct {
-	TokensDesign         []StatsAmount `json:"tokens_design"`
-	TokensImplementation []StatsAmount `json:"tokens_implementation"`
-	SpendDesign          []StatsAmount `json:"spend_design"`
-	SpendImplementation  []StatsAmount `json:"spend_implementation"`
+	Groups  []StatsCostGroup `json:"groups"`
+	Sources []string         `json:"sources"`
+	Partial bool             `json:"partial"`
 }
 
 // StatsFriction is the Friction section. The per-day maps are keyed by
@@ -96,7 +111,12 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now().In(time.Local)
-	out := buildStats(all, n, project, now)
+	led, err := s.costLedger(newStatsWindow(n, now))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	out := buildStats(all, n, project, now, led)
 	out.Grilling = buildGrilling(recs, s.onMapEpic, newStatsWindow(n, now), project)
 	out.LimitBurn = s.buildLimitBurns(n, now)
 	writeJSON(w, out)

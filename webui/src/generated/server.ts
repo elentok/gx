@@ -2416,14 +2416,31 @@ export interface StatsThroughput {
   waiting_for_design: number /* int */[];
 }
 /**
- * StatsCost is the Tokens and spend section, each split into Design (map
- * epics and their tickets) and Implementation (everything else).
+ * StatsHarnessAmount is one harness's share of a group's day, for tooltips.
+ */
+export interface StatsHarnessAmount {
+  tokens: number /* int64 */;
+  dollars: number /* float64 */;
+}
+/**
+ * StatsCostGroup is one agent group's series, one point per entry of
+ * Stats.Days. Harness is empty on stamp days: stamps do not record it.
+ */
+export interface StatsCostGroup {
+  group: string;
+  tokens: StatsAmount[];
+  spend: StatsAmount[];
+  harness: { [key: string]: StatsHarnessAmount}[];
+}
+/**
+ * StatsCost is the Tokens and spend section: Queue, Design, One-off and Other.
+ * Sources names each day's source (live, rebuilt or stamp). Partial is set when
+ * any day is not live.
  */
 export interface StatsCost {
-  tokens_design: StatsAmount[];
-  tokens_implementation: StatsAmount[];
-  spend_design: StatsAmount[];
-  spend_implementation: StatsAmount[];
+  groups: StatsCostGroup[];
+  sources: string[];
+  partial: boolean;
 }
 /**
  * StatsFriction is the Friction section. The per-day maps are keyed by

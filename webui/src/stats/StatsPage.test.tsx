@@ -50,7 +50,7 @@ const statsOf = (over: Partial<Stats["throughput"]> = {}, extra: Partial<Stats> 
     waiting_for_design: [4, 5, 7],
     ...over,
   },
-  cost: { tokens_design: [], tokens_implementation: [], spend_design: [], spend_implementation: [] },
+  cost: { groups: [], sources: [], partial: false },
   friction: { pause_reasons: [], pauses_by_reason: [], run_events: [], pause_endings: [] },
   grilling: { words: [], questions: [] },
   limit_burn: {
@@ -113,13 +113,18 @@ const cardEl = async (title: string) => {
 
 const amount = (value: number, no_data = false) => ({ value, no_data });
 
+type Series = { tokens: ReturnType<typeof amount>[]; spend: ReturnType<typeof amount>[] };
+const costOf = (groups: Record<string, Series>) => ({
+  groups: Object.entries(groups).map(([group, v]) => ({ group, ...v, harness: [] })),
+  sources: [],
+  partial: false,
+});
+
 test("the Cost cards hatch a no-data day and say partial", async () => {
-  const cost = {
-    tokens_design: [amount(100), amount(0, true), amount(300)],
-    tokens_implementation: [amount(1000), amount(0, true), amount(2000)],
-    spend_design: [amount(1), amount(0, true), amount(2)],
-    spend_implementation: [amount(3), amount(0, true), amount(4.5)],
-  };
+  const cost = costOf({
+    Design: { tokens: [amount(100), amount(0, true), amount(300)], spend: [amount(1), amount(0, true), amount(2)] },
+    Queue: { tokens: [amount(1000), amount(0, true), amount(2000)], spend: [amount(3), amount(0, true), amount(4.5)] },
+  });
   renderStats(async () => statsOf({}, { cost }));
   const tokens = await cardText("Tokens");
   expect(tokens).toContain("3,400");
@@ -128,12 +133,12 @@ test("the Cost cards hatch a no-data day and say partial", async () => {
   const spend = await cardText("Spend");
   expect(spend).toContain("$10.50");
   expect(spend).toContain("Design");
-  expect(spend).toContain("Implementation");
+  expect(spend).toContain("Queue");
 });
 
 test("Cost cards with data on every day are not partial", async () => {
   const full = [amount(1), amount(1), amount(1)];
-  renderStats(async () => statsOf({}, { cost: { tokens_design: full, tokens_implementation: full, spend_design: full, spend_implementation: full } }));
+  renderStats(async () => statsOf({}, { cost: costOf({ Design: { tokens: full, spend: full }, Queue: { tokens: full, spend: full } }) }));
   expect(await cardText("Tokens")).not.toContain("partial");
 });
 

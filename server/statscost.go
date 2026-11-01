@@ -20,17 +20,64 @@ type costSourceInput struct {
 	Project      string // "" is All projects, the only filter that sees "no project"
 }
 
-// harnessCost is one harness's share of a group's day.
-type harnessCost struct {
-	Tokens  int64
-	Dollars float64
-}
-
 // groupCost is one agent group's day. Harness is empty on stamp days: stamps
 // do not record it.
 type groupCost struct {
 	Tokens, Dollars StatsAmount
-	Harness         map[string]harnessCost
+	Harness         map[string]StatsHarnessAmount
+}
+
+// costLedger is the ledger as the stats build reads it: the rows of the
+// range's days and the two boundary days.
+type costLedger struct {
+	Rows                    []tokenledger.Row
+	FirstRebuilt, FirstLive string
+}
+
+// costLedger reads the in-memory ledger for the window's days. It never reads
+// transcripts.
+func (s *Server) costLedger(win statsWindow) (costLedger, error) {
+	var out costLedger
+	for _, day := range win.labels() {
+		rows, err := s.tokens.Day(day)
+		if err != nil {
+			return out, err
+		}
+		out.Rows = append(out.Rows, rows...)
+	}
+	var err error
+	if out.FirstRebuilt, err = s.tokens.FirstRebuiltDay(); err != nil {
+		return out, err
+	}
+	out.FirstLive, err = s.tokens.FirstLiveDay()
+	return out, err
+}
+
+// statsCostOf turns the picked days into the payload. Partial is set when any
+// day is rebuilt or stamp-only.
+func statsCostOf(days []dayCost) StatsCost {
+	out := StatsCost{Sources: make([]string, len(days))}
+	for _, g := range costGroups {
+		out.Groups = append(out.Groups, StatsCostGroup{
+			Group:   g,
+			Tokens:  make([]StatsAmount, len(days)),
+			Spend:   make([]StatsAmount, len(days)),
+			Harness: make([]map[string]StatsHarnessAmount, len(days)),
+		})
+	}
+	for i, d := range days {
+		out.Sources[i] = d.Source
+		out.Partial = out.Partial || d.Source != costSourceLive
+		for gi, g := range costGroups {
+			c := d.Groups[g]
+			out.Groups[gi].Tokens[i], out.Groups[gi].Spend[i] = c.Tokens, c.Dollars
+			out.Groups[gi].Harness[i] = c.Harness
+			if c.Harness == nil {
+				out.Groups[gi].Harness[i] = map[string]StatsHarnessAmount{}
+			}
+		}
+	}
+	return out
 }
 
 // dayCost is one day of the cost charts, from a single source.
@@ -86,7 +133,7 @@ func pickCostSource(in costSourceInput) []dayCost {
 func ledgerGroups(rows []tokenledger.Row) map[string]groupCost {
 	groups := make(map[string]groupCost, len(costGroups))
 	for _, g := range costGroups {
-		groups[g] = groupCost{Harness: map[string]harnessCost{}}
+		groups[g] = groupCost{Harness: map[string]StatsHarnessAmount{}}
 	}
 	for _, r := range rows {
 		g, ok := groups[r.Group]

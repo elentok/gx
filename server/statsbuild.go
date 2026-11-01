@@ -64,7 +64,6 @@ func emptyCounts(n int) []map[string]int {
 // newStats is an all-zero payload with one point per day in every series.
 func newStats(n int) Stats {
 	ints := func() []int { return make([]int, n) }
-	amounts := func() []StatsAmount { return make([]StatsAmount, n) }
 	return Stats{
 		Range: n,
 		Throughput: StatsThroughput{
@@ -72,10 +71,6 @@ func newStats(n int) Stats {
 			LinesAdded: ints(), LinesRemoved: ints(),
 			FollowUpsCreated: ints(), FollowUpsFinished: ints(),
 			WaitingForDesign: ints(),
-		},
-		Cost: StatsCost{
-			TokensDesign: amounts(), TokensImplementation: amounts(),
-			SpendDesign: amounts(), SpendImplementation: amounts(),
 		},
 		Friction: StatsFriction{
 			PauseReasons:   []string{},
@@ -86,7 +81,7 @@ func newStats(n int) Stats {
 	}
 }
 
-func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time) Stats {
+func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time, led costLedger) Stats {
 	win := newStatsWindow(n, now)
 	out := newStats(n)
 	out.Project, out.Days = project, win.labels()
@@ -104,8 +99,10 @@ func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time) S
 		}
 	}
 	b.friction.fill(&out.Friction)
-	out.Cost.TokensDesign, out.Cost.SpendDesign = b.design.amounts()
-	out.Cost.TokensImplementation, out.Cost.SpendImplementation = b.impl.amounts()
+	out.Cost = statsCostOf(pickCostSource(costSourceInput{
+		Days: out.Days, Rows: led.Rows, FirstRebuilt: led.FirstRebuilt, FirstLive: led.FirstLive,
+		Design: b.design, Impl: b.impl, Project: project,
+	}))
 	return out
 }
 
