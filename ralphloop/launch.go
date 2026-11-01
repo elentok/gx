@@ -347,7 +347,7 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 		if err != nil {
 			log.Printf("reading %s status before initial prompt: %v", opts.Label, err)
 		}
-		err = agentrunner.PromptNudged(r, s, prompt, func(decision string) { onNudge(attempt, decision) })
+		err = agentrunner.PromptLaunch(r, s, prompt, func(decision string) { onNudge(attempt, decision) })
 		if !errors.Is(err, agentrunner.ErrNotDelivered) {
 			return launched{Session: s, Baseline: status.Turn}, withDoctorHint(err)
 		}

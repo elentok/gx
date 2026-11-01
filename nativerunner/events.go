@@ -1,6 +1,7 @@
 package nativerunner
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -46,6 +47,10 @@ type event struct {
 		Status   string `json:"status"`
 		ResetsAt int64  `json:"resetsAt"`
 	} `json:"rate_limit_info"`
+	// unknownCommand marks claude rejecting a "/" command. Claude words it in
+	// different event shapes, so it is found in the raw line; assistant text is
+	// skipped, since the agent may quote the phrase.
+	unknownCommand bool
 }
 
 // parseEvent reports false for a line that isn't a JSON object with a type,
@@ -55,6 +60,7 @@ func parseEvent(line []byte) (event, bool) {
 	if json.Unmarshal(line, &e) != nil || e.Type == "" {
 		return event{}, false
 	}
+	e.unknownCommand = e.Type != "assistant" && bytes.Contains(line, []byte("Unknown command:"))
 	return e, true
 }
 
@@ -88,6 +94,9 @@ type tracker struct {
 	// seen holds event uuids already applied, so replaying out.jsonl after a
 	// reattach never counts an event twice.
 	seen map[string]bool
+	// unknownCommands counts "Unknown command:" rejections; a launch prompt
+	// compares it against the count before it was sent.
+	unknownCommands int
 }
 
 func (t *tracker) status() agentrunner.Status {
@@ -162,6 +171,9 @@ func (t *tracker) apply(e event) {
 			t.seen = map[string]bool{}
 		}
 		t.seen[e.UUID] = true
+	}
+	if e.unknownCommand {
+		t.unknownCommands++
 	}
 	switch e.Type {
 	case "system":

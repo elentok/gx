@@ -369,6 +369,19 @@ func (h *Headless) live(s agentrunner.Session) (*headlessSession, error) {
 // Prompt writes one user message to claude's stdin and returns once claude
 // started a turn for it.
 func (h *Headless) Prompt(s agentrunner.Session, text string) error {
+	return h.prompt(s, text, false)
+}
+
+var _ agentrunner.LaunchPrompter = (*Headless)(nil)
+
+// PromptLaunch is Prompt for a launch prompt, which must start a turn: a "/"
+// command that leaves claude idle with no turn, or that claude rejects as
+// unknown, is ErrNotDelivered. Headless never nudges, so onNudge is unused.
+func (h *Headless) PromptLaunch(s agentrunner.Session, text string, _ func(string)) error {
+	return h.prompt(s, text, true)
+}
+
+func (h *Headless) prompt(s agentrunner.Session, text string, launch bool) error {
 	h.mu.Lock()
 	ss, err := h.live(s)
 	h.mu.Unlock()
@@ -383,6 +396,9 @@ func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 	if err != nil {
 		return err
 	}
+	h.mu.Lock()
+	unknown := ss.track.unknownCommands
+	h.mu.Unlock()
 	// Claude echoes uuid as command_uuid in its command_lifecycle events.
 	err = ss.send(map[string]any{
 		"type":    "user",
@@ -393,7 +409,7 @@ func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 		return fmt.Errorf("%w: %v", agentrunner.ErrNotDelivered, err)
 	}
 	if isSlashCommand(text) {
-		return h.awaitSlash(ss, uuid, before.Turn)
+		return h.awaitSlash(ss, uuid, before.Turn, launch, unknown)
 	}
 	return h.awaitTurn(ss, uuid, before.Turn)
 }
@@ -432,18 +448,23 @@ func (h *Headless) awaitNotBusy(ss *headlessSession) (agentrunner.Status, error)
 // commands start no turn and a resend would run them twice. Delivered means
 // uuid started (a bare queued event is too early: Turn moves on started), a
 // turn that began, a dialog that blocked claude, or claude still idle after N.
-func (h *Headless) awaitSlash(ss *headlessSession, uuid string, turn int) error {
+// A launch prompt must start a turn, so idle after N, or an "Unknown command:"
+// since unknown was counted, is ErrNotDelivered.
+func (h *Headless) awaitSlash(ss *headlessSession, uuid string, turn int, launch bool, unknown int) error {
 	deadline := time.NewTimer(h.WaitN())
 	defer deadline.Stop()
 	for {
 		h.mu.Lock()
 		capErr := ss.track.capabilityErr()
 		moved := ss.track.started(uuid) || ss.track.turn > turn || ss.track.blocked
+		rejected := launch && ss.track.unknownCommands > unknown
 		exited, busy, changed := ss.track.exited, ss.track.busy(), ss.changed
 		h.mu.Unlock()
 		switch {
 		case capErr != nil:
 			return capErr
+		case rejected && !moved:
+			return fmt.Errorf("%w: claude rejected the launch prompt as an unknown command", agentrunner.ErrNotDelivered)
 		case moved:
 			return nil
 		case exited:
@@ -454,6 +475,9 @@ func (h *Headless) awaitSlash(ss *headlessSession, uuid string, turn int) error 
 		case <-deadline.C:
 			if busy {
 				return fmt.Errorf("%w: slash command started no turn and claude is not idle", agentrunner.ErrNotDelivered)
+			}
+			if launch {
+				return fmt.Errorf("%w: launch prompt started no turn", agentrunner.ErrNotDelivered)
 			}
 			return nil
 		}

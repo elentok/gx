@@ -115,7 +115,12 @@ func fakeClaude() {
 			continue
 		}
 		content := msg.Message.Content
-		if content == "stall" {
+		if content == "stall" || content == "/quiet" {
+			continue
+		}
+		if content == "/nope" {
+			// A rejected skill: claude says so and starts no turn.
+			emit(`{"type":"user","message":{"content":"<local-command-stderr>Unknown command: /nope</local-command-stderr>"}}`)
 			continue
 		}
 		lifecycle := func(state string) string {
@@ -447,6 +452,25 @@ func TestHeadless_PromptNeverStartedIsNotDelivered(t *testing.T) {
 
 	if err := h.runner.Prompt(s, "stall"); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("Prompt = %v, want ErrNotDelivered", err)
+	}
+}
+
+// A launch prompt must start a turn; the same "/" text sent as a no-turn
+// command (compaction) keeps the single-send, idle-counts rule.
+func TestHeadless_LaunchPromptThatStartsNoTurnIsNotDelivered(t *testing.T) {
+	for _, text := range []string{"/nope", "/quiet"} {
+		t.Run(text, func(t *testing.T) {
+			h := newHarness(t)
+			h.runner.N = 100 * time.Millisecond
+			s := h.start(t, "epic-07")
+
+			if err := h.runner.PromptLaunch(s, text, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+				t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
+			}
+			if err := h.runner.Prompt(s, text); err != nil {
+				t.Fatalf("Prompt = %v, want delivered", err)
+			}
+		})
 	}
 }
 

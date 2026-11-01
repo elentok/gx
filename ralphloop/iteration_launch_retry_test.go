@@ -127,6 +127,57 @@ func TestRunIteration_LogsEveryNudgeDecision(t *testing.T) {
 	}
 }
 
+// launchRunner counts launch prompts and rejects the first rejects of them.
+// Its plain Prompt always delivers, so only the launch method can fail.
+type launchRunner struct {
+	agentrunner.Runner
+	rejects  int
+	launches *int
+}
+
+func (l launchRunner) PromptLaunch(s agentrunner.Session, text string, _ func(string)) error {
+	*l.launches++
+	if *l.launches <= l.rejects {
+		return agentrunner.ErrNotDelivered
+	}
+	return l.Prompt(s, text)
+}
+
+func TestRunIteration_LaunchPromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	launches := 0
+	d.Runner = launchRunner{Runner: d.Runner, rejects: 1, launches: &launches}
+
+	scratchDir := runLaunchEpic(t, d, false)
+
+	assertTicketStatus(t, scratchDir, "done")
+	if launches != 2 {
+		t.Errorf("launch prompts = %d, want 2 (rejected, then the fresh session)", launches)
+	}
+	failed := launchFailedEvents(t, scratchDir)
+	if len(failed) != 1 || failed[0].Kind != string(events.AgentPromptStalled) {
+		t.Errorf("launch-failed events = %+v, want one agent_prompt_stalled", failed)
+	}
+}
+
+func TestRunIteration_LaunchPromptNotDeliveredTwice_PausesPromptStalled(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	launches := 0
+	d.Runner = launchRunner{Runner: d.Runner, rejects: 2, launches: &launches}
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
+	if launches != 2 {
+		t.Errorf("launch prompts = %d, want 2", launches)
+	}
+	if failed := launchFailedEvents(t, scratchDir); len(failed) != 2 {
+		t.Errorf("launch-failed events = %d, want 2", len(failed))
+	}
+}
+
 func TestRunIteration_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()

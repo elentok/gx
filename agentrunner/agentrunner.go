@@ -271,6 +271,23 @@ type Nudger interface {
 	PromptNudged(s Session, text string, onNudge func(decision string)) error
 }
 
+// LaunchPrompter is implemented by runners that can tell a launch prompt that
+// started no turn from a no-turn command. A launch prompt counts as delivered
+// only when it started a turn; otherwise it is ErrNotDelivered. onNudge is as
+// in Nudger.
+type LaunchPrompter interface {
+	PromptLaunch(s Session, text string, onNudge func(decision string)) error
+}
+
+// PromptLaunch sends a launch prompt, which must start a turn. A runner
+// without LaunchPrompter falls back to PromptNudged.
+func PromptLaunch(r Runner, s Session, text string, onNudge func(decision string)) error {
+	if l, ok := r.(LaunchPrompter); ok {
+		return l.PromptLaunch(s, text, onNudge)
+	}
+	return PromptNudged(r, s, text, onNudge)
+}
+
 // PersonInputter is implemented by runners whose agent a person can type into
 // (pty). PersonInput sends on events each time a person presses a key or
 // pastes; watching alone sends nothing. Events collapse while the receiver is
