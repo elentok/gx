@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/runnertest"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -67,7 +68,7 @@ func ptyKeysTyped(t *testing.T, p *nativerunner.Pty, text string) (string, error
 
 // Vim mode comes only from the config dir in Pty.Env: a poisoned home next
 // to a clean config dir types straight away, and vim mode in the config dir
-// presses `i` first, which the TUI fake never answers with an INSERT marker.
+// runs the vim probe, which types nothing when it cannot find the input.
 func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 	t.Parallel()
 	t.Run("poisoned home, clean config dir", func(t *testing.T) {
@@ -86,8 +87,10 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 			t.Fatal(err)
 		}
 		in, err := ptyKeysTyped(t, p, "do it")
-		if err == nil || !strings.HasPrefix(in, "i") || strings.Contains(in, "do it") {
-			t.Fatalf("Prompt = %v, keys = %q; want i pressed and the prompt not typed", err, in)
+		// The TUI fake has no `❯` input box, so the probe cannot find the input:
+		// it presses nothing and the prompt is not typed.
+		if !errors.Is(err, claudeui.ErrNotReadyToType) || in != "" {
+			t.Fatalf("Prompt = %v, keys = %q; want not ready to type, nothing typed", err, in)
 		}
 	})
 }
