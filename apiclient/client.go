@@ -584,6 +584,14 @@ func (c *Client) FixAgent(ctx context.Context, req server.FixAgentRequest) (serv
 	return res, err
 }
 
+// RetryMigration runs a project's pending migration steps again in the server.
+// A refusal is a result (Refused set), not an error.
+func (c *Client) RetryMigration(ctx context.Context, req server.RetryMigrationRequest) (server.RetryMigrationResult, error) {
+	var res server.RetryMigrationResult
+	err := c.post(ctx, "/v1/projects/retry-migration", req, &res)
+	return res, err
+}
+
 // StopSession ends a live session's holder. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) StopSession(ctx context.Context, id string) (server.SessionResult, error) {

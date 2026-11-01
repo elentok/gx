@@ -306,6 +306,10 @@ type Server struct {
 	idx            *index
 	// migrationsDone closes when the start-up migration run ends.
 	migrationsDone chan struct{}
+	// migratingNow counts the migration runs in flight per project name (the
+	// start-up run and Retry); Retry is refused while a project's count is above zero.
+	migratingMu  sync.Mutex
+	migratingNow map[string]int
 	// startupDone closes when the steps that run after the migrations (the
 	// first scan, merge recovery, run reclaim) have ended; claiming waits for it.
 	startupDone chan struct{}
@@ -666,6 +670,7 @@ var routeTable = []struct {
 	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
 	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
 	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
+	{"POST /v1/projects/retry-migration", (*Server).retryMigrationWrite},
 	{"POST /v1/afk", (*Server).afkWrite},
 	{"POST /v1/vimode", (*Server).viModeWrite},
 	{"POST /v1/checks/save", (*Server).checksSaveWrite},

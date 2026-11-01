@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -57,8 +59,98 @@ func (s *Server) migrateAll(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		name := tickets.ProjectName(dir)
+		s.migratingMu.Lock()
+		s.markMigrationLocked(name, 1)
+		s.migratingMu.Unlock()
 		s.migrateProject(reg, dir)
+		s.endMigration(name)
 	}
+}
+
+// Refusal reasons of the retry-migration route.
+const (
+	ReasonRetryRunning        = "migrating"
+	ReasonRetryUnknownProject = "unknown-project"
+)
+
+// RetryMigrationRequest is the body of POST /v1/projects/retry-migration.
+type RetryMigrationRequest struct {
+	Project string `json:"project"`
+}
+
+// RetryMigrationResult answers it: Started, or Refused with a Reason.
+type RetryMigrationResult struct {
+	Started bool   `json:"started"`
+	Refused bool   `json:"refused,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+func (s *Server) retryMigrationWrite(w http.ResponseWriter, r *http.Request) {
+	var req RetryMigrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, s.retryMigration(req.Project))
+}
+
+// retryMigration runs the project's pending steps in the background, the same
+// code path as the start-up run.
+func (s *Server) retryMigration(project string) RetryMigrationResult {
+	dir := ""
+	if s.cfg.TicketStore != "" {
+		dirs, _ := tickets.ProjectDirs(s.cfg.TicketStore)
+		for _, d := range dirs {
+			if tickets.ProjectName(d) == project {
+				dir = d
+			}
+		}
+	}
+	if dir == "" {
+		return RetryMigrationResult{Refused: true, Reason: ReasonRetryUnknownProject, Message: "no project " + project}
+	}
+	if !s.beginMigration(project) {
+		return RetryMigrationResult{Refused: true, Reason: ReasonRetryRunning, Message: "project " + project + " is migrating"}
+	}
+	go func() {
+		defer s.endMigration(project)
+		s.migrateProject(s.migrationRegistry(), dir)
+	}()
+	return RetryMigrationResult{Started: true}
+}
+
+// beginMigration marks project as migrating; it reports false when another run
+// of that project is already in flight.
+func (s *Server) beginMigration(project string) bool {
+	s.migratingMu.Lock()
+	defer s.migratingMu.Unlock()
+	if s.migratingNow[project] > 0 {
+		return false
+	}
+	s.markMigrationLocked(project, 1)
+	return true
+}
+
+// MigrationRunning reports whether a migration run of project is in flight.
+func (s *Server) MigrationRunning(project string) bool {
+	s.migratingMu.Lock()
+	defer s.migratingMu.Unlock()
+	return s.migratingNow[project] > 0
+}
+
+func (s *Server) endMigration(project string) {
+	s.migratingMu.Lock()
+	defer s.migratingMu.Unlock()
+	s.markMigrationLocked(project, -1)
+}
+
+func (s *Server) markMigrationLocked(project string, delta int) {
+	if s.migratingNow == nil {
+		s.migratingNow = map[string]int{}
+	}
+	s.migratingNow[project] += delta
 }
 
 func (s *Server) migrateProject(reg *migrations.Registry, dir string) {

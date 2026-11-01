@@ -102,6 +102,7 @@ func newProjectCmd(d deps) *cobra.Command {
 	add.Flags().StringVar(&vcs, "vcs", "", `"none" registers a directory that is not a git repo`)
 	add.Flags().BoolVar(&addJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(add)
+	cmd.AddCommand(newProjectRetryMigrationCmd(d))
 
 	var rmJSON bool
 	remove := &cobra.Command{
