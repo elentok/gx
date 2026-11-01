@@ -11,6 +11,7 @@ import type { DaySeries } from "../ui/day-chart/DayChart";
 import { Spinner } from "../ui/spinner/Spinner";
 import { StatCard } from "../ui/stat-card/StatCard";
 import type { Tone } from "../ui/tone";
+import { LimitBurnCards } from "./LimitBurnCards";
 import { parseRange, RANGES, useStats, type FetchStats, type Stats } from "./stats";
 
 const sum = (values: number[]) => values.reduce((a, v) => a + v, 0);
@@ -74,7 +75,7 @@ function Throughput({ stats }: { stats: Stats }) {
 const amounts = (a: StatsAmount[]) => a.map((d) => (d.no_data ? null : d.value));
 const sumNullable = (values: (number | null)[]) => sum(values.map((v) => v ?? 0));
 
-function Cost({ stats }: { stats: Stats }) {
+function Cost({ stats, project }: { stats: Stats; project: string }) {
   const { days, cost: c } = stats;
   const tones = ["running", "waiting", "done", "deadlocked"] as const;
   const card = (title: string, pick: (g: StatsCostGroup) => StatsAmount[], fmt: (n: number) => string) => {
@@ -92,6 +93,7 @@ function Cost({ stats }: { stats: Stats }) {
   };
   return (
     <Section id="stats-cost" title="Cost and effort" tone="waiting">
+      <LimitBurnCards days={days} burns={stats.limit_burn} project={project} />
       {card("Tokens", (g) => g.tokens, thousands)}
       {card("Spend", (g) => g.spend, (n) => `$${n.toFixed(2)}`)}
     </Section>
@@ -218,7 +220,7 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
       ) : (
         <>
           <Throughput stats={stats} />
-          <Cost stats={stats} />
+          <Cost stats={stats} project={project} />
           <Grilling stats={stats} />
           <Friction stats={stats} />
         </>
