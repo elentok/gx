@@ -98,7 +98,7 @@ export function RestartDialog({ liveInstance, check = fetchRestartCheck, restart
           </Text>
           {timedOut && (
             <Text>
-              {`The server did not return. It may still be migrating. Check the restart log at ${logPath ?? "the restart log"}, or run \`gx server start\`. This page keeps checking.`}
+              {`The server did not return. It may have failed to start. Check the restart log at ${logPath ?? "the restart log"}, or run \`gx server start\`. This page keeps checking.`}
             </Text>
           )}
         </Box>
@@ -122,13 +122,13 @@ export function RestartDialog({ liveInstance, check = fetchRestartCheck, restart
               {badProjects.map((p) => (
                 <Text key={p.name}>{`${p.name}: ${p.error ?? "failed"}`}</Text>
               ))}
-              <Text>The failed migration is saved, and the server starts anyway.</Text>
+              <Text>After the restart the project is in Migration block. You can retry the migration from the strip.</Text>
             </Box>
           )}
           {report.agents > 0 && (
             <>
               <Text>{`${report.agents} ${report.agents === 1 ? "agent is" : "agents are"} running. Agents keep running through the restart.`}</Text>
-              <Text>A migration runs while the agents work.</Text>
+              {report.projects.some((p) => p.pending > 0) && <Text>A migration runs while the agents work.</Text>}
             </>
           )}
           {notice && <Text role="alert">{notice}</Text>}

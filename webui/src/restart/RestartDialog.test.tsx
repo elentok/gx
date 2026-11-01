@@ -42,13 +42,25 @@ describe("RestartDialog", () => {
     expect((getByRole("button", { name: "Restart" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("shows versions, agents and the migration warning when ready", async () => {
-    const { findByText, getByRole, getByText } = open(report({ agents: 2 }));
+  it("shows versions, agents and the migration line when agents run and steps are pending", async () => {
+    const { findByText, getByRole, getByText } = open(report({ agents: 2, projects: [{ name: "p", ok: true, files: [], pending: 2 }] }));
     await findByText("Next version: v2");
     expect(getByText("Running version: v1")).toBeTruthy();
     expect(getByText(/2 agents are running. Agents keep running/)).toBeTruthy();
     expect(getByText(/migration runs while the agents work/)).toBeTruthy();
     expect((getByRole("button", { name: "Restart" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("hides the migration line when no step is pending", async () => {
+    const { findByText, queryByText } = open(report({ agents: 2, projects: [{ name: "p", ok: true, files: [], pending: 0 }] }));
+    await findByText(/2 agents are running/);
+    expect(queryByText(/migration runs/)).toBeNull();
+  });
+
+  it("hides the migration line when no agent runs", async () => {
+    const { findByText, queryByText } = open(report({ agents: 0, projects: [{ name: "p", ok: true, files: [], pending: 2 }] }));
+    await findByText("Next version: v2");
+    expect(queryByText(/migration runs/)).toBeNull();
   });
 
   it("says when the versions match", async () => {
@@ -60,6 +72,7 @@ describe("RestartDialog", () => {
     const { findByRole, getByText } = open(report({ projects: [{ name: "p", ok: false, error: "boom", files: [], pending: 1 }] }));
     expect((await findByRole("button", { name: "Restart anyway" }) as HTMLButtonElement).disabled).toBe(false);
     expect(getByText("p: boom")).toBeTruthy();
+    expect(getByText(/project is in Migration block.*retry the migration from the strip/)).toBeTruthy();
   });
 
   it.each([
@@ -113,7 +126,8 @@ describe("RestartDialog", () => {
     const msg = await findByText(/did not return/);
     expect(msg.textContent).toContain("/state/restart.log");
     expect(msg.textContent).toContain("gx server start");
-    expect(msg.textContent).toContain("still be migrating");
+    expect(msg.textContent).toContain("may have failed to start");
+    expect(msg.textContent).not.toContain("migrating");
   });
 
   it("reloads once when the live instance differs after the click", async () => {
