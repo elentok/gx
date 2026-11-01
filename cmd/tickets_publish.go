@@ -12,6 +12,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
@@ -178,6 +179,21 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 	return plan, nil
 }
 
+// printBundledAdvisories prints one line per implement ticket that reaches both
+// bundled-ticket thresholds. It is advice only and never refuses.
+func printBundledAdvisories(w io.Writer, cwd string, plan *publishPlan) {
+	root, err := git.Toplevel(cwd)
+	if err != nil {
+		return
+	}
+	topDirs := topLevelDirs(root)
+	for _, t := range plan.Tickets {
+		if line := tickets.BundledAdvisory(t.Slug, t.Type, t.Body, topDirs); line != "" {
+			fmt.Fprintln(w, line)
+		}
+	}
+}
+
 // fileWriter is deps.writeFile, or os.WriteFile.
 func (d deps) fileWriter() func(string, []byte, os.FileMode) error {
 	if d.writeFile != nil {
@@ -236,6 +252,7 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	if report.Refused() && !allowClaimMisses {
 		return &ExitError{Code: 1}
 	}
+	printBundledAdvisories(lintOut, cwd, plan)
 
 	if dryRun {
 		return printPublished(w, plan.rows(), jsonOut)

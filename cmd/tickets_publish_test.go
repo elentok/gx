@@ -405,6 +405,49 @@ func TestPublishAllowFlagsAreIndependent(t *testing.T) {
 	}
 }
 
+func TestPublishBundledAdvisory(t *testing.T) {
+	section := func(criteria int, files int, extra string) string {
+		var b strings.Builder
+		b.WriteString("\n## Test seams\n\nnone\n\n## Where to look\n\n")
+		for i := range files {
+			fmt.Fprintf(&b, "- `docs/f%d.md`\n", i)
+		}
+		b.WriteString("\n## Acceptance criteria\n\n")
+		for i := range criteria {
+			fmt.Fprintf(&b, "- [ ] criterion %d\n", i)
+		}
+		b.WriteString(extra)
+		return b.String()
+	}
+	cases := []struct {
+		name  string
+		body  string
+		extra []string
+		want  bool
+	}{
+		{"5 and 5", section(5, 5, ""), nil, true},
+		{"5 and 5 dry run", section(5, 5, ""), []string{"--dry-run"}, true},
+		{"4 criteria", section(4, 5, ""), nil, false},
+		{"4 files", section(5, 4, ""), nil, false},
+		{"boilerplate not counted", section(4, 5, "- [ ] Tests pass.\n- [ ] `make verify` is green\n"), nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d, _, err := publishShape(t, "implement", 1000, tc.body, append([]string{"--allow-claim-misses"}, tc.extra...)...)
+			if err != nil {
+				t.Fatalf("publish: %v\n%s", err, publishOut(d))
+			}
+			out := publishOut(d)
+			if got := strings.Contains(out, "consider splitting"); got != tc.want {
+				t.Fatalf("advisory printed = %v, want %v:\n%s", got, tc.want, out)
+			}
+			if tc.want && !strings.Contains(out, "a: 5 acceptance criteria and 5 files") {
+				t.Errorf("advisory lacks slug and counts:\n%s", out)
+			}
+		})
+	}
+}
+
 func TestPublishStampsCommit(t *testing.T) {
 	d, project, err := publishShape(t, "implement", 1000, "verified at {{commit}}, keep \\{{commit}}\n"+shapeSections)
 	if err != nil {

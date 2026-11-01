@@ -53,7 +53,10 @@ lines can still blow the budget once you add:
   new case can be written — 3+ files is the same cost shape as the explore/implement split below,
   even if the ticket reads as "mostly implementation" rather than "mostly tests." Don't let a single
   `expected_context_window` number smooth over this; split by file group (or route through
-  explore/implement, below) once a ticket's Test Seams section names 3+ files.
+  explore/implement, below) once a ticket's Test Seams section names 3+ files. `publish` warns on 5
+  or more acceptance criteria with 5 or more files; a warning means you re-check the slice before
+  going on. The 3-or-more-test-files rule is not shown to predict overruns (precision 0.18, recall
+  0.31), so treat it as a prompt to look, not a limit.
 
 Separate "the capability doesn't exist yet" from "something consumes a capability that now exists"
 into different tickets — a plumbing/infra ticket vs. a feature-on-top ticket. This applies whenever
@@ -158,8 +161,9 @@ plain `add`.
 
 ### 4. Declare each ticket's test seams
 
-Every ticket must declare its **approved public test seams** under a `## Test seams` heading — the
-public interfaces `gx-tdd` (or whatever implements the ticket) is allowed to test against. This
+Every `implement` ticket must declare its **approved public test seams** under a `## Test seams`
+heading. Verify and research tickets have no such section. Any non-blank line under the heading
+passes, including `none — <reason>`. The seams are the public interfaces `gx-tdd` (or whatever implements the ticket) is allowed to test against. This
 skill runs unattended under ralph-loop, so the seam decision has to be made now, in the ticket, not
 negotiated live with a human later.
 
@@ -221,8 +225,8 @@ context overrun) rediscovering it, then misses shared fixtures and fails the ful
   hit in full (no `| head`). List each affected test in Test seams, and give a scoped run (`-run`
   pattern or file list) that covers every hit. Don't scope by the new feature's name.
 - **Caller lists are verified, not recalled**: build every list of call sites with gopls
-  `go_symbol_references` (not from memory or a ticket's prose) and stamp it `verified at <commit>`
-  (`git rev-parse --short HEAD`). If gopls is unavailable, use `rg` and label the list
+  `go_symbol_references` (not from memory or a ticket's prose) and stamp it `verified at {{commit}}`;
+  `publish` fills in the commit. If gopls is unavailable, use `rg` and label the list
   `not verified`, so the implementer knows to re-check it.
 - **Doc pointers**: cite only a doc section you opened and confirmed exists (file and heading). A
   pointer to guidance that is not there sends the agent searching.
@@ -325,6 +329,11 @@ tickets exist. It also assigns the IDs, in dependency order:
 ```sh
 gx tickets publish <project:epic> --manifest <file>
 ```
+
+`publish` enforces the authoring rules from steps 3, 4 and 4b: an `implement` ticket needs a
+non-empty `## Test seams`, a `## Where to look`, and a window at or under the cap. It also prints a
+"consider splitting" line for a ticket with 5 or more acceptance criteria and 5 or more files; that
+line never refuses a publish.
 
 Add `--dry-run` first to print the IDs it would assign without writing anything. Opening the epic is
 the very last step, after the Summary, `ensure-code-review` and `ensure-verify` (see the end of this
