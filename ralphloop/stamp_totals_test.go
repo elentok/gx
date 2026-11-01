@@ -54,6 +54,68 @@ func TestWriteMergedMetrics_StampsTokensAndCostOverEverySession(t *testing.T) {
 	}
 }
 
+func TestWriteMergedMetrics_PrefixTokens(t *testing.T) {
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name       string
+		sessionIDs string
+		turns      [][3]any
+		want       int
+	}{
+		{"first call, not the peak", "[sess-1]", [][3]any{{"claude-sonnet-5", 40000, 0}, {"claude-sonnet-5", 90000, 0}}, 40000},
+		{"empty without a first call", "[sess-1]", nil, 0},
+		{"empty for a resumed session", "[sess-1, sess-1]", [][3]any{{"claude-sonnet-5", 40000, 0}, {"claude-sonnet-5", 90000, 0}}, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ticketPath, cwd, homes := stampTotalsFixture(t, c.sessionIDs)
+			turns := c.turns
+			if turns == nil {
+				// A transcript with no assistant usage line still has to exist.
+				turns = [][3]any{{"claude-sonnet-5", 0, 0}}
+			}
+			writeFakeTranscript(t, homes.Claude, cwd, "sess-1", start, turns...)
+			if _, _, err := writeMergedMetrics(homes, AgentClaude, cwd, "sess-1", ticketPath); err != nil {
+				t.Fatal(err)
+			}
+			if got := mustParse(t, ticketPath).PrefixTokens; got != c.want {
+				t.Errorf("PrefixTokens = %d, want %d", got, c.want)
+			}
+		})
+	}
+}
+
+func TestWriteMergedMetrics_PrefixTokens_FromThePeakSession(t *testing.T) {
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-1, sess-2]")
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-1", start, [3]any{"claude-sonnet-5", 10000, 0})
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-2", start, [3]any{"claude-sonnet-5", 45000, 0}, [3]any{"claude-sonnet-5", 90000, 0})
+
+	if _, _, err := writeMergedMetrics(homes, AgentClaude, cwd, "sess-2", ticketPath); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustParse(t, ticketPath).PrefixTokens; got != 45000 {
+		t.Errorf("PrefixTokens = %d, want the merging session's 45000", got)
+	}
+}
+
+func TestWriteMergedMetrics_CodexStampsPrefixTokensFromFirstTokenCount(t *testing.T) {
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-codex]")
+	rollout := filepath.Join(homes.Codex, "sessions", "rollout-sess-codex.jsonl")
+	if err := writeCodexSessionMeta(rollout, 0, "sess-codex", cwd); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCodexUsageLine(rollout, 1, 500, 7000); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := writeMergedMetrics(homes, AgentCodex, cwd, "sess-codex", ticketPath); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustParse(t, ticketPath).PrefixTokens; got != 500 {
+		t.Errorf("PrefixTokens = %d, want 500", got)
+	}
+}
+
 func TestWriteMergedMetrics_UnreadableSession_LeavesTicketUnstamped(t *testing.T) {
 	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-1, sess-missing, sess-2]")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

@@ -72,10 +72,13 @@ func turnTokens(u transcript.Usage) int {
 // subagents included; each turn priced by its own model).
 type sessionStats struct {
 	peakOccupancy int
-	totalTokens   int
-	cost          float64
-	start, end    time.Time
-	ok            bool // false if the transcript couldn't be read/found
+	// firstOccupancy is the first assistant call's occupancy; 0 when the
+	// transcript has none.
+	firstOccupancy int
+	totalTokens    int
+	cost           float64
+	start, end     time.Time
+	ok             bool // false if the transcript couldn't be read/found
 }
 
 // sessionKey identifies one agent session an event referenced.
@@ -125,6 +128,9 @@ func readTranscriptStats(path string) (sessionStats, error) {
 		}
 		if l.Type != "assistant" {
 			continue
+		}
+		if stats.firstOccupancy == 0 {
+			stats.firstOccupancy = l.Usage.Occupancy()
 		}
 		if occ := l.Usage.Occupancy(); occ > stats.peakOccupancy {
 			stats.peakOccupancy = occ
@@ -273,11 +279,12 @@ func readAgentSessionStats(homes SessionHomes, key sessionKey) (sessionStats, er
 		return sessionStats{}, err
 	}
 	return sessionStats{
-		start:         stats.Start,
-		end:           stats.End,
-		peakOccupancy: stats.PeakContext,
-		totalTokens:   stats.TotalTokens,
-		ok:            true,
+		start:          stats.Start,
+		end:            stats.End,
+		peakOccupancy:  stats.PeakContext,
+		firstOccupancy: stats.FirstContext,
+		totalTokens:    stats.TotalTokens,
+		ok:             true,
 	}, nil
 }
 
@@ -324,6 +331,13 @@ func writeMergedMetrics(homes SessionHomes, agent AgentKind, cwd, sessionID, tic
 		if stats.ok {
 			t.ActualContextWindow = m.contextWindow
 			t.ElapsedTime = m.elapsedSeconds
+			// A resumed session reuses its id, so a repeat in session_ids marks
+			// one whose first call can carry old history. A server-launched
+			// resume is recorded once (recordLiveSession dedups) and is not seen.
+			t.PrefixTokens = 0
+			if countOf(current.SessionIDs, sessionID) < 2 {
+				t.PrefixTokens = stats.firstOccupancy
+			}
 		}
 		if m.costStamped {
 			total := sum.tokens
@@ -336,6 +350,16 @@ func writeMergedMetrics(homes SessionHomes, agent AgentKind, cwd, sessionID, tic
 		return mergedMetrics{}, false, err
 	}
 	return m, stats.ok, nil
+}
+
+func countOf(ids []string, id string) int {
+	n := 0
+	for _, s := range ids {
+		if s == id {
+			n++
+		}
+	}
+	return n
 }
 
 // collectTicketTotals sums every session of the ticket plus its recorded

@@ -23,7 +23,10 @@ type Stats struct {
 	Start       time.Time
 	End         time.Time
 	PeakContext int
-	TotalTokens int
+	// FirstContext is the context of the session's first model call, 0 when
+	// the rollout has none.
+	FirstContext int
+	TotalTokens  int
 }
 
 // ReadStatsIn returns duration endpoints, peak per-turn context, and the
@@ -353,6 +356,9 @@ func readStats(path, cwd, sessionID string) (stats Stats, ok bool, err error) {
 		}
 		if line.Type != "event_msg" || line.Payload.Type != "token_count" {
 			continue
+		}
+		if stats.FirstContext == 0 {
+			stats.FirstContext = line.Payload.Info.LastTokenUsage.InputTokens
 		}
 		if line.Payload.Info.LastTokenUsage.InputTokens > stats.PeakContext {
 			stats.PeakContext = line.Payload.Info.LastTokenUsage.InputTokens
