@@ -1,13 +1,16 @@
 package check
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -109,6 +112,57 @@ func TestRunBatchesTogetherListEveryFile(t *testing.T) {
 		if !strings.Contains(string(log), n) {
 			t.Errorf("log lacks %s:\n%s", n, log)
 		}
+	}
+}
+
+func TestRunGoStepHoldsCacheGate(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "pkg/a.go", "package pkg\n")
+	bin := t.TempDir()
+	started := filepath.Join(t.TempDir(), "started")
+	release := filepath.Join(t.TempDir(), "release")
+	testutil.WriteFile(t, bin, "go", "#!/bin/sh\ntouch '"+started+"'\nwhile [ ! -e '"+release+"' ]; do sleep 0.02; done\n")
+	if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	stateDir := filepath.Join(t.TempDir(), "state")
+
+	done := make(chan error)
+	go func() {
+		_, err := Run(Options{Dir: repo, DataDir: t.TempDir(), StateDir: stateDir, Kinds: []string{"test"}, Env: env})
+		done <- err
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("go step never started")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	gate := gocachegate.Deps{Cap: 150 * time.Millisecond, Scan: func() (bool, error) { return false, nil }, Logf: func(string, ...any) {}}
+	probe := func() bool {
+		rel, capPassed, err := gate.WaitExclusive(context.Background(), stateDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rel()
+		return capPassed
+	}
+	if !probe() {
+		t.Error("gate not held while the go step runs")
+	}
+	if err := os.WriteFile(release, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if probe() {
+		t.Error("gate still held after the go step ended")
 	}
 }
 

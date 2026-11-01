@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -9,9 +10,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -133,6 +137,59 @@ func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
 	if !reflect.DeepEqual(e.Tests, []string{"example.com/tiny.TestA", "example.com/tiny.TestB"}) ||
 		!reflect.DeepEqual(e.Failed, []string{"example.com/tiny.TestB"}) {
 		t.Errorf("tests %v, failed %v", e.Tests, e.Failed)
+	}
+}
+
+func TestBrief_GoToolsHoldCacheGate(t *testing.T) {
+	bin := t.TempDir()
+	started := filepath.Join(t.TempDir(), "started")
+	release := filepath.Join(t.TempDir(), "release")
+	script := "#!/bin/sh\ntouch '" + started + "'\nwhile [ ! -e '" + release + "' ]; do sleep 0.02; done\n"
+	testutil.WriteFile(t, bin, "go", script)
+	if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	prependPath(t, bin)
+	stateDir, err := config.DirsFrom(envFor(t)).StateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan int)
+	go func() {
+		_, code := runBriefCmd(t, t.TempDir(), "go-vet", "./...")
+		done <- code
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("fake go never started")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	gate := gocachegate.Deps{Cap: 150 * time.Millisecond, Scan: func() (bool, error) { return false, nil }, Logf: func(string, ...any) {}}
+	probe := func() bool {
+		rel, capPassed, err := gate.WaitExclusive(context.Background(), stateDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rel()
+		return capPassed
+	}
+	if !probe() {
+		t.Error("gate not held while go-vet runs")
+	}
+	if err := os.WriteFile(release, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := <-done; code != 0 {
+		t.Fatalf("exit = %d", code)
+	}
+	if probe() {
+		t.Error("gate still held after go-vet ended")
 	}
 }
 

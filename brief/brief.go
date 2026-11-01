@@ -10,12 +10,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/gocachegate"
 )
 
 // Exit codes of a brief run.
@@ -77,6 +80,9 @@ type Options struct {
 	// the kind of it) that started this one.
 	CheckRun  string
 	CheckKind string
+	// StateDir holds the Go cache gate lock. Go tools hold it shared while the
+	// child runs; empty means no gate.
+	StateDir string
 }
 
 // EnvCheckRun and EnvCheckKind carry a `gx check` run and kind to its children.
@@ -161,7 +167,9 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	branch, _ := git.CurrentBranch(dir)
 	treeID, _ := git.TreeID(dir)
 
+	releaseGate := registerGoBuild(tool, o.StateDir)
 	out, exit, err := execute(plan.Bin, plan.Argv, dir, withDefaults(o.Env, plan.Env), logFile)
+	releaseGate()
 	if err != nil {
 		return cantRun(o.Out, err.Error()), Outcome{}
 	}
@@ -193,6 +201,20 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 		return cantRun(o.Out, "cannot write index: "+err.Error()), Outcome{}
 	}
 	return report(tool, o, outcome, out, entry), outcome
+}
+
+// registerGoBuild holds the cache gate shared for a Go tool's run. Other tools
+// and an empty stateDir take no lock. The gate never fails a build: a state dir
+// that cannot be made leaves the run unregistered.
+func registerGoBuild(tool Tool, stateDir string) (release func()) {
+	if stateDir == "" || !strings.HasPrefix(tool.Name(), "go-") {
+		return func() {}
+	}
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		log.Printf("gocachegate: build runs unregistered: %v", err)
+		return func() {}
+	}
+	return gocachegate.Register(stateDir)
 }
 
 // execute runs the command and returns its combined output and exit code. The

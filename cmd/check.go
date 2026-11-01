@@ -80,6 +80,9 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 	if opts.DataDir, err = d.dirs().DataDir(); err != nil {
 		return err
 	}
+	if opts.StateDir, err = d.dirs().StateDir(); err != nil {
+		return err
+	}
 	opts.ProjectChecks = func() (json.RawMessage, error) { return projectChecks(d.dirs(), dir) }
 	if cfg, err := d.dirs().Load(); err == nil {
 		opts.TicketStore = cfg.TicketStore.Path

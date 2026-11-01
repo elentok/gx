@@ -44,9 +44,11 @@ const (
 type Options struct {
 	Dir     string // any directory inside the repo or worktree
 	DataDir string // logs go to <DataDir>/check/<run>/
-	Mode    Mode
-	Since   string   // the ref for ModeSince
-	Kinds   []string // empty means all
+	// StateDir holds the Go cache gate lock the Go step holds while it runs.
+	StateDir string
+	Mode     Mode
+	Since    string   // the ref for ModeSince
+	Kinds    []string // empty means all
 	// ArgLimit overrides DefaultArgLimit; a test sets it small to force batches.
 	ArgLimit int
 	// ProjectChecks supplies the project.json fallback config. It is called only
@@ -116,7 +118,7 @@ func Run(opts Options) (Result, error) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
 	}
-	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore, installs: map[string]*installEntry{}}
+	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, stateDir: opts.StateDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore, installs: map[string]*installEntry{}}
 	if r.limit <= 0 {
 		r.limit = DefaultArgLimit
 	}
@@ -188,6 +190,7 @@ func (r *runner) childEnv(kind string) []string {
 
 type runner struct {
 	root, runDir, dataDir string
+	stateDir              string
 	runID, treeID         string
 	treeErr               string // why treeID is empty; recorded so flake detection can say it skipped the run
 	files                 []string
