@@ -1,8 +1,18 @@
 import { apiFetch } from "../apiFetch";
-import type { RestartCheckReport, RestartRequest, RestartResult } from "../generated/server";
+import { postJson } from "../design/open";
+import type {
+  RestartCheckReport,
+  RestartRequest,
+  RestartResult,
+  RetryMigrationRequest,
+  RetryMigrationResult,
+} from "../generated/server";
 
 export type FetchRestartCheck = () => Promise<RestartCheckReport>;
 export type PostRestart = (body: RestartRequest) => Promise<RestartResult>;
+export type RetryMigration = (body: RetryMigrationRequest) => Promise<RetryMigrationResult>;
+
+export const postRetryMigration: RetryMigration = postJson("/v1/projects/retry-migration");
 
 export const fetchRestartCheck: FetchRestartCheck = async () => {
   const res = await apiFetch("/v1/restart/check");

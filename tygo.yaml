@@ -38,6 +38,7 @@ packages:
       - stats.go
       - statsgrilling.go
       - limitsstore.go
+      - migrate.go
       - limitsevents.go
       - usagesample.go
       - usagesummary.go
