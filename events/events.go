@@ -212,7 +212,7 @@ func (k Kind) Valid() bool { return kinds[k] }
 // schema).
 var kindAwaitsAnswer = map[Kind]bool{
 	ZeroCommit: true, BlockedPane: true, SelfReported: true, AmbiguousBase: true, StrandedCommits: true,
-	BackgroundTaskGate: true,
+	BackgroundTaskGate: true, ModelMismatch: true,
 }
 
 // AwaitsAnswer reports whether a pause of this kind is a question for a

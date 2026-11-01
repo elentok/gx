@@ -54,6 +54,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	// own doc comment.
 	recovery := newSmartZoneRecovery(smartZone)
 	vcap := newVerifyCap(p, smartZone)
+	mguard := newModelGuard(d, p, clockOf(d))
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -180,7 +181,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		acted, err := guardTick(d, p, sessionID, vcap, recovery)
+		acted, err := guardTick(d, p, sessionID, vcap, recovery, mguard)
 		if err != nil {
 			return err
 		}
@@ -190,11 +191,15 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	}
 }
 
-// guardTick is the occupancy guard of one timed-out poll: the verify cap, then
-// smart-zone recovery. acted reports that either interrupted the pane. The cap
-// stop goes first and takes the whole tick: if occupancy is also past the smart
-// zone, the next poll runs its recovery.
-func guardTick(d Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery) (acted bool, err error) {
+// guardTick is the guard of one timed-out poll: the verify cap, then smart-zone
+// recovery, then the model check (which returns a *ModelMismatchError). acted
+// reports that either of the first two interrupted the pane. The cap stop goes
+// first and takes the whole tick: if occupancy is also past the smart zone, the
+// next poll runs its recovery.
+func guardTick(d Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *modelGuard) (acted bool, err error) {
+	if err := mguard.tick(d, p, sessionID); err != nil {
+		return false, err
+	}
 	if stopped, err := vcap.tick(d, p, sessionID); err != nil || stopped {
 		return stopped, err
 	}

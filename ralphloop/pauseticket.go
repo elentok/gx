@@ -85,9 +85,10 @@ func logGxQuestion(ticketPath string, kind events.Kind, reason string) error {
 
 // Reasons a pause.closed names: what ended the question without an answer.
 const (
-	CloseBudgetKilled = "budget-killed"
-	CloseRelaunch     = "relaunch"
-	CloseResumed      = "resumed"
+	CloseBudgetKilled  = "budget-killed"
+	CloseModelMismatch = "model-mismatch"
+	CloseRelaunch      = "relaunch"
+	CloseResumed       = "resumed"
 )
 
 // CloseOpenQuestion writes pause.closed with reason for the ticket's open

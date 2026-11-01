@@ -341,12 +341,13 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 	p := launchAndPromptParams{
 		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
-		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: new(verifyCapState),
+		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: new(verifyCapState), Model: o.Model,
 	}
 	in := watchPersonInput(d.Runner, s)
 	defer in.close()
 	p.input = in
 	vcap := newVerifyCap(p, p.SmartZone)
+	mguard := newModelGuard(d, p, clockOf(d))
 	elapsedMs := 0
 	nudged := false
 	for {
@@ -356,6 +357,9 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 				sessionID := ""
 				if status, err := d.Runner.Status(s); err == nil {
 					sessionID = status.SessionID
+				}
+				if err := mguard.tick(d, p, sessionID); err != nil {
+					return err
 				}
 				if _, err := vcap.tick(d, p, sessionID); err != nil {
 					return err

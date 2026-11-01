@@ -831,6 +831,11 @@ func (s *Server) settleRun(rc runContext, err error) {
 		go s.watchUnblock(deps.Runner, run.Session, ticketAddr)
 		return
 	}
+	var mismatch *ralphloop.ModelMismatchError
+	if errors.As(err, &mismatch) {
+		s.pauseModelMismatch(rc, addr, mismatch)
+		return
+	}
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next
