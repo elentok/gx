@@ -433,6 +433,10 @@ func ptyLaunchArgs(extra []string, dir string) ([]string, error) {
 	settings, err := json.Marshal(map[string]any{
 		// The main screen keeps a scrollback to read back.
 		"tui": "default",
+		// The claude.ai synced skills (docx, pptx, ...) are never used and cost
+		// about 3k tokens in every turn's prefix. claude reads only the last
+		// --settings flag, so a caller's own --settings replaces this whole map.
+		"syncClaudeAiSkills": false,
 		// The statusline command records the usage limits into the agent dir.
 		"statusLine": map[string]any{
 			"type":    "command",
