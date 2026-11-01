@@ -132,6 +132,9 @@ type scenario struct {
 	// spend seeds the budget ledger before the server starts, in the shape the
 	// --shape flag names (default normal), and prints the held agent's transcript path.
 	spend bool
+	// limitBurn seeds the Claude limits file and the limit history before the
+	// server starts, in the shape the --shape flag names (default menu).
+	limitBurn bool
 	// migrate turns on the migration test hooks and the bare-server control script (see migrate.go).
 	migrate bool
 	// migrateHold also holds the start-up migration open until the hold file is removed.
@@ -174,6 +177,18 @@ var scenarios = map[string]scenario{
 	"web-logins": {projects: []string{project}, extraLogins: []time.Duration{time.Hour, 3 * 24 * time.Hour, 70 * 24 * time.Hour}},
 	// limits: a project with no epics and a seeded limits state, shaped by --shape.
 	"limits": {projects: []string{project}, limits: true},
+	// limit-burn: seeded limit history (--shape, see limitburn.go) and one Codex
+	// ticket held running. It writes no usage sample of its own: a flow appends a
+	// token_count line to the rollout under Output.CodexSessionsDir to make the
+	// usage scan save a new Codex sample.
+	"limit-burn": {
+		codex:       true,
+		epics:       []epic{{project, "limit-burn-epic", []ticket{{"01", "running", servertest.TicketOpts{}}}}},
+		queue:       []string{project + ":limit-burn-epic"},
+		queueAgents: map[string]string{project + ":limit-burn-epic": "codex"},
+		hold:        true,
+		limitBurn:   true,
+	},
 	// ready: an epic that is not queued yet.
 	"ready": {
 		epics: []epic{{project, "ready-epic", []ticket{

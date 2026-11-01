@@ -11,6 +11,7 @@
 // --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
 // --shape <fresh|stale|past-reset|one-window> picks the seeded limits state of the limits scenario (default fresh).
 // --shape <normal|short|empty> picks the seeded budget ledger of the spend scenario (default normal).
+// --shape <menu|few-days|stale|past-reset> picks the seeded limit history of the limit-burn scenario (default menu).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
@@ -90,6 +91,9 @@ type Output struct {
 	// AgentTranscript is the held fake agent's transcript path in the spend
 	// scenario; the directory may not exist yet.
 	AgentTranscript string `json:"agent_transcript,omitempty"`
+	// CodexSessionsDir holds the held Codex worker's rollout in the limit-burn
+	// scenario; empty elsewhere.
+	CodexSessionsDir string `json:"codex_sessions_dir,omitempty"`
 	// MockURL is the base URL serving --mock-dir; empty without the flag.
 	MockURL string `json:"mock_url,omitempty"`
 	// BrowserSession names this worktree's playwright-cli session (`-s=<name>`): the
@@ -370,6 +374,11 @@ func run(args []string) (err error) {
 			return fmt.Errorf("seed limits: %w", err)
 		}
 	}
+	if sc.limitBurn {
+		if err := f.seedLimitBurn(shape); err != nil {
+			return fmt.Errorf("seed limit burn: %w", err)
+		}
+	}
 	if sc.spend {
 		if err := f.seedSpend(shape); err != nil {
 			return fmt.Errorf("seed spend: %w", err)
@@ -531,6 +540,9 @@ func run(args []string) (err error) {
 	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript}
 	if sc.fakeGo {
 		o.GateDir = f.gateDir()
+	}
+	if sc.limitBurn {
+		o.CodexSessionsDir = filepath.Join(root, "home", ".codex", "sessions")
 	}
 	if sc.restart != nil {
 		o.RestartDir = f.restartDir()

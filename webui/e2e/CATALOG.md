@@ -9,7 +9,11 @@ The `limits` scenario seeds the limits state: `start("limits", { shape })` takes
 `stale`, `past-reset` or `one-window`. The `spend` scenario seeds the budget ledger
 (`start("spend", { shape })` takes `normal` (default), `short` or `empty`) and holds one fake agent
 running; append an assistant usage line to `fixture.agentTranscript` (create its directory first)
-and the ledger, polled every second, adds its cost. `fixture.cliInput(input, ...args)` and
+and the ledger, polled every second, adds its cost. The `limit-burn` scenario seeds `claude-limits.json` and the limit history
+(`start("limit-burn", { shape })` takes `menu` (default), `few-days`, `stale` or `past-reset`) and holds
+one Codex ticket running. To make the usage scan save a new Codex sample, append a `token_count` line
+(`{"timestamp":<ISO>,"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":N,"window_minutes":10080,"resets_at":<epoch>}}}}`)
+to the `rollout-*.jsonl` under `fixture.codexSessionsDir` (`codex_sessions_dir` in the fixture output). `fixture.cliInput(input, ...args)` and
 `fixture.cliEnvInput(extra, input, ...args)` are `cli`/`cliEnv` with `input` on stdin.
 Retries are off. Locators use roles and visible text, plus `data-testid` `pill` and `reason` on
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.

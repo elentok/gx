@@ -73,9 +73,11 @@ func checkShape(sc scenario, shape string) (string, error) {
 		def, names = "fresh", limitShapeNames()
 	case sc.spend:
 		def, names = "normal", spendShapeNames()
+	case sc.limitBurn:
+		def, names = "menu", limitBurnShapeNames()
 	default:
 		if shape != "" {
-			return "", fmt.Errorf("--shape only applies to the limits and spend scenarios")
+			return "", fmt.Errorf("--shape only applies to the limits, spend and limit-burn scenarios")
 		}
 		return "", nil
 	}
