@@ -206,27 +206,7 @@ func (pr *ptyPrompter) SendEnter() error {
 }
 
 func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		if err := pr.cancelled(); err != nil {
-			return false, err
-		}
-		_, turn, err := pr.ss.holder.Status()
-		if err != nil {
-			return false, pr.p.died(pr.ss, err)
-		}
-		if turn > pr.turn {
-			return true, nil
-		}
-		if time.Now().After(deadline) {
-			return false, nil
-		}
-		select {
-		case <-pr.ss.exited:
-			return false, pr.p.died(pr.ss, errors.New("holder exited"))
-		case <-time.After(pr.p.pollInterval()):
-		}
-	}
+	return pr.p.answerer(pr.ss).waitTurn(pr.turn, timeout, pr.cancelled)
 }
 
 func (pr *ptyPrompter) Screen() (string, error) {

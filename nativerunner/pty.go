@@ -920,103 +920,17 @@ func (p *Pty) awaitIdle(ss *ptySession) error {
 // approval. Their first option is "Yes", so Enter allows.
 const permissionPrompt = "permission prompt"
 
-// Answer presses Enter to allow a permission prompt or Esc to deny any
-// dialog, and returns once Turn moved. Allow on any other dialog is
-// ErrInvalidDecision: its options aren't known, but Esc always cancels it.
-// Deny with a reason also sends the reason as claude's next prompt. With a
-// RequestID, the screen is re-read first and anything but that approvable
-// dialog is ErrRequestMismatch, before any key is sent.
+// Answer answers the session's dialog; see holderAnswerer.AnswerClaude and
+// AnswerCodex.
 func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	ss, err := p.live(s)
 	if err != nil {
 		return err
 	}
 	if ss.kind == harness.Codex {
-		return p.answerCodex(ss, a)
+		return p.answerer(ss).AnswerCodex(a)
 	}
-	claude, turn, err := ss.holder.Status()
-	if err != nil {
-		return p.died(ss, err)
-	}
-	if claude == nil || claude.Status != ClaudeWaiting {
-		return fmt.Errorf("%w: answer on a session that is not blocked", agentrunner.ErrNotReady)
-	}
-	if a.RequestID != "" {
-		d, err := p.screenDialog(ss)
-		if err != nil {
-			return err
-		}
-		if !d.Approvable || d.ID != a.RequestID {
-			return fmt.Errorf("%w: %s", agentrunner.ErrRequestMismatch, a.RequestID)
-		}
-	}
-	var key string
-	switch a.Decision {
-	case agentrunner.DecisionAllow:
-		if claude.WaitingFor != permissionPrompt {
-			return fmt.Errorf("%w: %q is not a permission prompt; deny cancels it",
-				agentrunner.ErrInvalidDecision, claude.WaitingFor)
-		}
-		key = "\r"
-	case agentrunner.DecisionDeny:
-		if a.Text != "" {
-			return p.denyWithReason(ss, a.Text)
-		}
-		key = "\x1b"
-	default:
-		return fmt.Errorf("%w: %q", agentrunner.ErrInvalidDecision, a.Decision)
-	}
-	if err := p.died(ss, ss.holder.SendKeys(key)); err != nil {
-		return err
-	}
-	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
-	moved, err := pr.WaitStart(p.promptGrace())
-	if err != nil {
-		return err
-	}
-	if !moved {
-		return fmt.Errorf("%w: %s left the dialog open", agentrunner.ErrNotDelivered, a.Decision)
-	}
-	return nil
-}
-
-// denyWithReason prefers the holder's deny-reason op, which keeps Status
-// blocked until claude takes the reason; between a bare Esc and the reason,
-// a waiter would see idle and end the turn. A failed step leaves claude
-// somewhere between the dialog and the reason, so the session is marked died.
-func (p *Pty) denyWithReason(ss *ptySession, reason string) error {
-	var err error
-	if ss.holder.Supports(OpDenyReason) {
-		err = p.died(ss, ss.holder.DenyWithReason(reason))
-	} else {
-		err = p.escThenPrompt(ss, reason)
-	}
-	if errors.Is(err, agentrunner.ErrSessionDied) {
-		p.markDied(ss, err)
-	}
-	return err
-}
-
-// escThenPrompt is deny-reason over core ops, for a holder that predates the
-// op: Esc, then the reason as a normal prompt once claude is idle.
-func (p *Pty) escThenPrompt(ss *ptySession, reason string) error {
-	if err := p.died(ss, ss.holder.SendKeys("\x1b")); err != nil {
-		return err
-	}
-	deadline := time.Now().Add(p.promptGrace())
-	for {
-		claude, _, err := ss.holder.Status()
-		if err != nil {
-			return p.died(ss, err)
-		}
-		if claude != nil && claude.Status == ClaudeIdle {
-			return p.Prompt(ss.session, reason)
-		}
-		if time.Now().After(deadline) {
-			return agentrunner.SessionDied("claude did not go idle after Esc")
-		}
-		time.Sleep(p.pollInterval())
-	}
+	return p.answerer(ss).AnswerClaude(a)
 }
 
 func (p *Pty) backgroundTasks(s agentrunner.Session) bool {
