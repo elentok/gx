@@ -91,19 +91,17 @@ test("77. Send while busy", async ({ page, start }) => {
   await expect(composer(page).getByRole("button", { name: "Send" })).toBeDisabled();
 });
 
-test("81. Session without chat", async ({ page, start }) => {
+// No fixture harness lacks chat; the NoChat screen is unit-tested in AgentsPage.composer.test.tsx.
+test("81. Codex session has chat", async ({ page, start }) => {
   const fixture = await start("agents");
   const other = (await sessions(fixture)).find((s) => s.harness !== "claude")!;
+  expect(other.harness).toBe("codex");
   await go(page, `#/agents/${other.id}`);
 
-  await expect(page.getByText("Chat works for Claude sessions only.")).toBeVisible();
-  await expect(composer(page).getByText("Sending works for Claude sessions only")).toBeVisible();
-  await expect(composer(page).getByRole("button", { name: "Send" })).toBeDisabled();
-
-  await page.getByRole("button", { name: "Show screen" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(composer(page).getByRole("textbox", { name: "Message" })).toBeVisible();
+  await expect(page.getByText("Chat works for Claude and Codex sessions only.")).toHaveCount(0);
+  await expect(composer(page).getByText("Sending works for Claude and Codex sessions only")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Show screen" })).toHaveCount(0);
 });
 
 test("82. No messages yet", async ({ page, start }) => {

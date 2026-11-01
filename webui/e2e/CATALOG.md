@@ -1009,13 +1009,12 @@ Run with `-g "79\. Keyboard send"`: it matches three tests, and the number 79 is
   - With text, the main button is Send and the key posts it.
   - While Interrupt is the main button the box is off. The key posts nothing and opens no popover.
 
-## 81. Session without chat
+## 81. Codex session has chat
 
 - **Scenario:** `agents`
-- **Steps:**
-  1. Open the session of the non-Claude harness.
-  2. Click Show screen, then press Esc.
-- **Pass:** the notice reads "Chat works for Claude sessions only." The composer reads "Sending works for Claude sessions only" and Send is off. Show screen opens the screen dialog and Esc closes it.
+- **Steps:** open the Codex session.
+- **Pass:** the Message box shows. Neither "Chat works for Claude and Codex sessions only." nor "Sending works for Claude and Codex sessions only" shows, and there is no Show screen button.
+- **Note:** the fixture has no harness without chat, so the NoChat screen is unit-tested only (`AgentsPage.composer.test.tsx`).
 
 ## 82. No messages yet
 
