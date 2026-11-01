@@ -49,11 +49,12 @@ func TestUsageSummary_ModeFollowsStoredWindows(t *testing.T) {
 // seedLimitHistory writes the history file and restarts the server on it. Each id
 // gets one sample per local day for the five days before today, rising 10
 // points a day to 50, and its latest reading is the last sample's value read
-// latestAge ago.
-func seedLimitHistory(t *testing.T, h *servertest.Harness, ids []string, latestAge time.Duration) {
+// latestAge ago. It returns the reset time of the seeded windows: a later report
+// must reuse it, since a different one reads as a reset and burns today.
+func seedLimitHistory(t *testing.T, h *servertest.Harness, ids []string, latestAge time.Duration) (resets int64) {
 	t.Helper()
 	now := time.Now()
-	resets := now.Add(72 * time.Hour).Unix()
+	resets = now.Add(72 * time.Hour).Unix()
 	state := struct {
 		Samples map[string][]server.LimitSample `json:"samples"`
 		Latest  map[string]server.LimitSample   `json:"latest"`
@@ -75,14 +76,15 @@ func seedLimitHistory(t *testing.T, h *servertest.Harness, ids []string, latestA
 		t.Fatal(err)
 	}
 	h.Restart(t)
+	return resets
 }
 
 func TestUsageSummary_WeeklyCarriesChipAndForecast(t *testing.T) {
 	h := limitsHarness(t)
-	seedLimitHistory(t, h, []string{server.LimitIDClaudeWeekly}, 0)
+	resets := seedLimitHistory(t, h, []string{server.LimitIDClaudeWeekly}, 0)
 	sendLimits(t, h, server.LimitsReport{
 		FiveHour: limitWin(20, 4_000_000_000),
-		SevenDay: limitWin(50, time.Now().Add(72*time.Hour).Unix()),
+		SevenDay: limitWin(50, resets),
 	})
 
 	u := usageSummary(t, h)

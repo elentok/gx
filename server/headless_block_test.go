@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
@@ -36,6 +37,11 @@ func startBlockable(t *testing.T, runnerName string, opts ...func(*server.Config
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { _, ok, _ := turn.Find("epic-a-iter-01"); return ok })
+	// A block raised while the launch still waits for the session to be ready fails
+	// the launch instead of pausing the ticket.
+	servertest.WaitFor(t, time.Minute, "the launch finishes", func() bool {
+		return len(h.Server.Runs()) == 1 && h.Server.LaunchingRuns() == 0
+	})
 	return h, ticketPath, turn
 }
 
