@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -109,7 +110,11 @@ func (s *Server) addProject(req AddProjectRequest) (AddProjectResult, error) {
 	if req.VCS != "" {
 		pf.VCS = &req.VCS
 	}
-	if err := tickets.WriteProjectFile(filepath.Join(s.cfg.TicketStore, name), pf); err != nil {
+	projectDir := filepath.Join(s.cfg.TicketStore, name)
+	if err := tickets.WriteProjectFile(projectDir, pf); err != nil {
+		return AddProjectResult{}, err
+	}
+	if err := migrations.WriteFullApplied(projectDir); err != nil {
 		return AddProjectResult{}, err
 	}
 	return AddProjectResult{Name: name, Repo: repo}, nil

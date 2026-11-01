@@ -3,6 +3,7 @@ package migrations
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -59,6 +60,23 @@ func recordApplied(path, name string) error {
 		return err
 	}
 	return f.Close()
+}
+
+// WriteFullApplied gives a newly created project directory a list that already
+// holds every registered step, so the project is not migrated for nothing. Only
+// creation paths call it; an existing project keeps the list it has.
+func (r *Registry) WriteFullApplied(projectDir string) error {
+	for _, name := range r.Names() {
+		if err := recordApplied(filepath.Join(projectDir, AppliedFile), name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// WriteFullApplied writes the Default registry's full list into projectDir.
+func WriteFullApplied(projectDir string) error {
+	return Default.WriteFullApplied(projectDir)
 }
 
 // UnknownApplied returns the sorted names, across the lists in the given

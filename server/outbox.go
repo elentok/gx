@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -39,6 +40,9 @@ func EnsureOutboxProject(ticketStore, mode string) error {
 		return err
 	}
 	name, vcs := OutboxProject, config.VCSNone
-	return tickets.WriteProjectFile(filepath.Join(ticketStore, OutboxProject),
-		config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs})
+	dir := filepath.Join(ticketStore, OutboxProject)
+	if err := tickets.WriteProjectFile(dir, config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs}); err != nil {
+		return err
+	}
+	return migrations.WriteFullApplied(dir)
 }

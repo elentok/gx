@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -47,7 +48,15 @@ func ensureScratchProject(ticketStore string) error {
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		return err
 	}
+	dir := filepath.Join(ticketStore, ScratchProject)
+	_, statErr := os.Stat(filepath.Join(dir, config.ProjectFileName))
+	isNew := os.IsNotExist(statErr)
 	name, vcs := ScratchProject, config.VCSNone
-	return tickets.WriteProjectFile(filepath.Join(ticketStore, ScratchProject),
-		config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs})
+	if err := tickets.WriteProjectFile(dir, config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs}); err != nil {
+		return err
+	}
+	if isNew {
+		return migrations.WriteFullApplied(dir)
+	}
+	return nil
 }
