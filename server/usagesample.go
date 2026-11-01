@@ -289,27 +289,44 @@ func (s *Server) scanUsage() {
 		s.log.Warn("scan usage", "err", err)
 		return
 	}
+	// The gate keeps only the newest record; the history merges every agent's.
+	var codexSamples []codexsession.UsageSample
+	readCodex := func(agentDir string) (nativerunner.UsageRecord, bool) {
+		sample, ok := s.readCodexSample(agentDir)
+		if !ok {
+			return nativerunner.UsageRecord{}, false
+		}
+		codexSamples = append(codexSamples, sample)
+		return codexUsageRecord(sample), true
+	}
 	for _, dir := range dirs {
 		root := nativerunner.AgentsRoot(s.cfg.StateDir, tickets.ProjectName(dir))
 		if err := s.usage.scan(root, readUsageRecord); err != nil {
 			s.log.Warn("scan usage", "root", root, "err", err)
 		}
-		if err := s.usageCodex.scan(root, s.readCodexUsage); err != nil {
+		if err := s.usageCodex.scan(root, readCodex); err != nil {
 			s.log.Warn("scan codex usage", "root", root, "err", err)
 		}
 	}
+	saved, err := s.limitHistory.recordCodex(codexSamples, time.Now().Unix())
+	if err != nil {
+		s.log.Warn("save codex limit history", "err", err)
+	}
+	if saved {
+		s.limitsEvents.trigger()
+	}
 }
 
-// readCodexUsage is the usage record of a Codex agent dir, read from its
+// readCodexSample is the usage sample of a Codex agent dir, read from its
 // rollout; Codex agents write no usage.json. A dir of another harness has none.
-func (s *Server) readCodexUsage(agentDir string) (nativerunner.UsageRecord, bool) {
+func (s *Server) readCodexSample(agentDir string) (codexsession.UsageSample, bool) {
 	d, err := nativerunner.OpenDir(agentDir)
 	if err != nil || agentrunner.Kind(d.Meta.Harness) != harness.Codex {
-		return nativerunner.UsageRecord{}, false
+		return codexsession.UsageSample{}, false
 	}
 	home, err := s.codexHome()
 	if err != nil {
-		return nativerunner.UsageRecord{}, false
+		return codexsession.UsageSample{}, false
 	}
 	// Meta holds gx's start id; Codex names its rollout by the id the hook saved.
 	sessionID := d.Meta.SessionID
@@ -318,9 +335,9 @@ func (s *Server) readCodexUsage(agentDir string) (nativerunner.UsageRecord, bool
 	}
 	sample, ok, err := codexsession.LatestUsageIn(home, d.Meta.Cwd, sessionID)
 	if err != nil || !ok || sample.SeenAt.IsZero() {
-		return nativerunner.UsageRecord{}, false
+		return codexsession.UsageSample{}, false
 	}
-	return codexUsageRecord(sample), true
+	return sample, true
 }
 
 // codexUsageRecord maps a sample's windows onto the two slots of the Claude

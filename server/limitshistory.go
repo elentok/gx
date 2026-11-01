@@ -2,9 +2,12 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/elentok/gx/codexsession"
 )
 
 // limitHistoryFile keeps every limit sample, beside claude-limits.json.
@@ -45,11 +48,13 @@ type limitHistory struct {
 
 	mu    sync.Mutex
 	state limitHistoryState
+	// codexSeen is the newest rollout time noted per Codex limit; not persisted.
+	codexSeen map[string]int64
 }
 
 // openLimitHistory loads the history file; a missing or corrupt file means empty.
 func openLimitHistory(stateDir string) *limitHistory {
-	h := &limitHistory{path: filepath.Join(stateDir, limitHistoryFile)}
+	h := &limitHistory{path: filepath.Join(stateDir, limitHistoryFile), codexSeen: map[string]int64{}}
 	if data, err := os.ReadFile(h.path); err == nil {
 		if json.Unmarshal(data, &h.state) != nil {
 			h.state = limitHistoryState{}
@@ -93,7 +98,7 @@ func (h *limitHistory) Latest(id string) (LimitSample, bool) {
 // percentage or the reset time differs from the limit's last sample, or when
 // the last sample is an hour old. The in-memory state only moves once the save
 // succeeds.
-func (h *limitHistory) record(id string, w LimitWindow, now int64) error {
+func (h *limitHistory) record(id string, w LimitWindow, now int64) (saved bool, err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	sample := LimitSample{LimitID: id, UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: now}
@@ -103,7 +108,7 @@ func (h *limitHistory) record(id string, w LimitWindow, now int64) error {
 		unchanged := last.UsedPercentage == sample.UsedPercentage && last.ResetsAt == sample.ResetsAt
 		if unchanged && now-last.ReceivedAt < limitConfirmEverySeconds {
 			h.state.Latest[id] = sample
-			return nil
+			return false, nil
 		}
 	}
 	next := limitHistoryState{Samples: map[string][]LimitSample{}, Latest: map[string]LimitSample{}}
@@ -117,13 +122,84 @@ func (h *limitHistory) record(id string, w LimitWindow, now int64) error {
 	next.Latest[id] = sample
 	data, err := json.Marshal(next)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := writeFileAtomic(h.path, data); err != nil {
-		return err
+		return false, err
 	}
 	h.state = next
-	return nil
+	return true, nil
+}
+
+// newerCodexReading reports whether a reading seen at seen is newer than the
+// last one noted for the limit, and notes it. The newest seen time lives in
+// memory because the scan time stored as received-at can run ahead of a reading
+// that landed in the same second; after a restart the stored received-at stands
+// in for it.
+func (h *limitHistory) newerCodexReading(id string, seen int64) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	last, ok := h.codexSeen[id]
+	if !ok {
+		last = h.state.Latest[id].ReceivedAt
+	}
+	if seen <= last {
+		return false
+	}
+	h.codexSeen[id] = seen
+	return true
+}
+
+// codexLimitIDs maps the two window lengths in minutes the forecast knows to
+// their limit ids; a window of any other length is not saved.
+var codexLimitIDs = map[int]string{300: LimitIDCodex5h, 10080: LimitIDCodexWeekly}
+
+// recordCodex saves history from one scan's Codex samples, merged across
+// agents per limit: the later reset wins, and among equal resets the highest
+// percentage. A limit is only noted when a reading is newer than its latest
+// received-at, so an idle Codex does not get fresher. It reports whether any
+// sample was saved.
+func (h *limitHistory) recordCodex(samples []codexsession.UsageSample, now int64) (bool, error) {
+	type reading struct {
+		w    LimitWindow
+		seen int64
+	}
+	merged := map[string]reading{}
+	for _, s := range samples {
+		for _, cw := range s.Windows {
+			id, ok := codexLimitIDs[cw.Minutes]
+			if !ok {
+				continue
+			}
+			r := reading{w: LimitWindow{UsedPercentage: cw.UsedPercent, ResetsAt: cw.ResetsAt.Unix()}, seen: s.SeenAt.Unix()}
+			cur, have := merged[id]
+			switch {
+			case !have, r.w.ResetsAt > cur.w.ResetsAt:
+				merged[id] = r
+			case r.w.ResetsAt == cur.w.ResetsAt:
+				cur.w.UsedPercentage = max(cur.w.UsedPercentage, r.w.UsedPercentage)
+				cur.seen = max(cur.seen, r.seen)
+				merged[id] = cur
+			}
+		}
+	}
+	var saved bool
+	var errs []error
+	for _, id := range []string{LimitIDCodex5h, LimitIDCodexWeekly} {
+		r, ok := merged[id]
+		if !ok {
+			continue
+		}
+		if !h.newerCodexReading(id, r.seen) {
+			continue
+		}
+		s, err := h.record(id, r.w, now)
+		saved = saved || s
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return saved, errors.Join(errs...)
 }
 
 // recordClaude saves history for each window the merge accepted.
@@ -139,7 +215,7 @@ func (h *limitHistory) recordClaude(report LimitsReport, res LimitsApplyResult, 
 		if c.in == nil || c.res == nil || c.res.Outcome == LimitDropped {
 			continue
 		}
-		if err := h.record(c.id, *c.in, now); err != nil {
+		if _, err := h.record(c.id, *c.in, now); err != nil {
 			return err
 		}
 	}
