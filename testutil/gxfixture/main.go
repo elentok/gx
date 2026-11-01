@@ -42,6 +42,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
@@ -294,7 +295,16 @@ func run(args []string) (err error) {
 	if err := f.seed(sc); err != nil {
 		return err
 	}
-	// The server migrates on every start, and its steps read the store's git log.
+	// The server migrates on every start. The seed is already in the current
+	// shape, so only the migrate scenarios leave steps pending.
+	if !sc.migrate {
+		for _, p := range sc.projectNames() {
+			if err := migrations.WriteFullApplied(filepath.Join(f.store, p)); err != nil {
+				return err
+			}
+		}
+	}
+	// The migration's steps read the store's git log.
 	if err := f.commitStore(); err != nil {
 		return fmt.Errorf("commit store: %w", err)
 	}
