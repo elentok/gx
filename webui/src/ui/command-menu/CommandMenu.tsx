@@ -60,7 +60,7 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
       flexDirection="column"
       overflow="hidden"
     >
-      {status === "failed" && <Note warn>Skills could not load</Note>}
+      {status === "failed" && <Note warn>⚠ Skills could not load. Built-ins only.</Note>}
       {status === "loading" && (
         <Note>
           <Spinner size="xs" mr="2" verticalAlign="middle" color={`tone.${tone}.fg`} />
@@ -70,17 +70,11 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
       {status === "no-match" && (
         <>
           <Note>
-            {compact && sends ? (
-              "Send sends it as typed."
-            ) : (
-              <>
-                No command matches{" "}
-                <Text as="span" fontFamily="mono">
-                  {typed}
-                </Text>
-                {sends ? ". Cmd/Ctrl+Enter sends it as typed." : "."}
-              </>
-            )}
+            No command matches{" "}
+            <Text as="span" fontFamily="mono">
+              {typed}
+            </Text>
+            {sends ? `. ${compact ? "Send" : "Cmd/Ctrl+Enter"} sends it as typed.` : "."}
           </Note>
           {!compact && <Footer>Esc closes</Footer>}
         </>
@@ -146,7 +140,7 @@ function Row({ row, active, compact, tone, onPick }: { row: CommandMenuRow; acti
       bg={active ? "surface" : "transparent"}
       boxShadow={active ? `inset 2px 0 0 var(--chakra-colors-tone-${tone}-fg)` : "none"}
     >
-      <Text as="span" fontFamily="mono" fontSize="xs" whiteSpace="nowrap" gridColumn="1" gridRow="1">
+      <Text as="span" fontFamily="mono" fontSize="xs" whiteSpace="nowrap" minW="0" overflow="hidden" textOverflow="ellipsis" gridColumn="1" gridRow="1">
         {row.segments.map((s, i) =>
           s.match ? (
             <Text as="mark" key={i} bg="transparent" color={`tone.${tone}.fg`} fontWeight="700">

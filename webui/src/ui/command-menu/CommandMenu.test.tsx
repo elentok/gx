@@ -88,7 +88,7 @@ describe("CommandMenu", () => {
 
   it("shortens the no-match line on a phone", () => {
     const { getByText } = renderThemed(<CommandMenu {...base} rows={[]} status="no-match" typed="/zz" compact />);
-    expect(getByText("Send sends it as typed.")).toBeTruthy();
+    expect(getByText((_, el) => el?.tagName === "P" && el.textContent === "No command matches /zz. Send sends it as typed.")).toBeTruthy();
   });
 
   it("shows one loading line", () => {
@@ -99,7 +99,7 @@ describe("CommandMenu", () => {
 
   it("shows built-ins plus a warning when the list failed", () => {
     const { getByText, getAllByRole } = renderThemed(<CommandMenu {...base} status="failed" />);
-    expect(getByText("Skills could not load")).toBeTruthy();
+    expect(getByText("⚠ Skills could not load. Built-ins only.")).toBeTruthy();
     expect(getAllByRole("option")).toHaveLength(2);
   });
 

@@ -368,7 +368,7 @@ describe("completion menu", () => {
     stubCommands(async () => new Response("{}", { status: 500 }));
     render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
     await type("/co");
-    await screen.findByText("Skills could not load");
+    await screen.findByText("⚠ Skills could not load. Built-ins only.");
     fireEvent.keyDown(await composerBox(), { key: "Enter", metaKey: true });
     await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ text: "/co" })]));
   });
@@ -377,7 +377,7 @@ describe("completion menu", () => {
     stubCommands(async () => new Response(JSON.stringify({ ...canned, degraded: true })));
     render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
     await type("/co");
-    await screen.findByText("Skills could not load");
+    await screen.findByText("⚠ Skills could not load. Built-ins only.");
     await vi.waitFor(() => expect(options()).toHaveLength(2));
   });
 
