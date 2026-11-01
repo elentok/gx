@@ -33,6 +33,9 @@ type Meta struct {
 	Label          string `json:"label"`
 	Epic           string `json:"epic"`
 	Cwd            string `json:"cwd"`
+	// EditorModeNormal records that the launch set editorMode normal, so the
+	// vim-mode probe can skip a session where the override is in effect.
+	EditorModeNormal bool `json:"editor_mode_normal,omitempty"`
 	// Offset is where this session's events begin in out.jsonl, always at a
 	// line boundary. Earlier lines belong to a previous run in the same dir.
 	Offset int64 `json:"offset"`

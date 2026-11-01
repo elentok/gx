@@ -199,6 +199,9 @@ func runProgram() (int, error) {
 	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1", convPath: convPath, convID: id}
 	if os.Getenv(ProgramInputEnv) == "1" {
 		p.box = newInputBox(os.Stdout, os.Getenv(ProgramDraftEnv))
+		// A person's vim mode starts in NORMAL unless the launch asked for normal editing.
+		p.box.vim = launchEditorMode(os.Args[1:]) == "vim"
+		p.box.normal = p.box.vim
 		if s := os.Getenv(ProgramReadyDelayEnv); s != "" {
 			if p.readyDelay, err = time.ParseDuration(s); err != nil {
 				return 0, err

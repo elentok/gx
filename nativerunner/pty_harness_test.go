@@ -1,7 +1,9 @@
 package nativerunner_test
 
 import (
+	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -53,6 +55,36 @@ func TestPty_LaunchCommandPicksTheHarnessFromTheKind(t *testing.T) {
 				t.Errorf("--settings in Args = %v, want %v: %q", got, tc.wantSettings, cmd.Args)
 			}
 		})
+	}
+}
+
+func TestPty_LaunchCommandHasOneSettingsWithNormalEditorMode(t *testing.T) {
+	t.Parallel()
+	p := &nativerunner.Pty{Claude: "/bin/fake-claude"}
+	opts := agentrunner.StartOptions{Args: []string{"--settings", `{"editorMode":"vim","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"gx agent guard-bash"}]}]}}`}}
+	cmd, err := nativerunner.LaunchCommand(p, opts, t.TempDir(), "sid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var values []string
+	for i, a := range cmd.Args {
+		if a == "--settings" {
+			values = append(values, cmd.Args[i+1])
+		}
+	}
+	if len(values) != 1 {
+		t.Fatalf("want one --settings, got %q", cmd.Args)
+	}
+	var s struct {
+		EditorMode string         `json:"editorMode"`
+		StatusLine map[string]any `json:"statusLine"`
+		Hooks      map[string]any `json:"hooks"`
+	}
+	if err := json.Unmarshal([]byte(values[0]), &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.EditorMode != "normal" || s.StatusLine == nil || !strings.Contains(values[0], "gx agent guard-bash") {
+		t.Errorf("settings = %s", values[0])
 	}
 }
 

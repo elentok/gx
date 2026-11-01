@@ -11,7 +11,8 @@ import (
 func holdInputProgram(t *testing.T, env ...string) *heldProgram {
 	t.Helper()
 	conv := newConversationID(t)
-	cmd := Harness{}.Launch(harness.LaunchOptions{SessionID: conv})
+	// The canary config says vim; gx's launch overrides it, so the test does too.
+	cmd := Harness{}.Launch(harness.LaunchOptions{SessionID: conv, Args: []string{"--settings", `{"editorMode":"normal"}`}})
 	return holdProgram(t, cmd, conv, append([]string{ProgramInputEnv + "=1"}, env...)...)
 }
 

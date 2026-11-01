@@ -182,6 +182,8 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) err
 		Label:          ss.session.Label,
 		Epic:           ss.epic,
 		Cwd:            cwd,
+		// harness.claudeCommand put editorMode normal on every claude launch.
+		EditorModeNormal: kind == harness.Claude,
 	}
 	if err := RecordLaunch(procs, dir, &meta); err != nil {
 		return err

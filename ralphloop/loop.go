@@ -222,7 +222,8 @@ func agentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string,
 	if effort != "" {
 		args = append(args, "--effort", effort)
 	}
-	return args
+	// herdr launches claude from these args itself, so the editor mode goes in here.
+	return harness.MergeClaudeSettings(args)
 }
 
 // Tier names one of the three model/effort pairs configured per agent.

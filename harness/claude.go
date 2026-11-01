@@ -25,11 +25,13 @@ func (claudeHarness) Resume(conversationID string, opts LaunchOptions) (Command,
 
 // claudeCommand runs every claude agent in auto permission mode, so a launch
 // never stalls on a permission prompt. The flag goes right after the session
-// flag pair unless the caller already passed one.
+// flag pair unless the caller already passed one. It also folds every
+// --settings flag into one that starts claude in normal editor mode.
 func claudeCommand(args, env []string) Command {
 	if !slices.Contains(args, "--permission-mode") {
 		args = slices.Insert(args, 2, "--permission-mode", "auto")
 	}
+	args = MergeClaudeSettings(args)
 	return Command{Name: "claude", Args: args, Env: LaunchEnv(os.Environ(), env)}
 }
 
