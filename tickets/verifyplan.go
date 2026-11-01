@@ -12,7 +12,8 @@ import (
 // VerifyPlan is the verify plan the agent writes: one entry per story with
 // user-visible behaviour.
 type VerifyPlan struct {
-	Stories []PlanStory `yaml:"stories"`
+	Scenario string      `yaml:"scenario"` // fixture scenario to start; empty means none
+	Stories  []PlanStory `yaml:"stories"`
 }
 
 // PlanStory is one story's verify items. MockStates are names, so a state
@@ -64,14 +65,20 @@ func ParseVerifyPlan(data []byte) (VerifyPlan, error) {
 	return p, nil
 }
 
+// storyTokens is a story's estimate without its mock states, which are counted
+// once per distinct state.
+func storyTokens(s PlanStory) int {
+	return s.WebFlows*WebFlowTokens + s.CLIChecks*CLICheckTokens +
+		s.GoTests*GoTestRunTokens + s.SkillQuotes*SkillQuoteTokens
+}
+
 // partTokens is a part's expected tokens: the base, every story's items, and
 // each distinct mock state once.
 func partTokens(stories []PlanStory) int {
 	total := VerifyPartBaseTokens
 	states := map[string]bool{}
 	for _, s := range stories {
-		total += s.WebFlows*WebFlowTokens + s.CLIChecks*CLICheckTokens +
-			s.GoTests*GoTestRunTokens + s.SkillQuotes*SkillQuoteTokens
+		total += storyTokens(s)
 		for _, m := range s.MockStates {
 			states[m] = true
 		}

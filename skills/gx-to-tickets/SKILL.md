@@ -405,72 +405,32 @@ tickets. Skip this and `ensure-verify` when the epic has no user-visible behavio
 changes no web, CLI or server behavior (a docs-only, skills-only or refactor epic). The spec for epic
 `<name>-impl` is `docs/specs/<name>.md`; this is the resolved spec path.
 
-**Estimate each story.** Add up the cost of what its `## Verification` entry asks for:
+**Plan the verify tickets.** Write a plan file (YAML). Per story with user-visible behaviour it lists
+the story number, its scenario group, its items by kind (web flow, CLI check, Go test run, skill
+quote) and its mock states by name, plus the fixture scenario. gx does the estimating and packing:
 
-| Item in the entry                                  | Tokens |
-| -------------------------------------------------- | ------ |
-| Web flow run (one flow from the catalog)           | 6K     |
-| CLI check (one `gx` command and its output)        | 3K     |
-| Go test run (one package)                          | 4K     |
-| Skill-text quote (one `rg`/`Read` of a skill line) | 2K     |
-| Mock state check (one state, one width)            | 8K     |
+```sh
+gx tickets verify-plan <project:epic> --plan <file> --manifest <manifest>
+```
 
-Each Mock states line counts its 8K once, even when two stories share a state.
+It reads the spec at `docs/specs/<name>.md`, copies each story's Verification entry and Mock states
+line word for word, packs the parts, and appends the verify entries and their body files to the
+publish manifest. Publish the manifest once, together with the implement tickets. `gx tickets
+verify-plan --table` prints the estimates. Do not copy them into the skill or the tickets.
 
-A part's fixed base is 15K (fixture start and the ticket read). A collect ticket's fixed estimate is
-30K. Keep these numbers in one place so gx-evolve can compare them with the actual token counts.
-
-Implement tickets use the same table: add 10000 to `expected_context_window` per mock state in the
+Implement tickets keep their own rule: add 10000 to `expected_context_window` per mock state in the
 ticket's `## Mock check`, and allow at most 4 mock states per implement ticket. Both the 10000 and the
 cap count mock states: one state section of the mock file, one name at one width. Over the cap,
 split the ticket. The first ticket builds the parts and checks the first 4 states. A follow-on
 implement ticket, blocked by the first, checks the remaining states and fixes what differs.
 
-**Pack the parts.** Fill parts greedily in story order. A part's expected tokens (base plus its
-stories' estimates) stay at or under 70K.
+gx gives one lone `verify` entry when every story fits one part. Otherwise it gives top-level
+`verify-part-N` entries and one `verify-collect` entry blocked by every part. The body formats
+follow [gx-verify-epic](../gx-verify-epic/SKILL.md) ("The verify part body"). Every entry sets
+`expected_context_window`. Do not restate the formats here.
 
-- Stories that share a fixture scenario stay in one part.
-- The 70K budget wins: a scenario group that passes 70K is split across parts.
-- A single story over 70K gets a part of its own, with a note in the body that it is over budget.
-- A story's Mock states line packs like the story's other Verification items: only these three rules
-  apply. There is no per-part state cap and no per-mock-file rule.
-
-**One part.** If every story fits in one part, publish one lone verify ticket, and no collect ticket:
-
-```sh
-gx tickets add <epic-slug> --slug verify --type verify --expected-context-window <base+stories> --body -
-```
-
-The body has `Round: 1`, no `Role:` line, the spec path, the fixture scenario, per story its number,
-its text and its Verification entry word for word (a Mock states line is copied word for word too),
-and the spec's `## Out of Scope` section.
-
-**Several parts.** Publish each part as a top-level ticket (no `parent`, no `blocked_by`):
-
-```sh
-gx tickets add <epic-slug> --slug verify-part-<n> --type verify --expected-context-window <base+stories> --body -
-```
-
-The body follows the part format in [gx-verify-epic](../gx-verify-epic/SKILL.md) ("The verify part
-body"): `Round: 1`, `Role: part`, the spec path, the fixture scenario, and per story its number, its
-text and its Verification entry word for word, plus its estimate. Copy each Mock states line word
-for word into the part body. Do not restate the format here.
-
-Then publish one round-1 collect ticket after all parts:
-
-```sh
-gx tickets add <epic-slug> --slug verify-collect --type verify --expected-context-window 30000 \
-  --blocked-by <every part id> --body -
-```
-
-Its body has `Round: 1`, `Role: collect`, the spec path and a copy of the spec's `## Out of Scope`
-section. Never make a part a child (`parent`) of the collect ticket: a child waits for its parent,
-which would deadlock.
-
-Every verify ticket you write sets `expected_context_window`.
-
-Last, run `gx tickets ensure-verify <epic-slug>`. It is a no-op when the epic already has a verify
-ticket.
+After `publish`, run `gx tickets ensure-verify <epic-slug>`. It is a no-op when the epic already has
+a verify ticket.
 
 Last, once every ticket is written and validated, the Summary is written and `ensure-code-review`
 (and `ensure-verify`, when it ran) have run, open the epic you created as a draft: `gx tickets set <project:epic>-impl --status open`.

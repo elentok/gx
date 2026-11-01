@@ -21,6 +21,17 @@ func checkAnchors(t *testing.T, path string, wants ...string) {
 	}
 }
 
+// The estimate table lives in gx (`verify-plan --table`), not in the skill.
+func TestToTicketsHasNoEstimateTable(t *testing.T) {
+	text := normalizeSpace(readFile(t, "gx-to-tickets/SKILL.md"))
+	for _, gone := range []string{"Web flow run", "the same table"} {
+		if strings.Contains(text, gone) {
+			t.Errorf("gx-to-tickets/SKILL.md still has %q", gone)
+		}
+	}
+	checkAnchors(t, "gx-to-tickets/SKILL.md", "verify-plan", "--plan", "--table")
+}
+
 func TestMockRulesAnchors(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -87,7 +98,8 @@ func TestMockRulesAnchors(t *testing.T) {
 		{"to-tickets", "gx-to-tickets/SKILL.md", []string{
 			"## Mock check",
 			"- Mock file: `<full path>`",
-			"| 8K",
+			"gx tickets verify-plan <project:epic> --plan <file>",
+			"verify-plan --table` prints the estimates",
 			"add 10000 to `expected_context_window` per mock state",
 			"at most 4 mock states per implement ticket",
 			"checks the first 4 states",
@@ -95,7 +107,7 @@ func TestMockRulesAnchors(t *testing.T) {
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"**Mock states lines.**",
 			"[gx-ui-check/MOCK-CHECK.md](../gx-ui-check/MOCK-CHECK.md)",
-			"estimate from the gx-to-tickets estimate table",
+			"estimate from `gx tickets verify-plan --table`",
 			"`pass`, `fail`, `unchecked`",
 			"A missing mock file named by a Mock states line is an `unchecked` line plus a finding",
 		}},

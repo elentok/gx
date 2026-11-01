@@ -42,7 +42,7 @@ This is the one definition of a part's body format. gx-to-tickets and the collec
 - Per story: its spec number, its text and its Verification entry, both word for word, and its token
   estimate.
 - Per Mock states line of the spec's Verification section: the line word for word (mock path, state,
-  width, scenario, parts), and its estimate from the gx-to-tickets estimate table.
+  width, scenario, parts), and its estimate from `gx tickets verify-plan --table`.
 - A next-round part also adds, per story, the finding and the fix ticket it rechecks.
 
 Section names are free. The part writes its results under `## Results` (step 4).
