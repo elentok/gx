@@ -42,6 +42,9 @@ type sessionSpec struct {
 	thenPrompt string
 	// steps are "/" commands sent once the session is idle, in order.
 	steps []commandStep
+	// rejected says the agent rejects the first prompt (see scenario.unknownSkill):
+	// the session is settled once it raises the Unknown command Actionable.
+	rejected bool
 }
 
 // commandStep is one "/" command a seeded session runs. output is the stdout
@@ -81,6 +84,11 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 	id, err := f.createSession(s.project, f.repoDir(sc, s.project), s.prompt, s.harness)
 	if err != nil {
 		return err
+	}
+	if s.rejected {
+		return f.waitFor(id, "an Unknown command Actionable", func(si server.SessionInfo, _ server.SessionChatResponse) bool {
+			return si.Actionable.GxRaised && strings.Contains(si.Actionable.Reason, "Unknown command:")
+		})
 	}
 	slow := strings.Contains(s.prompt, agentfake.ChatSlowMarker)
 	if s.prompt != "" {

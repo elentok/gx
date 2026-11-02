@@ -323,6 +323,13 @@ func run(args []string) (err error) {
 	if sc.unknownSkill {
 		f.env = append(f.env, agentfake.TUIUnknownSkillEnv+"=1")
 	}
+	// Later entries win over the harness default of a ready signal at once.
+	if sc.readyDelay != "" {
+		f.env = append(f.env, agentfake.TUIReadyDelayEnv+"="+sc.readyDelay)
+	}
+	if sc.readyWait != "" {
+		f.env = append(f.env, "GX_PTY_READY_WAIT="+sc.readyWait)
+	}
 	if err := f.setupDisk(); err != nil {
 		return err
 	}

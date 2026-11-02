@@ -160,7 +160,16 @@ func runServer(ctx context.Context, d deps) error {
 	if err != nil {
 		return err
 	}
-	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, nil)
+	// Test hook: gxfixture shortens how long a launch prompt waits for the ready signal.
+	var ptyOverride *runnerbuild.PtyOverride
+	if v := os.Getenv("GX_PTY_READY_WAIT"); v != "" {
+		readyWait, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("GX_PTY_READY_WAIT: %w", err)
+		}
+		ptyOverride = &runnerbuild.PtyOverride{ReadyWait: readyWait}
+	}
+	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, ptyOverride)
 	var tcpAddr string
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr

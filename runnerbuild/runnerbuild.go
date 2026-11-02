@@ -28,6 +28,7 @@ type PtyOverride struct {
 	StartTimeout time.Duration
 	PromptGrace  time.Duration
 	StopGrace    time.Duration
+	ReadyWait    time.Duration
 }
 
 // New returns the runner for choice c, plus runnerFor, which builds any runner
@@ -68,6 +69,7 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 				p.StartTimeout = pty.StartTimeout
 				p.PromptGrace = pty.PromptGrace
 				p.StopGrace = pty.StopGrace
+				p.ReadyWait = pty.ReadyWait
 			}
 			r = p
 		default:

@@ -113,6 +113,12 @@ type scenario struct {
 	dropAskedAgent bool
 	// unknownSkill makes the fake TUI agent reject every skill prompt as an unknown command.
 	unknownSkill bool
+	// readyDelay is how long the fake TUI agent holds back its ready signal
+	// (see readyscenarios.go); empty keeps the harness default of none.
+	readyDelay string
+	// readyWait is how long a launch prompt waits for that signal before it is
+	// sent anyway; empty keeps nativerunner.DefaultReadyWait.
+	readyWait string
 	// restart points the server's restart at a fake gx binary (see restart.go).
 	restart *restartSpec
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
@@ -219,11 +225,14 @@ var scenarios = map[string]scenario{
 		queue:        []string{project + ":unknown-epic"},
 		unknownSkill: true,
 	},
-	"keep-worktree":     keepWorktree,
-	"keep-agent":        keepAgent,
-	"keep-cleanup":      keepCleanup,
-	"cache-gate":        cacheGate,
-	"cache-gate-custom": cacheGateCustom,
+	"rejected-first-prompt": rejectedFirstPrompt,
+	"ready-delayed":         readyDelayed,
+	"ready-never":           readyNever,
+	"keep-worktree":         keepWorktree,
+	"keep-agent":            keepAgent,
+	"keep-cleanup":          keepCleanup,
+	"cache-gate":            cacheGate,
+	"cache-gate-custom":     cacheGateCustom,
 	// restart-agents: a running agent on a queued epic, and a restart binary that passes its checks.
 	"restart-agents": {
 		epics: []epic{{project, "restart-epic", []ticket{
