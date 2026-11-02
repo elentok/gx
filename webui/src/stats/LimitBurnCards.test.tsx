@@ -69,6 +69,11 @@ test("renders four cards with sum headline and daily average", () => {
   expect(text).toContain("9 pts/day");
 });
 
+test("the burn cards have no legend row", () => {
+  render(burns());
+  expect(card("Claude weekly burn").querySelector("[aria-label=Legend]")).toBeNull();
+});
+
 test("weekly cards show the 7-day pace line and the forecast", () => {
   render(burns());
   const text = card("Claude weekly burn").textContent;

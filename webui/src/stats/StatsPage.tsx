@@ -23,7 +23,7 @@ function Section({ id, title, tone, children }: { id: string; title: string; ton
       <SectionHeading id={id} tone={tone}>
         {title}
       </SectionHeading>
-      <Box display="grid" gridTemplateColumns={{ base: "1fr", md: "1fr 1fr" }} gap="4">
+      <Box display="grid" gridTemplateColumns={{ base: "1fr", sm: "1fr 1fr" }} gap="4">
         {children}
       </Box>
     </Box>

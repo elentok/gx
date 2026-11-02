@@ -52,6 +52,7 @@ function LimitBurnCard({
       small={`${points(burn.average)} pts/day${partial ? ` · ${startLabel(burn.start_day!)}` : ""}`}
       series={[{ key: "burn", label: "Burn", tone: "muted", color, values }]}
       dayNotes={dayNotes}
+      hideLegend
       footer={
         <>
           {weekly ? (

@@ -18,13 +18,15 @@ interface StatCardProps {
   partial?: boolean;
   // Rendered under the legend.
   footer?: ReactNode;
+  // For a single-series card whose title already names the series.
+  hideLegend?: boolean;
   // Per-day bar styles, tooltip notes and extra tooltip rows; see DayChart.
   dayStyles?: ComponentProps<typeof DayChart>["dayStyles"];
   dayNotes?: ComponentProps<typeof DayChart>["dayNotes"];
   extraRows?: ComponentProps<typeof DayChart>["extraRows"];
 }
 
-export function StatCard({ title, days, series, chart = "bars", folded, headline, small, partial: partialOverride, footer, dayStyles, dayNotes, extraRows }: StatCardProps) {
+export function StatCard({ title, days, series, chart = "bars", folded, headline, small, partial: partialOverride, footer, hideLegend, dayStyles, dayNotes, extraRows }: StatCardProps) {
   const hasData = (i: number) => series.some((s) => s.values[i] !== null);
   const dataDays = days.filter((_, i) => hasData(i)).length;
   const partial = partialOverride ?? dataDays < days.length;
@@ -47,14 +49,16 @@ export function StatCard({ title, days, series, chart = "bars", folded, headline
         {small ?? `${average.toFixed(1)}/day`}
       </Text>
       {chart === "line" ? <LineChart days={days} tone={series[0].tone} values={series[0].values} /> : <DayChart days={days} series={series} kind={chart} folded={folded} dayStyles={dayStyles} dayNotes={dayNotes} extraRows={extraRows} />}
-      <Box as="ul" display="flex" gap="3" flexWrap="wrap" mt="2" fontSize="xs" listStyleType="none" aria-label="Legend">
-        {series.map((s) => (
-          <li key={s.key}>
-            <Box as="span" display="inline-block" w="8px" h="8px" borderRadius="sm" mr="1" style={{ background: seriesColor(s) }} />
-            {s.label}
-          </li>
-        ))}
-      </Box>
+      {!hideLegend && (
+        <Box as="ul" display="flex" gap="3" flexWrap="wrap" mt="2" fontSize="xs" listStyleType="none" aria-label="Legend">
+          {series.map((s) => (
+            <li key={s.key}>
+              <Box as="span" display="inline-block" w="8px" h="8px" borderRadius="sm" mr="1" style={{ background: seriesColor(s) }} />
+              {s.label}
+            </li>
+          ))}
+        </Box>
+      )}
       {footer}
     </Card>
   );
