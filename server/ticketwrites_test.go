@@ -121,6 +121,43 @@ func TestCancel_RemovesTheForkDescendantsWorktreeToo(t *testing.T) {
 	}
 }
 
+func TestCancel_FailedWorktreeRemovalDoesNotStopTheCancel(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	kidPath := filepath.Join(store, "proj", "epic-a", "issues", "02-kid.md")
+	kid := "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\n# kid\n"
+	if err := os.WriteFile(kidPath, []byte(kid), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+	// A locked worktree makes a single forced removal fail.
+	wts := []string{keepWorktree(t, repo, "epic-a", "01"), keepWorktree(t, repo, "epic-a", "02")}
+	for _, wt := range wts {
+		if out, err := exec.Command("git", "-C", repo, "worktree", "lock", wt).CombinedOutput(); err != nil {
+			t.Fatalf("git worktree lock: %v\n%s", err, out)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	servertest.WaitForEvent(ctx, t, evs, server.EventTicketCancelled, "proj:epic-a/01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventTicketCancelled, "proj:epic-a/02")
+	for _, p := range []string{filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"), kidPath} {
+		if b, err := os.ReadFile(p); err != nil || !strings.Contains(string(b), "status: cancelled") {
+			t.Errorf("%s not cancelled: %v\n%s", p, err, b)
+		}
+	}
+}
+
 func startTicketWrites(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

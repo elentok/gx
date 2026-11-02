@@ -695,10 +695,8 @@ var finishPoll = time.Second
 // recoveryFinish holds no ticket lock while it waits: the merge it waits for
 // needs it.
 func (s *Server) recoveryFinish(req QueueRequest, _ recovery.Call) (QueueResult, error) {
-	for deadline := time.Now().Add(finishWaitTimeout); s.registry.has(req.Address); time.Sleep(finishPoll) {
-		if time.Now().After(deadline) {
-			return refusal(ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
-		}
+	if !s.registry.waitGone(req.Address, finishWaitTimeout, finishPoll) {
+		return refusal(ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
 	}
 	return QueueResult{}, nil
 }

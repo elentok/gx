@@ -348,8 +348,9 @@ func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) e
 	s.stampFinished(tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}, t.Path, true)
 	// The branch stays: it holds the commits.
 	if ref.repo != "" && s.awaitRunSettled(ref.address(t)) {
+		// The epic merge removes leftovers later, so a failed removal must not stop the cancel.
 		if err := ralphloop.RemoveIterationWorktree(s.defaultDeps(), ref.repo, ref.addr.Epic, t.Identifier); err != nil {
-			return fmt.Errorf("cancel %s: %w", ref.address(t), err)
+			s.log.Warn("remove cancelled worktree", "ticket", ref.address(t), "err", err)
 		}
 	}
 	s.events.publish(EventTicketCancelled, ref.address(t))
@@ -360,16 +361,7 @@ func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) e
 // still reads the worktree, and a missing one would pause the cancelled ticket.
 // False means the run never settled, so its worktree is left for the epic merge.
 func (s *Server) awaitRunSettled(addr string) bool {
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		if _, ok := s.registry.tracked(addr); !ok {
-			return true
-		}
-		if time.Now().After(deadline) {
-			return false
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	return s.registry.waitGone(addr, 5*time.Second, 20*time.Millisecond)
 }
 
 // cancelInvestigateChild is a person's recovery verb withdrawing ref's

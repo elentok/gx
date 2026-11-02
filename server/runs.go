@@ -177,6 +177,19 @@ func (r *runRegistry) has(address string) bool {
 	return ok
 }
 
+// waitGone polls has every poll until address leaves the registry. False means
+// it was still there at timeout.
+func (r *runRegistry) waitGone(address string, timeout, poll time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for r.has(address) {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(poll)
+	}
+	return true
+}
+
 // countWhere counts the runs that hold a slot and match keep.
 func (r *runRegistry) countWhere(keep func(trackedRun) bool) int {
 	r.mu.Lock()
