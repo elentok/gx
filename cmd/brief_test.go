@@ -135,6 +135,31 @@ func TestBrief_GoTestPass(t *testing.T) {
 	}
 }
 
+func TestBrief_GoTestHangKillsAndNamesTest(t *testing.T) {
+	t.Parallel()
+	data := envValue(envFor(t), "XDG_DATA_HOME")
+	setEnvFor(t, brief.EnvCheckHang, "2s")
+	dir := t.TempDir()
+	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, dir, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestOK(t *testing.T) {}\nfunc TestStuck(t *testing.T) { select {} }\n")
+
+	start := time.Now()
+	out, code := runBriefCmd(t, dir, "go-test", "-timeout=60s", "./...")
+	if elapsed := time.Since(start); elapsed > 30*time.Second {
+		t.Errorf("took %s, want far below the 60s package timeout", elapsed)
+	}
+	if code != 1 || !strings.Contains(out, "TestStuck") {
+		t.Fatalf("exit = %d, want 1 naming TestStuck; out:\n%s", code, out)
+	}
+	var e brief.IndexEntry
+	if err := json.Unmarshal([]byte(indexLines(t, data)[0]), &e); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(e.Failed, []string{"example.com/tiny.TestStuck"}) {
+		t.Errorf("failed = %v", e.Failed)
+	}
+}
+
 func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
 	t.Parallel()
 	data := envValue(envFor(t), "XDG_DATA_HOME")

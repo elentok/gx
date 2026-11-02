@@ -198,6 +198,9 @@ func (r *runner) childEnv(kind string) []string {
 	if kind != "" {
 		env = append(env, brief.EnvCheckKind+"="+kind)
 	}
+	if hang := r.cfg[kind].Limits.Hang; kind == "test" && hang > 0 {
+		env = append(env, brief.EnvCheckHang+"="+hang.String())
+	}
 	return env
 }
 

@@ -96,7 +96,7 @@ func TestWithDefaults_CallerValueWins(t *testing.T) {
 
 func TestExecute_ChildGetsOnlyTheGivenEnv(t *testing.T) {
 	t.Setenv("BRIEF_LEAK", "leaked")
-	out, exit, err := execute("/usr/bin/env", nil, t.TempDir(), []string{"BRIEF_PROBE=yes"}, io.Discard)
+	out, exit, err := execute("/usr/bin/env", nil, t.TempDir(), []string{"BRIEF_PROBE=yes"}, io.Discard, 0)
 	if err != nil || exit != 0 {
 		t.Fatalf("exit = %d, err = %v", exit, err)
 	}

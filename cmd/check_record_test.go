@@ -201,6 +201,31 @@ func TestCheck_BriefCalledByConfiguredCommandNamesFailingTests(t *testing.T) {
 	}
 }
 
+func TestCheck_HangLimitKillsHungTestAndNamesIt(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("builds the gx binary")
+	}
+	bin := t.TempDir()
+	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, out)
+	}
+	prependPath(t, bin)
+	repo, _ := registeredCheckRepo(t, `{"test":{"full":"gx brief go-test -timeout=60s ./...","limits":{"hang":"2s"}}}`)
+	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestStuck(t *testing.T) { select {} }\n")
+	testutil.CommitAll(t, repo, "module")
+
+	start := time.Now()
+	out, code := runCheckCmd(t, repo, "--full", "--kind", "test")
+	if code != 1 || !strings.Contains(logOf(t, out, "test"), "TestStuck") {
+		t.Fatalf("exit %d, want 1 naming TestStuck\n%s", code, out)
+	}
+	if elapsed := time.Since(start); elapsed > 40*time.Second {
+		t.Errorf("took %s, want far below the 60s package timeout", elapsed)
+	}
+}
+
 // slowTestRepo has one Go test that sleeps 1.2s, checked under checksJSON.
 func slowTestRepo(t *testing.T, checksJSON string) (repo, data string) {
 	t.Helper()

@@ -105,6 +105,9 @@ type Options struct {
 const (
 	EnvCheckRun  = "GX_CHECK_RUN"
 	EnvCheckKind = "GX_CHECK_KIND"
+	// EnvCheckHang is the hang limit as a Go duration. `gx brief go-test` kills
+	// the run when a test runs longer; unset means nothing is watched.
+	EnvCheckHang = "GX_CHECK_HANG"
 )
 
 // IndexEntry is one line of index.jsonl.
@@ -185,10 +188,11 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	branch, _ := git.CurrentBranch(dir)
 	treeID, _ := git.TreeID(dir)
 
+	hang := hangLimit(tool, o.Env)
 	run := func() ([]byte, int, error) {
 		releaseGate := registerGoBuild(tool, o.StateDir)
 		defer releaseGate()
-		return execute(plan.Bin, plan.Argv, dir, withDefaults(o.Env, plan.Env), logFile)
+		return execute(plan.Bin, plan.Argv, dir, withDefaults(o.Env, plan.Env), logFile, hang)
 	}
 	out, exit, err := run()
 	cacheLost := false
@@ -240,6 +244,20 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	return report(tool, o, outcome, out, entry), outcome
 }
 
+// hangLimit is the hang limit of a run; zero means nothing is watched. Only
+// go test is watched: it is the one tool whose stream shows each test start.
+func hangLimit(tool Tool, env []string) time.Duration {
+	v, ok := envValue(env, EnvCheckHang)
+	if _, isGo := tool.(GoTest); !ok || !isGo {
+		return 0
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		return 0
+	}
+	return d
+}
+
 func isGoTool(tool Tool) bool { return strings.HasPrefix(tool.Name(), "go-") }
 
 const lostCacheMessage = "brief: the Go build cache was lost (deleted while the build ran), twice. This is not a code error: run the command again."
@@ -267,15 +285,37 @@ func registerGoBuild(tool Tool, stateDir string) (release func()) {
 // execute runs the command and returns its combined output and exit code. The
 // output is also written to logFile as it arrives, so a killed run keeps its
 // partial log.
-func execute(exe string, argv []string, dir string, env []string, logFile io.Writer) (out []byte, exit int, err error) {
+//
+// A positive hang makes it watch the `go test -json` stream and interrupt the
+// run when a test runs longer; the hung test is then appended as a failed one.
+func execute(exe string, argv []string, dir string, env []string, logFile io.Writer, hang time.Duration) (out []byte, exit int, err error) {
 	var buf bytes.Buffer
 	w := io.MultiWriter(&buf, logFile)
+	var stop <-chan struct{}
+	var watcher *hangWatcher
+	if hang > 0 {
+		watcher = newHangWatcher(hang)
+		stop = watcher.stop
+		done := make(chan struct{})
+		defer close(done)
+		go watcher.watch(done)
+		w = io.MultiWriter(w, watcher)
+	}
 	cmd := exec.Command(exe, argv...)
 	cmd.Dir = dir
 	cmd.Env = envOrEmpty(env)
 	cmd.Stdout = w
 	cmd.Stderr = w
-	if err := runForwardingSignals(cmd); err != nil {
+	if watcher != nil {
+		defer func() {
+			if extra := watcher.killedLines(); extra != nil {
+				buf.Write(extra)
+				logFile.Write(extra)
+				out, exit = buf.Bytes(), ExitFail
+			}
+		}()
+	}
+	if err := runForwardingSignals(cmd, stop); err != nil {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) {
 			return nil, 0, fmt.Errorf("cannot run %s: %v", exe, err)
