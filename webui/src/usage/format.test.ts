@@ -20,6 +20,13 @@ describe("forecastLine and chip text", () => {
     expect(chipText({ today: 4, yesterday: 4, direction: "equal" })).toBe("= 4 vs 4 pts");
     expect(chipTooltip({ today: 7, yesterday: 5, direction: "up" })).toBe("Burn today 7 pts so far, yesterday 5");
   });
+
+  it("shows a partial-day burn unscaled", () => {
+    // Today is half over; 3 pts stay 3, not 6.
+    expect(chipText({ today: 3, yesterday: 8, direction: "down" })).toBe("▼ 3 vs 8 pts");
+    expect(chipTooltip({ today: 3, yesterday: 8, direction: "down" })).toBe("Burn today 3 pts so far, yesterday 8");
+  });
+
 });
 
 const MIN = 60;

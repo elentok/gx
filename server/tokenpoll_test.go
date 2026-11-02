@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -31,6 +32,7 @@ type tokenFixture struct {
 	fake    *runnerfake.Runner
 	address string
 	epic    string
+	store   string
 
 	mu     sync.Mutex
 	tokens int64
@@ -49,7 +51,7 @@ func newTokenFixture(t *testing.T, epic string, opts ...func(*server.Config)) *t
 		func(c *server.Config) { c.TokenPollInterval = time.Hour },
 	}, opts...)
 	h := servertest.StartWithStore(t, store, all...)
-	f := &tokenFixture{h: h, fake: fake, address: "proj:" + epic + "/01", epic: epic}
+	f := &tokenFixture{h: h, fake: fake, address: "proj:" + epic + "/01", epic: epic, store: store}
 	f.live(t)
 	return f
 }
@@ -207,6 +209,65 @@ func TestTokenPoll_StoppedTicketKeepsItsTokens(t *testing.T) {
 	}
 	f.h.Server.PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 80, 0)
+}
+
+func TestTokenPoll_CancelledTicketKeepsItsTokens(t *testing.T) {
+	t.Parallel()
+	f := newTokenFixture(t, "epic-a")
+	f.grow(t, 100, 1)
+	f.h.Server.PollTokensAt(pollDay1)
+	f.grow(t, 180, 1)
+	f.h.Server.PollTokensAt(pollDay1)
+
+	servertest.WriteTicketWith(t, f.store, "proj", f.epic, "01", "first", servertest.TicketOpts{Status: "cancelled", CancelledAt: "2026-10-06T13:00:00Z"})
+	f.h.Server.PollTokensAt(pollDay1)
+	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 80, 0)
+}
+
+func TestTokenPoll_StartedOverTicketKeepsItsTokens(t *testing.T) {
+	t.Parallel()
+	f := newTokenFixture(t, "epic-a")
+	f.grow(t, 100, 1)
+	f.h.Server.PollTokensAt(pollDay1)
+	f.grow(t, 180, 1)
+	f.h.Server.PollTokensAt(pollDay1)
+
+	// A start-over resets the ticket to open and drops its session.
+	servertest.WriteTicketWith(t, f.store, "proj", f.epic, "01", "first", servertest.TicketOpts{})
+	f.h.Server.PollTokensAt(pollDay1)
+	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 80, 0)
+}
+
+func storeFiles(t *testing.T, root string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err == nil && d.IsDir() && d.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if err == nil && !d.IsDir() {
+			files = append(files, p)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}
+
+func TestTokenPoll_LedgerLivesInStateDirNotTicketStore(t *testing.T) {
+	t.Parallel()
+	f := newTokenFixture(t, "epic-a")
+	before := storeFiles(t, f.store)
+	f.grow(t, 100, 1)
+	f.h.Server.PollTokensAt(pollDay1)
+	f.grow(t, 160, 1.5)
+	f.h.Server.PollTokensAt(pollDay1)
+	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 60, 0.5)
+	if after := storeFiles(t, f.store); !slices.Equal(before, after) {
+		t.Errorf("ticket store files = %v, want %v", after, before)
+	}
 }
 
 func TestTokenPoll_IdlePollReadsNothing(t *testing.T) {

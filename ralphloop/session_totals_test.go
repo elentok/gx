@@ -68,6 +68,24 @@ func TestSessionsTotals(t *testing.T) {
 		}
 	})
 
+	t.Run("input, output, cache writes, cache reads and subagent tokens all count", func(t *testing.T) {
+		const session = "sess-all"
+		writeSubagentTranscript(t, home, cwd, session, "agent-a.jsonl",
+			`{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":30,"cache_creation_input_tokens":40}`)
+		path := transcript.PathIn(home, cwd, session)
+		line := `{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":4,"cache_creation_input_tokens":8}}}` + "\n"
+		if err := os.WriteFile(path, []byte(line), 0644); err != nil {
+			t.Fatal(err)
+		}
+		tokens, _, err := SessionsTotals(homes, []SessionRef{{Agent: AgentClaude, Cwd: cwd, SessionID: session}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64(1 + 2 + 4 + 8 + 100 + 20 + 30 + 40); tokens != want {
+			t.Errorf("tokens = %d, want %d", tokens, want)
+		}
+	})
+
 	t.Run("one missing transcript fails the whole sum", func(t *testing.T) {
 		tokens, cost, err := SessionsTotals(homes, []SessionRef{
 			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-a"},

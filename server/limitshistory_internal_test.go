@@ -32,6 +32,31 @@ func five(pct float64, reset int64) LimitsReport {
 	return LimitsReport{FiveHour: &LimitWindow{UsedPercentage: pct, ResetsAt: reset}}
 }
 
+func TestLimitHistory_FileSitsBesideLimitsAndStaleCheckReadsLimitsOnly(t *testing.T) {
+	dir := t.TempDir()
+	r := newHistoryRig(t, dir)
+	if filepath.Dir(r.h.path) != filepath.Dir(r.l.path) {
+		t.Errorf("history %s and limits %s are in different directories", r.h.path, r.l.path)
+	}
+
+	// The limits file holds an old reading; the history holds a fresh one.
+	old := int64(1000)
+	if _, err := r.l.apply(five(10, 5000), old); err != nil {
+		t.Fatal(err)
+	}
+	fresh := old + 10*LimitsStaleAfterSeconds
+	if err := r.h.recordClaude(five(10, 5000), LimitsApplyResult{FiveHour: &LimitResult{Outcome: LimitChanged}}, fresh); err != nil {
+		t.Fatal(err)
+	}
+	res, err := r.l.apply(five(10, 5000), fresh+1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.FiveHour.PrevReceivedAt != old || !limitsVisiblyChanged(res.FiveHour, fresh+1) {
+		t.Errorf("prev received = %d, want %d from the limits file, and a stale confirm", res.FiveHour.PrevReceivedAt, old)
+	}
+}
+
 func TestLimitHistory_ChangeSavesSampleWithAllFields(t *testing.T) {
 	r := newHistoryRig(t, t.TempDir())
 	r.report(five(12.5, 5000), 1000)

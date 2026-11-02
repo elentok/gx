@@ -84,6 +84,15 @@ func TestLimitBurnDays(t *testing.T) {
 			want: map[string]float64{"2026-10-05": 2},
 		},
 		{
+			name: "an ended window keeps its burn and the next window counts in full",
+			samples: []LimitSample{
+				ls(10, r0, 2026, 10, 4, 8, 0), ls(40, r0, 2026, 10, 4, 20, 0),
+				ls(5, r1, 2026, 10, 5, 8, 0),
+			},
+			want:   map[string]float64{"2026-10-04": 30, "2026-10-05": 5},
+			resets: []string{"2026-10-05"},
+		},
+		{
 			name: "a gap credits the later day, never the gap",
 			samples: []LimitSample{
 				ls(10, r1, 2026, 10, 2, 8, 0), ls(40, r1, 2026, 10, 6, 8, 0),
@@ -216,6 +225,11 @@ func TestLimitBurnChip(t *testing.T) {
 			name:    "equal after rounding",
 			samples: []LimitSample{ls(5, r, 2026, 10, 5, 8, 0), ls(9.6, r, 2026, 10, 6, 9, 0), ls(14.2, r, 2026, 10, 7, 9, 0)},
 			want:    LimitBurnChip{Today: 5, Yesterday: 5, Direction: LimitChipEqual},
+		},
+		{
+			name:    "fractional burn reaches the chip as whole points",
+			samples: []LimitSample{ls(5, r, 2026, 10, 5, 8, 0), ls(9.6, r, 2026, 10, 6, 9, 0), ls(17, r, 2026, 10, 7, 9, 0)},
+			want:    LimitBurnChip{Today: 7, Yesterday: 5, Direction: LimitChipUp},
 		},
 		{
 			name:    "a quiet yesterday counts 0",
