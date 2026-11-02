@@ -49,6 +49,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -229,9 +230,7 @@ func run(args []string) (err error) {
 		sc = limitBurnLive()
 	}
 
-	// Unix socket paths are capped near 100 bytes, and a holder's socket sits
-	// deep in the state dir, so the root stays short: macOS's TMPDIR is too long.
-	root, err := os.MkdirTemp("/tmp", "gxf")
+	root, err := testutil.ShortTempDir("gxf")
 	if err != nil {
 		return err
 	}

@@ -199,7 +199,7 @@ func TestServerLifecycle_StartEnqueueLandStopRestartReclaims(t *testing.T) {
 // logs what the server and the restart wrote.
 func newLifecycleEnv(t *testing.T, extra ...string) (*lifecycleEnv, string) {
 	t.Helper()
-	root, err := os.MkdirTemp("", "gxl")
+	root, err := testutil.ShortTempDir("gxl")
 	if err != nil {
 		t.Fatal(err)
 	}
