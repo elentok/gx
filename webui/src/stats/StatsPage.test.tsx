@@ -262,17 +262,17 @@ test("changing a control rewrites the URL and refetches", async () => {
   const fetchStats = vi.fn<FetchStats>(async () => statsOf());
   const router = renderStats(fetchStats);
   await screen.findByText("Tickets merged");
-  expect(fetchStats).toHaveBeenLastCalledWith({ range: 30, project: "" });
+  expect(fetchStats).toHaveBeenLastCalledWith({ range: 7, project: "" });
   fireEvent.change(screen.getByLabelText("Range"), { target: { value: "90" } });
   await waitFor(() => expect(fetchStats).toHaveBeenLastCalledWith({ range: 90, project: "" }));
   expect(router.state.location.search).toBe("?range=90");
 });
 
-test("a bad range falls back to 30 days", async () => {
+test("a bad range falls back to 7 days", async () => {
   const fetchStats = vi.fn<FetchStats>(async () => statsOf());
   renderStats(fetchStats, "/stats?range=5");
   await screen.findByText("Tickets merged");
-  expect(fetchStats).toHaveBeenCalledWith({ range: 30, project: "" });
+  expect(fetchStats).toHaveBeenCalledWith({ range: 7, project: "" });
 });
 
 test("shows the spinner first, then an error with Retry when the fetch fails", async () => {

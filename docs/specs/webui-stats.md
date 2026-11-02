@@ -16,7 +16,7 @@ friction it hit. A Design's epic page shows no cost or time at all.
 
 A read-only **Stats** page in the web UI, at `#/stats`, and a **Stats** section on the epic page.
 
-The Stats page shows per-day charts for the last 7, 30 or 90 days (30 by default), across all
+The Stats page shows per-day charts for the last 7, 30 or 90 days (7 by default), across all
 projects or one project. Both filters live in the URL (`#/stats?range=30&project=gx`). The charts
 sit in three sections of chart cards:
 
@@ -47,7 +47,7 @@ The Stats page
    whole system is doing.
 3. As the person running gx, I want a project dropdown with "All projects" and each project, so that
    I can look at one project alone.
-4. As the person running gx, I want a 7d / 30d / 90d range picker with 30 days as the default, so
+4. As the person running gx, I want a 7d / 30d / 90d range picker with 7 days as the default, so
    that I can zoom in on this week or out to the quarter.
 5. As the person running gx, I want the project and range in the URL, so that a reload or a shared
    link shows the same view.
@@ -225,7 +225,7 @@ Data and migration
 
 **Route, nav and filters**
 
-- The page lives at `#/stats`. The query holds `range` (7, 30 or 90; default 30) and `project` (a
+- The page lives at `#/stats`. The query holds `range` (7, 30 or 90; default 7) and `project` (a
   project name; absent means "All projects"). How the page handles a bad value in the URL is the
   implementer's choice.
 - Stats is a top-bar tab. The tab order is Queue, Epics, Designs, Stats. Until the Designs tab exists

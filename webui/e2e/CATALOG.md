@@ -645,7 +645,7 @@ an exited session.
 ## 57. Stats, Grilling section
 
 - **Scenario:** `grilling-stats`; the phone test runs at 375 px wide.
-- **Steps:** open `#/stats`; pick range 7d, then 30d; pick project `demo`.
+- **Steps:** open `#/stats?range=30`; pick range 7d, then 30d; pick project `demo`.
 - **Pass:**
   - The "Grilling" section follows "Cost and effort" and precedes "Friction", with cards "Words read" and "Questions asked".
   - At 30d the headlines are 550 and 12, and the small text is total over the 26 non-hatched days (21/day, 0/day).

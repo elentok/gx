@@ -62,7 +62,7 @@ func TestStats_GrillingCountsLandOnTheirLocalDays(t *testing.T) {
 			grillItem("m1", late, 2, 40), grillItem("m2", early, 1, 10), grillItem("m3", early, 3, 5),
 		}},
 	})
-	s := get("")
+	s := get("?range=30")
 	if got := amountAt(t, s, s.Grilling.Words, 3); got.Value != 40 || got.NoData {
 		t.Errorf("words before midnight = %+v, want 40", got)
 	}
@@ -79,7 +79,7 @@ func TestStats_GrillingHatchesBeforeTheFirstItemAndZeroesAfter(t *testing.T) {
 	get := grillingStats(t, []conversations.Record{
 		{ID: "a", Ticket: "proj:design/01", Design: true, Grilling: []conversations.GrillingItem{grillItem("m1", statsNoon(5), 1, 9)}},
 	})
-	s := get("")
+	s := get("?range=30")
 	if got := amountAt(t, s, s.Grilling.Words, 6); !got.NoData {
 		t.Errorf("day before first item = %+v, want no_data", got)
 	}
@@ -97,7 +97,7 @@ func TestStats_GrillingNothingCountedIsAllNoData(t *testing.T) {
 		{ID: "uncounted", Ticket: "proj:design/01", Design: true},
 		{ID: "impl", Ticket: "proj:loop/01", Grilling: []conversations.GrillingItem{grillItem("m1", statsNoon(2), 1, 9)}},
 	})
-	s := get("")
+	s := get("?range=30")
 	for _, series := range [][]server.StatsAmount{s.Grilling.Words, s.Grilling.Questions} {
 		if len(series) != len(s.Days) {
 			t.Fatalf("series has %d points, want %d", len(series), len(s.Days))
@@ -117,7 +117,7 @@ func TestStats_GrillingCountsAMessageOnce(t *testing.T) {
 		{ID: "a", Ticket: "proj:design/01", Design: true, Grilling: []conversations.GrillingItem{item}},
 		{ID: "b", Ticket: "proj:design/02", Design: true, Grilling: []conversations.GrillingItem{item}},
 	})
-	s := get("")
+	s := get("?range=30")
 	if got := amountAt(t, s, s.Grilling.Words, 2); got.Value != 7 {
 		t.Errorf("words = %+v, want 7", got)
 	}
@@ -129,7 +129,7 @@ func TestStats_GrillingProjectFilterKeepsTheGlobalBoundary(t *testing.T) {
 		{ID: "a", Ticket: "proj:design/01", Design: true, Grilling: []conversations.GrillingItem{grillItem("m1", statsNoon(2), 1, 7)}},
 		{ID: "b", Ticket: "other:design/01", Design: true, Grilling: []conversations.GrillingItem{grillItem("m2", statsNoon(6), 1, 30)}},
 	})
-	s := get("?project=proj")
+	s := get("?range=30&project=proj")
 	if got := amountAt(t, s, s.Grilling.Words, 2); got.Value != 7 {
 		t.Errorf("proj day 2 = %+v, want 7", got)
 	}

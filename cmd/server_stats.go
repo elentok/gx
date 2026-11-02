@@ -28,7 +28,7 @@ func newServerStatsCmd(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
-	cmd.Flags().IntVar(&days, "range", 0, "days to cover: 7, 30 or 90 (default 30)")
+	cmd.Flags().IntVar(&days, "range", 0, "days to cover: 7, 30 or 90 (default 7)")
 	cmd.Flags().StringVar(&project, "project", "", "only this project (default: all projects)")
 	return cmd
 }

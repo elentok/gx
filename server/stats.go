@@ -16,7 +16,7 @@ import (
 const StatsRangeWeek = 7
 const StatsRangeMonth = 30
 const StatsRangeQuarter = 90
-const StatsDefaultRange = StatsRangeMonth
+const StatsDefaultRange = StatsRangeWeek
 
 var statsRanges = []int{StatsRangeWeek, StatsRangeMonth, StatsRangeQuarter}
 

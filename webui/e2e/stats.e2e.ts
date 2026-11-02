@@ -10,7 +10,7 @@ const statCard = (page: import("@playwright/test").Page, title: string) =>
 
 test("57. Stats, Grilling section", async ({ page, start }) => {
   await start("grilling-stats");
-  await page.evaluate(() => (location.hash = "#/stats"));
+  await page.evaluate(() => (location.hash = "#/stats?range=30"));
   const words = statCard(page, "Words read");
   const questions = statCard(page, "Questions asked");
 
@@ -65,7 +65,7 @@ async function tip(card: Locator, day: number): Promise<string> {
 
 async function openStats(page: Page, start: (scenario: string, opts?: { shape?: string }) => Promise<unknown>) {
   await start("limit-burn", { shape: "stats" });
-  await page.evaluate(() => (location.hash = "#/stats"));
+  await page.evaluate(() => (location.hash = "#/stats?range=30"));
   await costCard(page, LIMIT_CARDS[0]).waitFor();
 }
 
@@ -210,7 +210,7 @@ test("184. Live token ledger", async ({ page, start }) => {
   const afterFirst = await waitFor((t) => Object.values(groups).every((g) => t[g] - before[g] === 250_000));
 
   // Navigate by hash: a page reload fails the suite.
-  await page.evaluate(() => (location.hash = "#/stats"));
+  await page.evaluate(() => (location.hash = "#/stats?range=30"));
   const tokens = costCard(page, /^Tokens/);
   await tokens.waitFor();
   const check = async (totals: Record<string, number>) => {
@@ -223,7 +223,7 @@ test("184. Live token ledger", async ({ page, start }) => {
   await append(100_000);
   const afterSecond = await waitFor((t) => Object.values(groups).every((g) => t[g] - afterFirst[g] === 100_000));
   await page.evaluate(() => (location.hash = "#/"));
-  await page.evaluate(() => (location.hash = "#/stats"));
+  await page.evaluate(() => (location.hash = "#/stats?range=30"));
   await tokens.waitFor();
   // The pointer still rests on the old bar; move it off so the new bar sees a fresh hover.
   await page.mouse.move(0, 0);
@@ -245,7 +245,7 @@ test.describe("phone", () => {
 
   test("57. Stats, Grilling section, phone", async ({ page, start }) => {
     await start("grilling-stats");
-    await page.evaluate(() => (location.hash = "#/stats"));
+    await page.evaluate(() => (location.hash = "#/stats?range=30"));
     const first = (await statCard(page, "Words read").boundingBox())!;
     const second = (await statCard(page, "Questions asked").boundingBox())!;
     expect(second.x).toBe(first.x);

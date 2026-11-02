@@ -2392,7 +2392,7 @@ export interface SessionResult {
 export const StatsRangeWeek = 7;
 export const StatsRangeMonth = 30;
 export const StatsRangeQuarter = 90;
-export const StatsDefaultRange = StatsRangeMonth;
+export const StatsDefaultRange = StatsRangeWeek;
 /**
  * StatsAmount is one day of a token or spend series. NoData marks a day that
  * had finished items and none carried a stamp; Value is then 0.

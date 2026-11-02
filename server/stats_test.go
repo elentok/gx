@@ -85,7 +85,7 @@ func statsStore(t *testing.T, setup func(store string)) (get func(query string) 
 func TestStats_TicketsMergedFollowTheCountingRules(t *testing.T) {
 	t.Parallel()
 	get := statsFixture(t)
-	s := get("")
+	s := get("?range=30")
 	// day 1: loop 01+02 and other/loop 01; the map ticket, the unstamped done
 	// ticket and the open ticket are left out.
 	if got := statsAt(t, s, s.Throughput.TicketsMerged, 1); got != 3 {
@@ -95,7 +95,7 @@ func TestStats_TicketsMergedFollowTheCountingRules(t *testing.T) {
 	if got := statsAt(t, s, s.Throughput.TicketsMerged, 3); got != 1 {
 		t.Errorf("tickets merged on local day 3 = %d, want 1", got)
 	}
-	// loop/05 is outside the default 30 days; merged and archived epics' tickets count.
+	// loop/05 is outside the 30-day range; merged and archived epics' tickets count.
 	if got := statsAt(t, s, s.Throughput.TicketsMerged, 2); got != 2 {
 		t.Errorf("tickets merged on day 2 = %d, want 2 (live and archived epic)", got)
 	}
@@ -106,7 +106,7 @@ func TestStats_TicketsMergedFollowTheCountingRules(t *testing.T) {
 
 func TestStats_EpicsMergedIncludeArchives(t *testing.T) {
 	t.Parallel()
-	s := statsFixture(t)("")
+	s := statsFixture(t)("?range=30")
 	if got := statsAt(t, s, s.Throughput.EpicsMerged, 2); got != 2 {
 		t.Errorf("epics merged on day 2 = %d, want 2 (live and archived)", got)
 	}
@@ -122,7 +122,7 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 		writeProjectEpic(t, store, "proj", "feat", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(3)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
 		writeProjectEpic(t, store, "proj", "feat-impl", "---\nstatus: done\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
 		writeProjectEpic(t, store, "proj", "open-map", "---\nkind: map\nstatus: open\n---\n", nil)
-	})("")
+	})("?range=30")
 	for _, c := range []struct {
 		name   string
 		series []int
@@ -143,7 +143,7 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 func TestStats_ProjectFilter(t *testing.T) {
 	t.Parallel()
 	get := statsFixture(t)
-	s := get("?project=other")
+	s := get("?range=30&project=other")
 	if got := statsAt(t, s, s.Throughput.TicketsMerged, 1); got != 1 {
 		t.Errorf("other: tickets merged on day 1 = %d, want 1", got)
 	}
@@ -155,7 +155,7 @@ func TestStats_ProjectFilter(t *testing.T) {
 func TestStats_Ranges(t *testing.T) {
 	t.Parallel()
 	get := statsFixture(t)
-	for query, want := range map[string]int{"": 30, "?range=7": 7, "?range=30": 30, "?range=90": 90} {
+	for query, want := range map[string]int{"": 7, "?range=7": 7, "?range=30": 30, "?range=90": 90} {
 		s := get(query)
 		if len(s.Days) != want || len(s.Throughput.TicketsMerged) != want {
 			t.Errorf("%q: %d days, %d points, want %d", query, len(s.Days), len(s.Throughput.TicketsMerged), want)
@@ -185,7 +185,7 @@ func TestStats_LinesOfCodeLandOnTheMergeDay(t *testing.T) {
 		writeProjectEpic(t, store, "proj", "a", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 120\nlines_removed: 30\n---\n", nil)
 		writeProjectEpic(t, store, "proj", "b", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 5\nlines_removed: 1\n---\n", nil)
 		writeProjectEpic(t, store, "proj", "unmerged", "---\nstatus: open\nlines_added: 999\nlines_removed: 999\n---\n", nil)
-	})("")
+	})("?range=30")
 	if got := statsAt(t, s, s.Throughput.LinesAdded, 2); got != 125 {
 		t.Errorf("lines added on day 2 = %d, want 125", got)
 	}
@@ -217,7 +217,7 @@ func TestStats_FollowUpsCountByOriginalAddress(t *testing.T) {
 			"11-k.md": issueMD("11", "open", "original_address: proj:follow-ups/11\n"+created(1), "K"),
 			"13-m.md": issueMD("13", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "M"),
 		})
-	})("")
+	})("?range=30")
 	for _, c := range []struct {
 		name   string
 		series []int
@@ -250,7 +250,7 @@ func TestStats_WaitingForDesignCountsOpenMapDays(t *testing.T) {
 		writeProjectEpic(t, store, "proj", "done", mapMD("done", 8, 4), nil)
 		writeProjectEpic(t, store, "proj", "old", mapMD("open", 100, -1), nil)
 		writeProjectEpic(t, store, "proj", "not-a-map", "---\nstatus: open\ncreated_at: "+statsStamp(5)+"\n---\n", nil)
-	})("")
+	})("?range=30")
 	// old always; open from day 5; done from day 8 until it completes on day 4.
 	for day, want := range map[int]int{9: 1, 8: 2, 6: 2, 5: 3, 4: 2, 0: 2} {
 		if got := statsAt(t, s, s.Throughput.WaitingForDesign, day); got != want {
@@ -310,7 +310,7 @@ func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
 	}
 	last := func(a []server.StatsAmount) server.StatsAmount { return a[len(a)-1] }
 
-	all := get("")
+	all := get("?range=30")
 	if q := costGroupOf(t, all, tokenledger.GroupQueue); last(q.Tokens).Value != 150 || last(q.Spend).Value != 1 || q.Harness[len(q.Harness)-1]["codex"].Tokens != 50 {
 		t.Errorf("queue today = %+v", q)
 	}
@@ -324,7 +324,7 @@ func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
 		t.Errorf("partial = %v, first source = %q, want partial stamp days", all.Cost.Partial, all.Cost.Sources[0])
 	}
 
-	filtered := get("?project=proj")
+	filtered := get("?range=30&project=proj")
 	if o := costGroupOf(t, filtered, tokenledger.GroupOneOff); last(o.Tokens).Value != 0 {
 		t.Errorf("one-off under project=proj = %+v, want none", o)
 	}
@@ -352,7 +352,7 @@ func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 			"04-d.md": issueMD("04", "cancelled", "cancelled_at: "+statsStamp(6)+"\n", "D"),
 			"05-e.md": issueMD("05", "done", done(7)+stamp(0, "0"), "E"),
 		})
-	})("")
+	})("?range=30")
 	design, queue := costGroupOf(t, s, tokenledger.GroupDesign), costGroupOf(t, s, tokenledger.GroupQueue)
 	cases := []struct {
 		name   string
@@ -402,7 +402,7 @@ func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {
 			"03-c.md": issueMD("03", "done", done(2), "C"),
 			"04-d.md": issueMD("04", "done", done(100)+frictionYAML("  pauses_by_reason:\n    z: 9\n"), "D"),
 		})
-	})("")
+	})("?range=30")
 	f := s.Friction
 	if want := []string{"a", "b", "c", "d", "e", "other"}; !slices.Equal(f.PauseReasons, want) {
 		t.Errorf("pause reasons = %v, want %v", f.PauseReasons, want)
@@ -436,7 +436,7 @@ func TestStats_FrictionWithoutPersonEndingsHasNoHeadlines(t *testing.T) {
 				frictionYAML("  pause_endings:\n    gx: 2\n"), "A"),
 			"02-b.md": issueMD("02", "done", "done_at: "+statsStamp(1)+"\n", "B"),
 		})
-	})("")
+	})("?range=30")
 	if s.Friction.WebShare != nil || s.Friction.MedianResumeSec != nil {
 		t.Errorf("headlines = %v, %v, want none", s.Friction.WebShare, s.Friction.MedianResumeSec)
 	}
