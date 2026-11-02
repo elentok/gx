@@ -13,7 +13,9 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-const budgetEventInterval = 50 * time.Millisecond
+// budgetEventInterval outlasts a burst of budget polls, which take tens of
+// milliseconds each, so the burst test sees one window.
+const budgetEventInterval = 300 * time.Millisecond
 
 // budgetEventFixture runs a claimed ticket whose cost the test sets, with the
 // background poll off so each poll is the test's own.
@@ -76,7 +78,7 @@ func budgetEvents(ch <-chan server.Event) int {
 			if ev.Type == server.EventBudgetChanged {
 				n++
 			}
-		case <-time.After(10 * budgetEventInterval):
+		case <-time.After(3 * budgetEventInterval):
 			return n
 		}
 	}

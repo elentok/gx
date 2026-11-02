@@ -60,6 +60,9 @@ func repoTemplate(t *testing.T) string {
 	if _, err := os.Stat(filepath.Join(path, ".git", "HEAD")); err == nil {
 		return path
 	}
+	// macOS purges stale files from the temp dir one by one, which leaves a
+	// directory without a HEAD that a rename can't replace.
+	_ = os.RemoveAll(path)
 	tmp, err := os.MkdirTemp("", repoTemplateName+"-build-")
 	if err != nil {
 		t.Fatal(err)

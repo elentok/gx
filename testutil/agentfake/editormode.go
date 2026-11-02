@@ -42,15 +42,19 @@ func claudeSettingsPath() string {
 
 // launchEditorMode is the editor mode the fake starts in. Like claude, a
 // --settings flag beats the person's config; the last flag that sets one wins.
-// The config is HOME's .claude.json, then CLAUDE_CONFIG_DIR's settings.json.
+// The config is the global .claude.json, then settings.json. Like gx's
+// claudeConfigDirs, CLAUDE_CONFIG_DIR holds both files when it is set; else
+// they are HOME's.
 func launchEditorMode(args []string) string {
 	mode := ""
 	home, _ := os.UserHomeDir()
-	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")
+	cfgDir, globalDir := os.Getenv("CLAUDE_CONFIG_DIR"), home
 	if cfgDir == "" {
 		cfgDir = filepath.Join(home, ".claude")
+	} else {
+		globalDir = cfgDir
 	}
-	for _, path := range []string{filepath.Join(home, ".claude.json"), filepath.Join(cfgDir, "settings.json")} {
+	for _, path := range []string{filepath.Join(globalDir, ".claude.json"), filepath.Join(cfgDir, "settings.json")} {
 		if m := editorModeOf(path); m != "" {
 			mode = m
 		}

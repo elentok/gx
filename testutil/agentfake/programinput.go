@@ -88,8 +88,6 @@ const ProgramEscEntry = "<esc>"
 // screen: a read with no styling at all cannot tell a draft from a placeholder.
 const promptMarker = "\x1b[35m❯\x1b[0m "
 
-const normalModeText = "normal mode"
-
 // inputBox is claude's input box: lines of a draft, the last one being edited.
 type inputBox struct {
 	out io.Writer
@@ -119,9 +117,10 @@ func (b *inputBox) draw() {
 	var sb strings.Builder
 	sb.WriteString("\x1b[2J\x1b[H")
 	if b.normal && b.text() == "" {
-		// Unstyled text, so a draft check that reads the screen before the
-		// INSERT switch sees a draft where the placeholder would be.
-		sb.WriteString(b.marker + normalModeText)
+		// The placeholder's text, unstyled, so a draft check that reads the
+		// screen before the INSERT switch sees a draft, while the vim probe sees
+		// the same text before and after its `i`.
+		sb.WriteString(b.marker + ProgramPlaceholder)
 	} else if b.text() == "" {
 		sb.WriteString(b.marker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m")
 	} else {
