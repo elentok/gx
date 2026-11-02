@@ -20,7 +20,7 @@ func TestLockHolderProcess(t *testing.T) {
 	if dir == "" {
 		t.Skip("child process only")
 	}
-	if _, err := AcquireFullLock(dir, nil); err != nil {
+	if _, err := AcquireFullLock(dir, "", nil); err != nil {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(dir, "held"), nil, 0o644)
@@ -50,7 +50,7 @@ func TestFullLock_KilledHolderReleases(t *testing.T) {
 
 	got := make(chan *FullLock)
 	go func() {
-		l, err := AcquireFullLock(dir, nil)
+		l, err := AcquireFullLock(dir, "/wt", nil)
 		if err != nil {
 			t.Error(err)
 		}
@@ -59,6 +59,8 @@ func TestFullLock_KilledHolderReleases(t *testing.T) {
 	waitFor(t, "a waiting file", func() bool { return len(ReadWaiting(dir)) == 1 })
 	if w := ReadWaiting(dir)[0]; w.PID != os.Getpid() {
 		t.Errorf("waiting pid = %d, want %d", w.PID, os.Getpid())
+	} else if w.Root != "/wt" {
+		t.Errorf("waiting root = %q, want /wt", w.Root)
 	}
 	select {
 	case <-got:
@@ -82,7 +84,7 @@ func TestFullLock_KilledHolderReleases(t *testing.T) {
 
 func TestFullLock_WaitLineNamesHolderAndClears(t *testing.T) {
 	dir := t.TempDir()
-	first, err := AcquireFullLock(dir, nil)
+	first, err := AcquireFullLock(dir, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +92,7 @@ func TestFullLock_WaitLineNamesHolderAndClears(t *testing.T) {
 	var out syncBuf
 	got := make(chan *FullLock)
 	go func() {
-		l, _ := AcquireFullLock(dir, &out)
+		l, _ := AcquireFullLock(dir, "", &out)
 		got <- l
 	}()
 	waitFor(t, "the wait line", func() bool { return strings.Contains(out.String(), "RUN-A") })

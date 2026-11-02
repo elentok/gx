@@ -126,6 +126,9 @@ type TicketDetail struct {
 	PauseReason string `json:"pause_reason,omitempty"`
 	// PauseLabel is PauseReason in the plain words the summaries and Queue show.
 	PauseLabel string `json:"pause_label,omitempty"`
+	// WaitingLabel is set while the claimed ticket's check run waits for the
+	// check lock. A label only: Status and the pause fields do not change.
+	WaitingLabel string `json:"waiting_label,omitempty"`
 	// ModelRan and ModelExpected are the two models a model-mismatch pause shows.
 	ModelRan      string `json:"model_ran,omitempty"`
 	ModelExpected string `json:"model_expected,omitempty"`
@@ -212,6 +215,9 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	}
 	d := newTicketDetail(ref)
 	fillHeader(&d, ref, t)
+	if t.Status == schema.StatusClaimed {
+		d.WaitingLabel = s.checkWaitingLabel(ref.addr.String())
+	}
 	if t.LongTicketTurns > 0 {
 		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns
 	}

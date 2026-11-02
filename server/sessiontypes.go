@@ -22,8 +22,10 @@ type SessionInfo struct {
 	// Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
 	// no Unread or Actionable, and Holder is the agent dir the TUI opens the
 	// live panel from.
-	Queue           bool          `json:"queue,omitempty"`
-	Holder          string        `json:"holder,omitempty"`
+	Queue  bool   `json:"queue,omitempty"`
+	Holder string `json:"holder,omitempty"`
+	// WaitingLabel is the Queue row's check-lock label (see checkWaitingLabel).
+	WaitingLabel    string        `json:"waiting_label,omitempty"`
 	Status          SessionStatus `json:"status"`
 	StatusChangedAt time.Time     `json:"status_changed_at"`
 	// RunStartedAt is when the current run began: the last Restore, else the

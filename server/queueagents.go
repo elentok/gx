@@ -63,6 +63,7 @@ func (s *Server) queueAgentRow(t trackedRun) (SessionInfo, bool) {
 		Ticket:          t.Address,
 		Queue:           true,
 		Holder:          filepath.Join(nativerunner.AgentsRoot(s.cfg.StateDir, addr.Project), label),
+		WaitingLabel:    s.checkWaitingLabel(t.Address),
 		Status:          SessionStatus{State: queueAgentState(st.State, t.RateLimited)},
 		StatusChangedAt: t.StartedAt,
 		RunStartedAt:    t.StartedAt,

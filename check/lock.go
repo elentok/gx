@@ -35,6 +35,9 @@ type Waiting struct {
 	PID    int    `json:"pid"`
 	HeldBy string `json:"held_by"` // run id of the holder, empty when unknown
 	Since  string `json:"since"`   // RFC3339
+	// Root is the worktree the waiting run checks; the server maps it to the
+	// claimed ticket working there.
+	Root string `json:"root,omitempty"`
 }
 
 // FullLock is a held check lock.
@@ -47,8 +50,9 @@ type FullLock struct {
 
 // AcquireFullLock takes the check lock in stateDir, waiting for the holder. While
 // it waits it prints a line to wait (nil means none), clears it when done and
-// keeps a waiting file in stateDir for readers.
-func AcquireFullLock(stateDir string, wait io.Writer) (*FullLock, error) {
+// keeps a waiting file in stateDir for readers. root is the worktree the run
+// checks, recorded in the waiting file.
+func AcquireFullLock(stateDir, root string, wait io.Writer) (*FullLock, error) {
 	if err := os.MkdirAll(filepath.Join(stateDir, checkWaitingDir), 0o755); err != nil {
 		return nil, err
 	}
@@ -76,7 +80,7 @@ func AcquireFullLock(stateDir string, wait io.Writer) (*FullLock, error) {
 	}
 	wf := filepath.Join(stateDir, checkWaitingDir, strconv.Itoa(os.Getpid())+".json")
 	start := time.Now()
-	data, _ := json.Marshal(Waiting{PID: os.Getpid(), HeldBy: held.Run, Since: start.UTC().Format(time.RFC3339)})
+	data, _ := json.Marshal(Waiting{PID: os.Getpid(), HeldBy: held.Run, Since: start.UTC().Format(time.RFC3339), Root: root})
 	if err := os.WriteFile(wf, data, 0o644); err != nil {
 		f.Close()
 		return nil, err

@@ -306,6 +306,11 @@ export interface TicketDetail {
    */
   pause_label?: string;
   /**
+   * WaitingLabel is set while the claimed ticket's check run waits for the
+   * check lock. A label only: Status and the pause fields do not change.
+   */
+  waiting_label?: string;
+  /**
    * ModelRan and ModelExpected are the two models a model-mismatch pause shows.
    */
   model_ran?: string;
@@ -2192,6 +2197,10 @@ export interface SessionInfo {
    */
   queue?: boolean;
   holder?: string;
+  /**
+   * WaitingLabel is the Queue row's check-lock label (see checkWaitingLabel).
+   */
+  waiting_label?: string;
   status: SessionStatus;
   status_changed_at: string;
   /**

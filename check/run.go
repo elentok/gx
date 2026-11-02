@@ -127,7 +127,7 @@ func Run(opts Options) (Result, error) {
 	// is read, so the wait is not part of any duration.
 	var lock *FullLock
 	if opts.Mode == ModeFull && opts.StateDir != "" && slices.Contains(kinds, "test") && !cfg["test"].Off {
-		if lock, err = AcquireFullLock(opts.StateDir, opts.Wait); err != nil {
+		if lock, err = AcquireFullLock(opts.StateDir, root, opts.Wait); err != nil {
 			return Result{}, err
 		}
 		defer lock.Release()

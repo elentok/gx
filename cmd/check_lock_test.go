@@ -15,7 +15,7 @@ func TestCheck_FullTestRunWaitsForTheLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lock, err := check.AcquireFullLock(stateDir, nil)
+	lock, err := check.AcquireFullLock(stateDir, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
