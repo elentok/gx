@@ -202,9 +202,12 @@ func (b *inputBox) control(c Control) bool {
 
 // writeEditorMode records editorMode vim in the settings file, keeping its
 // other keys, where launchEditorMode (and gx's claudeVimMode) read it.
-func (b *inputBox) writeEditorMode() error {
+func (b *inputBox) writeEditorMode() error { return writeVimSetting(b.configPath) }
+
+// writeVimSetting records editorMode vim in the settings file at path.
+func writeVimSetting(path string) error {
 	settings := map[string]any{}
-	if data, err := os.ReadFile(b.configPath); err == nil {
+	if data, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(data, &settings)
 	}
 	settings["editorMode"] = "vim"
@@ -212,10 +215,10 @@ func (b *inputBox) writeEditorMode() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(b.configPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(b.configPath, data, 0o644)
+	return os.WriteFile(path, data, 0o644)
 }
 
 func logSubmitted(conversationID, text string) error {

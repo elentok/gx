@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
@@ -160,14 +161,26 @@ func runServer(ctx context.Context, d deps) error {
 	if err != nil {
 		return err
 	}
-	// Test hook: gxfixture shortens how long a launch prompt waits for the ready signal.
 	var ptyOverride *runnerbuild.PtyOverride
+	// Test hook: gxfixture shortens how long a launch prompt waits for the ready signal.
 	if v := os.Getenv("GX_PTY_READY_WAIT"); v != "" {
 		readyWait, err := time.ParseDuration(v)
 		if err != nil {
 			return fmt.Errorf("GX_PTY_READY_WAIT: %w", err)
 		}
 		ptyOverride = &runnerbuild.PtyOverride{ReadyWait: readyWait}
+	}
+	// Test hook: gxfixture widens how long a launch prompt may sit on an unknown
+	// command, so a skill registry that fills late can still deliver it.
+	if v := os.Getenv("GX_LAUNCH_UNKNOWN_GRACE"); v != "" {
+		grace, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("GX_LAUNCH_UNKNOWN_GRACE: %w", err)
+		}
+		if ptyOverride == nil {
+			ptyOverride = &runnerbuild.PtyOverride{}
+		}
+		ptyOverride.LaunchCaps = claudeui.LaunchProofCaps{UnknownGrace: grace, Grace: 3 * grace}
 	}
 	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, ptyOverride)
 	var tcpAddr string

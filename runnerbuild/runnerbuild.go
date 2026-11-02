@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
@@ -29,6 +30,7 @@ type PtyOverride struct {
 	PromptGrace  time.Duration
 	StopGrace    time.Duration
 	ReadyWait    time.Duration
+	LaunchCaps   claudeui.LaunchProofCaps
 }
 
 // New returns the runner for choice c, plus runnerFor, which builds any runner
@@ -70,6 +72,7 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 				p.PromptGrace = pty.PromptGrace
 				p.StopGrace = pty.StopGrace
 				p.ReadyWait = pty.ReadyWait
+				p.LaunchCaps = pty.LaunchCaps
 			}
 			r = p
 		default:

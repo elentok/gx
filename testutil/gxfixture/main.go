@@ -330,6 +330,7 @@ func run(args []string) (err error) {
 	if sc.readyWait != "" {
 		f.env = append(f.env, "GX_PTY_READY_WAIT="+sc.readyWait)
 	}
+	f.env = append(f.env, sc.env...)
 	if err := f.setupDisk(); err != nil {
 		return err
 	}

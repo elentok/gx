@@ -100,6 +100,13 @@ const (
 	// BehaviourQuestionMenu blocks the TUI fake on a question menu, which is not
 	// an approvable dialog; Esc leaves it and the next prompt finishes the ticket.
 	BehaviourQuestionMenu = "question-menu"
+	// BehaviourStall makes the TUI fake run its first prompt as an empty turn:
+	// no work, no report, then idle. The next prompt finishes the ticket, so it
+	// takes the server's stall nudge to get the ticket done.
+	BehaviourStall = "stall"
+	// BehaviourStallNoRecord is BehaviourStall for a session whose transcript
+	// has no user record once the turn ends (the launch proof saw one first).
+	BehaviourStallNoRecord = "stall-no-record"
 	// BehaviourError makes the Codex fake end its first prompt with a non-usage
 	// error (a model Codex rejects) and no rate-limit sample; the next prompt
 	// finishes the ticket.

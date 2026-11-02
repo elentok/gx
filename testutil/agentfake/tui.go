@@ -237,6 +237,9 @@ func sendControlWhenReady(ready func() (path string, ok bool), c Control) error 
 	}
 }
 
+// stallTurnLength is how long a BehaviourStall turn stays busy.
+const stallTurnLength = 1500 * time.Millisecond
+
 // TUIClaude runs the fake interactive claude on the process's terminal and
 // exits with the code an exit control asked for.
 func TUIClaude() {
@@ -417,7 +420,9 @@ type tui struct {
 	opts    tuiOptions
 	started time.Time
 	// notice is a line drawn under the input, such as an unknown-command error.
-	notice     string
+	notice string
+	// vim is set by ActionVimToggle: the input then draws the INSERT footer.
+	vim        bool
 	pidPath    string
 	ctlPath    string
 	transcript string
@@ -727,6 +732,22 @@ func (t *tui) submit() error {
 			case BehaviourRateLimit:
 				t.resume = &pendingWork{cfg, address}
 				return t.rateLimit(cfg)
+			case BehaviourStall, BehaviourStallNoRecord:
+				t.resume = &pendingWork{cfg, address}
+				dropRecord := cfg.Behaviour[address] == BehaviourStallNoRecord
+				go func() {
+					// Long enough for a poll to see the turn start, and the launch
+					// proof to read the user record before it goes.
+					time.Sleep(stallTurnLength)
+					if dropRecord {
+						if path, err := t.transcriptPath(); err == nil {
+							_ = os.Truncate(path, 0)
+						}
+					}
+					t.runStatusLine()
+					_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+				}()
+				return t.setStatus(StatusBusy, "")
 			case BehaviourWriteAsk:
 				// A kept agent gets the answer as its next prompt and finishes on it;
 				// a relaunch sees the file and finishes at once.
@@ -990,6 +1011,10 @@ func (t *tui) handleControl(c Control) error {
 	case ActionModel:
 		t.opts.model = c.Model
 		return nil
+	case ActionVimToggle:
+		t.vim = true
+		t.draw()
+		return writeVimSetting(claudeSettingsPath())
 	default:
 		return fmt.Errorf("unknown control action %q", c.Action)
 	}
@@ -1111,6 +1136,9 @@ func (t *tui) draw() {
 	}
 	if t.notice != "" && t.pid.Status == StatusIdle {
 		rows = append(rows, t.notice)
+	}
+	if t.vim && t.pid.Status == StatusIdle {
+		rows = append(rows, "-- INSERT --")
 	}
 	if t.opts.mouse {
 		rows = append(rows, fmt.Sprintf("wheel up %d down %d", t.wheelUp, t.wheelDown))

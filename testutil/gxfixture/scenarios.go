@@ -119,6 +119,8 @@ type scenario struct {
 	// readyWait is how long a launch prompt waits for that signal before it is
 	// sent anyway; empty keeps nativerunner.DefaultReadyWait.
 	readyWait string
+	// env is extra server environment, for the fake's knobs and the server's test hooks.
+	env []string
 	// restart points the server's restart at a fake gx binary (see restart.go).
 	restart *restartSpec
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
@@ -228,6 +230,10 @@ var scenarios = map[string]scenario{
 	"rejected-first-prompt": rejectedFirstPrompt,
 	"ready-delayed":         readyDelayed,
 	"ready-never":           readyNever,
+	"stall-vim":             stallVim,
+	"stall-leaves-i":        stallLeavesI,
+	"late-registry":         lateRegistry,
+	"no-user-record":        noUserRecord,
 	"keep-worktree":         keepWorktree,
 	"keep-agent":            keepAgent,
 	"keep-cleanup":          keepCleanup,
