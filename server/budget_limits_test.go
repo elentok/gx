@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -197,12 +198,32 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 		}
 		return live, herdrfake.Identities{}, nil
 	})
-	h.Herdr.Register("agent", "prompt", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		// The launch counts as delivered once the transcript shows it as the first user record.
+		now := time.Now().UTC()
+		line, _ := json.Marshal(map[string]any{
+			"type": "user", "uuid": "launch", "timestamp": now.Format(time.RFC3339Nano),
+			"message": map[string]any{"role": "user", "content": argv[3]},
+		})
+		file := filepath.Join(h.Env("HOME"), ".claude", "projects", "wt", "sess.jsonl")
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
+		if err := os.WriteFile(file, append(line, '\n'), 0o644); err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
 		prompted.Store(true)
 		return map[string]any{"agent": map[string]any{
 			"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1,
 			"agent_session": map[string]any{"value": "sess"},
 		}}, herdrfake.Identities{}, nil
+	})
+	// Start waits for idle before the prompt; afterwards the pane never goes quiet.
+	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if !prompted.Load() {
+			return idle, herdrfake.Identities{}, nil
+		}
+		return nil, herdrfake.Identities{}, errors.New("timed out waiting for agent status")
 	})
 	h.Herdr.Register("agent", "read", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return "", herdrfake.Identities{}, nil
