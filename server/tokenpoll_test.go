@@ -12,11 +12,13 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
 	"github.com/elentok/gx/transcript"
 )
@@ -437,9 +439,36 @@ func TestTokenPoll_ExitedSessionsAreNotPolled(t *testing.T) {
 // Seam: nothing is polled before the migrations end, and polling starts after.
 func TestTokenPoll_WaitsForMigrations(t *testing.T) {
 	t.Parallel()
-	hold, entered, release := heldMigration(t)
-	f := newTokenFixture(t, "epic-a", hold, func(c *server.Config) { c.TokenPollInterval = 20 * time.Millisecond })
+	// The live iteration is set up first: a held migration holds the project
+	// lock, which PauseAs needs. The held step joins the registry for the restart.
+	reg := &migrations.Registry{}
+	f := newTokenFixture(t, "epic-a",
+		func(c *server.Config) { c.Migrations = reg },
+		func(c *server.Config) { c.TokenPollInterval = 20 * time.Millisecond })
+	entered := make(chan struct{})
+	gate := make(chan struct{})
+	var once, relOnce sync.Once
+	release := func() { relOnce.Do(func() { close(gate) }) }
+	t.Cleanup(release)
+	reg.Register(migrations.Step{Name: "hold", Run: func(migrations.Env) ([]tickets.MigrationChange, error) {
+		once.Do(func() { close(entered) })
+		<-gate
+		return nil, nil
+	}})
+	f.h.Restart(t)
+	f.h.Server.SetTokensOf(func(ralphloop.SessionRef) (int64, float64, error) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.reads++
+		return f.tokens, f.cost, nil
+	})
 	<-entered
+	// The ticket is still paused on disk, so the nudge makes it live again.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := f.h.Client.TicketNudge(ctx, f.address, "go"); err != nil || res.Refused {
+		t.Fatalf("nudge = %+v, %v", res, err)
+	}
 	f.grow(t, 100, 1)
 	time.Sleep(200 * time.Millisecond)
 	if n := f.readCount(); n != 0 {
