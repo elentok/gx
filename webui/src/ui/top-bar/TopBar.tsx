@@ -82,7 +82,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
     };
   }, []);
   return (
-    <Box as="nav" ref={nav} display="flex" alignItems="center" justifyContent="space-between" pb="4" position="sticky" {...(ruled && { mx: "-4", px: "4", borderBottomWidth: "1px", borderColor: "border" })} top="0" zIndex="sticky" bg="surface">
+    <Box as="nav" ref={nav} display="flex" alignItems="center" justifyContent="space-between" pt="4" pb="4" position="sticky" {...(ruled && { mx: "-4", px: "4", borderBottomWidth: "1px", borderColor: "border" })} top="0" zIndex="sticky" bg="surface">
       <Box display="flex" gap="5">
         {TABS.map(({ key, label, href }) => {
           const count = key === "epics" ? waiting : key === "agents" ? actionable : 0;
