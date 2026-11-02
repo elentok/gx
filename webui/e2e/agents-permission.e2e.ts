@@ -137,10 +137,13 @@ test("158. Allow once refused for Claude prompts gx cannot approve", async ({ pa
   const movedConv = await conversationOf(fixture, moved.id);
   const movedBefore = await fixture.input(movedConv);
   await open(page, `#/agents/${moved.id}`);
+  // Any key leaves the session Blocked, and the notice (with the Screen dialog it owns) goes with it unless the page stops learning.
+  await freeze(page);
   await noticeButton(page, "Screen").click();
   await screenDialog(page).getByRole("group", { name: "Keys" }).getByRole("button", { name: "Down", exact: true }).click();
   await expect.poll(() => readSince(fixture, movedConv, movedBefore)).toBe("\x1b[B");
   await screenDialog(page).getByRole("button", { name: "Close", exact: true }).click();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
   const redrawn = BASH_DIALOG("rg readable-command");
   redrawn[4] = "  1. Yes";
   redrawn[5] = "❯ 2. No";
