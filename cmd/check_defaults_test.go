@@ -69,7 +69,7 @@ func TestCheck_DefaultsRunOnlyRowsOfChangedFiles(t *testing.T) {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
 	got := readLog(t, tools)
-	for _, want := range []string{"gofmt -w a.go", "shfmt -w run.sh", "shellcheck run.sh", "go test -json -v ."} {
+	for _, want := range []string{"gofmt -w a.go", "shfmt -w run.sh", "shellcheck run.sh", "go test -json -v -timeout=30m ."} {
 		if !strings.Contains(got, want) {
 			t.Errorf("tool log lacks %q:\n%s", want, got)
 		}
@@ -165,7 +165,7 @@ func TestCheck_ServerFileRunsBriefGoTestNotMakeTarget(t *testing.T) {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
 	got := readLog(t, tools)
-	if !strings.Contains(got, "go test -json -v ./server") || strings.Contains(got, "make") {
+	if !strings.Contains(got, "go test -json -v -timeout=30m ./server") || strings.Contains(got, "make") {
 		t.Errorf("tool log:\n%s", got)
 	}
 }
@@ -218,7 +218,7 @@ func TestCheck_FullRunTestsEveryGoDirectory(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
-	if got := readLog(t, tools); !strings.Contains(got, "go test -json -v . ./pkg\n") {
+	if got := readLog(t, tools); !strings.Contains(got, "go test -json -v -timeout=30m . ./pkg\n") {
 		t.Errorf("tool log:\n%s", got)
 	}
 }

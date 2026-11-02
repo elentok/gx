@@ -66,6 +66,26 @@ func TestGoTestPlan_AddsAGomaxprocsDefault(t *testing.T) {
 	}
 }
 
+func TestGoTestPlan_TimeoutDefaultsButCallerWins(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct{ args, want []string }{
+		{nil, []string{"test", "-json", "-v", "-timeout=30m"}},
+		{[]string{"-timeout", "5m", "./a"}, []string{"test", "-json", "-v", "-timeout", "5m", "./a"}},
+		{[]string{"-timeout=5m"}, []string{"test", "-json", "-v", "-timeout=5m"}},
+	} {
+		inv, err := GoTest{}.Plan([]string{"PATH=" + bin}, t.TempDir(), tt.args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Join(inv.Argv, " ") != strings.Join(tt.want, " ") {
+			t.Errorf("Plan(%v) argv = %v, want %v", tt.args, inv.Argv, tt.want)
+		}
+	}
+}
+
 func TestWithDefaults_CallerValueWins(t *testing.T) {
 	got := withDefaults([]string{"PATH=/bin", "GOMAXPROCS=7"}, []string{"GOMAXPROCS=2", "OTHER=1"})
 	want := []string{"PATH=/bin", "GOMAXPROCS=7", "OTHER=1"}

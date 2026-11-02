@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+// defaultTimeout replaces go's 10m when the caller gives no -timeout. The
+// GOMAXPROCS cap below bounds the parallel tests, and ./server alone outlasts
+// 10m under it on a busy machine.
+const defaultTimeout = "-timeout=30m"
+
 // GoTest wraps `go test`.
 type GoTest struct{}
 
@@ -27,7 +32,11 @@ func (GoTest) Plan(env []string, _ string, args []string) (Invocation, error) {
 	}
 	rest, tail := splitArgs(args)
 	rest, _ = stripFlag(rest, false, "json", "v")
-	argv := append([]string{"test", "-json", "-v"}, rest...)
+	argv := []string{"test", "-json", "-v"}
+	if _, has := stripFlag(rest, true, "timeout"); !has {
+		argv = append(argv, defaultTimeout)
+	}
+	argv = append(argv, rest...)
 	procs := goTestProcs(runtime.NumCPU(), env)
 	return Invocation{Bin: exe, Argv: append(argv, tail...), Env: []string{"GOMAXPROCS=" + strconv.Itoa(procs)}}, nil
 }

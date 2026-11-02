@@ -216,7 +216,7 @@ func TestBrief_GoTestArgs(t *testing.T) {
 	if evalSymlinks(t, got[0]) != proj {
 		t.Errorf("ran in %q, want %q", got[0], proj)
 	}
-	want := []string{"test", "-json", "-v", "-run", "TestX", "-count=1", "./a", "./b"}
+	want := []string{"test", "-json", "-v", "-timeout=30m", "-run", "TestX", "-count=1", "./a", "./b"}
 	if strings.Join(got[1:], " ") != strings.Join(want, " ") {
 		t.Errorf("args = %v, want %v", got[1:], want)
 	}
