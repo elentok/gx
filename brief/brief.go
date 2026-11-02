@@ -41,6 +41,9 @@ type Tool interface {
 	// RerunArgs returns the caller's args changed to run only the failing
 	// tests, or nil when the failures cannot be re-run on their own.
 	RerunArgs(args []string, failures []Unit) []string
+	// NarrowArgs returns the caller's args changed to run only the named test
+	// (without its package), or nil when the tool cannot narrow to one test.
+	NarrowArgs(args []string, test string) []string
 }
 
 // Invocation is the command a tool plans to run.

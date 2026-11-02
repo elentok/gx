@@ -200,8 +200,21 @@ func (GoTest) RerunArgs(args []string, failures []Unit) []string {
 	for i, n := range names {
 		names[i] = regexp.QuoteMeta(n)
 	}
-	pattern := "^(" + strings.Join(names, "|") + ")$"
+	return withRunPattern(args, "^("+strings.Join(names, "|")+")$")
+}
 
+// NarrowArgs runs one test; a subtest name `Top/sub` gets one anchored
+// pattern per level, as -run splits its pattern on slashes.
+func (GoTest) NarrowArgs(args []string, test string) []string {
+	levels := strings.Split(test, "/")
+	for i, l := range levels {
+		levels[i] = "^" + regexp.QuoteMeta(l) + "$"
+	}
+	return withRunPattern(args, strings.Join(levels, "/"))
+}
+
+// withRunPattern replaces any -run of the caller with pattern.
+func withRunPattern(args []string, pattern string) []string {
 	rest, tail := splitArgs(args)
 	re, _ := stripFlag(rest, true, "run")
 	re = append(re, "-run", pattern)

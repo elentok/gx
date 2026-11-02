@@ -42,3 +42,24 @@ func TestSplitArgs(t *testing.T) {
 		t.Fatalf("splitArgs() without -args = %v, %v", rest, tail)
 	}
 }
+
+func TestGoTestNarrowArgs(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		args []string
+		test string
+		want []string
+	}{
+		{"plain", []string{"./..."}, "TestA", []string{"./...", "-run", "^TestA$"}},
+		{"subtest", []string{"./..."}, "TestA/sub_case", []string{"./...", "-run", "^TestA$/^sub_case$"}},
+		{"replaces -run, keeps -args tail", []string{"-run", "X", "./a", "-args", "-v"}, "TestA", []string{"./a", "-run", "^TestA$", "-args", "-v"}},
+		{"quotes metacharacters", nil, "TestA/a.b", []string{"-run", `^TestA$/^a\.b$`}},
+	} {
+		if got := (GoTest{}).NarrowArgs(c.args, c.test); !slices.Equal(got, c.want) {
+			t.Errorf("%s: NarrowArgs = %v, want %v", c.name, got, c.want)
+		}
+	}
+	if got := (Vitest{}).NarrowArgs(nil, "a"); got != nil {
+		t.Errorf("Vitest.NarrowArgs = %v, want nil", got)
+	}
+}

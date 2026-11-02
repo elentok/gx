@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -317,10 +319,17 @@ func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
 			continue
 		}
 		for name, ms := range l.TestDurations {
-			if d := time.Duration(ms) * time.Millisecond; d > limit {
-				res.SlowTests = append(res.SlowTests, name)
-				msgs = append(msgs, fmt.Sprintf("slow test %s took %.2fs, over the %s limit", name, d.Seconds(), limit))
+			d := time.Duration(ms) * time.Millisecond
+			if d <= limit {
+				continue
 			}
+			msg := fmt.Sprintf("slow test %s took %.2fs, over the %s limit", name, d.Seconds(), limit)
+			if r.rerunUnderLimit(l, name, limit) {
+				res.Warnings = append(res.Warnings, msg+" (machine under high load; passed when re-run alone)")
+				continue
+			}
+			res.SlowTests = append(res.SlowTests, name)
+			msgs = append(msgs, msg)
 		}
 	}
 	if len(msgs) == 0 {
@@ -328,8 +337,45 @@ func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
 	}
 	slices.Sort(msgs)
 	slices.Sort(res.SlowTests)
+	slices.Sort(res.Warnings)
 	res.Status = StatusFail
 	res.Tail = append(res.Tail, msgs...)
+}
+
+// rerunKindSuffix marks the index line of a slow test's re-run: same check run
+// (so the soak skips it like the run's own lines), a kind no result reads.
+const rerunKindSuffix = "-rerun"
+
+var testNameRe = regexp.MustCompile(`^(.*?)\.((?:Test|Fuzz|Example|Benchmark).*)$`)
+
+// rerunUnderLimit runs one slow test of a `gx brief` call again, alone, when
+// the machine is under high load, and reports whether it then passed under
+// limit. Without high load, or for a tool that cannot narrow, it reports false.
+func (r *runner) rerunUnderLimit(l brief.IndexEntry, name string, limit time.Duration) bool {
+	if !highLoad(r.loadAvg()) {
+		return false
+	}
+	var tool brief.Tool
+	switch l.Tool {
+	case "go-test":
+		tool = brief.GoTest{}
+	case "vitest":
+		tool = brief.Vitest{}
+	case "playwright":
+		tool = brief.Playwright{}
+	}
+	m := testNameRe.FindStringSubmatch(name)
+	if tool == nil || m == nil {
+		return false
+	}
+	args := tool.NarrowArgs(l.Args, m[2])
+	if args == nil {
+		return false
+	}
+	kind := l.CheckKind + rerunKindSuffix
+	exit, outcome := brief.RunOutcome(tool, brief.Options{Dir: l.Dir, Args: args, DataDir: r.dataDir, StateDir: r.stateDir, Out: io.Discard, Env: r.childEnv(kind), CheckRun: r.runID, CheckKind: kind})
+	ms, ok := outcome.TestDurations[name]
+	return exit == brief.ExitPass && ok && time.Duration(ms)*time.Millisecond <= limit
 }
 
 // enforceSuite fails a passing full test run that took longer than limit. On a

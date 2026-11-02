@@ -201,6 +201,9 @@ func (Vitest) RerunArgs(args []string, failures []Unit) []string {
 	return append(re, "-t", "^("+strings.Join(names, "|")+")$")
 }
 
+// NarrowArgs is nil until vitest narrowing lands.
+func (Vitest) NarrowArgs([]string, string) []string { return nil }
+
 // Tsc wraps `tsc`.
 type Tsc struct{}
 
@@ -289,3 +292,5 @@ func (Tsc) Parse(out []byte, exit int) Outcome {
 }
 
 func (Tsc) RerunArgs([]string, []Unit) []string { return nil }
+
+func (Tsc) NarrowArgs([]string, string) []string { return nil }

@@ -243,3 +243,6 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 
 // RerunArgs is nil: a name filter would have to be rebuilt as a -g regex.
 func (Playwright) RerunArgs([]string, []Unit) []string { return nil }
+
+// NarrowArgs is nil until playwright narrowing lands.
+func (Playwright) NarrowArgs([]string, string) []string { return nil }

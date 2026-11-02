@@ -22,6 +22,8 @@ func (GoBuild) Parse(out []byte, exit int) Outcome {
 
 func (GoBuild) RerunArgs([]string, []Unit) []string { return nil }
 
+func (GoBuild) NarrowArgs([]string, string) []string { return nil }
+
 // GoVet wraps `go vet`.
 type GoVet struct{}
 
@@ -36,6 +38,8 @@ func (GoVet) Parse(out []byte, exit int) Outcome {
 }
 
 func (GoVet) RerunArgs([]string, []Unit) []string { return nil }
+
+func (GoVet) NarrowArgs([]string, string) []string { return nil }
 
 func planGo(env []string, sub string, args []string) (Invocation, error) {
 	exe, err := LookPath(env, "go")

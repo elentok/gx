@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -212,6 +214,84 @@ func slowTestRepo(t *testing.T, checksJSON string) (repo, data string) {
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport (\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) { time.Sleep(1200 * time.Millisecond) }\n")
 	testutil.CommitAll(t, repo, "module")
 	return repo, data
+}
+
+// flakySlowRepo has one Go test that sleeps 1.5s when the file `state` does not
+// exist yet (and creates it) and sleeps 0.9s afterwards, under the 1s slow
+// limit but long enough to show in the kind's time if it were counted; with
+// stayslow it always sleeps 1.5s.
+func flakySlowRepo(t *testing.T, stayslow bool) (repo, data string) {
+	t.Helper()
+	const brief = `gx brief go-test ./...`
+	repo, data = slowTestRepo(t, `{"test":{"full":"`+brief+`","limits":{"slow":"1s","suite":"1m"}}}`)
+	state := filepath.Join(t.TempDir(), "state")
+	body := "_, err := os.Stat(" + strconv.Quote(state) + ")\n\tif err != nil {\n\t\tos.WriteFile(" + strconv.Quote(state) + ", nil, 0o644)\n\t\ttime.Sleep(1500 * time.Millisecond)\n\t} else {\n\t\ttime.Sleep(900 * time.Millisecond)\n\t}"
+	if stayslow {
+		body = "time.Sleep(1500 * time.Millisecond)"
+	}
+	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport (\n\t\"os\"\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) {\n\t"+body+"\n\t_ = os.Stat\n}\n")
+	testutil.CommitAll(t, repo, "flaky")
+	return repo, data
+}
+
+func TestCheck_SlowTestRerunUnderHighLoad(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("builds the gx binary")
+	}
+	high := func() float64 { return 1000 }
+	t.Run("passes alone: warns, exits 0, record keeps the warning", func(t *testing.T) {
+		repo, data := flakySlowRepo(t, false)
+		out, code := runCheckCmdLoad(t, high, repo, "--full", "--kind", "test")
+		if code != 0 || !strings.Contains(out, "warning:") || !strings.Contains(out, "example.com/tiny.TestSlow") {
+			t.Fatalf("exit %d; want 0 with a warning naming the test\n%s", code, out)
+		}
+		recs, _ := check.ReadRecords(data, "p")
+		k := kindRecord(t, recs[0], "test")
+		if len(recs) != 1 || len(k.Warnings) != 1 || len(k.Failed) != 0 {
+			t.Errorf("record = %+v; want one warning and no failures", recs)
+		}
+		lines, _ := brief.ReadIndex(data)
+		var first, rerun int64
+		reruns := 0
+		for _, l := range lines {
+			switch {
+			case l.CheckKind == "test-rerun" && slices.Equal(l.Args, []string{"./...", "-run", "^TestSlow$"}):
+				reruns++
+				rerun = l.DurationMS
+			case l.CheckKind == "test":
+				first = l.DurationMS
+			}
+		}
+		if reruns != 1 {
+			t.Fatalf("index has %d tagged re-runs, want 1: %+v", reruns, lines)
+		}
+		// The kind's time is the first run plus the check's own overhead, which is
+		// less than the re-run would add.
+		if over := k.DurationMS - first; over >= rerun {
+			t.Errorf("kind took %d ms, first run %d ms, re-run %d ms: the re-run is in the kind's time", k.DurationMS, first, rerun)
+		}
+	})
+	t.Run("stays slow: exits 1 and names the test", func(t *testing.T) {
+		repo, _ := flakySlowRepo(t, true)
+		out, code := runCheckCmdLoad(t, high, repo, "--full", "--kind", "test")
+		if code != 1 || !strings.Contains(out, "example.com/tiny.TestSlow") {
+			t.Fatalf("exit %d; want 1 naming the test\n%s", code, out)
+		}
+	})
+	t.Run("low load: exits 1 with no re-run", func(t *testing.T) {
+		repo, data := flakySlowRepo(t, false)
+		out, code := runCheckCmdLoad(t, func() float64 { return 0 }, repo, "--full", "--kind", "test")
+		if code != 1 {
+			t.Fatalf("exit %d, want 1\n%s", code, out)
+		}
+		lines, _ := brief.ReadIndex(data)
+		for _, l := range lines {
+			if l.CheckKind == "test-rerun" {
+				t.Errorf("low load re-ran a test: %+v", l)
+			}
+		}
+	})
 }
 
 func TestCheck_SlowLimit(t *testing.T) {
