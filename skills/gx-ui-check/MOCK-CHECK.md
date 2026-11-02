@@ -1,7 +1,7 @@
 # Mock check
 
 Compare a built page with the stored mock it came from. gx-implement and gx-verify-epic follow these
-steps. The browser commands come from the `playwright-cli` skill.
+steps. The browser commands come from [gx-playwright-cli](../gx-playwright-cli/SKILL.md).
 
 ## Steps
 

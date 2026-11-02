@@ -12,7 +12,7 @@ description: >-
 Drive the web UI of a throwaway gx server and compare what you see with the flow catalog. The
 catalog is `webui/e2e/CATALOG.md`, the same file the Playwright suite (`make web-e2e`) follows, so
 agents and the suite check the same flows. Read the catalog entry for the flow you run, not the whole
-file. Use the `playwright-cli` skill for the browser commands.
+file. Read [gx-playwright-cli](../gx-playwright-cli/SKILL.md) for the browser commands.
 
 ## 1. Build and start a scenario
 
