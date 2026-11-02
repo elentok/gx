@@ -51,6 +51,20 @@ func TestPlaywrightE2esSkillIsWired(t *testing.T) {
 	checkAnchors(t, "gx-test-review/SKILL.md", "(../gx-playwright-e2es/SKILL.md)")
 }
 
+func TestGxImplementTestRules(t *testing.T) {
+	checkAnchors(t, "gx-implement/SKILL.md",
+		"(../gx-test-guidelines.md)",
+		"before you write the first one",
+		"Before `--iteration-status finished`, check each new or changed test",
+		"pause with `gx tickets ask`",
+		"There is no exemption list",
+		"`gx check --full`",
+		"changed-file `gx check`",
+		"`gx-playwright-e2es`",
+	)
+	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines.md", "GOMAXPROCS", "claudeenv", "envguard")
+}
+
 func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
 	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
 	guidelines := normalizeSpace(readFile(t, "gx-test-guidelines.md"))

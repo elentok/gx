@@ -97,6 +97,10 @@ Then, while working:
 - **Read files with a file read (Read), not a shell command.** If a read ends in "(exporter
   truncated)" or has lost its indentation, read it again with a file read.
 
+If the ticket adds or changes tests, read [gx-test-guidelines.md](../gx-test-guidelines.md) before you
+write the first one. If the ticket text, its seams or the touched files are Playwright, also load
+`gx-playwright-e2es`.
+
 ## Forking when the ticket outgrows budget
 
 Check the live budget at every natural checkpoint — after a subagent survey returns, after each file
@@ -227,9 +231,20 @@ It is the only package-wide run. Run it in the foreground, unpiped: no `tail`, n
 Set the shell call's time limit to 600000 ms (see the Tool names table in
 [gx-local-tracker](../gx-local-tracker.md)): the default 120s moves it to the background. The `./server` tests alone
 take about 4 minutes. Iterate with `gx brief go-test -run <Test>`, then run `gx check` once at the
-end. It already runs the full suite, so do not run the package separately first.
+end. Do not run the package separately first.
+
+Never run `gx check --full`. Ticket agents run changed-file `gx check`. The epic's verify ticket,
+the proof and the person run `gx check --full` (the verify ticket runs it and the soak in the
+background and polls).
 
 A new or changed test that waits on time or concurrency runs with `-count=20` before commit.
+
+Before `--iteration-status finished`, check each new or changed test against
+[gx-test-guidelines.md](../gx-test-guidelines.md). If a test fails a per-test time limit, speed it up
+first (fake clock, a test-sized wait override, shared setup, a lower test level). If it cannot get
+under the limit, pause with `gx tickets ask` and the person decides. There is no exemption list, and
+you never raise a limit. Suite-limit failures are not yours to fix, and you add no per-test timing to
+the handoff.
 
 When a test fails, search the log path (the last line of the output) with `rg` for the details.
 Don't re-run the test to get raw output.

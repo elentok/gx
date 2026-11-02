@@ -42,6 +42,11 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   `go test ./e2e/...`. `make test` shares one CPU budget between its steps, half the cores by
   default; set `GX_TEST_CPUS=<n>` to change it. Every `gx brief go-test` run caps itself the same
   way (GOMAXPROCS at two fifths of that budget) unless the environment already sets GOMAXPROCS.
+- Test-writing rules shared with other projects are in `skills/gx-test-guidelines.md`. The rules
+  below are gx-only.
+- Ticket agents run changed-file `gx check` and never `gx check --full`. The epic's verify ticket,
+  the proof and the person run `gx check --full`; the verify ticket runs it and the soak in the
+  background and polls.
 - Never run `go clean -cache` directly, use `gx brief go-clean-cache`.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
 - Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
