@@ -46,10 +46,16 @@ type Runner func(ctx context.Context, name string, args ...string) error
 
 const playTimeout = 10 * time.Second
 
-// NewSystemPlayer returns the player for this machine. Inside a test binary
-// it returns a no-op, so tests never make a real sound.
+// OffEnv set to "off" turns sounds off for a process that runs the real
+// binary, such as a gxfixture server. It is the same variable that turns
+// osnotify banners off.
+const OffEnv = "GX_NOTIFY"
+
+// NewSystemPlayer returns the player for this machine. Inside a test binary,
+// or with OffEnv set to "off", it returns a no-op, so tests never make a real
+// sound.
 func NewSystemPlayer(log *slog.Logger) Player {
-	if testing.Testing() {
+	if testing.Testing() || os.Getenv(OffEnv) == "off" {
 		return noop{}
 	}
 	cfgPath, err := config.FilePath()

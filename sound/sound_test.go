@@ -147,3 +147,10 @@ func TestNewSystemPlayer_NoopInTests(t *testing.T) {
 		t.Fatal("NewSystemPlayer inside a test binary should be a no-op")
 	}
 }
+
+func TestNewSystemPlayer_NoopWhenOff(t *testing.T) {
+	t.Setenv(OffEnv, "off")
+	if _, ok := NewSystemPlayer(slog.Default()).(noop); !ok {
+		t.Fatal("NewSystemPlayer with GX_NOTIFY=off should be a no-op")
+	}
+}
