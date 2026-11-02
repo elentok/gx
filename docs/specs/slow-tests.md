@@ -27,8 +27,11 @@ green. The work has four parts:
   one exists.
 - Add guard rails: time limits in `gx check`, a `gx-test-review` step, shared test guidelines and
   a gx-implement self-check.
-- Close the epic only on proof: the 90th percentile of the newest 20 recorded full runs on main is
-  under 4 minutes, and `scripts/soak.sh 20` is 20 of 20 clean.
+- Keep full runs from fighting for the cores: a machine-wide lock for `gx check --full`, with a
+  waiting label in the Queue tab and on the web ticket page.
+- Close the epic only on proof: `scripts/soak.sh 10 --fail-fast` on main, run through
+  `gx check --full` in this epic's own verify ticket, is 10 of 10 clean, and the 90th percentile of
+  those 10 records is under 4 minutes.
 
 ## User Stories
 
@@ -38,10 +41,12 @@ Time limits in `gx check`
    `.gx/checks.json`, so that each project chooses its own limits.
 2. As a gx developer, I want a project with no limits set to have nothing enforced, so that slower
    projects do not start failing.
-3. As an agent, I want `gx check` to fail when a single test passes the `slow` limit, so that a
-   slow test is caught on the branch that adds it.
-4. As a gx developer, I want a test that is over `slow` on a loaded machine re-run alone once, so
-   that load does not cause false failures.
+3. As an agent, I want `gx check` to fail when a single test passes the `slow` limit, and to print
+   the test name and its time, so that a slow test is caught on the branch that adds it and I know
+   what to speed up.
+4. As a gx developer, I want a test that is over `slow` on a loaded machine re-run alone once (the
+   re-run time is not counted in `suite`), and failed if it is still over, so that load does not
+   cause false failures.
 5. As a gx developer, I want `slow` to take one value or a value per tool (go, vitest,
    playwright), so that Playwright flows can have a higher limit than unit tests.
 6. As a gx developer, I want a full run to fail when its wall time passes `suite`, so that the
@@ -52,18 +57,21 @@ Time limits in `gx check`
    run, so that I can tell a slow run from a loaded one afterwards.
 9. As an agent, I want a hung Go test killed as soon as it passes `hang`, with the test named, so
    that a hang costs about a minute and not the 30 minute package timeout.
-10. As a developer of a project that uses another test tool, I want the suite limit to apply to
-    the wall time of my test command, so that I get a guard without per-test numbers.
+10. As a developer of any project, I want per-test limits to apply to every test run through
+    `gx brief go-test`, `vitest` or `playwright` under a check run, whatever command started it,
+    and a test command that never calls `gx brief` to get only the suite limit, so that I get a
+    guard in both cases.
 11. As an agent, I want a clear error for a malformed limit value, so that I fix the config and
     do not get silent no-limit behaviour.
-12. As an agent, I want the failing test and its time printed in the `gx check` output, so that I
-    know what to speed up.
-13. As a gx developer, I want a second `gx check --full` to wait for the first one and say whom it
-    waits for, so that two full runs do not fight for the cores and time out.
-14. As a gx developer, I want the lock wait kept out of the suite limit and the proof, so that
+12. As a gx developer, I want a second `gx check --full` that selects the test kind to wait for the
+    first one and say whom it waits for, so that two full runs do not fight for the cores and time
+    out.
+13. As a gx developer, I want the lock wait kept out of the suite limit and the proof, so that
     queueing does not look like a slow suite.
-15. As an agent, I want changed-file `gx check` runs to take no lock, so that day-to-day checks
-    are not queued.
+14. As an agent, I want changed, staged and `--since` `gx check` runs to take no lock, whatever
+    command they run, so that day-to-day checks are not queued.
+15. As a gx developer, I want a ticket whose agent waits for the check lock to show that in the
+    Queue tab and on the ticket page, so that I can see why it is idle.
 
 Guard rails for agents
 
@@ -73,100 +81,104 @@ Guard rails for agents
     that adds tests, so that I write the test right the first time.
 18. As a gx-implement agent, I want a clear rule for a per-test limit failure (speed it up, or ask
     the person), so that I never raise a limit or add an exemption myself.
-19. As a gx developer, I want a `gx-test-review` step in the default code-review batch, so that
+19. As a gx-implement agent, I want a rule that I run changed-file `gx check` and leave `--full`
+    to the verify ticket, the proof and the person, so that many agents do not queue on the lock.
+20. As a gx developer, I want a `gx-test-review` step in the default code-review batch, so that
     every project reviews its tests next to the spec and thermo-nuclear reviews.
-20. As a reviewer, I want `gx-test-review` to skip when the diff touches no test file, so that it
+21. As a reviewer, I want `gx-test-review` to skip when the diff touches no test file, so that it
     costs nothing on non-test work.
-21. As a reviewer, I want `gx-test-review` to judge guideline rules, duplicate coverage and test
+22. As a reviewer, I want `gx-test-review` to judge guideline rules, duplicate coverage and test
     level without running anything, so that it stays fast and read-only.
-22. As a gx developer, I want its findings to use the existing triage (approved, deferred,
+23. As a gx developer, I want its findings to use the existing triage (approved, deferred,
     rejected), so that I learn one process.
-23. As an agent writing a Playwright flow, I want a `gx-playwright-e2es` skill with the
+24. As an agent writing a Playwright flow, I want a `gx-playwright-e2es` skill with the
     Playwright rules, so that I do not repeat the known state-read mistakes.
-24. As an agent writing tickets, I want `gx-to-tickets` to name that skill in every ticket whose
+25. As an agent writing tickets, I want `gx-to-tickets` to name that skill in every ticket whose
     seams include Playwright, so that the implementer loads it.
-25. As an agent, I want gx-implement and `gx-test-review` to load that skill when the ticket or
+26. As an agent, I want gx-implement and `gx-test-review` to load that skill when the ticket or
     diff is Playwright, so that the rules apply even when the ticket forgot to name it.
-26. As an agent in any project, I want generic rules in the shared list and gx-only rules in
+27. As an agent in any project, I want generic rules in the shared list and gx-only rules in
     `.ai/index.md`, so that other projects get only what applies to them.
-27. As an agent, I want the guard tests (`TestNoNewSleeps`, `TestNoEnvReads`, `TestNoOldWords`,
+28. As an agent, I want the guard tests (`TestNoNewSleeps`, `TestNoEnvReads`, `TestNoOldWords`,
     `TestSchemaSnapshot`) to run in every `gx check`, so that a count drift shows on my branch and
     not after the merge.
-28. As an agent, I want a lint that fails a Playwright state read (`evaluate`, `evaluateAll`,
+29. As an agent, I want a lint that fails a Playwright state read (`evaluate`, `evaluateAll`,
     `getComputedStyle`) not preceded by an `expect` on the same locator, so that this top flake
     pattern is caught in gx's repo.
 
 Speed
 
-29. As a gx developer, I want the fake `claude` to give the ready signal and the launch record by
+30. As a gx developer, I want the fake `claude` to give the ready signal and the launch record by
     default, so that no test waits for a launch prompt that never comes.
-30. As a test author, I want to opt out of those signals, so that I can still test the
+31. As a test author, I want to opt out of those signals, so that I can still test the
     "signal missing" path.
-31. As a gx developer, I want launch waits to stop when the server context is cancelled, so that
+32. As a gx developer, I want launch waits to stop when the server context is cancelled, so that
     shutdown never blocks for up to 60 s.
-32. As a gx developer, I want the hung `ralphloop` Telegram test fixed at its cause (`Run` stops
+33. As a gx developer, I want the hung `ralphloop` Telegram test fixed at its cause (`Run` stops
     when the watchdog fires, and the empty `git commit` is explained), so that it cannot hang
     again.
-33. As a gx developer, I want a lean command scenario of about 6 sessions for the agent command
+34. As a gx developer, I want a lean command scenario of about 6 sessions for the agent command
     flows, so that each flow does not seed 22 live fake sessions.
-34. As a gx developer, I want the failing `gxfixture` scenario tests fixed, so that the fixture is
+35. As a gx developer, I want the failing `gxfixture` scenario tests fixed, so that the fixture is
     trusted again.
-35. As a gx developer, I want the 5 Codex approval tests in `nativerunner` sped up with `-race`
+36. As a gx developer, I want the 5 Codex approval tests in `nativerunner` sped up with `-race`
     kept, so that they stop costing about 82 s.
-36. As a gx developer, I want each fake binary built once per package, so that tests do not
+37. As a gx developer, I want each fake binary built once per package, so that tests do not
     rebuild it.
-37. As a gx developer, I want web-e2e to start together with `scripts/test.sh` in a full run, so
+38. As a gx developer, I want web-e2e to start together with `scripts/test.sh` in a full run, so
     that the two do not add up.
-38. As a gx developer, I want vitest to run with 3 workers in `scripts/test.sh`, so that unit
+39. As a gx developer, I want vitest to run with 3 workers in `scripts/test.sh`, so that unit
     tests finish sooner.
-39. As a gx developer, I want further levers (`./server` at 4 CPUs, then Playwright at 3 to 4
+40. As a gx developer, I want further levers (`./server` at 4 CPUs, then Playwright at 3 to 4
     workers) used only when the measurement still misses the limit, so that I do not add flake
     risk for nothing.
-40. As a gx developer, I want the person asked when every lever is used and 4 minutes is still
+41. As a gx developer, I want the person asked when every lever is used and 4 minutes is still
     missed, so that the limit is never raised alone.
 
 Removing tests
 
-41. As a gx developer, I want the long-ticket tests that duplicate `ralphloop/longticket_test.go`
+42. As a gx developer, I want the long-ticket tests that duplicate `ralphloop/longticket_test.go`
     removed (G1), so that about 70 s of Go time goes away.
-42. As a gx developer, I want the "second long ticket" test replaced by a direct `alertLongTicket`
+43. As a gx developer, I want the "second long ticket" test replaced by a direct `alertLongTicket`
     call in a `package server` test (G2), so that the same rule is covered in a fraction of the
     time.
-43. As a gx developer, I want the three `...PausesBlockedPaneAfterTheDwell` gxfixture tests to
+44. As a gx developer, I want the three `...PausesBlockedPaneAfterTheDwell` gxfixture tests to
     stop at the blocked state and card (G3), so that the real pause is left to the Playwright
     pause and codex flows.
-44. As a gx developer, I want `TestScenarios_StartAnswerAndStop` trimmed to the 12 scenarios with
+45. As a gx developer, I want `TestScenarios_StartAnswerAndStop` trimmed to the 12 scenarios with
     no dedicated test plus 2 or 3 covered ones (G4), so that it stops starting every scenario.
-45. As a gx developer, I want the four command-menu Playwright flows removed (G5), because vitest
+46. As a gx developer, I want the four command-menu Playwright flows removed (G5), because vitest
     covers sort order, highlight, keys, loading and failure.
-46. As a gx developer, I want the exact duplicate `TestRefreshKeyTriggersRefresh` removed, so that
+47. As a gx developer, I want the exact duplicate `TestRefreshKeyTriggersRefresh` removed, so that
     no test runs twice for nothing.
-47. As a gx developer, I want the vi-editor Playwright flows kept (G6), so that real key events
+48. As a gx developer, I want the vi-editor Playwright flows kept (G6), so that real key events
     and the wrapped-line check stay covered.
 
 Green
 
-48. As a gx developer, I want the root causes still red (guard counts, the fake PTY session
+49. As a gx developer, I want the root causes still red (guard counts, the fake PTY session
     family, the 30 s ready wait, `gxfixture` EOF, the missing `claude` on CI's PATH) fixed, so
     that main is green.
-49. As a gx developer, I want `go.mod`, and so CI, on the latest stable Go, so that reliability is
+50. As a gx developer, I want `go.mod`, and so CI, on the latest stable Go, so that reliability is
     judged on the Go we ship with.
-50. As a gx developer, I want CI fail-fast off in the test matrix, so that macOS always reports.
-51. As a gx developer, I want `herdr-e2e` tests to pin `agent-runner: herdr`, and `TestClaimHold_*`
+51. As a gx developer, I want CI fail-fast off in the test matrix, so that macOS always reports.
+52. As a gx developer, I want `herdr-e2e` tests to pin `agent-runner: herdr`, and `TestClaimHold_*`
     to supply its own fake `claude`, so that CI needs no `claude` on its PATH.
-52. As a gx developer, I want every test item in `gx:follow-ups`, `follow-ups-2026-11-01` and
+53. As a gx developer, I want every test item in `gx:follow-ups`, `follow-ups-2026-11-01` and
     `gx:test-flakes` closed (fixed, or obsolete when its test is deleted), so that no known flake
     is left.
 
 Proof
 
-53. As a gx developer, I want the epic to close only when the 90th percentile of the newest 20
-    full runs on main is under 4 minutes, so that the claim rests on data.
-54. As a gx developer, I want `scripts/soak.sh 20` to be 20 of 20 clean, so that reliability is
-    shown, not assumed.
-55. As a gx developer, I want a miss caused by another epic's tests to go to the person, so that
+54. As a gx developer, I want the epic to close only when the 90th percentile of the 10 soak
+    records on main is under 4 minutes, so that the claim rests on data.
+55. As a gx developer, I want `scripts/soak.sh 10 --fail-fast` to be 10 of 10 clean, run once in
+    this epic's own verify ticket, so that reliability is shown, not assumed. The soak runs each
+    round as `gx check --full`, still lists failing tests per round, and with `--fail-fast` stops
+    at the first failed round and exits 1.
+56. As a gx developer, I want a miss caused by another epic's tests to go to the person, so that
     nobody raises the limit or deletes their tests alone.
-56. As a gx developer, I want the time limits to ship in the first implementation tickets, so that
+57. As a gx developer, I want the time limits to ship in the first implementation tickets, so that
     epics landing meanwhile are already checked.
 
 ## Implementation Decisions
@@ -174,14 +186,29 @@ Proof
 Ordering (from the landing decision)
 
 - The `gx check` time limits (per-test and suite) ship in the first implementation tickets,
-  before the speed work, so epics that land meanwhile are already checked.
+  before the speed work, so epics that land meanwhile are already checked. In `slow-tests-impl`,
+  the time-limit tickets block the speed tickets with `blocked_by` edges.
 - There is no freeze and no per-epic test budget. The suite limit is the guard. An epic whose tests
   push the suite over a limit speeds them up or asks the person.
-- The speed proof is taken last, after every ticket of this epic has merged. It uses the newest 20
-  recorded full runs on main, whatever landed in them. The 90th percentile must be under 4
-  minutes. The number stays 20.
+- The speed proof is taken last, after every ticket of this epic has merged. This epic's own verify
+  ticket (in `slow-tests-impl`) runs `scripts/soak.sh 10 --fail-fast` on main. The generic verify
+  ticket template never runs the soak. `scripts/soak.sh` changes to run each round as
+  `gx check --full` (test kind), so a round takes the lock, writes a record and sets
+  `GX_CHECK_RUN`. It still lists failing tests per round. `--fail-fast` is a new flag: it stops at
+  the first failed round, prints that round's failing tests and exits 1. Without the flag it runs
+  every round, so flake counting still works. On a failure the verify ticket fixes the cause and
+  restarts the 10 rounds. Those 10 records are the sample, whatever landed in them. The metric is
+  the whole run's wall time minus the lock wait. A round that started over the high-load threshold
+  is left out, and the verify ticket runs one extra `gx check --full` for it. That run must also
+  be clean. The sample is the 10 kept records. The 90th percentile must be under 4 minutes (one
+  slow run is allowed in 10). Because the verify agent's shell call can time out, it runs the full
+  run and the soak in the background and polls them.
 - If the proof is over the limit because of tests another epic added, the agent asks the person.
   It never raises the limit or deletes those tests alone.
+- The per-test limit that cannot be reached, the spent levers and the proof missed through another
+  epic's tests all use the existing ask pause. No new pause kind is added (ADR 0042). gx cannot
+  recover alone, because only the person may raise a limit or approve a coverage loss (decisions
+  03 and 05). The person's answer on the ticket page in the web UI ends the pause.
 - The order of the rest: restore green and remove waits, apply the cheap levers, measure, then add
   further levers only as the measurement needs.
 
@@ -208,20 +235,37 @@ Time limits in `gx check`
   re-run. The implementer picks the load-per-core threshold and notes it in the code and docs.
 - The run record keeps the load average at the start and end of the run, and the lock wait as its
   own field.
-- Per-test times: Go, vitest and Playwright report per-test times. Any other test command gets only
-  the suite limit, measured as the wall time of the command.
+- Per-test times: the brief index (`brief/brief.go` indexEntry) gains per-test durations. Per-test
+  limits apply to every test run through `gx brief go-test`, `vitest` or `playwright` under the
+  check run (tagged with `brief.EnvCheckRun`), whatever command started it, including a plain
+  shell script such as gx's own `test.full`. A test command that never calls `gx brief` gets only
+  the suite limit, measured as the wall time of the command. The re-run of a slow test uses the
+  index entry's tool, dir and args narrowed to that one test. Its time is not counted in `suite`.
 - Hang kill: `gx brief go-test` watches the `go test -json` stream and kills the run when a test
   passes `hang`, naming that test. The package timeout stays as a backstop. The hang limit reaches
   `gx brief go-test` through `gx check`. `gx brief go-test` keeps its 30 minute package timeout
   default.
 - Machine-wide lock: `gx check --full` takes a lock that is released when the process dies. A
-  second full run waits, and prints that it waits and for which run. The lock covers any run that
-  executes the test kind with full scope, since the reason is CPU use. Changed-file `gx check`
-  runs take no lock and keep the shared CPU budget. The wait is not counted in the suite limit or
-  the proof. The implementer picks the lock mechanism and where the record shows the wait.
+  second full run waits, and prints that it waits and for which run. The lock is taken only when the
+  mode is `--full` and the test kind is selected and not off, since the reason is CPU use.
+  Changed, staged and `--since` runs never lock, whatever command they run, and keep the shared
+  CPU budget. `scripts/soak.sh` rounds take it because they go through `gx check --full`. The wait is not
+  counted in the suite limit or the proof. The implementer picks the lock mechanism and where the record shows the wait.
+- Waiting indicator: while `gx check --full` waits for the lock, it writes a live waiting state
+  (waiting, and held by which run) that the server reads. The Queue tab row and the web ticket page
+  show it as a status label and clear it when the lock is taken. It is a label, not a pause. The
+  server maps the run's worktree to the claimed ticket. A run with no ticket shows no label. The
+  server shows the state only while the waiting process is alive (a pid or lease), so a killed
+  waiter never leaves a stale label. The implementer picks the mechanism.
 - The four guard tests (`TestNoNewSleeps`, `TestNoEnvReads`, `TestNoOldWords`,
-  `TestSchemaSnapshot`) are included in every `gx check` test row, whatever the scope. The
-  implementer picks how the default test row selects them.
+  `TestSchemaSnapshot`) are included in every `gx check` test row, whatever the scope. A new
+  optional generic key in the `test` entry (for example `always`) is a list of
+  shell commands. Each runs through the same `gx brief` path as the scoped command, in non-full
+  scopes only, because `--full` already covers them. gx's repo commits its four guard tests there.
+  The schema file and the config docs follow.
+- Schema: `limits`, `always`, the brief index durations and the run-record fields change no ticket
+  or epic schema, so no migration step is needed. Readers treat a missing new field as zero or
+  unknown. Old brief index entries are never re-run targets.
 
 Guard rails for agents
 
@@ -232,7 +276,7 @@ Guard rails for agents
   runs nothing. It judges guideline rules, duplicate coverage and test level. Its findings use the
   existing consultant triage with no special path.
 - One shared guideline list holds the generic rules. gx-implement's self-check and
-  `gx-test-review` both point to it. The implementer picks the file's location. It covers all 11
+  `gx-test-review` both point to it. The list lives inside the skill bundle, so other projects read it. It covers all 11
   known patterns: timer-count assertions, product waits with no test override, state reads
   without a wait, host binary assumed, shared ids, exact-count ratchets, generated-file drift,
   hidden failure causes, wall clock, stale assertions, and fail-fast hiding a platform.
@@ -246,6 +290,10 @@ Guard rails for agents
   decides. There is no exemption list, and the agent never raises a limit. Suite-limit failures
   are not a gx-implement concern. gx-implement adds no per-test timing to the handoff, because
   `gx check` already prints and records it.
+- Full runs: ticket agents run changed-file `gx check`. `gx check --full` is for the epic's verify
+  ticket, the proof and the person. The verify ticket runs it and the soak in the background and
+  polls, so an agent shell timeout does not cut a lock wait or the soak. The rule is written in gx-implement and `.ai/index.md`.
+  `gx check` does not enforce it.
 - A new skill `gx-playwright-e2es` ships with gx and holds the Playwright-specific rules. It
   points back to the shared list for the generic ones. `gx-to-tickets` names it in any ticket
   whose test seams include Playwright. gx-implement loads it as a fallback when the ticket text,
@@ -333,6 +381,9 @@ Removing tests
   agents (`servertest`, `gxfixture`). The context-cancel behaviour is covered by a `nativerunner`
   test that cancels the server context during a launch and asserts a prompt return. Prior art:
   `nativerunner` pty launch tests, `testutil/gxfixture` scenario tests.
+- **Seam 6: the waiting label.** A server test writes a waiting state, asserts the ticket's Queue
+  row and API label, that it clears when the lock is taken, and that a dead writer's state shows
+  nothing. A Queue tab view test covers the TUI row. One web flow is required.
 - **Seam 5: the Playwright lint** is a repo test, like `TestNoNewSleeps`
   (prior art: `oldwords/oldwords_test.go`), with a fixture file that violates the rule and one that
   passes.
@@ -340,8 +391,8 @@ Removing tests
   `package server` test.
 - **The suite itself** is the test for the speed and green parts. Timings come from the `gx check`
   run record. New or changed tests that wait on time pass `-count=20`.
-- The proof is a measurement, not a test: a script or query over the run records for the newest 20
-  full runs on main, plus `scripts/soak.sh 20`.
+- The proof is a measurement, not a test: `scripts/soak.sh 10 --fail-fast`, whose 10 run records
+  give the timing sample. A test with a fake `test.full` covers `--fail-fast`.
 
 ## Verification
 
@@ -353,18 +404,19 @@ New flows or scenarios to write:
 
 - A lean command scenario in `testutil/gxfixture` (about 6 sessions) for the agent command flows.
   The existing command flows move to it.
-- No new web flow is needed: the epic changes no screen. The existing web-e2e flows prove the
-  speed and the fake-agent changes.
+- One new web flow for the lock-waiting label, plus the server and Queue tab tests of Seam 6.
+  Otherwise no new web flow: the existing web-e2e flows prove the speed and the fake-agent changes.
 
 Stories:
 
 1. Write `limits` in a temp repo's `.gx/checks.json`; `gx check --full` reads them (a limit of
    `1s` on a script that sleeps 3 s fails). A schema check rejects an unknown key inside `limits`.
 2. Remove `limits`: a script that sleeps 3 s passes, exit 0.
-3. A test script reporting one test at 5 s with `slow: 2s`: `gx check` exits 1 and names the test
-   and its time.
+3. A test script that runs one test at 5 s through `gx brief go-test` (or vitest, playwright) with
+   `slow: 2s`: `gx check` exits 1 and names the test and its time.
 4. Same with an injected high load: the test is re-run alone once; if the second run is under the
-   limit the output warns and exits 0, and the record keeps the warning.
+   limit the output warns and exits 0, and the record keeps the warning. If the re-run is still over
+   the limit, exit 1 and the test is named. The re-run time is not in the suite time.
 5. `slow` as a map: `playwright` at 45s passes a 30 s Playwright test while `go` at 20s fails a
    30 s Go test.
 6. `suite: 1s` with `gx check --full` over a 3 s script: exit 1. The same limit on a changed-file
@@ -374,74 +426,89 @@ Stories:
    the load averages and the lock wait.
 9. A Go test that sleeps forever with `hang: 5s`: `gx brief go-test` ends in about 5 s and names
    the test, and `gx check` fails with it.
-10. A `test` command that is a plain shell script: only `suite` applies, and `slow` is ignored.
+10. A `test` command that is a plain shell script that never calls `gx brief`: only `suite` applies.
+    The same script calling `gx brief go-test` gets per-test limits.
 11. `limits: {"suite": "fast"}`: exit 2 and a message naming the key.
-12. The output of a failing slow test lists the name and time (see story 3).
-13. Start two `gx check --full` runs; the second prints that it waits and for which run.
-14. The second run's record shows the wait separately and the suite limit does not count it.
-15. A changed-file `gx check` started while a full run holds the lock starts at once.
+12. Start two `gx check --full` runs; the second prints that it waits and for which run. A
+    `gx check --full --kind lint` run starts at once.
+13. The second run's record shows the wait separately and the suite limit does not count it.
+14. A changed-file `gx check` started while a full run holds the lock starts at once. Same for a
+    `--since` and a staged run.
+15. Hold the lock with a long full run; the waiting ticket's Queue row and web page show the
+    waiting label and the holder, and the label clears when it takes the lock. Kill the waiter: the
+    label clears. A run with no ticket shows no label.
 16. `skills/` tests pass: gx-implement text contains the self-check and the start pointer
     (`go test ./skills/ -timeout 60s`).
 17. Same as 16 (the start pointer is checked there).
 18. Same as 16 (ask rule, no exemption list, never raise a limit).
-19. `gx project` default config lists `gx-test-review` in `skills["code-review"]`; the skill
+19. Skill-text test: gx-implement and `.ai/index.md` say ticket agents run changed-file `gx check`
+    and keep `--full` for the verify ticket, the proof and the person. They also say the verify ticket
+    runs `gx check --full` and the soak in the background and polls (`go test ./skills/`).
+20. `gx project` default config lists `gx-test-review` in `skills["code-review"]`; the skill
     bundle contains it.
-20. A skill-text test for the skip rule; run `gx-test-review` against a diff with no test file in a
+21. A skill-text test for the skip rule; run `gx-test-review` against a diff with no test file in a
     temp repo and see it skip (manual check by the verify agent).
-21. Same as 20 (it runs nothing: the skill text names no command).
-22. Same as 16 (triage wording points to the existing consultant triage).
-23. The `gx-playwright-e2es` skill is in the bundle; `go test ./skills/` passes.
-24. Same as 23 (`gx-to-tickets` names the skill; text test).
-25. Same as 23 (gx-implement fallback and `gx-test-review` read it; text test).
-26. The shared list exists and carries the 11 patterns; `.ai/index.md` keeps the gx-only rules (text
+22. Same as 21 (it runs nothing: the skill text names no command).
+23. Same as 21 (triage wording points to the existing consultant triage).
+24. The `gx-playwright-e2es` skill is in the bundle; `go test ./skills/` passes.
+25. Same as 24 (`gx-to-tickets` names the skill; text test).
+26. Same as 24 (gx-implement fallback and `gx-test-review` read it; text test).
+27. The skill bundle contains the shared list with the 11 patterns; `.ai/index.md` keeps the gx-only rules (text
     test or review).
-27. In a temp copy of gx with a sleep count drifted by one, `gx check` on an unrelated changed file
-    fails `TestNoNewSleeps`.
-28. The Playwright lint test passes on gx's flows and fails on a fixture with a bare `evaluate`.
-29. Run a web-e2e agent launch flow (any flow that starts a fake agent, such as the agent session
+28. In a temp copy of gx with a sleep count drifted by one, `gx check` on an unrelated changed file
+    fails `TestNoNewSleeps`. gx's `.gx/checks.json` lists the four guard tests under the `always` key,
+    and the schema accepts it. A parse error in `always` exits 2. On a changed-file run the listed
+    commands run through `gx brief`; on a `--full` run they do not run twice.
+29. The Playwright lint test passes on gx's flows and fails on a fixture with a bare `evaluate`.
+30. Run a web-e2e agent launch flow (any flow that starts a fake agent, such as the agent session
     flows) and check the launch takes seconds, not 60 s; the full run needs no launch wait.
-30. A `servertest` or `agentfake` test sets the opt-out and sees the "signal missing" path.
-31. `gxfixture ready` started, then SIGTERM while a launch is waiting: the process exits in under
+31. A `servertest` or `agentfake` test sets the opt-out and sees the "signal missing" path.
+32. `gxfixture ready` started, then SIGTERM while a launch is waiting: the process exits in under
     5 s.
-32. The `ralphloop` Telegram test passes 20 times (`-count=20`), and a watchdog test shows `Run`
+33. The `ralphloop` Telegram test passes 20 times (`-count=20`), and a watchdog test shows `Run`
     returning.
-33. The agent command flows run against the lean scenario (flow-catalog flows for `agents-commands`
+34. The agent command flows run against the lean scenario (flow-catalog flows for `agents-commands`
     that stay after G5: 149 refresh, 150, 151, 152, plus the other command flows).
-34. `go test ./testutil/gxfixture` passes.
-35. `go test -race ./nativerunner` passes and the 5 Codex approval tests together take well under
+35. `go test ./testutil/gxfixture` passes.
+36. `go test -race ./nativerunner` passes and the 5 Codex approval tests together take well under
     82 s.
-36. The fake binaries are built once per package (a build counter in a test, or the timing in the
+37. The fake binaries are built once per package (a build counter in a test, or the timing in the
     run record).
-37. `gx check --full` in gx's repo runs web-e2e at the same time as `scripts/test.sh` (log
+38. `gx check --full` in gx's repo runs web-e2e at the same time as `scripts/test.sh` (log
     timestamps overlap).
-38. `scripts/test.sh` shows vitest started with 3 workers (its log or process args).
-39. After the measurement, record whether `./server` at 4 CPUs and Playwright workers were needed.
+39. `scripts/test.sh` shows vitest started with 3 workers (its log or process args).
+40. After the measurement, record whether `./server` at 4 CPUs and Playwright workers were needed.
     Each is applied only if the run is still over the limit.
-40. If the measured p90 is still over 4 minutes with every lever used, the verify agent stops and
+41. If the measured p90 is still over 4 minutes with every lever used, the verify agent stops and
     asks the person (`gx tickets ask`).
-41. `rg TestLongTicket_ZeroThresholdProducesNoAlert` and
+42. `rg TestLongTicket_ZeroThresholdProducesNoAlert` and
     `TestLongTicket_ANonImplementTicketGetsNoMarkBannerOrDraft` find nothing; `ralphloop` long-ticket
     tests pass.
-42. The `package server` `alertLongTicket` test exists and passes.
-43. The three gxfixture pause tests pass and stop at the blocked state; Playwright `pause.e2e.ts`
+43. The `package server` `alertLongTicket` test exists and passes.
+44. The three gxfixture pause tests pass and stop at the blocked state; Playwright `pause.e2e.ts`
     and `codex.e2e.ts` flows pass.
-44. `TestScenarios_StartAnswerAndStop` passes and lists 14 or 15 scenarios.
-45. The four removed command-menu flows are gone from `agents-commands.e2e.ts` and from
+45. `TestScenarios_StartAnswerAndStop` passes and lists 14 or 15 scenarios.
+46. The four removed command-menu flows are gone from `agents-commands.e2e.ts` and from
     `webui/e2e/CATALOG.md`; vitest `match.test.ts` and `CommandMenu.test.tsx` pass.
-46. `rg TestRefreshKeyTriggersRefresh ui/prs` finds nothing.
-47. The vi-editor flows still pass in web-e2e.
-48. `gx check --full` locally is green, and the CI jobs on main are green (`gh run list --branch
+47. `rg TestRefreshKeyTriggersRefresh ui/prs` finds nothing.
+48. The vi-editor flows still pass in web-e2e.
+49. `gx check --full` locally is green, and the CI jobs on main are green (`gh run list --branch
     main`).
-49. `go.mod` names the latest stable Go; CI reads it; `TestBrief_*` passes on it.
-50. `.github/workflows/ci.yml` has `fail-fast: false` in the test matrix, and macOS reports.
-51. `herdr-e2e` passes on CI with no `claude` on PATH; `TestClaimHold_*` passes on a machine with no
+50. `go.mod` names the latest stable Go; CI reads it; `TestBrief_*` passes on it.
+51. `.github/workflows/ci.yml` has `fail-fast: false` in the test matrix, and macOS reports.
+52. `herdr-e2e` passes on CI with no `claude` on PATH; `TestClaimHold_*` passes on a machine with no
     `claude` installed.
-52. `gx tickets show` for each of the three follow-up lists shows no open test item.
-53. The proof: the newest 20 recorded full runs on main (from `~/.local/share/gx/check/gx.jsonl`,
-    lock wait excluded) have a 90th percentile under 4 minutes.
-54. `scripts/soak.sh 20` reports 20 of 20 clean.
-55. If the proof is over only because of another epic's tests, the verify agent asks the person.
-56. In the history of this epic's tickets, the time-limit tickets merged before the speed tickets.
+53. `gx tickets show` for each of the three follow-up lists shows no open test item.
+54. The proof: `scripts/soak.sh 10 --fail-fast` on main, each round through `gx check --full`,
+    writes 10 records with a lock-wait field in `~/.local/share/gx/check/gx.jsonl`. Their wall
+    time minus the lock wait has a 90th percentile under 4 minutes. A round that started over the
+    high-load threshold is left out and replaced by one extra clean `gx check --full`.
+55. `scripts/soak.sh 10 --fail-fast` reports 10 of 10 clean. A test with a fake `test.full` that
+    fails in round 2 stops after round 2, prints the failing test and exits 1. Without the flag it
+    runs every round.
+56. If the proof is over only because of another epic's tests, the verify agent asks the person.
+57. In `slow-tests-impl`, `blocked_by` edges make the time-limit tickets block the speed tickets
+    (`gx tickets show slow-tests-impl`).
 
 ## Out of Scope
 
