@@ -342,6 +342,23 @@ describe("completion menu", () => {
     await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ text: "/co" })]));
   });
 
+  test("Down and Up move the selected row, and Tab fills like Enter", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/co");
+    await vi.waitFor(() => expect(options()).toHaveLength(2));
+    const box = await composerBox();
+    const selected = () => screen.getAllByRole("option").map((o) => o.getAttribute("aria-selected"));
+    expect(selected()).toEqual(["true", "false"]);
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(selected()).toEqual(["false", "true"]);
+    fireEvent.keyDown(box, { key: "ArrowUp" });
+    expect(selected()).toEqual(["true", "false"]);
+    fireEvent.keyDown(box, { key: "Tab" });
+    expect(box.value).toBe("/compact ");
+    expect(prompts).toEqual([]);
+  });
+
   test("a click fills the row", async () => {
     stubCommands();
     render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);

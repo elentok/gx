@@ -26,6 +26,13 @@ describe("CommandMenu", () => {
     expect(getAllByRole("option")[1].textContent).toContain("[instructions]");
   });
 
+  it("shows name, hint, description and source on a row, and the full key footer", () => {
+    const { getAllByRole, getByText } = renderThemed(<CommandMenu {...base} />);
+    const row = getAllByRole("option")[1];
+    for (const part of ["/compact", "[instructions]", "Summarize the conversation", "built-in"]) expect(row.textContent).toContain(part);
+    for (const part of ["↑↓ select", "Enter fills", "Cmd/Ctrl+Enter sends", "Esc closes"]) expect(getByText(part)).toBeTruthy();
+  });
+
   it("calls onPick with the clicked row", () => {
     const onPick = vi.fn();
     const { getAllByRole } = renderThemed(<CommandMenu {...base} onPick={onPick} />);
