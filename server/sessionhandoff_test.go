@@ -36,6 +36,9 @@ func startHandoff(t *testing.T, step string, opts ...func(*server.Config)) hando
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	// Idle can precede the launch prompt: a /clear typed meanwhile lands in the
+	// same input box and is never submitted alone.
+	waitForSubmitted(t, conv, "\"/gx-design proj:map\"\n")
 	return handoffFixture{designsFixture: f, store: store, cfg: cfg, id: id, conv: conv}
 }
 
