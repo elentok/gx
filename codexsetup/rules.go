@@ -1,5 +1,5 @@
 // Package codexsetup installs the Codex approvals gx relies on: a managed
-// rules file for git commands and auto-approval of the gopls MCP tools.
+// rules file for git commands.
 package codexsetup
 
 import "path/filepath"

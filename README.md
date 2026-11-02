@@ -343,8 +343,8 @@ gx can run agents under Codex as well as Claude. Codex 0.166.0 or newer is requi
 - `gx codex doctor` runs short canned Codex sessions and prints one PASS, FAIL, WARN or SKIP line
   per check. Run it after each Codex upgrade. `--record <dir>` saves the raw PTY frames and
   rollouts; `--json` prints the results as JSON.
-- `gx codex setup` writes the git approval rules and the gopls MCP approval that gx relies on. It
-  shows the changes and asks first; `--yes` skips the question.
+- `gx codex setup` writes the git approval rules that gx relies on. It shows the changes and asks
+  first; `--yes` skips the question.
 - Codex reads gx's skills from `~/.agents/skills`. `gx skills install` puts them there.
 - Codex runs on the PTY runner. Under `agent-runner: herdr` it gets a reduced flow: no live reply,
   no approval cards and no resume.

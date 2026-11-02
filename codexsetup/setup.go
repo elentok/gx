@@ -14,9 +14,8 @@ import (
 // Options configures Run.
 type Options struct {
 	CodexHome   string
-	GoplsServer string // "" picks gopls-mcp, else gopls
-	Yes         bool   // skip the question
-	Interactive bool   // stdin is a terminal
+	Yes         bool // skip the question
+	Interactive bool // stdin is a terminal
 	In          io.Reader
 	Out         io.Writer
 }
@@ -29,7 +28,7 @@ type change struct {
 
 // Run previews the changes, asks, then writes them.
 func Run(o Options) error {
-	changes, notes, err := plan(o.CodexHome, o.GoplsServer)
+	changes, notes, err := plan(o.CodexHome)
 	if err != nil {
 		return err
 	}
@@ -69,7 +68,7 @@ func Run(o Options) error {
 }
 
 // plan computes the file changes. Notes explain what was skipped.
-func plan(codexHome, gopls string) (changes []change, notes []string, err error) {
+func plan(codexHome string) (changes []change, notes []string, err error) {
 	rulesPath := RulesPath(codexHome)
 	old, rerr := os.ReadFile(rulesPath)
 	switch {
@@ -81,22 +80,6 @@ func plan(codexHome, gopls string) (changes []change, notes []string, err error)
 		}
 	default:
 		return nil, nil, rerr
-	}
-
-	cfgPath := filepath.Join(codexHome, "config.toml")
-	cfg, cerr := os.ReadFile(cfgPath)
-	if errors.Is(cerr, os.ErrNotExist) {
-		return changes, append(notes, fmt.Sprintf("%s does not exist; skipped gopls approvals", cfgPath)), nil
-	}
-	if cerr != nil {
-		return nil, nil, cerr
-	}
-	server := resolveServer(strings.Split(string(cfg), "\n"), gopls)
-	if server == "" {
-		return changes, append(notes, missingServerMessage(gopls, cfgPath)), nil
-	}
-	if updated := approveGopls(string(cfg), server); updated != string(cfg) {
-		changes = append(changes, change{path: cfgPath, old: string(cfg), new: updated, existed: true})
 	}
 	return changes, notes, nil
 }

@@ -32,9 +32,12 @@ func TestCodexSetup_HelpListsFlags(t *testing.T) {
 	if err := execute([]string{"codex", "setup", "--help"}, d); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	for _, flag := range []string{"--yes", "--codex-home", "--gopls-server"} {
+	for _, flag := range []string{"--yes", "--codex-home"} {
 		if !strings.Contains(stdout.String(), flag) {
 			t.Errorf("help lacks %s:\n%s", flag, stdout.String())
 		}
+	}
+	if strings.Contains(stdout.String(), "gopls") {
+		t.Errorf("help still mentions gopls:\n%s", stdout.String())
 	}
 }

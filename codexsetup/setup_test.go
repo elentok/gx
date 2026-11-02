@@ -53,9 +53,6 @@ func TestRun_FreshDirWritesRulesFile(t *testing.T) {
 	if fi, _ := os.Stat(p); fi.Mode().Perm() != 0o600 {
 		t.Errorf("mode = %v, want 0600", fi.Mode().Perm())
 	}
-	if !strings.Contains(out, "does not exist; skipped gopls approvals") {
-		t.Errorf("want skip message for missing config.toml, got %q", out)
-	}
 	if !strings.Contains(out, "Restart Codex for the changes to take effect.") {
 		t.Errorf("missing restart line: %q", out)
 	}
@@ -64,14 +61,12 @@ func TestRun_FreshDirWritesRulesFile(t *testing.T) {
 func TestRun_SecondRunChangesNothing(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	write(t, filepath.Join(home, "config.toml"), "[mcp_servers.gopls-mcp]\ncommand = \"gopls\"\n")
 	if _, err := run(t, Options{CodexHome: home, Yes: true}); err != nil {
 		t.Fatal(err)
 	}
-	rules, cfg := RulesPath(home), filepath.Join(home, "config.toml")
-	beforeR, beforeC := read(t, rules), read(t, cfg)
-	fiR, _ := os.Stat(rules)
-	fiC, _ := os.Stat(cfg)
+	rules := RulesPath(home)
+	before := read(t, rules)
+	fi, _ := os.Stat(rules)
 	time.Sleep(20 * time.Millisecond)
 
 	out, err := run(t, Options{CodexHome: home, Yes: true})
@@ -81,12 +76,11 @@ func TestRun_SecondRunChangesNothing(t *testing.T) {
 	if !strings.Contains(out, "already set up") {
 		t.Errorf("out = %q, want already set up", out)
 	}
-	if read(t, rules) != beforeR || read(t, cfg) != beforeC {
+	if read(t, rules) != before {
 		t.Errorf("bytes changed on second run")
 	}
-	fiR2, _ := os.Stat(rules)
-	fiC2, _ := os.Stat(cfg)
-	if !fiR.ModTime().Equal(fiR2.ModTime()) || !fiC.ModTime().Equal(fiC2.ModTime()) {
+	fi2, _ := os.Stat(rules)
+	if !fi.ModTime().Equal(fi2.ModTime()) {
 		t.Errorf("mtime changed on second run")
 	}
 }
@@ -119,94 +113,20 @@ func TestRun_OldMarkerUpdatedInPlace(t *testing.T) {
 	}
 }
 
-func TestApproveGopls_KeepsOtherContent(t *testing.T) {
-	t.Parallel()
-	in := `# top comment
-model = "x"
-
-[mcp_servers.other]
-enabled_tools = ["a"]
-
-[mcp_servers.gopls-mcp]
-command = "gopls" # keep
-enabled = false
-enabled_tools = [
-  "a",
-  "b",
-]
-disabled_tools = ["c"]
-
-[tui]
-theme = "dark"
-`
-	want := `# top comment
-model = "x"
-
-[mcp_servers.other]
-enabled_tools = ["a"]
-
-[mcp_servers.gopls-mcp]
-command = "gopls" # keep
-enabled = true
-default_tools_approval_mode = "approve"
-
-[tui]
-theme = "dark"
-`
-	if got := approveGopls(in, "gopls-mcp"); got != want {
-		t.Errorf("got:\n%s\nwant:\n%s", got, want)
-	}
-}
-
-func TestRun_GoplsFallbackAndNamedServer(t *testing.T) {
-	t.Parallel()
-	home := t.TempDir()
-	cfg := filepath.Join(home, "config.toml")
-	write(t, cfg, "[mcp_servers.gopls]\ncommand = \"g\"\n\n[mcp_servers.custom]\ncommand = \"c\"\n")
-	if _, err := run(t, Options{CodexHome: home, Yes: true, GoplsServer: "custom"}); err != nil {
-		t.Fatal(err)
-	}
-	want := "[mcp_servers.gopls]\ncommand = \"g\"\n\n[mcp_servers.custom]\ncommand = \"c\"\nenabled = true\ndefault_tools_approval_mode = \"approve\"\n"
-	if got := read(t, cfg); got != want {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
-func TestRun_NoGoplsServerSkips(t *testing.T) {
-	t.Parallel()
-	home := t.TempDir()
-	cfg := filepath.Join(home, "config.toml")
-	write(t, cfg, "[mcp_servers.other]\ncommand = \"c\"\n")
-	out, err := run(t, Options{CodexHome: home, Yes: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if read(t, cfg) != "[mcp_servers.other]\ncommand = \"c\"\n" {
-		t.Errorf("config changed")
-	}
-	if !strings.Contains(out, "no gopls-mcp or gopls MCP server is configured") {
-		t.Errorf("out = %q", out)
-	}
-}
-
 func TestRun_PreviewNamesPathsBeforeWrite(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	write(t, filepath.Join(home, "config.toml"), "[mcp_servers.gopls]\ncommand = \"g\"\n")
 	out, err := run(t, Options{CodexHome: home, Interactive: true, In: strings.NewReader("n\n")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{RulesPath(home), filepath.Join(home, "config.toml"), "+enabled = true", "Write these changes? [y/N]"} {
+	for _, want := range []string{RulesPath(home), "Write these changes? [y/N]"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("preview lacks %q:\n%s", want, out)
 		}
 	}
 	if _, err := os.Stat(RulesPath(home)); err == nil {
 		t.Errorf("rules file written after answering n")
-	}
-	if strings.Contains(read(t, filepath.Join(home, "config.toml")), "enabled") {
-		t.Errorf("config written after answering n")
 	}
 }
 
