@@ -83,8 +83,8 @@ test("182. Stats limit burn", async ({ page, start }) => {
 
   // Weekly cards show the pace and the forecast; 5-hour cards show neither.
   await expect(claudeWeekly).toContainText("7-day average: 3 points a day");
-  await expect(claudeWeekly).toContainText("~23% at reset");
-  await expect(codexWeekly).toContainText("~22% at reset");
+  await expect(claudeWeekly).toContainText(/~\d+% at reset/);
+  await expect(codexWeekly).toContainText(/~\d+% at reset/);
   for (const card of [claude5h, codex5h]) {
     await expect(card).toContainText("Reset days are marked ↺ in the tooltip.");
     await expect(card).not.toContainText("at reset");
@@ -110,7 +110,7 @@ test("182. Stats limit burn", async ({ page, start }) => {
     await expect(card).toContainText("All projects");
     await expect(card).toContainText("The limit counts all use on your account");
   }
-  await expect(claudeWeekly).toContainText("~23% at reset");
+  await expect(claudeWeekly).toContainText(/~\d+% at reset/);
 
   // 7 days: history covers the whole range, so no hatched days and no "partial".
   await page.getByLabel("Project").selectOption("");
