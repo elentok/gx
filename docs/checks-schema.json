@@ -15,6 +15,11 @@
     "test": { "$ref": "#/definitions/check" }
   },
   "definitions": {
+    "duration": {
+      "type": "string",
+      "description": "A positive Go duration such as \"20s\" or \"4m\".",
+      "minLength": 1
+    },
     "check": {
       "description": "A command for both scopes, false to turn the kind off, or a pair of commands.",
       "oneOf": [
@@ -34,6 +39,30 @@
               "type": "string",
               "minLength": 1,
               "description": "Command for a --full run, with {files} set to every tracked file."
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Time limits for a test entry. A missing key turns that limit off.",
+              "properties": {
+                "suite": { "$ref": "#/definitions/duration" },
+                "hang": { "$ref": "#/definitions/duration" },
+                "slow": {
+                  "description": "Per-test slow limit: one duration for every tool, or a map by tool.",
+                  "oneOf": [
+                    { "$ref": "#/definitions/duration" },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "go": { "$ref": "#/definitions/duration" },
+                        "vitest": { "$ref": "#/definitions/duration" },
+                        "playwright": { "$ref": "#/definitions/duration" }
+                      }
+                    }
+                  ]
+                }
+              }
             }
           }
         }

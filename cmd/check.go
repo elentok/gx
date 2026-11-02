@@ -27,6 +27,10 @@ one line per kind plus the path of the summary and logs.
 <ref>...HEAD, --full runs each kind's full command on every tracked file. They
 exclude each other. --kind format,lint runs only the named kinds.
 
+The test entry may set "limits": {"suite": "4m", "slow": "20s", "hang": "60s"}.
+"slow" is one duration or a map by tool ("go", "vitest", "playwright"); a
+missing key turns that limit off. A malformed duration or an unknown key exits 2.
+
 Exit 0 pass, 1 fail, 2 gx could not run, 3 no applicable checks.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {

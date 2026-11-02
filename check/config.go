@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 )
 
 // Kinds lists the check kinds in output order.
@@ -26,6 +27,88 @@ type Command struct {
 	Off     bool
 	Changed string
 	Full    string
+	Limits  Limits
+}
+
+// Limits are the optional time limits of a test entry. A zero duration means
+// that limit is off.
+type Limits struct {
+	Suite time.Duration
+	Hang  time.Duration
+	Slow  SlowLimits
+}
+
+// SlowLimits is the per-test slow limit for each test tool.
+type SlowLimits struct {
+	Go, Vitest, Playwright time.Duration
+}
+
+var slowTools = []string{"go", "vitest", "playwright"}
+
+func parseLimits(raw json.RawMessage) (Limits, error) {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return Limits{}, errors.New(`limits: want an object {"suite", "slow", "hang"}`)
+	}
+	var l Limits
+	for _, key := range slices.Sorted(maps.Keys(m)) {
+		var err error
+		switch key {
+		case "suite":
+			l.Suite, err = parseDuration(key, m[key])
+		case "hang":
+			l.Hang, err = parseDuration(key, m[key])
+		case "slow":
+			l.Slow, err = parseSlow(m[key])
+		default:
+			err = fmt.Errorf("limits: unknown key %q (want suite, slow, hang)", key)
+		}
+		if err != nil {
+			return Limits{}, err
+		}
+	}
+	return l, nil
+}
+
+func parseSlow(raw json.RawMessage) (SlowLimits, error) {
+	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return SlowLimits{}, fmt.Errorf("limits.slow: %v", err)
+		}
+		var s SlowLimits
+		for _, tool := range slices.Sorted(maps.Keys(m)) {
+			d, err := parseDuration("slow."+tool, m[tool])
+			if err != nil {
+				return SlowLimits{}, err
+			}
+			switch tool {
+			case "go":
+				s.Go = d
+			case "vitest":
+				s.Vitest = d
+			case "playwright":
+				s.Playwright = d
+			default:
+				return SlowLimits{}, fmt.Errorf("limits.slow: unknown tool %q (want %s)", tool, strings.Join(slowTools, ", "))
+			}
+		}
+		return s, nil
+	}
+	d, err := parseDuration("slow", raw)
+	return SlowLimits{Go: d, Vitest: d, Playwright: d}, err
+}
+
+func parseDuration(key string, raw json.RawMessage) (time.Duration, error) {
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return 0, fmt.Errorf("limits.%s: want a duration string like \"20s\"", key)
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return 0, fmt.Errorf("limits.%s: %q is not a positive duration like \"20s\"", key, s)
+	}
+	return d, nil
 }
 
 // Config maps a kind to its command; a missing kind is unconfigured.
@@ -67,8 +150,9 @@ func parseCommand(raw json.RawMessage) (Command, error) {
 		return Command{Changed: s, Full: s}, nil
 	case bytes.HasPrefix(raw, []byte("{")):
 		var pair struct {
-			Changed *string `json:"changed"`
-			Full    *string `json:"full"`
+			Changed *string         `json:"changed"`
+			Full    *string         `json:"full"`
+			Limits  json.RawMessage `json:"limits"`
 		}
 		dec := json.NewDecoder(bytes.NewReader(raw))
 		dec.DisallowUnknownFields()
@@ -84,6 +168,13 @@ func parseCommand(raw json.RawMessage) (Command, error) {
 				return Command{}, errors.New(`"changed" must not be empty`)
 			}
 			c.Changed = *pair.Changed
+		}
+		if pair.Limits != nil {
+			l, err := parseLimits(pair.Limits)
+			if err != nil {
+				return Command{}, err
+			}
+			c.Limits = l
 		}
 		return c, nil
 	}

@@ -53,6 +53,23 @@ func logOf(t *testing.T, out, kind string) string {
 	return string(data)
 }
 
+func TestCheck_Limits(t *testing.T) {
+	for _, c := range []struct{ name, limits, key string }{
+		{"bad duration", `"suite":"fast"`, "suite"},
+		{"unknown key", `"speed":"1s"`, "speed"},
+	} {
+		repo := checkRepo(t, `{"test":{"full":"true","limits":{`+c.limits+`}}}`)
+		out, code := runCheckCmd(t, repo, "--full", "--kind", "test")
+		if code != 2 || !strings.Contains(out, c.key) {
+			t.Errorf("%s: code %d, out %q; want exit 2 naming %q", c.name, code, out, c.key)
+		}
+	}
+	repo := checkRepo(t, `{"test":{"full":"true","limits":{"suite":"4m","slow":"20s","hang":"60s"}}}`)
+	if out, code := runCheckCmd(t, repo, "--full", "--kind", "test"); code != 0 {
+		t.Errorf("valid limits: code %d, out %q", code, out)
+	}
+}
+
 func TestCheck_ConfiguredTestKindAlsoFromLinkedWorktree(t *testing.T) {
 	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature")
 	for _, dir := range []string{repo, wt} {

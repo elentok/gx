@@ -67,6 +67,92 @@ func TestParseConfig(t *testing.T) {
 	}
 }
 
+func TestParseConfigLimits(t *testing.T) {
+	s := time.Second
+	cases := []struct {
+		name, in string
+		want     Limits
+	}{
+		{"slow string", `{"test":{"full":"t","limits":{"suite":"4m","slow":"20s","hang":"60s"}}}`,
+			Limits{Suite: 4 * time.Minute, Hang: 60 * s, Slow: SlowLimits{Go: 20 * s, Vitest: 20 * s, Playwright: 20 * s}}},
+		{"slow map", `{"test":{"full":"t","limits":{"slow":{"go":"5s","vitest":"7s"}}}}`,
+			Limits{Slow: SlowLimits{Go: 5 * s, Vitest: 7 * s}}},
+		{"empty limits", `{"test":{"full":"t","limits":{}}}`, Limits{}},
+		{"no limits", `{"test":{"full":"t"}}`, Limits{}},
+		{"plain string", `{"test":"t"}`, Limits{}},
+	}
+	for _, c := range cases {
+		cfg, err := ParseConfig([]byte(c.in))
+		if err != nil {
+			t.Errorf("%s: %v", c.name, err)
+			continue
+		}
+		if got := cfg["test"].Limits; got != c.want {
+			t.Errorf("%s: limits = %+v, want %+v", c.name, got, c.want)
+		}
+	}
+	bad := map[string]string{
+		`{"test":{"full":"t","limits":{"suite":"fast"}}}`:       "suite",
+		`{"test":{"full":"t","limits":{"hang":"-1s"}}}`:         "hang",
+		`{"test":{"full":"t","limits":{"hang":5}}}`:             "hang",
+		`{"test":{"full":"t","limits":{"slow":"x"}}}`:           "slow",
+		`{"test":{"full":"t","limits":{"slow":{"go":"x"}}}}`:    "slow",
+		`{"test":{"full":"t","limits":{"slow":{"rust":"1s"}}}}`: "rust",
+		`{"test":{"full":"t","limits":{"speed":"1s"}}}`:         "speed",
+	}
+	for in, key := range bad {
+		_, err := ParseConfig([]byte(in))
+		if err == nil || !strings.Contains(err.Error(), key) || strings.Contains(err.Error(), "\n") {
+			t.Errorf("%s: err = %v, want one line naming %q", in, err, key)
+		}
+	}
+}
+
+func TestSchemaDescribesLimits(t *testing.T) {
+	data, err := os.ReadFile("../docs/checks-schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Definitions struct {
+			Check struct {
+				OneOf []struct {
+					Properties map[string]struct {
+						AdditionalProperties *bool                      `json:"additionalProperties"`
+						Properties           map[string]json.RawMessage `json:"properties"`
+					} `json:"properties"`
+				} `json:"oneOf"`
+			} `json:"check"`
+		} `json:"definitions"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	var limits *struct {
+		AdditionalProperties *bool                      `json:"additionalProperties"`
+		Properties           map[string]json.RawMessage `json:"properties"`
+	}
+	for _, o := range schema.Definitions.Check.OneOf {
+		if l, ok := o.Properties["limits"]; ok {
+			limits = &l
+		}
+	}
+	if limits == nil {
+		t.Fatal("schema has no limits property")
+	}
+	var got []string
+	for k := range limits.Properties {
+		got = append(got, k)
+	}
+	slices.Sort(got)
+	if want := []string{"hang", "slow", "suite"}; !slices.Equal(got, want) {
+		t.Errorf("limits keys = %v, want %v", got, want)
+	}
+	if limits.AdditionalProperties == nil || *limits.AdditionalProperties {
+		t.Error("limits must set additionalProperties: false")
+	}
+}
+
 func TestExpandBatchesSplitsUnderLimit(t *testing.T) {
 	files := []string{"a", "b", "c", "d"}
 	got := expandBatches("echo {files}", files, len("echo ")+2*4)
