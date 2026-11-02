@@ -28,6 +28,9 @@ type Command struct {
 	Changed string
 	Full    string
 	Limits  Limits
+	// Always are extra commands that run in every non-full run, next to the
+	// scoped command. A --full run already covers them.
+	Always []string
 }
 
 // Limits are the optional time limits of a test entry. A zero duration means
@@ -153,6 +156,7 @@ func parseCommand(raw json.RawMessage) (Command, error) {
 			Changed *string         `json:"changed"`
 			Full    *string         `json:"full"`
 			Limits  json.RawMessage `json:"limits"`
+			Always  json.RawMessage `json:"always"`
 		}
 		dec := json.NewDecoder(bytes.NewReader(raw))
 		dec.DisallowUnknownFields()
@@ -175,6 +179,16 @@ func parseCommand(raw json.RawMessage) (Command, error) {
 				return Command{}, err
 			}
 			c.Limits = l
+		}
+		if pair.Always != nil {
+			var always []string
+			if err := json.Unmarshal(pair.Always, &always); err != nil {
+				return Command{}, errors.New(`"always" must be a list of command strings`)
+			}
+			if slices.Contains(always, "") {
+				return Command{}, errors.New(`"always" must not hold an empty command`)
+			}
+			c.Always = always
 		}
 		return c, nil
 	}

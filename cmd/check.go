@@ -27,6 +27,9 @@ one line per kind plus the path of the summary and logs.
 <ref>...HEAD, --full runs each kind's full command on every tracked file. They
 exclude each other. --kind format,lint runs only the named kinds.
 
+An entry may set "always": a list of commands that also run in every changed,
+staged and --since run (not --full, which covers them). A malformed list exits 2.
+
 The test entry may set "limits": {"suite": "4m", "slow": "20s", "hang": "60s"}.
 "slow" is one duration or a map by tool ("go", "vitest", "playwright"); a
 missing key turns that limit off. A malformed duration or an unknown key exits 2.

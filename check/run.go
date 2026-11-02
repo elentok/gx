@@ -276,6 +276,17 @@ func (r *runner) runKind(kind string) KindResult {
 			}
 		}
 	}
+	if r.mode != ModeFull {
+		for _, cmd := range c.Always {
+			sh := exec.Command("sh", "-c", cmd)
+			sh.Dir = r.root
+			sh.Env = r.childEnv(kind)
+			sh.Stdout, sh.Stderr = logFile, logFile
+			if err := sh.Run(); err != nil {
+				res.Status = StatusFail
+			}
+		}
+	}
 	res.Duration = time.Since(start)
 	if kind == "test" {
 		r.enforceSlow(&res, c.Limits.Slow)

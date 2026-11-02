@@ -76,6 +76,31 @@ func TestCheck_Limits(t *testing.T) {
 	}
 }
 
+func TestCheck_Always(t *testing.T) {
+	repo := checkRepo(t, `{"test":{"changed":"true","full":"true","always":["touch $PWD/../marker-$(basename $PWD)"]}}`)
+	marker := filepath.Join(filepath.Dir(repo), "marker-"+filepath.Base(repo))
+	testutil.WriteFile(t, repo, "a.txt", "x")
+	if out, code := runCheckCmd(t, repo, "--kind", "test"); code != 0 {
+		t.Fatalf("changed run: code %d, out %q", code, out)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("always did not run on a changed run: %v", err)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	if out, code := runCheckCmd(t, repo, "--full", "--kind", "test"); code != 0 {
+		t.Fatalf("full run: code %d, out %q", code, out)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("always ran on a --full run")
+	}
+	bad := checkRepo(t, `{"test":{"full":"true","always":"x"}}`)
+	if out, code := runCheckCmd(t, bad, "--kind", "test"); code != 2 || !strings.Contains(out, "always") {
+		t.Errorf("string always: code %d, out %q; want exit 2 naming always", code, out)
+	}
+}
+
 func TestCheck_ConfiguredTestKindAlsoFromLinkedWorktree(t *testing.T) {
 	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature")
 	for _, dir := range []string{repo, wt} {

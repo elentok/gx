@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -53,8 +54,17 @@ func TestParseConfig(t *testing.T) {
 		"typecheck": {Changed: "c", Full: "t"},
 	}
 	for k, w := range want {
-		if cfg[k] != w {
+		if !reflect.DeepEqual(cfg[k], w) {
 			t.Errorf("%s = %+v, want %+v", k, cfg[k], w)
+		}
+	}
+	cfg, err = ParseConfig([]byte(`{"test":{"full":"t","always":["a","b"]}}`))
+	if err != nil || !slices.Equal(cfg["test"].Always, []string{"a", "b"}) {
+		t.Errorf("always = %+v, err %v", cfg["test"].Always, err)
+	}
+	for _, bad := range []string{`{"test":{"full":"t","always":"a"}}`, `{"test":{"full":"t","always":[1]}}`, `{"test":{"full":"t","always":[""]}}`} {
+		if _, err := ParseConfig([]byte(bad)); err == nil {
+			t.Errorf("%s: want an error", bad)
 		}
 	}
 	if _, err := ParseConfig([]byte(`{}`)); err != nil {

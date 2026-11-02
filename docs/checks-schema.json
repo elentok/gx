@@ -40,6 +40,11 @@
               "minLength": 1,
               "description": "Command for a --full run, with {files} set to every tracked file."
             },
+            "always": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Commands that also run in every non-full run (changed, staged, --since), through the same path as the scoped command. A --full run covers them already."
+            },
             "limits": {
               "type": "object",
               "additionalProperties": false,

@@ -49,6 +49,7 @@ type entry struct {
 var allowed = map[site]entry{
 	{"server/server.go", ruleConfigEnv}:                   {1, reasonStartup},
 	{"sound/sound.go", ruleConfigEnv}:                     {2, reasonStartup},
+	{"check/load.go", ruleChildEnv}:                       {1, reasonTool},
 	{"harness/claudepid.go", ruleChildEnv}:                {1, reasonChild},
 	{"harness/claudepid.go", ruleHomeDir}:                 {1, reasonChild},
 	{"osnotify/osnotify.go", ruleChildEnv}:                {1, reasonTool},

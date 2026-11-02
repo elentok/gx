@@ -1,5 +1,11 @@
 {
   "test": {
-    "full": "scripts/test.sh && make web-e2e"
+    "full": "scripts/test.sh && make web-e2e",
+    "always": [
+      "gx brief go-test -run '^TestNoNewSleeps$' ./sleepguard",
+      "gx brief go-test -run '^TestNoEnvReads$' ./envguard",
+      "gx brief go-test -run '^TestNoOldWords$' ./oldwords",
+      "gx brief go-test -run '^TestSchemaSnapshot$' ./migrations"
+    ]
   }
 }
