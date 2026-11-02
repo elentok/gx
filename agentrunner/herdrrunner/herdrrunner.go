@@ -230,7 +230,7 @@ var _ agentrunner.LaunchPrompter = (*Runner)(nil)
 // record is the command (see claudeui.CheckLaunchDelivered, which also owns
 // the resends). Other prompts, and runners without a Claude home, keep the
 // PromptNudged path.
-func (r *Runner) PromptLaunch(_ context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
+func (r *Runner) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
 	if r.Home == "" || r.kindOf(s) != harness.Claude || !isSlashCommand(text) {
 		return r.PromptNudged(s, text, onNudge)
 	}
@@ -241,10 +241,10 @@ func (r *Runner) PromptLaunch(_ context.Context, s agentrunner.Session, text str
 	if err != nil {
 		return err
 	}
-	return r.launchSlash(s, text, turn, onNudge)
+	return r.launchSlash(ctx, s, text, turn, onNudge)
 }
 
-func (r *Runner) launchSlash(s agentrunner.Session, text string, turn int, onNudge func(string)) error {
+func (r *Runner) launchSlash(ctx context.Context, s agentrunner.Session, text string, turn int, onNudge func(string)) error {
 	agent, herdrErr := r.CLI.AgentPrompt(herdr.AgentPromptOptions{
 		Target: s.ID, Text: text, Wait: true, Until: []string{"working", "blocked"}, TimeoutMs: toMs(r.WaitN()),
 	})
@@ -283,7 +283,7 @@ func (r *Runner) launchSlash(s agentrunner.Session, text string, turn int, onNud
 		Now:   now,
 		Sleep: sleep,
 	}
-	if err := claudeui.CheckLaunchDelivered(proof, text, caps); err != nil {
+	if err := claudeui.CheckLaunchDelivered(ctx, proof, text, caps); err != nil {
 		return err
 	}
 	if seen {

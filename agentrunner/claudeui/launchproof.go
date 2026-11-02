@@ -1,6 +1,7 @@
 package claudeui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -94,12 +95,16 @@ func launchedBy(content, text string) bool {
 // CheckLaunchDelivered returns nil once the transcript shows text as the first
 // user record, and agentrunner.ErrNotDelivered when the grace ends first. It
 // resends text only while the transcript lacks the command, never after it
-// shows it, so a command never runs twice.
-func CheckLaunchDelivered(p LaunchProof, text string, caps LaunchProofCaps) error {
+// shows it, so a command never runs twice. A cancelled ctx ends the loop within
+// one poll with the context error, not a delivery failure.
+func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps LaunchProofCaps) error {
 	start := p.Now()
 	var lastSend time.Time
 	var unknownAt time.Time
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		content, ok, err := p.FirstUser()
 		if err != nil {
 			return fmt.Errorf("reading transcript: %w", err)

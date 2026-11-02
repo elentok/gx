@@ -1,6 +1,7 @@
 package claudeui_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -12,6 +13,31 @@ import (
 const launchText = "/gx-implement gx:epic/20"
 
 const launchRecord = "<command-name>/gx-implement</command-name>\n<command-message>gx-implement</command-message>"
+
+func TestCheckLaunchDelivered_CancelEndsLoopWithContextError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	clock := time.Unix(1000, 0)
+	polls := 0
+	p := claudeui.LaunchProof{
+		FirstUser: func() (string, bool, error) { return "", false, nil },
+		Pane:      func() (string, error) { return "> ", nil },
+		Resend:    func() error { return nil },
+		Now:       func() time.Time { return clock },
+		Sleep: func(d time.Duration) {
+			clock = clock.Add(d)
+			if polls++; polls == 2 {
+				cancel()
+			}
+		},
+	}
+	err := claudeui.CheckLaunchDelivered(ctx, p, launchText, claudeui.DefaultLaunchProofCaps)
+	if !errors.Is(err, context.Canceled) || errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("err = %v, want context.Canceled and not ErrNotDelivered", err)
+	}
+	if polls != 2 {
+		t.Errorf("polls = %d, want the loop to stop on the poll after the cancel (2)", polls)
+	}
+}
 
 // TestCheckLaunchDelivered drives the proof on a fake clock: each case says,
 // per elapsed time, what the transcript and the pane show.
@@ -76,7 +102,7 @@ func TestCheckLaunchDelivered(t *testing.T) {
 				Now:    func() time.Time { return clock },
 				Sleep:  func(d time.Duration) { clock = clock.Add(d) },
 			}
-			err := claudeui.CheckLaunchDelivered(p, launchText, claudeui.DefaultLaunchProofCaps)
+			err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
 			if tt.wantErr != errors.Is(err, agentrunner.ErrNotDelivered) {
 				t.Fatalf("err = %v, want ErrNotDelivered=%v", err, tt.wantErr)
 			}

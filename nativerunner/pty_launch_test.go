@@ -153,6 +153,28 @@ func TestPty_LaunchPromptStopsWaitingForReadyWhenCancelled(t *testing.T) {
 	}
 }
 
+func TestPty_LaunchPromptStopsDeliveryWaitWhenCancelled(t *testing.T) {
+	t.Parallel()
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: time.Minute, ResendEvery: time.Hour},
+		agentfake.TUILaunchRecordEnv+"=0")
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan error, 1)
+	go func() { done <- p.PromptLaunch(ctx, s, "/gx-implement x/1", nil) }()
+	// Let the launch reach the delivery wait before cancelling.
+	time.Sleep(2 * time.Second)
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) || errors.Is(err, agentrunner.ErrNotDelivered) {
+			t.Fatalf("PromptLaunch = %v; want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("PromptLaunch kept waiting for delivery after the cancel")
+	}
+}
+
 func TestPty_LaunchPromptPersonTypingWithNoProofIsUnconfirmed(t *testing.T) {
 	t.Parallel()
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, agentfake.TUINoTurnEnv+"=1")

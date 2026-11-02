@@ -65,7 +65,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 		Now:   time.Now,
 		Sleep: time.Sleep,
 	}
-	err = claudeui.CheckLaunchDelivered(proof, text, p.launchCaps())
+	err = claudeui.CheckLaunchDelivered(ctx, proof, text, p.launchCaps())
 	if errors.Is(err, errPersonInput) {
 		// The person's keys end the resends; the transcript may still show the
 		// command from before they typed.

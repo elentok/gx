@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -359,7 +360,26 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 		Now:    time.Now,
 		Sleep:  time.Sleep,
 	}
-	return claudeui.CheckLaunchDelivered(p, prompt, caps)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	go func() {
+		select {
+		case <-f.cancel:
+		case <-f.s.sessionWatches.stop:
+		case <-ctx.Done():
+		}
+		stop()
+	}()
+	err = claudeui.CheckLaunchDelivered(ctx, p, prompt, caps)
+	if errors.Is(err, context.Canceled) {
+		select {
+		case <-f.cancel:
+			return errNudgeCancelled
+		default:
+			return errServerStopping
+		}
+	}
+	return err
 }
 
 // holderPrompter is the part of claudeui.Prompter every typed prompt shares:
