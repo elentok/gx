@@ -313,7 +313,7 @@ func TestTUIClaude_ChatSlowMarkerStaysBusyUntilFinished(t *testing.T) {
 }
 
 func TestTUIClaude_PlainPromptWithoutTheKnobWritesNoTranscript(t *testing.T) {
-	f := startTUIFake(t, tuiLaunchArgs)
+	f := startTUIFake(t, tuiLaunchArgs, TUIReadyDelayEnv+"="+TUIReadyOff)
 	path := f.transcriptPath()
 
 	f.typeLine("hello")
@@ -411,6 +411,9 @@ func (f *tuiFake) transcriptLines() []string {
 	if err != nil {
 		f.t.Fatal(err)
 	}
+	if strings.TrimSpace(string(raw)) == "" {
+		return nil
+	}
 	return strings.Split(strings.TrimSpace(string(raw)), "\n")
 }
 
@@ -429,7 +432,7 @@ func TestTUIClaude_UnknownSkillKnobDrawsTheErrorAndWritesNoUserRecord(t *testing
 }
 
 func TestTUIClaude_RegistryDelayKnobKnowsTheSkillOnlyAfterTheDelay(t *testing.T) {
-	f := startTUIFake(t, tuiLaunchArgs, TUIRegistryDelayEnv+"=1s", TUILaunchRecordEnv+"=1")
+	f := startTUIFake(t, tuiLaunchArgs, TUIRegistryDelayEnv+"=1s")
 	f.waitStatus(StatusIdle, "")
 	f.typeLine("/gx-implement gx:epic/01")
 	f.waitScreen("Unknown command: /gx-implement")
@@ -441,7 +444,7 @@ func TestTUIClaude_RegistryDelayKnobKnowsTheSkillOnlyAfterTheDelay(t *testing.T)
 }
 
 func TestTUIClaude_NoTurnKnobStaysIdleAndWritesNothing(t *testing.T) {
-	f := startTUIFake(t, tuiLaunchArgs, TUINoTurnEnv+"=1")
+	f := startTUIFake(t, tuiLaunchArgs, TUINoTurnEnv+"=1", TUIReadyDelayEnv+"="+TUIReadyOff)
 	f.waitStatus(StatusIdle, "")
 	f.control(Control{Action: ActionFast})
 	f.typeLine("/gx-implement gx:epic/01")
@@ -454,11 +457,38 @@ func TestTUIClaude_NoTurnKnobStaysIdleAndWritesNothing(t *testing.T) {
 	}
 }
 
-func TestTUIClaude_LaunchRecordKnobWritesTheCommandAsTheFirstUserRecord(t *testing.T) {
-	f := startTUIFake(t, tuiLaunchArgs, TUILaunchRecordEnv+"=1")
+func TestTUIClaude_ReadySignalIsOnByDefaultAndOptOutGivesNone(t *testing.T) {
+	on := startTUIFake(t, tuiLaunchArgs)
+	if _, err := os.Stat(on.transcriptPath()); err != nil {
+		t.Errorf("default transcript file: %v; want the ready signal", err)
+	}
+	off := startTUIFake(t, tuiLaunchArgs, TUIReadyDelayEnv+"="+TUIReadyOff)
+	if _, err := os.Stat(off.transcriptPath()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("opt-out transcript file: %v; want none", err)
+	}
+}
+
+func TestTUIClaude_LaunchRecordOptOutWritesNoUserRecord(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUILaunchRecordEnv+"=0")
+	f.waitStatus(StatusIdle, "")
+	f.control(Control{Action: ActionFast})
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitStatus(StatusIdle, "")
+	time.Sleep(200 * time.Millisecond)
+	for _, l := range f.transcriptLines() {
+		if strings.Contains(l, `"type":"user"`) {
+			t.Fatalf("transcript has a user record: %q", l)
+		}
+	}
+}
+
+func TestTUIClaude_LaunchRecordIsOnByDefaultAndWritesTheCommandAsTheFirstUserRecord(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")
 	f.typeLine("/gx-implement gx:epic/01")
-	f.waitFor("a user record", func() bool { return len(f.transcriptLines()) > 0 })
+	f.waitFor("a user record", func() bool {
+		return slices.ContainsFunc(f.transcriptLines(), func(l string) bool { return strings.Contains(l, `"type":"user"`) })
+	})
 	var rec struct {
 		Type    string `json:"type"`
 		Message struct {
@@ -494,7 +524,7 @@ func TestTUIClaude_CommandOutputControlWritesCaveatAndStdout(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			f := startTUIFake(t, tuiLaunchArgs)
+			f := startTUIFake(t, tuiLaunchArgs, TUILaunchRecordEnv+"=0")
 			path := f.transcriptPath()
 			f.control(Control{Action: ActionCommandOutput, Message: tc.stdout})
 			f.typeLine("/cost")

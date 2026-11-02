@@ -101,12 +101,9 @@ func (r *ptyRunner) prompt(s agentrunner.Session, text string, onNudge func(stri
 // a Restart gets fresh runners that reattach to the live holders.
 func (h *Harness) buildPty() {
 	exe := os.Args[0]
-	// The launch record is the proof a launch prompt is delivered (see
-	// Pty.PromptLaunch), which real claude writes for every skill prompt.
-	// The fake gives the ready signal a launch prompt waits for, at once; a test's
-	// own TUIReadyDelayEnv in cfg.Env comes later and wins.
-	env := append([]string{agentfake.TUIReadyDelayEnv + "=0s"}, h.cfg.Env...)
-	env = append(env, agentfake.TUIEnv+"=1", agentfake.TUILaunchRecordEnv+"=1")
+	// The fake gives the ready signal and the launch record by default; a test's
+	// own TUIReadyDelayEnv in cfg.Env still wins.
+	env := append(h.cfg.Env[:len(h.cfg.Env):len(h.cfg.Env)], agentfake.TUIEnv+"=1")
 	_, runnerFor := runnerbuild.New("pty", env, h.StateDir, h.cfg.RunnerWait, &runnerbuild.PtyOverride{
 		Holder:       []string{exe, holderArg},
 		Claude:       exe,

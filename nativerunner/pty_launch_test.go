@@ -21,7 +21,7 @@ import (
 func launchPty(t *testing.T, caps claudeui.LaunchProofCaps, env ...string) (*nativerunner.Pty, agentrunner.Session) {
 	t.Helper()
 	p := newPty(t)
-	// A later entry wins, so a test's own ready delay overrides the default.
+	// A later entry wins: undo newPty's opt-out, then apply the test's own.
 	p.Env = append(p.Env, agentfake.TUIReadyDelayEnv+"=0s")
 	p.Env = append(p.Env, env...)
 	p.LaunchCaps = caps
@@ -66,7 +66,7 @@ func TestPty_LaunchPromptUnknownCommandFailsFast(t *testing.T) {
 func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
 	t.Parallel()
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, UnknownGrace: time.Minute, ResendEvery: 200 * time.Millisecond},
-		agentfake.TUIRegistryDelayEnv+"=1s", agentfake.TUILaunchRecordEnv+"=1")
+		agentfake.TUIRegistryDelayEnv+"=1s")
 	var mu sync.Mutex
 	var decisions []string
 
@@ -96,7 +96,7 @@ func TestPty_LaunchPromptWaitsForTheReadySignal(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
-		agentfake.TUIReadyDelayEnv+"=1s", agentfake.TUILaunchRecordEnv+"=1")
+		agentfake.TUIReadyDelayEnv+"=1s")
 
 	if err := p.PromptLaunch(s, "/gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil", err)
@@ -109,7 +109,7 @@ func TestPty_LaunchPromptWaitsForTheReadySignal(t *testing.T) {
 func TestPty_LaunchPromptSendsAnywayWhenNeverReady(t *testing.T) {
 	t.Parallel()
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
-		agentfake.TUIReadyDelayEnv+"=1h", agentfake.TUILaunchRecordEnv+"=1")
+		agentfake.TUIReadyDelayEnv+"="+agentfake.TUIReadyOff)
 	p.ReadyWait = 400 * time.Millisecond
 	var logs strings.Builder
 	p.SetLog(slog.New(slog.NewTextHandler(&logs, nil)))

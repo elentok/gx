@@ -27,6 +27,8 @@ import (
 
 // newPty returns a pty runner whose holder is this test binary and whose
 // claude is the TUI fake, with claude's home in a temp dir.
+// newPty gives the plain "> " screen (no ready signal) that the generic pty
+// and conformance tests were written against; launchPty turns the signal back on.
 func newPty(t *testing.T) *nativerunner.Pty {
 	t.Helper()
 	exe, err := os.Executable()
@@ -36,7 +38,7 @@ func newPty(t *testing.T) *nativerunner.Pty {
 	root := shortTempDir(t)
 	t.Cleanup(func() { killAgents(root) })
 	p := ptyOn(root, exe)
-	p.Env = ptyTestEnv(t.TempDir(), holderEnv+"=1", agentfake.TUIEnv+"=1")
+	p.Env = ptyTestEnv(t.TempDir(), holderEnv+"=1", agentfake.TUIEnv+"=1", agentfake.TUIReadyDelayEnv+"="+agentfake.TUIReadyOff)
 	return p
 }
 

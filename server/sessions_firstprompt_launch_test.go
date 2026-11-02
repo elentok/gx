@@ -121,7 +121,7 @@ func TestFirstPromptLaunch_LateRegistryIsDeliveredAfterResends(t *testing.T) {
 	// The registry fills after the unknown grace would have ended in the
 	// always-unknown test, so only a longer grace lets the resends win.
 	f := startLaunchSessionWith(t, func(c *server.Config) { c.LaunchProofCaps.UnknownGrace = 5 * time.Second },
-		agentfake.TUIRegistryDelayEnv+"=1500ms", agentfake.TUILaunchRecordEnv+"=1")
+		agentfake.TUIRegistryDelayEnv+"=1500ms")
 	f.waitForUserRecord(t)
 	if n := strings.Count(f.transcript(), agentfake.UnknownCommandText("/gx-implement")); n < 2 {
 		t.Errorf("unknown-command records = %d, want the prompt resent at least once", n)
@@ -131,7 +131,7 @@ func TestFirstPromptLaunch_LateRegistryIsDeliveredAfterResends(t *testing.T) {
 
 func TestFirstPromptLaunch_AcceptedSlashPromptIsSentOnce(t *testing.T) {
 	t.Parallel()
-	f := startLaunchSession(t, agentfake.TUILaunchRecordEnv+"=1")
+	f := startLaunchSession(t)
 	f.waitForUserRecord(t)
 	time.Sleep(time.Second) // negative wait: a resend would come within a few ResendEvery
 	if n := f.launchRecords(); n != 1 {

@@ -27,6 +27,7 @@ var allowed = map[string]int{
 	"agentrunner/herdrrunner/conformance_test.go":   1,
 	"brief/brief_test.go":                           2, // poll loops with a deadline
 	"check/check_test.go":                           1, // poll loop with a deadline waiting on the go step
+	"check/lock_test.go":                            2, // a held-lock stand-in that sleeps until killed, and a poll loop with a deadline waiting on the lock state
 	"cmd/brief_cleancache_test.go":                  1, // negative wait: go clean does not run while a build holds the gate
 	"cmd/brief_test.go":                             2, // poll loop with a deadline waiting on the fake go; a fixture test source that is slow on purpose
 	"cmd/check_record_test.go":                      3, // fixture test sources that are slow on purpose, run by a child go test
@@ -126,7 +127,7 @@ var allowed = map[string]int{
 	"server/unavailable_test.go":                    1,
 	"storecommit/storecommit_test.go":               3,
 	"testutil/agentfake/harness_test.go":            1,
-	"testutil/agentfake/tui_test.go":                9, // poll loop with a deadline; negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open; a lone Esc leaves the turn alone; a stall lands before the prompt; the registry delay (1s) must pass before the retry
+	"testutil/agentfake/tui_test.go":                10, // poll loop with a deadline; negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open; a lone Esc leaves the turn alone; a stall lands before the prompt; the registry delay (1s) must pass before the retry; the launch-record opt-out writes no user record
 	"testutil/agentfake/worker_test.go":             1,
 	"testutil/gxfixture/cachegate_test.go":          5, // two poll loops with a deadline; negative waits: the gate holds the clean
 	"testutil/gxfixture/disk_test.go":               2,

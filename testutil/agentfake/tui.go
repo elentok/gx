@@ -59,13 +59,15 @@ const (
 	// TUINoTurnEnv, set to "1", leaves the agent idle after a skill prompt: no
 	// turn, no transcript record.
 	TUINoTurnEnv = "GX_AGENTFAKE_TUI_NO_TURN"
-	// TUILaunchRecordEnv, set to "1", makes a skill prompt's first transcript
-	// record the user record claude writes for the command.
+	// TUILaunchRecordEnv makes a skill prompt's first transcript record the
+	// user record claude writes for the command. On by default; "0" turns it off.
 	TUILaunchRecordEnv = "GX_AGENTFAKE_TUI_LAUNCH_RECORD"
-	// TUIReadyDelayEnv, a Go duration ("0s" for none), makes the fake give the
-	// ready signal a launch prompt waits for: an input box and a transcript
-	// file, held back for that long after start. Unset, it gives neither.
+	// TUIReadyDelayEnv, a Go duration, sets how long after start the fake holds
+	// back the ready signal a launch prompt waits for: an input box and a
+	// transcript file. Unset, the signal comes at once; TUIReadyOff gives none.
 	TUIReadyDelayEnv = "GX_AGENTFAKE_TUI_READY_DELAY"
+	// TUIReadyOff is the TUIReadyDelayEnv value for the "signal missing" path.
+	TUIReadyOff = "off"
 )
 
 // UnknownCommandText is what claude draws, and records, for a skill it doesn't know.
@@ -267,7 +269,7 @@ type tuiOptions struct {
 	unknownSkill  bool
 	noTurn        bool
 	launchRecord  bool
-	// readySignal turns the ready signal on (see TUIReadyDelayEnv).
+	// readySignal is false only for TUIReadyOff (see TUIReadyDelayEnv).
 	readySignal bool
 	readyDelay  time.Duration
 	// model is --model, reported on every reply.
@@ -313,7 +315,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
 	readyDelay, _ := time.ParseDuration(os.Getenv(TUIReadyDelayEnv))
 	return tuiOptions{
-		readySignal:   os.Getenv(TUIReadyDelayEnv) != "",
+		readySignal:   os.Getenv(TUIReadyDelayEnv) != TUIReadyOff,
 		readyDelay:    readyDelay,
 		sessionID:     *sessionID,
 		trust:         os.Getenv(TUITrustEnv) == "1",
@@ -325,7 +327,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		registryDelay: registryDelay,
 		unknownSkill:  os.Getenv(TUIUnknownSkillEnv) == "1",
 		noTurn:        os.Getenv(TUINoTurnEnv) == "1",
-		launchRecord:  os.Getenv(TUILaunchRecordEnv) == "1",
+		launchRecord:  os.Getenv(TUILaunchRecordEnv) != "0",
 		model:         cmp.Or(*model, ReportedModel),
 		settings:      settings,
 	}, nil
