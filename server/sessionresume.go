@@ -134,6 +134,10 @@ func (s *Server) restoreSessions() {
 				s.log.Warn("read session meta", "session", info.ID, "err", err)
 				continue
 			}
+			// The probe's memory of the launch override died with the old server.
+			if meta.Harness == string(harness.Claude) {
+				harness.NoteEditorOverride(meta.ConversationID, harness.LaunchEnv(os.Environ(), s.cfg.Env))
+			}
 			s.sessionWatches.start(func() { s.watchSession(dir, info.ID, meta.Run, time.Time{}, true) })
 			continue
 		}
