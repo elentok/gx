@@ -63,6 +63,8 @@ type Options struct {
 	// Env is the environment every command a run starts gets, and the PATH
 	// tools are looked up on. Empty means none, never the process env.
 	Env []string
+	// LoadAvg reads the 1-minute load average; nil means SystemLoad. Tests inject it.
+	LoadAvg func() float64
 }
 
 // KindResult is one kind's line of the result.
@@ -79,6 +81,8 @@ type KindResult struct {
 	// Notes are lines printed under the kind: a skipped row of a gx default,
 	// what format rewrote.
 	Notes []string
+	// Warnings are limits that were exceeded without failing the kind.
+	Warnings []string
 }
 
 // Result is the outcome of a run.
@@ -118,7 +122,11 @@ func Run(opts Options) (Result, error) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
 	}
-	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, stateDir: opts.StateDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore, installs: map[string]*installEntry{}}
+	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, stateDir: opts.StateDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore, installs: map[string]*installEntry{}, loadAvg: opts.LoadAvg}
+	if r.loadAvg == nil {
+		r.loadAvg = SystemLoad
+	}
+	r.loadStart = r.loadAvg()
 	if r.limit <= 0 {
 		r.limit = DefaultArgLimit
 	}
@@ -147,6 +155,7 @@ func Run(opts Options) (Result, error) {
 		}
 	}
 	wg.Wait()
+	r.loadEnd = r.loadAvg()
 
 	res := Result{Summary: filepath.Join(runDir, "summary.txt"), Kinds: results, Exit: exitCode(results)}
 	if err := os.WriteFile(res.Summary, []byte(res.Render()), 0o644); err != nil {
@@ -199,6 +208,8 @@ type runner struct {
 	limit                 int
 	env                   []string
 	ticketStore           string
+	loadAvg               func() float64
+	loadStart, loadEnd    float64
 
 	groupsOnce sync.Once
 	grp        *groups
@@ -259,6 +270,9 @@ func (r *runner) runKind(kind string) KindResult {
 		}
 	}
 	res.Duration = time.Since(start)
+	if kind == "test" && r.mode == ModeFull {
+		r.enforceSuite(&res, c.Limits.Suite)
+	}
 	if before != nil {
 		r.afterFormat(before, &res)
 	}
@@ -266,6 +280,20 @@ func (r *runner) runKind(kind string) KindResult {
 		res.Tail = lastLines(res.Log, tailLines)
 	}
 	return res
+}
+
+// enforceSuite fails a passing full test run that took longer than limit. On a
+// loaded machine it only warns.
+func (r *runner) enforceSuite(res *KindResult, limit time.Duration) {
+	if limit <= 0 || res.Status != StatusPass || res.Duration <= limit {
+		return
+	}
+	msg := fmt.Sprintf("suite took %.2fs, over the %s limit", res.Duration.Seconds(), limit)
+	if highLoad(r.loadAvg()) {
+		res.Warnings = append(res.Warnings, msg+" (machine under high load)")
+		return
+	}
+	res.Status, res.Tail = StatusFail, []string{msg}
 }
 
 func lastLines(path string, n int) []string {

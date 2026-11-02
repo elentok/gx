@@ -20,6 +20,9 @@ func (r Result) Render() string {
 		for _, n := range k.Notes {
 			fmt.Fprintf(&b, "      %s\n", n)
 		}
+		for _, w := range k.Warnings {
+			fmt.Fprintf(&b, "      warning: %s\n", w)
+		}
 	}
 	failed := 0
 	for _, k := range r.Kinds {

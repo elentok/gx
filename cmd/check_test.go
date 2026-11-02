@@ -15,7 +15,13 @@ import (
 // and the exit code.
 func runCheckCmd(t *testing.T, cwd string, args ...string) (string, int) {
 	t.Helper()
-	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }, env: envFor(t)})
+	return runCheckCmdLoad(t, nil, cwd, args...)
+}
+
+// runCheckCmdLoad is runCheckCmd with the load average injected.
+func runCheckCmdLoad(t *testing.T, loadAvg func() float64, cwd string, args ...string) (string, int) {
+	t.Helper()
+	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }, env: envFor(t), loadAvg: loadAvg})
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&out)

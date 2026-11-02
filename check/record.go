@@ -35,7 +35,8 @@ type KindRecord struct {
 	DurationMS int64  `json:"duration_ms"`
 	// Failed names the failing tests of the brief runs this kind started. A
 	// configured command that never calls `gx brief` has none.
-	Failed []string `json:"failed,omitempty"`
+	Failed   []string `json:"failed,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Record is one line of <data>/check/<project>.jsonl: what one `gx check` run
@@ -55,6 +56,10 @@ type Record struct {
 	Link       string       `json:"link"`
 	Epic       string       `json:"epic,omitempty"`   // set for LinkTicket
 	Ticket     string       `json:"ticket,omitempty"` // set for LinkTicket
+	// Load averages (1 minute) at the start and end of the run; a record
+	// without them reads as 0.
+	LoadStart float64 `json:"load_start"`
+	LoadEnd   float64 `json:"load_end"`
 }
 
 func (m Mode) scope() string {
@@ -127,6 +132,8 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result) Record {
 		TreeID:     r.treeID,
 		TreeError:  r.treeErr,
 		Link:       LinkOther,
+		LoadStart:  r.loadStart,
+		LoadEnd:    r.loadEnd,
 	}
 	rec.Branch, _ = git.CurrentBranch(r.root)
 	rec.Head, _ = git.RevParse(r.root, "HEAD")
@@ -146,7 +153,7 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result) Record {
 	}
 	for _, k := range res.Kinds {
 		rec.Kinds = append(rec.Kinds, KindRecord{
-			Kind: k.Kind, Status: k.Status, DurationMS: k.Duration.Milliseconds(), Failed: failed[k.Kind],
+			Kind: k.Kind, Status: k.Status, DurationMS: k.Duration.Milliseconds(), Failed: failed[k.Kind], Warnings: k.Warnings,
 		})
 	}
 	return rec

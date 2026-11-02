@@ -34,10 +34,12 @@ type LogOptions struct {
 }
 
 type deps struct {
-	stdin                io.Reader
-	stdout               io.Writer
-	stderr               io.Writer
-	getwd                func() (string, error)
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
+	getwd  func() (string, error)
+	// loadAvg reads the 1-minute load average for `gx check`; nil reads the machine.
+	loadAvg              func() float64
 	runWorktrees         func(string) error
 	runStatus            func(string) error
 	runLog               func(LogOptions) error

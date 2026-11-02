@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,6 +62,52 @@ func TestCheck_RecordHasEveryField(t *testing.T) {
 	}
 	if k := kindRecord(t, rec, "test"); k.Status != check.StatusPass {
 		t.Errorf("test kind = %+v", k)
+	}
+}
+
+const slowSuite = `{"test":{"full":"sleep 3","changed":"sleep 3","limits":{"suite":"1s"}}}`
+
+func TestCheck_SuiteLimitFailsFullRun(t *testing.T) {
+	repo, _ := registeredCheckRepo(t, slowSuite)
+	out, code := runCheckCmdLoad(t, func() float64 { return 0 }, repo, "--full", "--kind", "test")
+	if code != 1 || !strings.Contains(out, "took 3.") || !strings.Contains(out, "1s limit") {
+		t.Errorf("code %d, out %q; want exit 1 naming time and limit", code, out)
+	}
+}
+
+func TestCheck_SuiteLimitIgnoredOnChangedRun(t *testing.T) {
+	repo, _ := registeredCheckRepo(t, slowSuite)
+	testutil.WriteFile(t, repo, "new.txt", "x")
+	if out, code := runCheckCmdLoad(t, func() float64 { return 0 }, repo, "--kind", "test"); code != 0 {
+		t.Errorf("changed run: code %d, out %q", code, out)
+	}
+}
+
+func TestCheck_SuiteLimitWarnsUnderHighLoadAndRecordsLoad(t *testing.T) {
+	repo, data := registeredCheckRepo(t, slowSuite)
+	out, code := runCheckCmdLoad(t, func() float64 { return 1000 }, repo, "--full", "--kind", "test")
+	if code != 0 || !strings.Contains(out, "warning:") {
+		t.Fatalf("code %d, out %q; want exit 0 with a warning", code, out)
+	}
+	recs, _ := check.ReadRecords(data, "p")
+	if len(recs) != 1 || len(kindRecord(t, recs[0], "test").Warnings) != 1 {
+		t.Errorf("records = %+v; want one warning", recs)
+	}
+	if rec := recs[0]; rec.LoadStart != 1000 || rec.LoadEnd != 1000 {
+		t.Errorf("load = %v/%v; want 1000/1000", rec.LoadStart, rec.LoadEnd)
+	}
+}
+
+func TestCheck_RecordHasLoadAverages(t *testing.T) {
+	repo, data := registeredCheckRepo(t, `{"test":"true"}`)
+	n := 0
+	load := func() float64 { n++; return float64(n) }
+	if out, code := runCheckCmdLoad(t, load, repo, "--full", "--kind", "test"); code != 0 {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+	recs, _ := check.ReadRecords(data, "p")
+	if len(recs) != 1 || recs[0].LoadStart != 1 || recs[0].LoadEnd != 2 {
+		t.Errorf("records = %+v; want load 1 then 2", recs)
 	}
 }
 

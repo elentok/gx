@@ -30,6 +30,9 @@ exclude each other. --kind format,lint runs only the named kinds.
 The test entry may set "limits": {"suite": "4m", "slow": "20s", "hang": "60s"}.
 "slow" is one duration or a map by tool ("go", "vitest", "playwright"); a
 missing key turns that limit off. A malformed duration or an unknown key exits 2.
+"suite" fails a --full run whose test command takes longer. Changed, staged and
+--since runs ignore it. When the 1-minute load average per core is above
+1.5 (check.HighLoadPerCore) it only warns and the run keeps exit 0.
 
 Exit 0 pass, 1 fail, 2 gx could not run, 3 no applicable checks.`,
 		Args: cobra.NoArgs,
@@ -81,6 +84,7 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 	}
 	opts.Dir = dir
 	opts.Env = d.env
+	opts.LoadAvg = d.loadAvg
 	if opts.DataDir, err = d.dirs().DataDir(); err != nil {
 		return err
 	}
