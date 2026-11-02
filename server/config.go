@@ -64,6 +64,11 @@ type Config struct {
 	// config.LoadRunnerWait().
 	RunnerWait time.Duration
 
+	// DropAskedAgent makes every run clean up after its agent asks, as a
+	// herdr-hosted run does. Test-only: gxfixture sets it, because a fixture
+	// has no herdr to exercise that path.
+	DropAskedAgent bool
+
 	// Sleep paces the ralphloop waits (finish debounce, poll backoffs); nil
 	// means time.Sleep. Tests shrink it so each merge skips the real seconds.
 	Sleep func(time.Duration)

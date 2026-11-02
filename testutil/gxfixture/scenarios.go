@@ -108,6 +108,9 @@ type scenario struct {
 	diskLow bool
 	// fakeGo writes the gate dir's fake go (see cachegate.go).
 	fakeGo bool
+	// dropAskedAgent forces the server to clean up an asking agent, as a
+	// herdr-hosted run does (see keepworktree.go).
+	dropAskedAgent bool
 	// restart points the server's restart at a fake gx binary (see restart.go).
 	restart *restartSpec
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
@@ -207,6 +210,8 @@ var scenarios = map[string]scenario{
 		}}},
 		diskLow: true,
 	},
+	"keep-worktree":     keepWorktree,
+	"keep-agent":        keepAgent,
 	"cache-gate":        cacheGate,
 	"cache-gate-custom": cacheGateCustom,
 	// restart-agents: a running agent on a queued epic, and a restart binary that passes its checks.

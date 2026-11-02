@@ -20,6 +20,9 @@ import (
 // agent with fixed args and no env, so this file is the worker's only knob.
 const WorkerConfigFile = ".agentfake-worker.json"
 
+// UncommittedFile is the file BehaviourWriteAsk leaves untracked in the worktree.
+const UncommittedFile = "uncommitted-note.txt"
+
 // StartedSuffix names the marker file (Hold + StartedSuffix) the worker creates
 // once it has received a prompt: herdr's agent status never reports "working",
 // so tests wait on this instead.
@@ -78,6 +81,10 @@ const (
 	BehaviourFinish = "finish"
 	// BehaviourAsk pauses the ticket with a question and commits nothing.
 	BehaviourAsk = "ask"
+	// BehaviourWriteAsk leaves an uncommitted file in the worktree and asks. A
+	// relaunch that still sees the file finishes the ticket instead, so the
+	// worktree's survival is what lets it end.
+	BehaviourWriteAsk = "write-ask"
 	// BehaviourRefuseAsk commits, reports finished without running `gx check` so
 	// the finish guard refuses, then pauses the ticket with a question.
 	BehaviourRefuseAsk = "refuse-ask"
@@ -135,6 +142,13 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 		return askQuestion(cfg, address)
 	case BehaviourRefuseAsk:
 		return refuseThenAsk(cfg, address)
+	case BehaviourWriteAsk:
+		if !fileExists(UncommittedFile) {
+			if err := os.WriteFile(UncommittedFile, []byte("kept\n"), 0o644); err != nil {
+				return err
+			}
+			return askQuestion(cfg, address)
+		}
 	}
 	waitHold(cfg)
 	return finishTicket(cfg, address)

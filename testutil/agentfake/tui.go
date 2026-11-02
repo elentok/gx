@@ -727,6 +727,12 @@ func (t *tui) submit() error {
 			case BehaviourRateLimit:
 				t.resume = &pendingWork{cfg, address}
 				return t.rateLimit(cfg)
+			case BehaviourWriteAsk:
+				// A kept agent gets the answer as its next prompt and finishes on it;
+				// a relaunch sees the file and finishes at once.
+				if !fileExists(UncommittedFile) {
+					t.resume = &pendingWork{cfg, address}
+				}
 			}
 			go t.work(cfg, address)
 			return t.setStatus(StatusBusy, "")

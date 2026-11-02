@@ -863,7 +863,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		}
 		defer s.merges.end()
 		one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
-		one.KeepAskedAgent = keepsAskedAgent(run)
+		one.KeepAskedAgent = !s.cfg.DropAskedAgent && keepsAskedAgent(run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 		// The finish path wrote the merge or the pause; the store watch is only a hint.
 		s.rescan()
