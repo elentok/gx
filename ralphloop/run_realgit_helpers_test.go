@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,8 @@ import (
 )
 
 const resolvedSharedContent = "shared resolved for D\n"
+
+var firstTimestampRe = regexp.MustCompile(`"timestamp":"([^"]+)"`)
 
 // writeFakeTranscript writes a session transcript under a fake
 // <home>/.claude/projects/<slug>/<sessionID>.jsonl, with one assistant line per
@@ -53,6 +56,9 @@ func writeFakeTranscript(t *testing.T, home, cwd, sessionID string, start time.T
 // resends the prompt until its grace runs out.
 func recordLaunchPrompt(home, cwd, sessionID, text string) error {
 	path := transcript.PathIn(home, cwd, sessionID)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -61,7 +67,13 @@ func recordLaunchPrompt(home, cwd, sessionID, text string) error {
 	if err != nil {
 		return err
 	}
-	line := `{"type":"user","timestamp":"2026-08-14T08:59:59Z","message":{"role":"user","content":` + string(content) + "}}\n"
+	// Share the first existing record's timestamp so the record doesn't stretch
+	// the session's measured elapsed time.
+	ts := "2026-08-14T08:59:59Z"
+	if m := firstTimestampRe.FindSubmatch(existing); m != nil {
+		ts = string(m[1])
+	}
+	line := `{"type":"user","timestamp":"` + ts + `","message":{"role":"user","content":` + string(content) + "}}\n"
 	return os.WriteFile(path, append([]byte(line), existing...), 0644)
 }
 

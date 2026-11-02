@@ -163,6 +163,9 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 				if cwd != featurePath {
 					return herdrfake.CommandError(fmt.Sprintf("conflict resolver cwd = %q, want %q", cwd, featurePath))
 				}
+				if err := recordLaunchPrompt(home, cwd, sess, text); err != nil {
+					return herdrfake.CommandError(err.Error())
+				}
 				inProgress, err := git.CherryPickInProgress(cwd)
 				if err != nil || !inProgress {
 					return herdrfake.CommandError(fmt.Sprintf("conflict resolver cherry-pick state = %v, %v", inProgress, err))
@@ -225,6 +228,10 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 			}
 			if id, ok := ticketIDFromImplementPrompt(text); ok {
 				if id == "03" {
+					if err := recordLaunchPrompt(home, iterationWorktreePath(wtDir, epicName, id), sess, text); err != nil {
+						t.Errorf("recordLaunchPrompt(%s): %v", id, err)
+						return herdrfake.CommandError(err.Error())
+					}
 					mu.Lock()
 					status[pane] = "working"
 					mu.Unlock()
@@ -238,6 +245,10 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 					<-dReady
 				}
 				dir := iterationWorktreePath(wtDir, epicName, id)
+				if err := recordLaunchPrompt(home, dir, sess, text); err != nil {
+					t.Errorf("recordLaunchPrompt(%s): %v", id, err)
+					return herdrfake.CommandError(err.Error())
+				}
 				if err := commitIterationWork(dir, id); err != nil {
 					t.Errorf("commitIterationWork(%s): %v", id, err)
 					return herdrfake.CommandError(err.Error())
