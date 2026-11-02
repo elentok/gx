@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -42,7 +43,8 @@ func newPty(t *testing.T) *nativerunner.Pty {
 // ptyTestEnv is the env a test pty gives its holder: claude's home and no
 // config dir, plus the marker entries.
 func ptyTestEnv(home string, markers ...string) []string {
-	return append([]string{"HOME=" + home, "CLAUDE_CONFIG_DIR="}, markers...)
+	env := []string{"HOME=" + home, "CLAUDE_CONFIG_DIR=", holderOwnerEnv + "=" + strconv.Itoa(os.Getpid())}
+	return append(env, markers...)
 }
 
 // ptyHome is the home p gives claude.

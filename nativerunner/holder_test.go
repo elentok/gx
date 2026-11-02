@@ -29,7 +29,21 @@ const (
 	holderNoOpsEnv = "GX_TEST_HOLDER_NO_OPS"
 	// holderDenyTimeoutEnv overrides the holder's deny-reason timeout.
 	holderDenyTimeoutEnv = "GX_TEST_HOLDER_DENY_TIMEOUT"
+	// holderOwnerEnv is the pid of the test binary that started the holder.
+	// The holder is detached on purpose, so a test run killed before its
+	// cleanup would leave it, and its claude, running for good. The holder
+	// watches this pid and exits with it.
+	holderOwnerEnv = "GX_TEST_HOLDER_OWNER"
 )
+
+// exitWithOwner kills the holder and its child once the owner pid is gone.
+func exitWithOwner(owner int) {
+	for syscall.Kill(owner, 0) == nil {
+		time.Sleep(500 * time.Millisecond)
+	}
+	_ = exec.Command("pkill", "-KILL", "-P", strconv.Itoa(os.Getpid())).Run()
+	os.Exit(1)
+}
 
 // testHolder takes the gx agent-holder flags: --session-id <id> --dir <dir> -- <cmd...>.
 func testHolder() {
@@ -37,6 +51,9 @@ func testHolder() {
 	dir := args[slices.Index(args, "--dir")+1]
 	// The child may be this binary too, as the TUI fake.
 	_ = os.Unsetenv(holderEnv)
+	if owner, err := strconv.Atoi(os.Getenv(holderOwnerEnv)); err == nil && owner > 0 {
+		go exitWithOwner(owner)
+	}
 	if os.Getenv(holderNoOpsEnv) == "1" {
 		*nativerunner.HolderOptionalOps = nil
 	}
