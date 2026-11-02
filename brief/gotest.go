@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"runtime"
 	"slices"
@@ -65,8 +66,9 @@ type goTestEvent struct {
 	Package     string
 	Test        string
 	Output      string
-	ImportPath  string // build-output and build-fail events
-	FailedBuild string // package fail event of a package that did not build
+	ImportPath  string  // build-output and build-fail events
+	FailedBuild string  // package fail event of a package that did not build
+	Elapsed     float64 // seconds
 }
 
 // goPkg collects the events of one package.
@@ -84,6 +86,7 @@ type goPkg struct {
 func (GoTest) Parse(out []byte, _ int) Outcome {
 	tests := 0
 	var ran []string
+	var durations map[string]int64
 	pkgs := map[string]*goPkg{}
 	var order []*goPkg
 	pkg := func(name string) *goPkg {
@@ -127,7 +130,12 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 				continue
 			}
 			tests++
-			ran = append(ran, Unit{Location: ev.Package, Name: ev.Test}.String())
+			name := Unit{Location: ev.Package, Name: ev.Test}.String()
+			ran = append(ran, name)
+			if durations == nil {
+				durations = map[string]int64{}
+			}
+			durations[name] = int64(math.Round(ev.Elapsed * 1000))
 			if ev.Action == "fail" {
 				p.tests = append(p.tests, ev.Test)
 			}
@@ -157,6 +165,8 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 		Summary:  fmt.Sprintf("%d tests in %d packages", tests, len(finished)),
 		Failures: failures,
 		Tests:    ran,
+
+		TestDurations: durations,
 	}
 }
 

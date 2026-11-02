@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -128,6 +129,7 @@ func (Vitest) Parse(out []byte, _ int) Outcome {
 			AssertionResults []struct {
 				FullName        string
 				Status          string
+				Duration        *float64 // ms; null for a test that did not run
 				FailureMessages []string
 			}
 		}
@@ -137,10 +139,18 @@ func (Vitest) Parse(out []byte, _ int) Outcome {
 	}
 	var failures []Unit
 	var ran []string
+	var durations map[string]int64
 	for _, f := range rep.TestResults {
 		failed := 0
 		for _, a := range f.AssertionResults {
-			ran = append(ran, Unit{Location: f.Name, Name: a.FullName}.String())
+			name := Unit{Location: f.Name, Name: a.FullName}.String()
+			ran = append(ran, name)
+			if a.Duration != nil {
+				if durations == nil {
+					durations = map[string]int64{}
+				}
+				durations[name] = int64(math.Round(*a.Duration))
+			}
 			if a.Status == "failed" {
 				failed++
 				failures = append(failures, Unit{Location: f.Name, Name: a.FullName, Text: vitestText(a.FailureMessages)})
@@ -156,6 +166,8 @@ func (Vitest) Parse(out []byte, _ int) Outcome {
 		Summary:  fmt.Sprintf("%d tests", rep.NumTotalTests),
 		Failures: failures,
 		Tests:    ran,
+
+		TestDurations: durations,
 	}
 }
 

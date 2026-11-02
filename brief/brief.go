@@ -65,6 +65,9 @@ type Outcome struct {
 	// Tests names the tests that ran, passed and failed, as `location.name`. A
 	// tool that cannot list the passing ones names the failing ones only.
 	Tests []string
+	// TestDurations maps a test name (as in Tests) to its duration in
+	// milliseconds. A tool that does not time its tests leaves it nil.
+	TestDurations map[string]int64
 }
 
 // Options configure one run.
@@ -110,6 +113,8 @@ type indexEntry struct {
 	TreeID     string   `json:"tree_id,omitempty"`
 	CheckRun   string   `json:"check_run,omitempty"`
 	CheckKind  string   `json:"check_kind,omitempty"`
+	// TestDurations is in milliseconds, keyed like Tests. Old lines lack it.
+	TestDurations map[string]int64 `json:"test_durations,omitempty"`
 }
 
 // ReadIndex returns the lines of the index under dataDir, oldest first. A
@@ -207,6 +212,8 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 		TreeID:     treeID,
 		CheckRun:   o.CheckRun,
 		CheckKind:  o.CheckKind,
+
+		TestDurations: outcome.TestDurations,
 	}
 	for _, u := range outcome.Failures {
 		entry.Failed = append(entry.Failed, u.String())

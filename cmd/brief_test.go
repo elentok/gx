@@ -53,6 +53,29 @@ func lastLine(out string) string {
 	return lines[len(lines)-1]
 }
 
+func TestBrief_GoTestIndexRecordsTestDurations(t *testing.T) {
+	t.Parallel()
+	data := envValue(envFor(t), "XDG_DATA_HOME")
+	dir := t.TempDir()
+	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, dir, "a_test.go", "package tiny\n\nimport (\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) { time.Sleep(time.Second) }\nfunc TestFast(t *testing.T) {}\n")
+
+	if out, code := runBriefCmd(t, dir, "go-test", "./..."); code != 0 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	entries, err := brief.ReadIndex(filepath.Join(data, "gx"))
+	if err != nil || len(entries) == 0 {
+		t.Fatalf("ReadIndex = %v, %v", entries, err)
+	}
+	got := entries[len(entries)-1].TestDurations
+	if ms, ok := got["example.com/tiny.TestSlow"]; !ok || ms < 1000 || ms > 1500 {
+		t.Errorf("TestSlow duration = %d (present %v), want about 1000 ms; all: %v", ms, ok, got)
+	}
+	if _, ok := got["example.com/tiny.TestFast"]; !ok {
+		t.Errorf("TestFast missing from %v", got)
+	}
+}
+
 func TestBrief_GoTestPass(t *testing.T) {
 	t.Parallel()
 	data := envValue(envFor(t), "XDG_DATA_HOME")
@@ -95,10 +118,10 @@ func TestBrief_GoTestPass(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &fields); err != nil {
 		t.Fatal(err)
 	}
-	if len(fields) != 9 {
+	if len(fields) != 10 {
 		t.Errorf("index fields = %v", fields)
 	}
-	for _, k := range []string{"time", "tool", "args", "dir", "exit", "units", "duration_ms", "log", "tests"} {
+	for _, k := range []string{"time", "tool", "args", "dir", "exit", "units", "duration_ms", "log", "tests", "test_durations"} {
 		if _, ok := fields[k]; !ok {
 			t.Errorf("index lacks %q", k)
 		}
