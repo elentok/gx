@@ -212,6 +212,7 @@ var scenarios = map[string]scenario{
 	},
 	"keep-worktree":     keepWorktree,
 	"keep-agent":        keepAgent,
+	"keep-cleanup":      keepCleanup,
 	"cache-gate":        cacheGate,
 	"cache-gate-custom": cacheGateCustom,
 	// restart-agents: a running agent on a queued epic, and a restart binary that passes its checks.

@@ -29,4 +29,13 @@ var (
 		queue:     []string{project + ":keep-epic"},
 		behaviour: map[string]string{project + ":keep-epic/01": agentfake.BehaviourWriteAsk},
 	}
+	// keepCleanup is keepWorktree with a manual epic merge, so a test can cancel
+	// the asking ticket and then merge the epic itself.
+	keepCleanup = scenario{
+		epics:          keepWorktreeEpic,
+		queue:          []string{project + ":keep-epic"},
+		behaviour:      map[string]string{project + ":keep-epic/01": agentfake.BehaviourWriteAsk},
+		dropAskedAgent: true,
+		manualMerge:    []string{project},
+	}
 )
