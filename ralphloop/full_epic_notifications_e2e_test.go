@@ -132,6 +132,10 @@ func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing
 			mu.Unlock()
 			if id, ok := ticketIDFromImplementPrompt(text); ok {
 				dir := iterationWorktreePath(wtDir, epicName, id)
+				if err := recordLaunchPrompt(home, dir, sess, text); err != nil {
+					t.Errorf("recordLaunchPrompt(%s): %v", id, err)
+					return herdrfake.CommandError(err.Error())
+				}
 				if err := commitIterationWork(dir, id); err != nil {
 					t.Errorf("commitIterationWork(%s): %v", id, err)
 					return herdrfake.CommandError(err.Error())

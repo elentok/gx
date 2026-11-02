@@ -47,6 +47,24 @@ func writeFakeTranscript(t *testing.T, home, cwd, sessionID string, start time.T
 	}
 }
 
+// recordLaunchPrompt prepends text as the transcript's first user record, the
+// way a live claude records a delivered launch command. Without it the launch
+// proof (claudeui.CheckLaunchDelivered) never sees the command arrive and
+// resends the prompt until its grace runs out.
+func recordLaunchPrompt(home, cwd, sessionID, text string) error {
+	path := transcript.PathIn(home, cwd, sessionID)
+	existing, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	content, err := json.Marshal(text)
+	if err != nil {
+		return err
+	}
+	line := `{"type":"user","timestamp":"2026-08-14T08:59:59Z","message":{"role":"user","content":` + string(content) + "}}\n"
+	return os.WriteFile(path, append([]byte(line), existing...), 0644)
+}
+
 // ticketIDFromImplementPrompt extracts a ticket identifier ("01", "02", ...)
 // from a "/<skill> <ticket-path>" (Claude) or "$<skill> <ticket-path>"
 // (Codex, see skillPrompt) prompt's ticket path, or ok=false if text isn't a
