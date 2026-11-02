@@ -170,13 +170,19 @@ func TestEpicList_PermissionWaitingIsNeedsYou(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+	// The server learns of the pending request on its own poll, so the row
+	// reads "implementing" until then.
 	var r server.EpicListRow
-	for _, row := range getEpicList(t, code, body).Epics {
-		if row.Address == "proj:epic-a" {
-			r = row
+	waitFor(t, func() bool {
+		code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+		r = server.EpicListRow{}
+		for _, row := range getEpicList(t, code, body).Epics {
+			if row.Address == "proj:epic-a" {
+				r = row
+			}
 		}
-	}
+		return r.StatePill == "Permission"
+	})
 	want := server.CardAction{Kind: server.CardActionAnswer, Label: "Answer", Target: answerAddr}
 	if r.Section != server.SectionNeedsYou || r.StatePill != "Permission" || !strings.Contains(r.Reason, "List files") || !slices.Equal(r.Actions, []server.CardAction{want}) {
 		t.Errorf("row = section %q pill %q reason %q actions %v", r.Section, r.StatePill, r.Reason, r.Actions)
