@@ -357,6 +357,18 @@ func TestClaudeReadyToType_UnrelatedConfigRewriteIsNotAToggle(t *testing.T) {
 	}
 }
 
+func TestClaudeReadyToType_NotedOverrideSkipsUntilToggle(t *testing.T) {
+	vimConfig(t, "vim")
+	harness.NoteEditorOverride("adopted", nil)
+	ty, _ := harness.LookupTyping(harness.Claude)
+	s := &screenIO{rows: [][]string{normalRows, insertRows}}
+	io := s.io()
+	io.Session = "adopted"
+	if !ty.ReadyToType(io) || len(s.keys) != 0 {
+		t.Fatalf("adopted override with person's vim files: keys = %q", s.keys)
+	}
+}
+
 func TestCodexReadyToType_IsANoOp(t *testing.T) {
 	vimConfig(t, "vim")
 	ty, _ := harness.LookupTyping(harness.Codex)

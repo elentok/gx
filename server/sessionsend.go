@@ -11,6 +11,8 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 )
 
+const sendFailedPrefix = "Send failed: "
+
 // sendPrompt types a person's text into the session and nudges it until its
 // turn starts, as the first prompt does: claude can swallow the Enter after a
 // paste. A send that gives up raises a gx Actionable with the text, so the
@@ -24,12 +26,26 @@ func (s *Server) sendPrompt(dir, text string) {
 	err := send(dir, text)
 	switch {
 	case err == nil:
+		s.clearSendFailed(dir)
 	case errors.Is(err, errNudgeCancelled), errors.Is(err, errServerStopping):
 		log.Info("send stopped", "err", err)
 	default:
 		log.Warn("send failed", "err", err)
-		s.raiseGxActionable(dir, fmt.Sprintf("Send failed: %v", err), []string{text})
+		s.raiseGxActionable(dir, fmt.Sprintf("%s%v", sendFailedPrefix, err), []string{text})
 	}
+}
+
+// clearSendFailed drops an earlier "Send failed" card once a send gets
+// through, so the person doesn't see a stale stop on a session that runs.
+func (s *Server) clearSendFailed(dir string) {
+	id := filepath.Base(dir)
+	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+		if !m.Actionable.GxRaised || !strings.HasPrefix(m.Actionable.Reason, sendFailedPrefix) {
+			return false
+		}
+		m.Actionable = SessionActionable{}
+		return true
+	})
 }
 
 // isSingleSendCommand reports whether text is a "/" command typed once.

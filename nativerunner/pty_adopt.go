@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/harness"
 )
 
 type adoption int
@@ -56,6 +57,10 @@ func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
 	}
 	ss := p.newSession(label, meta)
 	ss.holder = holder
+	// The probe's memory of the launch override died with the old server.
+	if meta.EditorModeNormal {
+		harness.NoteEditorOverride(meta.SessionID, nil)
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// A concurrent adopt of label may have won meanwhile.

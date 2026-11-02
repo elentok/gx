@@ -54,6 +54,12 @@ func markEditorOverride(session string, env []string) {
 	s.overridden, s.overrideFiles = true, editorFilesContent(env)
 }
 
+// NoteEditorOverride records that session, launched by an earlier server, was
+// launched with editorMode normal. Its snapshot is of the files now, so a
+// /config toggle made before the server restarted is not seen. env is the
+// claude config env the probe reads, nil for the process's own.
+func NoteEditorOverride(session string, env []string) { markEditorOverride(session, env) }
+
 // EditorOverrideApplied reports whether session was launched with the normal
 // editor mode override.
 func EditorOverrideApplied(session string) bool {
