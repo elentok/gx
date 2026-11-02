@@ -579,3 +579,23 @@ func TestAttach_ExitSwitchesToTheExitedView(t *testing.T) {
 		t.Fatalf("Exited view not shown:\n%s", view)
 	}
 }
+
+func TestAttach_QueueAgentDialsItsHolderDir(t *testing.T) {
+	var dialedDir string
+	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m.sessionsDir = "/sessions"
+	m.dial = func(dir string) (AttachStream, []string, error) {
+		dialedDir = dir
+		return newFakeAttach(), nil, nil
+	}
+	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
+	st := &viewmodel.State{Sessions: []server.SessionInfo{{
+		ID: "queue-x-iter-01", Name: "x-iter-01", Project: "gx", Queue: true,
+		Holder: "/state/agents/gx/x-iter-01", Status: idleStatus,
+	}}}
+	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
+	dialed(t, next.(Model), cmd)
+	if dialedDir != "/state/agents/gx/x-iter-01" {
+		t.Fatalf("dialed %q, want the Queue agent's holder dir", dialedDir)
+	}
+}

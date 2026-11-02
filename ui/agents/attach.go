@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"cmp"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -174,7 +175,8 @@ func (m Model) dialAttach(attempt int) (Model, tea.Cmd) {
 	s := m.sessions[m.cursor]
 	a := &attachment{id: s.ID, status: s.Status, attempt: attempt, readOnly: s.Queue || s.Design}
 	m.attach = a
-	dir, dial := filepath.Join(m.sessionsDir, s.ID), m.dial
+	// A Queue agent's holder lives under the agents root, not the sessions dir.
+	dir, dial := cmp.Or(s.Holder, filepath.Join(m.sessionsDir, s.ID)), m.dial
 	return m, func() tea.Msg {
 		stream, snapshot, err := dial(dir)
 		return attachedMsg{a: a, stream: stream, snapshot: snapshot, err: err}
