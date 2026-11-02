@@ -962,6 +962,19 @@ func (h *Harness) serve(t *testing.T) {
 	if h.pty {
 		h.buildPty()
 	}
+	// A hold sleeps until its reset (an hour for a rate limit), which even
+	// scaled down outlasts WaitSettled below. Cleanup cuts the sleep short.
+	stopping := make(chan struct{})
+	if sleep := h.cfg.Sleep; sleep != nil {
+		h.cfg.Sleep = func(d time.Duration) {
+			woke := make(chan struct{})
+			go func() { sleep(d); close(woke) }()
+			select {
+			case <-woke:
+			case <-stopping:
+			}
+		}
+	}
 	srv, err := server.New(h.cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -979,6 +992,7 @@ func (h *Harness) serve(t *testing.T) {
 		return err
 	}
 	t.Cleanup(func() {
+		close(stopping)
 		if err := h.Stop(); err != nil {
 			t.Errorf("server: %v", err)
 		}
