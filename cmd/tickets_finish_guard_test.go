@@ -167,6 +167,19 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		}
 	})
 
+	t.Run("known failures: one address covers the failing set", func(t *testing.T) {
+		f := newFinishFixture(t)
+		commitFile(t, f.wt, "a.txt", "a")
+		f.record(t, check.ExitFail, "", "TestA", "TestB")
+		if err := f.finish(t, "--known-failures=99"); err == nil {
+			t.Fatal("unknown address: want a refusal")
+		}
+		f.assertUnwritten(t)
+		if err := f.finish(t, "--known-failures=02"); err != nil {
+			t.Fatalf("one known address for two tests: %v", err)
+		}
+	})
+
 	t.Run("failing line naming no tests needs one address", func(t *testing.T) {
 		f := newFinishFixture(t)
 		commitFile(t, f.wt, "a.txt", "a")

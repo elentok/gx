@@ -60,7 +60,8 @@ Agent-only settable fields:
     --status=done: the merge status is gx's alone to write. A finished report for a ticket
     whose iteration branch has commits is refused unless ` + "`gx check`" + ` recorded a passing
     run of the worktree's current tree. When the only failures are flakes or pre-existing
-    failures, file a follow-up per failing test and pass --check-failures <addr,addr>.
+    failures, file a follow-up per failing test and pass --check-failures <addr,addr>,
+    or pass --known-failures <addr> when one follow-up already tracks the whole failing set.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
@@ -162,6 +163,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().String("long-ticket-turns", "", "set long_ticket_turns")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, asking, finished)")
+	cmd.Flags().String("known-failures", "", "with --iteration-status finished: follow-up addresses that track the failing tests of the last `gx check` run; one address covers the whole failing set")
 	cmd.Flags().String("check-failures", "", "with --iteration-status finished: follow-up addresses (comma-separated), one per failing test of the last `gx check` run")
 
 	// Declared only so a write attempt is refused with a clear message rather

@@ -75,13 +75,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		return r.KindFilter != ""
 	})
 
-	failures, _ := c.Flags().GetString("check-failures")
-	var addrs []string
-	for _, a := range strings.Split(failures, ",") {
-		if a = strings.TrimSpace(a); a != "" && !slices.Contains(addrs, a) {
-			addrs = append(addrs, a)
-		}
-	}
+	addrs := splitAddrs(c, "check-failures")
 
 	var failing *check.Record
 	for i := range recs {
@@ -97,7 +91,14 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		return fmt.Errorf("%s: no passing `gx check` run for the current tree of %s; run `gx check` and fix it, or file follow-ups for flakes and pre-existing failures and finish with --check-failures <follow-up addrs>", label, branch)
 	}
 
+	// A known failure covers the whole failing set: one follow-up that tracks
+	// a pre-existing breakage (e.g. a broken test family) waives the one-per-test
+	// count, so a suite that is red on the base does not block every ticket.
+	known := splitAddrs(c, "known-failures")
 	need := max(1, len(failedTests(*failing)))
+	if len(known) > 0 {
+		addrs, need = known, len(known)
+	}
 	if len(addrs) < need {
 		return fmt.Errorf("%s: the last `gx check` run failed %d test(s); pass --check-failures with at least %d follow-up address(es), got %d", label, need, need, len(addrs))
 	}
@@ -111,6 +112,18 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		}
 	}
 	return nil
+}
+
+// splitAddrs reads a comma-separated address flag, trimmed and de-duplicated.
+func splitAddrs(c *cobra.Command, flag string) []string {
+	v, _ := c.Flags().GetString(flag)
+	var addrs []string
+	for _, a := range strings.Split(v, ",") {
+		if a = strings.TrimSpace(a); a != "" && !slices.Contains(addrs, a) {
+			addrs = append(addrs, a)
+		}
+	}
+	return addrs
 }
 
 func failedTests(r check.Record) []string {
