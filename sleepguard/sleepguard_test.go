@@ -39,7 +39,7 @@ var allowed = map[string]int{
 	"nativerunner/pty_codex_test.go":                2, // poll loops with a deadline
 	"nativerunner/pty_codexapproval_test.go":        2, // poll loops with a deadline
 	"server/blocked_pause_test.go":                  3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
-	"server/servertest/longticket_test.go":          3, // negative waits: no mark within the first 30s guard tick; a delayed transcript write
+	"server/servertest/longticket_test.go":          1, // a delayed transcript write
 	"server/startincident_test.go":                  2, // poll loops with a deadline
 	"testutil/agentfake/codex_test.go":              1, // poll loop with a deadline
 	"testutil/agentfake/codexdesign_test.go":        1, // poll loop with a deadline

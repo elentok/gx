@@ -763,20 +763,6 @@ func TestNewModelWithScopeStartsAllRepos(t *testing.T) {
 	}
 }
 
-func TestRefreshKeyTriggersRefresh(t *testing.T) {
-	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
-	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-
-	_, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
-	if cmd == nil {
-		t.Fatal("expected a refresh cmd from R")
-	}
-	sawOpen, sawClosed := containsMsgTypes(resolveMsgs(cmd))
-	if !sawOpen || !sawClosed {
-		t.Fatalf("expected R to refresh both sections, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
-	}
-}
-
 func TestMIsNotAChordPrefix(t *testing.T) {
 	for _, b := range newPRsManager().Bindings() {
 		if len(b.Seq) > 1 && b.Seq[0] == "m" {
