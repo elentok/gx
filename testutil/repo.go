@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -56,13 +57,25 @@ const repoTemplateName = "gx-testutil-repo-template-v2"
 // the first to need it builds it aside and renames it into place.
 func repoTemplate(t *testing.T) string {
 	t.Helper()
-	path := filepath.Join(os.TempDir(), repoTemplateName)
-	if _, err := os.Stat(filepath.Join(path, ".git", "HEAD")); err == nil {
+	return installRepoTemplate(t, filepath.Join(os.TempDir(), repoTemplateName))
+}
+
+// installTemplateMu serialises installs within a process. Across processes the
+// rename is the arbiter, and nobody deletes a template another may be copying.
+var installTemplateMu sync.Mutex
+
+func templateReady(path string) bool {
+	_, err := os.Stat(filepath.Join(path, ".git", "HEAD"))
+	return err == nil
+}
+
+func installRepoTemplate(t *testing.T, path string) string {
+	t.Helper()
+	installTemplateMu.Lock()
+	defer installTemplateMu.Unlock()
+	if templateReady(path) {
 		return path
 	}
-	// macOS purges stale files from the temp dir one by one, which leaves a
-	// directory without a HEAD that a rename can't replace.
-	_ = os.RemoveAll(path)
 	tmp, err := os.MkdirTemp("", repoTemplateName+"-build-")
 	if err != nil {
 		t.Fatal(err)
@@ -73,11 +86,24 @@ func repoTemplate(t *testing.T) string {
 	WriteFile(t, tmp, "README.md", "# test")
 	mustGit(t, tmp, "add", ".")
 	mustGit(t, tmp, "commit", "-m", "initial")
-	// Losing the race to another process is fine: its template is the same.
-	if err := os.Rename(tmp, path); err != nil {
-		if _, serr := os.Stat(filepath.Join(path, ".git", "HEAD")); serr != nil {
-			t.Fatalf("install repo template: %v", err)
+	// A rename fails when another process installed first (its template is the
+	// same) or when path is a stale directory without a HEAD, which macOS
+	// leaves behind when it purges the temp dir one file at a time. Move a
+	// stale one aside rather than deleting it, so a template that another
+	// process finished meanwhile is never removed under its readers.
+	err = os.Rename(tmp, path)
+	if err != nil && !templateReady(path) {
+		stale, merr := os.MkdirTemp("", repoTemplateName+"-stale-")
+		if merr != nil {
+			t.Fatal(merr)
 		}
+		defer os.RemoveAll(stale)
+		_ = os.Remove(stale)
+		_ = os.Rename(path, stale)
+		err = os.Rename(tmp, path)
+	}
+	if err != nil && !templateReady(path) {
+		t.Fatalf("install repo template: %v", err)
 	}
 	return path
 }
