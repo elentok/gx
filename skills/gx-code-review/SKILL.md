@@ -52,7 +52,7 @@ stop and fix the ticket's frontmatter before doing anything else.
 ## 2. Read the configured review skills
 
 `gx config show` prints the effective config as JSON; read `.skills["code-review"]`. If the list is
-empty or the field is absent, fall back to a single-element list: `["gx-thermo-nuclear-code-quality-review"]`.
+empty or the field is absent, fall back to the default list: `["gx-thermo-nuclear-code-quality-review", "gx-test-review"]`.
 
 Resolve each name to a `SKILL.md` path, taking the first that exists: `skills/<name>/SKILL.md` from
 the reviewed repo's root, then `../<name>/SKILL.md` relative to this file. Subagents read that file

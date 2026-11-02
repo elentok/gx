@@ -29,6 +29,22 @@ func TestTestGuidelinesHeadings(t *testing.T) {
 	}
 }
 
+func TestTestReviewSkill(t *testing.T) {
+	checkAnchors(t, "gx-test-review/SKILL.md",
+		"## 1. Skip when no test file changed",
+		"(../gx-test-guidelines.md)",
+		".ai/index.md",
+		"(../gx-code-review/SKILL.md)",
+		"consultant triage",
+	)
+	text := normalizeSpace(readFile(t, "gx-test-review/SKILL.md"))
+	for _, bad := range []string{"go test", "gx check", "gx brief"} {
+		if strings.Contains(text, bad) {
+			t.Errorf("gx-test-review/SKILL.md names a command to run: %q", bad)
+		}
+	}
+}
+
 func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
 	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
 	guidelines := normalizeSpace(readFile(t, "gx-test-guidelines.md"))

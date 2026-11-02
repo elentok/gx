@@ -1,0 +1,5 @@
+interface:
+  display_name: "Test Review"
+  short_description: "Review changed tests against the shared guidelines"
+policy:
+  allow_implicit_invocation: false

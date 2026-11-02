@@ -2,7 +2,7 @@ package config
 
 const defaultImplementSkill = "gx-implement"
 
-var defaultCodeReviewSkills = []string{"gx-thermo-nuclear-code-quality-review"}
+var defaultCodeReviewSkills = []string{"gx-thermo-nuclear-code-quality-review", "gx-test-review"}
 
 // SkillsConfig controls which skills gx-implement-equivalent work and code
 // review run under.

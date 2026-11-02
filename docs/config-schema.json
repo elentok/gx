@@ -452,14 +452,14 @@
         },
         "code-review": {
           "type": "array",
-          "description": "Skill(s) invoked for code review. Default: [gx-thermo-nuclear-code-quality-review].",
+          "description": "Skill(s) invoked for code review. Default: [gx-thermo-nuclear-code-quality-review, gx-test-review].",
           "items": { "type": "string" },
-          "default": ["gx-thermo-nuclear-code-quality-review"]
+          "default": ["gx-thermo-nuclear-code-quality-review", "gx-test-review"]
         }
       },
       "default": {
         "implement": "gx-implement",
-        "code-review": ["gx-thermo-nuclear-code-quality-review"]
+        "code-review": ["gx-thermo-nuclear-code-quality-review", "gx-test-review"]
       }
     },
     "agents": {

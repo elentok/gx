@@ -109,6 +109,8 @@ var requiredFiles = []string{
 	"gx-thermo-nuclear-code-quality-review/LICENSE",
 	"gx-thermo-nuclear-code-quality-review/README.md",
 	"gx-thermo-nuclear-code-quality-review/agents/openai.yaml",
+	"gx-test-review/SKILL.md",
+	"gx-test-review/agents/openai.yaml",
 	"gx-verify/SKILL.md",
 	"gx-verify-epic/SKILL.md",
 	"gx-verify-epic/agents/openai.yaml",
@@ -245,6 +247,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-to-spec":                   true,
 
 	"gx-thermo-nuclear-code-quality-review": true,
+	"gx-test-review":                        true,
 	"gx-verify":                             false,
 	"gx-verify-epic":                        true,
 	"gx-ui-check":                           false,
