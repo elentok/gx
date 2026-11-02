@@ -40,6 +40,8 @@ type QueueModel struct {
 	summaries map[string]server.EpicSummary
 	// harnessLabels is the snapshot's row label by ticket address.
 	harnessLabels map[string]string
+	// waitingLabels is the Queue agent rows' check-lock label by ticket address.
+	waitingLabels map[string]string
 	// codexRows marks the snapshot tickets whose label says codex, by address.
 	codexRows map[string]bool
 	herdrDown bool

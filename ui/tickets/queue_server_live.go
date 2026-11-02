@@ -47,6 +47,12 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 			m.harnessLabels[t.Address] = l
 		}
 	}
+	m.waitingLabels = make(map[string]string)
+	for _, s := range st.Sessions {
+		if s.Queue && s.WaitingLabel != "" {
+			m.waitingLabels[s.Ticket] = s.WaitingLabel
+		}
+	}
 	hadFinished := len(m.finished) > 0
 	m.finished = st.RecentlyFinished
 	m.herdrDown, m.herdrText, m.serverBudget = st.HerdrUnavailable, st.HerdrText, st.Budget
