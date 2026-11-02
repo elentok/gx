@@ -366,9 +366,11 @@ test("152. Phone, command menu", async ({ page, start }) => {
   await page.setViewportSize({ width: 390, height: 420 });
   await box.fill("/");
   await expect(menu).toBeVisible();
-  const frame = (await menu.boundingBox())!;
-  expect(frame.y).toBeGreaterThanOrEqual(0);
-  expect(frame.y + frame.height).toBeLessThanOrEqual(420);
+  // The menu places itself after the resize, so poll its frame.
+  await expect.poll(async () => {
+    const frame = (await menu.boundingBox())!;
+    return frame.y >= 0 && frame.y + frame.height <= 420;
+  }).toBe(true);
 
   // First prompt opens below the field.
   await openNewForm(page);

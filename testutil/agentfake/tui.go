@@ -812,7 +812,8 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 		})
 	case t.opts.noTurn:
 		return true, nil
-	case t.opts.launchRecord:
+	case t.opts.launchRecord && t.commandOutput == nil:
+		// An armed command output writes the command line itself.
 		name := strings.TrimPrefix(skill, "/")
 		args := strings.TrimSpace(strings.TrimPrefix(text, skill))
 		return false, appendEntry(path, "user", "<command-message>"+name+"</command-message>\n<command-name>"+skill+"</command-name>\n<command-args>"+args+"</command-args>", nil)

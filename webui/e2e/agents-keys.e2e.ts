@@ -103,7 +103,7 @@ test("156. Type refuses !x in the screen view", async ({ page, start }) => {
 const plain = (s: SessionInfo) => !s.design && !s.queue;
 
 test("156. Keys by session state", async ({ start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   const all = await sessions(fixture);
   const claude = (s: SessionInfo) => plain(s) && s.harness !== "codex";
   const byState: [string, SessionInfo][] = [
@@ -141,7 +141,7 @@ test("156. Keys by session state", async ({ start }) => {
 });
 
 test("156. Queue agent session shows no Screen", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 1280, height: 800 });
   const queue = (await sessions(fixture)).find((s) => s.queue)!;
   await go(page, `#/agents/${queue.id}`);
@@ -151,7 +151,7 @@ test("156. Queue agent session shows no Screen", async ({ page, start }) => {
 });
 
 test("156. Error-blocked session, Type and Enter get out", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 1280, height: 800 });
   const errored = (await sessions(fixture)).find((s) => s.failure?.label === "Agent hit an error")!;
   await openScreen(page, errored.id);
@@ -185,7 +185,7 @@ async function expectNoticeFits(page: Page, buttons: string[]) {
 }
 
 test("160. Phone, key input and Blocked notices", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 390, height: 844 });
   const pageFits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 

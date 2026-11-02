@@ -1965,7 +1965,7 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 
 ## 156. Key bar and Type field
 
-- **Scenario:** `agents-failures` (the stalled session) and `agents-commands` at 1280px. File `agents-keys.e2e.ts`; the fake claude's input log is `fixture.input`.
+- **Scenario:** `agents-failures` (the stalled session) and `agents-blocked` at 1280px. File `agents-keys.e2e.ts`; the fake claude's input log is `fixture.input`.
 - **Steps:**
   1. On the stalled session open Screen from the notice. Type `hello`, then press each key of the bar in order, Ctrl+C last.
   2. Type `!x`.
@@ -1982,7 +1982,7 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 
 ## 157. Close dialog
 
-- **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-permission.e2e.ts`; `fixture.controlClaude` blocks the session at a question dialog, `fixture.input` is the fake's input log. The test stops the page's `/v1/snapshot` reads after it opened, so the notice outlives the Blocked state.
+- **Scenario:** `agents-blocked` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-permission.e2e.ts`; `fixture.controlClaude` blocks the session at a question dialog, `fixture.input` is the fake's input log. The test stops the page's `/v1/snapshot` reads after it opened, so the notice outlives the Blocked state.
 - **Steps:**
   1. Open an Idle Claude session blocked at a dialog; click Close dialog.
   2. Click Close dialog again on the same notice.
@@ -1994,7 +1994,7 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 
 ## 158. Allow once and Deny
 
-- **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-permission.e2e.ts`; the seeded Blocked sessions cover a Claude prompt gx cannot read, one whose first option is "Yes, and don't ask again", one that ignores Enter, and three Codex ones (hook, screen only, unreadable screen). `fixture.controlClaude` blocks Idle Claude sessions at a readable Bash prompt; `fixture.input` and `fixture.codexDecisions` are the fakes' logs.
+- **Scenario:** `agents-blocked` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-permission.e2e.ts`; the seeded Blocked sessions cover a Claude prompt gx cannot read, one whose first option is "Yes, and don't ask again", one that ignores Enter, and three Codex ones (hook, screen only, unreadable screen). `fixture.controlClaude` blocks Idle Claude sessions at a readable Bash prompt; `fixture.input` and `fixture.codexDecisions` are the fakes' logs.
 - **Steps:**
   1. Block two Idle Claude sessions at a Bash prompt; read the notice, press Allow once on one and Deny on the other.
   2. On the unreadable Claude prompt press Allow once, then Deny.
@@ -2024,7 +2024,7 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 
 ## 160. Phone, key input and Blocked notices
 
-- **Scenario:** `agents-commands` at 390px. File `agents-keys.e2e.ts`; `fixture.controlClaude` blocks an Idle session at a dialog with a long row, then another at a Bash permission.
+- **Scenario:** `agents-blocked` at 390px. File `agents-keys.e2e.ts`; `fixture.controlClaude` blocks an Idle session at a dialog with a long row, then another at a Bash permission.
 - **Steps:**
   1. Open the dialog session: read the notice, then Screen.
   2. Close Screen and open the permission session.

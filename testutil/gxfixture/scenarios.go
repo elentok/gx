@@ -602,12 +602,16 @@ var scenarios = map[string]scenario{
 	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
 	// the Agents mock, and a worktree in demo. See agentsScenario.
 	"agents": agentsScenario(),
-	// agents-commands: agents plus fixed command lists from both fakes, an extra
-	// skill in the feature worktree and three sessions with command entries.
+	// agents-commands: six lean sessions and two design sessions with fixed
+	// command lists from both fakes and an extra skill in the feature worktree.
 	// -slow delays the list probes past what a flow waits; -failed fails them.
 	"agents-commands":        commandsScenario("", false),
 	"agents-commands-slow":   commandsScenario(slowProbeDelay, false),
 	"agents-commands-failed": commandsScenario("", true),
+	// agents-blocked: agents plus the command fakes, sessions with command
+	// entries, every Blocked state, a Rate limited one, a held Queue agent and
+	// two design sessions, for the key and permission flows.
+	"agents-blocked": blockedScenario(),
 	// default-harness: the global Default harness is claude; gx overrides to codex,
 	// demo and dotfiles inherit. One ticket waits behind a held Claude worker, and
 	// the Agents tab holds a Claude, a Codex and a model-switched Claude session.

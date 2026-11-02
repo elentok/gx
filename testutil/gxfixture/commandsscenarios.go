@@ -41,18 +41,56 @@ func commandEntries() []agentfake.ProbeEntry {
 	}
 }
 
-// commandsScenario extends agents with the command-list fakes, three sessions
-// that carry command entries, and an extra skill in the feature worktree. delay
-// and fail shape the list probes.
-func commandsScenario(delay string, fail bool) scenario {
-	sc := agentsScenario()
+// commandStepsSession is an idle Claude session whose chat holds the /cost
+// output and the /model pill, so a flow can read a command's result.
+func commandStepsSession() sessionSpec {
+	cost := make([]string, 14)
+	for i := range cost {
+		cost[i] = fmt.Sprintf("\x1b[1mcost line %d\x1b[0m: \x1b[32m$0.%02d\x1b[0m", i+1, i)
+	}
+	costOutput, empty := strings.Join(cost, "\n"), ""
+	return sessionSpec{project: project, prompt: "hello", read: true, steps: []commandStep{
+		{prompt: "/cost", output: &costOutput},
+		{prompt: "/model", output: &empty},
+		{prompt: "/todos", output: &empty},
+		{prompt: "/compact", turn: true},
+	}}
+}
+
+// leanCommandSessions is the order the command flows rely on: four idle Claude
+// sessions (claudeIdle 0..3, the last holds command output; flow 181 sends to
+// three of them, and each sent command keeps its session busy), an idle Codex
+// one, a Working one and an Exited one. The design sessions follow
+// (addDesignAgents).
+func leanCommandSessions() []sessionSpec {
+	return []sessionSpec{
+		{project: project, prompt: "hello", read: true},
+		{project: project, prompt: "hello", read: true},
+		{project: project, prompt: "hello", read: true},
+		commandStepsSession(),
+		{project: project, harness: "codex"},
+		{project: project, prompt: agentfake.ChatSlowMarker + " a long turn"},
+		{project: project, prompt: "hello", crash: true, read: true},
+	}
+}
+
+// withCommandFakes gives sc the command-list fakes and an extra skill in the
+// feature worktree of demo. delay and fail shape the list probes.
+func withCommandFakes(sc *scenario, delay string, fail bool) {
 	sc.commands = &agentfake.ProbeConfig{Entries: commandEntries(), Delay: delay, Fail: fail}
 	base := sc.gitSetup
 	sc.gitSetup = func(f *fixture, repo string) error {
-		if err := base(f, repo); err != nil {
-			return err
+		if base != nil {
+			if err := base(f, repo); err != nil {
+				return err
+			}
 		}
 		feature := filepath.Join(repo, ".worktrees", "feature")
+		if base == nil {
+			if err := f.git(repo, "worktree", "add", "-b", "feature", feature); err != nil {
+				return err
+			}
+		}
 		layer, err := json.Marshal(agentfake.ProbeConfig{Entries: append(commandEntries(),
 			agentfake.ProbeEntry{Name: featureSkill, Description: "Only in the feature worktree"})})
 		if err != nil {
@@ -60,24 +98,37 @@ func commandsScenario(delay string, fail bool) scenario {
 		}
 		return os.WriteFile(filepath.Join(feature, agentfake.CommandsCwdFile), layer, 0o644)
 	}
-	cost := make([]string, 14)
-	for i := range cost {
-		cost[i] = fmt.Sprintf("\x1b[1mcost line %d\x1b[0m: \x1b[32m$0.%02d\x1b[0m", i+1, i)
+}
+
+// commandsScenario is the lean scenario of the command flows: seven sessions and
+// the two design sessions, with no Blocked, Rate limited or Queue sessions.
+func commandsScenario(delay string, fail bool) scenario {
+	sc := scenario{
+		codex:       true,
+		chat:        true,
+		designSteps: map[string]string{},
+		sessions:    leanCommandSessions(),
 	}
-	costOutput, empty := strings.Join(cost, "\n"), ""
+	withCommandFakes(&sc, delay, fail)
+	addDesignAgents(&sc)
+	return sc
+}
+
+// blockedScenario extends agents with the command-list fakes, three sessions
+// that carry command entries and every Blocked state the key and permission
+// flows read.
+func blockedScenario() scenario {
+	sc := agentsScenario()
+	withCommandFakes(&sc, "", false)
 	sc.sessions = append(sc.sessions,
-		sessionSpec{project: project, prompt: "hello", read: true, steps: []commandStep{
-			{prompt: "/cost", output: &costOutput},
-			{prompt: "/model", output: &empty},
-			{prompt: "/todos", output: &empty},
-			{prompt: "/compact", turn: true},
-		}},
+		commandStepsSession(),
 		sessionSpec{project: project, harness: "codex", steps: []commandStep{{prompt: "/status"}}},
 		sessionSpec{project: "site", prompt: "hello", crash: true, read: true},
 	)
 	sc.sessions = append(sc.sessions, blockedCommandSessions()...)
 	sc.sessions = append(sc.sessions, stateCommandSessions()...)
-	addQueueAndDesignAgents(&sc)
+	addQueueAgent(&sc)
+	addDesignAgents(&sc)
 	return sc
 }
 
@@ -95,24 +146,26 @@ func stateCommandSessions() []sessionSpec {
 	}
 }
 
-// addQueueAndDesignAgents adds a held Queue agent, a Claude design session with
-// auto-advance on, and a Codex design session. The Codex one lives in gx, whose
-// project config defaults to Codex, so no seeded Claude session changes harness.
-func addQueueAndDesignAgents(sc *scenario) {
-	const queueEpic, autoMap, codexMap = "queue-epic", "design-auto", "design-codex"
+// addQueueAgent adds a held Queue agent.
+func addQueueAgent(sc *scenario) {
+	const queueEpic = "queue-epic"
+	sc.epics = append(sc.epics, epic{project, queueEpic, []ticket{{"01", "held", servertest.TicketOpts{}}}})
+	sc.queue = []string{project + ":" + queueEpic}
+	sc.hold = true
+}
+
+// addDesignAgents adds a Claude design session with auto-advance on, and a
+// Codex design session. The Codex one lives in gx, whose project config
+// defaults to Codex, so no seeded Claude session changes harness.
+func addDesignAgents(sc *scenario) {
+	const autoMap, codexMap = "design-auto", "design-codex"
 	step := string(tickets.StepResolveTickets)
-	sc.epics = append(sc.epics,
-		epic{project, queueEpic, []ticket{{"01", "held", servertest.TicketOpts{}}}},
-		epic{project, autoMap, nil},
-		epic{"gx", codexMap, nil},
-	)
+	sc.epics = append(sc.epics, epic{project, autoMap, nil}, epic{"gx", codexMap, nil})
 	sc.designSteps[project+":"+autoMap] = step
 	sc.designSteps["gx:"+codexMap] = step
 	sc.ownRepos = append(sc.ownRepos, "gx")
 	sc.projectExtra = map[string]string{"gx": `,"agents":{"default-harness":"codex"}`}
-	sc.queue = []string{project + ":" + queueEpic}
-	sc.hold = true
-	sc.openDesigns = []string{project + ":" + autoMap, "gx:" + codexMap}
+	sc.openDesigns = append(sc.openDesigns, project+":"+autoMap, "gx:"+codexMap)
 }
 
 // blockedCommandSessions are the sessions Blocked at a dialog or a permission

@@ -68,14 +68,14 @@ async function closeDialogTwice(page: Page, fixture: Fixture, hash: string, s: S
 }
 
 test("157. Close dialog, Agents page", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 1280, height: 800 });
   const { s, conv } = await blockIdle(fixture, QUESTION, "input needed");
   await closeDialogTwice(page, fixture, `#/agents/${s.id}`, s, conv);
 });
 
 test("157. Close dialog, design page", async ({ page, start }) => {
-  const fixture = await start("agents-commands", { autoAdvanceDelay: "1h" });
+  const fixture = await start("agents-blocked", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
   const design = (await sessions(fixture)).find((s) => s.ticket === "demo:design-auto")!;
   const conv = await conversationOf(fixture, design.id);
@@ -85,7 +85,7 @@ test("157. Close dialog, design page", async ({ page, start }) => {
 });
 
 test("158. Allow once and Deny, readable Claude prompt", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 1280, height: 800 });
 
   const allow = await blockIdle(fixture, BASH_DIALOG("rg allow-me"));
@@ -107,7 +107,7 @@ test("158. Allow once and Deny, readable Claude prompt", async ({ page, start })
 });
 
 test("158. Allow once refused for Claude prompts gx cannot approve", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 1280, height: 800 });
   const refused = async (text: string, notice: string) => {
     const s = await blockedAt(fixture, "claude", text);
@@ -154,7 +154,7 @@ test("158. Allow once refused for Claude prompts gx cannot approve", async ({ pa
 });
 
 test("158. Ignored Allow key shows the not-delivered text", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 1280, height: 800 });
   const s = await blockedAt(fixture, "claude", "rg ignores-allow");
   const conv = await conversationOf(fixture, s.id);
@@ -169,7 +169,7 @@ test("158. Ignored Allow key shows the not-delivered text", async ({ page, start
 });
 
 test("158. Allow once and Deny, Codex hook and screen", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
+  const fixture = await start("agents-blocked");
   await page.setViewportSize({ width: 1280, height: 800 });
 
   const hook = await blockedAt(fixture, "codex", "rg codex-hook");
@@ -196,7 +196,7 @@ test("158. Allow once and Deny, Codex hook and screen", async ({ page, start }) 
 });
 
 test("158. Allow once and Deny, design page", async ({ page, start }) => {
-  const fixture = await start("agents-commands", { autoAdvanceDelay: "1h" });
+  const fixture = await start("agents-blocked", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
   const design = (await sessions(fixture)).find((s) => s.ticket === "demo:design-auto")!;
   const conv = await conversationOf(fixture, design.id);

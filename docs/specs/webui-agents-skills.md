@@ -191,7 +191,7 @@ Blocked notices
 Fixtures and fakes
 
 - `fakeclaude` answers the `initialize` probe with a list the scenario sets, and can fail or delay it. `fakecodex` does the same for `codex app-server` `skills/list`. `fakeclaude` writes `<local-command-caveat>` and `<local-command-stdout>` lines for a built-in command the scenario names, and `fakecodex` writes a rollout user message for a `/` command. The fakes already model a dialog (`dialogNext`) and a permission dialog. `fakeclaude` also gets an option that ignores the Allow key, so the permission dialog stays open and the keys route answers `not-delivered`.
-- Scenarios `agents-commands`, `agents-commands-slow` and `agents-commands-failed` extend `agents`. See Verification.
+- Scenarios `agents-blocked` extends `agents`; `agents-commands`, `agents-commands-slow` and `agents-commands-failed` are lean (seven sessions and two design sessions). See Verification.
 
 ## Testing Decisions
 
@@ -217,12 +217,12 @@ Fixtures and fakes
 
 ## Verification
 
-New scenarios to write (each becomes an implementation ticket). All three extend `agents`, so they keep its projects, sessions, design sessions, Codex session and the `feature` worktree in `demo`.
+New scenarios to write (each becomes an implementation ticket). `agents-blocked` extends `agents`, so it keeps its projects, sessions, design sessions, Codex session and the `feature` worktree in `demo`. `agents-commands` is lean: three idle Claude sessions, the `/cost` one, a Codex one, a Working one, an Exited one and the two design sessions, with the `feature` worktree.
 
-- `agents-commands`:
+- `agents-commands` (the lean one has only the first, the `/cost`, the Codex, the design, Working and Exited items):
   - `fakeclaude` and `fakecodex` answer the list probes with a fixed list. Claude's list holds built-ins, skills (one with `<` in its description), a plugin command and an MCP prompt. Codex's `skills/list` holds skills, one name twice. The `feature` worktree holds one extra skill that no other worktree has.
   - An Idle Claude session whose chat holds a `/cost` pill with 14 lines of output, a `/model` pill with no output, an empty-output command, a caveat line and a `/compact` line.
-  - An Idle Codex session whose chat holds a `/status` pill.
+  - An Idle Codex session whose chat holds a `/status` pill (`agents-blocked` only).
   - A Claude session Blocked at a dialog after `/model`.
   - A Claude session Blocked on a Bash permission prompt whose text is readable, and one whose screen cannot be parsed.
   - A Claude session Blocked on a permission whose first option is not a plain "Yes".
