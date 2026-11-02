@@ -25,7 +25,10 @@ const selfFile = "sleepguard/sleepguard_test.go"
 // the map sorted, one entry per line.
 var allowed = map[string]int{
 	"agentrunner/herdrrunner/conformance_test.go":   1,
-	"brief/brief_test.go":                           1,
+	"brief/brief_test.go":                           2, // poll loops with a deadline
+	"check/check_test.go":                           1, // poll loop with a deadline waiting on the go step
+	"cmd/brief_cleancache_test.go":                  1, // negative wait: go clean does not run while a build holds the gate
+	"cmd/brief_test.go":                             1, // poll loop with a deadline waiting on the fake go
 	"cmd/agent_permission_request_test.go":          3, // one poll loop with a deadline; negative waits: no request is filed; a stale decision is ignored
 	"cmd/brief_retention_test.go":                   1,
 	"codexdoctor/session_test.go":                   1, // poll loop with a deadline waiting on the rollout
@@ -81,6 +84,7 @@ var allowed = map[string]int{
 	"server/headless_block_reclaim_test.go":         2,
 	"server/healthprocs_test.go":                    4,
 	"server/latefinish_test.go":                     2,
+	"server/limithistory_codex_test.go":             2, // settle wait for the event coalescer; received-at has second granularity
 	"server/map_done_test.go":                       1,
 	"server/merge_finish_test.go":                   1,
 	"server/mergedecide_test.go":                    3,
@@ -110,24 +114,29 @@ var allowed = map[string]int{
 	"server/sessions_failstart_test.go":             1,
 	"server/sessions_failure_banner_test.go":        1,
 	"server/sessions_firstprompt_failure_test.go":   1,
+	"server/sessions_firstprompt_launch_test.go":    1, // negative wait: a resend would come within a few ResendEvery
 	"server/sessions_firstprompt_test.go":           3,
 	"server/sessions_test.go":                       1,
 	"server/slackhook_test.go":                      1,
+	"server/tokenpoll_test.go":                      2, // poll loop with a deadline; negative wait: no poll while a migration is held
 	"server/trunkconflict_claim_test.go":            1,
 	"server/servertest/ptyrunner_test.go":           3, // negative waits: a wrong reap or kill would come within a few polls
 	"server/trunklock_test.go":                      1,
 	"server/unavailable_test.go":                    1,
 	"storecommit/storecommit_test.go":               3,
 	"testutil/agentfake/harness_test.go":            1,
-	"testutil/agentfake/tui_test.go":                7, // negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open
+	"testutil/agentfake/tui_test.go":                9, // poll loop with a deadline; negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open; a lone Esc leaves the turn alone; a stall lands before the prompt; the registry delay (1s) must pass before the retry
 	"testutil/agentfake/worker_test.go":             1,
+	"testutil/gxfixture/cachegate_test.go":          5, // two poll loops with a deadline; negative waits: the gate holds the clean
 	"testutil/gxfixture/disk_test.go":               2,
+	"testutil/gxfixture/limitburn_test.go":          4, // three poll loops with a deadline; a settle wait so the poll sees the first line
 	"testutil/gxfixture/main_test.go":               8,
 	"testutil/gxfixture/migrate_test.go":            2, // poll loop with a deadline; negative wait: the hold must keep the server migrating
 	"testutil/gxfixture/restart_test.go":            1, // poll loop with a deadline waiting on the running-agent count
 	"testutil/herdrfake/state_test.go":              2,
 	"testutil/runnerfake/runnerfake_test.go":        1,
 	"tickets/stamp_lock_test.go":                    1,
+	"tokenledger/ledger_test.go":                    3, // mtime granularity: a no-op write must leave the file's mtime alone
 	"ui/agents/attach_test.go":                      1,
 	"ui/agents/fake_client_test.go":                 1,
 	"ui/agents/focus_test.go":                       2,

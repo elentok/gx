@@ -179,11 +179,11 @@ func (d *Drivers) runCommit() (Recording, error) {
 		{"-C", repo, "commit", "-q", "--allow-empty", "-m", "initial"},
 		{"-C", repo, "worktree", "add", "-q", "-b", "doctor-probe", wt},
 	} {
-		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+		if out, err := d.git(args...).CombinedOutput(); err != nil {
 			return Recording{}, fmt.Errorf("git %s: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 		}
 	}
-	gitDirOut, err := exec.Command("git", "-C", wt, "rev-parse", "--absolute-git-dir").Output()
+	gitDirOut, err := d.git("-C", wt, "rev-parse", "--absolute-git-dir").Output()
 	if err != nil {
 		return Recording{}, err
 	}
@@ -197,7 +197,7 @@ func (d *Drivers) runCommit() (Recording, error) {
 	if err != nil {
 		return Recording{}, err
 	}
-	out, err := exec.Command("git", "-C", wt, "rev-list", "--count", "HEAD").Output()
+	out, err := d.git("-C", wt, "rev-list", "--count", "HEAD").Output()
 	if err != nil {
 		return Recording{}, err
 	}
@@ -448,6 +448,13 @@ func codexPath(env []string) (string, error) {
 		}
 	}
 	return "", errors.New("codex not found on PATH")
+}
+
+// git builds a git command that runs with the caller's env.
+func (d *Drivers) git(args ...string) *exec.Cmd {
+	cmd := exec.Command("git", args...)
+	cmd.Env = d.Env
+	return cmd
 }
 
 // withEnv returns env with each KEY=VALUE in set replacing any earlier KEY.

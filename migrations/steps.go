@@ -54,6 +54,11 @@ func init() {
 		return nil, nil
 	}})
 	Default.Register(Step{Name: ledgerStepName, Append: true, Run: rebuildLedger})
+	// prefix-tokens: PrefixTokens is optional and an older ticket reads as zero,
+	// so there is nothing to rewrite.
+	Default.Register(Step{Name: "prefix-tokens", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

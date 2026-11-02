@@ -6,6 +6,7 @@ struct schema.Ticket
   Type schema.TicketType 
   ExpectedContextWindow int 
   ActualContextWindow int 
+  PrefixTokens int 
   ElapsedTime int 
   ActualCost float64 
   Compactions int 
