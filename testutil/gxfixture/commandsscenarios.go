@@ -152,6 +152,7 @@ func addQueueAgent(sc *scenario) {
 	sc.epics = append(sc.epics, epic{project, queueEpic, []ticket{{"01", "held", servertest.TicketOpts{}}}})
 	sc.queue = []string{project + ":" + queueEpic}
 	sc.hold = true
+	sc.queueAfterSessions = true
 }
 
 // addDesignAgents adds a Claude design session with auto-advance on, and a

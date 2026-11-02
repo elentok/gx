@@ -472,23 +472,31 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	for _, addr := range sc.queue {
-		args := []string{"server", "queue", "add", addr}
-		if agent := sc.queueAgents[addr]; agent != "" {
-			args = append(args, "--agent", agent)
-		}
-		// A held migration holds the queue verb too; it finishes once the hold is released.
-		if sc.migrateHold {
-			cmd := exec.CommandContext(ctx, f.gx, args...)
-			cmd.Env = f.env
-			if err := cmd.Start(); err != nil {
-				return fmt.Errorf("queue %s: %w", addr, err)
+	queueAll := func() error {
+		for _, addr := range sc.queue {
+			args := []string{"server", "queue", "add", addr}
+			if agent := sc.queueAgents[addr]; agent != "" {
+				args = append(args, "--agent", agent)
 			}
-			go func() { _ = cmd.Wait() }()
-			continue
+			// A held migration holds the queue verb too; it finishes once the hold is released.
+			if sc.migrateHold {
+				cmd := exec.CommandContext(ctx, f.gx, args...)
+				cmd.Env = f.env
+				if err := cmd.Start(); err != nil {
+					return fmt.Errorf("queue %s: %w", addr, err)
+				}
+				go func() { _ = cmd.Wait() }()
+				continue
+			}
+			if out, err := f.cli(args...); err != nil {
+				return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
+			}
 		}
-		if out, err := f.cli(args...); err != nil {
-			return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
+		return nil
+	}
+	if !sc.queueAfterSessions {
+		if err := queueAll(); err != nil {
+			return err
 		}
 	}
 	if len(sc.queueAfterUsage) > 0 {
@@ -533,6 +541,11 @@ func run(args []string) (err error) {
 	}
 	if err := f.seedSessions(sc); err != nil {
 		return err
+	}
+	if sc.queueAfterSessions {
+		if err := queueAll(); err != nil {
+			return err
+		}
 	}
 	// Plain sessions are made before openDesigns, which then starts the newer
 	// run, but linked after it: a map with a live design session makes `designs

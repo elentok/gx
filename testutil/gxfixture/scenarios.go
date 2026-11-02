@@ -97,6 +97,9 @@ type scenario struct {
 	noCheckConfig bool
 	// ownRepos lists the projects that get a repo of their own instead of the shared one.
 	ownRepos []string
+	// queueAfterSessions queues sc.queue once the sessions are seeded: a Queue
+	// agent's control file would otherwise break seedSession's before/after diff.
+	queueAfterSessions bool
 	// queueAfterUsage lists the epics queued once the server has stored a usage
 	// sample, so the usage gate is already up when they first try to claim.
 	queueAfterUsage []string
