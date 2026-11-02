@@ -101,14 +101,23 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
 		step, text string
+		// stopped: a finished design's session is stopped, so its holder is gone.
+		stopped bool
 	}{
 		"grilling":   {step: "spec", text: "❓ **Q1** Which store?\n" + runEndText},
 		"branch":     {step: "branch", text: runEndText},
-		"done":       {step: "done", text: runEndText},
+		"done":       {step: "done", text: runEndText, stopped: true},
 		"no run-end": {step: "spec", text: "Interrupted mid-step."},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := startAdvancing(t, storeWithMapStep(t, tc.step))
+			if tc.stopped {
+				waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+				if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
+					t.Errorf("countdown = %v, want none", got.AutoAdvanceAt)
+				}
+				return
+			}
 			c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 			writeAssistantMessage(t, f.path, tc.text)
 			endTurn(t, f)
