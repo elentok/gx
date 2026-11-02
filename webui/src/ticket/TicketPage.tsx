@@ -1,10 +1,12 @@
 import { Box } from "@chakra-ui/react";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { fetchTicketScreen, type FetchScreen } from "../design/screen";
 import { ScreenModal } from "../design/ScreenModal";
 import { DetailPage } from "../page/DetailPage";
 import { VerdictLine, verdictText } from "../verdict";
+import { isExited } from "../agents/sessionWrites";
 import { PageHeader } from "../page/PageHeader";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -26,7 +28,10 @@ export function TicketPage({
 }) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps a running ticket's clock counting.
-  const verdict = verdictText(useConnectionState(conn).snapshot?.pending, address);
+  const snapshot = useConnectionState(conn).snapshot;
+  const verdict = verdictText(snapshot?.pending, address);
+  const navigate = useNavigate();
+  const agent = snapshot?.sessions?.find((s) => s.ticket === address && !isExited(s));
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
   const [showScreen, setShowScreen] = useState(false);
@@ -45,11 +50,18 @@ export function TicketPage({
                 </Box>
               )}
             </PageHeader>
-            {detail.has_screen && (
-              <Box mt="2">
-                <Button emphasis="secondary" onClick={() => setShowScreen(true)}>
-                  Screen
-                </Button>
+            {(detail.has_screen || agent) && (
+              <Box mt="2" display="flex" gap="2">
+                {detail.has_screen && (
+                  <Button emphasis="secondary" onClick={() => setShowScreen(true)}>
+                    Screen
+                  </Button>
+                )}
+                {agent && (
+                  <Button emphasis="secondary" onClick={() => navigate(`/agents/${agent.id}`)}>
+                    Goto agent
+                  </Button>
+                )}
               </Box>
             )}
             {showScreen && <ScreenModal target={address} fetcher={fetchScreen} onClose={() => setShowScreen(false)} />}

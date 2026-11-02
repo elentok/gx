@@ -73,7 +73,7 @@ export function ScreenModal({
   const problem = refusal ? refusalText(refusal) : sendError;
 
   return (
-    <Modal label="Screen" onClose={onClose} w={{ md: "720px" }} px={{ md: "5" }} py={{ md: "4.5" }} gap={{ md: "3" }}>
+    <Modal label="Screen" onClose={onClose} w={{ md: "min(1200px, 92vw)" }} px={{ md: "5" }} py={{ md: "4.5" }} gap={{ md: "3" }}>
       <Box display="flex" gap="2" alignItems="center" justifyContent="space-between">
         <Text as="h3" m="0" fontFamily="condensed" fontSize="22px" textTransform="uppercase" letterSpacing="0.02em">
           Screen
@@ -94,7 +94,7 @@ export function ScreenModal({
           aria-label="Screen rows"
           fontSize="xs"
           overflow="auto"
-          maxH={{ md: "180px" }}
+          maxH={{ md: "70vh" }}
           m="0"
           p="3"
           borderWidth="1px"
