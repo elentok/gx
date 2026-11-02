@@ -689,6 +689,14 @@ an exited session.
   - After the first append every group gained exactly 250,000 tokens today in `gx server stats --json`, and today's Tokens bar tooltip lists all four groups with those numbers.
   - After the second append every group gained exactly 100,000 more (only the delta is added), and the tooltip matches `gx server stats --json` again.
 
+## 185. Check-lock waiting label
+
+- **Scenario:** `check-lock` (epic `lock-epic`; one held agent, plus a live check-lock waiting state that `fixture.releaseCheckLock()` removes). File `check-lock.e2e.ts`.
+- **Steps:** open `#/t/demo:lock-epic/01` by hash; release the lock.
+- **Pass:**
+  - While waiting, the header shows the label "waiting for the check lock, held by run-holding-the-lock" next to the `claimed` status, and no Paused badge.
+  - After the release the label is gone and the status is still `claimed`.
+
 ## 58. Dirty trunk on the Epic page
 
 - **Scenario:** `dirty-trunk` (epic `dirty-epic`; the trunk has an untracked `same.txt` that the

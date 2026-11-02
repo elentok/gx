@@ -20,6 +20,11 @@ export function TicketHeader({ detail, now }: { detail: TicketDetail; now: numbe
           <a href={epicHref(detail.epic)}>Epic: {slugOf(detail.epic)}</a>
         </Button>
         <Badge tone={tone}>{label}</Badge>
+        {detail.waiting_label && (
+          <Badge tone="waiting" data-waiting-label>
+            {detail.waiting_label}
+          </Badge>
+        )}
         <LongRunningBadge of={detail} />
         {isRunning(detail) && <Arc label="Running" />}
       </Box>

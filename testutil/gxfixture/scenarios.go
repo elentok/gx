@@ -145,6 +145,9 @@ type scenario struct {
 	// spend seeds the budget ledger before the server starts, in the shape the
 	// --shape flag names (default normal), and prints the held agent's transcript path.
 	spend bool
+	// checkWaiting writes a live check-lock waiting state for the held agent's
+	// worktree once it runs, and prints the file's path.
+	checkWaiting bool
 	// limitBurn seeds the Claude limits file and the limit history before the
 	// server starts, in the shape the --shape flag names (default menu).
 	limitBurn bool
@@ -331,6 +334,16 @@ var scenarios = map[string]scenario{
 		queue: []string{project + ":spend-epic"},
 		hold:  true,
 		spend: true,
+	},
+	// check-lock: one fake agent held running, with a live waiting state for the
+	// check lock that a flow removes to end the wait.
+	"check-lock": {
+		epics: []epic{{project, "lock-epic", []ticket{
+			{"01", "held", servertest.TicketOpts{}},
+		}}},
+		queue:        []string{project + ":lock-epic"},
+		hold:         true,
+		checkWaiting: true,
 	},
 	// mixed: tickets in several states, and a worker that asks and fails.
 	"mixed": {

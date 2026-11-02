@@ -93,6 +93,9 @@ type Output struct {
 	// AgentTranscript is the held fake agent's transcript path in the spend
 	// scenario; the directory may not exist yet.
 	AgentTranscript string `json:"agent_transcript,omitempty"`
+	// CheckWaitingFile is the live check-lock waiting state of the check-lock
+	// scenario; removing it ends the wait. Empty elsewhere.
+	CheckWaitingFile string `json:"check_waiting_file,omitempty"`
 	// Transcripts are the limit-burn live shape's Claude transcript paths, keyed
 	// queue, one_off, design and other; the directories may not exist yet.
 	Transcripts map[string]string `json:"transcripts,omitempty"`
@@ -522,6 +525,12 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
+	checkWaitingFile := ""
+	if sc.checkWaiting {
+		if checkWaitingFile, err = f.writeCheckWaiting(ctx); err != nil {
+			return err
+		}
+	}
 	if err := f.seedSessions(sc); err != nil {
 		return err
 	}
@@ -568,7 +577,7 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript}
+	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript, CheckWaitingFile: checkWaitingFile}
 	if sc.fakeGo {
 		o.GateDir = f.gateDir()
 	}

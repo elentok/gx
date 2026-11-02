@@ -44,6 +44,17 @@ test("a ticket without a pty agent has no Screen button", async () => {
   expect(screen.queryByRole("button", { name: "Screen" })).toBeNull();
 });
 
+test("the ticket header shows the check-lock waiting label as a status label, and nothing without it", async () => {
+  const claimed = { ...base, status: "claimed" };
+  await renderTicket({ ...claimed, waiting_label: "waiting for the check lock, held by run-1" });
+  expect(document.querySelector("[data-waiting-label]")?.textContent).toBe("waiting for the check lock, held by run-1");
+  expect(screen.queryByText(/Paused/)).toBeNull();
+  cleanup();
+
+  await renderTicket(claimed);
+  expect(document.querySelector("[data-waiting-label]")).toBeNull();
+});
+
 test("the ticket page shows the ticket's verdict under the header, and nothing without a pending row", async () => {
   const mine: PendingRow = { address: "gx:demo/12", agent: "", verdict: "disk low", reason: "/tmp has 5G free" };
   await renderTicket(base, undefined, [{ ...mine, address: "gx:demo/13", verdict: "concurrency cap" }]);

@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { fetchTicketScreen, type FetchScreen } from "../design/screen";
@@ -17,6 +17,8 @@ import { useTicketDetail, type FetchDetail } from "./detail";
 import { TicketHeader } from "./TicketHeader";
 import { hasSections, NothingHere, TicketSections } from "./TicketSections";
 
+const WAITING_REFETCH_MS = 2000;
+
 export function TicketPage({
   address,
   fetchDetail,
@@ -33,6 +35,13 @@ export function TicketPage({
   const navigate = useNavigate();
   const agent = snapshot?.sessions?.find((s) => s.ticket === address && !isExited(s));
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
+  // The lock being taken emits no ticket event, so a page that shows the wait re-reads until it clears.
+  const waiting = !!detail?.waiting_label;
+  useEffect(() => {
+    if (!waiting) return;
+    const id = setInterval(refetch, WAITING_REFETCH_MS);
+    return () => clearInterval(id);
+  }, [waiting, refetch]);
   const [sent, setSent] = useState<Sent | null>(null);
   const [showScreen, setShowScreen] = useState(false);
 
