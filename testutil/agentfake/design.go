@@ -259,14 +259,26 @@ func (t *tui) writeCommandOutput(command, stdout string) error {
 }
 
 // rateLimit answers the worker's prompt with the rate-limit error claude writes
-// when the usage limit is hit, and stays idle.
+// when the usage limit is hit. The turn goes busy first, as in claude: a launch
+// prompt only counts as delivered once the server sees a turn start, and
+// without it the launch is retried and the hold never applies.
 func (t *tui) rateLimit(cfg WorkerConfig) error {
 	reset := DefaultRateLimitReset
 	if d, err := time.ParseDuration(cfg.RateLimitReset); err == nil && d > 0 {
 		reset = d
 	}
 	msg := "You've hit your limit · resets " + time.Now().Add(reset).Format("3:04pm")
-	return t.apiError(Control{Error: "rate_limit", Status: 429, Message: msg})
+	if err := t.setStatus(StatusBusy, ""); err != nil {
+		return err
+	}
+	if err := t.apiError(Control{Error: "rate_limit", Status: 429, Message: msg}); err != nil {
+		return err
+	}
+	go func() {
+		time.Sleep(designTurnTime)
+		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+	}()
+	return nil
 }
 
 func (t *tui) transcriptPath() (string, error) {
