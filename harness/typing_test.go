@@ -339,6 +339,24 @@ func TestClaudeReadyToType_LaunchOverrideSkipsUntilToggle(t *testing.T) {
 	}
 }
 
+func TestClaudeReadyToType_UnrelatedConfigRewriteIsNotAToggle(t *testing.T) {
+	vimConfig(t, "vim")
+	h, _ := harness.Lookup(harness.Claude)
+	h.Launch(harness.LaunchOptions{SessionID: "rewrite"})
+	ty, _ := harness.LookupTyping(harness.Claude)
+	s := &screenIO{rows: [][]string{normalRows, insertRows}}
+	io := s.io()
+	io.Session = "rewrite"
+	// Claude rewrites .claude.json all the time; editorMode stays as it was.
+	cfg := []byte(`{"editorMode":"vim","numStartups":42}`)
+	if err := os.WriteFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json"), cfg, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !ty.ReadyToType(io) || len(s.keys) != 0 {
+		t.Fatalf("unrelated rewrite read as a toggle: keys = %q", s.keys)
+	}
+}
+
 func TestCodexReadyToType_IsANoOp(t *testing.T) {
 	vimConfig(t, "vim")
 	ty, _ := harness.LookupTyping(harness.Codex)

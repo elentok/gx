@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ var vimSessions = struct {
 }{m: map[string]*vimSession{}}
 
 type vimSession struct {
-	// overrideFiles is the editor-mode files' content at launch; set when the
+	// overrideFiles is the editor-mode files' editorMode values at launch; set when the
 	// launch forced normal mode.
 	overrideFiles string
 	overridden    bool
@@ -107,6 +108,9 @@ func probeWanted(session string, env []string, io TypingIO) bool {
 	return s.toggled
 }
 
+// editorFilesContent is the editorMode each config file holds, nothing else:
+// claude rewrites ~/.claude.json all the time, so its whole content changing is
+// no sign of a /config toggle.
 func editorFilesContent(env []string) string {
 	configDir, globalDir, err := claudeConfigDirs(env)
 	if err != nil {
@@ -114,8 +118,13 @@ func editorFilesContent(env []string) string {
 	}
 	var sb strings.Builder
 	for _, path := range []string{filepath.Join(globalDir, ".claude.json"), filepath.Join(configDir, "settings.json")} {
-		data, _ := os.ReadFile(path)
-		sb.Write(data)
+		var cfg struct {
+			EditorMode string `json:"editorMode"`
+		}
+		if data, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(data, &cfg)
+		}
+		sb.WriteString(cfg.EditorMode)
 		sb.WriteByte(0)
 	}
 	return sb.String()
