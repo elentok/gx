@@ -267,9 +267,17 @@ func (r *running) get(t *testing.T, url string, signedIn bool) int {
 	return resp.StatusCode
 }
 
+// smokeScenarios are the scenarios no other test starts, plus "ready" as the
+// baseline. The covered ones need no second start here.
+var smokeScenarios = []string{
+	"check-lock", "design-branch", "design-defaulted", "design-error", "design-guard",
+	"design-mixed", "design-plain", "design-text", "design-working", "edge",
+	"long-running", "mixed", "model-mismatch", "restart-launchd", "ready",
+}
+
 func TestScenarios_StartAnswerAndStop(t *testing.T) {
 	t.Parallel()
-	for _, name := range scenarioNames() {
+	for _, name := range smokeScenarios {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			r := start(t, name)
@@ -537,34 +545,45 @@ func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T)
 	r.stop(t)
 }
 
-func TestBlockedMenuScenario_QuestionMenuPausesBlockedPaneAfterTheDwell(t *testing.T) {
+// waitBlockedSession waits for the ticket's agent to sit on a blocked pane. It
+// stops there: the 15 s dwell before the pause is covered by the injected-Sleep
+// tests in ralphloop and by the Playwright pause and codex flows.
+func (r *running) waitBlockedSession(t *testing.T, addr string) {
+	t.Helper()
+	var list []server.SessionInfo
+	if !testutil.Poll(60*time.Second, time.Second, func() bool {
+		list = nil
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(list, func(s server.SessionInfo) bool {
+			return s.Ticket == addr && s.Status.State == server.SessionBlocked
+		})
+	}) {
+		t.Fatalf("no blocked session on %s; sessions = %+v", addr, list)
+	}
+}
+
+func TestBlockedMenuScenario_QuestionMenuLeavesTheAgentBlocked(t *testing.T) {
 	t.Parallel()
 	r := start(t, "blocked-menu")
-	const addr = "demo:menu-epic/01"
-	// The wait loop pauses once the agent has stayed blocked past its 15 s dwell.
-	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.detail(t, addr).PauseReason == "blocked-pane" }) {
-		t.Fatalf("ticket %s pause_reason = %q, want blocked-pane", addr, r.detail(t, addr).PauseReason)
-	}
+	r.waitBlockedSession(t, "demo:menu-epic/01")
 	r.stop(t)
 }
 
-func TestCodexBlockedScenario_PermissionRequestPausesBlockedPaneAfterTheDwell(t *testing.T) {
+func TestCodexBlockedScenario_PermissionRequestShowsAPendingCard(t *testing.T) {
 	t.Parallel()
 	r := start(t, "codex-blocked")
 	const addr = "demo:codex-blocked-epic/01"
-	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.detail(t, addr).PauseReason == "blocked-pane" }) {
-		t.Fatalf("ticket %s pause_reason = %q, want blocked-pane", addr, r.detail(t, addr).PauseReason)
-	}
+	r.waitPermission(t, addr)
+	r.waitBlockedSession(t, addr)
 	r.stop(t)
 }
 
-func TestCodexErrorScenario_ModelErrorPausesBlockedPaneAfterTheDwell(t *testing.T) {
+func TestCodexErrorScenario_ModelErrorLeavesTheAgentBlocked(t *testing.T) {
 	t.Parallel()
 	r := start(t, "codex-error")
-	const addr = "demo:codex-error-epic/01"
-	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.detail(t, addr).PauseReason == "blocked-pane" }) {
-		t.Fatalf("ticket %s pause_reason = %q, want blocked-pane", addr, r.detail(t, addr).PauseReason)
-	}
+	r.waitBlockedSession(t, "demo:codex-error-epic/01")
 	r.stop(t)
 }
 
