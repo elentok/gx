@@ -20,9 +20,9 @@ var stepGrowth = map[tickets.DesignStep]int{
 	tickets.StepReview:         20_000,
 	tickets.StepResolveTickets: 50_000,
 	tickets.StepChart:          60_000,
-	tickets.StepGrillFindings:  150_000,
-	tickets.StepCreateTickets:  150_000,
-	tickets.StepBranch:         150_000,
+	tickets.StepGrillFindings:  80_000,
+	tickets.StepCreateTickets:  80_000,
+	tickets.StepBranch:         80_000,
 	tickets.StepDone:           0,
 }
 
@@ -55,7 +55,8 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 	growth := stepGrowth[step]
 	ceiling := ralphloop.SmartZoneCeiling
 	fmt.Fprintf(out, "used=%d growth=%d ceiling=%d\n", used, growth, ceiling)
-	if step != tickets.StepDone && used+growth >= ceiling {
+	// A session that has used nothing always fits: stopping cannot save any context.
+	if step != tickets.StepDone && used > 0 && used+growth >= ceiling {
 		return &ExitError{Code: 1}
 	}
 	return nil

@@ -199,9 +199,9 @@ Skill rules
   ceiling for every model, the same as ralph-loop's smart zone (`defaultSmartZone`). It replaces the
   50K rule in gx-design's "After every run".
 - Growth table, padded medians, in Go: spec 25K, review 20K, map ticket 50K, chart 60K, and
-  grill-findings through branch 150K as one block. Steps 6 to 8 always chain with each other, so a
-  check that lands on step 6 covers the whole block, and that block always starts in a fresh session
-  (47K + 150K > 130K).
+  grill-findings through branch 80K as one block. Steps 6 to 8 always chain with each other, so a
+  check that lands on step 6 covers the whole block. A session with 0 tokens used always fits, so a
+  blank session never loops on the check.
 - Command: `gx agent context-window --fits <step>`. It exits 0 for chain and 1 for stop, and prints
   the used tokens, the step's growth and the ceiling. Without `--fits` the command keeps printing
   the token count. Step names are the implementer's choice (the `design_step` values are the obvious

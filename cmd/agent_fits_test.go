@@ -30,9 +30,11 @@ func TestExecute_AgentContextWindow_Fits(t *testing.T) {
 		{"resolve-tickets", 80_000, 1},
 		{"chart", 69_999, 0},
 		{"chart", 70_000, 1},
-		{"grill-findings", 0, 1}, // 150K alone exceeds the ceiling
-		{"create-tickets", 0, 1},
-		{"branch", 0, 1},
+		{"grill-findings", 0, 0}, // a blank session always fits
+		{"create-tickets", 0, 0},
+		{"branch", 0, 0},
+		{"create-tickets", 49_999, 0},
+		{"create-tickets", 50_000, 1},
 		{"done", 129_000, 0},
 		{"done", 500_000, 0},
 	}
@@ -70,8 +72,8 @@ func TestExecute_AgentContextWindow_FitsGrillFindingsAliases(t *testing.T) {
 	for _, step := range []string{"grill-findings", "create-tickets", "branch"} {
 		var out bytes.Buffer
 		_ = execute([]string{"agent", "context-window", "--fits", step}, fitsDeps(&out, 10_000))
-		if !strings.Contains(out.String(), "150000") {
-			t.Errorf("%s: stdout %q missing the 150000 growth", step, out.String())
+		if !strings.Contains(out.String(), "80000") {
+			t.Errorf("%s: stdout %q missing the 80000 growth", step, out.String())
 		}
 	}
 }
@@ -167,8 +169,8 @@ func TestExecute_AgentContextWindow_FitsFreshCodexSessionUsesZero(t *testing.T) 
 	}
 	stdout.Reset()
 	code, err = fitsExit(t, []string{"agent", "context-window", "--agent", "codex", "--session", "c-1", "--fits", "grill-findings"}, d)
-	if err != nil || code != 1 {
-		t.Fatalf("grill-findings: code=%d err=%v, want the growth table to say exit 1", code, err)
+	if err != nil || code != 0 {
+		t.Fatalf("grill-findings: code=%d err=%v, want a blank session to fit", code, err)
 	}
 }
 
