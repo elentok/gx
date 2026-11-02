@@ -77,6 +77,11 @@ func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*ser
 	if res, err := h.Client.QueueAdd(context.Background(), answerAddr, "claude"); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
+	// A block raised while the launch still waits for the session to be ready fails
+	// the launch instead of showing the card.
+	servertest.WaitFor(t, time.Minute, "the launch finishes", func() bool {
+		return len(h.Server.Runs()) == 1 && h.Server.LaunchingRuns() == 0
+	})
 	fake.SetPending("epic-a-iter-01", p)
 	return h, fake
 }
