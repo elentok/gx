@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,10 +27,7 @@ func startCodexPromptSession(t *testing.T, extraEnv ...string) promptFixture {
 func startCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEnv ...string) promptFixture {
 	t.Helper()
 	codexPromptConv := "thread-server-prompt-" + strings.ReplaceAll(t.Name(), "/", "-")
-	bin := t.TempDir()
-	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex").CombinedOutput(); err != nil {
-		t.Fatalf("build fakecodex: %v\n%s", err, out)
-	}
+	bin := fakeCodexDir(t)
 	home := t.TempDir()
 	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = grace },
 		servertest.WithChatHarness("codex"),

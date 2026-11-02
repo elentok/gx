@@ -3,10 +3,12 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,15 +22,36 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
+var (
+	fakeCodexOnce sync.Once
+	fakeCodexBin  string // dir holding the built "codex"; removed by TestMain
+	fakeCodexErr  error
+)
+
+// fakeCodexDir builds fakecodex once per package run. Tests only read it.
+func fakeCodexDir(t *testing.T) string {
+	t.Helper()
+	fakeCodexOnce.Do(func() {
+		fakeCodexBin, fakeCodexErr = os.MkdirTemp("", "fakecodex-")
+		if fakeCodexErr != nil {
+			return
+		}
+		if out, err := exec.Command("go", "build", "-o", filepath.Join(fakeCodexBin, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex").CombinedOutput(); err != nil {
+			fakeCodexErr = fmt.Errorf("%w\n%s", err, out)
+		}
+	})
+	if fakeCodexErr != nil {
+		t.Fatalf("build fakecodex: %v", fakeCodexErr)
+	}
+	return fakeCodexBin
+}
+
 // withFakeAgents puts the fake codex first on PATH, so a session on the codex
 // harness runs it. Claude sessions are not run here: these tests read what a
 // session was started as from its meta.
 func withFakeAgents(t *testing.T) func(*server.Config) {
 	t.Helper()
-	bin, home := t.TempDir(), t.TempDir()
-	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex").CombinedOutput(); err != nil {
-		t.Fatalf("build fakecodex: %v\n%s", err, out)
-	}
+	bin, home := fakeCodexDir(t), t.TempDir()
 	return servertest.WithEnv(
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"HOME="+home,

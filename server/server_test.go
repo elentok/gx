@@ -29,7 +29,11 @@ func TestMain(m *testing.M) {
 	// One zone away from UTC for every test: a test that swapped it mid-run
 	// moved the budget day under its parallel neighbours.
 	time.Local = time.FixedZone("test", 5*3600)
-	os.Exit(m.Run())
+	code := m.Run()
+	if fakeCodexBin != "" {
+		os.RemoveAll(fakeCodexBin)
+	}
+	os.Exit(code)
 }
 
 func TestHandshake_ReturnsAPIVersionAndBuild(t *testing.T) {
