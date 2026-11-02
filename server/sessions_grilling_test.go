@@ -197,8 +197,8 @@ func TestRunEnd_NoContinueAtBranchAndDone(t *testing.T) {
 		step       string
 		wantAction bool
 	}{
+		// No "done": a first-seen done step makes scanDesignCleanups stop the live session.
 		"branch":     {step: "branch"},
-		"done":       {step: "done"},
 		"spec":       {step: "spec", wantAction: true},
 		"unreadable": {step: "no-such-step", wantAction: true},
 	} {

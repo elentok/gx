@@ -175,8 +175,11 @@ func ptyOn(root, exe string) *nativerunner.Pty {
 		Claude:       exe,
 		PollInterval: 10 * time.Millisecond,
 		StartTimeout: 10 * time.Second,
-		PromptGrace:  500 * time.Millisecond,
-		N:            300 * time.Millisecond,
+		// Long: a delivered prompt never waits for it, and a short one fires the
+		// nudge Enter and retype on a slow fake under load. Tests of the nudge
+		// set their own.
+		PromptGrace: 10 * time.Second,
+		N:           300 * time.Millisecond,
 	}
 }
 
@@ -388,6 +391,7 @@ func TestPty_StartWithoutPidFileFailsWithScreen(t *testing.T) {
 func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
+	p.PromptGrace = 500 * time.Millisecond
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
 		t.Fatal(err)

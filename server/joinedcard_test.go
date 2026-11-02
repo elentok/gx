@@ -125,6 +125,16 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 		t.Fatalf("before the question, design_section = %q, want finished", got)
 	}
 
+	// The seeded done step makes the first rescan stop a live design session, off
+	// the rescan's goroutine; let it finish before the session exists.
+	select {
+	case <-h.Server.StartupDone():
+	case <-ctx.Done():
+		t.Fatal("startup did not finish")
+	}
+	if !h.Server.WaitSettled(10 * time.Second) {
+		t.Fatal("startup design cleanup did not settle")
+	}
 	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:m"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)

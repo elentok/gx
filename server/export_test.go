@@ -209,6 +209,9 @@ func (s *Server) PutRunFrom(root string, r Run, base string) {
 // GateReleased reports whether the run's background-task gate was released.
 func (s *Server) GateReleased(address string) bool { return s.registry.gateReleased(address)() }
 
+// StartupDone closes once the startup steps, the first rescan among them, ended.
+func (s *Server) StartupDone() <-chan struct{} { return s.startupDone }
+
 // DropRun forgets a run the way its finish does.
 func (s *Server) DropRun(address string) { s.registry.delete(address) }
 
