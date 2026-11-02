@@ -53,6 +53,11 @@ Then, while working:
 - **Read a file once.** After a file edit (Edit) succeeds the file in context is current - never re-read to
   verify. Repeat reads are the largest leak. The one exception: re-read the exact range (`offset`/
   `limit`) after a file edit fails with `String to replace not found`.
+- **Read the range, not the file.** Reads and `rg` output are most of what a ticket puts into
+  context (a typical ticket does 11 reads and 7 `rg` runs). For a file over ~200 lines, find the
+  line with `rg -n 'symbol' path/to/file.go`, then Read with `offset`/`limit` around it. Read a long
+  file whole only when the ticket changes most of it. Give `rg` a path or `--glob`, and use `-l` for
+  a first pass over many files. Do not run `rg -n` over `.` and read every hit.
 - **Never edit code you have not read, and copy indentation exactly from the file read.** Don't guess
   tabs or spaces. Read the exact lines you will edit, in full: a read that says "(N lines omitted)"
   over them does not count - re-read that range with `offset`/`limit`.
