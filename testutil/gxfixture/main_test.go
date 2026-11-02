@@ -222,6 +222,14 @@ func (r *running) ticketStatus(t *testing.T, address string) string {
 	return ""
 }
 
+func (r *running) waitStatus(t *testing.T, addr, want string) {
+	t.Helper()
+	if !testutil.Poll(90*time.Second, time.Second, func() bool { return r.ticketStatus(t, addr) == want }) {
+		t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", addr))
+		t.Fatalf("ticket %s is %q, want %s", addr, r.ticketStatus(t, addr), want)
+	}
+}
+
 // webClient trusts the root the fixture's server wrote to its state dir. It
 // carries the fixture's login cookie when signedIn.
 func (r *running) webClient(t *testing.T, signedIn bool) *http.Client {

@@ -52,7 +52,7 @@ func (r *running) waitEvents(t *testing.T, addr, typ string) []ralphloop.Event {
 	return got
 }
 
-// paused fails the test when the ticket is in a paused state.
+// requireNotPaused fails the test when the ticket is in a paused state.
 func (r *running) requireNotPaused(t *testing.T, addr string) {
 	t.Helper()
 	if s := r.ticketStatus(t, addr); strings.HasPrefix(s, "needs-") {
@@ -63,8 +63,7 @@ func (r *running) requireNotPaused(t *testing.T, addr string) {
 // agentInput is what the fake agent read off its terminal.
 func (r *running) agentInput(t *testing.T) string {
 	t.Helper()
-	home := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "home")
-	paths, _ := filepath.Glob(agentfake.TUIInputPath(home, "*"))
+	paths, _ := filepath.Glob(agentfake.TUIInputPath(r.home(), "*"))
 	var all strings.Builder
 	for _, p := range paths {
 		data, err := os.ReadFile(p)
@@ -78,10 +77,9 @@ func (r *running) agentInput(t *testing.T) string {
 
 func (r *running) toggleVim(t *testing.T) {
 	t.Helper()
-	home := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "home")
 	var ctl string
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
-		paths, _ := filepath.Glob(agentfake.TUIControlPath(home, "*"))
+		paths, _ := filepath.Glob(agentfake.TUIControlPath(r.home(), "*"))
 		if len(paths) == 1 {
 			ctl = paths[0]
 		}
@@ -104,6 +102,20 @@ func TestStallVimScenario_AToggleToVimGetsTheNudgeWithNoStrayCharacter(t *testin
 	if len(nudges) == 0 || nudges[0].Text != ralphloop.StallNudgeText {
 		t.Fatalf("stall-nudged events = %+v, want one with the nudge text", nudges)
 	}
+	in := r.agentInput(t)
+	if strings.Contains(in, "i"+ralphloop.StallNudgeText) {
+		t.Errorf("a stray i reached the input before the nudge:\n%q", in)
+	}
+	if !strings.Contains(in, ralphloop.StallNudgeText) {
+		t.Errorf("the nudge text never reached the agent:\n%q", in)
+	}
+	r.stop(t)
+}
+
+func TestStallVimScenario_NormalSettingsGetTheNudgeWithNoStrayCharacter(t *testing.T) {
+	t.Parallel()
+	r := start(t, "stall-vim")
+	r.waitStatus(t, stallVimTicket, "done")
 	in := r.agentInput(t)
 	if strings.Contains(in, "i"+ralphloop.StallNudgeText) {
 		t.Errorf("a stray i reached the input before the nudge:\n%q", in)

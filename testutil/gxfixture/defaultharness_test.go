@@ -15,6 +15,9 @@ import (
 
 func fixtureRoot(r *running) string { return filepath.Dir(filepath.Dir(r.StateDir)) }
 
+func (r *running) repo() string { return filepath.Join(fixtureRoot(r), "repo") }
+func (r *running) home() string { return filepath.Join(fixtureRoot(r), "home") }
+
 func TestDefaultHarnessScenario_SessionsProjectsAndAWaitingTicket(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "default-harness", nil, "--fakecodex", fakeCodexBin)

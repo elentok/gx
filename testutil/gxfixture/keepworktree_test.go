@@ -20,8 +20,7 @@ const (
 // worktrees lists `git worktree list --porcelain` of the fixture repo.
 func (r *running) worktrees(t *testing.T) string {
 	t.Helper()
-	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
-	out, err := exec.Command("git", "-C", repo, "worktree", "list", "--porcelain").CombinedOutput()
+	out, err := exec.Command("git", "-C", r.repo(), "worktree", "list", "--porcelain").CombinedOutput()
 	if err != nil {
 		t.Fatalf("git worktree list: %v\n%s", err, out)
 	}
@@ -40,14 +39,6 @@ func (r *running) askedWorktree(t *testing.T) string {
 		}
 	}
 	return ""
-}
-
-func (r *running) waitStatus(t *testing.T, addr, want string) {
-	t.Helper()
-	if !testutil.Poll(90*time.Second, time.Second, func() bool { return r.ticketStatus(t, addr) == want }) {
-		t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", addr))
-		t.Fatalf("ticket %s is %q, want %s", addr, r.ticketStatus(t, addr), want)
-	}
 }
 
 func TestKeepWorktreeScenario_TheAskedFileSurvivesTheAnswerAndASecondTicketRuns(t *testing.T) {
@@ -140,8 +131,7 @@ func TestKeepCleanupScenario_MergingTheEpicRemovesALeftoverIterationWorktree(t *
 	// the epic merge looks for it.
 	r.gx(t, "server", "tickets", "cancel", keepFirst)
 	r.waitWorktreeGone(t, path, "after the cancel")
-	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
-	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "--detach", path).CombinedOutput(); err != nil {
+	if out, err := exec.Command("git", "-C", r.repo(), "worktree", "add", "--detach", path).CombinedOutput(); err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
 	}
 	if !r.worktreeListed(t, path) {

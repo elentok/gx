@@ -1,6 +1,8 @@
 package main
 
 import (
+	"slices"
+
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -33,6 +35,6 @@ var (
 )
 
 func withEnv(sc scenario, env ...string) scenario {
-	sc.env = env
+	sc.env = append(slices.Clone(sc.env), env...)
 	return sc
 }

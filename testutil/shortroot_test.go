@@ -20,7 +20,7 @@ func TestShortTempDir_LongTMPDIRStaysUnderSocketLimit(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(root) })
 
-	sock := filepath.Join(root, strings.Repeat("x", HolderSocketBudget-len("/holder.sock")), "holder.sock")
+	sock := filepath.Join(root, strings.Repeat("x", holderSocketBudget-len("/holder.sock")), "holder.sock")
 	if len(sock) >= 100 {
 		t.Fatalf("socket path is %d bytes, want under 100: %s", len(sock), sock)
 	}
