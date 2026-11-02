@@ -87,6 +87,7 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 	}
 	opts.Dir = dir
 	opts.Env = d.env
+	opts.Wait = c.ErrOrStderr()
 	opts.LoadAvg = d.loadAvg
 	if opts.DataDir, err = d.dirs().DataDir(); err != nil {
 		return err

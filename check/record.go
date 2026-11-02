@@ -60,6 +60,9 @@ type Record struct {
 	// without them reads as 0.
 	LoadStart float64 `json:"load_start"`
 	LoadEnd   float64 `json:"load_end"`
+	// LockWaitMS is how long the run waited for the check lock; it is not part
+	// of any kind's duration. Zero when it did not wait.
+	LockWaitMS int64 `json:"lock_wait_ms"`
 }
 
 func (m Mode) scope() string {
@@ -121,7 +124,7 @@ func FilterRecords(recs []Record, branch, tree string) []Record {
 }
 
 // newRecord describes the finished run.
-func (r *runner) newRecord(opts Options, started time.Time, res Result) Record {
+func (r *runner) newRecord(opts Options, started time.Time, res Result, lock *FullLock) Record {
 	rec := Record{
 		Run:        r.runID,
 		Time:       started.UTC().Format(time.RFC3339),
@@ -134,6 +137,9 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result) Record {
 		Link:       LinkOther,
 		LoadStart:  r.loadStart,
 		LoadEnd:    r.loadEnd,
+	}
+	if lock != nil {
+		rec.LockWaitMS = lock.Waited.Milliseconds()
 	}
 	rec.Branch, _ = git.CurrentBranch(r.root)
 	rec.Head, _ = git.RevParse(r.root, "HEAD")

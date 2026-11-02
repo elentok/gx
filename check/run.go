@@ -48,9 +48,12 @@ type Options struct {
 	DataDir string // logs go to <DataDir>/check/<run>/
 	// StateDir holds the Go cache gate lock the Go step holds while it runs.
 	StateDir string
-	Mode     Mode
-	Since    string   // the ref for ModeSince
-	Kinds    []string // empty means all
+	// Wait receives the line printed while a full run waits for the check lock;
+	// nil prints none.
+	Wait  io.Writer
+	Mode  Mode
+	Since string   // the ref for ModeSince
+	Kinds []string // empty means all
 	// ArgLimit overrides DefaultArgLimit; a test sets it small to force batches.
 	ArgLimit int
 	// ProjectChecks supplies the project.json fallback config. It is called only
@@ -120,8 +123,20 @@ func Run(opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	// Only a full run of the test kind locks. The lock is taken before started
+	// is read, so the wait is not part of any duration.
+	var lock *FullLock
+	if opts.Mode == ModeFull && opts.StateDir != "" && slices.Contains(kinds, "test") && !cfg["test"].Off {
+		if lock, err = AcquireFullLock(opts.StateDir, opts.Wait); err != nil {
+			return Result{}, err
+		}
+		defer lock.Release()
+	}
 	started := time.Now()
 	runID := started.UTC().Format("20060102T150405.000000000")
+	if lock != nil {
+		lock.SetRun(runID)
+	}
 	runDir := filepath.Join(opts.DataDir, "check", runID)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
@@ -169,7 +184,7 @@ func Run(opts Options) (Result, error) {
 	if projectFor == nil {
 		projectFor = func(dir string) string { return ProjectIn(opts.TicketStore, dir) }
 	}
-	if err := appendRecord(opts.DataDir, projectFor(root), r.newRecord(opts, started, res), started); err != nil {
+	if err := appendRecord(opts.DataDir, projectFor(root), r.newRecord(opts, started, res, lock), started); err != nil {
 		return Result{}, err
 	}
 	return res, nil
