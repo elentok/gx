@@ -1,0 +1,40 @@
+package skills
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestTestGuidelinesHeadings(t *testing.T) {
+	text := readFile(t, "gx-test-guidelines.md")
+	var headings []string
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			headings = append(headings, strings.TrimPrefix(line, "## "))
+		}
+	}
+	if len(headings) != 11 {
+		t.Fatalf("gx-test-guidelines.md has %d rule headings, want 11: %q", len(headings), headings)
+	}
+	for _, h := range headings {
+		section := text[strings.Index(text, "## "+h):]
+		if i := strings.Index(section[3:], "\n## "); i >= 0 {
+			section = section[:i+3]
+		}
+		for _, part := range []string{"**Why:**", "**Fix:**"} {
+			if !strings.Contains(section, part) {
+				t.Errorf("rule %q lacks %s", h, part)
+			}
+		}
+	}
+}
+
+func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
+	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
+	guidelines := normalizeSpace(readFile(t, "gx-test-guidelines.md"))
+	for _, bad := range []string{"GOMAXPROCS", "claudeenv", "envguard"} {
+		if strings.Contains(guidelines, bad) {
+			t.Errorf("gx-test-guidelines.md holds gx-only term %q", bad)
+		}
+	}
+}
