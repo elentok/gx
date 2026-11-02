@@ -244,6 +244,7 @@ function ChatBody({
           working={step && <WorkingRow {...step} />}
         />
       )}
+      {questions && busy && step && <WorkingRow {...step} />}
       <ChatTail
         session={session}
         chat={chat}

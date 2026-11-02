@@ -415,6 +415,13 @@ const roundChat = () =>
     }),
   );
 
+test("a busy turn still shows the Working row while the questions fill the screen", async () => {
+  renderChat([session({ status: { state: "working" }, reported_step: "chart" })], roundChat(), undefined, { steps });
+  await screen.findByRole("group", { name: "Questions" });
+  expect(screen.getByText("Working: Chart")).toBeTruthy();
+  expect(screen.getAllByRole("status")).toHaveLength(1);
+});
+
 test("a round opens a sheet that folds, and its stepper marks and jumps", async () => {
   renderChat([session()], roundChat());
   const sheet = await screen.findByRole("group", { name: "Questions" });
