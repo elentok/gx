@@ -1,5 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router";
 import { SessionWorking, type SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
@@ -57,26 +57,43 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
 const DESIGN_KEY = "gx.agents.design";
 const QUEUE_KEY = "gx.agents.queue";
 
+const memory = new Map<string, boolean>();
+const listeners = new Set<() => void>();
+
 function readFlag(key: string): boolean {
   try {
     return localStorage.getItem(key) === "1";
   } catch {
-    return false;
+    return memory.get(key) ?? false;
   }
 }
 
-/** A switch that starts off, remembers its choice under `storageKey`, and counts the rows it hides. */
+/** A switch that starts off, remembers its choice under `storageKey`, and is shared by every component that uses it. */
 function useGroupSwitch(storageKey: string) {
-  const [on, setOn] = useState(() => readFlag(storageKey));
+  const on = useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    () => readFlag(storageKey),
+  );
   const change = (next: boolean) => {
-    setOn(next);
+    memory.set(storageKey, next);
     try {
       localStorage.setItem(storageKey, next ? "1" : "0");
     } catch {
       // Storage is a convenience; the choice still holds for this page.
     }
+    listeners.forEach((l) => l());
   };
   return [on, change] as const;
+}
+
+/** The sidebar's Queue/Design toggles, for other lists that must follow them. */
+export function useGroupVisibility() {
+  const [showQueue] = useGroupSwitch(QUEUE_KEY);
+  const [showDesign] = useGroupSwitch(DESIGN_KEY);
+  return { showQueue, showDesign };
 }
 
 function GroupSwitch({ label, on, hidden, tone, onChange, bordered }: { label: string; on: boolean; hidden: number; tone: string; onChange: (on: boolean) => void; bordered: boolean }) {

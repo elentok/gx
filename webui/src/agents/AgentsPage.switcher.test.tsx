@@ -26,13 +26,20 @@ test("Cmd-K and Ctrl-K open the switcher", () => {
   expect(screen.getByRole("dialog", { name: "Switch session" })).toBeTruthy();
 });
 
+const showGroups = () => {
+  localStorage.setItem("gx.agents.design", "1");
+  localStorage.setItem("gx.agents.queue", "1");
+};
+
 test("Cmd-K opens the switcher before a session is picked", () => {
+  showGroups();
   render(switcherSessions(), "/agents");
   fireEvent.keyDown(window, { key: "k", metaKey: true });
   expect(dialog().getAllByRole("option")).toHaveLength(5);
 });
 
 test("the filter matches the ticket and the dir", () => {
+  showGroups();
   render(switcherSessions(), "/agents/s-1");
   openSwitcher();
   const input = dialog().getByRole("combobox");
@@ -43,9 +50,15 @@ test("the filter matches the ticket and the dir", () => {
   expect(optionNames()[0]).toContain("the design");
 });
 
-test("a design session is listed while the sidebar hides it, and the current one is tagged", () => {
+test("the switcher follows the Queue/Design toggles", () => {
   render(switcherSessions(), "/agents/s-1");
-  expect(rows().map((r) => r.textContent).join()).not.toContain("the design");
+  openSwitcher();
+  expect(optionNames().join()).not.toContain("the design");
+});
+
+test("a design session is listed once its toggle is on, and the current one is tagged", () => {
+  showGroups();
+  render(switcherSessions(), "/agents/s-1");
   openSwitcher();
   const design = dialog().getAllByRole("option").find((o) => o.textContent?.includes("the design"))!;
   expect(within(design).getByRole("img", { name: "Design" })).toBeTruthy();
@@ -54,6 +67,7 @@ test("a design session is listed while the sidebar hides it, and the current one
 });
 
 test("Design and Queue rows carry no Unread or Actionable mark and sort under Other", () => {
+  showGroups();
   const asks = { unread: { unread: true }, actionable: { reason: "Pick one" } };
   render([session("s-1", "alpha", { name: "plain" }), session("d", "alpha", { name: "dz", design: true, ...asks }), session("q", "alpha", { name: "qz", queue: true, ...asks })], "/agents/s-1");
   openSwitcher();
@@ -66,6 +80,7 @@ test("Design and Queue rows carry no Unread or Actionable mark and sort under Ot
 });
 
 test("switcher rows use the sidebar marks: purple design diamond and unread dot, ? for blocked", () => {
+  showGroups();
   const blocked = session("s-5", "beta", { name: "stuck" });
   blocked.status = { state: "blocked" } as SessionInfo["status"];
   render([...switcherSessions(), blocked], "/agents/s-1");

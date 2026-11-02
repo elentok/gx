@@ -3,6 +3,7 @@ import type { SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
 import { RowList, type ListRowData, type ListSection } from "../nav/JumpMenu";
 import { hasAttentionMarks, isActionable, stateLabel } from "./rules";
+import { useGroupVisibility } from "./AgentSidebar";
 import { SessionBadges, SessionGlyphs } from "./SessionGlyphs";
 
 // Port of ui/agents/jump.go: attention order, and the search fields plus the session ticket.
@@ -24,10 +25,7 @@ function sessionRow(s: SessionInfo, current: boolean): ListRowData {
   };
 }
 
-/**
- * The Agents page title as a button that opens every agent, Queue and Design agents included, even
- * while the sidebar hides them.
- */
+/** The Agents page title as a button that opens the agents, following the sidebar's Queue/Design toggles. */
 export function SessionSwitcher({
   name,
   sessions,
@@ -41,15 +39,15 @@ export function SessionSwitcher({
   onNew: () => void;
   fontSize?: string;
 }) {
-  const sections = useMemo<ListSection[]>(
-    () =>
-      SECTIONS.map((title, i) => ({
-        key: title.toLowerCase(),
-        title,
-        rows: sessions.filter((s) => bucket(s) === i).map((s) => sessionRow(s, s.id === current)),
-      })),
-    [sessions, current],
-  );
+  const { showQueue, showDesign } = useGroupVisibility();
+  const sections = useMemo<ListSection[]>(() => {
+    const shown = sessions.filter((s) => s.id === current || !((s.queue && !showQueue) || (s.design && !showDesign)));
+    return SECTIONS.map((title, i) => ({
+      key: title.toLowerCase(),
+      title,
+      rows: shown.filter((s) => bucket(s) === i).map((s) => sessionRow(s, s.id === current)),
+    }));
+  }, [sessions, current, showQueue, showDesign]);
   const footer = useMemo<ListRowData>(
     () => ({ key: "new", title: "+ New session", subtitle: "", href: "#/agents", searchText: "", onSelect: onNew }),
     [onNew],
