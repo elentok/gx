@@ -92,6 +92,9 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
             href={href}
             aria-current={key === active ? "page" : undefined}
             aria-label={count > 0 ? `${label} · ${count} ${count === 1 ? "needs" : "need"} you` : undefined}
+            display="inline-flex"
+            alignItems="center"
+            gap="2"
             fontFamily="condensed"
             fontSize="xl"
             fontWeight="600"
@@ -102,7 +105,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
           >
             {label}
             {count > 0 && (
-              <Text as="span" aria-hidden ml="2" px="2" borderRadius="full" bg="tone.waiting.fg" color="surface" fontFamily="text" fontSize="xs" fontWeight="600" verticalAlign="middle">
+              <Text as="span" aria-hidden px="2" lineHeight="1.4" borderRadius="full" bg="tone.waiting.fg" color="surface" fontFamily="text" fontSize="xs" fontWeight="600">
                 {count}
               </Text>
             )}
