@@ -178,7 +178,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 		})
 	})
 	live := map[string]any{"agent": map[string]any{
-		"pane_id": "p1", "tab_id": "t1", "agent_status": "working",
+		"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1,
 		"agent_session": map[string]any{"value": "sess"},
 	}}
 	// The agent is idle until prompted (Start waits for idle), then working.
@@ -203,6 +203,9 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 			"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1,
 			"agent_session": map[string]any{"value": "sess"},
 		}}, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "read", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return "", herdrfake.Identities{}, nil
 	})
 	var sent, closed []string
 	h.Herdr.Register("agent", "send-keys", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
