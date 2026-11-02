@@ -74,7 +74,7 @@ func fakeValidatingTelegramServer(t *testing.T) (*httptest.Server, func() []tele
 // dropped every ticket-completion message on a real bugs-07 run before
 // notification_text.go's counts/detail strings were escaped.
 func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing.T) {
-	realGitTimeoutWatchdog(t, realGitTestTimeout)
+	ctx := realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -178,7 +178,7 @@ func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing
 	sink := newTelegramEventSink(noopEventSink{}, "test-token", "chat-1", server.URL, scratchDir, epicName)
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
-	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, sink); err != nil {
+	if err := Run(RunOptions{Ctx: ctx, EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir}, deps, sink); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	sink.Close()

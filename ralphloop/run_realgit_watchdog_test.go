@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -30,11 +31,16 @@ type timeoutReporter interface {
 // hasn't run) within bound, so a hung real-git test is pinpointed directly
 // instead of waiting for the package's own -timeout. Call as the first line
 // of a real-git-backed test (or of each t.Run subtest, for table-driven
-// tests).
-func realGitTimeoutWatchdog(t timeoutReporter, bound time.Duration) {
+// tests). The returned context is canceled at the bound and when the test
+// ends: pass it as RunOptions.Ctx so a stuck Run stops.
+func realGitTimeoutWatchdog(t timeoutReporter, bound time.Duration) context.Context {
 	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	t.Cleanup(func() { close(done) })
+	t.Cleanup(func() {
+		close(done)
+		cancel()
+	})
 
 	timer := time.NewTimer(bound)
 	go func() {
@@ -42,9 +48,14 @@ func realGitTimeoutWatchdog(t timeoutReporter, bound time.Duration) {
 		case <-done:
 			timer.Stop()
 		case <-timer.C:
+			// Fatalf from this goroutine ends only this goroutine, so cancel the
+			// run too, or a spinning Run keeps writing its log until the package
+			// timeout and the test's cleanup never runs.
+			cancel()
 			t.Fatalf("%s exceeded its %s bound: likely hung; failing it directly instead of waiting for the package timeout", t.Name(), bound)
 		}
 	}()
+	return ctx
 }
 
 // fakeTimeoutReporter is a timeoutReporter that records registered cleanups

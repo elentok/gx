@@ -563,6 +563,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	// none is available right now (every remaining ticket is blocked,
 	// already claimed by a running iteration, the loop is paused on a
 	// smart-zone breach, or the epic is done).
+	// lastScan is the scan the previous pass logged. A paused or idle run scans
+	// again and again with nothing changed; logging each repeat grew a run-log to
+	// 2 GiB in a test that never slept between passes. Guarded by scheduleMu.
+	var lastScan []ScanDecision
 	claimNext := func() (ticket tickets.Ticket, reattach bool, ok bool, err error) {
 		scheduleMu.Lock()
 		defer scheduleMu.Unlock()
@@ -612,8 +616,13 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// the ticket is already claimed, so failing the run here would strand
 		// it claimed with no iteration behind it.
 		if scanned != nil {
-			if logErr := logSchedulerScan(scratchDir, opts.EpicName, agent, scanDecisions(*scanned, scope, frontier, ticket)); logErr != nil {
-				logger.Debug("logging scheduler scan: %v\n", logErr)
+			scan := scanDecisions(*scanned, scope, frontier, ticket)
+			if !slices.Equal(scan, lastScan) {
+				if logErr := logSchedulerScan(scratchDir, opts.EpicName, agent, scan); logErr != nil {
+					logger.Debug("logging scheduler scan: %v\n", logErr)
+				} else {
+					lastScan = scan
+				}
 			}
 		}
 		if err != nil {

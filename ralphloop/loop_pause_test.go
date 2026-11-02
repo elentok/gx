@@ -507,3 +507,43 @@ func TestRun_BlockedCycle_EmitsDeadlocked(t *testing.T) {
 		t.Errorf("deadlocked events = %v, want one blocked-cycle", got)
 	}
 }
+
+// TestRun_StalledTicket_RepeatedPollsLogOneScan covers the run-log growing
+// without bound: a run stalled on a paused ticket scans once per poll, and a
+// test timer that never waits made that thousands of identical lines a second.
+// Repeats of an unchanged scan are not logged.
+func TestRun_StalledTicket_RepeatedPollsLogOneScan(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Stuck\n",
+	})
+	d, _, _ := fakeDeps()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	polls := 0
+	d.PauseTimer = func(time.Duration) <-chan time.Time {
+		if polls++; polls == 50 {
+			cancel()
+		}
+		return readyTimer(0)
+	}
+
+	err := Run(RunOptions{Ctx: ctx, EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", err)
+	}
+
+	rawEvents, _, err := ReadEvents(scratchDir, "my-epic")
+	if err != nil {
+		t.Fatalf("ReadEvents: %v", err)
+	}
+	scans := 0
+	for _, ev := range rawEvents {
+		if ev.Type == string(events.SchedulerScan) {
+			scans++
+		}
+	}
+	if scans != 1 {
+		t.Errorf("scheduler-scan events = %d after %d polls, want 1", scans, polls)
+	}
+}

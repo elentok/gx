@@ -53,7 +53,7 @@ func appendCompactedItem(t *testing.T, codexHome, sessionID string) {
 func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.T) {
 	// not parallel-safe: setProcessEnv mutates the process-wide $HOME/$CODEX_HOME
 	// env vars.
-	realGitTimeoutWatchdog(t, realGitTestTimeout)
+	ctx := realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000
@@ -124,6 +124,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
 	sink := &compactRecoverySink{}
 	if err := Run(RunOptions{
+		Ctx:      ctx,
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: repoDir, SmartZone: smartZone,
 	}, deps, sink); err != nil {
@@ -325,7 +326,7 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 // /compact, finish-up) fires off the native-exhaustion banner, the agent
 // finishes and commits, and the ticket merges normally.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T) {
-	realGitTimeoutWatchdog(t, realGitTestTimeout)
+	ctx := realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000
@@ -439,7 +440,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
 	sink := &compactRecoverySink{}
 	if err := Run(RunOptions{
-		EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
+		Ctx: ctx, EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: repoDir, SmartZone: smartZone,
 	}, deps, sink); err != nil {
 		t.Fatalf("Run() error = %v", err)

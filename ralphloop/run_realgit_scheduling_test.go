@@ -28,7 +28,7 @@ import (
 // left to the scheduler alone: it only becomes frontier once both D and E are
 // done, so no extra fake-agent blocking is needed to prove F starts last.
 func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
-	realGitTimeoutWatchdog(t, realGitTestTimeout)
+	ctx := realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
@@ -309,7 +309,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		t.Fatalf("RevParse base: %v", err)
 	}
 
-	if err := Run(RunOptions{EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir, SmartZone: smartZone}, deps, noopEventSink{}); err != nil {
+	if err := Run(RunOptions{Ctx: ctx, EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir, SmartZone: smartZone}, deps, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -543,7 +543,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 }
 
 func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
-	realGitTimeoutWatchdog(t, realGitTestTimeout)
+	ctx := realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
 		smartZone = 150000
@@ -719,6 +719,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
 	sink := &compactRecoverySink{}
 	if err := Run(RunOptions{
+		Ctx:      ctx,
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: repoDir, SmartZone: smartZone,
 	}, deps, sink); err != nil {

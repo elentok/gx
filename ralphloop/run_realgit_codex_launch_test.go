@@ -67,7 +67,7 @@ exit 1
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			realGitTimeoutWatchdog(t, realGitTestTimeout)
+			ctx := realGitTimeoutWatchdog(t, realGitTestTimeout)
 			const epicName = "epic"
 			repoDir := testutil.TempRepo(t)
 			scratchDir := writeEpic(t, epicName, map[string]string{
@@ -102,6 +102,7 @@ exit 1
 
 			sink := newRecordingEventSink()
 			err := Run(RunOptions{
+				Ctx:      ctx,
 				EpicName: epicName, Agent: AgentCodex, Skill: "implement",
 				ScratchDir: scratchDir, RepoDir: repoDir,
 			}, deps, sink)
@@ -128,7 +129,7 @@ exit 1
 // skill's own specific, actionable reason.
 func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 	t.Parallel()
-	realGitTimeoutWatchdog(t, realGitTestTimeout)
+	ctx := realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	scratchDir := writeEpic(t, epicName, map[string]string{
@@ -141,7 +142,7 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 
 	sink := newRecordingEventSink()
 	err := Run(RunOptions{
-		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir,
+		Ctx: ctx, EpicName: epicName, Skill: "implement", ScratchDir: scratchDir, RepoDir: repoDir,
 	}, deps, sink)
 	wantErr := fmt.Sprintf(`skill "implement" not found at %s`, filepath.Join(home, ".claude", "skills", "implement", "SKILL.md"))
 	if err == nil || !strings.Contains(err.Error(), wantErr) {
