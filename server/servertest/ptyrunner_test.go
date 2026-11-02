@@ -488,6 +488,11 @@ func TestPty_RestartBuildsFreshRunnersAndReclaimsTheLiveRun(t *testing.T) {
 		}
 		return false
 	})
+	// Restarting mid-launch cancels it before the run is recorded, so nothing is left to reclaim.
+	WaitFor(t, 30*time.Second, "the launch to finish and record the run", func() bool {
+		runs := h.Server.Runs()
+		return len(runs) == 1 && runs[0].Session.Label != ""
+	})
 	before := ptyOf(t, h, "proj")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
