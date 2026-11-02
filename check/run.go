@@ -346,7 +346,16 @@ func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
 // (so the soak skips it like the run's own lines), a kind no result reads.
 const rerunKindSuffix = "-rerun"
 
-var testNameRe = regexp.MustCompile(`^(.*?)\.((?:Test|Fuzz|Example|Benchmark).*)$`)
+// testNameRes split a test's index name into location and test name, per tool.
+// A Go package path can hold dots, so its test name is found by prefix; a node
+// tool's location is a file, so it ends at the extension.
+var testNameRes = map[string]*regexp.Regexp{
+	"go-test":    regexp.MustCompile(`^(.*?)\.((?:Test|Fuzz|Example|Benchmark).*)$`),
+	"vitest":     nodeTestNameRe,
+	"playwright": nodeTestNameRe,
+}
+
+var nodeTestNameRe = regexp.MustCompile(`^(.*?\.[cm]?[jt]sx?)\.(.+)$`)
 
 // rerunUnderLimit runs one slow test of a `gx brief` call again, alone, when
 // the machine is under high load, and reports whether it then passed under
@@ -364,8 +373,11 @@ func (r *runner) rerunUnderLimit(l brief.IndexEntry, name string, limit time.Dur
 	case "playwright":
 		tool = brief.Playwright{}
 	}
-	m := testNameRe.FindStringSubmatch(name)
-	if tool == nil || m == nil {
+	if tool == nil {
+		return false
+	}
+	m := testNameRes[l.Tool].FindStringSubmatch(name)
+	if m == nil {
 		return false
 	}
 	args := tool.NarrowArgs(l.Args, m[2])

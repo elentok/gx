@@ -294,6 +294,71 @@ func TestCheck_SlowTestRerunUnderHighLoad(t *testing.T) {
 	})
 }
 
+// TestCheck_SlowTestRerunNodeTools stubs vitest and playwright to be slow on
+// the first run only, and checks the re-run is narrowed to the one test.
+func TestCheck_SlowTestRerunNodeTools(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("builds the gx binary")
+	}
+	high := func() float64 { return 1000 }
+	for _, c := range []struct {
+		tool, name, report string
+		want               []string
+	}{
+		{
+			"vitest", "a.test.ts.suite slow",
+			`{"numTotalTestSuites":1,"numTotalTests":1,"testResults":[{"name":"a.test.ts","status":"passed","assertionResults":[{"fullName":"suite slow","status":"passed","duration":DUR}]}]}`,
+			[]string{"-t", "^suite slow$"},
+		},
+		{
+			"playwright", "a.e2e.ts.7. slow",
+			`{"suites":[{"title":"a.e2e.ts","file":"a.e2e.ts","specs":[{"title":"7. slow","file":"a.e2e.ts","tests":[{"results":[{"duration":DUR}]}]}]}]}`,
+			[]string{"-g", `› 7\. slow$`},
+		},
+	} {
+		t.Run(c.tool, func(t *testing.T) {
+			bin := t.TempDir()
+			if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
+				t.Fatalf("go build: %v\n%s", err, out)
+			}
+			prependPath(t, bin)
+			repo, data := registeredCheckRepo(t, `{"test":{"full":"gx brief -C webui `+c.tool+`","limits":{"slow":{"`+c.tool+`":"1s"},"suite":"1m"}}}`)
+			testutil.WriteFile(t, repo, "webui/e2e/playwright.config.ts", "")
+			testutil.WriteFile(t, repo, "webui/dist/index.html", "")
+			testutil.CommitAll(t, repo, "web")
+			// The first run reports 1500 ms and any later run 900 ms. Playwright
+			// writes its report to the file named by PLAYWRIGHT_JSON_OUTPUT_NAME;
+			// vitest prints it.
+			state := filepath.Join(t.TempDir(), "state")
+			slow, fast := strings.ReplaceAll(c.report, "DUR", "1500"), strings.ReplaceAll(c.report, "DUR", "900")
+			script := "#!/bin/sh\nif [ -e '" + state + "' ]; then R='" + fast + "'; else R='" + slow + "'; : > '" + state + "'; fi\n" +
+				"if [ -n \"$PLAYWRIGHT_JSON_OUTPUT_NAME\" ]; then printf '%s' \"$R\" > \"$PLAYWRIGHT_JSON_OUTPUT_NAME\"; else printf '%s' \"$R\"; fi\n"
+			nodeBin := filepath.Join(repo, "webui", "node_modules", ".bin")
+			testutil.Mkdir(t, nodeBin)
+			testutil.WriteFile(t, nodeBin, c.tool, script)
+			if err := os.Chmod(filepath.Join(nodeBin, c.tool), 0o755); err != nil {
+				t.Fatal(err)
+			}
+
+			out, code := runCheckCmdLoad(t, high, repo, "--full", "--kind", "test")
+			lines, _ := brief.ReadIndex(data)
+			if code != 0 || !strings.Contains(out, "warning:") {
+				t.Fatalf("exit %d; want 0 with a warning\n%s\n%+v", code, out, lines)
+			}
+			reruns := 0
+			for _, l := range lines {
+				if l.CheckKind == "test-rerun" && slices.Equal(l.Args, c.want) {
+					reruns++
+				}
+			}
+			if reruns != 1 {
+				t.Fatalf("index has %d re-runs with args %v, want 1: %+v", reruns, c.want, lines)
+			}
+		})
+	}
+}
+
 func TestCheck_SlowLimit(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {

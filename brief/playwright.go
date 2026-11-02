@@ -244,5 +244,14 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 // RerunArgs is nil: a name filter would have to be rebuilt as a -g regex.
 func (Playwright) RerunArgs([]string, []Unit) []string { return nil }
 
-// NarrowArgs is nil until playwright narrowing lands.
-func (Playwright) NarrowArgs([]string, string) []string { return nil }
+// NarrowArgs runs one test. Bare flow numbers become a -g first, then every
+// -g is replaced. The pattern ends at the title with `$` but has no `^`: see
+// flowNumbersToGrep for what -g is matched against.
+func (Playwright) NarrowArgs(args []string, test string) []string {
+	args, err := flowNumbersToGrep(args)
+	if err != nil {
+		return nil
+	}
+	re, _ := stripFlag(args, true, "g", "grep")
+	return append(re, "-g", "› "+regexp.QuoteMeta(test)+"$")
+}

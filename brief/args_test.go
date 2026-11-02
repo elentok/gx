@@ -59,7 +59,24 @@ func TestGoTestNarrowArgs(t *testing.T) {
 			t.Errorf("%s: NarrowArgs = %v, want %v", c.name, got, c.want)
 		}
 	}
-	if got := (Vitest{}).NarrowArgs(nil, "a"); got != nil {
-		t.Errorf("Vitest.NarrowArgs = %v, want nil", got)
+}
+
+func TestNodeNarrowArgs(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		tool Tool
+		args []string
+		test string
+		want []string
+	}{
+		{"vitest anchors", Vitest{}, []string{"src"}, "suite a.b", []string{"src", "-t", `^suite a\.b$`}},
+		{"vitest replaces -t", Vitest{}, []string{"-t", "x", "src"}, "a", []string{"src", "-t", "^a$"}},
+		{"playwright full title, no ^", Playwright{}, []string{"disk.e2e.ts"}, "153. Send (x)", []string{"disk.e2e.ts", "-g", `› 153\. Send \(x\)$`}},
+		{"playwright replaces -g", Playwright{}, []string{"--grep=foo", "f.ts"}, "a", []string{"f.ts", "-g", "› a$"}},
+		{"playwright drops flow numbers", Playwright{}, []string{"disk.e2e.ts", "69", "70"}, "69. A", []string{"disk.e2e.ts", "-g", `› 69\. A$`}},
+	} {
+		if got := c.tool.NarrowArgs(c.args, c.test); !slices.Equal(got, c.want) {
+			t.Errorf("%s: NarrowArgs = %v, want %v", c.name, got, c.want)
+		}
 	}
 }

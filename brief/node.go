@@ -201,8 +201,11 @@ func (Vitest) RerunArgs(args []string, failures []Unit) []string {
 	return append(re, "-t", "^("+strings.Join(names, "|")+")$")
 }
 
-// NarrowArgs is nil until vitest narrowing lands.
-func (Vitest) NarrowArgs([]string, string) []string { return nil }
+// NarrowArgs runs one test: -t is a regex on the full name, so it is anchored.
+func (Vitest) NarrowArgs(args []string, test string) []string {
+	re, _ := stripFlag(args, true, "t", "testNamePattern")
+	return append(re, "-t", "^"+regexp.QuoteMeta(test)+"$")
+}
 
 // Tsc wraps `tsc`.
 type Tsc struct{}
