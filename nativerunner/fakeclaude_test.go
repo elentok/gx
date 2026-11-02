@@ -2,8 +2,6 @@ package nativerunner_test
 
 import (
 	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,10 +14,7 @@ import (
 // binary, not this test binary, as an e2e fixture runs it.
 func fakeclaudeRunner(t *testing.T) *nativerunner.Pty {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "claude")
-	if out, err := exec.Command("go", "build", "-o", bin, "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude").CombinedOutput(); err != nil {
-		t.Fatalf("build fakeclaude: %v\n%s", err, out)
-	}
+	bin := builtFakeclaude.get(t)
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)

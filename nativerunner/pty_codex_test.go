@@ -2,7 +2,6 @@ package nativerunner_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -18,10 +17,7 @@ import (
 // and the Codex home that fake writes its rollout to.
 func codexRunner(t *testing.T, env ...string) (p *nativerunner.Pty, codexHome string) {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "codex")
-	if out, err := exec.Command("go", "build", "-o", bin, "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex").CombinedOutput(); err != nil {
-		t.Fatalf("build fakecodex: %v\n%s", err, out)
-	}
+	bin := builtFakecodex.get(t)
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)

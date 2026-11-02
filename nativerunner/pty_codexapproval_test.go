@@ -3,7 +3,6 @@ package nativerunner_test
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -21,11 +20,12 @@ import (
 // so the fake draws the dialog and takes keys.
 func codexApprovalSession(t *testing.T, id string, hook bool) (*nativerunner.Pty, agentrunner.Session, string) {
 	t.Helper()
-	gxDir := t.TempDir()
-	if out, err := exec.Command("go", "build", "-o", filepath.Join(gxDir, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
-		t.Fatalf("build gx: %v\n%s", err, out)
+	env := []string{agentfake.CodexIDEnv + "=" + id}
+	if hook {
+		gxDir := filepath.Dir(builtGx.get(t))
+		env = append(env, "PATH="+gxDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}
-	p, home := codexRunner(t, agentfake.CodexIDEnv+"="+id, "PATH="+gxDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	p, home := codexRunner(t, env...)
 	args := gxharness.CodexArgs(gxharness.CodexArgsInput{})
 	if !hook {
 		i := slices.IndexFunc(args, func(a string) bool { return strings.HasPrefix(a, "hooks.PermissionRequest=") })
