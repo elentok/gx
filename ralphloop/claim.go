@@ -77,16 +77,18 @@ func markAsking(path string, pauseKind schema.PauseKind) error {
 	})
 }
 
-// ErrPauseDone is returned by a pause write on a ticket that is already done.
-var ErrPauseDone = errors.New("refusing to pause a done ticket")
+// ErrPauseDone is returned by a pause write on a ticket that is already done
+// or cancelled.
+var ErrPauseDone = errors.New("refusing to pause a done or cancelled ticket")
 
 // pauseWrite is the shared pause write: a done ticket is refused and left
-// untouched, unless repauseDone says the done itself is what paused for repair. The
-// check sits under the ticket lock so a merge racing the pause cannot slip a
-// done between check and write.
+// untouched, unless repauseDone says the done itself is what paused for repair.
+// A cancelled ticket is always refused: a stopped run's late finish must not
+// undo the cancel. The check sits under the ticket lock so a merge racing the
+// pause cannot slip a done between check and write.
 func pauseWrite(path string, repauseDone bool, mutate func(*schema.Ticket, *string)) error {
 	return rewriteTicket(path, false, func(t *schema.Ticket, body *string) error {
-		if t.Status == schema.StatusDone && !repauseDone {
+		if (t.Status == schema.StatusDone && !repauseDone) || t.Status == schema.StatusCancelled {
 			return ErrPauseDone
 		}
 		mutate(t, body)

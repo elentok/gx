@@ -346,8 +346,30 @@ func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) e
 		return fmt.Errorf("cancel %s: %w", ref.address(t), err)
 	}
 	s.stampFinished(tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}, t.Path, true)
+	// The branch stays: it holds the commits.
+	if ref.repo != "" && s.awaitRunSettled(ref.address(t)) {
+		if err := ralphloop.RemoveIterationWorktree(s.defaultDeps(), ref.repo, ref.addr.Epic, t.Identifier); err != nil {
+			return fmt.Errorf("cancel %s: %w", ref.address(t), err)
+		}
+	}
 	s.events.publish(EventTicketCancelled, ref.address(t))
 	return nil
+}
+
+// awaitRunSettled waits for a stopped run to leave the registry: its finish
+// still reads the worktree, and a missing one would pause the cancelled ticket.
+// False means the run never settled, so its worktree is left for the epic merge.
+func (s *Server) awaitRunSettled(addr string) bool {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, ok := s.registry.tracked(addr); !ok {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // cancelInvestigateChild is a person's recovery verb withdrawing ref's

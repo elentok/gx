@@ -153,6 +153,23 @@ func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
 	}
 }
 
+func TestEpicMerge_RemovesLeftoverIterationWorktrees(t *testing.T) {
+	t.Parallel()
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	wt := keepWorktree(t, f.repo, schedEpic, "01")
+
+	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v", res, err)
+	}
+	f.settle(t)
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Errorf("leftover worktree still there: %v", err)
+	}
+}
+
 func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, _ string) {

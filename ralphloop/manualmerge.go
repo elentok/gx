@@ -1,6 +1,10 @@
 package ralphloop
 
-import "github.com/elentok/gx/agentrunner"
+import (
+	"fmt"
+
+	"github.com/elentok/gx/agentrunner"
+)
 
 // Exported seams for `gx server tickets merge`: the label/branch naming and the
 // session recovery stay private to this package so a hand merging can never
@@ -29,6 +33,30 @@ func FindIterationSession(d Deps, epic, identifier string) (agentrunner.Session,
 // IterationWorktreePath is where an iteration of epic/identifier is checked out.
 func IterationWorktreePath(worktreeDir, epic, identifier string) string {
 	return iterationWorktreePath(worktreeDir, epic, identifier)
+}
+
+// RemoveIterationWorktree removes the leftover iteration worktree of
+// epic/identifier, keeping its branch (it holds commits). A missing worktree is
+// not an error.
+func RemoveIterationWorktree(d Deps, repoDir, epic, identifier string) error {
+	wtDir, err := d.WorktreeDir(repoDir)
+	if err != nil {
+		return fmt.Errorf("resolving worktree directory for %q: %w", repoDir, err)
+	}
+	path := iterationWorktreePath(wtDir, epic, identifier)
+	return withWorktreeLock(func() error {
+		exists, err := d.WorktreeExists(path)
+		if err != nil {
+			return fmt.Errorf("checking iteration worktree: %w", err)
+		}
+		if !exists {
+			return nil
+		}
+		if err := d.RemoveWorktree(repoDir, path, true); err != nil {
+			return fmt.Errorf("removing iteration worktree: %w", err)
+		}
+		return nil
+	})
 }
 
 // StampMerged stamps the trailers (and metrics, when a session is recoverable)

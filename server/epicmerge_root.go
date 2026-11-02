@@ -220,6 +220,8 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		}
 		s.stampMergedEpic(root, e, added, removed, countErr)
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
+		// On the settle group: it takes the worktree lock, which the merge must not wait on.
+		s.goSettle(func() { s.removeLeftoverWorktrees(repo, epics) })
 		first = true
 	default:
 		s.stampEpic(root, e.Path, "completed_at")
@@ -240,6 +242,20 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		d.outcome = outcomeAlreadyMerged
 	}
 	return d
+}
+
+// removeLeftoverWorktrees removes the iteration worktrees that paused or
+// cancelled tickets of the merged epics left behind. A failure is logged: the
+// merge already happened.
+func (s *Server) removeLeftoverWorktrees(repo string, epics []tickets.Epic) {
+	d := s.defaultDeps()
+	for _, e := range epics {
+		for _, t := range e.Tickets {
+			if err := ralphloop.RemoveIterationWorktree(d, repo, e.Name, t.Identifier); err != nil {
+				s.log.Warn("remove leftover iteration worktree", "epic", e.Name, "ticket", t.Identifier, "err", err)
+			}
+		}
+	}
 }
 
 // actOnMerge sends d's notices and retro. It runs after the trunk lock is

@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -47,6 +48,76 @@ func TestCancel_WithoutAnOpenRoundWritesNoEnd(t *testing.T) {
 	}
 	if rounds := endedRounds(t, path); len(rounds) != 0 {
 		t.Errorf("rounds = %+v; want none", rounds)
+	}
+}
+
+// keepWorktree leaves an iteration worktree and branch for epic/id, as a paused
+// iteration does.
+func keepWorktree(t *testing.T, repo, epic, id string) string {
+	t.Helper()
+	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := ralphloop.IterationWorktreePath(wtDir, epic, id)
+	out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", ralphloop.IterationBranch(epic, id), path).CombinedOutput()
+	if err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+	return path
+}
+
+func branchListed(t *testing.T, repo, branch string) bool {
+	t.Helper()
+	out, err := exec.Command("git", "-C", repo, "branch", "--list", branch).CombinedOutput()
+	if err != nil {
+		t.Fatalf("git branch: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out)) != ""
+}
+
+func TestCancel_RemovesTheKeptWorktreeAndKeepsTheBranch(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store)
+	wt := keepWorktree(t, repo, "epic-a", "01")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Errorf("worktree still there: %v", err)
+	}
+	if !branchListed(t, repo, ralphloop.IterationBranch("epic-a", "01")) {
+		t.Error("iteration branch gone")
+	}
+}
+
+func TestCancel_RemovesTheForkDescendantsWorktreeToo(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	kid := "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\n# kid\n"
+	if err := os.WriteFile(filepath.Join(store, "proj", "epic-a", "issues", "02-kid.md"), []byte(kid), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+	wts := []string{keepWorktree(t, repo, "epic-a", "01"), keepWorktree(t, repo, "epic-a", "02")}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	for _, wt := range wts {
+		if _, err := os.Stat(wt); !os.IsNotExist(err) {
+			t.Errorf("worktree %s still there: %v", wt, err)
+		}
 	}
 }
 
