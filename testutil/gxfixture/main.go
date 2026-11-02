@@ -320,6 +320,9 @@ func run(args []string) (err error) {
 	if sc.dropAskedAgent {
 		f.env = append(f.env, "GX_DROP_ASKED_AGENT=1")
 	}
+	if sc.unknownSkill {
+		f.env = append(f.env, agentfake.TUIUnknownSkillEnv+"=1")
+	}
 	if err := f.setupDisk(); err != nil {
 		return err
 	}

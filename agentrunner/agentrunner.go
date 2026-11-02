@@ -192,6 +192,9 @@ var (
 	// ErrNotDelivered: Prompt could not get the agent to start a new turn.
 	// Callers start a fresh session rather than retrying.
 	ErrNotDelivered = errors.New("agentrunner: prompt not delivered")
+	// ErrUnknownSkill: a launch prompt was rejected because the agent does not
+	// know the skill. Always wrapped together with ErrNotDelivered.
+	ErrUnknownSkill = errors.New("agentrunner: unknown skill")
 	// ErrDeliveryUnconfirmed: a launch prompt was typed but a person typed over
 	// it before any proof arrived. Not a success, and not a reason to start a
 	// fresh session: the person is in this one.

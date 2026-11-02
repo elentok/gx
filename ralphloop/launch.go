@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/agentrunner"
@@ -289,6 +290,16 @@ type launchFailure struct {
 func (e *launchFailure) Error() string { return e.Err.Error() }
 func (e *launchFailure) Unwrap() error { return e.Err }
 
+// LaunchFailureKind is the events kind of a launch failure in err's chain,
+// for a caller that pauses the ticket itself.
+func LaunchFailureKind(err error) (events.Kind, bool) {
+	var lf *launchFailure
+	if errors.As(err, &lf) {
+		return lf.Kind, true
+	}
+	return "", false
+}
+
 // logLaunchFailed appends one launch-failed event for a failed attempt.
 func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.Kind, err error) {
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
@@ -357,9 +368,20 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 			log.Printf("stopping undelivered session %s: %v", s.Label, stopErr)
 		}
 		if attempt == 2 {
-			return launched{}, &launchFailure{Kind: events.AgentPromptStalled, Err: err}
+			return launched{}, &launchFailure{Kind: events.AgentPromptStalled, Err: withSkillHint(err, prompt)}
 		}
 	}
+}
+
+// withSkillHint names the missing skill and the fix on an unknown-skill
+// failure: a missing skill does not appear by itself, so a bare Retry would hit
+// the same error. Any other error passes through unchanged.
+func withSkillHint(err error, prompt string) error {
+	if !errors.Is(err, agentrunner.ErrUnknownSkill) {
+		return err
+	}
+	skill, _, _ := strings.Cut(prompt, " ")
+	return fmt.Errorf("the agent does not know the skill %s: install or refresh it with `gx skills install`, then Retry: %w", skill, err)
 }
 
 // withDoctorHint points a missing-capability error at the command that

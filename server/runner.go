@@ -553,6 +553,8 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		kind, reason := events.IterationError, "launch failed: "+err.Error()
 		if taken := (*nameTakenError)(nil); errors.As(err, &taken) {
 			kind, reason = events.AgentNameTaken, "agent name taken: "+taken.reason
+		} else if k, ok := ralphloop.LaunchFailureKind(err); ok {
+			kind = k
 		}
 		if perr := s.pauseTicket(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
 			err = errors.Join(err, fmt.Errorf("pause: %w", perr))

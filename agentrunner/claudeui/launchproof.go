@@ -117,7 +117,7 @@ func CheckLaunchDelivered(p LaunchProof, text string, caps LaunchProofCaps) erro
 			unknownAt = now
 		}
 		if !unknownAt.IsZero() && now.Sub(unknownAt) >= caps.UnknownGrace {
-			return fmt.Errorf("%w: %q: %s", agentrunner.ErrNotDelivered, text, UnknownCommandMarker)
+			return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text, UnknownCommandMarker)
 		}
 		if now.Sub(start) >= caps.Grace {
 			return fmt.Errorf("%w: %q: no user record for the command after %s", agentrunner.ErrNotDelivered, text, caps.Grace)

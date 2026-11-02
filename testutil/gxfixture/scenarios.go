@@ -111,6 +111,8 @@ type scenario struct {
 	// dropAskedAgent forces the server to clean up an asking agent, as a
 	// herdr-hosted run does (see keepworktree.go).
 	dropAskedAgent bool
+	// unknownSkill makes the fake TUI agent reject every skill prompt as an unknown command.
+	unknownSkill bool
 	// restart points the server's restart at a fake gx binary (see restart.go).
 	restart *restartSpec
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
@@ -209,6 +211,13 @@ var scenarios = map[string]scenario{
 			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
 		}}},
 		diskLow: true,
+	},
+	// unknown-skill: a queued epic whose agent rejects every skill prompt as an
+	// unknown command, so the ticket pauses as agent_prompt_stalled.
+	"unknown-skill": {
+		epics:        []epic{{project, "unknown-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}}},
+		queue:        []string{project + ":unknown-epic"},
+		unknownSkill: true,
 	},
 	"keep-worktree":     keepWorktree,
 	"keep-agent":        keepAgent,

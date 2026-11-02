@@ -136,6 +136,19 @@ test.describe("3. Pause reasons and recovery", () => {
     });
   }
 
+  test("Unknown skill", async ({ page, start }) => {
+    await start("unknown-skill");
+    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:unknown-epic/01");
+
+    // The agent rejects the skill on both sessions, so the pause appears on its own.
+    await expect(page.getByText("Could not start the agent").first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/does not know the skill \/gx-implement/).first()).toBeVisible();
+    await expect(page.getByText(/gx skills install/).first()).toBeVisible();
+
+    await recovery(page).getByRole("button", nav("Retry")).click();
+    await expect(page.getByText("Could not start the agent")).toHaveCount(0);
+  });
+
   test("Repair", async ({ page, start }) => {
     const fixture = await start("paused");
     await fixture.cli("server", "queue", "add", "demo:paused-epic");

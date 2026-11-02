@@ -87,6 +87,10 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   | Approve | `approve-epic/01` | Needs approval | Allow once |
   | Repair | `paused-epic/07` | Run failed | none: the card shows "+6 more", the epic page shows three "Fix it with an agent" buttons |
 
+- **Unknown skill:** scenario `unknown-skill` (`unknown-epic`, queued; the fake agent rejects every
+  skill prompt as an unknown command). Open `unknown-epic/01`; once both launch attempts fail the
+  card reads "Could not start the agent", names the skill (`/gx-implement`) and says to install or
+  refresh it with `gx skills install`, and offers Retry. Retry lifts the pause.
 - **Tooltips:** each recovery button carries its tooltip as a `title`: Merge again (05), Resume (08),
   Retry Recommended (09) and Start over (08).
 - **Pending:** a held `/v1/tickets/retry` call leaves the Retry button disabled until it answers.

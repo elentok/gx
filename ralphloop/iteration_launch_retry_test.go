@@ -143,6 +143,33 @@ func (l launchRunner) PromptLaunch(s agentrunner.Session, text string, _ func(st
 	return l.Prompt(s, text)
 }
 
+// unknownSkillRunner rejects every launch prompt as an unknown skill.
+type unknownSkillRunner struct{ agentrunner.Runner }
+
+func (unknownSkillRunner) PromptLaunch(_ agentrunner.Session, text string, _ func(string)) error {
+	return fmt.Errorf("%w: %w: %q", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text)
+}
+
+func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	var kinds []events.Kind
+	_, err := startAndPrompt(unknownSkillRunner{d.Runner}, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
+		func(_ int, kind events.Kind, _ error) { kinds = append(kinds, kind) }, func(int, string) {})
+	var lf *launchFailure
+	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
+		t.Fatalf("err = %v, want agent_prompt_stalled launchFailure", err)
+	}
+	for _, want := range []string{"/gx-implement", "gx skills install", "Retry"} {
+		if !strings.Contains(lf.Error(), want) {
+			t.Errorf("reason %q lacks %q", lf.Error(), want)
+		}
+	}
+	if len(kinds) != 2 {
+		t.Errorf("launch-failed kinds = %v, want two (resend, fresh-session retry)", kinds)
+	}
+}
+
 func TestRunIteration_LaunchPromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
