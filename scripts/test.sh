@@ -12,7 +12,9 @@
 #           background goroutine, and herdrrunner's use of the herdr fake)
 #   go      every other package except ./server and ./e2e
 #   server  ./server
-#   web     make web-test (install, tsc, vitest)
+#   web     make web-test (install, tsc, vitest with 3 workers)
+#   e2e     make web-e2e (Playwright); only with GX_TEST_E2E=1, which `gx check
+#           --full` sets. `make test` (CI) leaves it off: CI runs web-e2e as its own job.
 #
 # -timeout=10m per package: CI runners' lower core counts give
 # concurrency-sensitive tests more room to run long. -count=1 keeps the test
@@ -54,6 +56,9 @@ while IFS= read -r pkg; do
 done < <(go list ./... | grep -Fvx -f <(echo "$skip"))
 
 names=(race go server web)
+if [[ ${GX_TEST_E2E:-} == 1 ]]; then
+	names+=(e2e)
+fi
 
 # run_step <name> <command...>: writes the command's output to $work/<name>.log
 # and its exit status and wall time to $work/<name>.status.
@@ -67,15 +72,20 @@ run_step() {
 # The steps share one CPU budget so the machine does not saturate. `gx brief
 # go-test` caps every run it starts with GOMAXPROCS (brief/gotest.go goTestProcs:
 # two fifths of GX_TEST_CPUS), so the go and server steps get that cap by
-# default. race and web get one worker each, so the total is about the budget.
+# default. race gets one worker and web three, so the total is a little over the
+# budget; e2e (GX_TEST_E2E=1 only) is on top, its Playwright workers unbudgeted.
 run_step race env GOMAXPROCS=1 "$gx" brief go-test -race -timeout=10m -count=1 "${race_pkgs[@]}" &
 pids=("$!")
 run_step go "$gx" brief go-test -timeout=10m -count=1 "${other_pkgs[@]}" &
 pids+=("$!")
 run_step server "$gx" brief go-test -timeout=10m -count=1 ./server &
 pids+=("$!")
-run_step web make web-test GX="$gx" WEB_TEST_WORKERS=1 &
+run_step web make web-test GX="$gx" WEB_TEST_WORKERS=3 &
 pids+=("$!")
+if [[ ${GX_TEST_E2E:-} == 1 ]]; then
+	run_step e2e make web-e2e GX="$gx" &
+	pids+=("$!")
+fi
 for pid in "${pids[@]}"; do
 	wait "$pid" || true
 done

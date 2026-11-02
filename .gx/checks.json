@@ -1,6 +1,6 @@
 {
   "test": {
-    "full": "scripts/test.sh && make web-e2e",
+    "full": "GX_TEST_E2E=1 scripts/test.sh",
     "always": [
       "gx brief go-test -run '^TestNoNewSleeps$' ./sleepguard",
       "gx brief go-test -run '^TestNoEnvReads$' ./envguard",
