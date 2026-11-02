@@ -236,6 +236,21 @@ test("the background strip lists running tasks",async () => {
   expect(within(strip).getByText("subagent: survey")).toBeTruthy();
 });
 
+test("a busy turn names the background tasks it waits on, also in the Questions view", async () => {
+  const background = [
+    { kind: "shell", label: "make test", started_at: ago(0) },
+    { kind: "agent", label: "survey", started_at: ago(0) },
+    { kind: "agent", label: "audit", started_at: ago(0) },
+  ];
+  const working = [session({ status: { state: "working" } })];
+  renderChat(working, okChat(chatOf([msg({ text: "hi" })], { background })));
+  expect(await screen.findByText("Working · waiting on 1 shell, 2 subagents")).toBeTruthy();
+  cleanup();
+  renderChat(working, roundChat({ background }));
+  await screen.findByRole("group", { name: "Questions" });
+  expect(screen.getByText("Working · waiting on 1 shell, 2 subagents")).toBeTruthy();
+});
+
 test("an event for the session refetches and a new conversation replaces the chat", async () => {
   let n = 0;
   const fetchChat = vi.fn<FetchChat>(async () => ({
@@ -403,9 +418,10 @@ const card = (over: Partial<SessionRoundCard>): SessionRoundCard => ({
   ...over,
 });
 
-const roundChat = () =>
+const roundChat = (over: Record<string, unknown> = {}) =>
   okChat(
     chatOf([], {
+      ...over,
       round: [
         card({ label: "1", body: "First?", recommended: "b" }),
         card({ label: "2", body: "Second?", kind: "yes-no", options: undefined, yes: "Sure", no: "Nope" }),

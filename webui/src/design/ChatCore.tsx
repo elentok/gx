@@ -137,13 +137,28 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
   );
 }
 
+const KIND_PLURALS: Record<string, string> = { shell: "shells", monitor: "monitors", agent: "subagents" };
+
+/** "2 subagents, 1 shell": what the turn waits on besides the model, by task kind. */
+export function backgroundSummary(tasks: SessionBackgroundTask[]): string {
+  const counts = new Map<string, number>();
+  for (const t of tasks) counts.set(t.kind, (counts.get(t.kind) ?? 0) + 1);
+  return [...counts]
+    .map(([kind, n]) => `${n} ${n === 1 ? (KIND_NAMES[kind] ?? kind) : (KIND_PLURALS[kind] ?? `${kind}s`)}`)
+    .join(", ");
+}
+
 export interface WorkingStep {
   step?: string;
   title?: string;
 }
 
 // Inline, not the page-centered Spinner: this one sits at the bottom of the chat.
-export function WorkingRow({ step, title }: WorkingStep) {
+export function WorkingRow({
+  step,
+  title,
+  background = [],
+}: WorkingStep & { background?: SessionBackgroundTask[] }) {
   return (
     <Box
       role="status"
@@ -158,6 +173,7 @@ export function WorkingRow({ step, title }: WorkingStep) {
         Working
         {step && `: ${step}`}
         {title && ` · ${title}`}
+        {background.length > 0 && ` · waiting on ${backgroundSummary(background)}`}
       </Text>
     </Box>
   );
