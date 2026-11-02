@@ -34,8 +34,8 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 
 ## Testing
 
-- Test the packages you touched plus their direct importers (find importers with the gopls-mcp
-  references/dependency tools). Don't run `go test ./...` for a local change.
+- Test the packages you touched plus their direct importers (find importers with `findReferences`,
+  see [gx-gopls](../skills/gx-gopls/SKILL.md)). Don't run `go test ./...` for a local change.
 - ralph-loop's land step runs no tests: it only cherry-picks commits onto the feature branch. The
   full suite runs in CI (`.github/workflows/ci.yml`, on pushes and PRs to `main`): `make test`
   (`scripts/test.sh`: race, other Go, server and web unit tests side by side), `make web-e2e`, and
@@ -168,7 +168,7 @@ Web checks:
 
 - See ./design-system.md for UI work
 - Don't show any keymaps on the statusbar, only "? help"
-- Whenever possible prefer using the LSP (gopls-mcp) over grepping
+- Whenever possible prefer the LSP tool over grepping, see [gx-gopls](../skills/gx-gopls/SKILL.md)
 - Run Go tests per package (`go test ./<pkg>/...`), never `go test ./...`: the whole repo is slow
   and loud, and has caused context blowups. Never add `-v`.
 - Transient feedback uses `ui/notify` (not `m.statusMsg`): emit `notify.Info/Success/Warning/Error/Progress()` as `tea.Cmd`
