@@ -2,7 +2,9 @@ package brief
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const playwrightConfig = "e2e/playwright.config.ts"
@@ -49,7 +52,10 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 	if err != nil {
 		return Invocation{}, err
 	}
-	argv := []string{"test", "--reporter=line"}
+	// The json reporter writes to a file, so the line report on stdout is
+	// unchanged. Playwright creates the file; the run reads and removes it.
+	report := filepath.Join(os.TempDir(), fmt.Sprintf("gx-brief-playwright-%d-%d.json", os.Getpid(), time.Now().UnixNano()))
+	argv := []string{"test", "--reporter=line,json"}
 	if !slices.ContainsFunc(rest, func(a string) bool {
 		return a == "-c" || a == "--config" || strings.HasPrefix(a, "--config=")
 	}) {
@@ -67,7 +73,61 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 			return Invocation{}, err
 		}
 	}
-	return Invocation{Bin: bin, Argv: append(argv, rest...), Note: note}, nil
+	return Invocation{
+		Bin: bin, Argv: append(argv, rest...), Note: note,
+		Env: []string{"PLAYWRIGHT_JSON_OUTPUT_NAME=" + report}, ReportFile: report,
+	}, nil
+}
+
+// ReadReport returns the duration in milliseconds of each test in the JSON
+// report at path, keyed like Outcome.Tests. A missing or unreadable report
+// yields nil.
+func (Playwright) ReadReport(path string) map[string]int64 {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	type suite struct {
+		Title  string
+		File   string
+		Suites []suite
+		Specs  []struct {
+			Title string
+			File  string
+			Tests []struct {
+				Results []struct{ Duration float64 }
+			}
+		}
+	}
+	var rep struct{ Suites []suite }
+	if json.Unmarshal(data, &rep) != nil {
+		return nil
+	}
+	var durations map[string]int64
+	var walk func(s suite, titles []string)
+	walk = func(s suite, titles []string) {
+		for _, sp := range s.Specs {
+			var ms float64
+			for _, t := range sp.Tests {
+				for _, r := range t.Results {
+					ms += r.Duration
+				}
+			}
+			if durations == nil {
+				durations = map[string]int64{}
+			}
+			name := strings.Join(append(slices.Clone(titles), sp.Title), " › ")
+			durations[Unit{Location: sp.File, Name: name}.String()] += int64(math.Round(ms))
+		}
+		for _, c := range s.Suites {
+			walk(c, append(slices.Clone(titles), c.Title))
+		}
+	}
+	// A top-level suite is the file; its title is not part of a test's name.
+	for _, file := range rep.Suites {
+		walk(file, nil)
+	}
+	return durations
 }
 
 // flowNumbersToGrep replaces bare flow numbers (`disk.e2e.ts 69 70`) with one

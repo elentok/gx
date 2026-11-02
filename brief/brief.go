@@ -52,6 +52,15 @@ type Invocation struct {
 	// Env holds KEY=VALUE defaults added to the child's environment. A
 	// variable the caller's environment already sets keeps the caller's value.
 	Env []string
+	// ReportFile is a file the run writes besides its output. After the run a
+	// tool that is a ReportReader reads it for test durations; the file is
+	// then removed.
+	ReportFile string
+}
+
+// ReportReader is a Tool that times its tests from Invocation.ReportFile.
+type ReportReader interface {
+	ReadReport(path string) map[string]int64
 }
 
 // Outcome is what a tool found in the output of one run.
@@ -195,6 +204,10 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	elapsed := time.Since(start)
 
 	outcome := tool.Parse(out, exit)
+	if rr, ok := tool.(ReportReader); ok && plan.ReportFile != "" {
+		outcome.TestDurations = rr.ReadReport(plan.ReportFile)
+		os.Remove(plan.ReportFile)
+	}
 	if exit != 0 {
 		outcome.Units = len(outcome.Failures)
 	}

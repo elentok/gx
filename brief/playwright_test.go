@@ -1,6 +1,7 @@
 package brief
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -84,9 +85,12 @@ func TestPlaywrightPlan_AddsConfigAndLineReporter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"test", "--reporter=line", "-c", playwrightConfig, "epics.e2e.ts", "-g", "^2\\."}
+	want := []string{"test", "--reporter=line,json", "-c", playwrightConfig, "epics.e2e.ts", "-g", "^2\\."}
 	if !slices.Equal(inv.Argv, want) {
 		t.Errorf("argv = %v, want %v", inv.Argv, want)
+	}
+	if inv.ReportFile == "" || !slices.Contains(inv.Env, "PLAYWRIGHT_JSON_OUTPUT_NAME="+inv.ReportFile) {
+		t.Errorf("report file %q, env %v: want the json reporter's output named", inv.ReportFile, inv.Env)
 	}
 	if !strings.Contains(inv.Note, "replaced") {
 		t.Errorf("note = %q, want a replaced-reporter note", inv.Note)
@@ -102,7 +106,7 @@ func TestPlaywrightPlan_BareFlowNumbersBecomeOneAnchoredGrep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"test", "--reporter=line", "-c", playwrightConfig, "disk.e2e.ts", "--workers", "2", "-g", `› (69|70)\. `}
+	want := []string{"test", "--reporter=line,json", "-c", playwrightConfig, "disk.e2e.ts", "--workers", "2", "-g", `› (69|70)\. `}
 	if !slices.Equal(inv.Argv, want) {
 		t.Errorf("argv = %v, want %v", inv.Argv, want)
 	}
@@ -157,6 +161,28 @@ func TestPlaywrightPlan_BuildsWebOnlyWhenDistIsMissing(t *testing.T) {
 	}
 	if !slices.Equal(builtEnv, env) {
 		t.Errorf("built with env %v, want %v", builtEnv, env)
+	}
+}
+
+func TestPlaywrightReadReport_KeysDurationsLikeFailureNames(t *testing.T) {
+	report := `{"suites":[{"title":"epics.e2e.ts","file":"epics.e2e.ts","specs":[
+	  {"title":"2. Epic looks right","file":"epics.e2e.ts","tests":[{"results":[{"duration":1200.4}]}]}],
+	  "suites":[{"title":"queue","file":"epics.e2e.ts","specs":[
+	  {"title":"3. Flaky","file":"epics.e2e.ts","tests":[{"results":[{"duration":100},{"duration":50}]}]}]}]}]}`
+	path := filepath.Join(t.TempDir(), "report.json")
+	if err := os.WriteFile(path, []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := Playwright{}.ReadReport(path)
+	want := map[string]int64{
+		"epics.e2e.ts.2. Epic looks right": 1200,
+		"epics.e2e.ts.queue › 3. Flaky":    150,
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("durations = %v, want %v", got, want)
+	}
+	if (Playwright{}).ReadReport(filepath.Join(t.TempDir(), "missing.json")) != nil {
+		t.Error("a missing report must yield nil")
 	}
 }
 
