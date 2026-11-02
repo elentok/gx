@@ -198,3 +198,63 @@ func TestCheck_BriefCalledByConfiguredCommandNamesFailingTests(t *testing.T) {
 		t.Errorf("index = %+v, err %v; run %q", lines, err, recs[0].Run)
 	}
 }
+
+// slowTestRepo has one Go test that sleeps 1.2s, checked under checksJSON.
+func slowTestRepo(t *testing.T, checksJSON string) (repo, data string) {
+	t.Helper()
+	bin := t.TempDir()
+	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, out)
+	}
+	prependPath(t, bin)
+	repo, data = registeredCheckRepo(t, checksJSON)
+	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport (\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) { time.Sleep(1200 * time.Millisecond) }\n")
+	testutil.CommitAll(t, repo, "module")
+	return repo, data
+}
+
+func TestCheck_SlowLimit(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("builds the gx binary")
+	}
+	const brief = `gx brief go-test ./...`
+	cases := []struct {
+		name, test string
+		args       []string
+		want       int
+	}{
+		{"scalar full", `{"full":"` + brief + `","changed":"` + brief + `","limits":{"slow":"1s"}}`, []string{"--full"}, 1},
+		{"scalar changed", `{"full":"` + brief + `","changed":"` + brief + `","limits":{"slow":"1s"}}`, nil, 1},
+		{"map go", `{"full":"` + brief + `","limits":{"slow":{"go":"1s"}}}`, []string{"--full"}, 1},
+		{"map other tool", `{"full":"` + brief + `","limits":{"slow":{"playwright":"1s","vitest":"1s"}}}`, []string{"--full"}, 0},
+		{"under limit", `{"full":"` + brief + `","limits":{"slow":"20s"}}`, []string{"--full"}, 0},
+		{"no brief", `{"full":"sleep 2","limits":{"slow":"1s"}}`, []string{"--full"}, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo, data := slowTestRepo(t, `{"test":`+c.test+`}`)
+			if c.args == nil {
+				testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport (\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) { time.Sleep(1300 * time.Millisecond) }\n")
+			}
+			out, code := runCheckCmd(t, repo, append(c.args, "--kind", "test")...)
+			if code != c.want {
+				t.Fatalf("exit %d, want %d\n%s", code, c.want, out)
+			}
+			if c.want == 0 {
+				return
+			}
+			if !strings.Contains(out, "example.com/tiny.TestSlow") || !strings.Contains(out, "over the 1s limit") {
+				t.Errorf("output lacks test name and time:\n%s", out)
+			}
+			recs, _ := check.ReadRecords(data, "p")
+			if len(recs) != 1 {
+				t.Fatalf("records = %+v", recs)
+			}
+			if k := kindRecord(t, recs[0], "test"); !reflect.DeepEqual(k.Failed, []string{"example.com/tiny.TestSlow"}) {
+				t.Errorf("failed = %v", k.Failed)
+			}
+		})
+	}
+}

@@ -153,7 +153,7 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result) Record {
 	}
 	for _, k := range res.Kinds {
 		rec.Kinds = append(rec.Kinds, KindRecord{
-			Kind: k.Kind, Status: k.Status, DurationMS: k.Duration.Milliseconds(), Failed: failed[k.Kind], Warnings: k.Warnings,
+			Kind: k.Kind, Status: k.Status, DurationMS: k.Duration.Milliseconds(), Failed: append(failed[k.Kind], k.SlowTests...), Warnings: k.Warnings,
 		})
 	}
 	return rec

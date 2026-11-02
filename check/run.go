@@ -78,6 +78,8 @@ type KindResult struct {
 	// Failures name the failing tests of a failing gx default as brief renders
 	// them (`package.TestName`).
 	Failures []string
+	// SlowTests name the tests that passed the kind's slow limit.
+	SlowTests []string
 	// Notes are lines printed under the kind: a skipped row of a gx default,
 	// what format rewrote.
 	Notes []string
@@ -270,8 +272,11 @@ func (r *runner) runKind(kind string) KindResult {
 		}
 	}
 	res.Duration = time.Since(start)
-	if kind == "test" && r.mode == ModeFull {
-		r.enforceSuite(&res, c.Limits.Suite)
+	if kind == "test" {
+		r.enforceSlow(&res, c.Limits.Slow)
+		if r.mode == ModeFull {
+			r.enforceSuite(&res, c.Limits.Suite)
+		}
 	}
 	if before != nil {
 		r.afterFormat(before, &res)
@@ -280,6 +285,51 @@ func (r *runner) runKind(kind string) KindResult {
 		res.Tail = lastLines(res.Log, tailLines)
 	}
 	return res
+}
+
+// limitFor is the slow limit of a brief tool name; zero means no limit.
+func (s SlowLimits) limitFor(tool string) time.Duration {
+	switch tool {
+	case "go-test":
+		return s.Go
+	case "vitest":
+		return s.Vitest
+	case "playwright":
+		return s.Playwright
+	}
+	return 0
+}
+
+// enforceSlow fails the kind when a test timed by a `gx brief` call of this run
+// took longer than its tool's slow limit.
+func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
+	if slow == (SlowLimits{}) {
+		return
+	}
+	lines, err := brief.ReadIndex(r.dataDir)
+	if err != nil {
+		return
+	}
+	var msgs []string
+	for _, l := range lines {
+		limit := slow.limitFor(l.Tool)
+		if l.CheckRun != r.runID || l.CheckKind != res.Kind || limit <= 0 {
+			continue
+		}
+		for name, ms := range l.TestDurations {
+			if d := time.Duration(ms) * time.Millisecond; d > limit {
+				res.SlowTests = append(res.SlowTests, name)
+				msgs = append(msgs, fmt.Sprintf("slow test %s took %.2fs, over the %s limit", name, d.Seconds(), limit))
+			}
+		}
+	}
+	if len(msgs) == 0 {
+		return
+	}
+	slices.Sort(msgs)
+	slices.Sort(res.SlowTests)
+	res.Status = StatusFail
+	res.Tail = append(res.Tail, msgs...)
 }
 
 // enforceSuite fails a passing full test run that took longer than limit. On a
