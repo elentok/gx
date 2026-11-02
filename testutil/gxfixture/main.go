@@ -563,11 +563,18 @@ func run(args []string) (err error) {
 		if err != nil {
 			return fmt.Errorf("open design %s: %w\n%s", addr, err, out)
 		}
+		var res server.SessionResult
+		if err := json.Unmarshal(out, &res); err != nil || res.Session == nil {
+			return fmt.Errorf("open design %s: no session in %s", addr, out)
+		}
+		// The opening prompt is still running when `designs open` returns. A control the test sends
+		// meanwhile (Block) is overwritten when that turn ends.
+		if err := f.waitFor(res.Session.ID, "past its opening turn", func(si server.SessionInfo, _ server.SessionChatResponse) bool {
+			return si.Status.State != server.SessionStarting && si.Status.State != server.SessionWorking
+		}); err != nil {
+			return fmt.Errorf("open design %s: %w", addr, err)
+		}
 		if slices.Contains(sc.autoAdvanceOff, addr) {
-			var res server.SessionResult
-			if err := json.Unmarshal(out, &res); err != nil || res.Session == nil {
-				return fmt.Errorf("open design %s: no session in %s", addr, out)
-			}
 			// Not the CLI verb: its on|off arg validation rejects the session id.
 			if res, err := apiclient.New(server.SocketPath(f.stateD)).SetAutoAdvance(ctx, res.Session.ID, false); err != nil || res.Refused {
 				return fmt.Errorf("auto-advance off for %s: %v %+v", addr, err, res)
