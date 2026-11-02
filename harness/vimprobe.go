@@ -60,6 +60,22 @@ func markEditorOverride(session string, env []string) {
 // claude config env the probe reads, nil for the process's own.
 func NoteEditorOverride(session string, env []string) { markEditorOverride(session, env) }
 
+// CarryEditorOverride moves the override memory of a session whose
+// conversation id changed (claude forks a new one on resume and /clear) to its
+// new id, so the probe still sees the launch override.
+func CarryEditorOverride(from, to string) {
+	if from == "" || to == "" || from == to {
+		return
+	}
+	vimSessions.Lock()
+	defer vimSessions.Unlock()
+	if old := vimSessions.m[from]; old != nil && old.overridden {
+		moved := *old
+		moved.iPress = 0
+		vimSessions.m[to] = &moved
+	}
+}
+
 // EditorOverrideApplied reports whether session was launched with the normal
 // editor mode override.
 func EditorOverrideApplied(session string) bool {

@@ -369,6 +369,19 @@ func TestClaudeReadyToType_NotedOverrideSkipsUntilToggle(t *testing.T) {
 	}
 }
 
+func TestClaudeReadyToType_OverrideFollowsAConversationIDChange(t *testing.T) {
+	vimConfig(t, "vim")
+	harness.NoteEditorOverride("conv-old", nil)
+	harness.CarryEditorOverride("conv-old", "conv-new")
+	ty, _ := harness.LookupTyping(harness.Claude)
+	s := &screenIO{rows: [][]string{normalRows, insertRows}}
+	io := s.io()
+	io.Session = "conv-new"
+	if !ty.ReadyToType(io) || len(s.keys) != 0 {
+		t.Fatalf("carried override: keys = %q", s.keys)
+	}
+}
+
 func TestCodexReadyToType_IsANoOp(t *testing.T) {
 	vimConfig(t, "vim")
 	ty, _ := harness.LookupTyping(harness.Codex)

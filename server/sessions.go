@@ -700,6 +700,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
 					s.saveConversationTotals(*m, m.ConversationID)
+					harness.CarryEditorOverride(m.ConversationID, msg.ConversationID)
 					m.ConversationID = msg.ConversationID
 					s.recordConversation(*m)
 					changed = true
