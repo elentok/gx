@@ -18,6 +18,9 @@ gx also leaks disk space on its own:
   keeps a full checkout with its `node_modules`.
 - Each Playwright e2e run builds `gx`, `claude` and `gxfixture` into a new `gx-e2e-bin-*` temp dir
   and never removes it. These dirs held 28 GiB.
+- `gxfixture` replaces `HOME` for its server. Without the Go cache variables, every `go build` there
+  downloaded the modules again, 244 MiB per fixture, and its cleanup could not remove the read-only
+  files. These dirs held 39 GiB.
 - `claudeenv.Isolate` gives each test package a temp `HOME`. Tests that run `go` there download the
   Go modules into it, Go makes those files read-only, and the cleanup fails without a word. These
   dirs held 2 GiB.
@@ -36,7 +39,10 @@ threshold and `"10G"` for the clean threshold.
   cleanup commands in the background. The default command is `go clean -cache`, set server-wide in
   `config.json`. A project can replace it in its `project.json`, or set it empty to turn cleanup
   off. gx sends a chat notice that says how much the cleanup freed, how much is free now, and
-  whether dispatch is still held. gx cleans again only after free space has climbed back above the
+  whether dispatch is still held. Every clean, including "Clean now", also removes stale test dirs from the temp dir and
+  `/tmp`: `gx-epic-*`, `go-build*`, `gxf*` and `gxs*`. Killed test runs leave these behind, and they
+  held 40 GiB. gx skips a dir that a running process names or that has any file changed in the last
+  hour. gx cleans again only after free space has climbed back above the
   higher of the warn threshold and the clean threshold plus 2G.
 - If the disk is still under the clean threshold after the cleanup, the hold stays. Running tickets
   keep running. Held tickets show a "disk low" verdict. Dispatch resumes on its own once free space

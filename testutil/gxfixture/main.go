@@ -51,6 +51,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -738,6 +739,9 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 		cliEnv = append(cliEnv, "PLAYWRIGHT_BROWSERS_PATH="+p)
 	}
 	env = append(env, cliEnv...)
+	// HOME is replaced, so go would download the modules again into the temp
+	// HOME's read-only tree, 244 MB per fixture that the cleanup cannot remove.
+	env = append(env, claudeenv.GoCacheEnv()...)
 	env = append(env,
 		"PATH="+binDir+string(os.PathListSeparator)+hostPathWithoutCodex(root),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
@@ -1046,9 +1050,11 @@ func (f *fixture) serverOutput() string {
 	return string(out)
 }
 
-// removeAll retries while a stopped process finishes writing into dir.
+// removeAll retries while a stopped process finishes writing into dir. Go
+// marks its module cache read-only, so the dirs are made writable first.
 func removeAll(dir string) {
 	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		testutil.MakeWritable(dir)
 		if os.RemoveAll(dir) == nil {
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
 				return

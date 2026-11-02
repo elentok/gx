@@ -81,6 +81,7 @@ func (s *Server) cleanWork(projects []string) []cleanCmd {
 func (s *Server) startClean(id, probe string, projects []string) {
 	work := s.cleanWork(projects)
 	if len(work) == 0 {
+		s.sweepTemp()
 		s.endClean(id, probe, cleanEnd{noWork: true})
 		return
 	}
@@ -114,6 +115,7 @@ func (s *Server) runCleanWork(work []cleanCmd) (failed string) {
 			s.log.Warn("disk clean went ahead after the build wait cap")
 		}
 	}
+	s.sweepTemp()
 	for _, c := range work {
 		ctx, cancel := context.WithTimeout(context.Background(), limit)
 		out, err := run(ctx, c.argv, c.dir)

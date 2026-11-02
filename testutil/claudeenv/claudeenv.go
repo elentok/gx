@@ -41,10 +41,17 @@ func In(home string) []string {
 	}
 	// go derives its cache defaults from HOME, and a temp HOME would make every
 	// child go command re-download the modules into a read-only tree.
+	return append(env, GoCacheEnv()...)
+}
+
+// GoCacheEnv returns the GOCACHE and GOMODCACHE entries that point a child
+// process at the caches go resolves now, or nil when go cannot say. A child
+// with a temp HOME needs them, or it downloads the modules again.
+func GoCacheEnv() []string {
 	if gocache, gomodcache, ok := goCaches(); ok {
-		env = append(env, "GOCACHE="+gocache, "GOMODCACHE="+gomodcache)
+		return []string{"GOCACHE=" + gocache, "GOMODCACHE=" + gomodcache}
 	}
-	return env
+	return nil
 }
 
 // goCaches returns the GOCACHE and GOMODCACHE that go resolves right now.

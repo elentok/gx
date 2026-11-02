@@ -912,6 +912,10 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	if h.cfg.CleanupRunner == nil {
 		h.cfg.CleanupRunner = func(context.Context, []string, string) ([]byte, error) { return nil, nil }
 	}
+	// The real sweep would delete the developer's stale temp dirs.
+	if h.cfg.TempSweepDir == "" {
+		h.cfg.TempSweepDir = t.TempDir()
+	}
 	// A real process scan would see the `go test` running this very test and wait.
 	if h.cfg.CacheGateScan == nil {
 		h.cfg.CacheGateScan = func() (bool, error) { return false, nil }

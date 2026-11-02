@@ -80,6 +80,11 @@ type Config struct {
 	CleanupRunner func(ctx context.Context, argv []string, dir string) ([]byte, error)
 	// CleanupTimeout is the time limit per cleanup command; zero means ten minutes.
 	CleanupTimeout time.Duration
+	// TempSweepDir is the temp dir a clean sweeps for stale gx-epic-* and
+	// go-build* dirs; empty means os.TempDir(). TempSweepMinAge is how long a
+	// dir must sit untouched first; zero means an hour.
+	TempSweepDir    string
+	TempSweepMinAge time.Duration
 	// CacheGateCap bounds the wait for running Go builds before a clean; zero
 	// means ten minutes. CacheGateScan replaces the `go` process scan; nil
 	// lists real processes. Both are test hooks.

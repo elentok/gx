@@ -62,6 +62,9 @@ func (s *Server) cleanNow(id string) CleanNowResult {
 	}
 
 	work := s.cleanWork(projects)
+	if len(work) == 0 {
+		s.sweepTemp()
+	}
 	end := cleanEnd{failed: s.runCleanWork(work), noWork: len(work) == 0}
 	r, held := s.endClean(id, probe, end)
 	return CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: end.failed, NoCleanupCommand: end.noWork}
