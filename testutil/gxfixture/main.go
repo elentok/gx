@@ -782,6 +782,9 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 	cliEnv = append(cliEnv, claudeenv.GoCacheEnv()...)
 	cliEnv = append(cliEnv, "GOFLAGS=-modcacherw")
 	env = append(env, cliEnv...)
+	// HOME is replaced, so go would download the modules again into the temp
+	// HOME's read-only tree, 244 MB per fixture that the cleanup cannot remove.
+	env = append(env, claudeenv.GoCacheEnv()...)
 	env = append(env,
 		"PATH="+binDir+string(os.PathListSeparator)+hostPathWithoutCodex(root),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
