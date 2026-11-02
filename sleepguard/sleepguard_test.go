@@ -37,6 +37,7 @@ var allowed = map[string]int{
 	"codexsetup/setup_test.go":                      1, // negative wait: a rerun leaves the files' mtimes alone
 	"nativerunner/pty_codex_prompt_test.go":         3, // two poll loops with a deadline; negative wait: a queued prompt is not submitted
 	"nativerunner/pty_codex_test.go":                2, // poll loops with a deadline
+	"nativerunner/pty_launch_test.go":               1, // negative wait: the launch must still be waiting for delivery when cancelled
 	"nativerunner/pty_codexapproval_test.go":        2, // poll loops with a deadline
 	"server/blocked_pause_test.go":                  3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
 	"server/servertest/longticket_test.go":          1, // a delayed transcript write
