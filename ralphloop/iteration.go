@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -77,7 +78,7 @@ func runIteration(d Deps, p iterationParams) error {
 
 	prompt := skillPrompt(p.Agent, launchSkill(p.Ticket, p.Skill), ticketAddress(p.Ticket))
 
-	l, err := startAndPrompt(d.Runner, agentrunner.StartOptions{
+	l, err := startAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,
 		Cwd:   path,
@@ -88,6 +89,7 @@ func runIteration(d Deps, p iterationParams) error {
 	}, func(attempt int, decision string) {
 		p.logPromptNudged(label, attempt, decision)
 	})
+
 	var launchFail *launchFailure
 	if errors.As(err, &launchFail) {
 		return err
@@ -1030,7 +1032,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	label := conflictLabel(p.Ticket.Identifier)
 	prompt := skillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
 
-	l, err := startAndPrompt(d.Runner, agentrunner.StartOptions{
+	l, err := startAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
@@ -1041,6 +1043,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	}, func(attempt int, decision string) {
 		p.logPromptNudged(label, attempt, decision)
 	})
+
 	var launchFail *launchFailure
 	if errors.As(err, &launchFail) {
 		return "", fmt.Errorf("starting conflict-resolution agent %s: %w", label, err)

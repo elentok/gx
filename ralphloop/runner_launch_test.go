@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"testing"
@@ -18,9 +19,10 @@ type launchFail struct {
 func startAndPromptFake(t *testing.T, r *runnerfake.Runner) (agentrunner.Session, error, []launchFail) {
 	t.Helper()
 	var fails []launchFail
-	l, err := startAndPrompt(r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
+	l, err := startAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
 		fails = append(fails, launchFail{attempt, kind})
 	}, func(int, string) {})
+
 	return l.Session, err, fails
 }
 
@@ -91,7 +93,7 @@ func TestStartAndPrompt_ServerLaunchNeverAdopts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := StartAndPrompt(r, opts, "/go", func(int, string) {}); !errors.Is(err, agentrunner.ErrLabelTaken) {
+	if _, err := StartAndPrompt(context.Background(), r, opts, "/go", func(int, string) {}); !errors.Is(err, agentrunner.ErrLabelTaken) {
 		t.Fatalf("err = %v, want ErrLabelTaken", err)
 	}
 	if got := r.Prompts("it-01"); len(got) != 0 {

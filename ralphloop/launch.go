@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -334,7 +335,7 @@ func (p iterationParams) logPromptNudged(label string, attempt int, decision str
 // A label already live before Start means Start adopted our own earlier
 // session (e.g. a second gx process racing the same ticket): that one is
 // returned unprompted with Adopted set, since it may be mid-turn.
-func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error), onNudge func(attempt int, decision string)) (launched, error) {
+func startAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error), onNudge func(attempt int, decision string)) (launched, error) {
 	_, adopted, err := r.Find(opts.Label)
 	if err != nil {
 		// Not fatal: Start still runs, it just can't be an adoption.
@@ -358,7 +359,7 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 		if err != nil {
 			log.Printf("reading %s status before initial prompt: %v", opts.Label, err)
 		}
-		err = agentrunner.PromptLaunch(r, s, prompt, func(decision string) { onNudge(attempt, decision) })
+		err = agentrunner.PromptLaunch(ctx, r, s, prompt, func(decision string) { onNudge(attempt, decision) })
 		if !errors.Is(err, agentrunner.ErrNotDelivered) {
 			return launched{Session: s, Baseline: status.Turn}, withDoctorHint(err)
 		}
@@ -396,9 +397,9 @@ func withDoctorHint(err error) error {
 // StartAndPrompt is startAndPrompt for callers outside the loop (the server's
 // launch): same retry on an undelivered prompt, no launch-failed events. It
 // never adopts a holder of the label (ADR 0039).
-func StartAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onNudge func(attempt int, decision string)) (agentrunner.Session, error) {
+func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onNudge func(attempt int, decision string)) (agentrunner.Session, error) {
 	opts.NoAdopt = true
-	l, err := startAndPrompt(r, opts, prompt, func(int, events.Kind, error) {}, onNudge)
+	l, err := startAndPrompt(ctx, r, opts, prompt, func(int, events.Kind, error) {}, onNudge)
 	return l.Session, err
 }
 

@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -579,6 +580,19 @@ func (w *sessionWatches) start(watch func()) {
 		defer w.running.Done()
 		watch()
 	}()
+}
+
+// context is cancelled when the watches stop. release frees it early.
+func (w *sessionWatches) context() (ctx context.Context, release context.CancelFunc) {
+	ctx, release = context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-w.stop:
+			release()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, release
 }
 
 func (w *sessionWatches) isStopped() bool {

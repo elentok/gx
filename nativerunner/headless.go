@@ -2,6 +2,7 @@ package nativerunner
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -377,7 +378,7 @@ var _ agentrunner.LaunchPrompter = (*Headless)(nil)
 // PromptLaunch is Prompt for a launch prompt, which must start a turn: a "/"
 // command that leaves claude idle with no turn, or that claude rejects as
 // unknown, is ErrNotDelivered. Headless never nudges, so onNudge is unused.
-func (h *Headless) PromptLaunch(s agentrunner.Session, text string, _ func(string)) error {
+func (h *Headless) PromptLaunch(_ context.Context, s agentrunner.Session, text string, _ func(string)) error {
 	return h.prompt(s, text, true)
 }
 

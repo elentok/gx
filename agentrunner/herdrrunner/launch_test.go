@@ -1,6 +1,7 @@
 package herdrrunner_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -50,7 +51,7 @@ func TestPromptLaunch_WorkingAndTranscriptAgreeIsDeliveredOnce(t *testing.T) {
 	if err := state.SlashStartsTurn(s.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(r, s, launchText, nil); err != nil {
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); err != nil {
 		t.Fatalf("PromptLaunch = %v, want nil", err)
 	}
 	if got, _ := state.Received(s.Label); !slices.Equal(got, []string{launchText}) {
@@ -65,7 +66,7 @@ func TestPromptLaunch_NeverWorkingIsTheStalledPromptError(t *testing.T) {
 	if err := state.StallAgent(s.Label); err != nil {
 		t.Fatal(err)
 	}
-	err := agentrunner.PromptLaunch(r, s, launchText, nil)
+	err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil)
 	if !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 	}
@@ -79,7 +80,7 @@ func TestPromptLaunch_WorkingWithoutTranscriptIsNotDelivered(t *testing.T) {
 	if err := state.SlashStartsTurn(s.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 	}
 }
@@ -89,7 +90,7 @@ func TestPromptLaunch_TurnPassedUnseenNeedsTheTranscript(t *testing.T) {
 	if err := state.FastTurn(s.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch without a transcript = %v, want ErrNotDelivered", err)
 	}
 
@@ -98,7 +99,7 @@ func TestPromptLaunch_TurnPassedUnseenNeedsTheTranscript(t *testing.T) {
 	if err := state.FastTurn(s.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(r, s, launchText, nil); err != nil {
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); err != nil {
 		t.Fatalf("PromptLaunch with a transcript = %v, want nil", err)
 	}
 }
@@ -108,7 +109,7 @@ func TestPromptLaunch_UnknownCommandOnThePaneIsNotDelivered(t *testing.T) {
 	if err := state.SetPaneText(s.Label, "Unknown command: /gx-implement"); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 	}
 }
@@ -129,7 +130,7 @@ func TestPromptLaunch_CodexIsUnchanged(t *testing.T) {
 	r, state, s := startCodex(t, nil)
 	r.Home = t.TempDir()
 	r.N = 50 * time.Millisecond
-	if err := agentrunner.PromptLaunch(r, s, "/status", nil); err != nil {
+	if err := agentrunner.PromptLaunch(context.Background(), r, s, "/status", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v, want nil", err)
 	}
 	if got, _ := state.Received(s.Label); !slices.Equal(got, []string{"/status"}) {

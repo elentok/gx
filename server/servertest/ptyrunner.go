@@ -1,6 +1,7 @@
 package servertest
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -66,8 +67,10 @@ func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge fun
 }
 
 // PromptLaunch is PromptNudged for a launch prompt.
-func (r *ptyRunner) PromptLaunch(s agentrunner.Session, text string, onNudge func(string)) error {
-	return r.prompt(s, text, onNudge, r.Pty.PromptLaunch)
+func (r *ptyRunner) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
+	return r.prompt(s, text, onNudge, func(s agentrunner.Session, text string, onNudge func(string)) error {
+		return r.Pty.PromptLaunch(ctx, s, text, onNudge)
+	})
 }
 
 func (r *ptyRunner) prompt(s agentrunner.Session, text string, onNudge func(string), send func(agentrunner.Session, string, func(string)) error) (err error) {

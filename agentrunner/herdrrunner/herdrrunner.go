@@ -5,6 +5,7 @@ package herdrrunner
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -229,7 +230,7 @@ var _ agentrunner.LaunchPrompter = (*Runner)(nil)
 // record is the command (see claudeui.CheckLaunchDelivered, which also owns
 // the resends). Other prompts, and runners without a Claude home, keep the
 // PromptNudged path.
-func (r *Runner) PromptLaunch(s agentrunner.Session, text string, onNudge func(string)) error {
+func (r *Runner) PromptLaunch(_ context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
 	if r.Home == "" || r.kindOf(s) != harness.Claude || !isSlashCommand(text) {
 		return r.PromptNudged(s, text, onNudge)
 	}

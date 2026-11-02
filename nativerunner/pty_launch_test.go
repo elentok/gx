@@ -1,6 +1,7 @@
 package nativerunner_test
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"os"
@@ -44,7 +45,7 @@ func TestPty_LaunchPromptThatStartsNoTurnIsNotDelivered(t *testing.T) {
 	t.Parallel()
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 600 * time.Millisecond, ResendEvery: time.Hour}, agentfake.TUINoTurnEnv+"=1")
 
-	if err := p.PromptLaunch(s, "/gx-implement x/1", nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v; want ErrNotDelivered", err)
 	}
 }
@@ -54,7 +55,7 @@ func TestPty_LaunchPromptUnknownCommandFailsFast(t *testing.T) {
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: 200 * time.Millisecond, ResendEvery: time.Hour}, agentfake.TUIUnknownSkillEnv+"=1")
 
 	start := time.Now()
-	err := p.PromptLaunch(s, "/gx-implement x/1", nil)
+	err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil)
 	if !errors.Is(err, agentrunner.ErrNotDelivered) || !strings.Contains(err.Error(), claudeui.UnknownCommandMarker) {
 		t.Fatalf("PromptLaunch = %v; want ErrNotDelivered naming %q", err, claudeui.UnknownCommandMarker)
 	}
@@ -70,11 +71,12 @@ func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
 	var mu sync.Mutex
 	var decisions []string
 
-	err := p.PromptLaunch(s, "/gx-implement x/1", func(d string) {
+	err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", func(d string) {
 		mu.Lock()
 		decisions = append(decisions, d)
 		mu.Unlock()
 	})
+
 	if err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil once the registry loaded", err)
 	}
@@ -98,7 +100,7 @@ func TestPty_LaunchPromptWaitsForTheReadySignal(t *testing.T) {
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
 		agentfake.TUIReadyDelayEnv+"=1s")
 
-	if err := p.PromptLaunch(s, "/gx-implement x/1", nil); err != nil {
+	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil", err)
 	}
 	if elapsed := time.Since(start); elapsed < 900*time.Millisecond {
@@ -115,7 +117,7 @@ func TestPty_LaunchPromptSendsAnywayWhenNeverReady(t *testing.T) {
 	p.SetLog(slog.New(slog.NewTextHandler(&logs, nil)))
 
 	start := time.Now()
-	if err := p.PromptLaunch(s, "/gx-implement x/1", nil); err != nil {
+	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil", err)
 	}
 	if elapsed := time.Since(start); elapsed < p.ReadyWait {
@@ -126,13 +128,38 @@ func TestPty_LaunchPromptSendsAnywayWhenNeverReady(t *testing.T) {
 	}
 }
 
+func TestPty_LaunchPromptStopsWaitingForReadyWhenCancelled(t *testing.T) {
+	t.Parallel()
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
+		agentfake.TUIReadyDelayEnv+"="+agentfake.TUIReadyOff)
+	var logs strings.Builder
+	p.SetLog(slog.New(slog.NewTextHandler(&logs, nil)))
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan error, 1)
+	go func() { done <- p.PromptLaunch(ctx, s, "/gx-implement x/1", nil) }()
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("PromptLaunch = %v; want context.Canceled", err)
+		}
+	case <-time.After(nativerunner.DefaultReadyWait / 3):
+		t.Fatal("PromptLaunch kept waiting for the ready signal after the cancel")
+	}
+	if strings.Contains(logs.String(), "ready signal missing") {
+		t.Errorf("log = %q; a cancel is not a missing ready signal", logs.String())
+	}
+}
+
 func TestPty_LaunchPromptPersonTypingWithNoProofIsUnconfirmed(t *testing.T) {
 	t.Parallel()
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, agentfake.TUINoTurnEnv+"=1")
 	a := attachTo(t, p, s)
 
 	done := make(chan error, 1)
-	go func() { done <- p.PromptLaunch(s, "/gx-implement x/1", nil) }()
+	go func() { done <- p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil) }()
 	waitFakeKeys(t, p, s, "/gx-implement x/1\r")
 	if err := a.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
 		t.Fatal(err)

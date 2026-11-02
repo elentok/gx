@@ -2,6 +2,7 @@ package nativerunner_test
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -464,7 +465,7 @@ func TestHeadless_LaunchPromptThatStartsNoTurnIsNotDelivered(t *testing.T) {
 			h.runner.N = 100 * time.Millisecond
 			s := h.start(t, "epic-07")
 
-			if err := h.runner.PromptLaunch(s, text, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+			if err := h.runner.PromptLaunch(context.Background(), s, text, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 				t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 			}
 			if err := h.runner.Prompt(s, text); err != nil {

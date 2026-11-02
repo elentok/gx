@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -135,7 +136,7 @@ type launchRunner struct {
 	launches *int
 }
 
-func (l launchRunner) PromptLaunch(s agentrunner.Session, text string, _ func(string)) error {
+func (l launchRunner) PromptLaunch(_ context.Context, s agentrunner.Session, text string, _ func(string)) error {
 	*l.launches++
 	if *l.launches <= l.rejects {
 		return agentrunner.ErrNotDelivered
@@ -292,7 +293,7 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 	r := fakeRunner(d)
 	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
 
-	_, err := StartAndPrompt(r, agentrunner.StartOptions{Label: launchLabel}, "/go", func(int, string) {})
+	_, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel}, "/go", func(int, string) {})
 
 	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "gx claude doctor") {
 		t.Errorf("StartAndPrompt = %v, want ErrMissingCapability with the doctor hint", err)

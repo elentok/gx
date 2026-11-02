@@ -2,6 +2,7 @@ package nativerunner
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -20,7 +21,7 @@ var _ agentrunner.LaunchPrompter = (*Pty)(nil)
 // which also owns the resends). A person typing over it is unconfirmed unless
 // the transcript already shows the command. Other prompts, Codex, and runners
 // without a Claude home keep the PromptNudged path.
-func (p *Pty) PromptLaunch(s agentrunner.Session, text string, onNudge func(string)) error {
+func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
 	home := envValue(p.Env, "HOME")
 	ss, err := p.live(s)
 	if err != nil {
@@ -38,7 +39,7 @@ func (p *Pty) PromptLaunch(s agentrunner.Session, text string, onNudge func(stri
 		defer stop()
 		pr.person = person
 	}
-	if err := pr.awaitReady(home); err != nil {
+	if err := pr.awaitReady(ctx, home); err != nil {
 		return err
 	}
 	if err := pr.awaitEmptyInput(p.promptGrace()); err != nil {
@@ -95,8 +96,9 @@ const DefaultReadyWait = 30 * time.Second
 // awaitReady waits for claude's ready signal: the input box on screen and the
 // session transcript on disk. A missing signal is logged and the prompt goes
 // anyway: the resend loop in CheckLaunchDelivered backstops a wrong signal, and
-// a claude that never shows it must still get its prompt.
-func (pr *ptyPrompter) awaitReady(home string) error {
+// a claude that never shows it must still get its prompt. A cancelled ctx
+// returns at once with an error wrapping ctx.Err(), never the warning path.
+func (pr *ptyPrompter) awaitReady(ctx context.Context, home string) error {
 	p := pr.p
 	wait := cmp.Or(p.ReadyWait, DefaultReadyWait)
 	deadline := time.Now().Add(wait)
@@ -119,6 +121,8 @@ func (pr *ptyPrompter) awaitReady(home string) error {
 		select {
 		case <-pr.ss.exited:
 			return p.died(pr.ss, errors.New("holder exited"))
+		case <-ctx.Done():
+			return fmt.Errorf("launch prompt cancelled: %w", context.Cause(ctx))
 		case <-time.After(p.pollInterval()):
 		}
 	}

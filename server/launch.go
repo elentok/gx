@@ -120,8 +120,12 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	if agent == ralphloop.AgentCodex && !s.codexRolloutExists(cwd, resumeID) {
 		resumeID = ""
 	}
+	// A server stop ends the launch prompt's wait, which Serve would otherwise
+	// sit out before it can finish.
+	ctx, release := s.sessionWatches.context()
+	defer release()
 	start := func() (agentrunner.Session, error) {
-		return ralphloop.StartAndPrompt(deps.Runner, agentrunner.StartOptions{
+		return ralphloop.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
 			Label:           label,
 			Epic:            ticket.Epic,
 			Cwd:             cwd,
