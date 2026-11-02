@@ -20,6 +20,8 @@ List the files in the diff. A test file is one named `*_test.go`, `*.test.ts`, `
 - The diff, limited to the test files and the code they cover.
 - [gx-test-guidelines.md](../gx-test-guidelines.md), the shared rule list.
 - `.ai/index.md` in the reviewed repo, for its project-specific test rules and its test levels.
+- When the diff touches a Playwright file (`*.e2e.ts`, or a file under `e2e/`), also read
+  [gx-playwright-e2es](../gx-playwright-e2es/SKILL.md).
 
 ## 3. Judge
 
