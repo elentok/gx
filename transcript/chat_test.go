@@ -98,3 +98,17 @@ func TestReadChat_MissingFile(t *testing.T) {
 		t.Fatalf("ReadChat = %v, %v", ok, err)
 	}
 }
+
+func TestReadChat_ToolRunKeepsOneLinePerCall(t *testing.T) {
+	lines := []string{
+		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la"}},{"type":"tool_use","name":"Read","input":{"file_path":"/x/a.go"}},{"type":"tool_use","name":"TodoWrite","input":{}}]}}`,
+	}
+	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n") + "\n"))
+	if err != nil || len(msgs) != 1 {
+		t.Fatalf("ReadChatFrom = %+v, %v", msgs, err)
+	}
+	want := []string{"Bash: ls -la", "Read: /x/a.go", "TodoWrite"}
+	if msgs[0].ToolCount != 3 || !reflect.DeepEqual(msgs[0].Calls, want) {
+		t.Errorf("tools entry = %+v, want 3 calls %v", msgs[0], want)
+	}
+}

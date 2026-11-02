@@ -27,6 +27,8 @@ type SessionChatMessage struct {
 	// calls and carries no Text.
 	ToolCount int    `json:"tool_count,omitempty"`
 	LastTool  string `json:"last_tool,omitempty"`
+	// Calls is one line per folded tool call: the tool and its command or target.
+	Calls []string `json:"calls,omitempty"`
 }
 
 // maxChatMessages caps how many of the newest visible messages the chat loads.
@@ -156,7 +158,7 @@ func snapshotOf(read chatreader.Result, kind agentrunner.Kind, ticket string, fi
 		if m.Role == transcript.ChatRoleAgent && m.Kind == transcript.ChatKindText {
 			text, _ = grillround.SplitFences(text)
 		}
-		snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})
+		snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls})
 	}
 	return snap
 }

@@ -82,3 +82,12 @@ test.each(BUTTONS)("the %s failure notice has the buttons %j", async (kind, expe
   const names = Array.from(region.querySelectorAll("button")).map((b) => b.textContent);
   expect(names).toEqual(expected);
 });
+
+test("a tools entry shows its count and each call", async () => {
+  const at = new Date().toISOString();
+  const tools = { id: "t1", role: "agent", kind: "tools", text: "", at, tool_count: 2, last_tool: "Read", calls: ["Bash: ls -la", "Read: /x/a.go"] };
+  render(session(), chat({ messages: [tools] }));
+  expect(await screen.findByText(/2 tool calls · last: Read/)).toBeTruthy();
+  expect(screen.getByText("Bash: ls -la")).toBeTruthy();
+  expect(screen.getByText("Read: /x/a.go")).toBeTruthy();
+});

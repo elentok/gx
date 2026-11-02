@@ -3,6 +3,7 @@ package server_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -75,7 +76,7 @@ func TestSessionChat_ArchiveRouteMatchesThePlainRollout(t *testing.T) {
 		t.Fatalf("archive messages = %+v, plain = %+v", got.Messages, plain.Messages)
 	}
 	for i := range plain.Messages {
-		if got.Messages[i] != plain.Messages[i] {
+		if !reflect.DeepEqual(got.Messages[i], plain.Messages[i]) {
 			t.Errorf("message %d = %+v, want %+v", i, got.Messages[i], plain.Messages[i])
 		}
 	}

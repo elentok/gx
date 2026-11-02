@@ -76,6 +76,8 @@ type chatRolloutLine struct {
 		Type       string `json:"type"`
 		Role       string `json:"role"`
 		Name       string `json:"name"`
+		Arguments  string `json:"arguments"`
+		Input      string `json:"input"`
 		CLIVersion string `json:"cli_version"`
 		Content    []struct {
 			Text string `json:"text"`
@@ -129,6 +131,12 @@ func ReadChat(r io.Reader) (Chat, error) {
 			}
 			run.ToolCount++
 			run.LastTool = p.Name
+			args := map[string]any{}
+			if json.Unmarshal([]byte(p.Arguments), &args) != nil {
+				// A custom tool call's input is free text, such as a patch.
+				args = map[string]any{"command": firstLine(p.Input)}
+			}
+			run.Calls = append(run.Calls, transcript.SummarizeCall(p.Name, args))
 		case p.Type == "message" && (p.Role == "assistant" || p.Role == "user"):
 			var texts []string
 			for _, c := range p.Content {
@@ -168,4 +176,9 @@ func IsInjected(text string) bool {
 		}
 	}
 	return false
+}
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
+	return line
 }

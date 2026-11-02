@@ -1856,6 +1856,10 @@ export interface SessionChatMessage {
    */
   tool_count?: number /* int */;
   last_tool?: string;
+  /**
+   * Calls is one line per folded tool call: the tool and its command or target.
+   */
+  calls?: string[];
 }
 /**
  * SessionChatResponse is the visible messages of a session's newest

@@ -17,7 +17,7 @@ const KIND_NAMES: Record<string, string> = {
   agent: "subagent",
 };
 
-function Entry({ m }: { m: SessionChatMessage }) {
+function Entry({ m, showTools }: { m: SessionChatMessage; showTools: boolean }) {
   if (m.kind === "compacted") {
     return (
       <Text
@@ -33,7 +33,7 @@ function Entry({ m }: { m: SessionChatMessage }) {
       </Text>
     );
   }
-  if (m.kind === "tools") return null;
+  if (m.kind === "tools") return showTools ? <ToolCalls m={m} /> : null;
   if (m.kind === "prompt") {
     return (
       <Box
@@ -70,6 +70,27 @@ function Entry({ m }: { m: SessionChatMessage }) {
   }
   if (m.kind === "output") return <CommandOutput text={m.text} />;
   return <Markdown fontSize="base">{m.text}</Markdown>;
+}
+
+// A run of tool calls, folded: the count in the summary, one line per call (shell commands, files) when opened.
+function ToolCalls({ m }: { m: SessionChatMessage }) {
+  const calls = m.calls ?? [];
+  const n = m.tool_count ?? calls.length;
+  return (
+    <Box as="details" fontSize="xs" color="text.dim" data-testid="tool-calls">
+      <Box as="summary" cursor="pointer">
+        {n === 1 ? "1 tool call" : `${n} tool calls`}
+        {m.last_tool ? ` · last: ${m.last_tool}` : ""}
+      </Box>
+      <Box as="ul" listStyleType="none" m="0" mt="1" p="0" fontFamily="mono" display="flex" flexDirection="column" gap="0.5">
+        {calls.map((c, i) => (
+          <Box as="li" key={i} whiteSpace="pre-wrap" wordBreak="break-all" borderInlineStart="2px solid" borderColor="border" px="2.5">
+            {c}
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
 }
 
 const OUTPUT_LINE_LIMIT = 12;
@@ -261,8 +282,11 @@ export function ChatMessages({
   busy,
   working,
   sessionId,
+  showTools = false,
 }: {
   chat: SessionChatResponse;
+  /** Shows each folded run of tool calls; the Design page leaves them out. */
+  showTools?: boolean;
   busy: boolean;
   /** Shown at the bottom while `busy`. */
   working?: ReactNode;
@@ -293,7 +317,7 @@ export function ChatMessages({
         </Text>
       )}
       {messages.map((m, i) => (
-        <Entry key={m.id || i} m={m} />
+        <Entry key={m.id || i} m={m} showTools={showTools} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {busy && working}

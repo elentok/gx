@@ -17,7 +17,7 @@ export function AgentChat({
   const failure = visibleFailure(session.failure);
   return (
     <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
-      <ChatMessages chat={chat} busy={busy} sessionId={session.id} working={<WorkingRow />} />
+      <ChatMessages chat={chat} busy={busy} sessionId={session.id} showTools working={<WorkingRow />} />
       {failure && (
         <FailureBanner
           failure={failure}

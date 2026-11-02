@@ -239,14 +239,14 @@ Answer prompt
 Chat route
 
 - `GET /v1/sessions/chat?session=<id>`, CLI twin `gx agents chat <session> --json` (ADR 0028). Response:
-  - `messages`: `id` (transcript uuid), `role` (agent, person), `kind` (text, command, tools, compacted), `text`, `tool_count`, `last_tool`, `at`.
+  - `messages`: `id` (transcript uuid), `role` (agent, person), `kind` (text, command, tools, compacted), `text`, `tool_count`, `last_tool`, `calls`, `at`.
   - `round`: the parsed cards, or null. It is set only when the last agent turn ended with a round and no person prompt came after it.
   - `background`: `kind` (shell, monitor, agent), `label`, `started_at`. The source is `transcript.ReadBackgroundTasks`, and markers past its aged-out cap drop off. The label is the tool call's description, else the first 60 characters of the command.
   - `next`: `{phase, action}` from the run-end line, or null. The same parser as the TUI Design Actionable (`designActionable`) produces it.
   - `conversation_id`, so the page can tell that a `/clear` happened.
   - `failure`, the same field `/v1/sessions` carries.
 - Visible entries: agent text blocks with `gx-question` fences stripped, the person's real prompts, slash commands as a command entry, and the run-end line as a normal agent message. Thinking, system lines, `isMeta` lines, attachments, `isCompactSummary` prompts and sidechain entries are hidden. A `compact_boundary` becomes a `compacted` entry.
-- Each run of tool calls between two text blocks folds into one `tools` entry. No tool inputs or results in v1.
+- Each run of tool calls between two text blocks folds into one `tools` entry. It carries `calls`, one line per call (tool and command or target); no results. Only the Agents page shows it.
 - Only the newest conversation of the session loads, capped at the last 300 visible messages. The server rereads the transcript only when its size or mtime changed.
 - Claude only. For a codex or opencode session, the page does not load the chat. It shows the "Chat works for Claude sessions only" text and reads the failure from `/v1/sessions`. The implementer picks what the route returns for such a session. The page also hides the composer, the question sheet and Continue for it. Restore, New session and Screen stay.
 

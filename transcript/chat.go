@@ -40,7 +40,9 @@ type ChatMessage struct {
 	Text      string
 	ToolCount int
 	LastTool  string
-	At        time.Time
+	// Calls is one short line per tool call of a tools entry: the tool and its command or target.
+	Calls []string
+	At    time.Time
 }
 
 type chatLine struct {
@@ -144,12 +146,13 @@ func ReadChatFrom(r io.Reader) (msgs []ChatMessage, err error) {
 			flush()
 			msgs = append(msgs, msg)
 		}
-		for _, name := range line.toolNames() {
+		for _, call := range line.toolCalls() {
 			if run == nil {
 				run = &ChatMessage{ID: line.UUID, Role: ChatRoleAgent, Kind: ChatKindTools, At: line.at()}
 			}
 			run.ToolCount++
-			run.LastTool = name
+			run.LastTool = call.Name
+			run.Calls = append(run.Calls, call.Summary())
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -164,18 +167,45 @@ func (l chatLine) at() time.Time {
 	return at
 }
 
-// toolNames lists the tools an agent line calls, in order.
-func (l chatLine) toolNames() []string {
+// toolCalls lists the tool_use blocks an agent line holds, in order.
+func (l chatLine) toolCalls() []contentBlock {
 	if l.IsSidechain || l.Type != "assistant" {
 		return nil
 	}
-	var names []string
+	var calls []contentBlock
 	for _, b := range decodeContentBlocks(l.Message.Content) {
 		if b.Type == "tool_use" {
-			names = append(names, b.Name)
+			calls = append(calls, b)
 		}
 	}
-	return names
+	return calls
+}
+
+// Summary is the call as one line: the tool name and its command or target.
+func (b contentBlock) Summary() string {
+	var in map[string]any
+	_ = json.Unmarshal(b.Input, &in)
+	return SummarizeCall(b.Name, in)
+}
+
+// SummarizeCall renders a tool name and its arguments as "Name: command-or-target".
+func SummarizeCall(name string, in map[string]any) string {
+	for _, k := range []string{"command", "cmd", "file_path", "path", "pattern", "url", "query", "description"} {
+		switch v := in[k].(type) {
+		case string:
+			if v = strings.TrimSpace(v); v != "" {
+				return name + ": " + v
+			}
+		case []any:
+			// Codex shell commands are argv; the script is the last element.
+			if n := len(v); n > 0 {
+				if s, ok := v[n-1].(string); ok && strings.TrimSpace(s) != "" {
+					return name + ": " + strings.TrimSpace(s)
+				}
+			}
+		}
+	}
+	return name
 }
 
 func (l chatLine) message() (ChatMessage, bool) {

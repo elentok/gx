@@ -35,6 +35,8 @@ type contentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 	Name string `json:"name"`
+	// Input is a tool_use block's arguments.
+	Input json.RawMessage `json:"input"`
 }
 
 // isRealUserTurn reports whether l is the "user" line that opens a turn: a
