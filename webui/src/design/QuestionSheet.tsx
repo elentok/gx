@@ -343,7 +343,6 @@ export function QuestionSheet({
           overflowY="auto"
         >
           <Box
-            maxW={questions ? "820px" : undefined}
             ref={row}
             onScroll={onScroll}
             display="flex"
