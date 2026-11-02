@@ -30,6 +30,7 @@ func TestServerTUI_ShowsServerModeAndDropsOnStop(t *testing.T) {
 		"HOME=" + home,
 		herdrSocketEnv(),
 	}}
+	writeGxConfig(t, home, nil)
 
 	store := filepath.Join(root, "data", "gx", "tickets")
 	const project, epic = "tuiproj", "visible-epic"

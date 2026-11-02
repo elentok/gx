@@ -40,7 +40,9 @@ func newUsageRig(t *testing.T) *usageRig {
 
 func (r *usageRig) server() *Server {
 	r.t.Helper()
-	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: r.stateDir, TicketStore: r.store})
+	// Its own claude: the host may have none, as on CI.
+	lookPath := func(file string) (string, error) { return "/fake/bin/" + file, nil }
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: r.stateDir, TicketStore: r.store, LookPath: lookPath})
 	if err != nil {
 		r.t.Fatal(err)
 	}

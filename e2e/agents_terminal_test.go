@@ -82,6 +82,7 @@ func newAgentsEnv(t *testing.T, extraEnv ...string) *agentsEnv {
 		"XDG_STATE_HOME=" + filepath.Join(root, "state"),
 		"HOME=" + filepath.Join(root, "home"),
 		"PATH=" + tuiFakeBinary(t) + string(os.PathListSeparator) + os.Getenv("PATH"),
+		herdrSocketEnv(), // HOME is the test home, where herdr's default socket is not
 	}
 	for _, kv := range os.Environ() {
 		if name, _, _ := strings.Cut(kv, "="); name != "TERM" && name != "COLORTERM" {
@@ -89,6 +90,7 @@ func newAgentsEnv(t *testing.T, extraEnv ...string) *agentsEnv {
 		}
 	}
 	e.serverEnv = append(append(e.serverEnv, e.env...), extraEnv...)
+	writeGxConfig(t, filepath.Join(root, "home"), nil)
 
 	store := filepath.Join(root, "data", "gx", "tickets")
 	servertest.WriteTicket(t, store, e.project, "some-epic", "01", "tiny", "")

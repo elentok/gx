@@ -194,6 +194,28 @@ func TestServerLifecycle_StartEnqueueLandStopRestartReclaims(t *testing.T) {
 	e.waitStatus(address, "done", 90*time.Second)
 }
 
+// writeGxConfig writes home's gx config with extra on top of agent-runner:
+// herdr. Pinning the runner skips the server's default-harness PATH check, so
+// the tests need no `claude` on CI's PATH.
+func writeGxConfig(t *testing.T, home string, extra map[string]any) {
+	t.Helper()
+	cfg := map[string]any{"agent-runner": "herdr"}
+	for k, v := range extra {
+		cfg[k] = v
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(home, ".config", "gx")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // newLifecycleEnv is a lifecycleEnv in its own root dir, with extra env entries
 // after the isolating ones. It stops the server at the end and, on failure,
 // logs what the server and the restart wrote.
@@ -210,9 +232,7 @@ func newLifecycleEnv(t *testing.T, extra ...string) (*lifecycleEnv, string) {
 		"HOME=" + filepath.Join(root, "home"), // gx reads config from ~/.config, ignoring XDG_CONFIG_HOME
 		herdrSocketEnv(),
 	}, extra...)}
-	if err := os.MkdirAll(filepath.Join(root, "home", ".config", "gx"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	writeGxConfig(t, filepath.Join(root, "home"), nil)
 	t.Cleanup(func() {
 		if _, up := e.running(); up {
 			e.gx("server", "stop")
@@ -250,10 +270,7 @@ func newAgentWorld(t *testing.T) *agentWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfgJSON := fmt.Sprintf(`{"server":{"tab-env":%s}}`, tabEnv)
-	if err := os.WriteFile(filepath.Join(home, ".config", "gx", "config.json"), []byte(cfgJSON), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeGxConfig(t, home, map[string]any{"server": map[string]any{"tab-env": json.RawMessage(tabEnv)}})
 	store := filepath.Join(root, "data", "gx", "tickets")
 	const project, epic, id = "lifecycle", "tiny-epic", "01"
 	w := &agentWorld{e: e, project: project, epic: epic,
