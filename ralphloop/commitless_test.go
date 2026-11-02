@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -127,6 +129,47 @@ func TestFinishCommitless_AskOnNonKeepingRunKeepsWorktreeAndStopsSession(t *test
 	}
 	if _, found, _ := runner.Find(wt.Label); found {
 		t.Errorf("session still live after the ask")
+	}
+}
+
+// Spec story 17: no timer or age check removes a kept worktree. The clock is
+// moved a year ahead and every removal and sleep is trapped; the ask must
+// neither remove the worktree nor schedule any wait that could.
+func TestFinishCommitless_AskKeepsWorktreeWhateverTheClockSays(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-b", "main")
+	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
+	scratchDir := writeEpic(t, "fix-it", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: investigate\niteration_status: asking\ncommitless: true\n---\n# A\n",
+	})
+	path := ticketPath(scratchDir, "fix-it", "01-a.md")
+	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
+	d := DefaultDeps()
+	d.Runner = runnerfake.NewRunner()
+	wt, err := PrepareCommitless(d, one, "", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var removals, sleeps atomic.Int32
+	d.RemoveWorktree = func(string, string, bool) error {
+		removals.Add(1)
+		return nil
+	}
+	d.Sleep = func(time.Duration) { sleeps.Add(1) }
+	d.Now = func() time.Time { return time.Now().AddDate(1, 0, 0) }
+
+	if _, err := FinishCommitless(d, one, wt, ""); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if _, err := os.Stat(wt.Path); err != nil {
+		t.Errorf("kept worktree gone: %v", err)
+	}
+	if n := removals.Load(); n != 0 {
+		t.Errorf("RemoveWorktree called %d times for a kept worktree", n)
+	}
+	if n := sleeps.Load(); n != 0 {
+		t.Errorf("Sleep called %d times: the ask scheduled a wait", n)
 	}
 }
 
