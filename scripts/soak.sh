@@ -1,45 +1,48 @@
 #!/usr/bin/env bash
-# Runs gx's full test command N times to measure flakes, then lists each
+# Runs gx's full test check N times to measure flakes, then lists each
 # failing test with the number of rounds it failed.
 #
-# Usage: scripts/soak.sh [N]    (N defaults to 20)
+# Usage: scripts/soak.sh [N] [--fail-fast]    (N defaults to 20)
 #
-# The command is `test.full` from .gx/checks.json at the repo root, so the
-# soak and `gx check --full` never drift. Every round runs, also after a
-# failing one. Each round's output stays in the work dir printed at the end.
+# Each round is `gx check --full --kind test`, so a round takes the check
+# lock, writes a run record and sets GX_CHECK_RUN, like a real full run. Every
+# round runs, also after a failing one, unless --fail-fast is given: then the
+# script stops at the first failed round, prints its failing tests and exits 1.
+# Each round's output stays in the work dir printed at the end.
 #
-# Failing test names are read from `gx brief` failure reports: after a
-# `FAIL <tool>: N failed in <time>` line come location lines, then each test
-# name indented two spaces (brief/render.go renderUnits).
+# The script runs the `gx` on PATH. The caller must have the `gx` built from
+# this checkout on PATH (scripts/test.sh builds its own for the same reason).
+#
+# Failing test names are read from the round's test log, which `gx check`
+# prints as `test log: <path>`. They come from `gx brief` failure reports:
+# after a `FAIL <tool>: N failed in <time>` line come location lines, then each
+# test name indented two spaces (brief/render.go renderUnits).
 set -euo pipefail
 
-rounds=${1:-20}
-
-command -v jq >/dev/null || {
-	echo "soak.sh: jq is required" >&2
-	exit 2
-}
+rounds=20
+fail_fast=0
+for arg in "$@"; do
+	case $arg in
+	--fail-fast) fail_fast=1 ;;
+	*) rounds=$arg ;;
+	esac
+done
 
 root=$(git rev-parse --show-toplevel)
-cmd=$(jq -r '.test.full // empty' "$root/.gx/checks.json") || {
-	echo "soak.sh: cannot read $root/.gx/checks.json" >&2
-	exit 2
-}
-if [[ -z $cmd ]]; then
-	echo "soak.sh: $root/.gx/checks.json has no test.full" >&2
-	exit 2
-fi
-
 work=$(mktemp -d)
 cd "$root"
 
-# failing_names <file>: each failing test name in a round's output, once.
+# failing_names <round output>: each failing test name in the round's test
+# log, once.
 failing_names() {
+	local log
+	log=$(sed -n 's/^test log: //p' "$1" | head -n 1)
+	[[ -n $log && -f $log ]] || return 0
 	awk '
 		/^FAIL .*: [0-9]+ failed in / { inblock = 1; next }
 		/^$/ || /^==/ { inblock = 0 }
 		inblock && /^  [^ ]/ { sub(/^  /, ""); print }
-	' "$1" | sort -u
+	' "$log" | sort -u
 }
 
 failed_rounds=()
@@ -47,7 +50,7 @@ for ((i = 1; i <= rounds; i++)); do
 	out=$work/round-$i.log
 	start=$SECONDS
 	status=0
-	bash -c "$cmd" >"$out" 2>&1 || status=$?
+	gx check --full --kind test >"$out" 2>&1 || status=$?
 	secs=$((SECONDS - start))
 	if [[ $status -eq 0 ]]; then
 		printf 'round %d: pass %ds\n' "$i" "$secs"
@@ -55,6 +58,16 @@ for ((i = 1; i <= rounds; i++)); do
 		printf 'round %d: FAIL %ds\n' "$i" "$secs"
 		failed_rounds+=("$i")
 		failing_names "$out" >"$work/round-$i.failed"
+		if [[ $fail_fast -eq 1 ]]; then
+			echo
+			echo "output files: $work"
+			if [[ -s $work/round-$i.failed ]]; then
+				cat "$work/round-$i.failed"
+			else
+				echo "round $i failed, no test names"
+			fi
+			exit 1
+		fi
 	fi
 done
 

@@ -2,10 +2,12 @@ package scripts_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -19,6 +21,32 @@ func soakRepo(t *testing.T, body string) string {
 	return repo
 }
 
+var (
+	soakGXOnce sync.Once
+	soakGXDir  string
+	soakGXErr  error
+)
+
+// soakGX builds gx once per test run; the script runs the gx on PATH.
+func soakGX(t *testing.T) string {
+	t.Helper()
+	soakGXOnce.Do(func() {
+		soakGXDir, soakGXErr = os.MkdirTemp("", "soak-gx-")
+		if soakGXErr != nil {
+			return
+		}
+		build := exec.Command("go", "build", "-o", filepath.Join(soakGXDir, "gx"), ".")
+		build.Dir = ".."
+		if out, err := build.CombinedOutput(); err != nil {
+			soakGXErr = fmt.Errorf("go build: %v\n%s", err, out)
+		}
+	})
+	if soakGXErr != nil {
+		t.Fatal(soakGXErr)
+	}
+	return soakGXDir
+}
+
 func runSoak(t *testing.T, repo string, args ...string) (string, int) {
 	t.Helper()
 	script, err := filepath.Abs("soak.sh")
@@ -27,6 +55,10 @@ func runSoak(t *testing.T, repo string, args ...string) (string, int) {
 	}
 	cmd := exec.Command("bash", append([]string{script}, args...)...)
 	cmd.Dir = repo
+	cmd.Env = append(os.Environ(),
+		"PATH="+soakGX(t)+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"XDG_DATA_HOME="+t.TempDir(),
+		"XDG_STATE_HOME="+t.TempDir())
 	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
@@ -114,13 +146,53 @@ func TestSoak_DefaultsToTwentyRounds(t *testing.T) {
 	}
 }
 
-func TestSoak_MissingKeyFailsClearly(t *testing.T) {
-	repo := soakRepo(t, "")
-	writeFile(t, filepath.Join(repo, ".gx", "checks.json"), `{}`)
+const failInRound2 = `
+n=$(( $(cat count 2>/dev/null || echo 0) + 1 ))
+echo $n > count
+if [[ $n -eq 2 ]]; then
+  printf 'FAIL go-test: 1 failed in 1s\npkg/a\n  TestRound2\n    boom\n/tmp/log\n'
+  exit 1
+fi
+`
 
-	out, code := runSoak(t, repo, "1")
+func TestSoak_FailFastStopsAtFirstFailedRound(t *testing.T) {
+	repo := soakRepo(t, failInRound2)
 
-	if code == 0 || !strings.Contains(out, "no test.full") {
-		t.Errorf("exit %d:\n%s", code, out)
+	out, code := runSoak(t, repo, "5", "--fail-fast")
+
+	if code != 1 {
+		t.Errorf("exit = %d, want 1:\n%s", code, out)
+	}
+	if !strings.Contains(out, "round 2: FAIL") || !strings.Contains(out, "TestRound2") {
+		t.Errorf("output:\n%s", out)
+	}
+	if strings.Contains(out, "round 3") {
+		t.Errorf("ran past the failed round:\n%s", out)
+	}
+}
+
+func TestSoak_WithoutFailFastRunsEveryRound(t *testing.T) {
+	repo := soakRepo(t, failInRound2)
+
+	out, code := runSoak(t, repo, "4")
+
+	if code != 1 {
+		t.Errorf("exit = %d, want 1:\n%s", code, out)
+	}
+	for _, want := range []string{"round 3: pass", "round 4: pass", "1× TestRound2"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestSoak_RoundsRunThroughGXCheck(t *testing.T) {
+	repo := soakRepo(t, "echo \"run=$GX_CHECK_RUN\" >> runs\n")
+
+	runSoak(t, repo, "1")
+
+	b, err := os.ReadFile(filepath.Join(repo, "runs"))
+	if err != nil || strings.TrimSpace(string(b)) == "run=" {
+		t.Errorf("GX_CHECK_RUN not set in the round: %v %q", err, b)
 	}
 }
