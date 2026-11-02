@@ -195,7 +195,16 @@ func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
 // claudeGuardSettings adds a PreToolUse hook that rejects shell file edits
 // (sed -i, heredoc writes), which agents keep using despite the gx-implement
 // skill forbidding them. See `gx agent guard-bash`.
-const claudeGuardSettings = `{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"gx agent guard-bash"}]}]}}`
+//
+// It also keeps the loop agent's context lean: no claude.ai synced skills and
+// no claude.ai connectors (Claude Docs). Together they cut about 5k tokens
+// from every turn's prefix. Design and regular agents are launched elsewhere
+// and keep both, because they use the Docs connector.
+const claudeGuardSettings = `{"syncClaudeAiSkills":false,"disableClaudeAiConnectors":true,"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"gx agent guard-bash"}]}]}}`
+
+// loopDisallowedTools is LoopDisallowedTools plus tools a loop agent never
+// uses. Banning them also drops their names from the deferred-tool list.
+const loopDisallowedTools = agentrunner.LoopDisallowedTools + ",CronCreate,CronDelete,CronList,RemoteTrigger,EnterWorktree,ExitWorktree"
 
 func agentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string, extraDirs ...string) []string {
 	if agent == AgentCodex {
@@ -207,7 +216,7 @@ func agentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string,
 	}
 	args := []string{
 		"--permission-mode", "auto", "--settings", claudeGuardSettings,
-		"--disallowedTools", agentrunner.LoopDisallowedTools,
+		"--disallowedTools", loopDisallowedTools,
 	}
 	// herdr types the launch command into a shell, so keep it short: the
 	// prompt goes in a file when one can be written.

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/testutil"
@@ -43,7 +42,7 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 				Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
 			},
 			wantAgentArgs: func(string) []string {
-				return []string{"--permission-mode", "auto", "--settings", launchSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--append-system-prompt-file", harness.GXSystemPromptFile(), "--model", "sonnet", "--effort", "medium"}
+				return []string{"--permission-mode", "auto", "--settings", launchSettings, "--disallowedTools", loopDisallowedTools, "--append-system-prompt-file", harness.GXSystemPromptFile(), "--model", "sonnet", "--effort", "medium"}
 			},
 		},
 		{

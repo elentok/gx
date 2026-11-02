@@ -493,7 +493,7 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"tui":"default"`, `"statusLine"`, exe + "' claude statusline --agent-dir '" + filepath.Join(p.Root, "e-01") + "'"} {
+	for _, want := range []string{`"tui":"default"`, `"syncClaudeAiSkills":false`, `"statusLine"`, exe + "' claude statusline --agent-dir '" + filepath.Join(p.Root, "e-01") + "'"} {
 		if !strings.Contains(claude.Cmdline, want) {
 			t.Errorf("claude cmdline %q lacks %q", claude.Cmdline, want)
 		}
