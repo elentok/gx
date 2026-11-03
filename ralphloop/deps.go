@@ -184,6 +184,9 @@ type Deps struct {
 	// RateLimitResetBuffer is how long past a parsed reset time a rate-limit
 	// hold waits; zero means the default.
 	RateLimitResetBuffer time.Duration
+	// GuardPoll is how often WaitIterationFinished ticks its guards (model,
+	// long ticket, verify cap) while the agent runs; zero means smartZonePollMs.
+	GuardPoll time.Duration
 	// PauseTimer returns a channel that fires once the given duration has
 	// elapsed — one poll of a paused run's wait. It is a channel rather than
 	// a blocking sleep so the pause can select on an operator's cosmetic wake
@@ -221,6 +224,8 @@ type DepsOverrides struct {
 	RunnerWait time.Duration
 	// RateLimitResetBuffer is Deps.RateLimitResetBuffer.
 	RateLimitResetBuffer time.Duration
+	// GuardPoll is Deps.GuardPoll.
+	GuardPoll time.Duration
 	// Finished tells the runner which sessions have reported their ticket
 	// finished (see herdrrunner.Runner.Finished). Nil means none.
 	Finished func(agentrunner.Session) bool
@@ -390,6 +395,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		Sleep:                time.Sleep,
 		Now:                  time.Now,
 		RateLimitResetBuffer: overrides.RateLimitResetBuffer,
+		GuardPoll:            overrides.GuardPoll,
 		PauseTimer:           time.After,
 	}
 }

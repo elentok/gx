@@ -66,6 +66,9 @@ type Config struct {
 	// RateLimitResetBuffer is how long past a rate limit's reset a hold waits;
 	// zero means ralphloop's default.
 	RateLimitResetBuffer time.Duration
+	// GuardPoll is how often a running iteration ticks its guards; zero means
+	// ralphloop's 30s default.
+	GuardPoll time.Duration
 
 	// DropAskedAgent makes every run clean up after its agent asks, as a
 	// herdr-hosted run does. Test-only: gxfixture sets it, because a fixture

@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -359,7 +360,7 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 	elapsedMs := 0
 	nudged := false
 	for {
-		st, err := d.Runner.Wait(s, waitStates, smartZonePollMs*time.Millisecond)
+		st, err := d.Runner.Wait(s, waitStates, cmp.Or(d.GuardPoll, smartZonePollMs*time.Millisecond))
 		if err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
 				sessionID := ""

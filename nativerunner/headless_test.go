@@ -58,6 +58,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv(agentfake.ClaudeEnv) == "1" {
 		agentfake.Claude()
 	}
+	warmBuilds()
 	os.Exit(m.Run())
 }
 

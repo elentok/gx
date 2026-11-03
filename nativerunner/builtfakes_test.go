@@ -31,6 +31,29 @@ var (
 // so the directory can go on PATH.
 func (b *builtBinary) get(t *testing.T) string {
 	t.Helper()
+	b.build()
+	if b.err != nil {
+		t.Fatal(b.err)
+	}
+	return b.path
+}
+
+// warmBuilds builds every binary in parallel before the first test runs, so no
+// test's own time (or the slow-test limit) pays for a cold compile. A build
+// error is kept and reported by the first get.
+func warmBuilds() {
+	var wg sync.WaitGroup
+	for _, b := range []*builtBinary{builtGx, builtFakeclaude, builtFakecodex} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			b.build()
+		}()
+	}
+	wg.Wait()
+}
+
+func (b *builtBinary) build() {
 	b.once.Do(func() {
 		dir, err := os.MkdirTemp("", "nativerunner-"+b.name)
 		if err != nil {
@@ -43,10 +66,6 @@ func (b *builtBinary) get(t *testing.T) string {
 			b.err = &buildError{b.pkg, err, string(out)}
 		}
 	})
-	if b.err != nil {
-		t.Fatal(b.err)
-	}
-	return b.path
 }
 
 type buildError struct {

@@ -13,6 +13,9 @@ import (
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
+	// Built before any test starts, so no test's time (or the slow-test limit)
+	// pays for the cold compile. An error is kept and reported by sharedGx.
+	_, _ = buildSharedGx()
 	code := m.Run()
 	if sharedGxDir != "" {
 		_ = os.RemoveAll(sharedGxDir)

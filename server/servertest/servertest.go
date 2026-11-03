@@ -858,6 +858,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.cfg.PollInterval = 200 * time.Millisecond
 	h.cfg.BudgetPollInterval = 100 * time.Millisecond
 	h.cfg.ChatPollInterval = 100 * time.Millisecond
+	h.cfg.GuardPoll = 200 * time.Millisecond
 	choice := &runnerChoice{herdr: herdrDown}
 	choices.Store(&h.cfg, choice)
 	t.Cleanup(func() { choices.Delete(&h.cfg) })
