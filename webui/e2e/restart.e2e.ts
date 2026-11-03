@@ -135,8 +135,15 @@ test("137. Restart dialog, running agents", async ({ page, start }) => {
   const before = await pidLine(fixture);
 
   // The queue starts the agent after the page loads: reopen the dialog until its check counts it.
+  // The dialog checks once on open, and its backdrop blocks the menu, so each try closes it first.
+  const closeDialog = () =>
+    expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(dialog(page)).toHaveCount(0, { timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
   const counted = async () => {
     await expect(async () => {
+      await closeDialog();
       await openDialog(page);
       await expect(dialog(page)).toContainText("1 agent is running", { timeout: 2_000 });
     }).toPass();
@@ -145,8 +152,7 @@ test("137. Restart dialog, running agents", async ({ page, start }) => {
 
   await counted();
   await expect(dialog(page)).not.toContainText("A migration runs while the agents work.");
-  await page.keyboard.press("Escape");
-  await expect(dialog(page)).toHaveCount(0);
+  await closeDialog();
 
   await fixture.setRestartControl("check.json", passing("fixture-next", { ok: true }, { demo: 1 }));
   await counted();
