@@ -292,7 +292,8 @@ describe("Tray popover", () => {
 
     it("tells a held disk to use the banner and has no button", async () => {
       withDisks([disk({ held: true, state: "critical" })]);
-      const { getByText, queryByRole } = await openTray();
+      const { getByText, queryByRole, container } = await openTray();
+      expect(container.ownerDocument.querySelector("[data-part='disk-entry']")!.getAttribute("data-state")).toBe("critical");
       expect(getByText("Dispatch held for gx, dotfiles. Clean now is in the banner.")).toBeTruthy();
       expect(queryByRole("button", { name: /clean/i })).toBeNull();
     });

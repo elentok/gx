@@ -185,6 +185,29 @@ test("the Cost cards draw rebuilt and stamp days lighter, say partial and split 
   expect(within(spend).getByRole("tooltip").textContent).toContain("Claude: $2");
 });
 
+// Replaces e2e flow 183: the legend follows the server's group order, and a quiet live day is a zero bar.
+test("the Cost legend lists the groups in order and a quiet live day is a zero bar, not hatched", async () => {
+  const live = [amount(900), amount(0)];
+  const quiet = [amount(0), amount(0)];
+  const cost = costOf({
+    Queue: { tokens: live, spend: live },
+    Design: { tokens: quiet, spend: quiet },
+    "One-off": { tokens: quiet, spend: quiet },
+    Other: { tokens: quiet, spend: quiet },
+  });
+  renderStats(async () => statsOf({}, { cost }));
+  for (const title of ["Tokens", "Spend (est.)"]) {
+    const card = await cardEl(title);
+    expect(within(card).getByLabelText("Legend").textContent).toBe("QueueDesignOne-offOther");
+  }
+  const tokens = await cardEl("Tokens");
+  expect(tokens.querySelectorAll("[data-nodata]")).toHaveLength(0);
+  fireEvent.mouseEnter(tokens.querySelector("[data-hit='1']") as Element);
+  const tip = within(tokens).getByRole("tooltip").textContent ?? "";
+  expect(tip).toContain("Queue: 0");
+  expect(tip).not.toContain("no data");
+});
+
 test("the Grilling section sits between Cost and effort and Friction", async () => {
   renderStats(async () => statsOf());
   await screen.findByText("Words read");

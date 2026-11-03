@@ -311,6 +311,14 @@ func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
 	last := func(a []server.StatsAmount) server.StatsAmount { return a[len(a)-1] }
 
 	all := get("?range=30")
+	// The web legend follows this order.
+	var order []string
+	for _, g := range all.Cost.Groups {
+		order = append(order, g.Group)
+	}
+	if want := []string{"Queue", "Design", "One-off", "Other"}; !slices.Equal(order, want) {
+		t.Errorf("cost group order = %v, want %v", order, want)
+	}
 	if q := costGroupOf(t, all, tokenledger.GroupQueue); last(q.Tokens).Value != 150 || last(q.Spend).Value != 1 || q.Harness[len(q.Harness)-1]["codex"].Tokens != 50 {
 		t.Errorf("queue today = %+v", q)
 	}

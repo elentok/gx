@@ -2,7 +2,7 @@ import { expect, nav, test, toasts } from "./fixture";
 
 const EPIC = "#/e/demo:dirty-epic";
 
-test("58. Dirty trunk on the Epic page", async ({ page, start }) => {
+test("58. Dirty trunk on the Epic page (and 60. Merge again)",async ({ page, start }) => {
   await start("dirty-trunk");
   await page.evaluate((hash) => (location.hash = hash), EPIC);
 
@@ -24,6 +24,15 @@ test("58. Dirty trunk on the Epic page", async ({ page, start }) => {
   expect(stashBox.y).toBeGreaterThanOrEqual(list.y + list.height);
   const sameRow = Math.abs(stashBox.y - againBox.y) < stashBox.height;
   expect(sameRow ? stashBox.x < againBox.x : stashBox.y < againBox.y).toBe(true);
+
+  // 60. Merge again on a dirty trunk: same starting state, so it runs here as the last step.
+  await again.click();
+  const warning = toasts(page).filter({ hasText: /^uncommitted changes on main .* clash with same\.txt/ });
+  await expect(warning).toBeVisible();
+  await expect(warning.getByRole("link", nav("Open the paused epic"))).toHaveAttribute("href", EPIC);
+  // The page shows the fresh state, not the stale Awaiting merge.
+  await expect(page.getByTestId("stats-line")).toHaveText(/^Paused · /);
+  await expect(files.getByRole("listitem")).toHaveText(["same.txt"]);
 });
 
 // --hold freezes the worker on the conflict ticket, so the epic stays mid-run.
@@ -40,19 +49,4 @@ test("59. Stash, merge and restore", async ({ page, start }) => {
   await expect(page.getByText("Finished", { exact: true })).toHaveCount(0);
 
   await fixture.release();
-});
-
-test("60. Merge again on a dirty trunk", async ({ page, start }) => {
-  await start("dirty-trunk");
-  await page.evaluate((hash) => (location.hash = hash), EPIC);
-
-  await page.getByRole("button", nav("Merge again")).click();
-
-  const warning = toasts(page).filter({ hasText: /^uncommitted changes on main .* clash with same\.txt/ });
-  await expect(warning).toBeVisible();
-  await expect(warning.getByRole("link", nav("Open the paused epic"))).toHaveAttribute("href", EPIC);
-
-  // The page shows the fresh state, not the stale Awaiting merge.
-  await expect(page.getByTestId("stats-line")).toHaveText(/^Paused · /);
-  await expect(page.getByTestId("merge-block-files").getByRole("listitem")).toHaveText(["same.txt"]);
 });

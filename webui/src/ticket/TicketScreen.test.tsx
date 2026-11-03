@@ -55,7 +55,17 @@ test("the ticket header shows the check-lock waiting label as a status label, an
   expect(document.querySelector("[data-waiting-label]")).toBeNull();
 });
 
-test("the ticket page shows the ticket's verdict under the header, and nothing without a pending row", async () => {
+// Replaces the ticket-page half of e2e flow 148 (Long-running badge).
+test("the ticket header shows the Long-running badge only for a marked ticket", async () => {
+  await renderTicket({ ...base, long_ticket_turns: 120, long_ticket_threshold: 100 });
+  expect(screen.getByText("Long-running").getAttribute("title")).toBe("120 assistant turns (threshold 100)");
+  cleanup();
+
+  await renderTicket(base);
+  expect(screen.queryByText("Long-running")).toBeNull();
+});
+
+test("the ticket page shows the ticket's verdict under the header,and nothing without a pending row", async () => {
   const mine: PendingRow = { address: "gx:demo/12", agent: "", verdict: "disk low", reason: "/tmp has 5G free" };
   await renderTicket(base, undefined, [{ ...mine, address: "gx:demo/13", verdict: "concurrency cap" }]);
   expect(document.querySelector("[data-verdict]")).toBeNull();

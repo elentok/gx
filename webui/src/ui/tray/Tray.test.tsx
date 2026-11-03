@@ -34,6 +34,24 @@ describe("Tray", () => {
     expect(getComputedStyle(cpu!).height).not.toBe("0%");
   });
 
+  // Replaces e2e flow 79 (Tray states): the states the fixture walked through, as meter data.
+  it.each([
+    { name: "normal", cpu: meter("normal", 0), mem: meter("normal", 0), cpuFill: "20%", memFill: "20%" },
+    { name: "high", cpu: meter("high", 3), mem: meter("high", 4), cpuFill: "80%", memFill: "100%" },
+    { name: "critical", cpu: meter("critical", 4), mem: meter("critical", 4), cpuFill: "100%", memFill: "100%" },
+    { name: "unknown", cpu: meter("unknown", 0), mem: meter("unknown", 0), cpuFill: null, memFill: null },
+  ])("shows the $name meter state and fill height", ({ name, cpu, mem, cpuFill, memFill }) => {
+    const { container } = renderThemed(<Tray health={healthOf(cpu, mem)} />);
+    for (const [letter, fill] of [["C", cpuFill], ["M", memFill]] as const) {
+      const m = container.querySelector(`[data-meter=${letter}]`)!;
+      expect(m.getAttribute("data-state")).toBe(name);
+      const bar = m.querySelector("[data-part=fill]");
+      if (fill === null) expect(bar).toBeNull();
+      else expect(getComputedStyle(bar!).height).toBe(fill);
+    }
+    expect(container.querySelector("[data-meter=D]")!.getAttribute("data-state")).toBe("normal");
+  });
+
   it("draws unknown as an outline with no fill", () => {
     const { container } = renderThemed(<Tray health={healthOf(meter("unknown", 0))} />);
     const [cpu, memory] = [...container.querySelectorAll("[data-meter]")];

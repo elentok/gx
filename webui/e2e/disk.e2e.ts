@@ -6,10 +6,16 @@ const DISK = "fixture disk";
 /** The disk strip; other live regions share its role, so it is found by the disk name. */
 const strip = (page: Page) => page.getByRole("status").filter({ hasText: DISK });
 
-test("76. Disk banner and Clean now", async ({ page, start }) => {
+// Also covers 78 (Clean now fails): the failing clean runs first, before the recovery steps.
+test("76. Disk banner and Clean now (and 78. Clean now fails)", async ({ page, start }) => {
   const fixture = await start("disk-low");
+  await fixture.setDiskClean("fail");
   await fixture.setDiskFree("15G");
   await expect(strip(page)).toContainText(`${DISK} is low`);
+  await strip(page).getByRole("button", nav("Clean now")).click();
+  await expect(strip(page).getByRole("alert")).toContainText(/^failed: .*clean\.sh/);
+  await expect(strip(page)).toBeVisible();
+  await fixture.setDiskClean("");
   await expect(strip(page).getByRole("button", nav("Clean now"))).toBeEnabled();
 
   await page.getByRole("link", { name: "disk-epic", exact: true }).click();
@@ -54,14 +60,4 @@ test("77. Disk hold", async ({ page, start }) => {
   await expect(strip(page)).toContainText(`${DISK} is low`);
   await expect(strip(page)).not.toContainText("new tickets held");
   await expect(row.locator("[data-meta]")).toHaveText(/^running · /);
-});
-
-test("78. Clean now fails", async ({ page, start }) => {
-  const fixture = await start("disk-low");
-  await fixture.setDiskClean("fail");
-  await fixture.setDiskFree("15G");
-  await expect(strip(page)).toContainText(`${DISK} is low`);
-  await strip(page).getByRole("button", nav("Clean now")).click();
-  await expect(strip(page).getByRole("alert")).toContainText(/^failed: .*clean\.sh/);
-  await expect(strip(page)).toBeVisible();
 });

@@ -189,6 +189,13 @@ test("a live ticket is one link to its page with id, title and meta; paused rows
   expect(screen.queryByText("Open →")).toBeNull();
 });
 
+// Replaces the epic-row half of e2e flow 148 (Long-running badge).
+test("a ticket row carries the Long-running badge only when the server marked it", async () => {
+  live([tk("01", { long_ticket_turns: 120, long_ticket_threshold: 100 }), tk("02")]);
+  expect(within(await cardOf("01")).getByText("Long-running").getAttribute("title")).toBe("120 assistant turns (threshold 100)");
+  expect(within(await cardOf("02")).queryByText("Long-running")).toBeNull();
+});
+
 const pend = (n: string, verdict: string, reason?: string): PendingRow => ({ address: `gx:blog/${n}`, agent: "", verdict, reason });
 const liveWith = (pending: PendingRow[], rows: object[]) =>
   render("/e/gx:blog-impl", [], "loop", { pending, detail: { total: rows.length, rows: rows as EpicDetail["rows"] } });
