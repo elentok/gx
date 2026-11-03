@@ -841,8 +841,17 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// The fake program's side channels, per test rather than shared on the machine.
 	h.cfg.Env = append(h.cfg.Env, agentfake.ProgramDirEnv+"="+agentfake.NewProgramDir(t))
 	// Every merge pauses on ralphloop's 3s finish debounce; the fake agents
-	// settle at once, so a hundredth keeps the order without the wait.
-	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }
+	// settle at once, so a hundredth keeps the order without the wait. The floor
+	// keeps the finish debounce longer than a loaded machine's lag between the
+	// run starting and its prompt turning the fake busy: a shorter one reads the
+	// not-yet-busy fake as finished and reaps a stalled run.
+	h.cfg.Sleep = func(d time.Duration) {
+		scaled := d / 100
+		if d >= time.Second {
+			scaled = max(scaled, 300*time.Millisecond)
+		}
+		time.Sleep(scaled)
+	}
 	// Fake agents idle without a report and never leave idle after a nudge, so
 	// the stall nudge is off unless a test sets its delay.
 	h.cfg.StalledNudgeDelay = -1
