@@ -34,7 +34,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if err != nil {
 		return err
 	}
-	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
+	pr := &ptyPrompter{p: p, ctx: ctx, ss: ss, turn: turn}
 	if person, stop, err := p.PersonInput(s); err == nil {
 		defer stop()
 		pr.person = person

@@ -1,6 +1,7 @@
 package nativerunner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -59,7 +60,9 @@ func (p *Pty) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error
 // the draft check's case; input after it sets stopped, and every later key or
 // wait returns errPersonInput.
 type ptyPrompter struct {
-	p       *Pty
+	p *Pty
+	// ctx ends the launch prompt's waits when the server stops; nil never ends.
+	ctx     context.Context
 	ss      *ptySession
 	turn    int
 	person  <-chan struct{}
@@ -67,8 +70,14 @@ type ptyPrompter struct {
 	stopped bool
 }
 
-// cancelled returns errPersonInput once a person typed after gx did.
+// cancelled returns the launch ctx's error once it ends, and errPersonInput
+// once a person typed after gx did.
 func (pr *ptyPrompter) cancelled() error {
+	if pr.ctx != nil {
+		if err := pr.ctx.Err(); err != nil {
+			return fmt.Errorf("launch prompt cancelled: %w", context.Cause(pr.ctx))
+		}
+	}
 	if !pr.typed {
 		return nil
 	}
@@ -121,6 +130,9 @@ func (pr *ptyPrompter) awaitEmptyInput(wait time.Duration) error {
 	deadline := time.Now().Add(wait)
 	extraRound := false
 	for {
+		if pr.ctx != nil && pr.ctx.Err() != nil {
+			return pr.cancelled()
+		}
 		empty, known, err := pr.InputEmpty()
 		if err != nil || empty || !known {
 			return err
