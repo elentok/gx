@@ -21,8 +21,11 @@ test("129. Restart server keyboard", async ({ page, start }) => {
   await menuButton(page).focus();
   await page.keyboard.press("Enter");
   await expect(menu(page)).toBeVisible();
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
+  // The usage block (with its InfoTip) can mount before the menu opens: focus must still land on the menu.
+  await expect(menu(page).getByRole("button", nav("About gx spend"))).toBeVisible();
+  await expect(menu(page).getByRole("menuitem", nav("Settings"))).toHaveAttribute("data-highlighted", "");
+  // Settings, AFK, Vi mode, Restart: Restart is three presses from the highlighted Settings.
+  for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowDown");
   await expect(restartItem(page)).toHaveAttribute("data-highlighted", "");
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toBeVisible();

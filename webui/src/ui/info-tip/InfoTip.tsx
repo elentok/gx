@@ -65,6 +65,8 @@ export function InfoTip({ label, content, children = "i", variant = "marker", ch
         <chakra.button
           type="button"
           aria-label={label}
+          // Inside a menu, zag focuses the first tabbable on open; this marker swallows arrows, so skip it.
+          data-no-autofocus=""
           ref={marker}
           onClick={() => setOpen((o) => !o)}
           onFocus={() => setOpen(true)}
