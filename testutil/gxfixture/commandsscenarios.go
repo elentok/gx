@@ -119,6 +119,8 @@ func commandsScenario(delay string, fail bool) scenario {
 // flows read.
 func blockedScenario() scenario {
 	sc := agentsScenario()
+	// A key the fake ignores (flow 158) fails after this wait, not after the 45s default.
+	sc.promptGrace = "8s"
 	withCommandFakes(&sc, "", false)
 	sc.sessions = append(sc.sessions,
 		commandStepsSession(),

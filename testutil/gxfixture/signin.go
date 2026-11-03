@@ -98,7 +98,14 @@ func webSetup(stateDir, webURL, setupCode string) (signIn, error) {
 		if started.Secret == "" {
 			return signIn{}, fmt.Errorf("setup step 1 returned no TOTP secret")
 		}
-		in.totpSecret, in.totpStep = started.Secret, server.TOTPStepAt(time.Now())
+		// The server accepts the step before its own, so the setup code uses it and leaves two
+		// steps for the flows to use without waiting. Near the end of a step the server's clock
+		// could already be on the next one, which no longer accepts the previous.
+		now := time.Now()
+		in.totpSecret, in.totpStep = started.Secret, server.TOTPStepAt(now)
+		if now.Unix()%30 < 25 {
+			in.totpStep--
+		}
 		if finish["totp_code"], err = server.TOTPCode(in.totpSecret, in.totpStep); err != nil {
 			return signIn{}, err
 		}

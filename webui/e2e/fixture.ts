@@ -119,10 +119,13 @@ export interface Fixture {
   /** What each fake codex PermissionRequest hook answered, oldest first: the decision and the deny reason. */
   codexDecisions(): Promise<{ behavior: string; message: string }[]>;
   /**
-   * A TOTP code for the fixture's secret, returned only once a step later than the last one used has
-   * begun (up to 30 seconds), since the server takes each step once. Every flow that needs a code uses it.
+   * A TOTP code for the fixture's secret, in a step later than the last one used for that secret,
+   * since the server takes each step once. It waits (up to 30 seconds) only when the steps the
+   * server accepts are used up. Every flow that needs a code uses it.
    */
   nextTotpCode(): Promise<string>;
+  /** The code for the current step, for a secret the server no longer holds, so it is refused without a wait. */
+  staleTotpCode(): string;
   /** Adopts the secret the setup page showed (spaces allowed), for a fixture that started with setup pending. */
   useTotpSecret(secret: string): void;
   /** The web password the fixture's setup used; empty while the setup is pending. */
@@ -225,8 +228,10 @@ async function startFixture(
     proc.once("exit", (code) => reject(new Error(`gxfixture exited with ${code} before it printed its output`)));
   });
   const env = { ...process.env, ...Object.fromEntries(out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)])) };
-  let lastStep = out.totp_step ?? 0;
   let totpSecret = out.totp_secret ?? "";
+  // The server refuses a step at or below the last one it accepted for a secret, and a secret it
+  // has not accepted yet starts at 0.
+  const lastSteps = new Map<string, number>([[totpSecret, out.totp_step ?? 0]]);
   const fixture: Fixture = {
     password: out.password ?? "",
     totpSecret: out.totp_secret ?? "",
@@ -329,14 +334,19 @@ async function startFixture(
       if (!totpSecret) throw new Error("this fixture runs without TOTP");
       const deadline = Date.now() + (TOTP_PERIOD_S + 1) * 1000;
       for (;;) {
-        const step = Math.floor(Date.now() / 1000 / TOTP_PERIOD_S);
-        if (step > lastStep) {
-          lastStep = step;
+        const current = Math.floor(Date.now() / 1000 / TOTP_PERIOD_S);
+        const step = Math.max(current, (lastSteps.get(totpSecret) ?? 0) + 1);
+        // The server accepts one step ahead of its clock.
+        if (step <= current + 1) {
+          lastSteps.set(totpSecret, step);
           return totpCode(totpSecret, step);
         }
         if (Date.now() > deadline) throw new Error("no new TOTP step began in time");
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
+    },
+    staleTotpCode() {
+      return totpCode(totpSecret, Math.floor(Date.now() / 1000 / TOTP_PERIOD_S));
     },
     useTotpSecret(secret) {
       totpSecret = secret.replace(/\s/g, "");

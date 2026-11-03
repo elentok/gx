@@ -129,7 +129,7 @@ test("108. Change password", async ({ page, start }) => {
 });
 
 test("109. Reset authenticator", async ({ page, start }) => {
-  // Six codes, each waits for a new 30 second TOTP step.
+  // Three codes for the old secret; the third can wait for a new 30 second TOTP step.
   test.setTimeout(240_000);
   const fixture = await start("web-logins");
   const oldSecret = fixture.totpSecret;
@@ -168,7 +168,7 @@ test("109. Reset authenticator", async ({ page, start }) => {
     await expect(loginRows(page)).toHaveCount(1);
 
     fixture.useTotpSecret(oldSecret);
-    const rejected = await signInElsewhere(browser, page.url(), fixture.password, await fixture.nextTotpCode());
+    const rejected = await signInElsewhere(browser, page.url(), fixture.password, fixture.staleTotpCode());
     await expect(rejected.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
     fixture.useTotpSecret(newKey);
@@ -218,7 +218,6 @@ test("111. CLI revoke", async ({ page, start }) => {
 });
 
 test("112. Add the authenticator after a CLI reset", async ({ page: first, start }) => {
-  // Two codes, each waits for a new 30 second TOTP step.
   test.setTimeout(180_000);
   const fixture = await start("web-login");
   const oldSecret = fixture.totpSecret;
@@ -265,7 +264,7 @@ test("112. Add the authenticator after a CLI reset", async ({ page: first, start
   const browser = await chromium.launch();
   try {
     fixture.useTotpSecret(oldSecret);
-    const rejected = await signInElsewhere(browser, page.url(), fixture.password, await fixture.nextTotpCode());
+    const rejected = await signInElsewhere(browser, page.url(), fixture.password, fixture.staleTotpCode());
     await expect(rejected.getByRole("heading", { name: "Sign in" })).toBeVisible();
   } finally {
     await browser.close();

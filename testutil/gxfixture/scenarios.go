@@ -39,6 +39,9 @@ type scenario struct {
 	epics    []epic
 	// behaviour is the fake worker's per-ticket behaviour, by address.
 	behaviour map[string]string
+	// promptGrace, when set, is the server's wait for a typed key or prompt to take effect
+	// (GX_PROMPT_GRACE); empty means the 45s default.
+	promptGrace string
 	// designSteps makes each epic, by address, a map and sets its design step
 	// with the CLI verb, so no spec file is needed in trunk.
 	designSteps map[string]string

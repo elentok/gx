@@ -217,8 +217,8 @@ test.describe("120. Menu refresh", () => {
     page,
     start,
   }) => {
-    test.setTimeout(180_000);
     const fixture = await start("spend", { shape: "normal" });
+    await page.clock.install();
     await openMenu(page);
     await expect(row(page, "Today").getByText(/\$\d+\.\d{2}/)).toBeVisible();
     const before = await amount(page, "Today");
@@ -234,9 +234,12 @@ test.describe("120. Menu refresh", () => {
     };
     await appendFile(fixture.agentTranscript, JSON.stringify(line) + "\n");
 
-    await expect(row(page, "Today").getByText(dollars(before + 3))).toBeVisible(
-      { timeout: 120_000 },
-    );
+    // The open menu refetches every 60 seconds; the page clock runs that interval, and the
+    // server may take a poll or two to see the line, so each try moves the clock again.
+    await expect(async () => {
+      await page.clock.fastForward(60_000);
+      await expect(row(page, "Today").getByText(dollars(before + 3))).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
 
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toBeHidden();

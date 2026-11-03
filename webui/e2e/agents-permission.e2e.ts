@@ -164,8 +164,8 @@ test("158. Ignored Allow key shows the not-delivered text", async ({ page, start
   const before = await fixture.input(conv);
   await open(page, `#/agents/${s.id}`);
   await noticeButton(page, "Allow once").click();
-  // The server waits its whole prompt grace (45s) for the session to move on.
-  await expect(failure(page).getByRole("alert")).toHaveText(NOT_DELIVERED, { timeout: 90_000 });
+  // The server waits its whole prompt grace (8s in this scenario) for the session to move on.
+  await expect(failure(page).getByRole("alert")).toHaveText(NOT_DELIVERED, { timeout: 30_000 });
   // The Enter went out; the fake ignored it and no other option was picked.
   await expect.poll(() => readSince(fixture, conv, before)).toBe("\r");
   expect(await stateOf(fixture, s.id)).toBe("blocked");

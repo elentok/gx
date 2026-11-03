@@ -406,6 +406,9 @@ func run(args []string) (err error) {
 			return fmt.Errorf("seed limit burn: %w", err)
 		}
 	}
+	if sc.promptGrace != "" {
+		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.promptGrace)
+	}
 	if sc.tokenPoll {
 		f.env = append(f.env, "GX_TOKEN_POLL_INTERVAL="+liveTokenPollInterval)
 	}

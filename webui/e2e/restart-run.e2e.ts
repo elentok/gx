@@ -210,9 +210,12 @@ test("143. Restart server, server does not return", async ({ page, start }) => {
   });
 
   await openDialog(page);
+  await page.clock.install();
   await restartButton(page).click();
   await expect(dialog(page)).toContainText("Restarting...");
-  await expect(dialog(page)).toContainText("The server did not return. It may have failed to start.", { timeout: 75_000 });
+  // The dialog gives up after 60 seconds on the page clock.
+  await page.clock.fastForward(61_000);
+  await expect(dialog(page)).toContainText("The server did not return. It may have failed to start.");
   await expect(dialog(page)).toContainText("gx server start");
   expect(logs.length).toBeGreaterThan(0);
   const shown = (await dialog(page).textContent())!.match(/restart log at (.+?), or run/)![1];
