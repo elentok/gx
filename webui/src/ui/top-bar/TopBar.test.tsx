@@ -70,6 +70,24 @@ describe("TopBar", () => {
     expect((await on.findByRole("menuitemcheckbox", { name: "Vi mode" })).getAttribute("aria-checked")).toBe("true");
   });
 
+  it("opens with Enter, highlights with ArrowDown, toggles AFK with Enter and closes with Escape", async () => {
+    const onToggleAfk = vi.fn();
+    const { getByRole, findByRole, queryByRole } = renderThemed(<TopBar connected onToggleAfk={onToggleAfk} />);
+    const trigger = getByRole("button", { name: "Menu" });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    const menu = await findByRole("menu", { name: "Menu" });
+    await waitFor(() => expect(document.activeElement).toBe(menu));
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    const item = await findByRole("menuitemcheckbox", { name: "AFK" });
+    await waitFor(() => expect(item.hasAttribute("data-highlighted")).toBe(true));
+    fireEvent.keyDown(item, { key: "Enter" });
+    await waitFor(() => expect(onToggleAfk).toHaveBeenCalledOnce());
+    expect(queryByRole("menu", { name: "Menu" })).toBeTruthy();
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await waitFor(() => expect(queryByRole("menu", { name: "Menu" })).toBeNull());
+  });
+
   it("has no Vi mode item without a toggle", async () => {
     const { getByRole, findByRole, queryByRole } = renderThemed(<TopBar connected />);
     fireEvent.click(getByRole("button", { name: "Menu" }));

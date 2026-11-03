@@ -160,6 +160,17 @@ test("a refused Merge shows its reason in a toast", async () => {
   expect(await screen.findByText("Conflicts with main")).toBeTruthy();
 });
 
+test("the Merge button is disabled while the merge is pending", async () => {
+  let release!: (v: unknown) => void;
+  const merge = vi.fn().mockReturnValue(new Promise((r) => (release = r)));
+  const r = row({ state: "merge-blocked", section: "needs-you", state_pill: "Merge blocked", actions: [{ kind: "merge", label: "Merge" }] });
+  renderThemed(<EpicCard row={r} writes={{ merge }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+  await waitFor(() => expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(true));
+  release({ refused: true, reason: "x", message: "Conflicts with main" });
+  expect(await screen.findByText("Conflicts with main")).toBeTruthy();
+});
+
 test("a paused Merge shows a warning toast with the message and a link to the epic", async () => {
   const merge = vi.fn().mockResolvedValue({ parked: true, message: "Rebase onto main failed" });
   const r = row({ state: "awaiting-merge", section: "needs-you", actions: [{ kind: "merge", label: "Merge" }] });
