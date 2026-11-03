@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -11,7 +12,9 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -412,10 +415,7 @@ func codexQueueScenario() scenario {
 		},
 		projectExtra: map[string]string{project: `,"max-agents":2`},
 		hold:         true,
-		behaviour:    map[string]string{addr("ran-on-claude/01"): agentfake.BehaviourAsk},
 		ranOnClaude:  []string{addr("ran-on-claude/01")},
-		config:       []string{"execution-queue.waiting-slot-grace=1s"},
-		transcripts:  true,
 		queue: []string{
 			addr("codex-running"), addr("claude-running"),
 			addr("follows-default"), addr("pinned"), addr("ran-on-claude"),
@@ -424,38 +424,30 @@ func codexQueueScenario() scenario {
 	}
 }
 
-// seedRanOnClaude gives the ticket a real Claude run: its epic is queued with no
-// agent, the fake worker asks, and once the ticket waits for the answer it is
-// taken off the queue and sent back to open. The run log keeps the session. The
-// asked run keeps its slot until the waiting-slot grace ends, which the scenario
-// sets short.
+// seedRanOnClaude leaves the ticket open with an earlier Claude run: an
+// iteration-started event in the epic's run log and a transcript for its session
+// in the fixture home, which is all server.earlierRunHarness reads. A live
+// worker would race the server's adoption of its question and hold a slot.
 func (f *fixture) seedRanOnClaude(addr string) error {
-	epicAddr, _, _ := strings.Cut(addr, "/")
-	if out, err := f.cli("server", "queue", "add", epicAddr); err != nil {
-		return fmt.Errorf("queue %s: %w\n%s", epicAddr, err, out)
+	project, rest, _ := strings.Cut(addr, ":")
+	epicName, id, _ := strings.Cut(rest, "/")
+	const session = "00000000-0000-4000-8000-0000000000c1"
+	ev := ralphloop.Event{
+		Time:         time.Now(),
+		Type:         string(events.IterationStarted),
+		Ticket:       id,
+		Agent:        ralphloop.AgentClaude,
+		AgentSession: session,
+		Cwd:          filepath.Join(f.root, "repo"),
 	}
-	deadline := time.Now().Add(sessionWaitTimeout * 6)
-	for {
-		out, _ := f.cli("server", "tickets", "detail", addr, "--json")
-		if strings.Contains(string(out), `"needs-answer"`) { // oldword:ok the kept legacy wire status
-			break
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("%s never asked its question:\n%s", addr, out)
-		}
-		time.Sleep(500 * time.Millisecond)
+	if err := ralphloop.AppendEvent(filepath.Join(f.store, project), epicName, ev); err != nil {
+		return fmt.Errorf("run log for %s: %w", addr, err)
 	}
-	// The queue loop adds the epic again. An epic that already left the queue
-	// makes remove fail, which is as good.
-	_, _ = f.cli("server", "queue", "remove", epicAddr)
-	// start-over finds the ticket's worktree from the working directory.
-	startOver := exec.Command(f.gx, "server", "tickets", "start-over", addr, "--reason", "fixture: seed a waiting ticket that ran on Claude")
-	startOver.Env = f.env
-	startOver.Dir = filepath.Join(f.root, "repo")
-	if out, err := startOver.CombinedOutput(); err != nil {
-		return fmt.Errorf("start over %s: %w\n%s", addr, err, out)
+	dir := filepath.Join(f.root, "home", ".claude", "projects", "fixture")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
 	}
-	return nil
+	return os.WriteFile(filepath.Join(dir, session+".jsonl"), []byte("{}\n"), 0o644)
 }
 
 // codexDesignScenario opens a design session on a map while the global Default
