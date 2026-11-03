@@ -56,7 +56,8 @@ export const Markdown = memo(function Markdown({
         "& strong": { fontWeight: "600" },
         "& a": { color: "{colors.tone.done.fg}", textDecoration: "underline" },
         "& code": {
-          background: "{colors.surface.raised}",
+          background: "{colors.tone.running.bg}",
+          color: "{colors.tone.running.fg}",
           borderRadius: "{radii.sm}",
           paddingInline: "1",
           fontSize: "0.9em",
@@ -72,7 +73,7 @@ export const Markdown = memo(function Markdown({
           overflowX: "auto",
           lineHeight: "1.5",
         },
-        "& pre code": { background: "none", padding: 0, fontSize: "0.85em" },
+        "& pre code": { background: "none", color: "inherit", padding: 0, fontSize: "0.85em" },
       }}
     >
       <ReactMarkdown
