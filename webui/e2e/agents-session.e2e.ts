@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
-import type { SessionInfo } from "../src/generated/server";
 import { expect, test } from "./fixture";
-import { ask, chatOf, composer, go, messageBox, REPLY, row, sendButton, sessions, titleButton } from "./agentsKit";
+import { ask, go, REPLY, row, sessions, titleButton } from "./agentsKit";
 
 /** The chat's scroll box, found from a message in it. */
 const scrollBox = (page: Page, text: string) => page.getByText(text, { exact: true }).first();
@@ -81,123 +80,9 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(page.getByText("after recovery", { exact: true })).toBeVisible();
 });
 
-test("77. Send while busy", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const working = (await sessions(fixture))[1];
-  expect(working.status.state).toBe("working");
-  await go(page, `#/agents/${working.id}`);
-
-  await expect(composer(page).getByText("Working. Send turns on when the session is idle.")).toBeVisible();
-  const box = composer(page).getByRole("textbox", { name: "Message" });
-  await box.fill("a draft for later");
-  await expect(box).toHaveValue("a draft for later");
-  await expect(composer(page).getByRole("button", { name: "Send" })).toBeDisabled();
-});
-
-// No fixture harness lacks chat; the NoChat screen is unit-tested in AgentsPage.composer.test.tsx.
-test("81. Codex session has chat", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const other = (await sessions(fixture)).find((s) => s.harness !== "claude")!;
-  expect(other.harness).toBe("codex");
-  await go(page, `#/agents/${other.id}`);
-
-  await expect(composer(page).getByRole("textbox", { name: "Message" })).toBeVisible();
-  await expect(page.getByText("Chat works for Claude and Codex sessions only.")).toHaveCount(0);
-  await expect(composer(page).getByText("Sending works for Claude and Codex sessions only")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Show screen" })).toHaveCount(0);
-});
-
-test("82. No messages yet", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const claude = (await sessions(fixture)).filter((s) => s.harness === "claude");
-  const empty: SessionInfo[] = [];
-  for (const s of claude) if ((await chatOf(fixture, s.id)).messages.length === 0) empty.push(s);
-  expect(empty.length).toBeGreaterThan(0);
-  await go(page, `#/agents/${empty[0].id}`);
-
-  await expect(page.getByText("No messages yet")).toBeVisible();
-  await expect(composer(page).getByRole("textbox", { name: "Message" })).toBeVisible();
-});
-
-const failure = (page: Page) => page.getByRole("region", { name: "Session failure" });
-
-test("80. Failure notices", async ({ page, start }) => {
-  const fixture = await start("agents-failures");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const byKind = async (kind: string) => (await sessions(fixture)).find((s) => s.failure?.kind === kind)!;
-  const open = async (kind: string) => {
-    const s = await byKind(kind);
-    await go(page, `#/agents/${s.id}`);
-    return s;
-  };
-  const buttons = async (kind: string) => {
-    await expect(failure(page)).toBeVisible();
-    return failure(page).getByRole("button").evaluateAll((els) => els.map((el) => el.textContent));
-  };
-
-  // Stalled: the fixture's threshold is 3s.
-  await open("stalled");
-  await expect(failure(page).getByText("No progress for 15 min")).toBeVisible();
-  expect(await buttons("stalled")).toEqual(["Screen"]);
-  await failure(page).getByRole("button", { name: "Screen" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.keyboard.press("Escape");
-
-  // Blocked at a permission prompt: Screen, then Deny and Allow once.
-  await open("blocked");
-  await expect(failure(page).getByText("The session asks for permission.")).toBeVisible();
-  await expect.poll(() => buttons("blocked")).toEqual(["Screen", "Deny", "Allow once"]);
-
-  // Auth: Retry, and Send stays on.
-  await open("auth");
-  await expect(failure(page).getByText("Claude login needed")).toBeVisible();
-  expect(await buttons("auth")).toEqual(["Retry"]);
-  await messageBox(page).fill("hi");
-  await expect(sendButton(page)).toBeEnabled();
-  const auth = await byKind("auth");
-  const texts = async () => (await chatOf(fixture, auth.id)).messages.map((m) => (m as { text: string }).text);
-  expect(await texts()).not.toContain("continue");
-  await failure(page).getByRole("button", { name: "Retry" }).click();
-  await expect.poll(texts).toContain("continue");
-
-  // Rate limit: label and text, no buttons, and the reason Send is off.
-  const limited = await open("rate-limit");
-  await expect(failure(page).getByText("Rate limited", { exact: true })).toBeVisible();
-  await expect(failure(page).getByText(limited.failure!.text!)).toBeVisible();
-  expect(await buttons("rate-limit")).toEqual([]);
-  await expect(composer(page).getByText("Rate limited. Send turns on when the session is idle.")).toBeVisible();
-  await expect(sendButton(page)).toBeDisabled();
-});
-
-test("80. Failure notices, crashed", async ({ page, start }) => {
-  const fixture = await start("agents");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const crashed = (await sessions(fixture)).find((s) => s.exit === "crashed")!;
-  await go(page, `#/agents/${crashed.id}`);
-
-  await expect(failure(page).getByText("Agent crashed")).toBeVisible();
-  await expect(page.getByText("hello", { exact: true })).toBeVisible();
-  await expect(composer(page).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Restore" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "New session", exact: true })).toHaveCount(0);
-  await expect(sendButton(page)).toBeDisabled();
-});
-
-test("83. Design session on the Agents page", async ({ page, start }) => {
-  const fixture = await start("agents");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const design = (await sessions(fixture)).find((s) => s.design)!;
-  await go(page, `#/agents/${design.id}`);
-
-  await expect(page.getByText(REPLY)).toBeVisible();
-  await expect(page.getByRole("alertdialog")).toHaveCount(0);
-  await expect(page.getByText("Unanswered questions")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Continue" })).toHaveCount(0);
-  await expect(messageBox(page)).toBeVisible();
-
-  await page.getByRole("link", { name: "Open design page →" }).click();
-  await expect(page).toHaveURL(/#\/d\/demo:design-epic$/);
-});
+// Moved to vitest: 77 and 81 (AgentsPage.composer.test.tsx), 82 (AgentsPage.sessionView.test.tsx),
+// 80 and 80 crashed (FailureBanner.test.tsx, AgentsPage.composer.test.tsx failureCases),
+// 83 (AgentsPage.composer.test.tsx).
 
 // The hold ends about 8 s after the limit in this scenario.
 const holdEnds = { timeout: 60_000 };

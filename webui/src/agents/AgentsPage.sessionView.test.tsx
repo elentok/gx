@@ -88,6 +88,13 @@ test("the header shows no model label when tier, model and effort are all empty"
   expect(header.queryByText(/CLI default|·/)).toBeNull();
 });
 
+test("a Queue agent's session offers no Screen and no Type field", async () => {
+  render([session("s-1", "p", { name: "q", queue: true })], "/agents/s-1", true, chatOf(chat()));
+  await screen.findByRole("heading", { name: /q/ });
+  expect(screen.queryByRole("button", { name: /Screen/ })).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Text to type" })).toBeNull();
+});
+
 test("a failed re-read keeps the last chat", async () => {
   let calls = 0;
   const { emit } = render([session("s-1", "p")], "/agents/s-1", true, {

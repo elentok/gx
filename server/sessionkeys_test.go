@@ -136,6 +136,41 @@ func TestSessionKeys_NamedKeysReachTheFake(t *testing.T) {
 	waitForSubmitted(t, f.conv, sb.String())
 }
 
+// Ports e2e flow 156 "Keys by session state". A Rate-limited session needs a real rate-limit turn
+// to reach, so it is not driven here.
+func TestSessionKeys_KeysAndTextReachALiveSessionInEveryReachableState(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		state   string
+		control agentfake.Control
+	}{
+		{"idle", agentfake.Control{State: "idle"}},
+		{"working", agentfake.Control{State: "working"}},
+		{"blocked", agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"}},
+	} {
+		t.Run(tc.state, func(t *testing.T) {
+			t.Parallel()
+			f := startPromptSession(t)
+			holder := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+			report(t, f.conv, tc.control)
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == tc.state })
+			for _, key := range []string{"Up", "Down"} {
+				if res := f.keys(t, server.SessionKeysRequest{Key: key}); res.Refused {
+					t.Fatalf("key %s = %+v", key, res)
+				}
+			}
+			if res := f.keys(t, server.SessionKeysRequest{Text: "typed"}); res.Refused {
+				t.Fatalf("text = %+v", res)
+			}
+			waitForScreen(t, holder, "typed")
+			if res := f.keys(t, server.SessionKeysRequest{Key: "Enter"}); res.Refused {
+				t.Fatalf("enter = %+v", res)
+			}
+			waitForSubmitted(t, f.conv, strconv.Quote("<csi A>")+"\n"+strconv.Quote("<csi B>")+"\n"+strconv.Quote("typed")+"\n")
+		})
+	}
+}
+
 func TestSessionKeys_TextIsTypedWithoutEnter(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)

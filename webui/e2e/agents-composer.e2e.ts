@@ -1,18 +1,6 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, test, type Fixture } from "./fixture";
+import { expect, nav, test } from "./fixture";
 import { ask, composer, created, freshVisit, go, messageBox, REPLY, sendButton, sessions } from "./agentsKit";
-
-/** Counts the prompts the page posts, so a key that does nothing can be told from one that sent. */
-function countPrompts(page: Page) {
-  const seen = { count: 0 };
-  page.on("request", (r) => {
-    if (r.method() === "POST" && r.url().includes("/v1/sessions/prompt")) seen.count++;
-  });
-  return seen;
-}
-
-const waitIdle = (fixture: Fixture, id: string) =>
-  expect.poll(async () => (await sessions(fixture)).find((s) => s.id === id)!.status.state).toBe("idle");
 
 test("76. Send and draft", async ({ page, start }) => {
   const fixture = await start("agents");
@@ -22,7 +10,6 @@ test("76. Send and draft", async ({ page, start }) => {
 
   // The draft survives a new tab of the same browser.
   await messageBox(page).fill("a draft to keep");
-  await expect(composer(page).getByText("Draft saved in this browser")).toBeVisible();
   const second = await freshVisit(page, `/#/agents/${idle.id}`);
   await expect(messageBox(second)).toHaveValue("a draft to keep");
   await second.close();
@@ -31,7 +18,6 @@ test("76. Send and draft", async ({ page, start }) => {
   await expect(messageBox(page)).toHaveValue("");
   await expect(page.getByText("a draft to keep", { exact: true })).toBeVisible();
   await expect.poll(() => fixture.cli("agents", "chat", idle.id)).toContain("a draft to keep");
-  await expect(composer(page).getByText("Draft saved in this browser")).toHaveCount(0);
 });
 
 test("78. Send refused", async ({ page, start }) => {
@@ -48,14 +34,9 @@ test("78. Send refused", async ({ page, start }) => {
   await expect(page.getByText("moved from the CLI", { exact: true })).toHaveCount(0);
 
   await messageBox(page).fill("my draft");
-  const saved = composer(page).getByText("Draft saved in this browser");
-  await expect(saved).toBeVisible();
-  const dim = await saved.evaluate((el) => getComputedStyle(el).color);
   failing = false;
   await sendButton(page).click();
-  const reason = composer(page).getByText("the conversation moved; review it first");
-  await expect(reason).toBeVisible();
-  expect(await reason.evaluate((el) => getComputedStyle(el).color)).not.toBe(dim);
+  await expect(composer(page).getByText("the conversation moved; review it first")).toBeVisible();
   await expect(page.getByText("moved from the CLI", { exact: true })).toBeVisible();
   await expect(messageBox(page)).toHaveValue("my draft");
   expect(await fixture.cli("agents", "chat", idle.id)).not.toContain("my draft");
@@ -67,98 +48,7 @@ test("78. Send refused", async ({ page, start }) => {
   await expect(messageBox(page)).toHaveValue("!ls");
 });
 
-test("79. Keyboard send", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const idle = (await sessions(fixture))[0];
-  const prompts = countPrompts(page);
-
-  // At 390px only the button sends.
-  await page.setViewportSize({ width: 390, height: 800 });
-  await go(page, `#/agents/${idle.id}`);
-  await messageBox(page).fill("phone text");
-  await messageBox(page).press("Control+Enter");
-  await expect(messageBox(page)).toHaveValue("phone text");
-  expect(prompts.count).toBe(0);
-  await sendButton(page).click();
-  await expect(messageBox(page)).toHaveValue("");
-  await expect(page.getByText("phone text", { exact: true })).toBeVisible();
-  await waitIdle(fixture, idle.id);
-
-  // Wide, Enter adds a newline and Ctrl+Enter sends.
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await messageBox(page).fill("line one");
-  await messageBox(page).press("Enter");
-  await messageBox(page).pressSequentially("line two");
-  await expect(messageBox(page)).toHaveValue("line one\nline two");
-  expect(prompts.count).toBe(1);
-  await messageBox(page).press("Control+Enter");
-  await expect(messageBox(page)).toHaveValue("");
-  expect(prompts.count).toBe(2);
-  await expect.poll(() => fixture.cli("agents", "chat", idle.id)).toContain("line two");
-});
-
-test("79. Keyboard send on the design page", async ({ page, start }) => {
-  await start("design", { autoAdvanceDelay: "1h" });
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(card(page, "design-epic")).toBeVisible();
-  await go(page, "#/d/demo:design-epic");
-  await page.getByRole("button", nav("Start design session")).click();
-  const prompts = countPrompts(page);
-  const questions = page.getByRole("group", nav("Questions"));
-  const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
-  const box = page.getByRole("textbox", { name: "Message" });
-  await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
-
-  // Send answers with gaps opens the popover and posts nothing.
-  await page.getByRole("button", nav("Note")).click();
-  await expect(box).toBeEnabled();
-  await box.press("Control+Enter");
-  await expect(popover.getByText("2 questions are unanswered")).toBeVisible();
-  expect(prompts.count).toBe(0);
-  await page.keyboard.press("Escape");
-  await expect(popover).toHaveCount(0);
-
-  // With every question answered the key sends the round.
-  await questions.getByRole("button", { name: /SQLite/ }).click();
-  await questions.getByRole("button", { name: /Yes/ }).click();
-  await box.press("Control+Enter");
-  await expect.poll(() => prompts.count).toBe(1);
-  const cont = page.getByRole("button", { name: /^Continue/ });
-  await expect(cont).toBeVisible();
-
-  // The main button is Continue: the key does nothing. The sent round closed the Note box, so it opens again.
-  await page.getByRole("button", nav("Note")).click();
-  await box.press("Control+Enter");
-  await expect(popover).toHaveCount(0);
-  await expect(cont).toBeVisible();
-  expect(prompts.count).toBe(1);
-
-  // With text the main button is Send, and the key sends it.
-  await box.fill("one more thing");
-  await expect(page.getByRole("button", nav("Send"))).toBeVisible();
-  await box.press("Control+Enter");
-  await expect.poll(() => prompts.count).toBe(2);
-  await expect(box).toHaveValue("");
-});
-
-test("79. Keyboard send while the design works", async ({ page, start }) => {
-  await start("design-working");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(card(page, "design-epic")).toBeVisible();
-  await go(page, "#/d/demo:design-epic");
-  await page.getByRole("button", nav("Start design session")).click();
-  const prompts = countPrompts(page);
-  await expect(page.getByRole("button", nav("Interrupt"))).toBeVisible();
-
-  // The box is off while the agent works, so the key is sent to it directly.
-  await page.getByRole("button", nav("Note")).click();
-  const box = page.getByRole("textbox", { name: "Message" });
-  await expect(box).toBeDisabled();
-  await box.dispatchEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true });
-  await expect(page.getByRole("button", nav("Interrupt"))).toBeVisible();
-  await expect(page.getByRole("alertdialog")).toHaveCount(0);
-  expect(prompts.count).toBe(0);
-});
+// 79 "Keyboard send" (x3) moved to AgentComposer.test.tsx and design/Composer.test.tsx ("design page: the key ...").
 
 test("91. Removed session draft", async ({ page, start }) => {
   const fixture = await start("agents");
@@ -226,38 +116,5 @@ test("93. Shared draft", async ({ page, start }) => {
   await agentsPage.close();
 });
 
-test("114. Read-only Queue agent", async ({ page, start }) => {
-  const fixture = await start("queue-agents");
-  await expect.poll(async () => (await sessions(fixture)).filter((s) => s.queue).length).toBe(1);
-  const queue = (await sessions(fixture)).find((s) => s.queue)!;
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await go(page, `#/agents/${queue.id}`);
-
-  const line = page.getByText("gx is driving this agent, so the composer is off.");
-  const turnOn = page.getByRole("button", { name: "Turn on composer" });
-  const dialog = page.getByRole("dialog", { name: "Turn on composer for Queue agent" });
-  await expect(line).toBeVisible();
-  await expect(sendButton(page)).toBeDisabled();
-
-  // Cancel keeps it off.
-  await turnOn.click();
-  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(line).toBeVisible();
-  await expect(sendButton(page)).toBeDisabled();
-
-  // The confirm turns it on.
-  await turnOn.click();
-  await dialog.getByRole("button", { name: "Turn on composer" }).click();
-  await expect(line).toHaveCount(0);
-  await expect(turnOn).toHaveCount(0);
-  await messageBox(page).fill("hello");
-  await expect(messageBox(page)).toHaveValue("hello");
-
-  // Reopening is read-only again.
-  const second = await freshVisit(page, `/#/agents/${queue.id}`);
-  await expect(second.getByText("gx is driving this agent, so the composer is off.")).toBeVisible();
-  await expect(sendButton(second)).toBeDisabled();
-  await second.close();
-});
+// 114 "Read-only Queue agent" moved to AgentsPage.composer.test.tsx ("a $kind agent opens with the composer
+// off; confirm turns it on", "Cancel keeps a Queue agent's composer off").

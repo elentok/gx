@@ -1,5 +1,4 @@
 import type { Page } from "@playwright/test";
-import type { SessionInfo } from "../src/generated/server";
 import { expect, test, type Fixture } from "./fixture";
 import { chatOf, claudeIdle, composer, go, sendButton, sessions } from "./agentsKit";
 
@@ -26,16 +25,6 @@ const KEYS: [name: string, cli: string, bytes: string][] = [
 
 /** What the fake read after `before`, the input log it had then. */
 const readSince = async (fixture: Fixture, conv: string, before: string) => (await fixture.input(conv)).slice(before.length);
-
-/** The text of a refused CLI call. A refusal exits non-zero. */
-async function refusal(fixture: Fixture, ...args: string[]) {
-  try {
-    await fixture.cli("agents", "keys", ...args);
-  } catch (e) {
-    return String((e as Error).message);
-  }
-  throw new Error(`gx agents keys ${args.join(" ")} was not refused`);
-}
 
 /** Counts the screen reads the page makes. */
 function countScreenReads(page: Page) {
@@ -100,55 +89,8 @@ test("156. Type refuses !x in the screen view", async ({ page, start }) => {
   expect(await readSince(fixture, conv, before)).toBe("");
 });
 
-const plain = (s: SessionInfo) => !s.design && !s.queue;
-
-test("156. Keys by session state", async ({ start }) => {
-  const fixture = await start("agents-blocked");
-  const all = await sessions(fixture);
-  const claude = (s: SessionInfo) => plain(s) && s.harness !== "codex";
-  const byState: [string, SessionInfo][] = [
-    ["working", all.filter((s) => claude(s) && s.status.state === "working").at(-1)!],
-    ["idle", (await claudeIdle(fixture))!],
-    ["blocked", all.find((s) => claude(s) && s.status.state === "blocked")!],
-    ["rate-limited", all.find((s) => claude(s) && s.status.state === "rate-limited")!],
-  ];
-
-  // Every key reaches the fake of a session that is live in any of these states.
-  for (const [state, session] of byState) {
-    expect(session, state).toBeTruthy();
-    const conv = await conversationOf(fixture, session.id);
-    for (const [, cli, bytes] of KEYS.slice(3, 5)) {
-      const before = await fixture.input(conv);
-      await fixture.cli("agents", "keys", session.id, "--key", cli);
-      await expect.poll(() => readSince(fixture, conv, before), state).toBe(bytes);
-    }
-    const before = await fixture.input(conv);
-    await fixture.cli("agents", "keys", session.id, "--text", "typed");
-    await expect.poll(() => readSince(fixture, conv, before), state).toBe("typed");
-  }
-
-  // An Exited session refuses with a message; so do text with `!` first, text with a newline, and a Queue agent.
-  const exited = all.find((s) => plain(s) && s.status.state === "exited")!;
-  expect(await refusal(fixture, exited.id, "--key", "down")).toMatch(/is exited/);
-  const idle = byState[1][1];
-  const conv = await conversationOf(fixture, idle.id);
-  const before = await fixture.input(conv);
-  expect(await refusal(fixture, idle.id, "--text", "!x")).toMatch(/may not start with !/);
-  expect(await refusal(fixture, idle.id, "--text", "a\nb")).toMatch(/control character/);
-  const queue = all.find((s) => s.queue)!;
-  expect(await refusal(fixture, queue.id, "--key", "down")).toMatch(/session-read-only|Queue agent/);
-  expect(await readSince(fixture, conv, before)).toBe("");
-});
-
-test("156. Queue agent session shows no Screen", async ({ page, start }) => {
-  const fixture = await start("agents-blocked");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const queue = (await sessions(fixture)).find((s) => s.queue)!;
-  await go(page, `#/agents/${queue.id}`);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Screen/ })).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: "Text to type" })).toHaveCount(0);
-});
+// 156 "Keys by session state" moved to the Go test TestSessionKeys_KeysAndTextReachALiveSessionInEveryReachableState;
+// 156 "Queue agent session shows no Screen" moved to AgentsPage.sessionView.test.tsx.
 
 test("156. Error-blocked session, Type and Enter get out", async ({ page, start }) => {
   const fixture = await start("agents-blocked");
