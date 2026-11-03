@@ -34,29 +34,7 @@ async function openAccountPage(page: Page, link: string) {
   await page.getByRole("link", { name: link }).click();
 }
 
-test("105. Settings and web logins", async ({ page, start }) => {
-  await start("web-logins");
-  await page.getByRole("button", nav("Menu")).click();
-  await page.getByRole("menuitem", nav("Settings")).click();
-  await expect(page.getByText("Security")).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Web logins/ })).toContainText("4 devices");
-
-  await page.getByRole("link", { name: /^Web logins/ }).click();
-  await expect(loginRows(page)).toHaveCount(4);
-  await expect(page.getByText("This device")).toHaveCount(1);
-  await expect(page.getByText(/^Ends in \d+ days? unless used$/)).toHaveCount(1);
-  await expect(page.getByText(/^Ends in 20 days unless used$/)).toBeVisible();
-
-  const other = loginRows(page).filter({ hasNot: page.getByText("This device") }).first();
-  await other.click();
-  await expect(page.getByRole("button", { name: "Sign out this device" })).toBeVisible();
-  const name = page.getByLabel(/^Name/);
-  await name.fill("Kitchen tablet");
-  await name.blur();
-  await page.getByRole("link", { name: "‹ Settings" }).click();
-  await page.getByRole("link", { name: /^Web logins/ }).click();
-  await expect(loginRows(page).filter({ hasText: "Kitchen tablet" })).toHaveCount(1);
-});
+// 105 (Settings and web logins) moved to SettingsPage.test.tsx.
 
 test("106. Sign out another device", async ({ page, start }) => {
   const fixture = await start("web-logins");
@@ -91,7 +69,8 @@ test("106. Sign out another device", async ({ page, start }) => {
   }
 });
 
-test("107. Sign out of this device", async ({ page, start }) => {
+// 111 (CLI revoke) is the second step: same web-logins scenario, same "signed out" end state.
+test("107. Sign out of this device (+111 CLI revoke)", async ({ page, start }) => {
   const fixture = await start("web-logins");
   const before = await loginIds(fixture);
   expect(before).toHaveLength(4);
@@ -101,6 +80,21 @@ test("107. Sign out of this device", async ({ page, start }) => {
   await page.getByRole("button", { name: "Sign out of this device" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   expect(await loginIds(fixture)).toHaveLength(3);
+
+  // 111: the page above is signed out, so sign in again in a second browser and revoke that login from the CLI.
+  const browser = await chromium.launch();
+  try {
+    const other = await signInElsewhere(browser, page.url(), fixture.password, await fixture.nextTotpCode());
+    await signedInPage(other);
+    const [id] = (await loginIds(fixture)).filter((i) => !before.includes(i));
+    expect(id, "the second sign-in has a web login").toBeTruthy();
+
+    await fixture.cli("server", "web-revoke", id);
+    await expect(other.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    expect(await loginIds(fixture)).not.toContain(id);
+  } finally {
+    await browser.close();
+  }
 });
 
 test("108. Change password", async ({ page, start }) => {
@@ -203,18 +197,6 @@ test("110. Web reset from the CLI", async ({ page, start }) => {
   await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode());
   await page.getByRole("button", { name: "Finish setup" }).click();
   await expect(page.getByRole("link", { name: "Epics", exact: true }).or(page.getByRole("heading", { name: "Epics" })).first()).toBeVisible();
-});
-
-test("111. CLI revoke", async ({ page, start }) => {
-  const fixture = await start("web-logins");
-  await openWebLogins(page);
-  const href = await loginRows(page).filter({ has: page.getByText("This device") }).getAttribute("href");
-  const id = href?.split("/").pop();
-  expect(id, "the Web logins page links this device by id").toBeTruthy();
-
-  await fixture.cli("server", "web-revoke", id!);
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-  expect(await loginIds(fixture)).not.toContain(id);
 });
 
 test("112. Add the authenticator after a CLI reset", async ({ page: first, start }) => {
