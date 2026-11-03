@@ -185,7 +185,7 @@ function Menu({
       borderRadius={phone ? undefined : "16px"}
       display="flex"
       flexDirection="column"
-      zIndex="dropdown"
+      zIndex={phone ? "modal" : "dropdown"}
       {...(phone
         ? { position: "fixed", inset: "0", p: "4", gap: "3" }
         : { position: "absolute", top: "100%", left: "0", mt: "2", w: "440px", maxW: "calc(100vw - 32px)", p: "3", gap: "2" })}
