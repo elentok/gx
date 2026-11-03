@@ -163,42 +163,61 @@ const twoProjects = () =>
     row("o1", { project: "other" }),
     row("fu", { project: "other", card_kind: "follow-ups" as never }),
   ]);
-const projectSelect = () => screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement;
+const projectButton = () => screen.getByRole("button", { name: "Project" });
+const pick = async (name: string) => {
+  fireEvent.click(projectButton());
+  fireEvent.click(await screen.findByRole("checkbox", { name }));
+};
 
-test("the project select shows only with two or more projects, defaulting to All projects", async () => {
+test("the project picker shows only with two or more projects, defaulting to All projects", async () => {
   await loaded(mixed());
-  expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Project" })).toBeNull();
   cleanup();
   await loaded(twoProjects());
-  expect(projectSelect().value).toBe("");
-  expect(within(projectSelect()).getByRole("option", { name: "All projects" })).toBeTruthy();
+  expect(projectButton().textContent).toContain("All projects");
   expect(screen.getAllByRole("link", { name: /^(g1|o1|fu)$/ })).toHaveLength(3);
 });
 
-test("the project select filters every card, follow-ups included, combined with text, and is stored", async () => {
+test("the project picker lists projects that have no epics", async () => {
+  await loaded(listOf([row("g1", { project: "gx" })], { projects: ["empty", "gx"] }));
+  fireEvent.click(projectButton());
+  expect(await screen.findByRole("checkbox", { name: "empty" })).toBeTruthy();
+});
+
+test("the project picker filters every card, follow-ups included, combined with text, and is stored", async () => {
   await loaded(twoProjects());
-  fireEvent.change(projectSelect(), { target: { value: "other" } });
+  await pick("other");
   expect(screen.queryByRole("link", { name: "g1" })).toBeNull();
   expect(screen.getByRole("link", { name: "o1" })).toBeTruthy();
   expect(screen.getByRole("link", { name: "fu" })).toBeTruthy();
   fireEvent.change(await filterBox(), { target: { value: "o1" } });
   expect(screen.queryByRole("link", { name: "fu" })).toBeNull();
-  expect(localStorage.getItem("gx.epics.project")).toBe("other");
+  expect(localStorage.getItem("gx.epics.project")).toBe('["other"]');
 });
 
-test("a stored project is restored", async () => {
+test("several projects can be picked at once", async () => {
+  await loaded(listOf([row("g1", { project: "gx" }), row("o1", { project: "other" }), row("b1", { project: "blog" })]));
+  await pick("gx");
+  fireEvent.click(screen.getByRole("checkbox", { name: "other" }));
+  expect(screen.getByRole("link", { name: "g1" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "o1" })).toBeTruthy();
+  expect(screen.queryByRole("link", { name: "b1" })).toBeNull();
+  expect(projectButton().textContent).toContain("2 projects");
+});
+
+test("a stored project is restored, in the old plain format too", async () => {
   localStorage.setItem("gx.epics.project", "gx");
   await loaded(twoProjects());
-  expect(projectSelect().value).toBe("gx");
+  expect(projectButton().textContent).toContain("gx");
   expect(screen.queryByRole("link", { name: "o1" })).toBeNull();
 });
 
 test("a stale stored project acts as All projects without being rewritten", async () => {
-  localStorage.setItem("gx.epics.project", "gone");
+  localStorage.setItem("gx.epics.project", '["gone"]');
   await loaded(twoProjects());
-  expect(projectSelect().value).toBe("");
+  expect(projectButton().textContent).toContain("All projects");
   expect(screen.getAllByRole("link", { name: /^(g1|o1|fu)$/ })).toHaveLength(3);
-  expect(localStorage.getItem("gx.epics.project")).toBe("gone");
+  expect(localStorage.getItem("gx.epics.project")).toBe('["gone"]');
 });
 
 test("a filter with no match says No match", async () => {

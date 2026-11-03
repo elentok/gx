@@ -1021,6 +1021,11 @@ export interface FollowUpCount {
 export interface EpicList {
   epics: EpicListRow[];
   /**
+   * Projects is every project, including those with no epics: the project
+   * pickers list them all.
+   */
+  projects?: string[];
+  /**
    * FollowUps lists only the projects with at least one open follow-up.
    */
   follow_ups: FollowUpCount[];

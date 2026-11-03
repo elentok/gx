@@ -79,12 +79,12 @@ const setupDialog = (project: string) => screen.findByRole("dialog", { name: `Se
 const both = async (): Promise<ChecksStatus> => ({ projects: [project("demo", {}, 1), project("auto")] });
 const banner = () => screen.findByRole("region", { name: "Missing check config" });
 const noBanner = async () => {
-  await screen.findByRole("combobox", { name: "Project" });
+  await screen.findByRole("button", { name: "Project" });
   await waitFor(() => expect(screen.queryByRole("region", { name: "Missing check config" })).toBeNull());
 };
 
 test("one filtered project gets its own sentence, the suggestion count and two buttons", async () => {
-  localStorage.setItem("gx.epics.project", "demo");
+  localStorage.setItem("gx.epics.project", '["demo"]');
   renderPage(both);
   const b = await banner();
   expect(b.textContent).toContain("demo has no check config.");
@@ -130,7 +130,7 @@ test("no banner when nothing is missing", async () => {
 });
 
 test("no banner when the filtered project has config", async () => {
-  localStorage.setItem("gx.epics.project", "auto");
+  localStorage.setItem("gx.epics.project", '["auto"]');
   renderPage(async () => ({ projects: [project("demo"), project("auto", { missing: false })] }));
   await noBanner();
 });

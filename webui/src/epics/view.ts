@@ -31,10 +31,10 @@ const SECTIONS: Omit<Section, "rows">[] = [
  * text filter, Finished shows only its first `finishedCap` cards; text searches all of them. A
  * project filter applies first, so the cap counts only that project's cards.
  */
-export function sectionsOf(epics: EpicListRow[], query: string, finishedCap?: number, project?: string): Section[] {
+export function sectionsOf(epics: EpicListRow[], query: string, finishedCap?: number, projects?: string[]): Section[] {
   const q = query.trim().toLowerCase();
   return SECTIONS.map((s) => {
-    let rows = epics.filter((e) => e.section === s.key && (project === undefined || e.project === project));
+    let rows = epics.filter((e) => e.section === s.key && (projects === undefined || projects.includes(e.project)));
     if (q) rows = rows.filter((e) => e.name.toLowerCase().includes(q));
     else if (s.key === SectionFinished && finishedCap !== undefined) rows = rows.slice(0, finishedCap);
     return { ...s, rows };

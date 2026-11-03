@@ -125,6 +125,9 @@ type FollowUpCount struct {
 // EpicList is the /v1/epics payload.
 type EpicList struct {
 	Epics []EpicListRow `json:"epics"`
+	// Projects is every project, including those with no epics: the project
+	// pickers list them all.
+	Projects []string `json:"projects,omitempty"`
 	// FollowUps lists only the projects with at least one open follow-up.
 	FollowUps []FollowUpCount `json:"follow_ups"`
 	// RecentlyFinished is config server.recently-finished: how many Finished cards
@@ -186,6 +189,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	queue := s.newQueueIndex()
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
+		list.Projects = append(list.Projects, project)
 		epics, err := s.projectEpics(project)
 		if err != nil {
 			continue

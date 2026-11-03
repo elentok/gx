@@ -1,4 +1,4 @@
-import { Box, chakra, Input, Text } from "@chakra-ui/react";
+import { Box, Input, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { MissingBanner } from "../checks/MissingBanner";
@@ -16,15 +16,23 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { useFetched } from "../useFetched";
 import { EpicCard } from "./EpicCard";
 import { useEpicList, type FetchEpicList } from "./list";
+import { ProjectFilter } from "./ProjectFilter";
 import { sectionsOf, type Section } from "./view";
 
 const PROJECT_KEY = "gx.epics.project";
 
-function readStoredProject(): string {
+/** The stored choice: a JSON array, or the plain project name an older version wrote. */
+function readStoredProjects(): string[] {
   try {
-    return localStorage.getItem(PROJECT_KEY) ?? "";
+    const raw = localStorage.getItem(PROJECT_KEY);
+    if (!raw) return [];
+    if (raw.startsWith("[")) {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string") : [];
+    }
+    return [raw];
   } catch {
-    return "";
+    return [];
   }
 }
 
@@ -111,20 +119,22 @@ export function EpicsPage({
   const [query, setQuery] = useState("");
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [designing, setDesigning] = useState(false);
-  const [storedProject, setStoredProject] = useState(readStoredProject);
+  const [storedProjects, setStoredProjects] = useState(readStoredProjects);
   const now = usePageClock((list?.epics ?? []).some((e) => e.time_kind && e.time_start));
   const searching = query.trim() !== "";
-  const projects = [...new Set((list?.epics ?? []).map((e) => e.project))];
-  // A stored project that is gone, or a single project, acts as "All projects" without rewriting it.
-  const filterProject = projects.length > 1 && projects.includes(storedProject) ? storedProject : undefined;
-  const missing = (checks?.projects ?? []).filter((p) => p.missing && (filterProject === undefined || p.project === filterProject));
+  // Every project, even one with no epics yet; the epics' own projects cover an older server.
+  const projects = [...new Set([...(list?.projects ?? []), ...(list?.epics ?? []).map((e) => e.project)])].sort();
+  // Stored projects that are gone are ignored without rewriting them; none left acts as "All projects".
+  const known = storedProjects.filter((p) => projects.includes(p));
+  const filterProjects = projects.length > 1 && known.length > 0 ? known : undefined;
+  const missing = (checks?.projects ?? []).filter((p) => p.missing && (filterProjects === undefined || filterProjects.includes(p.project)));
   const setupProject = checks?.projects.find((p) => p.project === settingUp);
-  const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProject) : [];
+  const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProjects) : [];
   const shown = sections.filter((s) => s.rows.length > 0);
-  const chooseProject = (project: string) => {
-    setStoredProject(project);
+  const chooseProjects = (chosen: string[]) => {
+    setStoredProjects(chosen);
     try {
-      localStorage.setItem(PROJECT_KEY, project);
+      localStorage.setItem(PROJECT_KEY, JSON.stringify(chosen));
     } catch {
       // Storage is a convenience; the choice still holds for this page.
     }
@@ -158,28 +168,7 @@ export function EpicsPage({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {projects.length > 1 && (
-          <chakra.select
-            aria-label="Project"
-            value={filterProject ?? ""}
-            onChange={(e) => chooseProject(e.target.value)}
-            bg="surface"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="sm"
-            px="2"
-            h="40px"
-            fontSize="16px"
-            flexShrink="0"
-          >
-            <option value="">All projects</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </chakra.select>
-        )}
+        {projects.length > 1 && <ProjectFilter projects={projects} selected={filterProjects ?? []} onChange={chooseProjects} />}
         {list && list.epics.length > 0 && newDesign}
       </Box>
       {!bannerHidden && <MissingBanner missing={missing} onSetUp={setSettingUp} onDismiss={() => setBannerHidden(true)} />}
@@ -203,7 +192,7 @@ export function EpicsPage({
       {designing && (
         <NewDesignForm
           projects={projects}
-          filterProject={filterProject}
+          filterProject={filterProjects?.[0]}
           open={openDesign}
           onStarted={(address, startFailure) => navigate(designHref(address).slice(1), { state: { startFailure } })}
           onClose={() => setDesigning(false)}
