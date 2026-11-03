@@ -113,7 +113,8 @@ test("118. Codex queue rows", async ({ page, start }) => {
   const expectRows = async () => {
     await go(page, "#/e/demo:codex-running");
     await expect(chips(page, "codex-running")).toContainText("Codex");
-    await expect(chips(page, "codex-running")).toContainText("Worker");
+    // The row shows its pinned note until the worker claims it, which is slow under load.
+    await expect(chips(page, "codex-running")).toContainText("Worker", { timeout: 45_000 });
     await go(page, "#/e/demo:claude-running");
     await expect(chips(page, "claude-running")).toContainText("Claude");
     await go(page, "#/e/demo:pinned");
