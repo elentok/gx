@@ -160,7 +160,9 @@ export function SessionView({
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
   // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
   const [echoed, setEchoed] = useState<{ sessionId: string; text: string; seen: number; after?: string }[]>([]);
-  const promptCount = (text: string) => chat?.messages.filter((m) => m.kind === "prompt" && m.text === text).length ?? 0;
+  // A slash command shows up in the transcript as a "command" message, so it counts too.
+  const promptCount = (text: string) =>
+    chat?.messages.filter((m) => (m.kind === "prompt" || m.kind === "command") && m.text === text).length ?? 0;
   const waiting = echoed.filter((e) => e.sessionId === session.id && promptCount(e.text) <= e.seen);
   const shown = chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat;
   return (
@@ -204,7 +206,11 @@ export function SessionView({
         connected={connected && chatty && !locked}
         lastMessage={chat?.messages.at(-1)?.id}
         onStale={refetch}
-        onSent={(text) => setEchoed((all) => [...all, { sessionId: session.id, text, seen: promptCount(text), after: chat?.messages.at(-1)?.id }])}
+        onSent={(sent) => {
+          // The transcript stores the trimmed text, so the echo must too or it never matches.
+          const text = sent.trim();
+          setEchoed((all) => [...all, { sessionId: session.id, text, seen: promptCount(text), after: chat?.messages.at(-1)?.id }]);
+        }}
         reason={locked ? undefined : sendReason(session, connected)}
       />
     </Box>
