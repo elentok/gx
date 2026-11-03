@@ -1651,3 +1651,15 @@ func TestChartingHandoffScenario_ContinueRestartsOnWorkerOrFailsOnStaleSlug(t *t
 	}
 	r.stop(t)
 }
+
+func TestIsolatedEnv_KeepsGoOutOfTheTempHomeForTheCLIToo(t *testing.T) {
+	_, cliEnv := isolatedEnv("/tmp/r", "/tmp/r/bin")
+	if !slices.Contains(cliEnv, "GOFLAGS=-modcacherw") {
+		t.Errorf("cliEnv = %v, want GOFLAGS=-modcacherw", cliEnv)
+	}
+	for _, kv := range cliEnv {
+		if strings.HasPrefix(kv, "GOMODCACHE=/tmp/r/") {
+			t.Errorf("cliEnv has %s, want the real module cache", kv)
+		}
+	}
+}

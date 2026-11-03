@@ -236,6 +236,10 @@ func run(args []string) (err error) {
 		return err
 	}
 	defer removeAll(root)
+	// Caught from here on, so a Ctrl-C or kill while building or seeding still
+	// unwinds through the removeAll above instead of leaking the root.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	// /tmp is a symlink on macOS: claude slugs transcripts by the real path, so
 	// record dirs must use it too.
 	if root, err = filepath.EvalSymlinks(root); err != nil {
@@ -409,8 +413,6 @@ func run(args []string) (err error) {
 		f.env = append(f.env, "GX_BUDGET_POLL_INTERVAL="+spendPollInterval)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	srv := exec.Command(gxBin, "server")
 	srv.Env = f.env
 	logPath := filepath.Join(root, "server.out")
@@ -738,10 +740,13 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 	if p := playwrightBrowsersPath(); p != "" {
 		cliEnv = append(cliEnv, "PLAYWRIGHT_BROWSERS_PATH="+p)
 	}
+	// HOME is replaced, so go would download the modules and toolchain again into
+	// the temp HOME's read-only tree, 250 MB per fixture that a killed run leaves
+	// behind. cliEnv carries these too: the CLI and fake agents run go as well.
+	// -modcacherw keeps whatever does land there deletable.
+	cliEnv = append(cliEnv, claudeenv.GoCacheEnv()...)
+	cliEnv = append(cliEnv, "GOFLAGS=-modcacherw")
 	env = append(env, cliEnv...)
-	// HOME is replaced, so go would download the modules again into the temp
-	// HOME's read-only tree, 244 MB per fixture that the cleanup cannot remove.
-	env = append(env, claudeenv.GoCacheEnv()...)
 	env = append(env,
 		"PATH="+binDir+string(os.PathListSeparator)+hostPathWithoutCodex(root),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
