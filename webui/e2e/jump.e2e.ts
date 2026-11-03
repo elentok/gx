@@ -75,6 +75,10 @@ test("22. Back link count", async ({ page, start }) => {
   const back = (n: number) => page.getByRole("link", nav(`Epics · ${n} need you`));
 
   // Eight other cards need you from a Needs-you epic, nine from one that does not.
+  // Start on an epic outside Needs you: the permission card joins it only once its held worker asks,
+  // so the full count of nine is the signal that the scenario has settled.
+  await goto(page, "#/e/demo:running-epic");
+  await expect(back(9)).toBeVisible({ timeout: 60_000 });
   await goto(page, "#/e/demo:paused-epic");
   await expect(back(8)).toBeVisible();
   await goto(page, "#/d/demo:design-live");
@@ -82,13 +86,13 @@ test("22. Back link count", async ({ page, start }) => {
   await goto(page, "#/e/demo:running-epic");
   await expect(back(9)).toBeVisible();
 
-  // The count is not the link's colour and has no pill background.
+  // The count is not the link's colour and sits on the waiting-tone pill (the mock's tab count).
   const style = await back(9).getByText("9", { exact: true }).evaluate((el) => {
     const cs = getComputedStyle(el);
     const link = getComputedStyle(el.closest("a")!);
     return { recolored: cs.color !== link.color, bg: cs.backgroundColor };
   });
-  expect(style).toEqual({ recolored: true, bg: "rgba(0, 0, 0, 0)" });
+  expect(style).toEqual({ recolored: true, bg: "rgb(242, 184, 69)" });
 
   // The title button carries no number and nothing is called waiting-count.
   await expect(page.getByRole("heading", { level: 1 }).getByRole("button")).not.toContainText(/\d/);

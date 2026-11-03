@@ -54,7 +54,8 @@ test("16. Needs you", async ({ page, start }) => {
 
   // Each title counts its cards; Finished counts the cards on screen.
   const needs = await section(page, "Needs you");
-  await expect(needs.locator("[data-section]")).toHaveCount(NEEDS_YOU.length);
+  // The permission card joins Needs you only once its held worker asks.
+  await expect(needs.locator("[data-section]")).toHaveCount(NEEDS_YOU.length, { timeout: 60_000 });
   await expect(needs.getByRole("button", { name: new RegExp(`${NEEDS_YOU.length}$`) })).toBeVisible();
   const fin = await section(page, "Finished");
   const shown = await fin.locator("[data-section]").count();
