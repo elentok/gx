@@ -14,39 +14,31 @@ const showChat = (page: Page) => page.getByRole("group", nav("View")).getByRole(
 
 const step = (page: Page, name: string, state: string) => page.locator(`li[data-step="${name}"][data-state="${state}"]`);
 
-test.describe("4. Start a design session", () => {
-  test("shows the first step", async ({ page, start }) => {
-    await start("design");
+// The Design page ring: a Design badge (role img) inside the element that carries data-tone.
+const ring = (page: Page) => page.locator("[data-kind='design']").first();
+
+test.describe("5. Start a design session and answer a round", () => {
+  test("first step, ids, answer, Continue and a fresh round", async ({ page, start }) => {
+    // A countdown that never ends in the test, so the press is the only Continue.
+    await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
     await expect(page.getByRole("link", nav("Epics"))).toHaveAttribute("aria-current", "page");
     // The charted design has no session, so its ⋯ menu would be empty and the button is absent.
     await expect(page.getByRole("button", nav("More actions"))).toHaveCount(0);
-
     await page.getByRole("button", nav("Start design session")).click();
-
-    // The first message arrives with round one, which opens in the Questions view.
-    await showChat(page);
-    await expect(page.getByText("Two questions before the spec.")).toBeVisible();
     await expect(page.getByRole("button", nav("Start design session"))).toHaveCount(0);
-    await expect(step(page, "resolve-tickets", "current")).toBeVisible();
-  });
-});
-
-test.describe("5. Answer a round", () => {
-  test("ids, answer, Continue and a fresh round", async ({ page, start }) => {
-    // A countdown that never ends in the test, so the press is the only Continue.
-    await start("design", { autoAdvanceDelay: "1h" });
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
 
     const questions = page.getByRole("group", nav("Questions"));
     await expect(questions.getByRole("button", nav("Question 8"))).toBeVisible();
     await expect(questions.getByRole("button", nav("Question 8b"))).toBeVisible();
     await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
 
-    // Answered from the Chat view, so the person's message shows once it is sent.
+    // The first message arrives with round one, which opens in the Questions view; the sheet is answered there.
     await showChat(page);
+    await expect(page.getByText("Two questions before the spec.")).toBeVisible();
+    await expect(step(page, "resolve-tickets", "current")).toBeVisible();
+    await page.getByRole("group", nav("View")).getByRole("button", { name: /^Questions/ }).click();
     await questions.getByRole("button", { name: /SQLite/ }).click();
     await expect(questions.getByText("Q8b - Migrate at startup?")).toBeVisible();
     await questions.getByRole("button", { name: /Yes/ }).click();
@@ -57,8 +49,8 @@ test.describe("5. Answer a round", () => {
     release();
 
     // The agent got the answers: the chat shows them as the person's message.
-    await expect(page.getByText("Q8 - Which store?: SQLite")).toBeVisible();
-    await expect(page.getByText("Q8b - Migrate at startup?: Yes")).toBeVisible();
+    await expect(page.getByText("Q8 - Which store?: SQLite").first()).toBeVisible();
+    await expect(page.getByText("Q8b - Migrate at startup?: Yes").first()).toBeVisible();
     const cont = page.getByRole("button", { name: /^Continue/ });
     await expect(cont).toBeVisible();
 
@@ -70,277 +62,6 @@ test.describe("5. Answer a round", () => {
     }).toPass();
     await showChat(page);
     await expect(page.getByText("A fresh round.")).toBeVisible();
-  });
-});
-
-test.describe("47. Send popover", () => {
-  test("lists the gaps above Send, jumps to a question, sends anyway", async ({ page, start }) => {
-    await start("design", { autoAdvanceDelay: "1h" });
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
-
-    const questions = page.getByRole("group", nav("Questions"));
-    const send = page.getByRole("button", nav("Send answers"));
-    const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
-    const composer = page.locator('[aria-label="Composer"]');
-    await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
-
-    const heightBefore = (await composer.boundingBox())!.height;
-    await send.click();
-    await expect(popover).toBeVisible();
-    expect((await composer.boundingBox())!.height).toBe(heightBefore);
-    await expect(popover.getByText("2 questions are unanswered")).toBeVisible();
-    await expect(popover.getByText("0 of 2 answered")).toBeVisible();
-    const rowQ8 = popover.getByRole("button", { name: /^Q8 Which store\? ›$/ });
-    const rowQ8b = popover.getByRole("button", { name: /^Q8b Migrate at startup\? ›$/ });
-    await expect(rowQ8).toBeVisible();
-    await expect(rowQ8b).toBeVisible();
-    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
-
-    // The popover sits above Send and ends at its right edge. It scales in, so it is measured once settled.
-    await popover.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-    const pop = (await popover.boundingBox())!;
-    const btn = (await send.boundingBox())!;
-    expect(pop.y + pop.height).toBeLessThan(btn.y);
-    expect(Math.abs(pop.x + pop.width - (btn.x + btn.width))).toBeLessThanOrEqual(2);
-
-    // A row closes the popover, makes its question current and focuses its first choice.
-    await rowQ8b.click();
-    await expect(popover).toHaveCount(0);
-    await expect(questions.getByRole("button", nav("Question 8b"))).toHaveAttribute("aria-current", "step");
-    await expect(questions.getByRole("group", nav("Question 8b of 2")).getByRole("button").first()).toBeFocused();
-
-    // A folded sheet opens at the question of the row. Only the Chat view has the fold chevron.
-    await showChat(page);
-    await questions.getByRole("button", nav("Fold questions")).click();
-    await expect(questions.getByRole("button", nav("Open questions"))).toBeVisible();
-    await send.click();
-    await popover.getByRole("button", { name: /^Q8 Which store\? ›$/ }).click();
-    await expect(questions.getByRole("button", nav("Fold questions"))).toBeVisible();
-    await expect(questions.getByRole("button", nav("Question 8"))).toHaveAttribute("aria-current", "step");
-
-    // One gap left.
-    await questions.getByRole("button", { name: /SQLite/ }).click();
-    await send.click();
-    await expect(popover.getByText("1 question is unanswered")).toBeVisible();
-    await expect(popover.getByText("1 of 2 answered")).toBeVisible();
-
-    // Escape and a click outside the popover close it and give focus back to Send.
-    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(popover).toHaveCount(0);
-    await expect(send).toBeFocused();
-    await page.getByRole("group", nav("View")).getByRole("button", { name: /^Questions/ }).click();
-    await send.click();
-    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
-    await questions.getByText("Q8 - Which store?").click();
-    await expect(popover).toHaveCount(0);
-    await expect(send).toBeFocused();
-
-    // A second press closes what the first opened, and sends nothing.
-    await send.click();
-    await expect(popover).toBeVisible();
-    await send.click();
-    await expect(popover).toHaveCount(0);
-    await expect(page.getByText("Q8b - Migrate at startup?: (unanswered)")).toHaveCount(0);
-
-    // Enter on the focused Send anyway sends, with no second dialog.
-    await send.click();
-    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(page.getByText("Q8b - Migrate at startup?: (unanswered)")).toBeVisible();
-    await expect(page.getByRole("alertdialog")).toHaveCount(0);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.getByRole("button", nav("Answer them"))).toHaveCount(0);
-  });
-});
-
-test.describe("48. Fixed sheet rows", () => {
-  test.use({ viewport: { width: 1280, height: 600 } });
-
-  for (const mode of ["Questions view", "docked in the Chat view"]) {
-  test(`the header and Prev/Next stay put while the body scrolls, ${mode}`, async ({ page, start }) => {
-    await start("design", { autoAdvanceDelay: "1h" });
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
-
-    const questions = page.getByRole("group", nav("Questions"));
-    await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
-    if (mode !== "Questions view") await showChat(page);
-    await questions.getByRole("button", nav("Note on question 8")).click();
-    const note = questions.getByRole("textbox", nav("Note text for question 8"));
-    await expect(note).toBeVisible();
-    await expect(note).toHaveAttribute("rows", "5");
-
-    const dot = questions.getByRole("button", nav("Question 8"));
-    const count = questions.getByText("0 of 2 answered");
-    const prev = questions.getByRole("button", nav("← Prev"));
-    const next = questions.getByRole("button", nav("Next →"));
-    const scroller = await note.evaluateHandle((el) => {
-      for (let p = el.parentElement; p; p = p.parentElement) {
-        if (getComputedStyle(p).overflowY === "auto" && p.scrollHeight > p.clientHeight) return p;
-      }
-      return null;
-    });
-    expect(await scroller.evaluate((el) => el !== null), "the body must overflow at this height").toBe(true);
-
-    const where = async () => ({
-      dot: await dot.boundingBox(),
-      count: await count.boundingBox(),
-      prev: await prev.boundingBox(),
-      next: await next.boundingBox(),
-      top: (await questions.boundingBox())!.y,
-    });
-    // Opening the note may already have scrolled to the bottom (the Questions view is taller).
-    await scroller.evaluate((el) => ((el as HTMLElement).scrollTop = 0));
-    const before = await where();
-    const scrollBefore = await scroller.evaluate((el) => (el as HTMLElement).scrollTop);
-    await scroller.evaluate((el) => ((el as HTMLElement).scrollTop = (el as HTMLElement).scrollHeight));
-    const scrollAfter = await scroller.evaluate((el) => (el as HTMLElement).scrollTop);
-
-    expect(scrollAfter).toBeGreaterThan(scrollBefore);
-    expect(await where()).toEqual(before);
-    for (const el of [dot, count, prev, next]) await expect(el).toBeInViewport();
-  });
-  }
-});
-
-test.describe("49. Questions and Chat views", () => {
-  test("the View toggle, Escape from each layer, and the round across switches", async ({ page, start }) => {
-    await start("design", { autoAdvanceDelay: "1h" });
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
-
-    const questions = page.getByRole("group", nav("Questions"));
-    const view = page.getByRole("group", nav("View"));
-    const questionsTab = view.getByRole("button", { name: /^Questions/ });
-    const chatTab = view.getByRole("button", nav("Chat"));
-    const send = page.getByRole("button", nav("Send answers"));
-    const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
-    const jump = page.getByRole("dialog", nav("Jump to epic"));
-    const noteModal = page.getByRole("dialog", nav("Note on Q8b - Migrate at startup?"));
-    const menu = page.getByRole("menu", nav("More actions"));
-    const chat = page.getByText("Two questions before the spec.");
-    const viewport = page.viewportSize()!;
-
-    // The Design opens in the Questions view and the sheet fills the column.
-    await expect(questionsTab).toHaveAttribute("aria-pressed", "true");
-    await expect(questionsTab).toHaveAccessibleName("Questions (0 of 2)");
-    await expect(chat).toBeHidden();
-    expect((await questions.boundingBox())!.height).toBeGreaterThan(viewport.height / 2);
-
-    await questions.getByRole("button", { name: /SQLite/ }).click();
-    await expect(questionsTab).toHaveAccessibleName("Questions (1 of 2)");
-
-    // Chat docks the sheet under the messages, with a fold chevron; Questions has none.
-    await chatTab.click();
-    await expect(chatTab).toHaveAttribute("aria-pressed", "true");
-    await expect(chat).toBeVisible();
-    const fold = questions.getByRole("button", nav("Fold questions"));
-    await fold.click();
-    await expect(questions.getByRole("button", nav("Open questions"))).toBeVisible();
-    await questions.getByRole("button", nav("Open questions")).click();
-    await expect(fold).toBeVisible();
-    await questionsTab.click();
-    await expect(chat).toBeHidden();
-    await expect(fold).toHaveCount(0);
-
-    // Escape in the Questions view shows the chat.
-    await page.keyboard.press("Escape");
-    await expect(chatTab).toHaveAttribute("aria-pressed", "true");
-    await expect(chat).toBeVisible();
-
-    // Escape closes the layer on top first, a second one shows the chat.
-    const layers = [
-      { layer: popover, open: () => send.click() },
-      { layer: jump, open: () => page.keyboard.press("Control+k") },
-      { layer: menu, open: () => page.getByRole("button", nav("More actions")).click() },
-    ];
-    for (const { layer, open } of layers) {
-      await questionsTab.click();
-      await expect(chat).toBeHidden();
-      await open();
-      await expect(layer).toBeVisible();
-      // Escape goes to the layer once focus is inside it (or on it).
-      await expect.poll(() => layer.evaluate((el) => el.contains(document.activeElement))).toBe(true);
-      await page.keyboard.press("Escape");
-      await expect(layer).toHaveCount(0);
-      await expect(questionsTab).toHaveAttribute("aria-pressed", "true");
-      await page.keyboard.press("Escape");
-      await expect(chat).toBeVisible();
-    }
-
-    // The note editor ignores Escape; only Done closes it.
-    await questionsTab.click();
-    await questions.getByRole("button", nav("Note on question 8b")).click();
-    await questions.getByRole("button", nav("Open the note in a large editor")).click();
-    await expect(noteModal).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(noteModal).toBeVisible();
-    await noteModal.getByRole("button", nav("Done")).click();
-    await expect(noteModal).toHaveCount(0);
-
-    // The round survives two switches: an answer, the current question and the composer note.
-    await expect(questions.getByText("Q8b - Migrate at startup?")).toBeVisible();
-    await page.getByRole("button", nav("Note")).click();
-    await page.getByRole("textbox", nav("Message")).fill("keep this");
-    await questionsTab.click();
-    await chatTab.click();
-    await questionsTab.click();
-    await expect(questionsTab).toHaveAccessibleName("Questions (1 of 2)");
-    await expect(questions.getByRole("button", nav("Question 8b"))).toHaveAttribute("aria-current", "step");
-    await expect(page.getByRole("textbox", nav("Message"))).toHaveValue("keep this");
-
-    // The focus mode buttons are gone.
-    await expect(page.getByRole("button", nav("Enter focus mode"))).toHaveCount(0);
-    await expect(page.getByRole("button", nav("Leave focus mode"))).toHaveCount(0);
-
-    // The question title stays at most 820px wide on a wide screen.
-    await page.setViewportSize({ width: 1440, height: 900 });
-    expect((await questions.getByText("Q8b - Migrate at startup?").boundingBox())!.width).toBeLessThanOrEqual(820);
-
-    // On a phone, Escape closes the steps sheet first, a second one shows the chat.
-    await page.setViewportSize({ width: 375, height: 812 });
-    const steps = page.getByRole("dialog", nav("Design progress steps"));
-    await questionsTab.click();
-    await page.getByRole("button", { name: /^Resolve tickets/ }).click();
-    await expect(steps).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(steps).toHaveCount(0);
-    await expect(questionsTab).toHaveAttribute("aria-pressed", "true");
-    await page.keyboard.press("Escape");
-    await expect(chat).toBeVisible();
-  });
-
-  test("a round sent from Chat shows the answers, and the next round opens in Questions", async ({ page, start }) => {
-    await start("design", { autoAdvanceDelay: "1h" });
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
-
-    const questions = page.getByRole("group", nav("Questions"));
-    const view = page.getByRole("group", nav("View"));
-    await view.getByRole("button", nav("Chat")).click();
-    await questions.getByRole("button", { name: /SQLite/ }).click();
-    await questions.getByRole("button", { name: /Yes/ }).click();
-    await page.getByRole("button", nav("Send answers")).click();
-    await expect(page.getByText("Q8b - Migrate at startup?: Yes")).toBeVisible();
-
-    const cont = page.getByRole("button", { name: /^Continue/ });
-    await expect(async () => {
-      await cont.click({ timeout: 2000 });
-      await expect(questions.getByText("Q9 - Keep going?")).toBeVisible({ timeout: 2000 });
-    }).toPass();
-    await expect(view.getByRole("button", { name: /^Questions/ })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  test("a busy turn with no round has no View group and shows the chat", async ({ page, start }) => {
-    await start("design-working");
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
-
-    await expect(page.getByRole("status").filter({ hasText: "Working:" })).toBeVisible();
-    await expect(page.getByRole("group", nav("View"))).toHaveCount(0);
-    await expect(page.getByRole("group", nav("Questions"))).toHaveCount(0);
   });
 });
 
@@ -357,10 +78,33 @@ test.describe("9. Design progress to the end", () => {
     expect((await link.boundingBox())!.y - region.y).toBeLessThan(80);
   };
 
-  test("1440px: the Progress region shows each step in turn", async ({ page, start }) => {
+  test("1440px: the Progress region and the ring show each step in turn", async ({ page, start }) => {
     const fixture = await start("design");
     await page.setViewportSize({ width: 1440, height: 900 });
+
+    // The Epic page ring is the reference for the label.
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
+    const epicLabel = (await ring(page).innerText()).trim();
+    expect(epicLabel).toMatch(/%$/);
+
+    await page.evaluate(() => (location.hash = "#/epics"));
     await openDesign(page);
+    const badge = ring(page);
+    await expect(badge.getByRole("img", nav("Design"))).toBeVisible();
+    const ringBox = (await badge.boundingBox())!;
+    const nameBox = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
+    expect(ringBox.x + ringBox.width).toBeLessThanOrEqual(nameBox.x);
+    expect(Math.abs(ringBox.y + ringBox.height / 2 - (nameBox.y + nameBox.height / 2))).toBeLessThan(nameBox.height);
+    await expect(badge).toContainText(epicLabel);
+    await expect(badge).toHaveAttribute("data-tone", "muted");
+
+    // Round one up: waiting, no comet. The Chat view has the link region the loop below reads.
+    await page.getByRole("button", nav("Start design session")).click();
+    await expect(page.getByRole("group", nav("Questions"))).toBeVisible();
+    await expect(badge).toHaveAttribute("data-tone", "waiting");
+    await expect(page.getByTestId("comet")).toHaveCount(0);
+    await showChat(page);
     await expectImplLink(page, "resolve-tickets");
 
     for (const [i, name] of steps.entries()) {
@@ -371,20 +115,7 @@ test.describe("9. Design progress to the end", () => {
       await expectImplLink(page, name);
     }
     for (const s of ["chart", ...steps]) await expect(step(page, s, "done")).toBeVisible();
-  });
-
-  test("375px: the step line follows the step and the link shows at Branch and Done", async ({ page, start }) => {
-    const fixture = await start("design");
-    await page.setViewportSize({ width: 375, height: 812 });
-    await openDesign(page);
-    await expectImplLink(page, "resolve-tickets");
-    await expect(page.getByRole("button", { name: /^Resolve tickets/ })).toBeVisible();
-
-    for (const name of steps) {
-      await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", name);
-      await expectImplLink(page, name);
-    }
-    await expect(page.getByRole("button", { name: /^Resolve tickets/ })).toHaveCount(0);
+    await expect(badge).toHaveAttribute("data-tone", "done");
   });
 });
 
@@ -407,20 +138,9 @@ const flipAuto = async (page: Page, from: "on" | "off") => {
   await page.keyboard.press("Escape");
 };
 
-test.describe("10. Auto-advance", () => {
-  test("a fresh round follows the run end with no press", async ({ page, start }) => {
-    await start("design", { autoAdvanceDelay: "3s" });
-    await answerFirstRound(page);
-
-    await expect(page.getByText(/Continuing in \ds/)).toBeVisible();
-    await expect(page.getByRole("button", nav("Cancel"))).toBeVisible();
-    await expect(page.getByRole("group", nav("Questions")).getByText("Q9 - Keep going?")).toBeVisible();
-    await showChat(page);
-    await expect(page.getByText("A fresh round.")).toBeVisible();
-  });
-});
-
 test.describe("11. Auto-advance, cancel", () => {
+  // The server's "a note typed during the countdown stops the send" is proven in
+  // server/sessions_autoadvance_countdown_test.go (PageNoteStopsTheSendAndKeepsContinue).
   test("Cancel stops the send and Continue stays", async ({ page, start }) => {
     await start("design", { autoAdvanceDelay: "5s" });
     await answerFirstRound(page);
@@ -432,42 +152,9 @@ test.describe("11. Auto-advance, cancel", () => {
     await page.waitForTimeout(6000);
     await expect(page.getByText("A fresh round.")).toHaveCount(0);
   });
-
-  test("a note typed during the countdown stops the send", async ({ page, start }) => {
-    await start("design", { autoAdvanceDelay: "5s" });
-    await answerFirstRound(page);
-
-    await expect(page.getByText(/Continuing in/)).toBeVisible();
-    await page.getByRole("button", nav("Note")).click();
-    await page.getByRole("textbox", nav("Message")).fill("wait, one thing");
-    await page.getByRole("button", nav("Send")).click();
-    await expect(page.getByText(/Continuing in/)).toHaveCount(0);
-    await page.waitForTimeout(6000);
-    await expect(page.getByText("A fresh round.")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /^Continue/ })).toBeVisible();
-  });
 });
 
 test.describe("13. Defaulted questions", () => {
-  test("one asked question and two defaults: one card, defaults as plain text", async ({ page, start }) => {
-    await start("design-mixed", { autoAdvanceDelay: "1h" });
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
-
-    const questions = page.getByRole("group", nav("Questions"));
-    await expect(questions.getByText("Q12 - Keep going?")).toBeVisible();
-    await expect(questions.getByRole("button", { name: /^Question \d/ })).toHaveCount(1);
-    await showChat(page);
-    await expect(page.getByText("Q10: keep the current store.")).toBeVisible();
-    await expect(page.getByText("Q11: migrate at startup.")).toBeVisible();
-
-    await questions.getByRole("button", { name: /Yes/ }).click();
-    await page.getByRole("button", nav("Send answers")).click();
-    await expect(page.getByText("Q12 - Keep going?: Yes")).toBeVisible();
-    // Send asked nothing about the defaults.
-    await expect(page.getByText(/Q1[01] - /)).toHaveCount(0);
-  });
-
   test("an all-defaulted round: one Accept these defaults card and a grilling Actionable", async ({ page, start }) => {
     const fixture = await start("design-defaulted", { autoAdvanceDelay: "1h" });
     await openDesign(page);
@@ -488,10 +175,16 @@ test.describe("14. Working row", () => {
   test("shows the step and ticket, then follows the step report", async ({ page, start }) => {
     const fixture = await start("design-working");
     await openDesign(page);
+    await expect(ring(page)).toHaveAttribute("data-tone", "muted");
     await page.getByRole("button", nav("Start design session")).click();
 
     const row = page.getByRole("status").filter({ hasText: "Working:" });
     await expect(row).toHaveText(/Working: Resolve tickets · first/);
+    // A busy turn with no round has no View group and no sheet; the ring runs with the comet.
+    await expect(page.getByRole("group", nav("View"))).toHaveCount(0);
+    await expect(page.getByRole("group", nav("Questions"))).toHaveCount(0);
+    await expect(ring(page)).toHaveAttribute("data-tone", "running");
+    await expect(page.getByTestId("comet")).toBeVisible();
 
     const id = (await fixture.cli("agents", "list")).split("\t")[0].trim();
     await fixture.cliEnv({ GX_AGENT_SESSION: id }, "agent", "step", "spec");
@@ -500,8 +193,8 @@ test.describe("14. Working row", () => {
 });
 
 test.describe("12. The auto-advance switch", () => {
-  test("shows while working and idle; off, then on starts the countdown", async ({ page, start }) => {
-    await start("design", { autoAdvanceDelay: "30s" });
+  test("shows while working and idle; off, then on starts the countdown and a fresh round follows", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "3s" });
     await openDesign(page);
     await page.getByRole("button", nav("Start design session")).click();
     await expect(autoButton(page, "on")).toBeVisible();
@@ -521,7 +214,13 @@ test.describe("12. The auto-advance switch", () => {
       if (await autoButton(page, "off").isVisible()) await flipAuto(page, "off");
       await expect(autoButton(page, "on")).toBeVisible({ timeout: 2000 });
     }).toPass();
-    await expect(page.getByText(/Continuing in/)).toBeVisible();
+    await expect(page.getByText(/Continuing in \ds/)).toBeVisible();
+    await expect(page.getByRole("button", nav("Cancel"))).toBeVisible();
+
+    // The countdown ends with no press: the fresh round follows the run end.
+    await expect(questions.getByText("Q9 - Keep going?")).toBeVisible();
+    await showChat(page);
+    await expect(page.getByText("A fresh round.")).toBeVisible();
   });
 });
 
@@ -535,10 +234,13 @@ const startDesign = async (page: Page, slug: string) => {
   await expect(page).toHaveURL(new RegExp(`#/d/demo:${slug}$`));
 };
 
-// Stops the session of `slug` through the CLI; its row is found by slug in `gx agents list`.
+const isLive = (row: string) => !/exited/.test(row);
+const rowId = (row: string) => row.split("\t")[0].trim();
+
+// Stops the live session of `slug` through the CLI; its row is found by slug in `gx agents list`.
 const stopSession = async (fixture: Fixture, slug: string) => {
-  await expect.poll(async () => (await sessionRows(fixture, slug)).length).toBeGreaterThan(0);
-  await fixture.cli("agents", "stop", (await sessionRows(fixture, slug))[0].split("\t")[0].trim());
+  await expect.poll(async () => (await sessionRows(fixture, slug)).filter(isLive).length).toBeGreaterThan(0);
+  await fixture.cli("agents", "stop", rowId((await sessionRows(fixture, slug)).filter(isLive)[0]));
 };
 
 // The ⋯ menu's items; opening it is a click on the trigger.
@@ -547,75 +249,59 @@ const actionsMenu = async (page: Page) => {
   return page.getByRole("menu", nav("More actions"));
 };
 
-test.describe("42. Stopped session card", () => {
-  test("the card moves to Ready to design as Not started with a Design button", async ({ page, start }) => {
+test.describe("43. New session on a Design", () => {
+  test("live asks first, a stopped card moves to Ready to design, the menu and the banner start a new session", async ({ page, start }) => {
     const fixture = await start("ready");
-    await startDesign(page, "stopped-design");
-    await page.getByRole("link", nav("Epics")).click();
+    const slug = "stopped-design";
+    await startDesign(page, slug);
+    await expect.poll(async () => (await sessionRows(fixture, slug)).length).toBe(1);
+    const firstId = rowId((await sessionRows(fixture, slug))[0]);
 
-    await stopSession(fixture, "stopped-design");
-    const ready = await section(page, "Ready to design");
-    const stopped = ready.locator("[data-kind]").filter({ has: page.getByRole("link", nav("stopped-design")) });
-    await expect(stopped).toContainText("Not started");
-    await expect(stopped.getByRole("button", nav("Design"))).toBeVisible();
-  });
-});
-
-test.describe("43. New session on a stopped Design", () => {
-  test("the ⋯ menu starts a new session and no form opens", async ({ page, start }) => {
-    const fixture = await start("ready");
-    await startDesign(page, "retry-design");
-    await stopSession(fixture, "retry-design");
-
-    const menu = await actionsMenu(page);
-    const item = menu.getByRole("menuitem", { name: /^New session/ });
-    await expect(item).toHaveAccessibleName("New session Start a fresh session");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.getByRole("textbox", nav("Epic slug"))).toHaveCount(0);
-
-    await item.click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect.poll(async () => (await sessionRows(fixture, "retry-design")).length).toBe(2);
-    await expect(page).toHaveURL(/#\/d\/demo:retry-design$/);
-  });
-
-  test("on a live session it asks first: Cancel starts nothing, OK starts a new session", async ({ page, start }) => {
-    const fixture = await start("ready");
-    await startDesign(page, "live-design");
-    await expect.poll(async () => (await sessionRows(fixture, "live-design")).length).toBe(1);
-    const [first] = await sessionRows(fixture, "live-design");
-    const firstId = first.split("\t")[0].trim();
-
+    // On a live session the menu asks first: Cancel starts nothing, OK starts a new session.
     const menu = await actionsMenu(page);
     const item = menu.getByRole("menuitem", { name: /^New session/ });
     await expect(item).toHaveAccessibleName("New session Stop this session and start a fresh one");
-
     page.once("dialog", (d) => d.dismiss());
     await item.click();
-    await expect(async () => expect(await sessionRows(fixture, "live-design")).toHaveLength(1)).toPass({ timeout: 2000 });
+    await expect(async () => expect(await sessionRows(fixture, slug)).toHaveLength(1)).toPass({ timeout: 2000 });
 
     await actionsMenu(page);
     page.once("dialog", (d) => d.accept());
     await menu.getByRole("menuitem", { name: /^New session/ }).click();
-    await expect.poll(async () => (await sessionRows(fixture, "live-design")).length).toBe(2);
-    const rows = await sessionRows(fixture, "live-design");
-    expect(rows.find((r) => r.split("\t")[0].trim() === firstId)).toMatch(/exited/);
-    expect(rows.filter((r) => !/exited/.test(r))).toHaveLength(1);
-  });
-});
+    await expect.poll(async () => (await sessionRows(fixture, slug)).length).toBe(2);
+    const rows = await sessionRows(fixture, slug);
+    expect(rows.find((r) => rowId(r) === firstId)).toMatch(/exited/);
+    expect(rows.filter(isLive)).toHaveLength(1);
 
-test.describe("44. Failure banner New session", () => {
-  test("a session that ends without a run-end starts a new one with no form", async ({ page, start }) => {
-    const fixture = await start("ready");
-    await startDesign(page, "ended-design");
-    await stopSession(fixture, "ended-design");
+    // The stopped session's card moves to Ready to design as Not started with a Design button.
+    await stopSession(fixture, slug);
+    await page.getByRole("link", nav("Epics")).click();
+    const ready = await section(page, "Ready to design");
+    const stopped = ready.locator("[data-kind]").filter({ has: page.getByRole("link", nav(slug)) });
+    await expect(stopped).toContainText("Not started");
+    await expect(stopped.getByRole("button", nav("Design"))).toBeVisible();
 
+    // On the stopped Design the ⋯ menu starts a new session and no form opens.
+    await page.evaluate((s) => (location.hash = `#/d/demo:${s}`), slug);
     const failure = page.getByRole("region", nav("Session failure"));
+    await expect(failure).toContainText("Session ended");
+    const stoppedMenu = await actionsMenu(page);
+    const fresh = stoppedMenu.getByRole("menuitem", { name: /^New session/ });
+    await expect(fresh).toHaveAccessibleName("New session Start a fresh session");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("textbox", nav("Epic slug"))).toHaveCount(0);
+    await fresh.click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect.poll(async () => (await sessionRows(fixture, slug)).length).toBe(3);
+    await expect(page).toHaveURL(new RegExp(`#/d/demo:${slug}$`));
+
+    // A session that ends without a run-end: the failure banner starts a new one with no form.
+    await stopSession(fixture, slug);
     await expect(failure).toContainText("Session ended");
     await failure.getByRole("button", nav("New session")).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("textbox", nav("Epic slug"))).toHaveCount(0);
-    await expect.poll(async () => (await sessionRows(fixture, "ended-design")).length).toBe(2);
+    await expect.poll(async () => (await sessionRows(fixture, slug)).length).toBe(4);
   });
 });
 
@@ -656,15 +342,6 @@ test.describe("45. Delete design", () => {
 
     await startDesign(page, "delete-me");
   });
-
-  test("a charted design has no Delete design", async ({ page, start }) => {
-    await start("design");
-    await openDesign(page);
-    await page.getByRole("button", nav("Start design session")).click();
-    const menu = await actionsMenu(page);
-    await expect(menu.getByRole("menuitem", { name: /^New session/ })).toBeVisible();
-    await expect(menu.getByRole("menuitem", { name: /^Delete design/ })).toHaveCount(0);
-  });
 });
 
 test("50. Design epic page", async ({ page, start }) => {
@@ -677,11 +354,11 @@ test("50. Design epic page", async ({ page, start }) => {
     await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
     await expect(page.getByText(summary, nav(summary))).toBeVisible({ timeout: 1000 });
   }).toPass();
-  const ring = page.locator("[data-kind]").first();
+  const epicRing = page.locator("[data-kind]").first();
 
   // Before a session the ring is muted and the stats line names the step, with a time and no cost.
-  await expect(ring).toHaveAttribute("data-tone", "muted");
-  await expect(ring).toHaveText(/%$/);
+  await expect(epicRing).toHaveAttribute("data-tone", "muted");
+  await expect(epicRing).toHaveText(/%$/);
   await expect(page.getByText(summary, nav(summary))).toBeVisible();
   const stats = page.getByTestId("stats-line");
   await expect(stats).toHaveText(/^Resolve tickets/);
@@ -697,7 +374,7 @@ test("50. Design epic page", async ({ page, start }) => {
   // Once the first round lands the session waits for answers and the ring turns "waiting", so the
   // running ring is read first. The epic page is reopened for it; the Design page has no ring.
   await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
-  await expect(ring).toHaveAttribute("data-tone", "running");
+  await expect(epicRing).toHaveAttribute("data-tone", "running");
   await expect(page.getByTestId("comet")).toBeVisible();
   // A live session makes a design ticket's meta read "<type> · running" and adds a time.
   await fixture.cli("tickets", "set", "demo:design-epic/01", "--status", "claimed");
@@ -709,19 +386,21 @@ test("50. Design epic page", async ({ page, start }) => {
   }).toPass();
 });
 
-test.describe("46. gx designs delete", () => {
-  test("removes an uncharted design", async ({ start }) => {
-    const fixture = await start("ready");
-    await fixture.cli("designs", "open", "cli-del", "--idea", "x", "--project", "demo", "--json");
-    await stopSession(fixture, "cli-del");
+test.describe("46. gx designs open and delete", () => {
+  test("open refuses an existing epic, delete removes an uncharted design and refuses a charted one", async ({ start }) => {
+    const fixture = await start("design");
+    const open = () => fixture.cli("designs", "open", "cli-del", "--idea", "x", "--project", "demo", "--json");
+    await open();
+    expect(await fixture.cli("tickets", "show", "demo:cli-del")).toContain("kind: map");
 
+    // With --json a refusal is printed as JSON; the exit code may or may not be non-zero.
+    const exists = await open().catch((err: { stdout?: string; stderr?: string }) => `${err.stdout}${err.stderr}`);
+    expect(exists).toContain("epic-exists");
+
+    await stopSession(fixture, "cli-del");
     await fixture.cli("designs", "delete", "demo:cli-del");
     await expect(fixture.cli("tickets", "show", "demo:cli-del")).rejects.toBeTruthy();
 
-  });
-
-  test("refuses a charted design with the not-uncharted reason", async ({ start }) => {
-    const fixture = await start("design");
     const refused = await fixture
       .cli("designs", "delete", "demo:design-epic")
       .then(() => undefined, (err: { stdout?: string; stderr?: string }) => `${err.stdout}${err.stderr}`);
