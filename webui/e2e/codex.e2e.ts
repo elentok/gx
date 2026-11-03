@@ -32,6 +32,10 @@ test("117. Default harness setting", async ({ page, start }) => {
   }
 
   // Switching reports how many waiting tickets follow and how many running agents keep Claude.
+  // The running epic's ticket counts as waiting until its worker claims it.
+  await expect
+    .poll(async () => fixture.cli("tickets", "show", "demo:running-epic/01"), { timeout: 60_000 })
+    .toMatch(/^status: claimed$/m);
   await control(page).getByRole("button", { name: "Codex" }).click();
   await expect(page.locator('[data-mock-part="switch-notice"]')).toHaveText(
     /^Default is now Codex\. 1 waiting ticket and the next design step will use it\. \d+ running agents? keeps? Claude\.$/,
@@ -121,7 +125,9 @@ test("118. Codex queue rows", async ({ page, start }) => {
   };
 
   await go(page, "#/e/demo:follows-default");
-  await expect(chips(page, "follows-default")).toContainText("follows default");
+  // "follows default" is the common case, so the row shows no chip for it.
+  await expect(page.locator(`a[href$="/t/demo:follows-default/01"]`).filter({ hasNotText: "→" })).toBeVisible();
+  await expect(chips(page, "follows-default")).toHaveCount(0);
   await expectRows();
 
   await openAgentsSettings(page);
