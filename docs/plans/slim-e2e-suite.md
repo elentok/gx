@@ -47,23 +47,23 @@ count left after tickets 1 to 12 (target about 100). Tickets 1 to 12 must not ed
 
 - [x] 0. Add the guidelines, the `.ai/index.md` rule and the `maxFlows` guard
 
-- [ ] 1. `slim-vi-editor`: `vi-editor.e2e.ts`, 45 flows down to about 7 (triage-1)
-- [ ] 2. `slim-small-flows`: `checks`, `disk`, `dirty-trunk`, `health`, `modes`, `stats`, `titles`,
+- [x] 1. `slim-vi-editor`: `vi-editor.e2e.ts`, 45 flows down to about 7 (triage-1)
+- [x] 2. `slim-small-flows`: `checks`, `disk`, `dirty-trunk`, `health`, `modes`, `stats`, `titles`,
       `long-running`, `check-lock` (triage-1). Delete the "coarse pointer" flow.
-- [ ] 3. `slim-design-flows`: `design`, `design-page`, `newdesign` (triage-2)
-- [ ] 4. `slim-jump-phone-epics`: `jump`, `phone` (triage-2), `epics` (triage-3)
-- [ ] 5. `slim-menu-flows`: `menu` (triage-3)
-- [ ] 6. `slim-united-flows`: `united` (triage-3)
-- [ ] 7. `slim-pause-codex`: `pause`, `codex` (triage-3)
-- [ ] 8. `slim-restart-migration`: `migration`, `restart`, `restart-run` (triage-4)
-- [ ] 9. `slim-settings-login`: `settings`, `login`, `reload`, `setup` (triage-4)
-- [ ] 10. `slim-agents-permission-commands`: `agents-permission`, `agents-commands`,
+- [x] 3. `slim-design-flows`: `design`, `design-page`, `newdesign` (triage-2)
+- [x] 4. `slim-jump-phone-epics`: `jump`, `phone` (triage-2), `epics` (triage-3)
+- [x] 5. `slim-menu-flows`: `menu` (triage-3)
+- [x] 6. `slim-united-flows`: `united` (triage-3)
+- [x] 7. `slim-pause-codex`: `pause`, `codex` (triage-3)
+- [x] 8. `slim-restart-migration`: `migration`, `restart`, `restart-run` (triage-4)
+- [x] 9. `slim-settings-login`: `settings`, `login`, `reload`, `setup` (triage-4)
+- [x] 10. `slim-agents-permission-commands`: `agents-permission`, `agents-commands`,
       `agents-commands-send`, `agents-commands-output` (triage-5)
-- [ ] 11. `slim-agents-session-composer`: `agents-session`, `agents-composer`, `agents-keys`
+- [x] 11. `slim-agents-session-composer`: `agents-session`, `agents-composer`, `agents-keys`
       (flow 156 becomes a Go server test) (triage-5)
-- [ ] 12. `slim-agents-sidebar-misc`: `agents-sidebar`, `agents-create`, `agents-tiers`,
+- [x] 12. `slim-agents-sidebar-misc`: `agents-sidebar`, `agents-create`, `agents-tiers`,
       `agents-switcher` (triage-5)
-- [ ] 13. `slim-e2e-catalog`: update `CATALOG.md`, the flow counts and the budget notes; blocked by
+- [x] 13. `slim-e2e-catalog`: update `CATALOG.md`, the flow counts and the budget notes; blocked by
       1 to 12. Run `go test ./playwrightguard` only.
 
 Tickets 1 to 12 run in parallel (they edit different files). Ticket 55a4 is blocked by all of them:

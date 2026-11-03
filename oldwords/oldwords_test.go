@@ -125,7 +125,6 @@ var allowed = map[string]allowance{
 	"webui/src/ticket/ActionCard.test.tsx":     allow("builds tickets with the legacy wire statuses", "needsanswer", "needsrepair"),
 	"webui/src/ticket/TicketSections.test.tsx": allow("builds related tickets with the legacy wire statuses", "needsanswer", "needsrepair"),
 	"testutil/gxfixture/main_test.go":          allow("waits on and asserts the kept legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
-	"webui/e2e/CATALOG.md":                     allow("names the kept legacy needs-answer and needs-repair rendered statuses", "needsanswer", "needsrepair"),
 	"webui/e2e/epics.e2e.ts":                   allow("asserts the kept legacy needs-answer and needs-repair rendered statuses", "needsanswer", "needsrepair"),
 	"webui/e2e/pause.e2e.ts":                   allow("asserts the kept legacy needs-answer and needs-repair rendered statuses", "needsanswer", "needsrepair"),
 	"webui/src/epic/EpicPage.test.tsx":         allow("builds rows with the legacy rendered statuses", "needsanswer", "needsrepair"),

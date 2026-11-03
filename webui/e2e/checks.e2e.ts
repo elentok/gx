@@ -38,7 +38,7 @@ const phoneFits = async (page: Page, dialog: Locator) => {
   const box = (await dialog.boundingBox())!;
   expect(box.x + box.width).toBeLessThanOrEqual(400);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(400);
-  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await expect.poll(() => dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 };
 
 // One server start for what needs the server, git and a real layout. Moved to vitest: banner text and

@@ -12,7 +12,7 @@ import (
 // Lower it whenever flows are removed (docs/plans/slim-e2e-suite.md aims for
 // about 100). Raise it only with a reason in the commit, after trying vitest or
 // a Go test (skills/gx-playwright-e2es, "Write an e2e only when...").
-const maxFlows = 301
+const maxFlows = 111
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
