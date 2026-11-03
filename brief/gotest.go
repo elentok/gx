@@ -87,6 +87,7 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 	tests := 0
 	var ran []string
 	var durations map[string]int64
+	var parents []string
 	pkgs := map[string]*goPkg{}
 	var order []*goPkg
 	pkg := func(name string) *goPkg {
@@ -136,10 +137,17 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 				durations = map[string]int64{}
 			}
 			durations[name] = int64(math.Round(ev.Elapsed * 1000))
+			if i := strings.LastIndex(ev.Test, "/"); i >= 0 {
+				parents = append(parents, Unit{Location: ev.Package, Name: ev.Test[:i]}.String())
+			}
 			if ev.Action == "fail" {
 				p.tests = append(p.tests, ev.Test)
 			}
 		}
+	}
+
+	for _, parent := range parents {
+		delete(durations, parent)
 	}
 
 	var failures []Unit

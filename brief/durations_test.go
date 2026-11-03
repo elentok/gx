@@ -20,6 +20,21 @@ func TestGoTestParse_RecordsElapsedPerTestInMilliseconds(t *testing.T) {
 	}
 }
 
+// A parent's Elapsed includes its parallel subtests' wait for a free slot, so
+// only the leaves carry a duration.
+func TestGoTestParse_ParentWithSubtestsHasNoDuration(t *testing.T) {
+	out := `{"Action":"pass","Package":"p","Test":"TestP/a","Elapsed":0.3}
+{"Action":"pass","Package":"p","Test":"TestP/b","Elapsed":0.4}
+{"Action":"pass","Package":"p","Test":"TestP","Elapsed":180}
+{"Action":"pass","Package":"p","Test":"TestQ","Elapsed":1}
+`
+	got := GoTest{}.Parse([]byte(out), 1).TestDurations
+	want := map[string]int64{"p.TestP/a": 300, "p.TestP/b": 400, "p.TestQ": 1000}
+	if !maps.Equal(got, want) {
+		t.Errorf("TestDurations = %v, want %v", got, want)
+	}
+}
+
 func TestVitestParse_RecordsDurationPerTestInMilliseconds(t *testing.T) {
 	out := `{"numTotalTestSuites":1,"numTotalTests":3,"testResults":[{"name":"/a.test.ts","status":"passed","assertionResults":[` +
 		`{"fullName":"a one","status":"passed","duration":12.6,"failureMessages":[]},` +

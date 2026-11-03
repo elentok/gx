@@ -68,6 +68,25 @@ func seedMap(t *testing.T, store, epic string) {
 	}
 }
 
+// waitPromptTyped waits until gx has typed the session's first prompt and checks
+// the head the server logged for it. The meta's first_prompt is cleared once gx
+// types it, so a read of the meta races the typing under load.
+func waitPromptTyped(t *testing.T, h *servertest.Harness, id, head string) {
+	t.Helper()
+	ready := fmt.Sprintf(`"msg":"first prompt ready","session":%q,"signal":`, id)
+	typed := fmt.Sprintf(`"msg":"first prompt typed","session":%q`, id)
+	var log string
+	servertest.WaitFor(t, 15*time.Second, "the first prompt is typed", func() bool {
+		data, _ := os.ReadFile(server.LogPath(h.StateDir))
+		log = string(data)
+		return strings.Contains(log, typed)
+	})
+	i := strings.Index(log, ready)
+	if i < 0 || !strings.Contains(strings.SplitN(log[i:], "\n", 2)[0], `"head":"`+head) {
+		t.Errorf("session %s first prompt head is not %q", id, head)
+	}
+}
+
 // A design session reads the default when it starts and keeps its harness
 // after a later switch.
 func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
@@ -87,7 +106,6 @@ func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
 	if meta["harness"] != "codex" || meta["first_prompt"] != "$gx-design proj:map-a" {
 		t.Fatalf("first design meta = %v, want codex and a $ skill prompt", meta)
 	}
-
 	switchDefaultHarness(t, f.h, path, store, "claude")
 	second := f.open(t, "proj:map-b", false)
 	if second.Refused || second.Session == nil {
@@ -105,7 +123,6 @@ func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
 // The Fix agent (web route) and TUI Investigate start on a Codex default.
 func TestFixAgent_StartsOnACodexDefault(t *testing.T) {
 	t.Parallel()
-	const wantPrompt = "$gx-investigate proj:loop/01 is paused for repair: Merge conflict"
 	for _, route := range []string{"tui", "web"} {
 		t.Run(route, func(t *testing.T) {
 			t.Parallel()
@@ -127,9 +144,10 @@ func TestFixAgent_StartsOnACodexDefault(t *testing.T) {
 				t.Fatalf("%d live sessions, want the Fix agent", len(live))
 			}
 			meta := readMeta(t, f.h, live[0].ID)
-			if meta["harness"] != "codex" || meta["first_prompt"] != wantPrompt {
-				t.Errorf("fix agent meta = %v, want codex and %q", meta, wantPrompt)
+			if meta["harness"] != "codex" {
+				t.Errorf("fix agent meta = %v, want codex", meta)
 			}
+			waitPromptTyped(t, f.h, live[0].ID, "$gx-investigate proj:loop/01")
 		})
 	}
 }
