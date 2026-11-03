@@ -87,7 +87,7 @@ func TestRepoChecksLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := time.Second
-	want := Limits{Suite: 4 * time.Minute, Hang: 60 * s, Slow: SlowLimits{Go: 20 * s, Vitest: 20 * s, Playwright: 45 * s}}
+	want := Limits{Suite: 10 * time.Minute, Hang: 60 * s, Slow: SlowLimits{Go: 20 * s, Vitest: 20 * s, Playwright: 45 * s}}
 	if got := cfg["test"].Limits; got != want {
 		t.Errorf("limits = %+v, want %+v", got, want)
 	}
