@@ -69,10 +69,10 @@ func TestMarkLoaded_MultipleMutations(t *testing.T) {
 
 func TestTableDriven(t *testing.T) {
 	tests := []struct {
-		name    string
-		ops     func(g *reloadgate.ReloadGate)
-		tab     nav.TabID
-		want    bool
+		name string
+		ops  func(g *reloadgate.ReloadGate)
+		tab  nav.TabID
+		want bool
 	}{
 		{
 			name: "no mutations ever",

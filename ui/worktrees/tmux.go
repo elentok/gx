@@ -17,4 +17,3 @@ func cmdTmuxNewSession(name, path string) tea.Cmd {
 		return terminalResultMsg{err: err}
 	}
 }
-

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui/keys"
 	ui "github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 )
 
 func newScrollTestModel(t *testing.T) Model {

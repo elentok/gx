@@ -8,9 +8,12 @@ set -euo pipefail
 GO_VERSION="${GO_VERSION:-1.25.0}"
 
 case "$(uname -m)" in
-	x86_64) GO_ARCH=amd64 ;;
-	aarch64|arm64) GO_ARCH=arm64 ;;
-	*) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+x86_64) GO_ARCH=amd64 ;;
+aarch64 | arm64) GO_ARCH=arm64 ;;
+*)
+	echo "unsupported architecture: $(uname -m)" >&2
+	exit 1
+	;;
 esac
 
 export DEBIAN_FRONTEND=noninteractive

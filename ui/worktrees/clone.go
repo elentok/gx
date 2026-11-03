@@ -97,7 +97,6 @@ func (m Model) handleCloneKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, tiCmd
 }
 
-
 // ── file copy helpers ─────────────────────────────────────────────────────────
 
 func copyPath(src, dst string) error {

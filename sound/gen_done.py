@@ -13,7 +13,7 @@ import tempfile
 import wave
 from pathlib import Path
 
-import numpy as np
+import numpy as np  # ty: ignore[unresolved-import]  # pyright: ignore[reportMissingImports]
 
 SR = 44100
 PEAK_DB = -10.0  # quiet, close to herdr's done sound

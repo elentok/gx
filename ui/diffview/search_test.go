@@ -25,4 +25,3 @@ func TestApplyDiffSearchMatch(t *testing.T) {
 		t.Fatalf("ActiveHunk = %d, want 0", section.ActiveHunk)
 	}
 }
-

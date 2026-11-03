@@ -44,11 +44,11 @@ type Model struct {
 	yes bool
 
 	// running phase
-	running  bool
-	steps    []execStep
-	stepIdx  int
-	spinner  spinner.Model
-	root     string
+	running bool
+	steps   []execStep
+	stepIdx int
+	spinner spinner.Model
+	root    string
 }
 
 // New returns a zero-value Model.

@@ -10,8 +10,8 @@ import (
 
 type stashAutoReloadMsg struct{}
 type stashApplyDoneMsg struct{ err error }
-type stashPopDoneMsg   struct{ err error }
-type stashDropDoneMsg  struct{ err error }
+type stashPopDoneMsg struct{ err error }
+type stashDropDoneMsg struct{ err error }
 
 // AutoReload is called by the app shell when this tab is stale (gate epoch
 // mismatch). It dispatches stashAutoReloadMsg so the list reload runs inside

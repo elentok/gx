@@ -13,8 +13,8 @@ import (
 func TestParseVersion_Valid(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		tag                    string
-		major, minor, patch    int
+		tag                 string
+		major, minor, patch int
 	}{
 		{"v1.2.3", 1, 2, 3},
 		{"v0.0.0", 0, 0, 0},
