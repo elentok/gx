@@ -60,6 +60,14 @@ test("the header shows tier and model chips with a tier tooltip, and CLI default
   expect(await screen.findByText("Worker · CLI default")).toBeTruthy();
 });
 
+test.each([
+  ["strongest", "opus", "max", "Strongest tier"],
+  ["worker", "sonnet", "medium", "Worker tier"],
+])("the %s tier shows %s · %s with the %s tooltip", async (tier, model, effort, title) => {
+  render([session("s-1", "p", { name: "one", tier, model, effort })], "/agents/s-1", true, chatOf(chat()));
+  expect((await screen.findByText(`${model} · ${effort}`, { selector: "[title]" })).getAttribute("title")).toBe(title);
+});
+
 test("the header of a Codex session with a hand-switched model says so", async () => {
   render([session("s-1", "p", { name: "one", harness: "codex", tier: "worker", model: "gpt-5.5", effort: "xhigh", model_switched: true })], "/agents/s-1", true, chatOf(chat()));
   expect(await screen.findByText("Codex")).toBeTruthy();

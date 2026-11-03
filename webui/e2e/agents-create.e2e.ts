@@ -1,9 +1,9 @@
 import { expect, test } from "./fixture";
 import {
+  ask,
   composer,
   created,
   createButton,
-  freshVisit,
   go,
   messageBox,
   newForm,
@@ -15,11 +15,12 @@ import {
   sessions,
   sidebar,
   switcher,
-  switcherFilter,
   titleButton,
   worktreeBox,
 } from "./agentsKit";
 
+// Flow 85 also covers 86 (worktree), 98 (model label) and 90 (offline, last); flow 87 moved to
+// AgentsPage.newSession.test.tsx and NewSessionForm.test.tsx.
 test("85. Create session", async ({ page, start }) => {
   const fixture = await start("agents");
   const before = await sessions(fixture);
@@ -39,14 +40,9 @@ test("85. Create session", async ({ page, start }) => {
   await expect(row(page, made)).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("first words", { exact: true })).toBeVisible();
   expect(await fixture.cli("agents", "list")).toContain(made.id);
-});
 
-test("86. Create in a new worktree", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const before = await sessions(fixture);
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await go(page, "#/agents");
-
+  // 86. Create in a new worktree.
+  const beforeTree = await sessions(fixture);
   await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
   await expect(newForm(page)).toBeVisible();
 
@@ -56,7 +52,7 @@ test("86. Create in a new worktree", async ({ page, start }) => {
   await createButton(page).click();
   await expect(newForm(page).getByRole("alert")).toBeVisible();
   await expect(worktreeBox(page)).toHaveValue("bad name");
-  expect(await sessions(fixture)).toHaveLength(before.length);
+  expect(await sessions(fixture)).toHaveLength(beforeTree.length);
 
   // A first prompt that starts with ! is refused too.
   await worktreeBox(page).fill("fresh-tree");
@@ -66,59 +62,47 @@ test("86. Create in a new worktree", async ({ page, start }) => {
   await expect(newForm(page).getByRole("alert")).toBeVisible();
   await expect(promptBox(page)).toHaveValue("!ls");
   await expect(worktreeBox(page)).toHaveValue("fresh-tree");
-  expect(await sessions(fixture)).toHaveLength(before.length);
+  expect(await sessions(fixture)).toHaveLength(beforeTree.length);
 
   // A good one creates the worktree and runs the session in it.
   await promptBox(page).fill("hello");
   await createButton(page).click();
-  const made = await created(fixture, before);
-  expect(made.dir).toMatch(/fresh-tree$/);
-  await expect(page).toHaveURL(new RegExp(`#/agents/${made.id}$`));
+  const inTree = await created(fixture, beforeTree);
+  expect(inTree.dir).toMatch(/fresh-tree$/);
+  await expect(page).toHaveURL(new RegExp(`#/agents/${inTree.id}$`));
   await expect(newForm(page)).toHaveCount(0);
-});
 
-test("87. Create entry points", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const list = await sessions(fixture);
-  const inSite = list.find((s) => s.project === "site" && !s.design)!;
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const closeForm = async () => {
-    await newForm(page).getByRole("button", { name: "Close" }).click();
-    await expect(newForm(page)).toHaveCount(0);
-  };
-
-  // No session selected: a group's "+" prefills its project.
-  await go(page, "#/agents");
+  // 98. A project with no tier config runs the default worker model, and a reply keeps the label.
+  const beforeOther = await sessions(fixture);
   await sidebar(page).getByRole("button", { name: "New session in other" }).click();
-  await expect(projectSelect(page)).toHaveValue("other");
-  await closeForm();
+  await createButton(page).click();
+  const interactive = await created(fixture, beforeOther);
+  const label = page.getByText("sonnet · medium", { exact: true });
+  await expect(label).toHaveAttribute("title", "Worker tier");
+  await ask(fixture, interactive.id, "hello");
+  await expect(label).toHaveAttribute("title", "Worker tier");
 
-  // With a session selected, the sidebar button and the switcher row prefill its project.
-  await go(page, `#/agents/${inSite.id}`);
-  await sidebar(page).getByRole("button", { name: "+ New session" }).click();
-  await expect(projectSelect(page)).toHaveValue("site");
-  await closeForm();
-  await titleButton(page).click();
-  await switcher(page).getByRole("option", { name: /\+ New session/ }).click();
-  await expect(switcher(page)).toHaveCount(0);
-  await expect(projectSelect(page)).toHaveValue("site");
-  await closeForm();
+  // 90. Offline comes last: the server stops. The create form and the composer are disabled.
+  const idle = before[0];
+  await go(page, `#/agents/${idle.id}`);
+  await expect(page.getByText(REPLY)).toBeVisible();
+  await messageBox(page).fill("typed before the drop");
+  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
+  await promptBox(page).fill("a first prompt");
+  await expect(createButton(page)).toBeEnabled();
 
-  // Cmd-K, then the keyboard to the last row.
-  await page.keyboard.press("Control+k");
-  await switcherFilter(page).press("ArrowUp");
-  await switcherFilter(page).press("Enter");
-  await expect(projectSelect(page)).toHaveValue("site");
+  await fixture.stopServer();
+  await expect(page.getByText("Offline, reconnecting…")).toBeVisible({ timeout: 15_000 });
+  await expect(createButton(page)).toBeDisabled();
+  await expect(promptBox(page)).toHaveValue("a first prompt");
+  await newForm(page).getByRole("button", { name: "Close" }).click();
 
-  // The draft survives closing and a fresh page of the same browser.
-  await promptBox(page).fill("a draft to keep");
-  await closeForm();
-  const second = await freshVisit(page, "/#/agents");
-  await second.getByRole("button", { name: "+ New session" }).click();
-  await expect(promptBox(second)).toHaveValue("a draft to keep");
-  await expect(second.getByRole("dialog", { name: "New session" }).getByRole("combobox", { name: "Project" })).toHaveValue("site");
-  await second.close();
-  expect(await sessions(fixture)).toHaveLength(list.length);
+  // The last data stays; Send is off with its reason and the draft is kept.
+  await expect(row(page, idle)).toBeVisible();
+  await expect(page.getByText(REPLY)).toBeVisible();
+  await expect(composer(page).getByText("Offline. Send turns on when gx reconnects.")).toBeVisible();
+  await expect(sendButton(page)).toBeDisabled();
+  await expect(messageBox(page)).toHaveValue("typed before the drop");
 });
 
 test("88. Phone, Agents page", async ({ page, start }) => {
@@ -168,29 +152,4 @@ test("88. Phone, Agents page", async ({ page, start }) => {
     .toEqual([0, height, width]);
   await newForm(page).getByRole("button", { name: "Close" }).click();
   await expect(newForm(page)).toHaveCount(0);
-});
-
-test("90. Agents offline", async ({ page, start }) => {
-  const fixture = await start("agents");
-  const idle = (await sessions(fixture))[0];
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await go(page, `#/agents/${idle.id}`);
-  await expect(page.getByText(REPLY)).toBeVisible();
-  await messageBox(page).fill("typed before the drop");
-  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
-  await promptBox(page).fill("a first prompt");
-  await expect(createButton(page)).toBeEnabled();
-
-  await fixture.stopServer();
-  await expect(page.getByText("Offline, reconnecting…")).toBeVisible({ timeout: 15_000 });
-  await expect(createButton(page)).toBeDisabled();
-  await expect(promptBox(page)).toHaveValue("a first prompt");
-  await newForm(page).getByRole("button", { name: "Close" }).click();
-
-  // The last data stays; Send is off with its reason and the draft is kept.
-  await expect(row(page, idle)).toBeVisible();
-  await expect(page.getByText(REPLY)).toBeVisible();
-  await expect(composer(page).getByText("Offline. Send turns on when gx reconnects.")).toBeVisible();
-  await expect(sendButton(page)).toBeDisabled();
-  await expect(messageBox(page)).toHaveValue("typed before the drop");
 });

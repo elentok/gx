@@ -16,6 +16,15 @@ test("the title button opens the switcher with Actionable, Unread, Other section
   expect(names.slice(2).join()).toContain("plain");
 });
 
+test("the title button and Cmd-K open the switcher on the filter", () => {
+  render(switcherSessions(), "/agents/s-1");
+  openSwitcher();
+  expect(document.activeElement).toBe(dialog().getByRole("combobox"));
+  fireEvent.keyDown(window, { key: "Escape" });
+  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+  expect(document.activeElement).toBe(dialog().getByRole("combobox"));
+});
+
 test("Cmd-K and Ctrl-K open the switcher", () => {
   render(switcherSessions(), "/agents/s-1");
   fireEvent.keyDown(window, { key: "k", metaKey: true });

@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
-import { ask, created, createButton, go, newForm, projectSelect, promptBox, sessions } from "./agentsKit";
+// Flow 96 moved to AgentsPage.sessionView.test.tsx; flow 98 merged into flow 85 (agents-create.e2e.ts).
+import { created, createButton, go, newForm, projectSelect, promptBox, sessions } from "./agentsKit";
 import { expect, flag, test } from "./fixture";
 
 const tierSelect = (page: Page) => newForm(page).getByRole("combobox", { name: "Tier" });
@@ -49,45 +50,10 @@ test("95. New Agents tab session tiers", async ({ page, start }) => {
   await expect(page.getByText("opus · max").first()).toBeVisible();
 });
 
-test("96. Session model label", async ({ page, start }) => {
-  const fixture = await start("design-model-tiers");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const list = await sessions(fixture);
-
-  // Each design session shows the model and effort of its tier; the tooltip names the tier.
-  const expected: Array<[string, string, string]> = [
-    ["tier-chart", "opus · max", "Strongest tier"],
-    ["tier-later", "sonnet · medium", "Worker tier"],
-    ["tier-unconfirmed", "opus · max", "Strongest tier"],
-    ["tier-no-step", "opus · max", "Strongest tier"],
-  ];
-  for (const [map, text, tier] of expected) {
-    await go(page, `#/agents/${list.find((s) => s.ticket?.includes(map))!.id}`);
-    await expect(page.getByText(text, { exact: true })).toHaveAttribute("title", tier);
-  }
-});
-
 test("97. Session model label follows the handoff", async ({ page, start }) => {
   const fixture = await start("charting-handoff", { autoAdvanceDelay: "1s" });
   await page.setViewportSize({ width: 1280, height: 800 });
   const auto = (await sessions(fixture)).find((s) => s.ticket?.includes("handoff-auto"))!;
   await go(page, `#/agents/${auto.id}`);
   await expect(page.getByText("sonnet · medium", { exact: true })).toBeVisible();
-});
-
-test("98. Session model label on an interactive session", async ({ page, start }) => {
-  const fixture = await start("agents");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const before = await sessions(fixture);
-  await go(page, "#/agents");
-  await page.getByRole("button", { name: "+ New session", exact: true }).click();
-  await projectSelect(page).selectOption("other");
-  await createButton(page).click();
-  const made = await created(fixture, before);
-
-  // A project with no tier config runs the default worker model, and a reply keeps the label.
-  const label = page.getByText("sonnet · medium", { exact: true });
-  await expect(label).toHaveAttribute("title", "Worker tier");
-  await ask(fixture, made.id, "hello");
-  await expect(label).toHaveAttribute("title", "Worker tier");
 });
