@@ -281,6 +281,8 @@ test("31. Menu keyboard", async ({ page, start }) => {
   await menuButton(page).focus();
   await page.keyboard.press("Enter");
   await expect(menu(page)).toBeVisible();
+  // Arrow keys sent before the open menu takes focus are lost, which only shows under load.
+  await expect(menu(page)).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(afkItem(page)).toHaveAttribute("data-highlighted", "");
   await page.keyboard.press("Enter");

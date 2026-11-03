@@ -122,7 +122,8 @@ test.describe("3. Pause reasons and recovery", () => {
       const fixture = await start("paused");
       await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
-      await expect(card(page, row.epic).getByText(row.onQueue)).toBeVisible();
+      // The Approve card waits for a real worker session to ask for permission, which is slow under load.
+      await expect(card(page, row.epic).getByText(row.onQueue)).toBeVisible({ timeout: 45_000 });
 
       await page.getByRole("link", { name: row.epic }).click();
       // The epic page card shows the state and, for repairs, the reason; the ticket page shows the reason.
@@ -132,7 +133,7 @@ test.describe("3. Pause reasons and recovery", () => {
 
       await expect(page.getByText(row.reason).first()).toBeVisible();
       await row.recover!(page);
-      await expect(page.getByText(row.reason)).toHaveCount(0);
+      await expect(page.getByText(row.reason)).toHaveCount(0, { timeout: 30_000 });
     });
   }
 

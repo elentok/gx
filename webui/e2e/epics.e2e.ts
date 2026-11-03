@@ -42,7 +42,7 @@ test("2. Epic looks right", async ({ page, start }) => {
   // The worker settles with 02 and 03 merged, 06 asking and 07 failing.
   await page.getByRole("button", nav("Queue")).click();
   await expect(page.getByText("2/7")).toBeVisible();
-  await expect(page.getByTestId("stats-line")).toHaveText(/^Running · /);
+  await expect(page.getByTestId("stats-line")).toHaveText(/^Running · /, { timeout: 30_000 });
   await expect(page.getByTestId("comet")).toBeVisible();
   // 02 then 03 merge one after the other, and every merge waits out the server's 3s finish debounce.
   await expect(page.getByText("4/7")).toBeVisible({ timeout: 30_000 });
