@@ -323,8 +323,9 @@ test.describe("126. Vi editor: layers and focus", () => {
     await expect(editor).toBeVisible();
     await expect(again).toBeVisible();
 
-    // Last, so a failure here hides nothing above. This step failed before the slimming too.
-    await page.mouse.click(5, 5);
+    // Last, so a failure here hides nothing above. The editor's backdrop starts below the top bar,
+    // so the press lands beside the 860px panel, mid-height, not in the corner.
+    await page.mouse.click(5, 450);
     await expect(editor).toHaveCount(0);
     await expect(again).toBeVisible();
   });

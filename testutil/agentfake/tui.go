@@ -880,8 +880,15 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	// The finish report ends the agent, so a statusLine run after the turn can
 	// be too late; claude also refreshes it mid-turn.
 	t.runStatusLine()
+	began := time.Now()
 	if err := WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
+	}
+	if cfg.Behaviour[address] == BehaviourAsk {
+		// An ask is one gx call, so under load the whole turn can fit between two
+		// polls of the pid file: the launch then sees no turn and pauses as
+		// agent_prompt_stalled over the question.
+		time.Sleep(max(0, stallTurnLength-time.Since(began)))
 	}
 	if cfg.Behaviour[address] == BehaviourFail {
 		_ = SendControl(t.ctlPath, Control{Action: ActionExit, Code: 1})
