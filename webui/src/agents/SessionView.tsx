@@ -158,25 +158,11 @@ export function SessionView({
   const [confirming, setConfirming] = useState(false);
   const { detail: chat, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat);
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
-  const [echoed, setEchoed] = useState<{ sessionId: string; text: string; seen: number }[]>([]);
+  // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
+  const [echoed, setEchoed] = useState<{ sessionId: string; text: string; seen: number; after?: string }[]>([]);
   const promptCount = (text: string) => chat?.messages.filter((m) => m.kind === "prompt" && m.text === text).length ?? 0;
   const waiting = echoed.filter((e) => e.sessionId === session.id && promptCount(e.text) <= e.seen);
-  const shown =
-    chat && waiting.length > 0
-      ? {
-          ...chat,
-          messages: [
-            ...chat.messages,
-            ...waiting.map((e, i) => ({
-              id: `echo-${i}`,
-              role: "person",
-              kind: "prompt",
-              text: e.text,
-              at: "",
-            })),
-          ],
-        }
-      : chat;
+  const shown = chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat;
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
       <SessionHeader session={session} sessions={sessions} onNew={onNew} />
@@ -218,9 +204,23 @@ export function SessionView({
         connected={connected && chatty && !locked}
         lastMessage={chat?.messages.at(-1)?.id}
         onStale={refetch}
-        onSent={(text) => setEchoed((all) => [...all, { sessionId: session.id, text, seen: promptCount(text) }])}
+        onSent={(text) => setEchoed((all) => [...all, { sessionId: session.id, text, seen: promptCount(text), after: chat?.messages.at(-1)?.id }])}
         reason={locked ? undefined : sendReason(session, connected)}
       />
     </Box>
   );
+}
+
+// Puts each echo after its anchor message, in send order. An echo sent into an empty chat goes first; one whose anchor is gone goes last.
+export function withEchoes<M extends { id: string }>(messages: M[], echoes: { text: string; after?: string }[]): M[] {
+  const echo = (e: { text: string }, i: number) => ({ id: `echo-${i}`, role: "person", kind: "prompt", text: e.text, at: "" }) as unknown as M;
+  const known = new Set(messages.map((m) => m.id));
+  const out: M[] = [];
+  echoes.forEach((e, i) => e.after === undefined && out.push(echo(e, i)));
+  for (const m of messages) {
+    out.push(m);
+    echoes.forEach((e, i) => e.after === m.id && out.push(echo(e, i)));
+  }
+  echoes.forEach((e, i) => e.after !== undefined && !known.has(e.after) && out.push(echo(e, i)));
+  return out;
 }
