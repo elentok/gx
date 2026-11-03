@@ -41,6 +41,7 @@ import { StatCard } from "../ui/stat-card/StatCard";
 import { DiskStrip } from "../ui/disk-strip/DiskStrip";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
+import { StickyTopContainer } from "../ui/top-bar/StickyTopContainer";
 import { TopBar } from "../ui/top-bar/TopBar";
 import { Tray } from "../ui/tray/Tray";
 import type { Health, HealthState, LimitWindow, UsageLimits, UsageLimitWindow, UsageSpend, UsageSummary } from "../generated/server";
@@ -295,6 +296,7 @@ const MenuFrame = ({ children }: { children: ReactNode }) => (
 export const galleryEntries: GalleryEntry[] = [
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
+  { name: "StickyTopContainer", cases: perTone((tone) => <StickyTopContainer ruled>{tone}</StickyTopContainer>) },
   {
     name: "Modal",
     cases: perTone((tone) => (
