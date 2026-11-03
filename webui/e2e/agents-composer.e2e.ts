@@ -48,7 +48,9 @@ test("78. Send refused", async ({ page, start }) => {
   await expect(page.getByText("moved from the CLI", { exact: true })).toHaveCount(0);
 
   await messageBox(page).fill("my draft");
-  const dim = await composer(page).getByText("Draft saved in this browser").evaluate((el) => getComputedStyle(el).color);
+  const saved = composer(page).getByText("Draft saved in this browser");
+  await expect(saved).toBeVisible();
+  const dim = await saved.evaluate((el) => getComputedStyle(el).color);
   failing = false;
   await sendButton(page).click();
   const reason = composer(page).getByText("the conversation moved; review it first");

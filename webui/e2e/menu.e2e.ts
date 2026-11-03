@@ -281,8 +281,10 @@ const exactRow = (page: Page, name: string) =>
   page.getByRole("group", { name, exact: true });
 const codexRow = (page: Page, name: string) => exactRow(page, `Codex ${name}`);
 
-const color = (loc: ReturnType<Page["locator"]>) =>
-  loc.evaluate((el) => getComputedStyle(el).color);
+const color = async (loc: ReturnType<Page["locator"]>) => {
+  await expect(loc).toBeVisible();
+  return loc.evaluate((el) => getComputedStyle(el).color);
+};
 
 const appendCodexSample = async (fixture: Fixture, usedPercent: number) => {
   let rollout = "";

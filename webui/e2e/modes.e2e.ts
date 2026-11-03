@@ -68,6 +68,7 @@ test("62. Card columns", async ({ page, start }) => {
   await expect(page.getByText(long, nav(long))).toBeVisible();
 
   const cards = page.locator(LIVE_CARDS);
+  await expect(cards.first()).toBeVisible();
   const rows = await cards.evaluateAll((els) =>
     els.map((el) => {
       const meta = el.querySelector("[data-meta]")!.getBoundingClientRect();

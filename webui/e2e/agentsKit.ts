@@ -53,14 +53,17 @@ export const sendButton = (page: Page) => composer(page).getByRole("button", { n
 export const commandMenu = (page: Page) => page.getByRole("listbox", { name: "Commands" });
 export const commandRows = (page: Page) => commandMenu(page).getByRole("option");
 /** Row names in menu order, without the argument hint. */
-export const commandNames = (page: Page) =>
-  commandRows(page).evaluateAll((rows) =>
-    rows.map((r) => {
+export const commandNames = async (page: Page) => {
+  const rows = commandRows(page);
+  await expect(rows.first()).toBeVisible();
+  return rows.evaluateAll((els) =>
+    els.map((r) => {
       const name = r.firstElementChild!.cloneNode(true) as HTMLElement;
       name.querySelector("i")?.remove();
       return name.textContent!.trim();
     }),
   );
+};
 
 /** Turns the Vi mode setting on or off and checks the Menu shows it. */
 export async function setViMode(fixture: Fixture, page: Page, on: boolean) {

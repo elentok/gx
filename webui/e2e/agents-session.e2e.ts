@@ -5,12 +5,15 @@ import { ask, chatOf, composer, go, messageBox, REPLY, row, sendButton, sessions
 
 /** The chat's scroll box, found from a message in it. */
 const scrollBox = (page: Page, text: string) => page.getByText(text, { exact: true }).first();
-const scrollTo = (page: Page, text: string, top: boolean) =>
-  scrollBox(page, text).evaluate((el, toTop) => {
+const scrollTo = async (page: Page, text: string, top: boolean) => {
+  const message = scrollBox(page, text);
+  await expect(message).toBeVisible();
+  await message.evaluate((el, toTop) => {
     let box = el.parentElement;
     while (box && getComputedStyle(box).overflowY !== "auto") box = box.parentElement;
     box!.scrollTop = toTop ? 0 : box!.scrollHeight;
   }, top);
+};
 
 test("75. Read a session", async ({ page, start }) => {
   const fixture = await start("agents");
@@ -127,7 +130,10 @@ test("80. Failure notices", async ({ page, start }) => {
     await go(page, `#/agents/${s.id}`);
     return s;
   };
-  const buttons = (kind: string) => failure(page).getByRole("button").evaluateAll((els) => els.map((el) => el.textContent));
+  const buttons = async (kind: string) => {
+    await expect(failure(page)).toBeVisible();
+    return failure(page).getByRole("button").evaluateAll((els) => els.map((el) => el.textContent));
+  };
 
   // Stalled: the fixture's threshold is 3s.
   await open("stalled");

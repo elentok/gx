@@ -15,7 +15,9 @@ test("57. Stats, Grilling section", async ({ page, start }) => {
   const questions = statCard(page, "Questions asked");
 
   // The section sits after Cost and effort and before Friction.
-  const headings = await page.getByRole("region").evaluateAll((els) => els.map((el) => document.getElementById(el.getAttribute("aria-labelledby") ?? "")?.textContent));
+  const regions = page.getByRole("region");
+  await expect(regions.first()).toBeVisible();
+  const headings = await regions.evaluateAll((els) => els.map((el) => document.getElementById(el.getAttribute("aria-labelledby") ?? "")?.textContent));
   expect(headings.indexOf("Grilling")).toBe(headings.indexOf("Cost and effort") + 1);
   expect(headings.indexOf("Friction")).toBe(headings.indexOf("Grilling") + 1);
 

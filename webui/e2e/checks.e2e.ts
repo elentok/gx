@@ -153,6 +153,7 @@ test.describe("phone", () => {
     const box = (await dialog.boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(400);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(400);
+    await expect(dialog).toBeVisible();
     expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   });
 });

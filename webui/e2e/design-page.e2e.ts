@@ -191,7 +191,10 @@ test.describe("73. Note box", () => {
 
 const showChat = (page: Page) => page.getByRole("group", nav("View")).getByRole("button", nav("Chat")).click();
 
-const fontSize = (el: Locator) => el.evaluate((node) => getComputedStyle(node).fontSize);
+const fontSize = async (el: Locator) => {
+  await expect(el).toBeVisible();
+  return el.evaluate((node) => getComputedStyle(node).fontSize);
+};
 
 test.describe("74. Question top", () => {
   test.use({ viewport: { width: 1280, height: 600 } });
@@ -210,6 +213,7 @@ test.describe("74. Question top", () => {
       await expect(questions.getByRole("textbox", nav("Note text for question 8"))).toBeVisible();
 
       const body = questions.getByTestId("question-body");
+      await expect(body).toBeVisible();
       const title = questions.getByText("Q8b - Migrate at startup?");
       const toEnd = async () => {
         await body.evaluate((el) => (el.scrollTop = el.scrollHeight));

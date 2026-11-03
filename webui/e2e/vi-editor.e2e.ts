@@ -94,6 +94,7 @@ test.describe("124. Vi editor: open, close and submit", () => {
     await setViMode(fixture, page, true);
     const field = await openMessageBox(page);
     await field.fill("hello world");
+    await expect(field).toHaveValue("hello world");
     await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(5, 5));
     await page.keyboard.press("ControlOrMeta+g");
     const dialog = page.getByRole("dialog", nav("Message to the agent"));
@@ -412,12 +413,15 @@ test.describe("123. Vi editor: layouts and touch bar", () => {
 });
 
 // The editor text, one line per `.cm-line`.
-const editorText = (editable: ReturnType<Page["getByRole"]>) =>
-  editable.evaluate((el) => [...el.querySelectorAll(".cm-line")].map((l) => l.textContent).join("\n"));
+const editorText = async (editable: ReturnType<Page["getByRole"]>) => {
+  await expect(editable).toBeVisible();
+  return editable.evaluate((el) => [...el.querySelectorAll(".cm-line")].map((l) => l.textContent).join("\n"));
+};
 
 // [anchor, head] of the editor's selection as character offsets in the text; `\n` counts as one.
-const editorSelection = (editable: ReturnType<Page["getByRole"]>) =>
-  editable.evaluate((el) => {
+const editorSelection = async (editable: ReturnType<Page["getByRole"]>) => {
+  await expect(editable).toBeVisible();
+  return editable.evaluate((el) => {
     const lines = [...el.querySelectorAll(".cm-line")];
     const offset = (node: Node, at: number) => {
       const line = lines.findIndex((l) => l.contains(node));
@@ -431,6 +435,7 @@ const editorSelection = (editable: ReturnType<Page["getByRole"]>) =>
     const s = document.getSelection()!;
     return [offset(s.anchorNode!, s.anchorOffset), offset(s.focusNode!, s.focusOffset)];
   });
+};
 
 const head = async (editable: ReturnType<Page["getByRole"]>) => (await editorSelection(editable))[1];
 
