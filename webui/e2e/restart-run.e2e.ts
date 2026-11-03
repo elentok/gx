@@ -25,15 +25,19 @@ const breakBroken = async (fixture: Fixture) => {
   await forgetApplied(fixture);
 };
 
-/** A restart-projects fixture ready to restart through the real gx, with `broken` unable to migrate. */
+/** The step names demo has applied. */
+const appliedList = async (fixture: Fixture) => (await fixture.readStoreFile("demo/applied-migrations.txt")).split("\n").filter(Boolean);
+
+/** A restart-projects fixture ready to restart through the real gx, with `broken` unable to migrate. `full` is demo's applied list before it is emptied. */
 const startBroken = async (start: (scenario: string, opts?: { reloads?: number }) => Promise<Fixture>, reloads: number) => {
   const fixture = await start("restart-projects", { reloads });
   await fixture.setRestartControl("check.json", passing("fixture-next"));
   await fixture.setRestartControl("start", "up");
+  const full = await appliedList(fixture);
   await breakBroken(fixture);
   const epic = await fixture.readStoreFile(demoEpic);
   await fixture.writeStoreFile(demoEpic, epic.replace(/^---\n/, `---\n${legacyKey}: main\n`));
-  return fixture;
+  return { fixture, full };
 };
 
 const restartNow = async (page: Page) => {
@@ -44,8 +48,13 @@ const restartNow = async (page: Page) => {
 
 const strip = (page: Page) => page.getByRole("status").filter({ hasText: "broken: Migration blocked" });
 
-test("139. Restart with a failed migration", async ({ page, start }) => {
-  const fixture = await startBroken(start, 4);
+const fixDialog = (page: Page) => page.getByRole("dialog", nav("Fix it with an agent"));
+
+// Also covers 140 (the Fix agent dialog and route) and 179 (the web restart applies pending steps).
+test("139. Restart with a failed migration", async ({ page, context, start }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const { fixture, full } = await startBroken(start, 4);
+  expect(full.length).toBeGreaterThan(0);
   const before = await pidLine(fixture);
 
   await test.step("the server comes back although broken fails", async () => {
@@ -54,10 +63,11 @@ test("139. Restart with a failed migration", async ({ page, start }) => {
     expect(await fixture.cli("server", "status")).toMatch(/running/i);
   });
 
-  await test.step("the other project is migrated", async () => {
+  await test.step("the other project is migrated and its applied list is full again (179)", async () => {
     const epic = await fixture.readStoreFile(demoEpic);
     expect(epic).toContain("destination_unconfirmed: main");
     expect(epic).not.toContain(legacyKey);
+    await expect.poll(() => appliedList(fixture), { timeout: 30_000 }).toEqual(full);
   });
 
   await test.step("the strip shows on two pages, with Retry migration", async () => {
@@ -68,6 +78,42 @@ test("139. Restart with a failed migration", async ({ page, start }) => {
     await page.getByRole("link", { name: "demo-epic" }).first().click();
     await expect(strip(page)).toBeVisible();
     await expect(strip(page).locator("code")).toContainText("gx tickets migrate");
+  });
+
+  await test.step("the Fix agent dialog has the prompt and Copy, Start runs the strongest tier in the trunk checkout (140)", async () => {
+    const error = (await strip(page).locator("p").nth(1).textContent())!;
+    const sessionsBefore = (await sessions(fixture)).length;
+    await strip(page).getByRole("button", nav("Fix agent")).click();
+    await expect(fixDialog(page)).toBeVisible();
+    await expect(fixDialog(page)).toContainText("The migration of project broken failed with:");
+    await expect(fixDialog(page)).toContainText(error);
+    await fixDialog(page).getByRole("button", nav("Copy")).click();
+    await expect(fixDialog(page).getByRole("button", nav("Copied"))).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("The migration of project broken failed with:");
+
+    await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
+    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab")).toBeVisible();
+    await expect.poll(async () => (await sessions(fixture)).length).toBe(sessionsBefore + 1);
+    const started = (await sessions(fixture)).at(-1)!;
+    const path = (await fixture.cli("tickets", "show", "broken:broken-epic/01")).match(/^path: (.+)$/m)![1];
+    expect(await realpath(started.dir)).toBe(await realpath(`${path.split("/data/gx/tickets")[0]}/broken-repo`));
+    expect(started.tier).toBe("strongest");
+    expect(started.project).toBe("broken");
+    await expect.poll(async () => (await fixture.launches()).at(-1)!.join(" ")).toContain("--model opus --effort high");
+
+    // A hash change keeps the page: a reload would fail the test.
+    await page.evaluate(() => (location.hash = "#/agents"));
+    await expect(page.locator(`a[href$="/agents/${started.id}"]`)).toBeVisible();
+
+    const second = await context.newPage();
+    await second.goto(new URL(page.url()).origin);
+    await strip(second).getByRole("button", nav("Fix agent")).click();
+    await fixDialog(second).getByRole("button", nav("Start gx agent")).click();
+    await expect(toasts(second).filter({ hasText: "an agent is already fixing broken" })).toBeVisible();
+    expect((await sessions(fixture)).length).toBe(sessionsBefore + 1);
+    await second.close();
+    await page.goBack();
+    await expect(strip(page)).toBeVisible();
   });
 
   await test.step("fixing the project and Retry migration clears the strip", async () => {
@@ -96,53 +142,6 @@ test("139. Restart with a failed migration", async ({ page, start }) => {
   });
 });
 
-const fixDialog = (page: Page) => page.getByRole("dialog", nav("Fix it with an agent"));
-
-test("140. Fix agent for a failed migration", async ({ page, context, start }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  const fixture = await startBroken(start, 1);
-  await restartNow(page);
-  await expect(strip(page)).toBeVisible({ timeout: 30_000 });
-  const error = (await strip(page).locator("p").nth(1).textContent())!;
-  const before = (await sessions(fixture)).length;
-
-  await test.step("the strip button opens the dialog with the prompt and Copy", async () => {
-    await strip(page).getByRole("button", nav("Fix agent")).click();
-    await expect(fixDialog(page)).toBeVisible();
-    await expect(fixDialog(page)).toContainText("The migration of project broken failed with:");
-    await expect(fixDialog(page)).toContainText(error);
-    await fixDialog(page).getByRole("button", nav("Copy")).click();
-    await expect(fixDialog(page).getByRole("button", nav("Copied"))).toBeVisible();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("The migration of project broken failed with:");
-  });
-
-  await test.step("Start runs the strongest tier in the trunk checkout", async () => {
-    await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
-    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab")).toBeVisible();
-    await expect.poll(async () => (await sessions(fixture)).length).toBe(before + 1);
-    const started = (await sessions(fixture)).at(-1)!;
-    const path = (await fixture.cli("tickets", "show", "broken:broken-epic/01")).match(/^path: (.+)$/m)![1];
-    expect(await realpath(started.dir)).toBe(await realpath(`${path.split("/data/gx/tickets")[0]}/broken-repo`));
-    expect(started.tier).toBe("strongest");
-    expect(started.project).toBe("broken");
-    await expect.poll(async () => (await fixture.launches()).at(-1)!.join(" ")).toContain("--model opus --effort high");
-  });
-
-  await test.step("the Agents tab lists it and a second start is refused", async () => {
-    const started = (await sessions(fixture)).at(-1)!;
-    // A hash change keeps the page: a reload would fail the test.
-    await page.evaluate(() => (location.hash = "#/agents"));
-    await expect(page.locator(`a[href$="/agents/${started.id}"]`)).toBeVisible();
-
-    const second = await context.newPage();
-    await second.goto(new URL(page.url()).origin);
-    await strip(second).getByRole("button", nav("Fix agent")).click();
-    await fixDialog(second).getByRole("button", nav("Start gx agent")).click();
-    await expect(toasts(second).filter({ hasText: "an agent is already fixing broken" })).toBeVisible();
-    expect((await sessions(fixture)).length).toBe(before + 1);
-  });
-});
-
 test("141. Restart server, tab reloads", async ({ page, start }) => {
   const fixture = await start("restart-projects", { reloads: 1 });
   await fixture.setRestartControl("check.json", passing("fixture-next"));
@@ -156,23 +155,6 @@ test("141. Restart server, tab reloads", async ({ page, start }) => {
   await expect(dialog(page)).toHaveCount(0, { timeout: 45_000 });
   // A fresh page can show the menu button before React attaches its handler, which drops a click.
   await expect(async () => expect(await buildText(page)).toContain("fixture-next")).toPass({ timeout: 30_000 });
-});
-
-test("179. Restart from the web applies pending steps", async ({ page, start }) => {
-  const fixture = await start("restart-projects", { reloads: 1 });
-  await fixture.setRestartControl("check.json", passing("fixture-next"));
-  await fixture.setRestartControl("start", "up");
-  await fixture.setRestartControl("gx", process.env.GX_E2E_GX_NEXT!);
-  const list = async () => (await fixture.readStoreFile("demo/applied-migrations.txt")).split("\n").filter(Boolean);
-  const full = await list();
-  expect(full.length).toBeGreaterThan(0);
-  // Empty lists make every step pending, as a new build with steps would.
-  await forgetApplied(fixture);
-  expect(await list()).toEqual([]);
-
-  await restartNow(page);
-
-  await expect.poll(list, { timeout: 30_000 }).toEqual(full);
 });
 
 test("142. Restart server, other tab",async ({ page, context, start }) => {
@@ -228,22 +210,7 @@ test("143. Restart server, server does not return", async ({ page, start }) => {
   await expect(page.getByText("Restarting...")).toHaveCount(0);
 });
 
-test("144. Restart server, binary changed", async ({ page, start }) => {
-  const fixture = await start("restart-projects");
-  await fixture.setRestartControl("check.json", passing("fixture-next"));
-  await fixture.setRestartControl("start", "up");
-  const before = await pidLine(fixture);
-
-  await openDialog(page);
-  await expect(dialog(page)).toContainText("Next version: fixture-next");
-  await fixture.setRestartControl("check.json", passing("fixture-newer"));
-  await restartButton(page).click();
-
-  await expect(dialog(page)).toContainText("Next version: fixture-newer");
-  await expect(dialog(page)).not.toContainText("Restarting...");
-  await expect(restartButton(page)).toBeVisible();
-  expect(await pidLine(fixture)).toBe(before);
-});
+// 144 (binary changed: the dialog shows the new values after a refusal) moved to RestartDialog.test.tsx.
 
 test("145. Restart server, two tabs", async ({ page, context, start }) => {
   const fixture = await start("restart-projects");
@@ -271,8 +238,10 @@ test("145. Restart server, two tabs", async ({ page, context, start }) => {
   await expect(dialog(after)).toContainText("Restarting...");
 });
 
+// Also covers 133 (a binary at another install path, same version as the running build).
 test("146. Restart dialog, launchd binary", async ({ page, start }) => {
   const fixture = await start("restart-launchd");
+  const build = await buildText(page);
   await fixture.setRestartControl(
     "check.json",
     JSON.stringify({ version: "launchd-version", config: { ok: true }, projects: [{ name: "demo", ok: true, files: [] }] }),
@@ -280,5 +249,15 @@ test("146. Restart dialog, launchd binary", async ({ page, start }) => {
 
   await openDialog(page);
   await expect(dialog(page)).toContainText("Next version: launchd-version");
+  await expect(restartButton(page)).toBeEnabled();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  await fixture.setRestartControl(
+    "check.json",
+    JSON.stringify({ version: build, config: { ok: true }, projects: [{ name: "demo", ok: true, files: [] }] }),
+  );
+  await openDialog(page);
+  await expect(dialog(page)).toContainText("Versions match");
   await expect(restartButton(page)).toBeEnabled();
 });

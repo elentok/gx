@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import { expect, sessionRows, test, type Fixture } from "./fixture";
-import { dialog, openDialog, passing, restartButton } from "./restart-helpers";
 
 // Flows for the migration the server runs when it starts (no flag, no command code). They run on the
 // migrate-* scenarios: the real `gx server` runs on the store, and `fixture.serverCtl` kills and starts
@@ -100,16 +99,11 @@ test("169. Migrating state holds scheduling", async ({ start, page }) => {
   });
 });
 
-test("170. A failed project is rescanned after the migration", async ({ start }) => {
-  const fixture = await start("migrate-broken");
-  await migrated(fixture);
-  await expect.poll(() => startupSteps(fixture), { timeout: 30_000 }).toEqual(["first-rescan", "recover-merges", "reclaim-runs"]);
-  expect(await fixture.cli("tickets", "show", "broken:broken-epic/01")).toContain("first");
-});
-
 /** Whether a started CLI verb has ended. */
 const ended = async (run: { done: Promise<unknown> }) => (await Promise.race([run.done.then(() => true), new Promise((r) => setTimeout(() => r(false), 100))])) as boolean;
 
+// 171 stays its own flow instead of a step in 169: its writes move and ask the tickets that 169
+// asserts get claimed once the hold ends (ready-epic/01, old-epic/01), so the two cannot share a run.
 test("171. Writes wait for the migration", async ({ start }) => {
   const fixture = await start("migrate-held");
 
@@ -153,38 +147,41 @@ test("171. Writes wait for the migration", async ({ start }) => {
 
 const strip = (page: Page) => page.getByRole("status").filter({ hasText: "Migration blocked" });
 
-test("172. A failed step is not recorded, skip notes stay in the log", async ({ start, page }) => {
-  const fixture = await start("migrate-pending");
-  await migrated(fixture);
-  const first = await names(fixture, "demo");
-
-  await test.step("a failing step is left out of the list, the steps before it are in", async () => {
-    await fixture.setInject([{ name: "e2e-before" }, { name: "e2e-fails", fail: "e2e step failed" }]);
-    await restartBare(fixture);
-    const listed = await names(fixture, "demo");
-    expect(listed).toContain("e2e-before");
-    expect(listed).not.toContain("e2e-fails");
-    expect(listed).toEqual([...first, "e2e-before"]);
-    await expect(strip(page).filter({ hasText: "demo:" })).toContainText("e2e step failed");
-  });
-
-  await test.step("a step with skip notes puts them in the log and shows nothing on the strip", async () => {
-    await fixture.setInject([{ name: "e2e-noted", notes: ["e2e skip note"] }]);
-    await restartBare(fixture);
-    expect(await names(fixture, "demo")).toContain("e2e-noted");
-    expect(await serverLog(fixture)).toContain("e2e skip note");
-    await expect(strip(page)).toHaveCount(0, { timeout: 15_000 });
-  });
-});
-
 const brokenTicket = "broken/broken-epic/issues/90-bad.md";
 const goodTicket = "---\nid: \"90\"\nstatus: open\ntype: implement\n---\n# Bad\n";
 const brokenStrip = (page: Page) => strip(page).filter({ hasText: "broken:" });
 const pidOf = (fixture: Fixture) => fixture.serverCtl("pid");
 
+/** Makes the next start fail on a new step (applied steps are not run again) and waits for the strip. */
+const breakAgain = async (fixture: Fixture, page: Page, n: number) => {
+  await fixture.setInject([{ name: `e2e-fails-again-${n}`, fail: `e2e step failed again ${n}` }]);
+  await restartBare(fixture);
+  await expect(brokenStrip(page)).toContainText(`e2e step failed again ${n}`);
+  await fixture.setInject([]);
+};
+
+/** Fixes the project, ends the block the way `end` says (no restart), and checks the server kept its pid. */
+const endsBlock = async (name: string, page: Page, fixture: Fixture, end: () => Promise<void>) => {
+  const pid = await pidOf(fixture);
+  await fixture.writeStoreFile(brokenTicket, goodTicket);
+  await end();
+  await expect(brokenStrip(page), name).toHaveCount(0, { timeout: 30_000 });
+  expect(await pidOf(fixture), `${name}: pid`).toBe(pid);
+};
+
+const migrateDir = async (page: Page) => (await brokenStrip(page).locator("code").textContent())!.match(/gx tickets migrate '(.+)'/)![1];
+
+// Covers 170 (rescan after the migration), 174 (Retry button), 175 (command by hand), 176 (Fix agent
+// route) and 177 (stale failure cleared by a start). Each ends the block, then a new failing step
+// brings it back for the next one.
 test("173. Failed start and Migration block", async ({ start, page }) => {
   const fixture = await start("migrate-broken");
   await migrated(fixture);
+
+  await test.step("the failed project is rescanned after the migration (170)", async () => {
+    await expect.poll(() => startupSteps(fixture), { timeout: 30_000 }).toEqual(["first-rescan", "recover-merges", "reclaim-runs"]);
+    expect(await fixture.cli("tickets", "show", "broken:broken-epic/01")).toContain("first");
+  });
 
   await test.step("the server runs and the other project works", async () => {
     expect(JSON.parse(await fixture.cli("server", "status", "--json")).running).toBe(true);
@@ -205,90 +202,45 @@ test("173. Failed start and Migration block", async ({ start, page }) => {
     await expect(page.getByRole("status").getByText("Paused")).toHaveCount(0);
     await expect(page.getByRole("status").getByText("Missing trunk")).toHaveCount(0);
   });
-});
 
-/** A migrate-broken fixture whose strip is showing. */
-const startBlocked = async (start: (scenario: string) => Promise<Fixture>, page: Page) => {
-  const fixture = await start("migrate-broken");
-  await migrated(fixture);
-  await expect(brokenStrip(page)).toBeVisible();
-  return fixture;
-};
-
-/** Ends a block the way `end` says, with no restart. */
-const endsBlock = async (name: string, page: Page, start: (scenario: string) => Promise<Fixture>, end: (fixture: Fixture) => Promise<void>) => {
-  const fixture = await startBlocked(start, page);
-  const pid = await pidOf(fixture);
-  await fixture.writeStoreFile(brokenTicket, goodTicket);
-  await end(fixture);
-  await expect(brokenStrip(page), name).toHaveCount(0, { timeout: 30_000 });
-  expect(await pidOf(fixture), `${name}: pid`).toBe(pid);
-  await expect.poll(() => fixture.cli("tickets", "show", "broken:broken-epic/01"), { timeout: 30_000 }).toContain("claimed");
-  return fixture;
-};
-
-test("174. Retry migration button ends the block", async ({ start, page }) => {
-  const fixture = await endsBlock("retry", page, start, async () => {
-    await brokenStrip(page).getByRole("button", { name: "Retry migration" }).click();
+  await test.step("the Retry migration button ends the block and the ticket is claimed (174)", async () => {
+    await endsBlock("retry", page, fixture, async () => {
+      await brokenStrip(page).getByRole("button", { name: "Retry migration" }).click();
+    });
+    await expect.poll(() => fixture.cli("tickets", "show", "broken:broken-epic/01"), { timeout: 30_000 }).toContain("claimed");
   });
-  await test.step("the block comes back on the next failing start", async () => {
-    // Applied steps are not run again: the new failure needs a new step.
-    await fixture.setInject([{ name: "e2e-fails-again", fail: "e2e step failed again" }]);
+
+  await test.step("the retry command by hand ends the block (175)", async () => {
+    await breakAgain(fixture, page, 1);
+    await endsBlock("by hand", page, fixture, async () => {
+      await fixture.cli("tickets", "migrate", await migrateDir(page));
+    });
+  });
+
+  await test.step("the Fix agent route ends the block (176)", async () => {
+    await breakAgain(fixture, page, 2);
+    await endsBlock("fix agent", page, fixture, async () => {
+      const dir = await migrateDir(page);
+      await brokenStrip(page).getByRole("button", { name: "Fix agent" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Start gx agent" }).click();
+      await expect(page.getByText("Agent started.")).toBeVisible();
+      // The fake agent runs no command: run the one the session is told to run.
+      await fixture.cli("tickets", "migrate", dir);
+    });
+  });
+
+  await test.step("a stale failure record is cleared by the start-up run (177)", async () => {
+    await breakAgain(fixture, page, 3);
+    await fixture.writeStoreFile(brokenTicket, goodTicket);
     await restartBare(fixture);
-    await expect(brokenStrip(page)).toContainText("e2e step failed again");
+    await expect(brokenStrip(page)).toHaveCount(0, { timeout: 30_000 });
   });
 });
 
-test("175. The retry command by hand ends the block", async ({ start, page }) => {
-  await endsBlock("by hand", page, start, async (fixture) => {
-    const dir = (await brokenStrip(page).locator("code").textContent())!.match(/gx tickets migrate '(.+)'/)![1];
-    await fixture.cli("tickets", "migrate", dir);
-  });
-});
-
-test("176. The Fix agent route ends the block", async ({ start, page }) => {
-  await endsBlock("fix agent", page, start, async (fixture) => {
-    const command = (await brokenStrip(page).locator("code").textContent())!;
-    await brokenStrip(page).getByRole("button", { name: "Fix agent" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Start gx agent" }).click();
-    await expect(page.getByText("Agent started.")).toBeVisible();
-    // The fake agent runs no command: run the one the session is told to run.
-    await fixture.cli("tickets", "migrate", command.match(/gx tickets migrate '(.+)'/)![1]);
-  });
-});
-
-test("177. A stale failure record is cleared by the start-up run", async ({ start, page }) => {
-  const fixture = await startBlocked(start, page);
-  await fixture.writeStoreFile(brokenTicket, goodTicket);
-  await restartBare(fixture);
-  await expect(brokenStrip(page)).toHaveCount(0, { timeout: 30_000 });
-});
-
-test("178. Restart dialog with and without pending steps", async ({ start, page }) => {
-  const fixture = await start("restart-projects");
-  const alert = () => dialog(page).getByRole("alert");
-
-  await test.step("a project with a pending step reports its dry-run failure", async () => {
-    await openDialog(page);
-    await expect(alert()).toContainText("broken: fixture migration failed");
-    await expect(restartButton(page)).toHaveText("Restart anyway");
-  });
-
-  await test.step("with nothing pending the check is ok at once and the button is plain", async () => {
-    await page.keyboard.press("Escape");
-    await expect(dialog(page)).toHaveCount(0);
-    await fixture.setRestartControl("check.json", passing("fixture-next"));
-    const began = Date.now();
-    await openDialog(page);
-    await expect(restartButton(page)).toHaveText("Restart");
-    await expect(restartButton(page)).toBeEnabled();
-    expect(Date.now() - began).toBeLessThan(10_000);
-    await expect(dialog(page).getByRole("alert")).toHaveCount(0);
-    await expect(dialog(page)).not.toContainText("A migration runs while the agents work.");
-  });
-});
-
-test("161. Server migrates on start",async ({ start }) => {
+// Covers 161 (migrates on start), 168 (a later start runs only an added step), 163 (a second
+// project without a list runs its steps alone) and 172 (a failed step is not recorded). Each step
+// builds on the lists the one before left.
+test("161. Server migrates on start", async ({ start, page }) => {
   const fixture = await start("migrate-pending");
   await migrated(fixture);
 
@@ -309,50 +261,45 @@ test("161. Server migrates on start",async ({ start }) => {
     expect(await noteCount(fixture)).toBe(notes);
     expect(await names(fixture, "demo")).toEqual(listed);
   });
-});
 
-test("163. Per-project list", async ({ start }) => {
-  const fixture = await start("migrate-pending");
-  await migrated(fixture);
-  const full = await names(fixture, "demo");
-
-  await test.step("a second project has a ticket in the old shape and no list", async () => {
-    await fixture.writeStoreFile("other/project.json", await fixture.readStoreFile("demo/project.json"));
-    await fixture.writeStoreFile("other/other-epic/ticket.md", (await fixture.readStoreFile("demo/demo-epic/ticket.md")).replace("demo-epic", "other-epic"));
-    await fixture.writeStoreFile("other/other-epic/issues/01-broken-shape.md", (await fixture.readStoreFile(ticket)).replace("status: paused", "status: needs-answer"));
-  });
-
-  await restartBare(fixture);
-
-  await test.step("only the project without a list ran its steps", async () => {
-    expect(await fixture.readStoreFile("other/other-epic/issues/01-broken-shape.md")).toContain("status: paused");
-    expect(await names(fixture, "demo")).toEqual(full);
-  });
-
-  await test.step("both lists are full", async () => {
-    expect(await names(fixture, "other")).toEqual(full);
-  });
-});
-
-test("168. Crash restart and login start", async ({ start }) => {
-  const fixture = await start("migrate-pending");
-  await migrated(fixture);
-  const first = await names(fixture, "demo");
-
-  await test.step("the first start migrated", async () => {
-    expect(await fixture.readStoreFile(ticket)).toContain("status: paused");
-    expect(first.length).toBeGreaterThan(0);
-  });
-
-  await test.step("the second start, from a bare process, ran only the added step", async () => {
+  await test.step("a start from a bare process runs only an added step, on every project (168)", async () => {
     const notes = await noteCount(fixture);
     await fixture.setInject([{ name: "e2e-added", notes: ["e2e added step ran"] }]);
     await restartBare(fixture);
-    expect(await names(fixture, "demo")).toEqual([...first, "e2e-added"]);
+    expect(await names(fixture, "demo")).toEqual([...listed, "e2e-added"]);
     // The fixture store has a second project, scratch, which also had the full list.
     expect(await noteCount(fixture)).toBe(notes + 2);
     expect(await noteCount(fixture, "e2e added step ran")).toBe(2);
-    expect(await names(fixture, "scratch")).toEqual([...first, "e2e-added"]);
+    expect(await names(fixture, "scratch")).toEqual([...listed, "e2e-added"]);
     expect(await serverLog(fixture)).toContain("e2e added step ran");
+  });
+
+  const full = [...listed, "e2e-added"];
+  await test.step("a new project with an old-shape ticket and no list runs its steps alone (163)", async () => {
+    await fixture.writeStoreFile("other/project.json", await fixture.readStoreFile("demo/project.json"));
+    await fixture.writeStoreFile("other/other-epic/ticket.md", (await fixture.readStoreFile("demo/demo-epic/ticket.md")).replace("demo-epic", "other-epic"));
+    await fixture.writeStoreFile("other/other-epic/issues/01-broken-shape.md", (await fixture.readStoreFile(ticket)).replace("status: paused", "status: needs-answer"));
+    await restartBare(fixture);
+    expect(await fixture.readStoreFile("other/other-epic/issues/01-broken-shape.md")).toContain("status: paused");
+    expect(await names(fixture, "demo")).toEqual(full);
+    expect(await names(fixture, "other")).toEqual(full);
+  });
+
+  await test.step("a failing step is left out of the list, the steps before it are in (172)", async () => {
+    await fixture.setInject([{ name: "e2e-before" }, { name: "e2e-fails", fail: "e2e step failed" }]);
+    await restartBare(fixture);
+    const after = await names(fixture, "demo");
+    expect(after).toContain("e2e-before");
+    expect(after).not.toContain("e2e-fails");
+    expect(after).toEqual([...full, "e2e-before"]);
+    await expect(strip(page).filter({ hasText: "demo:" })).toContainText("e2e step failed");
+  });
+
+  await test.step("a step with skip notes puts them in the log and shows nothing on the strip (172)", async () => {
+    await fixture.setInject([{ name: "e2e-noted", notes: ["e2e skip note"] }]);
+    await restartBare(fixture);
+    expect(await names(fixture, "demo")).toContain("e2e-noted");
+    expect(await serverLog(fixture)).toContain("e2e skip note");
+    await expect(strip(page)).toHaveCount(0, { timeout: 15_000 });
   });
 });

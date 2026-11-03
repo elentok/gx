@@ -1,21 +1,7 @@
 import { expect, nav, test } from "./fixture";
-import { buildText, dialog, expectReloaded, menu, menuButton, openDialog, passing, pidLine, restartButton, restartItem } from "./restart-helpers";
+import { dialog,expectReloaded, menu, menuButton, openDialog, passing, pidLine, restartButton, restartItem } from "./restart-helpers";
 
-test("128. Restart server in the menu", async ({ page, start }) => {
-  await start("restart-projects");
-  await menuButton(page).click();
-  const item = restartItem(page);
-  await expect(item).toBeVisible();
-  const afk = await menu(page).getByRole("menuitemcheckbox", nav("AFK")).boundingBox();
-  const restart = await item.boundingBox();
-  const build = await menu(page).getByTestId("server-build").boundingBox();
-  expect(restart!.y).toBeGreaterThan(afk!.y);
-  expect(build!.y).toBeGreaterThan(restart!.y);
-  await item.click();
-  await expect(menu(page)).toHaveCount(0);
-  await expect(dialog(page)).toBeVisible();
-});
-
+// Also covers 128 (the item sits between AFK and the build line, and opening it closes the menu).
 test("129. Restart server keyboard", async ({ page, start }) => {
   await start("restart-projects");
   await menuButton(page).focus();
@@ -24,10 +10,16 @@ test("129. Restart server keyboard", async ({ page, start }) => {
   // The usage block (with its InfoTip) can mount before the menu opens: focus must still land on the menu.
   await expect(menu(page).getByRole("button", nav("About gx spend"))).toBeVisible();
   await expect(menu(page).getByRole("menuitem", nav("Settings"))).toHaveAttribute("data-highlighted", "");
+  const afk = await menu(page).getByRole("menuitemcheckbox", nav("AFK")).boundingBox();
+  const restart = await restartItem(page).boundingBox();
+  const build = await menu(page).getByTestId("server-build").boundingBox();
+  expect(restart!.y).toBeGreaterThan(afk!.y);
+  expect(build!.y).toBeGreaterThan(restart!.y);
   // Settings, AFK, Vi mode, Restart: Restart is three presses from the highlighted Settings.
   for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowDown");
   await expect(restartItem(page)).toHaveAttribute("data-highlighted", "");
   await page.keyboard.press("Enter");
+  await expect(menu(page)).toHaveCount(0);
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
@@ -51,48 +43,10 @@ test("130. Restart dialog confirms", async ({ page, start }) => {
   await expect.poll(() => pidLine(fixture)).not.toBe(before);
 });
 
-test("131. Restart dialog checks", async ({ page, start }) => {
-  const fixture = await start("restart-projects");
-  await fixture.setRestartControl("check.json", passing("fixture-next"));
-  await fixture.setRestartControl("slow", "3");
-  const build = await buildText(page);
+// 131 (Checking / disabled / versions) and 132 (Versions match) live in RestartDialog.test.tsx; the
+// restart and pid change of 132 is flow 130.
 
-  await openDialog(page);
-  await expect(dialog(page).getByText("Checking...")).toBeVisible();
-  await expect(restartButton(page)).toBeDisabled();
-  await expect(restartButton(page)).toBeEnabled();
-  await expect(dialog(page)).toContainText(`Running version: ${build}`);
-  await expect(dialog(page)).toContainText("Next version: fixture-next");
-});
-
-test("132. Restart dialog, same version", async ({ page, start }) => {
-  const fixture = await start("restart-projects", { reloads: 1 });
-  const build = await buildText(page);
-  await fixture.setRestartControl("check.json", passing(build));
-  await fixture.setRestartControl("start", "up");
-  const before = await pidLine(fixture);
-
-  await openDialog(page);
-  await expect(dialog(page)).toContainText("Versions match");
-  await expect(restartButton(page)).toBeEnabled();
-  await restartButton(page).click();
-  await expectReloaded(page);
-  await expect.poll(() => pidLine(fixture)).not.toBe(before);
-});
-
-test("133. Restart dialog, other install path", async ({ page, start }) => {
-  const fixture = await start("restart-launchd");
-  const build = await buildText(page);
-  await fixture.setRestartControl(
-    "check.json",
-    JSON.stringify({ version: build, config: { ok: true }, projects: [{ name: "demo", ok: true, files: [] }] }),
-  );
-
-  await openDialog(page);
-  await expect(dialog(page)).toContainText("Versions match");
-  await expect(restartButton(page)).toBeEnabled();
-});
-
+// Also covers 135 (bad config) and 136 (old binary) on the same restart-projects server.
 test("134. Restart dialog, unreadable version", async ({ page, start }) => {
   // A binary that fails to run: the fake cannot read its check file.
   const failing = await start("restart-projects");
@@ -103,6 +57,23 @@ test("134. Restart dialog, unreadable version", async ({ page, start }) => {
   await expect(restartButton(page)).toBeDisabled();
   expect(await pidLine(failing)).toBe(before);
 
+  // 135: a config the new binary rejects.
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  await failing.setRestartControl("check.json", passing("fixture-next", { ok: false, error: "fixture config: port is not a number" }));
+  await openDialog(page);
+  await expect(dialog(page).getByRole("alert")).toContainText("fixture config: port is not a number");
+  await expect(restartButton(page)).toBeDisabled();
+  expect(await pidLine(failing)).toBe(before);
+
+  // 136: a binary too old to have the check.
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  await failing.setRestartControl("old", "1");
+  await openDialog(page);
+  await expect(dialog(page).getByRole("alert")).toContainText("gx server restart");
+  await expect(restartButton(page)).toBeDisabled();
+
   // A binary that is missing.
   const missing = await start("restart-missing");
   const beforeMissing = await pidLine(missing);
@@ -110,26 +81,6 @@ test("134. Restart dialog, unreadable version", async ({ page, start }) => {
   await expect(dialog(page).getByRole("alert")).toContainText(/no such file/i);
   await expect(restartButton(page)).toBeDisabled();
   expect(await pidLine(missing)).toBe(beforeMissing);
-});
-
-test("135. Restart dialog, bad config", async ({ page, start }) => {
-  const fixture = await start("restart-projects");
-  await fixture.setRestartControl("check.json", passing("fixture-next", { ok: false, error: "fixture config: port is not a number" }));
-  const before = await pidLine(fixture);
-
-  await openDialog(page);
-  await expect(dialog(page).getByRole("alert")).toContainText("fixture config: port is not a number");
-  await expect(restartButton(page)).toBeDisabled();
-  expect(await pidLine(fixture)).toBe(before);
-});
-
-test("136. Restart dialog, old binary", async ({ page, start }) => {
-  const fixture = await start("restart-projects");
-  await fixture.setRestartControl("old", "1");
-
-  await openDialog(page);
-  await expect(dialog(page).getByRole("alert")).toContainText("gx server restart");
-  await expect(restartButton(page)).toBeDisabled();
 });
 
 test("137. Restart dialog, running agents", async ({ page, start }) => {
@@ -166,6 +117,7 @@ test("137. Restart dialog, running agents", async ({ page, start }) => {
   await expect.poll(() => pidLine(fixture)).not.toBe(before);
 });
 
+// Also covers 178 (with nothing pending the check is ok at once and the button is plain).
 test("138. Restart dialog, dry run", async ({ page, start }) => {
   const fixture = await start("restart-projects", { reloads: 1 });
   await fixture.setRestartControl("start", "up");
@@ -176,7 +128,17 @@ test("138. Restart dialog, dry run", async ({ page, start }) => {
   await expect(dialog(page).getByRole("alert")).toContainText("Migration block");
   await expect(dialog(page).getByRole("alert")).toContainText("retry the migration from the strip");
   await expect(dialog(page).getByRole("button", nav("Restart"))).toHaveCount(0);
+  await expect(restartButton(page)).toHaveText("Restart anyway");
   await restartButton(page).click();
   await expectReloaded(page);
   await expect.poll(() => pidLine(fixture)).not.toBe(before);
+
+  await fixture.setRestartControl("check.json", passing("fixture-next"));
+  const began = Date.now();
+  await openDialog(page);
+  await expect(restartButton(page)).toHaveText("Restart");
+  await expect(restartButton(page)).toBeEnabled();
+  expect(Date.now() - began).toBeLessThan(10_000);
+  await expect(dialog(page).getByRole("alert")).toHaveCount(0);
+  await expect(dialog(page)).not.toContainText("A migration runs while the agents work.");
 });
