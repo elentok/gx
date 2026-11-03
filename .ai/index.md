@@ -44,6 +44,10 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   way (GOMAXPROCS at two fifths of that budget) unless the environment already sets GOMAXPROCS.
 - Test-writing rules shared with other projects are in `skills/gx-test-guidelines.md`. The rules
   below are gx-only.
+- **Default to no new Playwright flow.** Cover render and component logic with vitest and server
+  rules with Go tests. A flow needs a real server round trip, browser layout, or a multi-page
+  journey, and extends an existing flow when it can. `playwrightguard` fails above `maxFlows`. Full
+  rules: `skills/gx-playwright-e2es`.
 - Ticket agents run changed-file `gx check` and never `gx check --full`. The epic's verify ticket,
   the proof and the person run `gx check --full`; the verify ticket runs it and the soak in the
   background and polls.

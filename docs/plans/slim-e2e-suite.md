@@ -36,7 +36,16 @@ and searching `webui/src`; **no test was run**, so every verdict is a proposal t
   into a flow that already runs. Say why in the commit message.
 - Each commit records, per flow: kept, moved (to which test), merged (into which flow) or deleted.
 
+## Keeping it slim
+
+The rules for writing new flows are in `skills/gx-playwright-e2es` ("Write an e2e only when vitest
+or a Go test cannot cover it"). `playwrightguard/budget_test.go` fails when the suite has more
+than `maxFlows` flows. It starts at 301 (the count today). Only ticket 13 lowers it, to the real
+count left after tickets 1 to 12 (target about 100). Tickets 1 to 12 must not edit it.
+
 ## Tasks
+
+- [x] 0. Add the guidelines, the `.ai/index.md` rule and the `maxFlows` guard
 
 - [ ] 1. `slim-vi-editor`: `vi-editor.e2e.ts`, 45 flows down to about 7 (triage-1)
 - [ ] 2. `slim-small-flows`: `checks`, `disk`, `dirty-trunk`, `health`, `modes`, `stats`, `titles`,
