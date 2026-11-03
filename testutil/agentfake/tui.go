@@ -884,7 +884,7 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	if err := WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
 	}
-	if cfg.Behaviour[address] == BehaviourAsk {
+	if b := cfg.Behaviour[address]; b == BehaviourAsk || b == BehaviourWriteAsk {
 		// An ask is one gx call, so under load the whole turn can fit between two
 		// polls of the pid file: the launch then sees no turn and pauses as
 		// agent_prompt_stalled over the question.
