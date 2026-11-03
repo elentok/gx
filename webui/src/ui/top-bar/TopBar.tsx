@@ -1,11 +1,10 @@
 import { Box, Button, chakra, Image, Menu, Text } from "@chakra-ui/react";
-import { type ReactNode, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import type { Health } from "../../generated/server";
 import { AGENTS_HREF, SETTINGS_HREF, STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
 import { Chip } from "../chip/Chip";
 import { LiveDot } from "../live-dot/LiveDot";
-import { TOP_BAR_HEIGHT_VAR } from "../modal/useVisualViewportHeight";
 import type { Tone } from "../tone";
 import { Tray } from "../tray/Tray";
 
@@ -42,47 +41,13 @@ interface Props {
   onToggleViMode?: () => void;
   // The item shows only when the page can host the restart dialog.
   onRestart?: () => void;
-  // Draws the separator under the bar, edge to edge, so it sticks with the bar.
-  ruled?: boolean;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, viMode = false, onToggleViMode, onRestart, menuBlock, menuBlockShown, ruled = false }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, viMode = false, onToggleViMode, onRestart, menuBlock, menuBlockShown }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
-  const nav = useRef<HTMLElement>(null);
-  // iOS leaves the layout viewport in place when the keyboard opens and pans the visual viewport, which
-  // carries a sticky bar off screen. Follow the visual viewport's offset to keep it in view.
-  useEffect(() => {
-    const el = nav.current;
-    const vv = window.visualViewport;
-    if (!el || !vv) return;
-    const follow = () => {
-      el.style.transform = vv.offsetTop > 0 ? `translateY(${vv.offsetTop}px)` : "";
-    };
-    follow();
-    vv.addEventListener("scroll", follow);
-    vv.addEventListener("resize", follow);
-    return () => {
-      vv.removeEventListener("scroll", follow);
-      vv.removeEventListener("resize", follow);
-    };
-  }, []);
-  // Sheets that sit below the bar read its real height from the root.
-  useEffect(() => {
-    const el = nav.current;
-    if (!el) return;
-    const publish = () => document.documentElement.style.setProperty(TOP_BAR_HEIGHT_VAR, `${el.offsetHeight}px`);
-    publish();
-    if (typeof ResizeObserver === "undefined") return () => document.documentElement.style.removeProperty(TOP_BAR_HEIGHT_VAR);
-    const observer = new ResizeObserver(publish);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      document.documentElement.style.removeProperty(TOP_BAR_HEIGHT_VAR);
-    };
-  }, []);
   return (
-    <Box as="nav" ref={nav} display="flex" alignItems="center" justifyContent="space-between" pt="4" pb="4" position="sticky" {...(ruled && { mx: "-4", px: "4", borderBottomWidth: "1px", borderColor: "border" })} top="0" zIndex="sticky" bg="surface">
+    <Box as="nav" display="flex" alignItems="center" justifyContent="space-between" px="4" pt="4" pb="4">
       <Box display="flex" gap="5">
         {TABS.map(({ key, label, href }) => {
           const count = key === "epics" ? waiting : key === "agents" ? actionable : 0;

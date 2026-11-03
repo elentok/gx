@@ -7,8 +7,8 @@ import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
 import { MigratingStrip } from "../restart/MigratingStrip";
 import { PageContainer } from "../ui/PageContainer";
-import { TOP_BAR_HEIGHT_VAR } from "../ui/modal/useVisualViewportHeight";
 import { Strip } from "../ui/strip/Strip";
+import { StickyTopContainer } from "../ui/top-bar/StickyTopContainer";
 import type { TopBarTab } from "../ui/top-bar/TopBar";
 import { DiskStrips } from "./DiskStrips";
 import { formatTitle, type PageTitle } from "./title";
@@ -22,7 +22,7 @@ function usePageTitle(title: PageTitle) {
   }, [text]);
 }
 
-// The frame every page shares: the connected top bar, the strips under it and the page container.
+// The frame every page shares: the sticky banners and top bar, then the page container.
 // `fill` makes the page exactly the window tall; its children then share the space below the top bar.
 // `mode` sets the breakpoint `useWide` answers by for everything below.
 export function DetailPage({
@@ -48,13 +48,12 @@ export function DetailPage({
     <PageModeContext.Provider value={mode}>
       <Box {...(fill && { h: "100dvh", display: "flex", flexDirection: "column" })}>
         <PageContainer fill={fill}>
-          <ConnectedTopBar active={active} waiting={waiting} ruled={fill} />
-          {/* Under the bar, not above it: a banner above would push the sticky bar down and sit beneath the iOS status bar. They stick below the bar. */}
-          <Box mx="-4" position="sticky" top={`var(${TOP_BAR_HEIGHT_VAR}, 0px)`} zIndex="sticky">
+          <StickyTopContainer ruled={fill}>
             {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
             <MigratingStrip />
             <DiskStrips />
-          </Box>
+            <ConnectedTopBar active={active} waiting={waiting} />
+          </StickyTopContainer>
           <FailedMigrationStrip />
           {children}
         </PageContainer>

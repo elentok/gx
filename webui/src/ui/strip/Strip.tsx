@@ -3,22 +3,31 @@ import type { ReactNode } from "react";
 import type { Tone } from "../tone";
 
 // Thin full-width banner, e.g. the Offline notice.
-export function Strip({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
+export function Strip({
+  tone = "muted",
+  children,
+}: {
+  tone?: Tone;
+  children: ReactNode;
+}) {
+  // The tone background is translucent; the opaque surface behind it keeps what scrolls under from showing.
   return (
-    <Box
-      role="status"
-      data-tone={tone}
-      w="100%"
-      px="4"
-      py="1"
-      textAlign="center"
-      fontFamily="condensed"
-      fontSize="sm"
-      fontWeight="600"
-      color={`tone.${tone}.fg`}
-      bg={`tone.${tone}.bg`}
-    >
-      {children}
+    <Box bg="surface">
+      <Box
+        role="status"
+        data-tone={tone}
+        w="100%"
+        px="4"
+        py="1"
+        textAlign="center"
+        fontFamily="condensed"
+        fontSize="sm"
+        fontWeight="600"
+        color={`tone.${tone}.fg`}
+        bg={`tone.${tone}.bg`}
+      >
+        {children}
+      </Box>
     </Box>
   );
 }
