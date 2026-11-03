@@ -57,6 +57,21 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
+func TestCheck_BasedpyrightFailsOnErrorsOnly(t *testing.T) {
+	t.Parallel()
+	repo := checkRepo(t, `{}`)
+	tools := fakeTools(t, nil, "basedpyright", "ty")
+	testutil.WriteFile(t, repo, "a.py", "x = 1\n")
+
+	out, code := runCheckCmd(t, repo)
+	if code != 0 {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+	if got := readLog(t, tools); !strings.Contains(got, "basedpyright --level error a.py") {
+		t.Errorf("basedpyright must ignore warnings (they exit 1):\n%s", got)
+	}
+}
+
 func TestCheck_DefaultsRunOnlyRowsOfChangedFiles(t *testing.T) {
 	t.Parallel()
 	repo := checkRepo(t, `{}`)

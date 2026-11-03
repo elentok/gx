@@ -189,7 +189,8 @@ func (r *runner) defaultSteps(kind string) (steps []step, notes []string) {
 	case "lint":
 		files("shellcheck", nil, g.shell)
 	case "typecheck":
-		files("basedpyright", nil, g.python)
+		// basedpyright exits 1 on warnings by default; --level error keeps real errors failing.
+		files("basedpyright", []string{"--level", "error"}, g.python)
 		files("ty", []string{"check"}, g.python)
 	case "test":
 		if dirs := goDirs(g.golang); len(dirs) > 0 {
