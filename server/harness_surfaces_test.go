@@ -103,15 +103,18 @@ func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
 		t.Fatalf("open map-a = %+v", first)
 	}
 	meta := readMeta(t, f.h, first.Session.ID)
-	if meta["harness"] != "codex" || meta["first_prompt"] != "$gx-design proj:map-a" {
-		t.Fatalf("first design meta = %v, want codex and a $ skill prompt", meta)
+	if meta["harness"] != "codex" {
+		t.Fatalf("first design meta = %v, want codex", meta)
 	}
+	// Meta's first_prompt is cleared once typed, so it is read from the log.
+	waitPromptTyped(t, f.h, first.Session.ID, "$gx-design proj:map-a")
 	switchDefaultHarness(t, f.h, path, store, "claude")
 	second := f.open(t, "proj:map-b", false)
 	if second.Refused || second.Session == nil {
 		t.Fatalf("open map-b = %+v", second)
 	}
 	meta = readMeta(t, f.h, second.Session.ID)
+	// No fake claude runs, so this prompt is never typed and stays in meta.
 	if meta["harness"] != "claude" || meta["first_prompt"] != "/gx-design proj:map-b" {
 		t.Errorf("design after the switch meta = %v, want claude and a / skill prompt", meta)
 	}

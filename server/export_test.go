@@ -190,6 +190,12 @@ func (s *Server) PutRunAt(root string, r Run, at time.Time) {
 	s.registry.put(trackedRun{Run: r, Root: root, StartedAt: at})
 }
 
+// AgentWaiting reports whether the run's agent is not working (idle or done).
+func (s *Server) AgentWaiting(project, epic, id string) bool {
+	_, idle, err := s.agentState(tickets.Address{Project: project, Epic: epic, ID: id})
+	return err == nil && idle
+}
+
 // PauseTicket pauses a ticket the way a failed iteration does: the write, the
 // event, then the chat message (or its hold while recovery runs).
 func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason string) error {

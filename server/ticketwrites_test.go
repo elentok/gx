@@ -456,7 +456,7 @@ func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	launched := time.Now().Add(-90 * time.Second).Truncate(time.Second)
-	h.Server.PutRunAt("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}}, launched)
+	h.Server.PutRunAt("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "pty", Session: agentrunner.Session{ID: "p1"}}, launched)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

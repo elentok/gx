@@ -57,7 +57,11 @@ func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*ser
 	if herdr {
 		runner = herdrHosted{fake}
 	}
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(runner), func(c *server.Config) {
+	// The scaled-down dwell would pause the blocked ticket within a loaded
+	// machine's lag, before the test reads the card.
+	hold, release := gateDwell()
+	t.Cleanup(release)
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(runner), hold, func(c *server.Config) {
 		c.BudgetPollInterval = time.Hour
 		c.WebAddr = "127.0.0.1:0"
 	})

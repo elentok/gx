@@ -93,25 +93,27 @@ func TestHealthProcs_CallsInsideTheWindowShareOneRead(t *testing.T) {
 	}
 }
 
-// Seam: the window runs from the read's own time, so calls 0.9 of a window apart
-// still read once per window (story 51).
+// Seam: the window runs from the read's own time, so a call 0.6 of a window after
+// the read shares it, and one 1.2 windows after it (0.6 after the last call)
+// reads again (story 51). The spacing leaves a loaded machine 0.4 of a window of
+// lag before the second call; a later third call only helps.
 func TestHealthProcs_WindowRunsFromTheReadNotTheLastCall(t *testing.T) {
 	t.Parallel()
 	tm := slowSecondRead
-	tm.window = 500 * time.Millisecond
+	tm.window = time.Second
 	h := startProcs(t, tm, proc(10, "a", 100, 1))
-	spacing := tm.window * 9 / 10
+	spacing := tm.window * 6 / 10
 	health(t, h, false)
 	// The window is wall-clock time, so these two sleeps space the calls; there is no condition to wait on.
 	time.Sleep(spacing)
 	health(t, h, false)
 	if n := h.Processes.Reads(); n != 1 {
-		t.Fatalf("reads after 0.9 window = %d, want 1", n)
+		t.Fatalf("reads after 0.6 window = %d, want 1", n)
 	}
 	time.Sleep(spacing)
 	health(t, h, false)
 	if n := h.Processes.Reads(); n != 2 {
-		t.Fatalf("reads after 1.8 windows = %d, want 2", n)
+		t.Fatalf("reads after 1.2 windows = %d, want 2", n)
 	}
 }
 
