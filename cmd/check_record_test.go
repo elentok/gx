@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -175,11 +174,7 @@ func TestCheck_BriefCalledByConfiguredCommandNamesFailingTests(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the gx binary")
 	}
-	bin := t.TempDir()
-	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
-		t.Fatalf("go build: %v\n%s", err, out)
-	}
-	prependPath(t, bin)
+	prependPath(t, sharedGx(t))
 	repo, data := registeredCheckRepo(t, `{"test":"gx brief go-test ./..."}`)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\nfunc TestB(t *testing.T) { t.Fail() }\n")
@@ -206,11 +201,7 @@ func TestCheck_HangLimitKillsHungTestAndNamesIt(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the gx binary")
 	}
-	bin := t.TempDir()
-	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
-		t.Fatalf("go build: %v\n%s", err, out)
-	}
-	prependPath(t, bin)
+	prependPath(t, sharedGx(t))
 	repo, _ := registeredCheckRepo(t, `{"test":{"full":"gx brief go-test -timeout=60s ./...","limits":{"hang":"2s"}}}`)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestStuck(t *testing.T) { select {} }\n")
@@ -229,11 +220,7 @@ func TestCheck_HangLimitKillsHungTestAndNamesIt(t *testing.T) {
 // slowTestRepo has one Go test that sleeps 1.2s, checked under checksJSON.
 func slowTestRepo(t *testing.T, checksJSON string) (repo, data string) {
 	t.Helper()
-	bin := t.TempDir()
-	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
-		t.Fatalf("go build: %v\n%s", err, out)
-	}
-	prependPath(t, bin)
+	prependPath(t, sharedGx(t))
 	repo, data = registeredCheckRepo(t, checksJSON)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport (\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) { time.Sleep(1200 * time.Millisecond) }\n")
@@ -343,11 +330,7 @@ func TestCheck_SlowTestRerunNodeTools(t *testing.T) {
 		},
 	} {
 		t.Run(c.tool, func(t *testing.T) {
-			bin := t.TempDir()
-			if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
-				t.Fatalf("go build: %v\n%s", err, out)
-			}
-			prependPath(t, bin)
+			prependPath(t, sharedGx(t))
 			repo, data := registeredCheckRepo(t, `{"test":{"full":"gx brief -C webui `+c.tool+`","limits":{"slow":{"`+c.tool+`":"1s"},"suite":"1m"}}}`)
 			testutil.WriteFile(t, repo, "webui/e2e/playwright.config.ts", "")
 			testutil.WriteFile(t, repo, "webui/dist/index.html", "")

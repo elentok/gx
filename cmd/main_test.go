@@ -13,5 +13,9 @@ import (
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
-	os.Exit(m.Run())
+	code := m.Run()
+	if sharedGxDir != "" {
+		_ = os.RemoveAll(sharedGxDir)
+	}
+	os.Exit(code)
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +19,34 @@ var goBuildCache = sync.OnceValue(func() string {
 	}
 	return strings.TrimSpace(string(out))
 })
+
+// sharedGxDir holds the gx binary built once for the whole test run (TestMain
+// removes it). Building it per test made the first test of a loaded run wait
+// past the hang limit for a cold compile.
+var sharedGxDir string
+
+var buildSharedGx = sync.OnceValues(func() (string, error) {
+	dir, err := os.MkdirTemp("", "gx-bin")
+	if err != nil {
+		return "", err
+	}
+	sharedGxDir = dir
+	out, err := exec.Command("go", "build", "-o", filepath.Join(dir, "gx"), "github.com/elentok/gx").CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("go build: %w\n%s", err, out)
+	}
+	return dir, nil
+})
+
+// sharedGx returns the dir holding the shared gx binary, for prependPath.
+func sharedGx(t *testing.T) string {
+	t.Helper()
+	dir, err := buildSharedGx()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
 
 // tempEnv returns an env (KEY=VALUE entries) rooted in a fresh temp HOME, with
 // every XDG base dir under it. Pass it as the env field of deps, or to

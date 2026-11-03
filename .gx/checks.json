@@ -9,7 +9,7 @@
       "gx brief go-test -run '^TestSchemaSnapshot$' ./migrations"
     ],
     "limits": {
-      "suite": "4m",
+      "suite": "10m",
       "hang": "60s",
       "slow": { "go": "20s", "vitest": "20s", "playwright": "45s" }
     }
