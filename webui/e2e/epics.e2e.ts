@@ -1,6 +1,9 @@
 import { card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
 
 test("2. Epic looks right", async ({ page, start }) => {
+  // 06 asks while 02 merges. With a live paused sibling the run only re-reads the epic on its 30s pause poll,
+  // so 03 can start up to 30s after 02 merges, and 03's own merge waits out the debounce after that.
+  test.setTimeout(180_000);
   // Recovery would fork an investigation off the failed ticket and turn it into a waiting parent.
   await start("mixed", { config: { "recovery.enabled": "false" } });
   const mixed = card(page, "mixed-epic");
@@ -28,14 +31,14 @@ test("2. Epic looks right", async ({ page, start }) => {
   await expect(page.getByTestId("stats-line")).toHaveText(/^Running · /, { timeout: 30_000 });
   await expect(page.getByTestId("comet")).toBeVisible();
   // 02 then 03 merge one after the other, and every merge waits out the server's 3s finish debounce.
-  await expect(page.getByText("4/7")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("4/7")).toBeVisible({ timeout: 120_000 });
   // The innermost block holding both the 06 link and the Answer button is its card.
   const asking = page
     .locator("div")
     .filter({ has: page.locator('a[href$="/t/demo:mixed-epic/06"]') })
     .filter({ has: page.getByRole("button", nav("Answer")) })
     .last();
-  await expect(asking.getByText("needs answer")).toBeVisible();
+  await expect(asking.getByText("needs answer")).toBeVisible({ timeout: 45_000 });
   await expect(asking.getByText("Which option should the fake worker take?")).toBeVisible();
   const answer = asking.getByRole("button", nav("Answer"));
   await expect(answer).toBeVisible();
@@ -43,7 +46,7 @@ test("2. Epic looks right", async ({ page, start }) => {
   const answerBox = (await answer.boundingBox())!;
   expect(answerBox.x).toBeGreaterThanOrEqual(title.x + title.width);
   const failed = page.locator('[data-tone="deadlocked"]').filter({ has: page.getByRole("link", { name: "fails" }) });
-  await expect(failed.getByText("needs-repair · Run failed")).toBeVisible();
+  await expect(failed.getByText("needs-repair · Run failed")).toBeVisible({ timeout: 45_000 });
 
   await page.getByRole("link", { name: /^Epics/ }).click();
   await expect(mixed.getByText("4/7")).toBeVisible();
