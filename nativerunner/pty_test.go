@@ -221,6 +221,9 @@ func TestPty_Conformance(t *testing.T) {
 				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionFast})
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
+				// A stalled agent never starts a turn, so a short grace costs no
+				// false nudge; the default would wait it out three times over.
+				p.PromptGrace = time.Second
 				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionStall})
 			},
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
