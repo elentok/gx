@@ -573,6 +573,13 @@ func run(args []string) (err error) {
 		if err := json.Unmarshal(out, &res); err != nil || res.Session == nil {
 			return fmt.Errorf("open design %s: no session in %s", addr, out)
 		}
+		// The step moves while the opening turn still runs, so that turn's end finds the map past its
+		// step and the handoff fires. After the wait the run end would already be behind it.
+		if step, ok := sc.advanceSteps[addr]; ok {
+			if out, err := f.cli("tickets", "set", addr, "--design-step", step); err != nil {
+				return fmt.Errorf("advance %s to %s: %w\n%s", addr, step, err, out)
+			}
+		}
 		// The opening prompt is still running when `designs open` returns. A control the test sends
 		// meanwhile (Block) is overwritten when that turn ends.
 		if err := f.waitFor(res.Session.ID, "past its opening turn", func(si server.SessionInfo, _ server.SessionChatResponse) bool {
@@ -585,11 +592,6 @@ func run(args []string) (err error) {
 			if res, err := apiclient.New(server.SocketPath(f.stateD)).SetAutoAdvance(ctx, res.Session.ID, false); err != nil || res.Refused {
 				return fmt.Errorf("auto-advance off for %s: %v %+v", addr, err, res)
 			}
-		}
-	}
-	for addr, step := range sc.advanceSteps {
-		if out, err := f.cli("tickets", "set", addr, "--design-step", step); err != nil {
-			return fmt.Errorf("advance %s to %s: %w\n%s", addr, step, err, out)
 		}
 	}
 	for addr, id := range plain {
