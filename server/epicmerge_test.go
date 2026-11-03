@@ -170,6 +170,30 @@ func TestEpicMerge_RemovesLeftoverIterationWorktrees(t *testing.T) {
 	}
 }
 
+// Another epic's iteration worktree may hold a running agent: only the merged
+// epic's leftovers go.
+func TestEpicMerge_KeepsAnotherEpicsIterationWorktree(t *testing.T) {
+	t.Parallel()
+	f := newFFFixture(t)
+	servertest.WriteTicket(t, f.store, "proj", "other-epic", "01", "t", "")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	mine := keepWorktree(t, f.repo, schedEpic, "01")
+	other := keepWorktree(t, f.repo, "other-epic", "01")
+
+	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v", res, err)
+	}
+	f.settle(t)
+	if _, err := os.Stat(mine); !os.IsNotExist(err) {
+		t.Errorf("merged epic's leftover worktree still there: %v", err)
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Errorf("another epic's worktree was removed: %v", err)
+	}
+}
+
 func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, _ string) {
