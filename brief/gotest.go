@@ -18,6 +18,14 @@ import (
 // 10m under it on a busy machine.
 const defaultTimeout = "-timeout=30m"
 
+// serverPkg tests spend most of their time waiting (debounces, polls, git), not
+// on the CPU, so the GOMAXPROCS cap alone leaves its slots idle. Its -parallel
+// is serverParallelFactor times the cap; CPU use stays capped.
+const (
+	serverPkg            = "./server"
+	serverParallelFactor = 2
+)
+
 // GoTest wraps `go test`.
 type GoTest struct{}
 
@@ -37,8 +45,11 @@ func (GoTest) Plan(env []string, _ string, args []string) (Invocation, error) {
 	if _, has := stripFlag(rest, true, "timeout"); !has {
 		argv = append(argv, defaultTimeout)
 	}
-	argv = append(argv, rest...)
 	procs := goTestProcs(runtime.NumCPU(), env)
+	if _, has := stripFlag(rest, true, "parallel"); !has && slices.Contains(rest, serverPkg) {
+		argv = append(argv, "-parallel="+strconv.Itoa(procs*serverParallelFactor))
+	}
+	argv = append(argv, rest...)
 	return Invocation{Bin: exe, Argv: append(argv, tail...), Env: []string{"GOMAXPROCS=" + strconv.Itoa(procs)}}, nil
 }
 

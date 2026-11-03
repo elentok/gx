@@ -86,6 +86,27 @@ func TestGoTestPlan_TimeoutDefaultsButCallerWins(t *testing.T) {
 	}
 }
 
+func TestGoTestPlan_ServerGetsMoreParallelSlotsThanTheCPUCap(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := []string{"PATH=" + bin, "GX_TEST_CPUS=5"} // cap 2
+	for _, tt := range []struct{ args, want []string }{
+		{[]string{"./server"}, []string{"test", "-json", "-v", "-timeout=30m", "-parallel=4", "./server"}},
+		{[]string{"./server", "-parallel", "3"}, []string{"test", "-json", "-v", "-timeout=30m", "./server", "-parallel", "3"}},
+		{[]string{"./cmd"}, []string{"test", "-json", "-v", "-timeout=30m", "./cmd"}},
+	} {
+		inv, err := GoTest{}.Plan(env, t.TempDir(), tt.args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Join(inv.Argv, " ") != strings.Join(tt.want, " ") {
+			t.Errorf("Plan(%v) argv = %v, want %v", tt.args, inv.Argv, tt.want)
+		}
+	}
+}
+
 func TestWithDefaults_CallerValueWins(t *testing.T) {
 	got := withDefaults([]string{"PATH=/bin", "GOMAXPROCS=7"}, []string{"GOMAXPROCS=2", "OTHER=1"})
 	want := []string{"PATH=/bin", "GOMAXPROCS=7", "OTHER=1"}

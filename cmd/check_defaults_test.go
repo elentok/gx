@@ -180,7 +180,7 @@ func TestCheck_ServerFileRunsBriefGoTestNotMakeTarget(t *testing.T) {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
 	got := readLog(t, tools)
-	if !strings.Contains(got, "go test -json -v -timeout=30m ./server") || strings.Contains(got, "make") {
+	if !strings.Contains(got, "go test -json -v -timeout=30m -parallel=") || !strings.Contains(got, " ./server") || strings.Contains(got, "make") {
 		t.Errorf("tool log:\n%s", got)
 	}
 }
