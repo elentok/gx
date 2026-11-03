@@ -5,9 +5,11 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 )
 
 func TestProjectRetryMigration_StartsAndRefuses(t *testing.T) {
@@ -20,7 +22,14 @@ func TestProjectRetryMigration_StartsAndRefuses(t *testing.T) {
 		return out.String(), err
 	}
 
-	out, err := run(server.ScratchProject)
+	// The start-up migration may still be running under load; the server
+	// refuses with ReasonRetryRunning until it ends, so retry until it accepts.
+	var out string
+	var err error
+	testutil.WaitFor(t, 30*time.Second, "the start-up migration to end", func() bool {
+		out, err = run(server.ScratchProject)
+		return err == nil || !strings.Contains(err.Error(), server.ReasonRetryRunning)
+	})
 	if err != nil || !strings.Contains(out, "migration of project "+server.ScratchProject+" started") {
 		t.Errorf("started = %q, %v", out, err)
 	}
