@@ -15,6 +15,7 @@ export function NoteBox({
   autoFocus = false,
   onSubmit,
   completion,
+  bg,
 }: {
   /** What the note is on, for its labels: "question 2". */
   name: string;
@@ -32,6 +33,8 @@ export function NoteBox({
   onSubmit?: () => void;
   /** Opt in to the command completion menu. */
   completion?: CompletionConfig;
+  /** Overrides the box's background. */
+  bg?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -50,6 +53,7 @@ export function NoteBox({
         autoFocus={autoFocus}
         onSubmit={onSubmit}
         completion={completion}
+        bg={bg}
       />
     </Box>
   );

@@ -63,7 +63,7 @@ function ChatTail({
       minH="0"
       gap="3"
     >
-      {round.length > 0 && (
+      {round.length > 0 && questions && (
         <QuestionSheet
           round={round}
           answers={answers}
@@ -104,7 +104,10 @@ function ChatTail({
             clear();
             onQuestions(false);
           }}
-          onReview={(index) => setFocus({ index })}
+          onReview={(index) => {
+            onQuestions(true);
+            setFocus({ index });
+          }}
           autoMenu={autoMenu}
         />
       )}

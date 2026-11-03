@@ -32,6 +32,8 @@ interface FieldProps {
   onSubmit?: () => void;
   size?: "sm" | "md";
   radius?: string;
+  /** Overrides the field's background (default: the raised surface). */
+  bg?: string;
   /** Opt in to the command completion menu in the inline textarea. */
   completion?: CompletionConfig;
   /** A status line inside the box, under the text. `null` keeps its room with no text; leave it out for no line. */
@@ -74,6 +76,7 @@ function Field({
   onSubmit,
   size,
   radius = "12px",
+  bg,
   menu,
   note,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
@@ -117,6 +120,7 @@ function Field({
         {...fieldLook}
         size={size}
         borderRadius={radius}
+        {...(bg ? { bg } : {})}
         autoFocus={autoFocus}
         rows={rows}
         lineHeight="1.5"

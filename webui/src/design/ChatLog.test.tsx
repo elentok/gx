@@ -438,7 +438,7 @@ test("a busy turn still shows the Working row while the questions fill the scree
   expect(screen.getAllByRole("status")).toHaveLength(1);
 });
 
-test("a round opens a sheet that folds, and its stepper marks and jumps", async () => {
+test("a round opens a sheet whose stepper marks and jumps", async () => {
   renderChat([session()], roundChat());
   const sheet = await screen.findByRole("group", { name: "Questions" });
   expect(within(sheet).getByText("First?")).toBeTruthy();
@@ -450,10 +450,7 @@ test("a round opens a sheet that folds, and its stepper marks and jumps", async 
   expect(within(sheet).getByRole("textbox", { name: "Answer to question 3" })).toBeTruthy();
 
   fireEvent.click(viewButton("Chat"));
-  fireEvent.click(within(sheet).getByRole("button", { name: "Fold questions" }));
-  expect(within(sheet).queryByRole("textbox", { name: "Answer to question 3" })).toBeNull();
-  fireEvent.click(within(sheet).getByRole("button", { name: "Open questions" }));
-  expect(within(sheet).getByRole("textbox", { name: "Answer to question 3" })).toBeTruthy();
+  expect(screen.queryByRole("group", { name: "Questions" })).toBeNull();
 });
 
 test("picking an option marks the circle answered and advances; Prev and Next move", async () => {
@@ -591,17 +588,16 @@ test("Questions keeps the gx stopped notice", async () => {
   expect(screen.getByRole("region", { name: "gx stopped" })).toBeTruthy();
 });
 
-test("the Chat view's sheet folds; the Questions view's sheet has no fold chevron and no focus button", async () => {
+test("the Chat view has no sheet; the Questions view's sheet has no fold chevron and no focus button", async () => {
   renderChat([session()], focusChat());
   const sheet = await screen.findByRole("group", { name: "Questions" });
   expect(within(sheet).queryByRole("button", { name: /Fold questions|Open questions/ })).toBeNull();
   expect(screen.queryByRole("button", { name: /focus mode/ })).toBeNull();
   await showChat();
-  fireEvent.click(within(sheet).getByRole("button", { name: "Fold questions" }));
-  expect(within(sheet).queryByRole("button", { name: "Alpha" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "Questions" })).toBeNull();
   expect(screen.queryByRole("button", { name: /focus mode/ })).toBeNull();
   showQuestions();
-  expect(within(sheet).getByRole("button", { name: "Alpha" })).toBeTruthy();
+  expect(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Alpha" })).toBeTruthy();
   expect(inQuestions()).toBe(true);
 });
 
@@ -754,22 +750,24 @@ test("a fresh mount with a round draft opens Questions", async () => {
 
 test("answers, the open question and the note survive two view switches; the text answer has five rows in Questions", async () => {
   renderChat([session()], focusChat());
-  const sheet = await screen.findByRole("group", { name: "Questions" });
-  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
-  fireEvent.click(within(sheet).getByRole("button", { name: "Question 3" }));
+  const sheet = async () => within(await screen.findByRole("group", { name: "Questions" }));
+  const first = await sheet();
+  fireEvent.click(first.getByRole("button", { name: "Alpha" }));
+  fireEvent.click(first.getByRole("button", { name: "Question 3" }));
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "for all" } });
-  const answer = () => within(sheet).getByRole("textbox", { name: "Answer to question 3" }) as HTMLTextAreaElement;
-  expect(answer().rows).toBe(5);
-  fireEvent.change(answer(), { target: { value: "typed" } });
+  const answer = async () => (await sheet()).getByRole("textbox", { name: "Answer to question 3" }) as HTMLTextAreaElement;
+  expect((await answer()).rows).toBe(5);
+  fireEvent.change(await answer(), { target: { value: "typed" } });
   await showChat();
-  expect(answer().rows).toBe(2);
   showQuestions();
   await showChat();
-  expect(answer().rows).toBe(2);
-  expect(answer().value).toBe("typed");
-  expect(within(sheet).getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
-  expect(within(sheet).getByRole("button", { name: "Question 3, answered" }).getAttribute("aria-current")).toBe("step");
+  showQuestions();
+  expect((await answer()).rows).toBe(5);
+  expect((await answer()).value).toBe("typed");
+  const again = await sheet();
+  expect(again.getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
+  expect(again.getByRole("button", { name: "Question 3, answered" }).getAttribute("aria-current")).toBe("step");
   expect((screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("for all");
 });
 
@@ -780,13 +778,12 @@ test("defaulted questions render as plain text beside one card, and Send asks no
   const fetchChat = okChat(chatOf([msg({ text: defaultsText })], { round: [card({ label: "1", body: "First?" })] }));
   renderChat([session()], fetchChat, post);
   const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(within(sheet).getAllByRole("button", { name: /^Question \d/ })).toHaveLength(1);
+  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
   fireEvent.click(viewButton("Chat"));
   expect(screen.getByText("Decided unless you object")).toBeTruthy();
   expect(screen.getByText("Naming: use camelCase")).toBeTruthy();
   expect(screen.getByText("Order: alphabetical")).toBeTruthy();
-  expect(within(sheet).getAllByRole("button", { name: /^Question \d/ })).toHaveLength(1);
-
-  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   const sent = JSON.stringify(post.mock.calls[0]);

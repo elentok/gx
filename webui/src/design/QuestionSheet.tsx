@@ -135,6 +135,7 @@ export function Question({
           name={`question ${card.label}`}
           title={`Note on ${nameOf(card)} - ${card.title}`}
           placeholder="Note on this question"
+          bg="surface"
           value={answer.note ?? ""}
           onChange={(note) => onChange({ ...answer, note })}
         />

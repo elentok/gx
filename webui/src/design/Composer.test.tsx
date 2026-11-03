@@ -807,14 +807,13 @@ test("a second Send click closes the popover and sends nothing", async () => {
   expect(post).not.toHaveBeenCalled();
 });
 
-test("a popover row opens the sheet at that question and focuses its first control, even folded", async () => {
+test("a popover row opens the sheet at that question and focuses its first control, from the Chat view", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
   const { s, popover: gaps } = await sendWithGaps(post);
-  // Folding needs the Chat view; close the popover first and open it again after.
+  // The sheet is gone in the Chat view; close the popover first and open it again after.
   fireEvent.keyDown(gaps, { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   fireEvent.click(screen.getByRole("button", { name: "Chat" }));
-  fireEvent.click(s.getByRole("button", { name: "Fold questions" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   const popover = await screen.findByRole("alertdialog");
   await waitFor(() =>
@@ -826,11 +825,11 @@ test("a popover row opens the sheet at that question and focuses its first contr
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      s.getByRole("textbox", { name: "Answer to question 3" }),
+      within(screen.getByRole("group", { name: "Questions" })).getByRole("textbox", { name: "Answer to question 3" }),
     ),
   );
   expect(
-    s.getByRole("button", { name: "Question 3" }).getAttribute("aria-current"),
+    within(screen.getByRole("group", { name: "Questions" })).getByRole("button", { name: "Question 3" }).getAttribute("aria-current"),
   ).toBe("step");
 
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
@@ -841,7 +840,7 @@ test("a popover row opens the sheet at that question and focuses its first contr
   );
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      s.getByRole("button", { name: "Sure" }),
+      within(screen.getByRole("group", { name: "Questions" })).getByRole("button", { name: "Sure" }),
     ),
   );
   expect(post).not.toHaveBeenCalled();
