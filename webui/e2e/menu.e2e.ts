@@ -441,7 +441,8 @@ test.describe("118. Limits states", () => {
     await start("limits", { shape: "stale" });
     await openMenu(page);
     await expect(row(page, "5h limit").getByText(/^seen /)).toBeVisible();
-    await expect(row(page, "Weekly limit").getByText(/^seen /)).toBeVisible();
+    // The weekly row also carries "today so far" before the seen-age.
+    await expect(row(page, "Weekly limit").getByText(/seen 3h ago$/)).toBeVisible();
   });
 
   test("past-reset", async ({ page, start }) => {
