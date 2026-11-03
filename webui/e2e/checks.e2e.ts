@@ -81,6 +81,8 @@ test("67. Set up checks, save to repo (and 68. save to project.json, 69. refused
   expect(head()).toBe(before);
   expect(readFileSync(file, "utf8")).toBe(draft);
   rmSync(file);
+  // At phone width the refusal toast sits over the Save button; dismiss it as a user would.
+  await toasts(page).getByRole("button", nav("Dismiss notification")).click();
 
   // 67: the real save commits .gx/checks.json on main.
   await expect(dialog.getByRole("radio", { name: /Commit \.gx\/checks\.json on main/ })).toBeChecked();
