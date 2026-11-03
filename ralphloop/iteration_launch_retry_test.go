@@ -147,7 +147,7 @@ func (l launchRunner) PromptLaunch(_ context.Context, s agentrunner.Session, tex
 // unknownSkillRunner rejects every launch prompt as an unknown skill.
 type unknownSkillRunner struct{ agentrunner.Runner }
 
-func (unknownSkillRunner) PromptLaunch(_ agentrunner.Session, text string, _ func(string)) error {
+func (unknownSkillRunner) PromptLaunch(_ context.Context, _ agentrunner.Session, text string, _ func(string)) error {
 	return fmt.Errorf("%w: %w: %q", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text)
 }
 
@@ -155,7 +155,7 @@ func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	var kinds []events.Kind
-	_, err := startAndPrompt(unknownSkillRunner{d.Runner}, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
+	_, err := startAndPrompt(context.Background(), unknownSkillRunner{d.Runner},agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
 		func(_ int, kind events.Kind, _ error) { kinds = append(kinds, kind) }, func(int, string) {})
 	var lf *launchFailure
 	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
