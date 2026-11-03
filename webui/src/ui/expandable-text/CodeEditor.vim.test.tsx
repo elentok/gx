@@ -98,6 +98,56 @@ describe("vi on", () => {
     expect(text()).toBe("two\ntwo\nthree four\nfive");
   });
 
+  test("h l w e 0 f gg G move the caret as vim does", () => {
+    const { keys, caret } = mount(true, { start: 0, end: 0 }, "alpha beta gamma\ndelta epsilon\nzeta");
+    keys("<Esc>");
+    const steps: [string, number][] = [
+      ["l", 1],
+      ["h", 0],
+      ["w", 6],
+      ["e", 9],
+      ["0", 0],
+      ["fg", 11],
+      ["G", 31],
+      ["gg", 0],
+    ];
+    for (const [k, at] of steps) {
+      for (const key of k === "fg" || k === "gg" ? [k] : [...k]) keys(key);
+      expect(caret(), k).toBe(at);
+    }
+  });
+
+  test("i, a, o and . change the text and the mode", () => {
+    const { keys, text, view, onModeChange } = mount(true, { start: 0, end: 0 }, "abc");
+    const type = (s: string) => act(() => view.dispatch(view.state.replaceSelection(s)));
+    keys("<Esc>");
+    for (const [key, typed, after] of [
+      ["i", "X", "Xabc"],
+      ["a", "Y", "XYabc"],
+      ["o", "Z", "XYabc\nZ"],
+    ]) {
+      keys(key);
+      expect(onModeChange, key).toHaveBeenLastCalledWith("INSERT");
+      type(typed);
+      keys("<Esc>");
+      expect(onModeChange, key).toHaveBeenLastCalledWith("NORMAL");
+      expect(text(), key).toBe(after);
+    }
+    keys("gg");
+    keys("x");
+    keys(".");
+    expect(text()).toBe("abc\nZ");
+  });
+
+  test("v d deletes the selection", () => {
+    const { keys, text } = mount(true, { start: 0, end: 0 }, "two three");
+    keys("<Esc>");
+    keys("v");
+    keys("l");
+    keys("d");
+    expect(text()).toBe("o three");
+  });
+
   test("ZZ calls the close callback once", () => {
     const { keys, onZZ } = mount(true);
     keys("<Esc>");

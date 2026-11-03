@@ -215,6 +215,14 @@ test("with vi mode off the key is not handled", () => {
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
+test("with vi mode on, the key with focus on the page body opens nothing", () => {
+  stubPlatform("MacIntel");
+  withVi(true, <Keys />);
+  document.body.focus();
+  fireEvent.keyDown(document.body, { key: "g", metaKey: true });
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
 test("a disabled field opens nothing", () => {
   stubPlatform("MacIntel");
   withVi(true, <Keys disabled />);
@@ -257,9 +265,11 @@ test("Cmd-Enter without a submit action leaves the editor open", async () => {
   expect(onKeyDown).not.toHaveBeenCalled();
 });
 
-test("Done, a backdrop press and ZZ each refocus the field with the editor's selection, before the dialog goes", async () => {
+test("Done, the open key, a backdrop press and ZZ each refocus the field with the editor's selection, before the dialog goes", async () => {
   const closers: [string, () => void][] = [
     ["Done", () => fireEvent.click(screen.getByText("Done"))],
+    // CodeMirror reads Mod as Ctrl in jsdom.
+    ["Cmd-G", () => void fireEvent.keyDown(viewOf(TITLE).contentDOM, { key: "g", ctrlKey: true })],
     ["backdrop", () => {
       const backdrop = screen.getByRole("dialog").parentElement!;
       fireEvent.mouseDown(backdrop);
