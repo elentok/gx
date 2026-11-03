@@ -77,6 +77,22 @@ func TestParseConfig(t *testing.T) {
 	}
 }
 
+func TestRepoChecksLimits(t *testing.T) {
+	raw, err := os.ReadFile("../.gx/checks.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := ParseConfig(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := time.Second
+	want := Limits{Suite: 4 * time.Minute, Hang: 60 * s, Slow: SlowLimits{Go: 20 * s, Vitest: 20 * s, Playwright: 45 * s}}
+	if got := cfg["test"].Limits; got != want {
+		t.Errorf("limits = %+v, want %+v", got, want)
+	}
+}
+
 func TestParseConfigLimits(t *testing.T) {
 	s := time.Second
 	cases := []struct {

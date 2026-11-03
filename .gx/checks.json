@@ -7,6 +7,11 @@
       "gx brief go-test -run '^TestNoOldWords$' ./oldwords",
       "gx brief go-test -run '^TestRepoFlowsReadStateAfterExpect$' ./playwrightguard",
       "gx brief go-test -run '^TestSchemaSnapshot$' ./migrations"
-    ]
+    ],
+    "limits": {
+      "suite": "4m",
+      "hang": "60s",
+      "slow": { "go": "20s", "vitest": "20s", "playwright": "45s" }
+    }
   }
 }
