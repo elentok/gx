@@ -65,6 +65,8 @@ func runTestSh(t *testing.T, env ...string) (out string, code int, stubs string)
 	cmd.Env = append(os.Environ(), append([]string{
 		"PATH=" + stubs + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"STUB_DIR=" + stubs,
+		// `gx check --full` sets GX_TEST_E2E=1 in this process's env; a test turns it on itself.
+		"GX_TEST_E2E=",
 	}, env...)...)
 	b, err := cmd.CombinedOutput()
 	if exitErr, ok := err.(*exec.ExitError); ok {
