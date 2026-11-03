@@ -108,6 +108,13 @@ describe("LimitsBlock", () => {
     expect(await v.findByText(exactTime(w.resets_at))).toBeTruthy();
   });
 
+  it("opens the reset-time tooltip on click, as a tap does", async () => {
+    const w = win(34);
+    const v = show({ five_hour: w });
+    fireEvent.click(v.getByRole("button"));
+    expect(await v.findByText(exactTime(w.resets_at))).toBeTruthy();
+  });
+
   describe("weekly burn", () => {
     const weekly = (over: Partial<UsageLimitWindow>) => ({
       seven_day: { ...win(50, { resets_at: sec + 3 * 86400 }), ...over },
@@ -136,6 +143,16 @@ describe("LimitsBlock", () => {
         weekly({ chip: { today: 7, yesterday: 5, direction: "up" } }),
       );
       fireEvent.focus(v.getByRole("button", { name: "Weekly limit burn" }));
+      expect(
+        await v.findByText("Burn today 7 pts so far, yesterday 5"),
+      ).toBeTruthy();
+    });
+
+    it("chip tooltip opens on click, as a tap does", async () => {
+      const v = show(
+        weekly({ chip: { today: 7, yesterday: 5, direction: "up" } }),
+      );
+      fireEvent.click(v.getByRole("button", { name: "Weekly limit burn" }));
       expect(
         await v.findByText("Burn today 7 pts so far, yesterday 5"),
       ).toBeTruthy();
