@@ -634,16 +634,24 @@ var scenarios = map[string]scenario{
 	// codex-design: Default harness codex; one map whose design session starts on
 	// Codex. See codexDesignScenario.
 	"codex-design": codexDesignScenario(),
-	// codex-blocked: one Codex ticket whose worker raises a PermissionRequest hook and
-	// stays blocked, so the ticket pauses on the approval card after the dwell.
+	// codex-blocked: two Codex tickets (one per epic) whose workers raise a
+	// PermissionRequest hook and stay blocked, so each pauses on the approval card
+	// after the dwell. One server serves both decisions: Allow once and Deny.
 	"codex-blocked": {
 		codex: true,
 		epics: []epic{
 			{project, "codex-blocked-epic", []ticket{{"01", "approve", servertest.TicketOpts{}}}},
+			{project, "codex-denied-epic", []ticket{{"01", "deny", servertest.TicketOpts{}}}},
 		},
-		behaviour:   map[string]string{project + ":codex-blocked-epic/01": agentfake.BehaviourPermission},
-		queue:       []string{project + ":codex-blocked-epic"},
-		queueAgents: map[string]string{project + ":codex-blocked-epic": "codex"},
+		behaviour: map[string]string{
+			project + ":codex-blocked-epic/01": agentfake.BehaviourPermission,
+			project + ":codex-denied-epic/01":  agentfake.BehaviourPermission,
+		},
+		queue: []string{project + ":codex-blocked-epic", project + ":codex-denied-epic"},
+		queueAgents: map[string]string{
+			project + ":codex-blocked-epic": "codex",
+			project + ":codex-denied-epic":  "codex",
+		},
 	},
 	// codex-error: one Codex ticket whose first turn ends in a model error with no
 	// usage-limit signal, so the ticket pauses after the dwell. The Retry prompt

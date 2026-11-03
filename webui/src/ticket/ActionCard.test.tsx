@@ -130,6 +130,21 @@ test("Retry posts the state token and shows a success toast", async () => {
   expect(posted(fetchMock)).toEqual([["/v1/tickets/retry", { address: "gx:demo/12", state: "tok-3" }]]);
 });
 
+test("Retry is disabled while the call runs", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  vi.stubGlobal("fetch", vi.fn(async () => {
+    await gate;
+    return new Response(JSON.stringify({}));
+  }));
+  renderTicket(() => repair(["retry", "start-over"]));
+  const retry = (await screen.findByRole("button", { name: "Retry" })) as HTMLButtonElement;
+  fireEvent.click(retry);
+  await waitFor(() => expect(retry.disabled).toBe(true));
+  release();
+  expect(await screen.findByText("Retry started")).toBeTruthy();
+});
+
 test("Resume posts to the resume route and shows a success toast", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: { ticket: "12", status: "open" } })));
   vi.stubGlobal("fetch", fetchMock);

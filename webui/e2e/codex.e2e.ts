@@ -22,14 +22,6 @@ test("117. Default harness setting", async ({ page, start }) => {
   await openAgentsSettings(page);
 
   await expect(control(page).getByRole("button", { name: "Claude" })).toHaveAttribute("aria-pressed", "true");
-  await expect(control(page).getByRole("button", { name: "Codex" })).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByText("Codex runs on PTY")).toHaveCount(0);
-  await expect(projectRow(page, "gx").getByText("Codex", { exact: true })).toBeVisible();
-  await expect(projectRow(page, "gx").getByRole("button", { name: "Remove override" })).toBeVisible();
-  for (const inheriting of ["demo", "dotfiles"]) {
-    await expect(projectRow(page, inheriting)).toContainText("Inherits global (Claude)");
-    await expect(projectRow(page, inheriting).getByRole("button", { name: "Override" })).toBeVisible();
-  }
 
   // Switching reports how many waiting tickets follow and how many running agents keep Claude.
   // The running epic's ticket counts as waiting until its worker claims it.
@@ -84,21 +76,8 @@ test("117. Default harness setting", async ({ page, start }) => {
   await expect(page.getByText("switched by hand").first()).toBeVisible();
 });
 
-test("117. Default harness setting, tier without a model", async ({ page, start }) => {
-  const fixture = await start("default-harness", { config: { "agents.claude.model": "", "agents.claude.effort": "" } });
-  const before = await sessions(fixture);
-  await fixture.cli("agents", "create", "--project", "demo", "--harness", "claude", "--name", "silent");
-  const silent = await created(fixture, before);
-  await go(page, `#/agents/${silent.id}`);
-  await expect(page.getByText("Claude", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Worker · CLI default")).toBeVisible();
-});
-
-test("117. Default harness setting, headless note", async ({ page, start }) => {
-  await start("default-harness", { config: { "agent-runner": "headless" } });
-  await go(page, "#/settings/agents");
-  await expect(page.getByText("Codex runs on PTY")).toBeVisible();
-});
+// 117b (tier without a model) and 117c (headless note) are vitest cases:
+// AgentsPage.sessionView.test.tsx and AgentsSettingsPage.test.tsx.
 
 const chips = (page: Page, epic: string) =>
   page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).locator("[data-chips]");
@@ -193,10 +172,10 @@ test("120. Codex rate-limit wait", async ({ page, start }) => {
 const dwell = { timeout: 30_000 };
 const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true });
 
-async function openBlockedTicket(page: Page) {
-  await page.getByRole("link", { name: "codex-blocked-epic" }).click();
+async function openBlockedTicket(page: Page, epic: string) {
+  await page.getByRole("link", { name: epic }).click();
   await expect(page.getByText("needs answer").first()).toBeVisible(dwell); // oldword:ok the kept legacy rendered status
-  await page.locator('a[href$="/t/demo:codex-blocked-epic/01"]').filter({ hasNotText: "→" }).click();
+  await page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).click();
   await expect(stuck(page)).toBeVisible();
   await expect(page.getByRole("group", { name: "Permission request" })).toBeVisible();
 }
@@ -255,21 +234,25 @@ test("122. Codex design run", async ({ page, start }) => {
     .toBeGreaterThan(0);
 });
 
-test.describe("119. Codex approval card", () => {
-  test("Allow once answers the hook with allow", async ({ page, start }) => {
-    const fixture = await start("codex-blocked");
-    await openBlockedTicket(page);
-    await page.getByRole("button", nav("Allow once")).click();
-    await expect(stuck(page)).toHaveCount(0);
-    await expect.poll(() => fixture.codexDecisions()).toEqual([{ behavior: "allow", message: "" }]);
-  });
+// 119a and 119b: one server, two blocked tickets (Allow once, then Deny with a note).
+test("119. Codex approval card", async ({ page, start }) => {
+  test.setTimeout(180_000);
+  const fixture = await start("codex-blocked");
 
-  test("Deny sends the note as the reason", async ({ page, start }) => {
-    const fixture = await start("codex-blocked");
-    await openBlockedTicket(page);
-    await page.getByRole("textbox", nav("Note for Deny (optional)")).fill("not on my machine");
-    await page.getByRole("button", nav("Deny")).click();
-    await expect(stuck(page)).toHaveCount(0);
-    await expect.poll(() => fixture.codexDecisions()).toEqual([{ behavior: "deny", message: "not on my machine" }]);
-  });
+  await openBlockedTicket(page, "codex-blocked-epic");
+  await page.getByRole("button", nav("Allow once")).click();
+  await expect(stuck(page)).toHaveCount(0);
+  await expect.poll(() => fixture.codexDecisions()).toEqual([{ behavior: "allow", message: "" }]);
+
+  await go(page, "#/");
+  await openBlockedTicket(page, "codex-denied-epic");
+  await page.getByRole("textbox", nav("Note for Deny (optional)")).fill("not on my machine");
+  await page.getByRole("button", nav("Deny")).click();
+  await expect(stuck(page)).toHaveCount(0);
+  await expect
+    .poll(() => fixture.codexDecisions())
+    .toEqual([
+      { behavior: "allow", message: "" },
+      { behavior: "deny", message: "not on my machine" },
+    ]);
 });

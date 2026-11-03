@@ -584,9 +584,10 @@ func TestBlockedMenuScenario_QuestionMenuLeavesTheAgentBlocked(t *testing.T) {
 func TestCodexBlockedScenario_PermissionRequestShowsAPendingCard(t *testing.T) {
 	t.Parallel()
 	r := start(t, "codex-blocked")
-	const addr = "demo:codex-blocked-epic/01"
-	r.waitPermission(t, addr)
-	r.waitBlockedSession(t, addr)
+	for _, addr := range []string{"demo:codex-blocked-epic/01", "demo:codex-denied-epic/01"} {
+		r.waitPermission(t, addr)
+		r.waitBlockedSession(t, addr)
+	}
 	r.stop(t)
 }
 
