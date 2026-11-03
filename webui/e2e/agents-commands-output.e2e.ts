@@ -58,14 +58,9 @@ test("155. Command output in the chat, cut at 12 lines", async ({ page, start })
   expect(await fixture.input(conv)).not.toContain("cost-row");
   expect((await infoOf(fixture, idle.id)).actionable.reason ?? "").toBe("");
   expect(await fixture.cli("agents", "chat", idle.id)).not.toContain("Caveat");
-});
 
-test("155. Command output in the chat, hidden output", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
-  await page.setViewportSize({ width: 1280, height: 800 });
-
-  // `/model` and `/compact` leave the pill alone: empty output and the Compacted line are dropped.
-  for (const [n, command, message] of [[0, "/model", ""], [1, "/compact", "Compacted (ctrl+o to see full summary)"]] as const) {
+  // Hidden output. `/model` and `/compact` leave the pill alone: empty output and the Compacted line are dropped.
+  for (const [n, command, message] of [[1, "/model", ""], [2, "/compact", "Compacted (ctrl+o to see full summary)"]] as const) {
     const idle = await claudeIdle(fixture, n);
     const conv = await conversationOf(fixture, idle.id);
     await go(page, `#/agents/${idle.id}`);
@@ -88,9 +83,22 @@ test("155. Command output in the chat, hidden output", async ({ page, start }) =
   await reopen(page, `#/agents/${codex.id}`);
   await expect(page.getByText("/status", { exact: true })).toBeVisible();
   await expect(output(page)).toHaveCount(0);
+
+  // 159 /exit, Agents page. Last: it ends the session.
+  const exiting = await claudeIdle(fixture);
+  await go(page, `#/agents/${exiting.id}`);
+  await expect(page.getByText("hello", { exact: true })).toBeVisible();
+  await messageBox(page).fill("/exit");
+  await sendButton(page).click();
+  await expect.poll(async () => (await infoOf(fixture, exiting.id)).status.state).toBe("exited");
+
+  // The chat stays, the composer is off and says how to get the session back.
+  await expect(page.getByText("hello", { exact: true })).toBeVisible();
+  await expect(composer(page).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible();
+  await expect(sendButton(page)).toBeDisabled();
 });
 
-test("155. Command output in the chat, design page", async ({ page, start }) => {
+test("155. Command output in the chat, design page; 159. /exit, design page", async ({ page, start }) => {
   const fixture = await start("agents-commands", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
   const design = (await sessions(fixture)).find((s) => s.ticket === "demo:design-auto")!;
@@ -115,32 +123,8 @@ test("155. Command output in the chat, design page", async ({ page, start }) => 
   expect(await output(page).innerText()).not.toMatch(/\[2m|\[0m|\u001b/);
   await expect(page.getByText(/Caveat/)).toHaveCount(0);
   expect(await fixture.input(conv)).not.toContain("design-row");
-});
 
-test("159. Exit with /exit, Agents page", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const idle = await claudeIdle(fixture);
-  await go(page, `#/agents/${idle.id}`);
-  await expect(page.getByText("hello", { exact: true })).toBeVisible();
-
-  await messageBox(page).fill("/exit");
-  await sendButton(page).click();
-  await expect.poll(async () => (await infoOf(fixture, idle.id)).status.state).toBe("exited");
-
-  // The chat stays, the composer is off and says how to get the session back.
-  await expect(page.getByText("hello", { exact: true })).toBeVisible();
-  await expect(composer(page).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible();
-  await expect(sendButton(page)).toBeDisabled();
-});
-
-test("159. Exit with /exit, design page", async ({ page, start }) => {
-  const fixture = await start("agents-commands", { autoAdvanceDelay: "1h" });
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const design = (await sessions(fixture)).find((s) => s.ticket === "demo:design-auto")!;
-  await endRun(fixture, design.id);
-  await go(page, "#/d/demo:design-auto");
-
+  // 159 /exit, design page. Last: it ends the session.
   await (await designBox(page)).fill("/exit");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect.poll(async () => (await infoOf(fixture, design.id)).status.state).toBe("exited");

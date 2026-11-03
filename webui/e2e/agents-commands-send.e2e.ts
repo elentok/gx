@@ -1,13 +1,16 @@
 import type { Page } from "@playwright/test";
 import { expect, nav, test, type Fixture } from "./fixture";
-import { ask, chatOf, claudeIdle, codexIdle, composer, created, createButton, go, messageBox, newForm, promptBox, sendButton, sessions, sidebar } from "./agentsKit";
+import { chatOf, claudeIdle, codexIdle, go, messageBox, sendButton, sessions } from "./agentsKit";
 
 /** The conversation id the fake claude of a session is named by. */
 const conversationOf = async (fixture: Fixture, id: string) => (await chatOf(fixture, id)).conversation_id;
 
 const countOf = (text: string, part: string) => text.split(part).length - 1;
 
-test("153. Send a command, typed once or nudged", async ({ page, start }) => {
+// 153 "Refused" was deleted as a duplicate of 78 Send refused; its checks live in AgentsPage.composer.test.tsx
+// ("a refusal keeps the draft", "stale refetches") and NewSessionForm.test.tsx ("a refusal shows in the form").
+// 153 "Working" is the vitest test "Send is off while Working" (AgentsPage.composer.test.tsx).
+test("153. Send a command, typed once or nudged, and /clear", async ({ page, start }) => {
   const fixture = await start("agents-commands");
   await page.setViewportSize({ width: 1280, height: 800 });
 
@@ -44,57 +47,6 @@ test("153. Send a command, typed once or nudged", async ({ page, start }) => {
   await sendButton(page).click();
   await expect(page.getByText("$review-skill", { exact: true })).toBeVisible();
   await expect.poll(() => fixture.cli("agents", "chat", codex.id)).toContain("$review-skill");
-});
-
-test("153. Send a command, refused", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const idle = await claudeIdle(fixture);
-  const conv = await conversationOf(fixture, idle.id);
-  await go(page, `#/agents/${idle.id}`);
-  await expect(page.getByText("hello", { exact: true })).toBeVisible();
-
-  // The page keeps its old chat while the chat read fails, so a CLI prompt moves the chat under it.
-  let failing = true;
-  await page.route("**/v1/sessions/chat*", (route) => (failing ? route.fulfill({ status: 500, body: "boom" }) : route.continue()));
-  await ask(fixture, idle.id, "moved from the CLI");
-  await expect(page.getByText("moved from the CLI", { exact: true })).toHaveCount(0);
-
-  // A stale `last_message` refuses `/clear` like text, and the box keeps it.
-  await messageBox(page).fill("/clear");
-  failing = false;
-  await sendButton(page).click();
-  await expect(composer(page).getByText("the conversation moved; review it first")).toBeVisible();
-  await expect(messageBox(page)).toHaveValue("/clear");
-  await expect(page.getByText("moved from the CLI", { exact: true })).toBeVisible();
-  expect(await fixture.input(conv)).not.toContain("/clear");
-
-  // `!ls` is refused in the composer with the input kept.
-  await messageBox(page).fill("!ls");
-  await sendButton(page).click();
-  await expect(composer(page).getByText("text may not start with !")).toBeVisible();
-  await expect(messageBox(page)).toHaveValue("!ls");
-  expect(await fixture.input(conv)).not.toContain("!ls");
-
-  // First prompt refuses it too and keeps it; `/cost` is accepted there.
-  const before = await sessions(fixture);
-  await go(page, "#/agents");
-  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
-  await promptBox(page).fill("!ls");
-  await createButton(page).click();
-  await expect(newForm(page).getByText("the first prompt may not start with !")).toBeVisible();
-  await expect(promptBox(page)).toHaveValue("!ls");
-  expect(await sessions(fixture)).toHaveLength(before.length);
-  await promptBox(page).fill("/cost");
-  await createButton(page).click();
-  const made = await created(fixture, before);
-  await expect(page).toHaveURL(new RegExp(`#/agents/${made.id}$`));
-  await expect(newForm(page)).toHaveCount(0);
-});
-
-test("153. Send a command, /clear and Working", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
-  await page.setViewportSize({ width: 1280, height: 800 });
 
   // `/clear` on the Idle session starts a new conversation: the open chat resets and a draft typed since stays.
   const withOutput = await findWithOutput(fixture);
@@ -107,13 +59,6 @@ test("153. Send a command, /clear and Working", async ({ page, start }) => {
   await expect(page.getByTestId("command-output")).toHaveCount(0);
   await expect(page.getByText("/cost", { exact: true })).toHaveCount(0);
   await expect(messageBox(page)).toHaveValue("a draft to keep");
-
-  // A Working session shows its reason, and Send stays off with text in the box.
-  const working = (await sessions(fixture)).find((s) => s.status.state === "working" && s.harness !== "codex" && !s.design && !s.queue)!;
-  await go(page, `#/agents/${working.id}`);
-  await messageBox(page).fill("hello again");
-  await expect(composer(page).getByText("Working. Send turns on when the session is idle.")).toBeVisible();
-  await expect(sendButton(page)).toBeDisabled();
 });
 
 /** The seeded session whose chat holds the `/cost` output. */
@@ -159,10 +104,11 @@ const openNote = async (page: Page) => {
 
 const countdownText = (page: Page) => page.getByText(/^Continuing in \d+s$/);
 
-test("154. Commands in a design session, /clear and /compact", async ({ page, start }) => {
+test("154. Commands in a design session, /clear and /compact; keys and Type; Close dialog, Allow once and Deny", async ({ page, start }) => {
   const fixture = await start("agents-commands", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
   const design = await designOf(fixture, "demo:design-auto");
+  const conv = await conversationOf(fixture, design.id);
 
   for (const command of ["/clear", "/compact"]) {
     await startCountdown(fixture, design.id);
@@ -177,12 +123,6 @@ test("154. Commands in a design session, /clear and /compact", async ({ page, st
     // As typed text does, a command stops only the countdown: the run-end Continue stays for the person to press.
     expect((await designInfo(fixture, design.id)).actionable.reason).toBeTruthy();
   }
-});
-
-test("154. Commands in a design session, keys and Type", async ({ page, start }) => {
-  const fixture = await start("agents-commands", { autoAdvanceDelay: "1h" });
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const design = await designOf(fixture, "demo:design-auto");
 
   // The key bar and Type field send through the keys route; the Screen view that holds them opens on a design
   // session only while it is Blocked or stalled, and leaving that state starts a new countdown, so the route is
@@ -196,13 +136,6 @@ test("154. Commands in a design session, keys and Type", async ({ page, start })
     await expect.poll(async () => (await designInfo(fixture, design.id)).auto_advance_at).toBeUndefined();
     await expect.poll(async () => (await designInfo(fixture, design.id)).actionable.reason ?? "").toBe("");
   }
-});
-
-test("154. Commands in a design session, Close dialog, Allow once and Deny", async ({ page, start }) => {
-  const fixture = await start("agents-commands", { autoAdvanceDelay: "1h" });
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const design = await designOf(fixture, "demo:design-auto");
-  const conv = await conversationOf(fixture, design.id);
 
   const dialogs: [string, string, string[]][] = [
     ["Close dialog", "input needed", ["Select a thing", "❯ 1. One", "  2. Two", "Esc to cancel"]],

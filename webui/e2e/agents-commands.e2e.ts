@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, holdRoute, nav, test, touch } from "./fixture";
-import { claudeIdle, codexIdle, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sidebar, worktreeBox } from "./agentsKit";
+import { claudeIdle, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sidebar } from "./agentsKit";
 
 /** Whether a command of that name is in the open menu. */
 const hasName = (page: Parameters<typeof commandRows>[0], name: string) => commandNames(page).then((names) => names.includes(name));
@@ -42,45 +42,8 @@ test("149. Command list freshness and failure, refresh", async ({ page, start })
   expect(await hasName(page, "/deploy-notes")).toBe(false);
 });
 
-test("150. Codex command menu", async ({ page, start }) => {
-  const fixture = await start("agents-commands");
-  const codex = await codexIdle(fixture);
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await go(page, `#/agents/${codex.id}`);
-  const box = messageBox(page);
-  const menu = commandMenu(page);
-
-  // `/` lists only built-ins, no skills.
-  await box.fill("/");
-  await expect(menu).toBeVisible();
-  await expect.poll(() => hasName(page, "/status")).toBe(true);
-  expect(await hasName(page, "/review-skill")).toBe(false);
-  expect(await hasName(page, "/html-skill")).toBe(false);
-
-  // `$` at the start lists skills, a doubled name once; filling writes `$name `.
-  await box.fill("$review-s");
-  await expect.poll(() => commandNames(page)).toEqual(["$review-skill"]);
-  await box.press("Enter");
-  await expect(box).toHaveValue("$review-skill ");
-
-  // `$` in the second word lists them too and fills at that word.
-  await box.fill("use $htm");
-  await expect.poll(() => commandNames(page)).toEqual(["$html-skill"]);
-  await box.press("Tab");
-  await expect(box).toHaveValue("use $html-skill ");
-  await expect(menu).toHaveCount(0);
-
-  // `$` in a Claude session opens nothing.
-  await go(page, `#/agents/${(await claudeIdle(fixture)).id}`);
-  await box.fill("$re");
-  await expect(menu).toHaveCount(0);
-  await expect(page.getByText("No command matches")).toHaveCount(0);
-
-  // A Codex draft that starts with `/gx-` shows the hint.
-  await go(page, `#/agents/${codex.id}`);
-  await box.fill("/gx-triage");
-  await expect(page.getByText("Codex skills start with $. Type $gx-... instead.")).toBeVisible();
-});
+// 150 (Codex command menu) and 151 (menu on the design page and First prompt) moved to vitest:
+// AgentsPage.composer.test.tsx "completion menu", NewSessionForm.test.tsx, design/Composer.test.tsx.
 
 /** The design page composer's box, opened with the Note button. */
 const openNote = async (page: Page) => {
@@ -97,56 +60,6 @@ const openNewForm = async (page: Page) => {
   else await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
   await expect(newForm(page)).toBeVisible();
 };
-
-test("151. Command menu on the design page and First prompt", async ({ page, start }) => {
-  await start("agents-commands");
-  await page.setViewportSize({ width: 1280, height: 800 });
-
-  // The design composer opens the menu for a Claude design session...
-  await go(page, "#/d/demo:design-auto");
-  let box = await openNote(page);
-  await box.fill("/co");
-  await expect(commandMenu(page)).toBeVisible();
-  await expect.poll(() => commandNames(page)).toEqual(expect.arrayContaining(["/compact", "/cost"]));
-  await box.fill("/");
-  await expect.poll(() => hasName(page, "/html-skill")).toBe(true);
-  await box.press("Escape");
-
-  // ...and a Codex design session lists built-ins and `$` skills.
-  await go(page, "#/d/gx:design-codex");
-  box = await openNote(page);
-  await box.fill("/");
-  await expect.poll(() => hasName(page, "/status")).toBe(true);
-  expect(await hasName(page, "/html-skill")).toBe(false);
-  await box.fill("$html");
-  await expect.poll(() => commandNames(page)).toEqual(["$html-skill"]);
-
-  // First prompt lists the chosen worktree's commands: `feature` only in the feature worktree.
-  await openNewForm(page);
-  const prompt = promptBox(page);
-  await prompt.fill("/");
-  await expect.poll(() => hasName(page, "/html-skill")).toBe(true);
-  expect(await hasName(page, "/feature-only-skill")).toBe(false);
-  await prompt.fill("");
-  await worktreeBox(page).fill("feature");
-  await page.getByRole("option", { name: /feature/ }).first().click();
-  await prompt.fill("/");
-  await expect.poll(() => hasName(page, "/feature-only-skill")).toBe(true);
-
-  // A pick fills the field and creates nothing.
-  await prompt.fill("/feature-o");
-  await prompt.press("Enter");
-  await expect(prompt).toHaveValue("/feature-only-skill ");
-  await expect(newForm(page)).toBeVisible();
-
-  // "+ Create worktree" lists the project's base worktree commands.
-  await prompt.fill("");
-  await worktreeBox(page).fill("fresh-tree");
-  await page.getByRole("option", { name: /Create worktree/ }).click();
-  await prompt.fill("/");
-  await expect.poll(() => hasName(page, "/html-skill")).toBe(true);
-  expect(await hasName(page, "/feature-only-skill")).toBe(false);
-});
 
 test("152. Phone, command menu", async ({ page, start }) => {
   const fixture = await start("agents-commands");

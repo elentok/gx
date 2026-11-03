@@ -67,25 +67,53 @@ async function closeDialogTwice(page: Page, fixture: Fixture, hash: string, s: S
   await page.unrouteAll({ behavior: "ignoreErrors" });
 }
 
-test("157. Close dialog, Agents page", async ({ page, start }) => {
-  const fixture = await start("agents-blocked");
+// Hosts: 157 (Close dialog, Agents page; also covers 157 design page and 158 design page) and 158 (readable Claude prompt;
+// also covers 158 Allow once refused, Ignored Allow key, Codex hook and screen). Both run on agents-blocked.
+test("157. Close dialog, Agents page and design page; 158. design Allow once and Deny", async ({ page, start }) => {
+  const fixture = await start("agents-blocked", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
   const { s, conv } = await blockIdle(fixture, QUESTION, "input needed");
   await closeDialogTwice(page, fixture, `#/agents/${s.id}`, s, conv);
-});
 
-test("157. Close dialog, design page", async ({ page, start }) => {
-  const fixture = await start("agents-blocked", { autoAdvanceDelay: "1h" });
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const design = (await sessions(fixture)).find((s) => s.ticket === "demo:design-auto")!;
-  const conv = await conversationOf(fixture, design.id);
-  await fixture.controlClaude(conv, { action: "block", waiting_for: "input needed", dialog: QUESTION });
+  // 157 design page.
+  const design = (await sessions(fixture)).find((x) => x.ticket === "demo:design-auto")!;
+  const designConv = await conversationOf(fixture, design.id);
+  await fixture.controlClaude(designConv, { action: "block", waiting_for: "input needed", dialog: QUESTION });
   await expect.poll(() => stateOf(fixture, design.id)).toBe("blocked");
-  await closeDialogTwice(page, fixture, "#/d/demo:design-auto", design, conv);
+  await closeDialogTwice(page, fixture, "#/d/demo:design-auto", design, designConv);
+
+  // 158 design page.
+  const block = async (dialog: string[]) => {
+    await fixture.controlClaude(designConv, { action: "block", waiting_for: "permission prompt", dialog });
+    await expect.poll(() => stateOf(fixture, design.id)).toBe("blocked");
+  };
+  await go(page, "#/epics");
+  await block(BASH_DIALOG("rg design-allow"));
+  let before = await fixture.input(designConv);
+  await open(page, "#/d/demo:design-auto");
+  await expect(failure(page)).toContainText("rg design-allow");
+  await noticeButton(page, "Allow once").click();
+  await leavesBlocked(fixture, design.id);
+  await expect.poll(() => readSince(fixture, designConv, before)).toBe("\r");
+
+  // A prompt gx cannot read: Allow is refused, Deny works.
+  await block(UNREADABLE);
+  before = await fixture.input(designConv);
+  // A fresh visit: the notice of the first prompt is still being replaced.
+  await go(page, "#/epics");
+  await open(page, "#/d/demo:design-auto");
+  await expect(failure(page)).not.toContainText("rg design-allow");
+  await expect(noticeButton(page, "Allow once")).toBeVisible();
+  await noticeButton(page, "Allow once").click();
+  await expect(failure(page).getByRole("alert")).toHaveText(NOT_APPROVABLE);
+  expect(await readSince(fixture, designConv, before)).toBe("");
+  await noticeButton(page, "Deny").click();
+  await leavesBlocked(fixture, design.id);
+  await expect.poll(() => readSince(fixture, designConv, before)).toBe("\x1b");
 });
 
-test("158. Allow once and Deny, readable Claude prompt", async ({ page, start }) => {
-  const fixture = await start("agents-blocked");
+test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow key; Codex hook and screen", async ({ page, start }) => {
+  const fixture = await start("agents-blocked", { autoAdvanceDelay: "1h" });
   await page.setViewportSize({ width: 1280, height: 800 });
 
   const allow = await blockIdle(fixture, BASH_DIALOG("rg allow-me"));
@@ -104,11 +132,8 @@ test("158. Allow once and Deny, readable Claude prompt", async ({ page, start })
   await noticeButton(page, "Deny").click();
   await leavesBlocked(fixture, deny.s.id);
   await expect.poll(() => readSince(fixture, deny.conv, before)).toBe("\x1b");
-});
 
-test("158. Allow once refused for Claude prompts gx cannot approve", async ({ page, start }) => {
-  const fixture = await start("agents-blocked");
-  await page.setViewportSize({ width: 1280, height: 800 });
+  // Allow once refused for Claude prompts gx cannot approve.
   const refused = async (text: string, notice: string) => {
     const s = await blockedAt(fixture, "claude", text);
     const conv = await conversationOf(fixture, s.id);
@@ -154,27 +179,8 @@ test("158. Allow once refused for Claude prompts gx cannot approve", async ({ pa
   await expect(failure(page).getByRole("alert")).toHaveText(NOT_APPROVABLE);
   expect(await readSince(fixture, movedConv, movedBefore)).toBe("\x1b[B");
   expect(await stateOf(fixture, moved.id)).toBe("blocked");
-});
 
-test("158. Ignored Allow key shows the not-delivered text", async ({ page, start }) => {
-  const fixture = await start("agents-blocked");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const s = await blockedAt(fixture, "claude", "rg ignores-allow");
-  const conv = await conversationOf(fixture, s.id);
-  const before = await fixture.input(conv);
-  await open(page, `#/agents/${s.id}`);
-  await noticeButton(page, "Allow once").click();
-  // The server waits its whole prompt grace (8s in this scenario) for the session to move on.
-  await expect(failure(page).getByRole("alert")).toHaveText(NOT_DELIVERED, { timeout: 30_000 });
-  // The Enter went out; the fake ignored it and no other option was picked.
-  await expect.poll(() => readSince(fixture, conv, before)).toBe("\r");
-  expect(await stateOf(fixture, s.id)).toBe("blocked");
-});
-
-test("158. Allow once and Deny, Codex hook and screen", async ({ page, start }) => {
-  const fixture = await start("agents-blocked");
-  await page.setViewportSize({ width: 1280, height: 800 });
-
+  // Codex hook and screen.
   const hook = await blockedAt(fixture, "codex", "rg codex-hook");
   await open(page, `#/agents/${hook.id}`);
   await expect(failure(page)).toContainText("rg codex-hook");
@@ -189,45 +195,22 @@ test("158. Allow once and Deny, Codex hook and screen", async ({ page, start }) 
   await leavesBlocked(fixture, screen.id);
 
   // No hook and a screen gx cannot read: Allow is refused, Deny sends Esc.
-  const unreadable = await blockedAt(fixture, "codex", "");
-  await open(page, `#/agents/${unreadable.id}`);
+  const codexUnreadable = await blockedAt(fixture, "codex", "");
+  await open(page, `#/agents/${codexUnreadable.id}`);
   await noticeButton(page, "Allow once").click();
   await expect(failure(page).getByRole("alert")).toHaveText(NOT_APPROVABLE);
-  expect(await stateOf(fixture, unreadable.id)).toBe("blocked");
+  expect(await stateOf(fixture, codexUnreadable.id)).toBe("blocked");
   await noticeButton(page, "Deny").click();
-  await leavesBlocked(fixture, unreadable.id);
-});
+  await leavesBlocked(fixture, codexUnreadable.id);
 
-test("158. Allow once and Deny, design page", async ({ page, start }) => {
-  const fixture = await start("agents-blocked", { autoAdvanceDelay: "1h" });
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const design = (await sessions(fixture)).find((s) => s.ticket === "demo:design-auto")!;
-  const conv = await conversationOf(fixture, design.id);
-  const block = async (dialog: string[]) => {
-    await fixture.controlClaude(conv, { action: "block", waiting_for: "permission prompt", dialog });
-    await expect.poll(() => stateOf(fixture, design.id)).toBe("blocked");
-  };
-
-  await block(BASH_DIALOG("rg design-allow"));
-  let before = await fixture.input(conv);
-  await open(page, "#/d/demo:design-auto");
-  await expect(failure(page)).toContainText("rg design-allow");
+  // Ignored Allow key shows the not-delivered text. Last: the server waits its whole prompt grace (8s in this scenario).
+  const ignored = await blockedAt(fixture, "claude", "rg ignores-allow");
+  const ignoredConv = await conversationOf(fixture, ignored.id);
+  const ignoredBefore = await fixture.input(ignoredConv);
+  await open(page, `#/agents/${ignored.id}`);
   await noticeButton(page, "Allow once").click();
-  await leavesBlocked(fixture, design.id);
-  await expect.poll(() => readSince(fixture, conv, before)).toBe("\r");
-
-  // A prompt gx cannot read: Allow is refused, Deny works.
-  await block(UNREADABLE);
-  before = await fixture.input(conv);
-  // A fresh visit: the notice of the first prompt is still being replaced.
-  await go(page, "#/epics");
-  await open(page, "#/d/demo:design-auto");
-  await expect(failure(page)).not.toContainText("rg design-allow");
-  await expect(noticeButton(page, "Allow once")).toBeVisible();
-  await noticeButton(page, "Allow once").click();
-  await expect(failure(page).getByRole("alert")).toHaveText(NOT_APPROVABLE);
-  expect(await readSince(fixture, conv, before)).toBe("");
-  await noticeButton(page, "Deny").click();
-  await leavesBlocked(fixture, design.id);
-  await expect.poll(() => readSince(fixture, conv, before)).toBe("\x1b");
+  await expect(failure(page).getByRole("alert")).toHaveText(NOT_DELIVERED, { timeout: 30_000 });
+  // The Enter went out; the fake ignored it and no other option was picked.
+  await expect.poll(() => readSince(fixture, ignoredConv, ignoredBefore)).toBe("\r");
+  expect(await stateOf(fixture, ignored.id)).toBe("blocked");
 });
