@@ -85,8 +85,11 @@ func changedWithin(path string, cutoff time.Time) bool {
 }
 
 // processCommands lists every running process's command line, one per line.
-func processCommands() string {
-	out, err := exec.Command("ps", "-axo", "command=").Output()
+// ps runs in env, which is the server's configured environment.
+func processCommands(env []string) string {
+	cmd := exec.Command("ps", "-axo", "command=")
+	cmd.Env = env
+	out, err := cmd.Output()
 	if err != nil {
 		return ""
 	}
@@ -114,7 +117,7 @@ func (s *Server) sweepTemp() {
 			continue
 		}
 		seen[dir] = true
-		if removed := sweepStaleTemp(dir, minAge, processCommands, time.Now()); len(removed) > 0 {
+		if removed := sweepStaleTemp(dir, minAge, func() string { return processCommands(s.cfg.Env) }, time.Now()); len(removed) > 0 {
 			s.log.Info("disk clean removed stale temp dirs", "count", len(removed), "dir", dir)
 		}
 	}

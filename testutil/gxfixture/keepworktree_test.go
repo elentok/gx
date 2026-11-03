@@ -10,12 +10,16 @@ import (
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 )
 
 const (
 	keepFirst  = "demo:keep-epic/01"
 	keepSecond = "demo:keep-epic/02"
 )
+
+// askedStatus is the rendered status word of a ticket waiting on an answer.
+var askedStatus = tickets.StatusPausedAnswer.Word()
 
 // worktrees lists `git worktree list --porcelain` of the fixture repo.
 func (r *running) worktrees(t *testing.T) string {
@@ -44,7 +48,7 @@ func (r *running) askedWorktree(t *testing.T) string {
 func TestKeepWorktreeScenario_TheAskedFileSurvivesTheAnswerAndASecondTicketRuns(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-worktree")
-	r.waitStatus(t, keepFirst, "needs-answer")
+	r.waitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s while the ticket waits:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -66,7 +70,7 @@ func TestKeepWorktreeScenario_TheAskedFileSurvivesTheAnswerAndASecondTicketRuns(
 func TestKeepAgentScenario_TheUnmodifiedPtyFixtureKeepsTheAskedWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-agent")
-	r.waitStatus(t, keepFirst, "needs-answer")
+	r.waitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -93,7 +97,7 @@ func (r *running) waitWorktreeGone(t *testing.T, path, after string) {
 func TestKeepCleanupScenario_ACommitlessAskKeepsItsWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-cleanup")
-	r.waitStatus(t, keepFirst, "needs-answer")
+	r.waitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s after the ask:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -108,7 +112,7 @@ func TestKeepCleanupScenario_ACommitlessAskKeepsItsWorktree(t *testing.T) {
 func TestKeepCleanupScenario_CancellingThePausedTicketRemovesItsWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-cleanup")
-	r.waitStatus(t, keepFirst, "needs-answer")
+	r.waitStatus(t, keepFirst, askedStatus)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s before the cancel:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -121,7 +125,7 @@ func TestKeepCleanupScenario_CancellingThePausedTicketRemovesItsWorktree(t *test
 func TestKeepCleanupScenario_MergingTheEpicRemovesALeftoverIterationWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-cleanup")
-	r.waitStatus(t, keepFirst, "needs-answer")
+	r.waitStatus(t, keepFirst, askedStatus)
 	r.waitStatus(t, keepSecond, "done")
 	path := r.askedWorktree(t)
 	if path == "" {

@@ -12,10 +12,8 @@ func TestRunRegistry_WaitGoneTrueOnceRemovedFalseAtTimeout(t *testing.T) {
 	if r.waitGone(addr, 50*time.Millisecond, 5*time.Millisecond) {
 		t.Error("waitGone = true with the run still tracked, want false at timeout")
 	}
-	go func() {
-		time.Sleep(30 * time.Millisecond)
-		r.delete(addr)
-	}()
+	removal := time.AfterFunc(30*time.Millisecond, func() { r.delete(addr) })
+	defer removal.Stop()
 	if !r.waitGone(addr, 5*time.Second, 5*time.Millisecond) {
 		t.Error("waitGone = false after the run left, want true")
 	}

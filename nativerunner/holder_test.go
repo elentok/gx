@@ -38,8 +38,10 @@ const (
 
 // exitWithOwner kills the holder and its child once the owner pid is gone.
 func exitWithOwner(owner int) {
+	tick := time.NewTicker(500 * time.Millisecond)
+	defer tick.Stop()
 	for syscall.Kill(owner, 0) == nil {
-		time.Sleep(500 * time.Millisecond)
+		<-tick.C
 	}
 	_ = exec.Command("pkill", "-KILL", "-P", strconv.Itoa(os.Getpid())).Run()
 	os.Exit(1)
