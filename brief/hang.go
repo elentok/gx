@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,6 +19,9 @@ type hangWatcher struct {
 	mu      sync.Mutex
 	partial []byte
 	started map[hangKey]time.Time
+	// parents are tests that have started a subtest. They keep running while
+	// their parallel subtests queue for a slot, so only the subtests are timed.
+	parents map[hangKey]bool
 	hung    *hangKey
 	stop    chan struct{}
 }
@@ -25,7 +29,7 @@ type hangWatcher struct {
 type hangKey struct{ pkg, test string }
 
 func newHangWatcher(limit time.Duration) *hangWatcher {
-	return &hangWatcher{limit: limit, started: map[hangKey]time.Time{}, stop: make(chan struct{})}
+	return &hangWatcher{limit: limit, started: map[hangKey]time.Time{}, parents: map[hangKey]bool{}, stop: make(chan struct{})}
 }
 
 func (h *hangWatcher) Write(p []byte) (int, error) {
@@ -48,6 +52,9 @@ func (h *hangWatcher) event(line []byte) {
 		return
 	}
 	k := hangKey{ev.Package, ev.Test}
+	for i := strings.LastIndexByte(ev.Test, '/'); i > 0; i = strings.LastIndexByte(ev.Test[:i], '/') {
+		h.parents[hangKey{ev.Package, ev.Test[:i]}] = true
+	}
 	switch ev.Action {
 	case "run", "cont":
 		h.started[k] = time.Now()
@@ -78,7 +85,7 @@ func (h *hangWatcher) check(now time.Time) bool {
 	var oldest *hangKey
 	var at time.Time
 	for k, t := range h.started {
-		if now.Sub(t) > h.limit && (oldest == nil || t.Before(at)) {
+		if !h.parents[k] && now.Sub(t) > h.limit && (oldest == nil || t.Before(at)) {
 			k := k
 			oldest, at = &k, t
 		}
