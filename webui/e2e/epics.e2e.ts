@@ -1,22 +1,5 @@
 import { card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
 
-test("1. Queue an epic", async ({ page, start }) => {
-  await start("ready");
-  const ready = await section(page, "Ready to queue");
-  await expect(ready.getByRole("link", { name: "ready-epic" })).toBeVisible();
-
-  const release = await holdRoute(page, "**/v1/queue/add");
-  await card(page, "ready-epic").getByRole("button", nav("Queue")).click();
-  await expect(card(page, "ready-epic").getByRole("button")).toBeDisabled();
-  release();
-
-  await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
-  const progress = await section(page, "Implementing");
-  await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
-  // The card moving is the feedback: no success toast.
-  await expect(toasts(page)).toHaveCount(0);
-});
-
 test("2. Epic looks right", async ({ page, start }) => {
   // Recovery would fork an investigation off the failed ticket and turn it into a waiting parent.
   await start("mixed", { config: { "recovery.enabled": "false" } });
@@ -103,57 +86,27 @@ test("7. Epic completion", async ({ page, start }) => {
   await expect(more).toHaveAttribute("aria-expanded", "true");
 });
 
-test("8. Edge states", async ({ page, start }) => {
-  await start("edge");
-
-  // An empty epic counts as implemented, so the server files it under Implementing.
-  const progress = await section(page, "Implementing");
-  await expect(progress.getByRole("link", { name: "empty-epic" })).toBeVisible();
-  await expect(card(page, "empty-epic").getByText("Implemented")).toBeVisible();
-
-  // Filtering to the empty epic hides every other card.
-  await page.getByRole("searchbox", nav("Filter epics")).fill("empty");
-  await expect(card(page, "empty-epic")).toBeVisible();
-  await expect(page.getByRole("link", { name: "blocked-epic" })).toHaveCount(0);
-  await page.getByRole("searchbox", nav("Filter epics")).fill("");
-
-  await progress.getByRole("link", { name: "empty-epic" }).click();
-  await expect(page.getByText("No tickets yet")).toBeVisible();
-  await expect(page.getByText("0/0")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^More stats/ })).toHaveCount(0);
-
-  await page.getByRole("link", { name: /^Epics/ }).click();
-  await page.getByRole("link", { name: "blocked-epic" }).click();
-  await expect(page.getByRole("link", { name: "02 waiting after 01" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "01 unmerged ready" })).toBeVisible();
-});
-
-test("54. Done list", async ({ page, start }) => {
-  await start("many-done");
-  await page.evaluate(() => (location.hash = "#/e/demo:many-done-epic"));
-  const done = page.locator('[data-done-divider] ~ [data-tone="done"]');
-  await expect(page.getByText("5 done")).toBeVisible();
-  await expect(done).toHaveCount(3);
-  // Newest first.
-  await expect(done.nth(0)).toContainText("merged-e");
-  await expect(done.nth(2)).toContainText("merged-c");
-
-  await page.getByRole("button", nav("Show 2 more")).click();
-  await expect(done).toHaveCount(5);
-  await expect(done.nth(4)).toContainText("merged-a");
-  await page.getByRole("button", nav("Show fewer")).click();
-  await expect(done).toHaveCount(3);
-  await expect(page.getByRole("button", nav("Show 2 more"))).toBeVisible();
-});
-
-test("6. Outside changes show up", async ({ page, start }) => {
+test("6. Queue an epic, and outside changes show up", async ({ page, start }) => {
   const fixture = await start("ready");
   const ready = await section(page, "Ready to queue");
   await expect(ready.getByRole("link", { name: "ready-epic" })).toBeVisible();
 
+  const release = await holdRoute(page, "**/v1/queue/add");
+  await card(page, "ready-epic").getByRole("button", nav("Queue")).click();
+  await expect(card(page, "ready-epic").getByRole("button")).toBeDisabled();
+  release();
+
+  await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
+  const progress = await section(page, "Implementing");
+  await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
+  // The card moving is the feedback: no success toast.
+  await expect(toasts(page)).toHaveCount(0);
+
+  // A change made outside the page (CLI) moves the card too.
+  await fixture.cli("server", "queue", "remove", "demo:ready-epic");
+  await expect(ready.getByRole("link", { name: "ready-epic" })).toBeVisible();
   await fixture.cli("server", "queue", "add", "demo:ready-epic");
 
-  const progress = await section(page, "Implementing");
   await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
   await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
 });

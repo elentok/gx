@@ -32,6 +32,7 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 		writeEpicFiles(t, store, "draft", "---\nstatus: draft\n---\n", open)
 		writeEpicFiles(t, store, "noopen", loop, map[string]string{"01-a.md": issueMD("01", "claimed", "", "A")})
 		writeEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
+		writeEpicFiles(t, store, "empty", loop, map[string]string{})
 	})
 	if res, err := h.Client.QueueAdd(t.Context(), "proj:queued", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
@@ -61,6 +62,8 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 		"proj:draft":    {server.SectionReadyToDesign, "Draft", 0, nil},
 		"proj:noopen":   {server.SectionReadyToDesign, "No open tickets", 0, nil},
 		"proj:merged":   {server.SectionFinished, "Merged", 100, nil},
+		// An empty epic counts as implemented (nothing is left to run).
+		"proj:empty": {server.SectionNeedsYou, "Implemented", 0, merge("proj:empty")},
 	}
 	for addr, w := range want {
 		r, ok := got[addr]

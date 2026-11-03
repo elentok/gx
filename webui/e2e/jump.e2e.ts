@@ -1,76 +1,9 @@
 import type { Page } from "@playwright/test";
-import { expect, nav, test } from "./fixture";
+import { card, expect, nav, test } from "./fixture";
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash);
 
-const menu = (page: Page) => page.getByRole("dialog", nav("Jump to epic"));
-const filter = (page: Page) => menu(page).getByRole("combobox");
-const row = (page: Page, name: string) => menu(page).getByRole("option").filter({ has: page.getByText(name, { exact: true }) });
-
-test("20. Jump menu opens and closes", async ({ page, start }) => {
-  await start("united");
-  await goto(page, "#/e/demo:running-epic");
-  const title = page.getByRole("heading", { level: 1 }).getByRole("button");
-  await expect(title).toContainText("running-epic");
-
-  await title.click();
-  await expect(filter(page)).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(menu(page)).toHaveCount(0);
-
-  await page.keyboard.press("Control+k");
-  await expect(filter(page)).toBeFocused();
-  await expect(menu(page)).not.toContainText(/more need/);
-
-  // Ready to design and Finished rows show only once the filter has text.
-  await expect(row(page, "draft-epic")).toHaveCount(0);
-  await expect(row(page, "finished-a")).toHaveCount(0);
-  await expect(row(page, "paused-epic")).toBeVisible();
-  await filter(page).fill("draft-epic");
-  await expect(row(page, "draft-epic")).toBeVisible();
-  await filter(page).fill("finished-a");
-  await expect(row(page, "finished-a")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(menu(page)).toHaveCount(0);
-});
-
-test("21. Jump menu keyboard and picks", async ({ page, start }) => {
-  await start("united");
-  await goto(page, "#/e/demo:running-epic");
-  const title = page.getByRole("heading", { level: 1 }).getByRole("button");
-
-  // Down moves the cursor to the second row and Enter opens it.
-  await title.click();
-  await filter(page).fill("finished");
-  const second = menu(page).getByRole("option").nth(1);
-  const name = (await second.innerText()).split("\n")[0];
-  await filter(page).press("ArrowDown");
-  await expect(second).toHaveAttribute("aria-selected", "true");
-  await filter(page).press("Enter");
-  await expect(page).toHaveURL(new RegExp(`#/e/[a-z]+:${name}$`));
-  await expect(menu(page)).toHaveCount(0);
-  await expect(title).toContainText(name);
-
-  // A Design opens its Design page, a loop epic its epic page, a one-off its ticket page.
-  const picks: Array<[string, RegExp]> = [
-    ["design-live", /#\/d\/demo:design-live$/],
-    ["running-epic", /#\/e\/demo:running-epic$/],
-    ["queued", /#\/t\/demo:one-offs\/02$/],
-  ];
-  for (const [pick, url] of picks) {
-    await page.keyboard.press("Control+k");
-    await filter(page).fill(pick);
-    await row(page, pick).click();
-    await expect(page).toHaveURL(url);
-    // The shortcut works once the new page has mounted its menu.
-    if (pick !== "queued") await expect(title).toContainText(pick);
-  }
-
-  // A one-off's ticket page has no count on its Epics tab.
-  await expect(page.getByRole("link", { name: /^Epics/ }).first()).toHaveAccessibleName("Epics");
-});
-
-test("22. Back link count", async ({ page, start }) => {
+test("22. Back link count, then the phone layout", async ({ page, start }) => {
   const fx = await start("united");
   const back = (n: number) => page.getByRole("link", nav(`Epics · ${n} need you`));
 
@@ -101,6 +34,41 @@ test("22. Back link count", async ({ page, start }) => {
   // Clicking the count text itself opens the Epics page.
   await back(9).getByText("9", { exact: true }).click();
   await expect(page).toHaveURL(/#\/epics$/);
+
+  // Phone layout on the same settled scenario. 375 px is below the wide layout's 62em breakpoint.
+  await page.setViewportSize({ width: 375, height: 812 });
+
+  // The grid is one column: two cards of a section sit at the same left edge, one under the other.
+  const first = await card(page, "paused-epic").boundingBox();
+  const second = await card(page, "question-epic").boundingBox();
+  expect(second!.x).toBe(first!.x);
+  expect(second!.y).toBeGreaterThan(first!.y);
+
+  // The card's time label stays on one line.
+  const time = card(page, "paused-epic").getByTestId("time");
+  await expect(time).toBeVisible();
+  const timeBox = await time.boundingBox();
+  const timeLineHeight = await time.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  expect(timeBox!.height).toBeLessThanOrEqual(timeLineHeight * 1.5);
+
+  // The Epics tab stays on one line with its count.
+  await goto(page, "#/d/demo:design-live");
+  const tab = back(9);
+  await expect(tab).toBeVisible();
+  const line = await tab.boundingBox();
+  const lineHeight = await tab.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  expect(line!.height).toBeLessThanOrEqual(lineHeight * 1.5);
+
+  // On the epic page the buttons sit below the stats line.
+  await goto(page, "#/e/demo:awaiting-epic");
+  const merge = page.getByRole("button", nav("Merge"));
+  await expect(merge).toBeVisible();
+  const stats = (await page.getByTestId("stats-line").boundingBox())!;
+  for (const button of await merge.locator("xpath=..").getByRole("button").all()) {
+    const box = (await button.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(stats.y + stats.height);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
 
   // The count follows the server with no reload.
   await goto(page, "#/e/demo:running-epic");

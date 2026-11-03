@@ -1,49 +1,13 @@
-import { card, expect, nav, test } from "./fixture";
+import { expect, nav, test } from "./fixture";
 
 // 375 px is below the wide layout's 62em breakpoint.
 test.use({ viewport: { width: 375, height: 812 } });
 
-test("23. Phone, Epics page", async ({ page, start }) => {
-  await start("united");
-
-  // The grid is one column: two cards of a section sit at the same left edge, one under the other.
-  const first = await card(page, "paused-epic").boundingBox();
-  const second = await card(page, "question-epic").boundingBox();
-  expect(second!.x).toBe(first!.x);
-  expect(second!.y).toBeGreaterThan(first!.y);
-
-  // The card's time label stays on one line.
-  const time = card(page, "paused-epic").getByTestId("time");
-  await expect(time).toBeVisible();
-  const timeBox = await time.boundingBox();
-  const timeLineHeight = await time.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
-  expect(timeBox!.height).toBeLessThanOrEqual(timeLineHeight * 1.5);
-
-  // The Epics tab stays on one line with its count.
-  await page.evaluate(() => (location.hash = "#/d/demo:design-live"));
-  const back = page.getByRole("link", { name: /^Epics · 9 need you$/ });
-  await expect(back).toBeVisible();
-  const line = await back.boundingBox();
-  const lineHeight = await back.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
-  expect(line!.height).toBeLessThanOrEqual(lineHeight * 1.5);
-});
-
+// Phone 23 and 53a (the "united" scenario) live in jump.e2e.ts flow 22, which already pays the settle wait.
 test.describe("53. Phone, epic page", () => {
-  test("buttons sit below the stats line", async ({ page, start }) => {
-    await start("united");
-    await page.evaluate(() => (location.hash = "#/e/demo:awaiting-epic"));
-    const merge = page.getByRole("button", nav("Merge"));
-    await expect(merge).toBeVisible();
-    const stats = (await page.getByTestId("stats-line").boundingBox())!;
-    for (const button of await merge.locator("xpath=..").getByRole("button").all()) {
-      const box = (await button.boundingBox())!;
-      expect(box.y).toBeGreaterThanOrEqual(stats.y + stats.height);
-      expect(box.height).toBeGreaterThanOrEqual(44);
-    }
-  });
-
-  test("a card's meta sits below its title", async ({ page, start }) => {
-    const fixture = await start("mixed");
+  test("a card's meta sits below its title, and answer and fix buttons are full-width tap targets", async ({ page, start }) => {
+    // Recovery would turn 07 into a waiting parent, so it stays off as in flow 2.
+    const fixture = await start("mixed", { config: { "recovery.enabled": "false" } });
     const long = "A very long ticket title that would wrap onto a second line on a phone screen";
     await fixture.cli("tickets", "add", "demo:mixed-epic", "--slug", "long-title", "--body", `# ${long}\n\n## What to build\n\nx`);
     await page.evaluate(() => (location.hash = "#/e/demo:mixed-epic"));
@@ -63,17 +27,12 @@ test.describe("53. Phone, epic page", () => {
     expect(box.height).toBeGreaterThan(lineHeight * 1.5);
     const longMeta = (await longTitle.locator("xpath=ancestor::a").locator("[data-meta]").boundingBox())!;
     expect(longMeta.y).toBeGreaterThanOrEqual(box.y + box.height);
-  });
 
-  test("answer and fix buttons are full-width tap targets", async ({ page, start }) => {
-    // Recovery would turn 07 into a waiting parent, so it stays off as in flow 2.
-    await start("mixed", { config: { "recovery.enabled": "false" } });
-    await page.evaluate(() => (location.hash = "#/e/demo:mixed-epic"));
     await page.getByRole("button", nav("Queue")).click();
     const answer = page.getByRole("button", nav("Answer"));
     const fix = page.getByRole("button", { name: "Fix it with an agent" });
     // 07 only starts once 02 and 03 have merged, each after the server's 3s finish debounce, as in flow 2.
-    await expect(page.getByText("4/7")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("4/8")).toBeVisible({ timeout: 30_000 });
     await expect(answer).toBeVisible();
     await expect(fix).toBeVisible();
 
@@ -91,12 +50,12 @@ test.describe("53. Phone, epic page", () => {
     const askCard = card(answer);
     const metaEl = askCard.locator("[data-meta]");
     await expect(metaEl).toHaveCSS("padding-left", "80px");
-    const meta = (await metaEl.boundingBox())!;
+    const askMeta = (await metaEl.boundingBox())!;
     const question = (await askCard.getByText("Which option should the fake worker take?").boundingBox())!;
     const ab = (await answer.boundingBox())!;
-    expect(meta.y + meta.height).toBeLessThanOrEqual(question.y);
+    expect(askMeta.y + askMeta.height).toBeLessThanOrEqual(question.y);
     expect(question.y + question.height).toBeLessThanOrEqual(ab.y);
-    expect(meta.x + 80).toBeCloseTo(question.x, 0);
+    expect(askMeta.x + 80).toBeCloseTo(question.x, 0);
     expect(ab.x).toBeCloseTo(question.x, 0);
   });
 });
