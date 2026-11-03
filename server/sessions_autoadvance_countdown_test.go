@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -110,14 +111,25 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 		"no run-end": {step: "spec", text: "Interrupted mid-step."},
 	} {
 		t.Run(name, func(t *testing.T) {
-			f := startAdvancing(t, storeWithMapStep(t, tc.step))
 			if tc.stopped {
+				// The server stops a design only on a rescan that sees the step move to
+				// done while the session is live. Seeding done would race the first
+				// rescan, which can run before the session exists and then never again.
+				f := startAdvancing(t, storeWithMapStep(t, "spec"))
+				mapMD := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
+				if err := os.WriteFile(mapMD, []byte("---\nkind: map\ndesign_step: "+tc.step+"\n---\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+					t.Fatal(err)
+				}
 				waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
 				if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
 					t.Errorf("countdown = %v, want none", got.AutoAdvanceAt)
 				}
 				return
 			}
+			f := startAdvancing(t, storeWithMapStep(t, tc.step))
 			c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 			writeAssistantMessage(t, f.path, tc.text)
 			endTurn(t, f)
