@@ -406,6 +406,9 @@ func run(args []string) (err error) {
 			return fmt.Errorf("seed limit burn: %w", err)
 		}
 	}
+	if sc.rateLimitFromUsage {
+		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s")
+	}
 	if sc.promptGrace != "" {
 		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.promptGrace)
 	}
@@ -867,6 +870,13 @@ func (f *fixture) seed(sc scenario) error {
 			FiveHour: agentfake.UsageWindow{UsedPercentage: 10, ResetsAt: resets},
 			SevenDay: agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: resets},
 		}
+	}
+	if sc.rateLimitFromUsage {
+		// Long enough for the flow to see the hold, short enough to wait it out; the fake sets
+		// the window's reset when it hits the limit.
+		wcfg.RateLimitFromUsage = true
+		wcfg.RateLimitReset = "8s"
+		wcfg.Usage = &agentfake.UsageConfig{FiveHour: agentfake.UsageWindow{UsedPercentage: 100}}
 	}
 	if sc.codexUsage {
 		wcfg.CodexUsage = &agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: time.Now().Add(72 * time.Hour).Unix()}

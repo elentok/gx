@@ -39,6 +39,9 @@ type scenario struct {
 	epics    []epic
 	// behaviour is the fake worker's per-ticket behaviour, by address.
 	behaviour map[string]string
+	// rateLimitFromUsage makes the ratelimit worker's reset come from a usage window that
+	// resets soon, and shortens the hold's wait past that reset, so a flow can wait the hold out.
+	rateLimitFromUsage bool
 	// promptGrace, when set, is the server's wait for a typed key or prompt to take effect
 	// (GX_PROMPT_GRACE); empty means the 45s default.
 	promptGrace string
@@ -411,6 +414,8 @@ var scenarios = map[string]scenario{
 		projectExtra: map[string]string{project: `,"max-agents":1`},
 		queue:        []string{project + ":limited-epic", project + ":waiting-epic"},
 		behaviour:    map[string]string{project + ":limited-epic/01": agentfake.BehaviourRateLimit},
+
+		rateLimitFromUsage: true,
 	},
 	// usage-gated: the first epic's worker reports the weekly window at 99% and
 	// holds, so the usage gate keeps the second epic's ticket from claiming.

@@ -251,6 +251,13 @@ func runServer(ctx context.Context, d deps) error {
 			return fmt.Errorf("GX_TOKEN_POLL_INTERVAL: %w", err)
 		}
 	}
+	// Test hook: gxfixture shortens the wait past a rate limit's reset.
+	var rateLimitBuffer time.Duration
+	if v := os.Getenv("GX_RATE_LIMIT_BUFFER"); v != "" {
+		if rateLimitBuffer, err = time.ParseDuration(v); err != nil {
+			return fmt.Errorf("GX_RATE_LIMIT_BUFFER: %w", err)
+		}
+	}
 	// Test hook: gxfixture shortens the wait for a typed key or prompt to take effect.
 	var promptGrace time.Duration
 	if v := os.Getenv("GX_PROMPT_GRACE"); v != "" {
@@ -291,7 +298,7 @@ func runServer(ctx context.Context, d deps) error {
 	srv, err := server.New(server.Config{Migrations: migrationReg, Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
-		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace,
+		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, RateLimitResetBuffer: rateLimitBuffer,
 		ProcessSource: processSource, DropAskedAgent: dropAskedAgent(os.Getenv)})
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"time"
@@ -45,7 +46,7 @@ func holdRateLimit(d Deps, o OneIteration, p launchAndPromptParams, waitStates [
 		}
 		if resetAt.IsZero() {
 			d.Sleep(rateLimitPollInterval)
-		} else if wait := resetAt.Add(rateLimitResetBuffer).Sub(d.Now()); wait > 0 {
+		} else if wait := resetAt.Add(cmp.Or(d.RateLimitResetBuffer, rateLimitResetBuffer)).Sub(d.Now()); wait > 0 {
 			d.Sleep(wait)
 		}
 		// A Codex pane back on its own dialog is not waiting for "continue": that

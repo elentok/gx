@@ -268,8 +268,16 @@ func (t *tui) rateLimit(cfg WorkerConfig) error {
 		reset = d
 	}
 	msg := "You've hit your limit · resets " + time.Now().Add(reset).Format("3:04pm")
+	if cfg.RateLimitFromUsage {
+		msg = "You've hit your limit"
+	}
 	if err := t.setStatus(StatusBusy, ""); err != nil {
 		return err
+	}
+	if cfg.RateLimitFromUsage {
+		// The server reads the usage record when it sees the limit, so it must exist by then.
+		t.limitResetsAt = time.Now().Add(reset).Unix()
+		t.runStatusLine()
 	}
 	if err := t.apiError(Control{Error: "rate_limit", Status: 429, Message: msg}); err != nil {
 		return err

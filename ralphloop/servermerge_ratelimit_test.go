@@ -146,6 +146,19 @@ func codexBlockedLimitFixture(t *testing.T, onReset func(r *runnerfake.Runner)) 
 	return d, r, one, sleeps
 }
 
+func TestWaitIterationFinished_RateLimitResetBufferOverridesTheDefault(t *testing.T) {
+	d, _, one, sleeps := codexBlockedLimitFixture(t, func(r *runnerfake.Runner) {
+		r.SetState("iter-01", agentrunner.StateIdle, "")
+	})
+	d.RateLimitResetBuffer = time.Second
+	if err := waitBlocked(t, d, one); err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if want := time.Minute + time.Second; (*sleeps)[0] != want {
+		t.Errorf("first sleep = %v, want %v", (*sleeps)[0], want)
+	}
+}
+
 func TestWaitIterationFinished_CodexQuotaWhileBlockedHoldsThenContinues(t *testing.T) {
 	d, r, one, sleeps := codexBlockedLimitFixture(t, func(r *runnerfake.Runner) {
 		r.SetState("iter-01", agentrunner.StateIdle, "")

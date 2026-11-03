@@ -42,6 +42,10 @@ type WorkerConfig struct {
 	// RateLimitReset is a Go duration: how far ahead of now a BehaviourRateLimit
 	// error puts its reset clock. Empty means DefaultRateLimitReset.
 	RateLimitReset string `json:"ratelimit_reset,omitempty"`
+	// RateLimitFromUsage makes the TUI fake's BehaviourRateLimit message name no
+	// clock time, so the reset comes from the Usage windows (Unix seconds)
+	// instead of a message that only has minute resolution.
+	RateLimitFromUsage bool `json:"ratelimit_from_usage,omitempty"`
 	// Design scripts the design agent's turns, one DesignTurn* kind per prompt
 	// in order. Empty means today's behaviour: a round per /gx-design prompt,
 	// the run-end message for any other text.

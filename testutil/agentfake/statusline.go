@@ -63,6 +63,11 @@ func (t *tui) runStatusLine() {
 		usage = cfg.Usage
 		env = cfg.Env
 	}
+	if usage != nil && t.limitResetsAt != 0 {
+		limited := *usage
+		limited.FiveHour.ResetsAt = t.limitResetsAt
+		usage = &limited
+	}
 	payload, err := StatusLinePayload(t.opts.model, usage)
 	if err != nil {
 		return

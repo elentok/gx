@@ -199,16 +199,22 @@ test("83. Design session on the Agents page", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/d\/demo:design-epic$/);
 });
 
-// The hold ends at the reset clock plus the 60 s buffer.
-const holdEnds = { timeout: 180_000 };
+// The hold ends about 8 s after the limit in this scenario.
+const holdEnds = { timeout: 60_000 };
 
 test("103. Rate-limit hold", async ({ page, start }) => {
-  test.setTimeout(240_000);
   const fixture = await start("rate-limited");
   const verdict = (epic: string) => page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).locator("[data-verdict]");
+  // The pages learn of a verdict change on the connection's 60 s tick, so each try moves the page clock by one.
+  await page.clock.install();
+  const afterTick = (assertion: () => Promise<void>) =>
+    expect(async () => {
+      await page.clock.fastForward(60_000);
+      await assertion();
+    }).toPass({ timeout: 40_000, intervals: [500] });
 
   await page.getByRole("link", { name: "limited-epic", exact: true }).click();
-  await expect(page.getByText(/rate-limited: resets /).first()).toBeVisible();
+  await afterTick(() => expect(page.getByText(/rate-limited: resets /).first()).toBeVisible({ timeout: 1_000 }));
   await expect(page.getByText("Paused", { exact: false })).toHaveCount(0);
 
   await go(page, "#/e/demo:waiting-epic");

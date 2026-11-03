@@ -181,6 +181,9 @@ type Deps struct {
 	// Now returns the current time, injectable so a rate-limit reset
 	// deadline can be tested without a real wall-clock wait.
 	Now func() time.Time
+	// RateLimitResetBuffer is how long past a parsed reset time a rate-limit
+	// hold waits; zero means the default.
+	RateLimitResetBuffer time.Duration
 	// PauseTimer returns a channel that fires once the given duration has
 	// elapsed — one poll of a paused run's wait. It is a channel rather than
 	// a blocking sleep so the pause can select on an operator's cosmetic wake
@@ -216,6 +219,8 @@ type DepsOverrides struct {
 	StateDir string
 	// RunnerWait is the runner's N; zero means agentrunner.DefaultN.
 	RunnerWait time.Duration
+	// RateLimitResetBuffer is Deps.RateLimitResetBuffer.
+	RateLimitResetBuffer time.Duration
 	// Finished tells the runner which sessions have reported their ticket
 	// finished (see herdrrunner.Runner.Finished). Nil means none.
 	Finished func(agentrunner.Session) bool
@@ -382,9 +387,10 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			}
 			return codexsession.CountCompactionsAfterIn(overrides.CodexHome, cwd, sessionID, since)
 		},
-		Sleep:      time.Sleep,
-		Now:        time.Now,
-		PauseTimer: time.After,
+		Sleep:                time.Sleep,
+		Now:                  time.Now,
+		RateLimitResetBuffer: overrides.RateLimitResetBuffer,
+		PauseTimer:           time.After,
 	}
 }
 

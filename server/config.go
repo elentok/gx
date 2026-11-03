@@ -63,6 +63,9 @@ type Config struct {
 	// RunnerWait is the default runner's configured wait; zero means
 	// config.LoadRunnerWait().
 	RunnerWait time.Duration
+	// RateLimitResetBuffer is how long past a rate limit's reset a hold waits;
+	// zero means ralphloop's default.
+	RateLimitResetBuffer time.Duration
 
 	// DropAskedAgent makes every run clean up after its agent asks, as a
 	// herdr-hosted run does. Test-only: gxfixture sets it, because a fixture
