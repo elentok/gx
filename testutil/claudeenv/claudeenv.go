@@ -56,6 +56,11 @@ func GoCacheEnv() []string {
 
 // goCaches returns the GOCACHE and GOMODCACHE that go resolves right now.
 func goCaches() (gocache, gomodcache string, ok bool) {
+	// Asking go costs a process that writes telemetry under HOME; a caller that
+	// already named both (the fixture test, with a decoy HOME) skips it.
+	if gocache, gomodcache = os.Getenv("GOCACHE"), os.Getenv("GOMODCACHE"); gocache != "" && gomodcache != "" {
+		return gocache, gomodcache, true
+	}
 	out, err := exec.Command("go", "env", "GOCACHE", "GOMODCACHE").Output()
 	if err != nil {
 		return "", "", false

@@ -24,6 +24,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -512,6 +513,8 @@ func TestFixture_NeverTouchesTheRealHomeOrState(t *testing.T) {
 	for _, k := range []string{"XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME"} {
 		env = append(env, k+"="+filepath.Join(decoy, k))
 	}
+	// The fixture would ask go for its caches, and go writes telemetry under HOME.
+	env = append(env, claudeenv.GoCacheEnv()...)
 	r := startWith(t, "ready", env)
 	r.gx(t, "server", "snapshot", "--json")
 	r.stop(t)
