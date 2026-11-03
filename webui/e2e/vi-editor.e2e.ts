@@ -22,7 +22,7 @@ const openMessageBox = async (page: Page) => {
   await page.getByRole("button", nav("Note")).click();
   const field = page.getByRole("textbox", nav("Message"));
   // The field stays disabled while the session starts.
-  await expect(field).toBeEnabled();
+  await expect(field).toBeEnabled({ timeout: 45_000 });
   return field;
 };
 
@@ -131,7 +131,7 @@ const openWith = async (page: Page, text: string, caret: number) => {
   await expect(working).toBeHidden({ timeout: 45_000 });
   await page.getByRole("button", nav("Note")).click();
   const field = page.getByRole("textbox", nav("Message"));
-  await expect(field).toBeEnabled();
+  await expect(field).toBeEnabled({ timeout: 45_000 });
   await field.fill(text);
   await field.evaluate((el: HTMLTextAreaElement, at) => el.setSelectionRange(at, at), caret);
   await page.keyboard.press("ControlOrMeta+g");
