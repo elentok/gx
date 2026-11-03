@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -95,9 +96,43 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 	r.stop(t)
 }
 
+// The agents-blocked scenario seeds two dozen sessions one by one, so the
+// read-only TestBlockedScenario_* tests share one fixture. The last test to
+// finish stops it.
+var blocked struct {
+	mu   sync.Mutex
+	refs int
+	r    *running
+}
+
+func sharedBlocked(t *testing.T) *running {
+	t.Helper()
+	blocked.mu.Lock()
+	defer blocked.mu.Unlock()
+	blocked.refs++
+	var kill func()
+	t.Cleanup(func() {
+		blocked.mu.Lock()
+		defer blocked.mu.Unlock()
+		if blocked.refs--; blocked.refs > 0 {
+			return
+		}
+		if r := blocked.r; r != nil {
+			blocked.r = nil
+			r.stop(t)
+		} else if kill != nil {
+			kill() // the launch failed after the process started
+		}
+	})
+	if blocked.r == nil {
+		blocked.r = launch(t, func(k func()) { kill = k }, "agents-blocked", nil)
+	}
+	return blocked.r
+}
+
 func TestBlockedScenario_BlockedSessionsSettleBlocked(t *testing.T) {
 	t.Parallel()
-	r := start(t, "agents-blocked")
+	r := sharedBlocked(t)
 	list := r.seededSessions(t)
 	if len(list) != commandSessionCount {
 		t.Fatalf("%d sessions, want %d", len(list), commandSessionCount)
@@ -112,12 +147,11 @@ func TestBlockedScenario_BlockedSessionsSettleBlocked(t *testing.T) {
 			t.Errorf("session %d = %s/%s failure=%+v, want a Blocked %s session", 11+i, harness, si.Status.State, si.Failure, want)
 		}
 	}
-	r.stop(t)
 }
 
 func TestBlockedScenario_RemainingStatesExist(t *testing.T) {
 	t.Parallel()
-	r := start(t, "agents-blocked")
+	r := sharedBlocked(t)
 	list := r.seededSessions(t)
 	if len(list) != commandSessionCount {
 		t.Fatalf("%d sessions, want %d", len(list), commandSessionCount)
@@ -149,12 +183,11 @@ func TestBlockedScenario_RemainingStatesExist(t *testing.T) {
 	if !codexDesign.Design || codexDesign.Harness != "codex" {
 		t.Errorf("Codex design = harness %q design %v", codexDesign.Harness, codexDesign.Design)
 	}
-	r.stop(t)
 }
 
 func TestBlockedScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 	t.Parallel()
-	r := start(t, "agents-blocked")
+	r := sharedBlocked(t)
 	list := r.seededSessions(t)
 	var chat server.SessionChatResponse
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[8].ID, "--json")), &chat); err != nil {
@@ -183,7 +216,6 @@ func TestBlockedScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 	if len(codexChat.Messages) != 1 || codexChat.Messages[0].Kind != transcript.ChatKindCommand || codexChat.Messages[0].Text != "/status" {
 		t.Errorf("codex chat = %+v, want one /status pill", codexChat.Messages)
 	}
-	r.stop(t)
 }
 
 func TestCommandsScenario_FailedProbesAreDegraded(t *testing.T) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -178,8 +180,8 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 		if err := f.waitFor(id, "Unread", func(si server.SessionInfo, _ server.SessionChatResponse) bool { return si.Unread.Unread }); err != nil {
 			return err
 		}
-		if out, err := f.cli("agents", "mark-read", id); err != nil {
-			return fmt.Errorf("mark-read %s: %w\n%s", id, err, out)
+		if res, err := apiclient.New(server.SocketPath(f.stateD)).MarkSessionRead(context.Background(), id); err != nil || res.Refused {
+			return fmt.Errorf("mark-read %s: %v (refused %v: %s)", id, err, res.Refused, res.Reason)
 		}
 	}
 	return nil
@@ -281,20 +283,20 @@ func (f *fixture) repoDir(sc scenario, project string) string {
 
 // waitFor polls the session until ok accepts its list row and chat.
 func (f *fixture) waitFor(id, what string, ok func(server.SessionInfo, server.SessionChatResponse) bool) error {
-	for deadline := time.Now().Add(sessionWaitTimeout); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
-		var list []server.SessionInfo
-		out, err := f.cli("agents", "list", "--json")
-		if err != nil || json.Unmarshal(out, &list) != nil {
+	// In-process calls: this loop runs for every seeded session, and a spawned
+	// gx per poll dominated the scenario's start-up.
+	cl := apiclient.New(server.SocketPath(f.stateD))
+	for deadline := time.Now().Add(sessionWaitTimeout); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		ctx := context.Background()
+		list, err := cl.Sessions(ctx)
+		if err != nil {
 			continue
 		}
 		i := slices.IndexFunc(list, func(si server.SessionInfo) bool { return si.ID == id })
 		if i < 0 {
 			continue
 		}
-		var chat server.SessionChatResponse
-		if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
-			_ = json.Unmarshal(out, &chat)
-		}
+		chat, _ := cl.SessionChat(ctx, id)
 		if ok(list[i], chat) {
 			return nil
 		}
@@ -432,7 +434,7 @@ func (f *fixture) seedRanOnClaude(addr string) error {
 	if out, err := f.cli("server", "queue", "add", epicAddr); err != nil {
 		return fmt.Errorf("queue %s: %w\n%s", epicAddr, err, out)
 	}
-	deadline := time.Now().Add(sessionWaitTimeout * 3)
+	deadline := time.Now().Add(sessionWaitTimeout * 6)
 	for {
 		out, _ := f.cli("server", "tickets", "detail", addr, "--json")
 		if strings.Contains(string(out), `"needs-answer"`) { // oldword:ok the kept legacy wire status

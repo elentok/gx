@@ -141,6 +141,13 @@ func start(t *testing.T, scenario string) *running {
 // goes after the test's own env in the fixture's.
 func startWith(t *testing.T, scenario string, env []string, flags ...string) *running {
 	t.Helper()
+	return launch(t, t.Cleanup, scenario, env, flags...)
+}
+
+// launch is startWith with the kill cleanup handed to register, for a fixture
+// that outlives one test.
+func launch(t *testing.T, register func(func()), scenario string, env []string, flags ...string) *running {
+	t.Helper()
 	args := append([]string{"--gx", gxBin, "--fakeclaude", fakeBin}, flags...)
 	cmd := exec.Command(fixtureBin, append(args, scenario)...)
 	cmd.Env = append(os.Environ(), env...)
@@ -153,21 +160,7 @@ func startWith(t *testing.T, scenario string, env []string, flags ...string) *ru
 		t.Fatal(err)
 	}
 	r := &running{cmd: cmd}
-	t.Cleanup(func() {
-		if r.stopped {
-			return
-		}
-		// SIGTERM lets the fixture stop its server and holders; a kill orphans them.
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		done := make(chan struct{})
-		go func() { _ = cmd.Wait(); close(done) }()
-		select {
-		case <-done:
-		case <-time.After(30 * time.Second):
-			_ = cmd.Process.Kill()
-			<-done
-		}
-	})
+	register(r.kill)
 	line, err := bufio.NewReader(stdout).ReadBytes('\n')
 	if err != nil {
 		t.Fatalf("no output line: %v", err)
@@ -176,6 +169,23 @@ func startWith(t *testing.T, scenario string, env []string, flags ...string) *ru
 		t.Fatalf("output is not JSON: %v\n%s", err, line)
 	}
 	return r
+}
+
+// kill is the cleanup for a fixture its test did not stop.
+func (r *running) kill() {
+	if r.stopped {
+		return
+	}
+	// SIGTERM lets the fixture stop its server and holders; a kill orphans them.
+	_ = r.cmd.Process.Signal(syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() { _ = r.cmd.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		_ = r.cmd.Process.Kill()
+		<-done
+	}
 }
 
 // stop sends SIGTERM and waits for the fixture to exit.
