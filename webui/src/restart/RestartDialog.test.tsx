@@ -120,6 +120,9 @@ describe("RestartDialog", () => {
     fireEvent.click(await findByRole("button", { name: "Restart" }));
     await findByText(/Restarting/);
     expect(queryByText(/did not return/)).toBeNull();
+    // The 60 s timer is set in a passive effect that can run after the text shows up; flush it
+    // first, or the advance below finds no timer to fire.
+    await act(async () => {});
     await act(async () => {
       vi.advanceTimersByTime(RESTART_TIMEOUT_MS);
     });

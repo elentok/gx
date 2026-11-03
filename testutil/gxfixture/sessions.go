@@ -190,6 +190,23 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 	return nil
 }
 
+// prompt sends text to the session. The server's status lags the fake's turn,
+// so under load it can still report "working" after the reply landed; a
+// session-not-idle refusal is retried until the session settles.
+func (f *fixture) prompt(id, text string) error {
+	deadline := time.Now().Add(sessionWaitTimeout)
+	for {
+		out, err := f.cli("agents", "prompt", id, text)
+		if err == nil {
+			return nil
+		}
+		if !strings.Contains(string(out), "session-not-idle") || time.Now().After(deadline) {
+			return fmt.Errorf("prompt %s: %w\n%s", id, err, out)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 // promptAgain sends text as another chat turn and waits for its reply.
 func (f *fixture) promptAgain(id, text string) error {
 	agentMessages := func(chat server.SessionChatResponse) int {
@@ -203,8 +220,8 @@ func (f *fixture) promptAgain(id, text string) error {
 	}
 	// The control travels on its own FIFO; give it time to land before the turn.
 	time.Sleep(300 * time.Millisecond)
-	if out, err := f.cli("agents", "prompt", id, text); err != nil {
-		return fmt.Errorf("prompt %s: %w\n%s", id, err, out)
+	if err := f.prompt(id, text); err != nil {
+		return err
 	}
 	return f.waitFor(id, "a reply to "+text, func(si server.SessionInfo, chat server.SessionChatResponse) bool {
 		return si.Status.State == server.SessionIdle && agentMessages(chat) > agentMessages(before)
@@ -231,10 +248,7 @@ func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(age
 		time.Sleep(300 * time.Millisecond)
 	}
 	if st.blocks {
-		if out, err := f.cli("agents", "prompt", id, st.prompt); err != nil {
-			return fmt.Errorf("prompt %s: %w\n%s", id, err, out)
-		}
-		return nil
+		return f.prompt(id, st.prompt)
 	}
 	count := func(chat server.SessionChatResponse, kind string) int {
 		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m server.SessionChatMessage) bool {
@@ -245,8 +259,8 @@ func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(age
 	if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
 		_ = json.Unmarshal(out, &before)
 	}
-	if out, err := f.cli("agents", "prompt", id, st.prompt); err != nil {
-		return fmt.Errorf("prompt %s: %w\n%s", id, err, out)
+	if err := f.prompt(id, st.prompt); err != nil {
+		return err
 	}
 	wantOutput := st.output != nil && strings.TrimSpace(*st.output) != ""
 	return f.waitFor(id, "the "+st.prompt+" entries", func(si server.SessionInfo, chat server.SessionChatResponse) bool {

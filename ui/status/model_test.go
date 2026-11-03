@@ -103,7 +103,6 @@ func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 	}
 
 	filetreeW, diffW := m.splitWidth()
-	fmt.Printf("filetreeW: %d", filetreeW)
 	if filetreeW != maxFiletreePaneWidth {
 		t.Fatalf("expected filetree pane max width %d, got %d", maxFiletreePaneWidth, filetreeW)
 	}
