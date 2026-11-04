@@ -4,6 +4,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/server/broker"
 )
 
 // DefaultBudgetEventInterval is the throttle window of budget-changed when
@@ -14,7 +16,7 @@ const DefaultBudgetEventInterval = 60 * time.Second
 // more since the last publish. All three spend sums include today, so today's
 // total is enough. The first reading only sets the baseline.
 type budgetEvents struct {
-	throttle *eventThrottle
+	throttle *broker.Throttle
 
 	mu        sync.Mutex
 	seeded    bool
@@ -27,7 +29,7 @@ func newBudgetEvents(interval time.Duration, publish func()) *budgetEvents {
 		interval = DefaultBudgetEventInterval
 	}
 	b := &budgetEvents{}
-	b.throttle = newEventThrottle(interval, func() {
+	b.throttle = broker.NewThrottle(interval, func() {
 		b.mu.Lock()
 		b.published = b.current
 		b.mu.Unlock()
@@ -50,8 +52,8 @@ func (b *budgetEvents) observe(total float64) {
 	changed := cents != b.published
 	b.mu.Unlock()
 	if changed {
-		b.throttle.trigger()
+		b.throttle.Trigger()
 	}
 }
 
-func (b *budgetEvents) stop() { b.throttle.stop() }
+func (b *budgetEvents) stop() { b.throttle.Stop() }

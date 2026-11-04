@@ -617,7 +617,7 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 	}
 	t.State = ""
 	s.registry.put(t)
-	s.events.publish(wire.EventReclaimed, t.Address)
+	s.events.Publish(wire.EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished || reportedFinished(t.TicketPath) {
@@ -699,7 +699,7 @@ func (s *Server) reclaim(t trackedRun) error {
 	t.Session = agentrunner.Session{Label: label, ID: session.ID, SessionID: t.Session.SessionID}
 	t.State = ""
 	s.registry.put(t)
-	s.events.publish(wire.EventReclaimed, t.Address)
+	s.events.Publish(wire.EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	rc := runContext{deps, root, mode, one, wt, t.Run, t.Address}
@@ -772,7 +772,7 @@ func (s *Server) reopenEmptyClaim(t trackedRun) (bool, error) {
 		s.log.Warn("log claim-reopened", "ticket", t.Address, "err", err)
 	}
 	s.log.Info("reopened empty claim", "ticket", t.Address)
-	s.events.publish(wire.EventTicketChanged, t.Address)
+	s.events.Publish(wire.EventTicketChanged, t.Address)
 	return true, nil
 }
 

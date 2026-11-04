@@ -113,7 +113,7 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 	w.started = true
 	w.mu.Unlock()
 	if !first && (meterChanged(old.CPU, cur.CPU) || meterChanged(old.Memory, cur.Memory) || meterChanged(old.Disk, cur.Disk)) {
-		s.events.publish(wire.EventHealthChanged, "")
+		s.events.Publish(wire.EventHealthChanged, "")
 	}
 }
 
@@ -138,7 +138,7 @@ func (s *Server) observeDiskHealth(now time.Time) {
 	started := w.started
 	w.mu.Unlock()
 	if started && meterChanged(old, cur) {
-		s.events.publish(wire.EventHealthChanged, "")
+		s.events.Publish(wire.EventHealthChanged, "")
 	}
 }
 

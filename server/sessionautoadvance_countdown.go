@@ -103,7 +103,7 @@ func (s *Server) startAutoAdvance(id string) bool {
 		if !s.autoAdvances.finish(id, c) {
 			return
 		}
-		s.events.publish(wire.EventSessionChanged, id)
+		s.events.Publish(wire.EventSessionChanged, id)
 		s.sendAutoAdvance(id)
 	})
 	return true
@@ -115,7 +115,7 @@ func (s *Server) cancelAutoAdvance(id, why string) bool {
 	if !s.autoAdvances.stop(id) {
 		return false
 	}
-	s.events.publish(wire.EventSessionChanged, id)
+	s.events.Publish(wire.EventSessionChanged, id)
 	s.triggerBanner(id, sound.Attention, why)
 	return true
 }

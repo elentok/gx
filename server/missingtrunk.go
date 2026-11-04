@@ -81,7 +81,7 @@ func (s *Server) checkTrunks() {
 		if !missing {
 			if s.trunkMissing.clear(addr.Project) {
 				s.log.Info("trunk found", "project", addr.Project)
-				s.events.publishEvent(wire.Event{Type: wire.EventTrunkFound, Address: addr.Project, Level: wire.EventLevelSuccess, Message: "trunk found, claiming resumes"})
+				s.events.PublishEvent(wire.Event{Type: wire.EventTrunkFound, Address: addr.Project, Level: wire.EventLevelSuccess, Message: "trunk found, claiming resumes"})
 				s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkFound, Emoji: "🌳", Title: "project " + addr.Project + ": trunk found",
 					Detail: "trunk found, claiming resumes"})
 			}
@@ -97,7 +97,7 @@ func (s *Server) enterTrunkMissing(project, reason string) {
 		return
 	}
 	s.log.Warn("trunk missing", "project", project, "reason", reason)
-	s.events.publishEvent(wire.Event{Type: wire.EventTrunkMissing, Address: project, Level: wire.EventLevelWarning, Message: reason})
+	s.events.PublishEvent(wire.Event{Type: wire.EventTrunkMissing, Address: project, Level: wire.EventLevelWarning, Message: reason})
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
 		Detail: reason + "; its tickets will not be claimed until it is fixed"})
 }

@@ -61,6 +61,6 @@ func (s *Server) forkMergeTicket(root rootRef, e tickets.Epic, target string, ma
 		return ""
 	}
 	s.log.Info("merge ticket forked", "root", root, "ticket", id, "manual", manual)
-	s.events.publish(wire.EventQueueChanged, root.String())
+	s.events.Publish(wire.EventQueueChanged, root.String())
 	return id
 }

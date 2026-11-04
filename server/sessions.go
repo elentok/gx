@@ -175,7 +175,7 @@ func (s *Server) createSession(req wire.CreateSessionRequest, sc sessionCtx) (wi
 		return wire.SessionResult{}, err
 	}
 	s.sessionWatches.start(func() { s.watchSession(dir, id, 0, time.Time{}, false) })
-	s.events.publish(wire.EventSessionChanged, id)
+	s.events.Publish(wire.EventSessionChanged, id)
 	info := meta.info()
 	return wire.SessionResult{Session: &info}, nil
 }
@@ -444,7 +444,7 @@ func (s *Server) endFailedStart(dir string, meta *sessionMeta) {
 		s.log.Warn("save session meta", "session", meta.ID, "err", err)
 		return
 	}
-	s.events.publish(wire.EventSessionChanged, meta.ID)
+	s.events.Publish(wire.EventSessionChanged, meta.ID)
 }
 
 // trustFlag has the holder answer the trust dialog, only for a worktree gx
@@ -982,7 +982,7 @@ func (s *Server) removeSession(req wire.SessionRequest) (wire.SessionResult, err
 	if err := os.RemoveAll(dir); err != nil {
 		return wire.SessionResult{}, err
 	}
-	s.events.publish(wire.EventSessionChanged, req.ID)
+	s.events.Publish(wire.EventSessionChanged, req.ID)
 	info := meta.info()
 	return wire.SessionResult{Session: &info}, nil
 }
@@ -1016,7 +1016,7 @@ func (s *Server) saveSessionMetaUpdate(dir, id string, change func(*sessionMeta)
 	if err := writeSessionMeta(dir, meta); err != nil {
 		return meta, false, fmt.Errorf("save session %s meta: %w", id, err)
 	}
-	s.events.publish(wire.EventSessionChanged, id)
+	s.events.Publish(wire.EventSessionChanged, id)
 	return meta, meta.Design && !wasExited && meta.Status.State == wire.SessionExited, nil
 }
 

@@ -86,7 +86,7 @@ func (s *Server) startResumedHolder(dir string, meta *sessionMeta, crashUntil ti
 	}
 	id, run := meta.ID, meta.Run
 	s.sessionWatches.start(func() { s.watchSession(dir, id, run, crashUntil, false) })
-	s.events.publish(wire.EventSessionChanged, id)
+	s.events.Publish(wire.EventSessionChanged, id)
 	return nil
 }
 

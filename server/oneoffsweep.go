@@ -72,7 +72,7 @@ func (s *Server) dequeueIdleOneOffs(dir string) {
 	if err != nil {
 		s.log.Warn("dequeue idle one-offs", "root", root, "err", err)
 	} else if removed {
-		s.events.publish(wire.EventQueueChanged, root.String())
+		s.events.Publish(wire.EventQueueChanged, root.String())
 	}
 }
 

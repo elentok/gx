@@ -50,7 +50,7 @@ func (s *Server) alertLongTicket(addr tickets.Address, ticketPath string, turns 
 	}); err != nil {
 		s.log.Warn("mark long ticket", "ticket", addr.String(), "err", err)
 	}
-	s.events.publish(wire.EventTicketChanged, addr.String())
+	s.events.Publish(wire.EventTicketChanged, addr.String())
 	body := fmt.Sprintf("%s has run %d assistant turns", addr, turns)
 	s.banner(wire.EventLevelWarning, "Long ticket", body)
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeLongTicket, Emoji: "⏳", Title: "long ticket", Detail: body})

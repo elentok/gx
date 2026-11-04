@@ -85,7 +85,7 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("logging nudge of %s: %w", address, err)
 		}
-		s.events.publish(wire.EventTicketNudged, address)
+		s.events.Publish(wire.EventTicketNudged, address)
 		if !s.registry.has(address) {
 			s.watchNudgedPane(ref, it)
 		}

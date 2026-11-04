@@ -475,7 +475,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
 	s.rescan() // the claim must show now, not when the backstop poll comes
-	s.events.publish(wire.EventTicketClaimed, ticketAddr)
+	s.events.Publish(wire.EventTicketClaimed, ticketAddr)
 
 	if err := clearLongTicketMark(t.Path); err != nil {
 		s.log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
@@ -533,13 +533,13 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		if perr := s.pauseTicket(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
 			err = errors.Join(err, fmt.Errorf("pause: %w", perr))
 		}
-		s.events.publish(wire.EventIterationLaunchFailed, ticketAddr)
+		s.events.Publish(wire.EventIterationLaunchFailed, ticketAddr)
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
 	s.registry.put(trackedRun{
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
-	s.events.publish(wire.EventIterationStarted, ticketAddr)
+	s.events.Publish(wire.EventIterationStarted, ticketAddr)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
 	return true, nil
 }
@@ -768,7 +768,7 @@ func (s *Server) watchBlocked(r agentrunner.Runner, sess agentrunner.Session, ad
 			return
 		}
 		blocked = !blocked
-		s.events.publish(wire.EventTicketChanged, addr)
+		s.events.Publish(wire.EventTicketChanged, addr)
 	}
 }
 
@@ -819,7 +819,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		// person: hand the run to the waiting-run machinery as a question does.
 		keepRun = true
 		s.registry.markWaiting(ticketAddr, time.Now())
-		s.events.publish(wire.EventIterationPaused, ticketAddr)
+		s.events.Publish(wire.EventIterationPaused, ticketAddr)
 		s.announcePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
 		go s.watchUnblock(deps.Runner, run.Session, ticketAddr)
 		return
@@ -850,7 +850,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		if perr := s.pauseTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
 			s.log.Warn("pause failed finish", "ticket", ticketAddr, "err", perr)
 		}
-		s.events.publish(wire.EventIterationFailed, ticketAddr)
+		s.events.Publish(wire.EventIterationFailed, ticketAddr)
 		return
 	}
 	if !out.Merged {
@@ -860,7 +860,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			keepRun = true
 			s.registry.markWaiting(ticketAddr, time.Now())
 		}
-		s.events.publish(wire.EventIterationPaused, ticketAddr)
+		s.events.Publish(wire.EventIterationPaused, ticketAddr)
 		s.announcePause(addr, one.Ticket.Path, out.Kind, out.Reason)
 		return
 	}
@@ -869,7 +869,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	if cerr := agentrunner.Cleanup(deps.Runner, run.Session.Label); cerr != nil {
 		s.log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
 	}
-	s.events.publish(wire.EventTicketDone, ticketAddr)
+	s.events.Publish(wire.EventTicketDone, ticketAddr)
 	s.stampFinished(addr, one.Ticket.Path, false)
 	s.notifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)

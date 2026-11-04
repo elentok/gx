@@ -28,7 +28,7 @@ func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		s.log.Warn("refresh after pause", "ticket", addr.String(), "err", err)
 	}
-	s.events.publish(wire.EventTicketPaused, addr.String())
+	s.events.Publish(wire.EventTicketPaused, addr.String())
 	s.announcePause(addr, ticketPath, kind, reason)
 	return nil
 }

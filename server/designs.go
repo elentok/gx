@@ -568,7 +568,7 @@ func (s *Server) deleteDesign(req wire.DesignDeleteRequest) (wire.SessionResult,
 	if err := os.RemoveAll(epics[i].Path); err != nil {
 		return wire.SessionResult{}, err
 	}
-	s.events.publish(wire.EventTicketChanged, req.Epic)
+	s.events.Publish(wire.EventTicketChanged, req.Epic)
 	return wire.SessionResult{}, nil
 }
 

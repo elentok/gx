@@ -18,7 +18,7 @@ func (r *codexUsageRig) serverWithEvents() *Server {
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	r.t.Cleanup(func() { s.limitsEvents.stop() })
+	r.t.Cleanup(func() { s.limitsEvents.Stop() })
 	return s
 }
 
@@ -26,7 +26,7 @@ func (r *codexUsageRig) serverWithEvents() *Server {
 func limitsEventsSince(t *testing.T, s *Server, seq uint64) int {
 	t.Helper()
 	time.Sleep(10 * codexEventInterval)
-	ch, cancel, err := s.events.subscribe(seq)
+	ch, cancel, err := s.events.Subscribe(seq)
 	if err != nil {
 		t.Fatal(err)
 	}

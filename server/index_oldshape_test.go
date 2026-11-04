@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/server/broker"
 )
 
 // oldShapeStore is a store whose one ticket the strict scan rejects.
@@ -37,7 +39,7 @@ func TestBuildIndex_OldShapeTicketGivesEmptyIndex(t *testing.T) {
 	if _, _, err := scanStore(store); err == nil {
 		t.Fatal("strict scan accepted the old-shape ticket; fix the fixture")
 	}
-	idx, err := buildIndex(store, newBroker(1))
+	idx, err := buildIndex(store, broker.New(1))
 	if err != nil {
 		t.Fatalf("buildIndex: %v", err)
 	}

@@ -93,7 +93,7 @@ func (s *Server) recordModelMismatch(scratchDir, path string, addr tickets.Addre
 	if err := s.pauseTicket(scratchDir, addr, path, events.ModelMismatch, m.Error(), run); err != nil {
 		s.log.Warn("pause model mismatch", "ticket", ticketAddr, "err", err)
 	}
-	s.events.publish(wire.EventIterationPaused, ticketAddr)
+	s.events.Publish(wire.EventIterationPaused, ticketAddr)
 	if _, err := s.writeFollowUp(addr, modelMismatchFollowUp(addr, m)); err != nil {
 		s.log.Warn("file model-mismatch follow-up", "ticket", ticketAddr, "err", err)
 	}

@@ -68,7 +68,7 @@ func (s *Server) keepMigrationFailuresWatched(ctx context.Context) {
 		case <-tick.C:
 			if cur := read(); !bytes.Equal(cur, last) {
 				last = cur
-				s.events.publish(wire.EventMigrationFailuresChanged, "")
+				s.events.Publish(wire.EventMigrationFailuresChanged, "")
 				s.kickRunner() // a clear ends a Migration block: claim now, not at the next tick
 			}
 		}

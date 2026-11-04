@@ -1,4 +1,4 @@
-package server
+package broker
 
 import (
 	"sync"
@@ -9,11 +9,11 @@ import (
 // Config.LimitsEventInterval is zero.
 const DefaultLimitsEventInterval = 2 * time.Second
 
-// eventThrottle coalesces bursts: the first trigger fires at once, triggers
+// Throttle coalesces bursts: the first trigger fires at once, triggers
 // inside the interval set one trailing fire for when the interval ends. Dropping
 // them instead would leave an open menu on an old value. It owns no goroutine;
-// only a pending trailing timer, which stop cancels.
-type eventThrottle struct {
+// only a pending trailing timer, which Stop cancels.
+type Throttle struct {
 	interval time.Duration
 	fire     func()
 
@@ -23,20 +23,21 @@ type eventThrottle struct {
 	stopped bool
 }
 
-// limitsEventInterval is the limits-changed window, defaulted when unset.
-func limitsEventInterval(cfg Config) time.Duration {
-	if cfg.LimitsEventInterval <= 0 {
+// LimitsInterval is the limits-changed window for a configured interval,
+// defaulted when unset.
+func LimitsInterval(configured time.Duration) time.Duration {
+	if configured <= 0 {
 		return DefaultLimitsEventInterval
 	}
-	return cfg.LimitsEventInterval
+	return configured
 }
 
-func newEventThrottle(interval time.Duration, fire func()) *eventThrottle {
-	return &eventThrottle{interval: interval, fire: fire}
+func NewThrottle(interval time.Duration, fire func()) *Throttle {
+	return &Throttle{interval: interval, fire: fire}
 }
 
-// trigger records that something changed.
-func (t *eventThrottle) trigger() {
+// Trigger records that something changed.
+func (t *Throttle) Trigger() {
 	t.mu.Lock()
 	if t.stopped || t.timer != nil {
 		t.mu.Unlock()
@@ -53,7 +54,7 @@ func (t *eventThrottle) trigger() {
 	t.mu.Unlock()
 }
 
-func (t *eventThrottle) trailing() {
+func (t *Throttle) trailing() {
 	t.mu.Lock()
 	t.timer = nil
 	if t.stopped {
@@ -65,8 +66,8 @@ func (t *eventThrottle) trailing() {
 	t.fire()
 }
 
-// stop cancels a pending trailing fire and ignores later triggers.
-func (t *eventThrottle) stop() {
+// Stop cancels a pending trailing fire and ignores later triggers.
+func (t *Throttle) Stop() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.stopped = true

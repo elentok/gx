@@ -25,7 +25,7 @@ func (s *Server) cleanNow(id string) wire.CleanNowResult {
 	probe, projects, before := st.probe, st.projects, st.reading.Free
 	st.beginClean(before)
 	d.mu.Unlock()
-	s.events.publish(wire.EventDiskWarnChanged, "")
+	s.events.Publish(wire.EventDiskWarnChanged, "")
 
 	// The fresh read, not the last poll, is what "freed" is measured from.
 	if r, err := s.freeSpace(probe); err != nil {

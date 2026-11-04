@@ -50,7 +50,7 @@ func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 	if err := writeSessionMeta(dir, meta); err != nil {
 		return wire.SessionResult{}, err
 	}
-	s.events.publish(wire.EventSessionChanged, req.ID)
+	s.events.Publish(wire.EventSessionChanged, req.ID)
 	s.startContinue(dir, meta, "Action", action)
 	info := meta.info()
 	return wire.SessionResult{Session: &info}, nil

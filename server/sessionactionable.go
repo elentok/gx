@@ -219,7 +219,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	case actionableAdvance:
 		// A countdown that starts is silent: the person is told only if it does not send.
 		if s.startAutoAdvance(id) {
-			s.events.publish(wire.EventSessionChanged, id)
+			s.events.Publish(wire.EventSessionChanged, id)
 			return
 		}
 		s.triggerBanner(id, sound.Attention, a.Reason)

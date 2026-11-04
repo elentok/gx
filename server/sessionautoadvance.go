@@ -86,7 +86,7 @@ func (s *Server) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult
 	}
 	// Switching on over a raised Continue starts the countdown a run end would have.
 	if start && s.startAutoAdvance(req.ID) {
-		s.events.publish(wire.EventSessionChanged, req.ID)
+		s.events.Publish(wire.EventSessionChanged, req.ID)
 	}
 	return wire.SessionResult{Session: &info}, nil
 }

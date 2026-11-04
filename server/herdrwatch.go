@@ -149,11 +149,11 @@ func (s *Server) syncHerdrBanner() {
 		return
 	}
 	if show {
-		s.events.publish(wire.EventHerdrUnavailable, "")
+		s.events.Publish(wire.EventHerdrUnavailable, "")
 		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text})
 		return
 	}
-	s.events.publish(wire.EventHerdrAvailable, "")
+	s.events.Publish(wire.EventHerdrAvailable, "")
 	if !s.herdr.isUnavailable() {
 		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
 	}

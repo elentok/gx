@@ -124,7 +124,7 @@ func (s *Server) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration,
 		s.log.Warn("queue root after stash-merge", "root", root, "err", err)
 	}
 	s.log.Info("stash-merge left conflicts", "root", root, "ticket", id, "backup", ref)
-	s.events.publish(wire.EventQueueChanged, root.String())
+	s.events.Publish(wire.EventQueueChanged, root.String())
 	return wire.QueueResult{TrunkConflict: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}, nil, nil
 }
 

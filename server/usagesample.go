@@ -236,7 +236,7 @@ func (s *Server) usageOverride(now time.Time, agent ralphloop.AgentKind) (wire.U
 		return wire.UsageOverrideResult{Refused: true, Reason: wire.ReasonNotGated,
 			Message: fmt.Sprintf("no %s usage window is at its limit", strings.TrimSuffix(prefix, " usage: "))}, nil
 	}
-	s.events.publish(wire.EventQueueChanged, "")
+	s.events.Publish(wire.EventQueueChanged, "")
 	s.kickRunner()
 	return wire.UsageOverrideResult{Windows: names, Until: until}, nil
 }
@@ -295,7 +295,7 @@ func (s *Server) scanUsage() {
 		s.log.Warn("save codex limit history", "err", err)
 	}
 	if saved {
-		s.limitsEvents.trigger()
+		s.limitsEvents.Trigger()
 	}
 }
 

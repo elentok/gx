@@ -73,7 +73,7 @@ func (s *Server) setViMode(req wire.ViModeRequest) (wire.ViModeResult, error) {
 		v.on = prev
 		return wire.ViModeResult{}, err
 	}
-	s.events.publish(wire.EventViModeChanged, "")
+	s.events.Publish(wire.EventViModeChanged, "")
 	return wire.ViModeResult{ViMode: v.on}, nil
 }
 

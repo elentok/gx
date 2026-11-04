@@ -1,4 +1,4 @@
-package server
+package broker
 
 import (
 	"errors"
@@ -15,13 +15,13 @@ const (
 	replayWindow = 256
 )
 
-// errSeqGone means the requested seq is outside the replay window: the client
+// ErrSeqGone means the requested seq is outside the replay window: the client
 // must re-snapshot.
-var errSeqGone = errors.New("seq outside replay window")
+var ErrSeqGone = errors.New("seq outside replay window")
 
-// broker numbers events and fans them out. A subscriber whose buffer is full is
+// Broker numbers events and fans them out. A subscriber whose buffer is full is
 // dropped (its channel is closed) rather than ever blocking the publisher.
-type broker struct {
+type Broker struct {
 	mu     sync.Mutex
 	seq    uint64
 	recent []wire.Event
@@ -30,25 +30,25 @@ type broker struct {
 	closed bool
 }
 
-func newBroker(buffer int) *broker {
+func New(buffer int) *Broker {
 	if buffer <= 0 {
 		buffer = defaultSubscriberBuffer
 	}
-	return &broker{subs: map[chan wire.Event]struct{}{}, buffer: buffer}
+	return &Broker{subs: map[chan wire.Event]struct{}{}, buffer: buffer}
 }
 
-func (b *broker) currentSeq() uint64 {
+func (b *Broker) CurrentSeq() uint64 {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.seq
 }
 
-func (b *broker) publish(typ, address string) {
-	b.publishEvent(wire.Event{Type: typ, Address: address})
+func (b *Broker) Publish(typ, address string) {
+	b.PublishEvent(wire.Event{Type: typ, Address: address})
 }
 
-// publishEvent numbers ev (its Seq is overwritten) and fans it out.
-func (b *broker) publishEvent(ev wire.Event) {
+// PublishEvent numbers ev (its Seq is overwritten) and fans it out.
+func (b *Broker) PublishEvent(ev wire.Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.seq++
@@ -67,13 +67,13 @@ func (b *broker) publishEvent(ev wire.Event) {
 	}
 }
 
-// subscribe returns a channel carrying every event with seq > since. The
+// Subscribe returns a channel carrying every event with seq > since. The
 // channel is closed when the subscriber is dropped or the broker closes.
-func (b *broker) subscribe(since uint64) (<-chan wire.Event, func(), error) {
+func (b *Broker) Subscribe(since uint64) (<-chan wire.Event, func(), error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if since > b.seq || (since < b.seq && (len(b.recent) == 0 || b.recent[0].Seq > since+1)) {
-		return nil, nil, errSeqGone
+		return nil, nil, ErrSeqGone
 	}
 	var replay []wire.Event
 	for _, ev := range b.recent {
@@ -101,8 +101,8 @@ func (b *broker) subscribe(since uint64) (<-chan wire.Event, func(), error) {
 	return ch, cancel, nil
 }
 
-// close ends every stream so http shutdown isn't held open by subscribers.
-func (b *broker) close() {
+// Close ends every stream so http shutdown isn't held open by subscribers.
+func (b *Broker) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.closed = true

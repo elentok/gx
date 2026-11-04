@@ -279,7 +279,7 @@ func (s *Server) publishVerdictChanges() {
 	for _, r := range rows {
 		next[r.Address] = r.Verdict
 		if prev, ok := l.seen[r.Address]; ok && prev != r.Verdict {
-			s.events.publish(wire.EventExplainVerdictChange, r.Address)
+			s.events.Publish(wire.EventExplainVerdictChange, r.Address)
 		}
 	}
 	l.seen = next

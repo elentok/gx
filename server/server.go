@@ -30,6 +30,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
@@ -306,14 +307,14 @@ type Server struct {
 	usage        *usageSamples // Claude's
 	limits       *limitsStore
 	limitHistory *limitHistory
-	limitsEvents *eventThrottle
+	limitsEvents *broker.Throttle
 	budgetEvents *budgetEvents
 	usageCodex   *usageSamples
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
 	extraUsage   extraUsageNotes
 	costOf       func(wire.IterationInfo) (float64, bool) // swapped in tests
-	events       *broker
+	events       *broker.Broker
 	herdr        herdrWatch
 	pauseFold    pauseFold
 	pauseHold    recoveryHold
@@ -425,7 +426,7 @@ func New(cfg Config) (*Server, error) {
 			return nil, fmt.Errorf("prune scratch workspace: %w", err)
 		}
 	}
-	events := newBroker(cfg.SubscriberBuffer)
+	events := broker.New(cfg.SubscriberBuffer)
 	idx, err := buildIndex(cfg.TicketStore, events)
 	if err != nil {
 		lock.release()
@@ -529,8 +530,8 @@ func New(cfg Config) (*Server, error) {
 		usage:        openUsageSamples(cfg.StateDir),
 		limits:       openLimitsStore(cfg.StateDir),
 		limitHistory: openLimitHistory(cfg.StateDir),
-		limitsEvents: newEventThrottle(limitsEventInterval(cfg), func() { events.publish(wire.EventLimitsChanged, "") }),
-		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.publish(wire.EventBudgetChanged, "") }),
+		limitsEvents: broker.NewThrottle(broker.LimitsInterval(cfg.LimitsEventInterval), func() { events.Publish(wire.EventLimitsChanged, "") }),
+		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.Publish(wire.EventBudgetChanged, "") }),
 		usageCodex:   openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
 		costOf:       iterationCostIn(cfg.Env),
 		mergeInto:    git.MergeBranchInto,
@@ -766,7 +767,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		since = n
 	}
-	ch, cancel, err := s.events.subscribe(since)
+	ch, cancel, err := s.events.Subscribe(since)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusGone)
 		return
@@ -908,7 +909,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	var err error
 	select {
 	case <-ctx.Done():
-		s.events.close() // open streams would otherwise hold Shutdown
+		s.events.Close() // open streams would otherwise hold Shutdown
 		err = shutdown()
 		for range lns {
 			<-errc
@@ -924,7 +925,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	recordShutdown("stop-fresh")
 	stopFresh()
 	recordShutdown("limits-events-stop")
-	s.limitsEvents.stop()
+	s.limitsEvents.Stop()
 	recordShutdown("budget-events-stop")
 	s.budgetEvents.stop()
 	recordShutdown("session-watches-close")

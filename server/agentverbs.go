@@ -98,7 +98,7 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			return wire.QueueResult{}, err
 		}
 		// The prompt is gone, so open pages re-read the detail and the snapshot.
-		s.events.publish(wire.EventTicketChanged, ref.addr.String())
+		s.events.Publish(wire.EventTicketChanged, ref.addr.String())
 		return wire.QueueResult{}, nil
 	})
 }

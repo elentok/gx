@@ -116,7 +116,7 @@ func (s *Server) endHardGrace(gen int) {
 		s.rearmBudgetNotes(s.budgetStatus(now))
 	}
 	s.reloadMu.Unlock()
-	s.events.publish(wire.EventQueueChanged, "")
+	s.events.Publish(wire.EventQueueChanged, "")
 	if !hard {
 		s.kickRunner()
 		return

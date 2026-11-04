@@ -115,7 +115,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 
 - `cmd/` — CLI commands (`gx tickets`, `gx agent`, ...)
 - `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the
-  wire types, consts and pure methods (no behaviour, no import of `server`)
+  wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds
+  the SSE event broker and throttle (imports `wire` only)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

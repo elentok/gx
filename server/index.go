@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -28,7 +29,7 @@ type indexedTicket struct {
 // index is the server's in-memory view of the ticket store.
 type index struct {
 	mu     sync.RWMutex
-	events *broker
+	events *broker.Broker
 	list   []indexedTicket
 	// loaded is each project's epics as the last scan read them, by project
 	// dir. Treated as read-only: readers share it until the next scan.
@@ -72,7 +73,7 @@ func scanStore(storePath string) ([]indexedTicket, map[string][]tickets.Epic, er
 // buildIndex does the initial scan. A store the strict scan cannot read yet
 // (old-shape tickets a migration is about to rewrite) gives an empty index and
 // no error: the scan is deferred to the first rescan after the migrations end.
-func buildIndex(storePath string, events *broker) (*index, error) {
+func buildIndex(storePath string, events *broker.Broker) (*index, error) {
 	list, loaded, err := scanStore(storePath)
 	if err != nil {
 		return &index{list: []indexedTicket{}, loaded: map[string][]tickets.Epic{}, events: events}, nil
@@ -91,10 +92,10 @@ func (i *index) refresh(storePath string) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	for _, addr := range changedAddresses(i.list, list) {
-		i.events.publish(wire.EventTicketChanged, addr)
+		i.events.Publish(wire.EventTicketChanged, addr)
 	}
 	for _, addr := range changedEpicMeta(i.loaded, loaded) {
-		i.events.publish(wire.EventTicketChanged, addr)
+		i.events.Publish(wire.EventTicketChanged, addr)
 	}
 	i.list, i.loaded = list, loaded
 	return nil
@@ -256,5 +257,5 @@ func (i *index) snapshotAgents() (wire.Snapshot, []string) {
 	for n, t := range i.list {
 		infos[n], agents[n] = t.TicketInfo, t.agent
 	}
-	return wire.Snapshot{Seq: i.events.currentSeq(), Tickets: infos}, agents
+	return wire.Snapshot{Seq: i.events.CurrentSeq(), Tickets: infos}, agents
 }

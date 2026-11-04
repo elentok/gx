@@ -157,7 +157,7 @@ func (s *Server) focusSession(req wire.SessionRequest) (wire.SessionResult, erro
 	info := meta.info()
 	client := s.focus.focusedClient()
 	if client != "" {
-		s.events.publishEvent(wire.Event{Type: wire.EventSessionFocus, Address: req.ID, Client: client})
+		s.events.PublishEvent(wire.Event{Type: wire.EventSessionFocus, Address: req.ID, Client: client})
 	}
 	return wire.SessionResult{Session: &info, Client: client}, nil
 }

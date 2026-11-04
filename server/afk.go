@@ -73,7 +73,7 @@ func (s *Server) setAFK(req wire.AFKRequest) (wire.AFKResult, error) {
 		a.on = prev
 		return wire.AFKResult{}, err
 	}
-	s.events.publish(wire.EventAFKChanged, "")
+	s.events.Publish(wire.EventAFKChanged, "")
 	return wire.AFKResult{AFK: a.on}, nil
 }
 

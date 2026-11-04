@@ -117,7 +117,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 		if err := writeSessionMeta(dir, meta); err != nil {
 			return wire.SessionResult{}, err
 		}
-		s.events.publish(wire.EventSessionChanged, req.ID)
+		s.events.Publish(wire.EventSessionChanged, req.ID)
 		s.startContinue(dir, meta, "Continue", action)
 		ev.Action = "continue"
 		for _, a := range action {
@@ -132,7 +132,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 			if err := writeSessionMeta(dir, meta); err != nil {
 				return wire.SessionResult{}, err
 			}
-			s.events.publish(wire.EventSessionChanged, req.ID)
+			s.events.Publish(wire.EventSessionChanged, req.ID)
 		}
 		if err := s.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
 			return wire.SessionResult{}, err
@@ -162,7 +162,7 @@ func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error
 	if err := writeSessionMeta(dir, meta); err != nil {
 		return err
 	}
-	s.events.publish(wire.EventSessionChanged, meta.ID)
+	s.events.Publish(wire.EventSessionChanged, meta.ID)
 	return nil
 }
 

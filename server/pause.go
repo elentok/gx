@@ -99,7 +99,7 @@ func (s *Server) setMode(paused bool) (wire.QueueResult, error) {
 		p.paused = prev
 		return wire.QueueResult{}, err
 	}
-	s.events.publish(wire.EventQueueChanged, "")
+	s.events.Publish(wire.EventQueueChanged, "")
 	s.kickRunner()
 	return wire.QueueResult{Queue: s.queued.list(), Mode: p.mode()}, nil
 }

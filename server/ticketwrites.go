@@ -337,7 +337,7 @@ func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) e
 			s.log.Warn("remove cancelled worktree", "ticket", ref.address(t), "err", err)
 		}
 	}
-	s.events.publish(wire.EventTicketCancelled, ref.address(t))
+	s.events.Publish(wire.EventTicketCancelled, ref.address(t))
 	return nil
 }
 

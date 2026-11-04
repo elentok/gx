@@ -197,7 +197,7 @@ func (s *Server) observeCleanEnd(r wire.DiskReading, probe string, end cleanEnd)
 // publishChange announces a changed disk: the event, the warn and hold logs and
 // the warn notice.
 func (s *Server) publishChange(r wire.DiskReading, c diskChange) {
-	s.events.publish(wire.EventDiskWarnChanged, "")
+	s.events.Publish(wire.EventDiskWarnChanged, "")
 	if c.warnSet {
 		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", c.warn)
 		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,

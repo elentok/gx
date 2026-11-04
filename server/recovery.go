@@ -186,7 +186,7 @@ func (s *Server) runRule(plan recoveryPlan, f recovery.Failure) {
 		s.escalate(plan, f, entry.ID+" left it paused", "")
 	default:
 		// A --wait on the ticket reads the hold, so it must hear the hold end.
-		s.events.publish(wire.EventTicketChanged, f.Address)
+		s.events.Publish(wire.EventTicketChanged, f.Address)
 	}
 }
 
@@ -200,7 +200,7 @@ func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome
 		s.pauseHold.take(f.Address)
 		s.pauseHold.escalate(f.Address)
 		// A --wait on the ticket reads the hold, so it must hear the escalation.
-		s.events.publish(wire.EventTicketChanged, f.Address)
+		s.events.Publish(wire.EventTicketChanged, f.Address)
 	}
 	why, entry, report := reason, "no match", ref.ticket.Path
 	if outcome != "" {
@@ -232,13 +232,13 @@ func (s *Server) holdPauseForRecovery(addr tickets.Address, ticketPath string, k
 			s.recoverFrom(plan, f)
 			// An opened investigation keeps it pending from here: see recoveryState.
 			if s.pauseHold.started(f.Address) {
-				s.events.publish(wire.EventTicketChanged, f.Address)
+				s.events.Publish(wire.EventTicketChanged, f.Address)
 			}
 		})
 		return false
 	}
 	s.pauseHold.hold(f.Address, s.settings.Load().RecoverySettings.NotifyHold, func() {
-		s.events.publish(wire.EventTicketChanged, f.Address)
+		s.events.Publish(wire.EventTicketChanged, f.Address)
 		s.notifyPause(addr, ticketPath, kind, reason)
 	})
 	s.goSettle(func() { s.recoverFrom(plan, f) })
@@ -297,7 +297,7 @@ func (s *Server) propose(plan recoveryPlan, f recovery.Failure) {
 	}
 	ev := ralphloop.Event{Type: string(events.RecoveryProposed), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entry.ID, Text: text, Fingerprint: fingerprint}
 	s.appendRecoveryEvent(ref, f, ev)
-	s.events.publish(wire.EventTicketChanged, ref.addr.String())
+	s.events.Publish(wire.EventTicketChanged, ref.addr.String())
 	s.escalate(plan, f, entry.ID+" proposes a remedy awaiting approval", "")
 }
 
@@ -353,7 +353,7 @@ func (s *Server) ticketApprove(req wire.QueueRequest) (wire.QueueResult, error) 
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
-		s.events.publish(wire.EventTicketChanged, ref.addr.String())
+		s.events.Publish(wire.EventTicketChanged, ref.addr.String())
 		return wire.QueueResult{}, nil
 	})
 }
@@ -748,7 +748,7 @@ func (s *Server) ticketCommitlessDone(req wire.QueueRequest) (wire.QueueResult, 
 			return wire.QueueResult{}, fmt.Errorf("commitless-done %s: %w", ref.addr, err)
 		}
 		s.stampFinished(ref.addr, ref.ticket.Path, false)
-		s.events.publish(wire.EventTicketDone, ref.addr.String())
+		s.events.Publish(wire.EventTicketDone, ref.addr.String())
 		return wire.QueueResult{}, nil
 	})
 }

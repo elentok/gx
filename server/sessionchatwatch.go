@@ -83,7 +83,7 @@ func (p *chatPoll) run(stop <-chan struct{}, done chan<- struct{}) {
 		// The first reading is the baseline: growth that predates the poll
 		// is already in the chat the page loads.
 		if prev >= 0 && size != prev {
-			p.s.events.publish(wire.EventSessionChatChanged, p.id)
+			p.s.events.Publish(wire.EventSessionChatChanged, p.id)
 		}
 	}
 }

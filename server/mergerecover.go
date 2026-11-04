@@ -86,12 +86,12 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 		if err := ralphloop.RecordManualMerge(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
 			return fmt.Errorf("finishing merge of %s: %w", addr, err)
 		}
-		s.events.publish(wire.EventTicketDone, addr)
+		s.events.Publish(wire.EventTicketDone, addr)
 	case ralphloop.MergingRecoverable:
 		if err := s.abortHalfPick(run.FeatureWorktree); err != nil {
 			return fmt.Errorf("rolling back merge of %s: %w", addr, err)
 		}
-		s.events.publish(wire.EventMergeRolledBack, addr)
+		s.events.Publish(wire.EventMergeRolledBack, addr)
 	default:
 		reason := fmt.Sprintf("merge interrupted by a crash (lock owner %s) and verify cannot tell whether it merged: %s", owner.Describe(), v.Merging)
 		if err := s.pauseTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, Run{}); err != nil {

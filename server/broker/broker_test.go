@@ -1,4 +1,4 @@
-package server
+package broker
 
 import (
 	"testing"
@@ -8,12 +8,12 @@ import (
 
 func TestBroker_SlowSubscriberIsDroppedOthersKeepContiguousSeq(t *testing.T) {
 	t.Parallel()
-	b := newBroker(2)
-	slow, _, err := b.subscribe(0)
+	b := New(2)
+	slow, _, err := b.Subscribe(0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fast, cancel, err := b.subscribe(0)
+	fast, cancel, err := b.Subscribe(0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +21,7 @@ func TestBroker_SlowSubscriberIsDroppedOthersKeepContiguousSeq(t *testing.T) {
 
 	var got []uint64
 	for range 5 {
-		b.publish(wire.EventTicketChanged, "p:e/01")
+		b.Publish(wire.EventTicketChanged, "p:e/01")
 		got = append(got, (<-fast).Seq) // keeps up
 	}
 	for i, seq := range got {
@@ -41,12 +41,12 @@ func TestBroker_SlowSubscriberIsDroppedOthersKeepContiguousSeq(t *testing.T) {
 
 func TestBroker_SubscribeReplaysFromSeqAndRefusesUnknownSeq(t *testing.T) {
 	t.Parallel()
-	b := newBroker(0)
+	b := New(0)
 	for range 3 {
-		b.publish(wire.EventTicketChanged, "p:e/01")
+		b.Publish(wire.EventTicketChanged, "p:e/01")
 	}
 
-	ch, cancel, err := b.subscribe(1)
+	ch, cancel, err := b.Subscribe(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestBroker_SubscribeReplaysFromSeqAndRefusesUnknownSeq(t *testing.T) {
 	if first := <-ch; first.Seq != 2 {
 		t.Errorf("first replayed seq = %d, want 2", first.Seq)
 	}
-	if _, _, err := b.subscribe(99); err == nil {
+	if _, _, err := b.Subscribe(99); err == nil {
 		t.Error("subscribing from a future seq succeeded")
 	}
 }

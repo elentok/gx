@@ -123,7 +123,7 @@ func (s *Server) applyBudgetLimits(old, next Settings) {
 	}
 	s.cancelHardGrace()
 	s.rearmBudgetNotes(s.budgetStatus(now))
-	s.events.publish(wire.EventQueueChanged, "")
+	s.events.Publish(wire.EventQueueChanged, "")
 }
 
 // reloadableSettings is next with the chat test seams, which are not config
@@ -250,7 +250,7 @@ func (s *Server) banner(level, title, body string) {
 			s.log.Warn("OS banner failed", "title", title, "error", err)
 		}
 	}()
-	s.events.publishEvent(wire.Event{Type: wire.EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
+	s.events.PublishEvent(wire.Event{Type: wire.EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
 }
 
 func joinBanner(title, body string) string {

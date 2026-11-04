@@ -222,12 +222,12 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		if perr := s.pauseTicket(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {
 			s.log.Warn("late finish: pause failed finish", "ticket", addr, "err", perr)
 		}
-		s.events.publish(wire.EventIterationFailed, addr.String())
+		s.events.Publish(wire.EventIterationFailed, addr.String())
 		return false
 	}
 	if !out.Merged {
 		s.log.Warn("late finish re-paused", "ticket", addr, "kind", out.Kind, "reason", out.Reason)
-		s.events.publish(wire.EventIterationPaused, addr.String())
+		s.events.Publish(wire.EventIterationPaused, addr.String())
 		return false
 	}
 	sha, outcome := "", "closed commitless"
@@ -242,7 +242,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		Reason: fmt.Sprintf("paused %s, finished %s; %s",
 			lf.pause.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),
 	})
-	s.events.publish(wire.EventTicketDone, addr.String())
+	s.events.Publish(wire.EventTicketDone, addr.String())
 	s.stampFinished(addr, lf.path, false)
 	s.cancelUnstartedInvestigations(lf.dir, addr)
 	unlock()
@@ -276,7 +276,7 @@ func (s *Server) cancelUnstartedInvestigations(dir string, addr tickets.Address)
 			}
 			child := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
 			s.stampFinished(child, t.Path, true)
-			s.events.publish(wire.EventTicketCancelled, child.String())
+			s.events.Publish(wire.EventTicketCancelled, child.String())
 		}
 	}
 }

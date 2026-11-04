@@ -84,5 +84,5 @@ wait:
 	if design.Conversation != "" {
 		s.detectDesignActionable(dir, id, design)
 	}
-	s.events.publish(wire.EventSessionChatChanged, id)
+	s.events.Publish(wire.EventSessionChatChanged, id)
 }
