@@ -6,7 +6,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/confirm"
@@ -168,7 +167,7 @@ func (m QueueModel) openServerPauseConfirm(b wire.BudgetStatus) QueueModel {
 	return m
 }
 
-func cmdServerQueueMode(ok string, verb func(context.Context) (server.QueueResult, error)) tea.Cmd {
+func cmdServerQueueMode(ok string, verb func(context.Context) (wire.QueueResult, error)) tea.Cmd {
 	return func() tea.Msg {
 		res, err := verb(context.Background())
 		switch {

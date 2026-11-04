@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -24,7 +25,7 @@ func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -41,7 +42,7 @@ func TestRepair_MergeStampsTheFrictionSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -68,9 +69,9 @@ func TestRepair_MergeClosesAFinishedCommitlessTicketAsDone(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	merge := func() server.RepairResult {
+	merge := func() wire.RepairResult {
 		t.Helper()
-		res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+		res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -106,17 +107,17 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 	cases := []struct {
 		name   string
 		verb   string
-		req    server.RepairRequest
+		req    wire.RepairRequest
 		reason string
 	}{
-		{"merge from a ralph-loop branch", "merge", server.RepairRequest{Address: addr, Branch: "ralph-loop/epic-a"}, repair.ReasonRalphLoopCwd},
-		{"merge continue and abort", "merge", server.RepairRequest{Address: addr, Continue: true, Abort: true}, repair.ReasonError},
-		{"merge an open ticket", "merge", server.RepairRequest{Address: addr, Cwd: t.TempDir()}, repair.ReasonStatusRefused},
-		{"start-over without a reason", "start-over", server.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
-		{"resume an open ticket via alias", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotPaused},
-		{"resume an open ticket", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotPaused},
-		{"bad address", "resume", server.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
-		{"unknown project", "start-over", server.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
+		{"merge from a ralph-loop branch", "merge", wire.RepairRequest{Address: addr, Branch: "ralph-loop/epic-a"}, repair.ReasonRalphLoopCwd},
+		{"merge continue and abort", "merge", wire.RepairRequest{Address: addr, Continue: true, Abort: true}, repair.ReasonError},
+		{"merge an open ticket", "merge", wire.RepairRequest{Address: addr, Cwd: t.TempDir()}, repair.ReasonStatusRefused},
+		{"start-over without a reason", "start-over", wire.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
+		{"resume an open ticket via alias", "resume", wire.RepairRequest{Address: addr}, repair.ReasonNotPaused},
+		{"resume an open ticket", "resume", wire.RepairRequest{Address: addr}, repair.ReasonNotPaused},
+		{"bad address", "resume", wire.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
+		{"unknown project", "start-over", wire.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
 	}
 	for _, c := range cases {
 		res, err := h.Client.Repair(ctx, c.verb, c.req)
@@ -137,7 +138,7 @@ func TestRepair_ResumeAndUnparkRefusalsNameStatusAndVerb(t *testing.T) {
 			{"14", "ticket 14 is paused (repair: iteration-error); use retry"},
 			{"15", "ticket 15 is open, not asking"},
 		} {
-			res, err := h.Client.Repair(context.Background(), verb, server.RepairRequest{Address: "proj:epic-a/" + c.id})
+			res, err := h.Client.Repair(context.Background(), verb, wire.RepairRequest{Address: "proj:epic-a/" + c.id})
 			if err != nil || !res.Refused || res.Message != c.want {
 				t.Errorf("%s %s: %+v, %v; want refusal %q", verb, c.id, res, err, c.want)
 			}
@@ -169,7 +170,7 @@ func TestRepair_StartOverIgnoresAnOpenInvestigateChild(t *testing.T) {
 	epicIssues := filepath.Dir(ticketPath)
 	testutil.WriteFile(t, epicIssues, "01a-investigate.md", "---\nid: \"01a\"\nparent: \"01\"\nstatus: open\ntype: investigate\n---\n\n# 01a\n")
 
-	res, err := h.Client.Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	res, err := h.Client.Repair(context.Background(), "start-over", wire.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v; want started over", res, err)
 	}
@@ -180,7 +181,7 @@ func TestRepair_MergeAcceptsAZeroCommitPauseWithCommits(t *testing.T) {
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 
 	// A caller outside the repo still merges: the repo comes from the project.
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -203,7 +204,7 @@ func TestRepair_MergeRefusesOtherPauses(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			h, _ := pausedIteration(t, c.kind, c.commit)
-			res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
+			res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01"})
 			if err != nil || !res.Refused || res.Reason != c.reason {
 				t.Errorf("merge = %+v, %v; want refusal %s", res, err, c.reason)
 			}
@@ -221,7 +222,7 @@ func TestRepair_MergeWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
+	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonWrongRepo {
 		t.Errorf("merge = %+v, %v; want %s", res, err, repair.ReasonWrongRepo)
 	}
@@ -233,7 +234,7 @@ func TestRepair_RalphLoopGuardIsServerSide(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Branch: "ralph-loop/other"})
+	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Branch: "ralph-loop/other"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonRalphLoopCwd {
 		t.Errorf("merge = %+v, %v; want %s", res, err, repair.ReasonRalphLoopCwd)
 	}

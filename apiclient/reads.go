@@ -10,8 +10,8 @@ import (
 )
 
 // Projects returns every project in the server's ticket store with its state.
-func (c *Client) Projects(ctx context.Context) ([]server.ProjectInfo, error) {
-	var p []server.ProjectInfo
+func (c *Client) Projects(ctx context.Context) ([]wire.ProjectInfo, error) {
+	var p []wire.ProjectInfo
 	err := c.get(ctx, "/v1/projects", &p)
 	return p, err
 }
@@ -47,8 +47,8 @@ func (c *Client) SetProjectPath(ctx context.Context, req server.ProjectRequest) 
 }
 
 // Locks returns every held lock with its owner.
-func (c *Client) Locks(ctx context.Context) ([]server.LockInfo, error) {
-	var l []server.LockInfo
+func (c *Client) Locks(ctx context.Context) ([]wire.LockInfo, error) {
+	var l []wire.LockInfo
 	err := c.get(ctx, "/v1/locks", &l)
 	return l, err
 }
@@ -68,15 +68,15 @@ func (c *Client) UsageSummary(ctx context.Context) (wire.UsageSummary, error) {
 }
 
 // History returns the events logged for one ticket, by its full address.
-func (c *Client) History(ctx context.Context, address string) (server.History, error) {
-	var h server.History
+func (c *Client) History(ctx context.Context, address string) (wire.History, error) {
+	var h wire.History
 	err := c.get(ctx, "/v1/tickets/history?address="+url.QueryEscape(address), &h)
 	return h, err
 }
 
 // Explain returns the scheduler's verdict on one ticket, by its full address.
-func (c *Client) Explain(ctx context.Context, address string) (server.Explanation, error) {
-	var e server.Explanation
+func (c *Client) Explain(ctx context.Context, address string) (wire.Explanation, error) {
+	var e wire.Explanation
 	err := c.get(ctx, "/v1/tickets/explain?address="+url.QueryEscape(address), &e)
 	return e, err
 }
@@ -118,22 +118,22 @@ func (c *Client) Stats(ctx context.Context, days int, project string) (wire.Stat
 }
 
 // Iterations returns the live iterations.
-func (c *Client) Iterations(ctx context.Context) ([]server.IterationInfo, error) {
-	var l []server.IterationInfo
+func (c *Client) Iterations(ctx context.Context) ([]wire.IterationInfo, error) {
+	var l []wire.IterationInfo
 	err := c.get(ctx, "/v1/iterations", &l)
 	return l, err
 }
 
 // Queue returns every ticket with the scheduler's verdict on it.
-func (c *Client) Queue(ctx context.Context) ([]server.QueueEntry, error) {
-	var l []server.QueueEntry
+func (c *Client) Queue(ctx context.Context) ([]wire.QueueEntry, error) {
+	var l []wire.QueueEntry
 	err := c.get(ctx, "/v1/queue", &l)
 	return l, err
 }
 
 // QueueItems returns the server-wide queue in order.
-func (c *Client) QueueItems(ctx context.Context) ([]server.QueueItem, error) {
-	var l []server.QueueItem
+func (c *Client) QueueItems(ctx context.Context) ([]wire.QueueItem, error) {
+	var l []wire.QueueItem
 	err := c.get(ctx, "/v1/queue/items", &l)
 	return l, err
 }

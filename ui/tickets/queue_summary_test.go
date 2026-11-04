@@ -8,7 +8,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -131,9 +130,9 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 // summaryQueue delivers one epic with the given ticket rows and server summary.
 func summaryQueue(t *testing.T, sum wire.EpicSummary, infos ...wire.TicketInfo) QueueModel {
 	t.Helper()
-	items := make([]server.QueueItem, len(infos))
+	items := make([]wire.QueueItem, len(infos))
 	for i, info := range infos {
-		items[i] = server.QueueItem{Address: info.Address}
+		items[i] = wire.QueueItem{Address: info.Address}
 	}
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: infos, Epics: []wire.EpicSummary{sum}}, items)
 	return m

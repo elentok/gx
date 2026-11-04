@@ -98,11 +98,11 @@ func TestTicketUnmute_PostsTheAddressAndReturnsTheResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.QueueRequest
+	var got wire.QueueRequest
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/tickets/unmute", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(server.QueueResult{Refused: true, Reason: server.ReasonNotMuted})
+		_ = json.NewEncoder(w).Encode(wire.QueueResult{Refused: true, Reason: server.ReasonNotMuted})
 	})
 	srv := &http.Server{Handler: mux}
 	go srv.Serve(ln)

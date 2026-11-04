@@ -78,7 +78,7 @@ func (r *holdRig) queue(t *testing.T, addr string) {
 	}
 }
 
-func (r *holdRig) explain(t *testing.T, addr string) server.Explanation {
+func (r *holdRig) explain(t *testing.T, addr string) wire.Explanation {
 	t.Helper()
 	ex, err := r.h.Client.Explain(context.Background(), addr)
 	if err != nil {
@@ -88,9 +88,9 @@ func (r *holdRig) explain(t *testing.T, addr string) server.Explanation {
 }
 
 // explainWhen polls until the verdict is want.
-func (r *holdRig) explainWhen(t *testing.T, addr, want string) server.Explanation {
+func (r *holdRig) explainWhen(t *testing.T, addr, want string) wire.Explanation {
 	t.Helper()
-	var ex server.Explanation
+	var ex wire.Explanation
 	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("explain %s verdict %q", addr, want), func() bool {
 		ex = r.explain(t, addr)
 		return ex.Verdict == want
@@ -108,7 +108,7 @@ func (r *holdRig) neverStarts(t *testing.T) {
 	}
 }
 
-func assertLowReason(t *testing.T, ex server.Explanation, disk, free string) {
+func assertLowReason(t *testing.T, ex wire.Explanation, disk, free string) {
 	t.Helper()
 	if ex.Verdict != wire.VerdictDiskLow || !strings.Contains(ex.Reason, disk) || !strings.Contains(ex.Reason, free) {
 		t.Errorf("explain = %+v, want %q naming %s and %s", ex, wire.VerdictDiskLow, disk, free)
@@ -234,7 +234,7 @@ func TestDiskHold_OneOffOnHeldDiskWaits(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, gb)
-	res, err := r.h.Client.OneOff(context.Background(), server.OneOffRequest{Prompt: "do it", Project: "proj"})
+	res, err := r.h.Client.OneOff(context.Background(), wire.OneOffRequest{Prompt: "do it", Project: "proj"})
 	if err != nil || res.Refused {
 		t.Fatalf("one-off = %+v, %v", res, err)
 	}
@@ -329,9 +329,9 @@ func TestDiskHold_RelaunchAndRetryRefused(t *testing.T) {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	r.disks.SetFree(repo, 3*gb)
-	for name, call := range map[string]func() (server.QueueResult, error){
-		"retry":    func() (server.QueueResult, error) { return r.h.Client.TicketRetry(ctx, "proj:epic-a/01", false) },
-		"relaunch": func() (server.QueueResult, error) { return r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false) },
+	for name, call := range map[string]func() (wire.QueueResult, error){
+		"retry":    func() (wire.QueueResult, error) { return r.h.Client.TicketRetry(ctx, "proj:epic-a/01", false) },
+		"relaunch": func() (wire.QueueResult, error) { return r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false) },
 	} {
 		res, err := call()
 		if err != nil || !res.Refused || res.Reason != wire.ReasonDiskLow || !strings.Contains(res.Message, "/vol-proj") || !strings.Contains(res.Message, "3.0 GB") {

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func decodeJSON(t *testing.T, b []byte) map[string]any {
@@ -55,8 +55,8 @@ func TestTicketsSetJSON_IterationStatusFromAgent(t *testing.T) {
 func TestServerRepairJSON_ReportsServerVia(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out bytes.Buffer
-	if err := runServerRepair(context.Background(), cl, &out, true, "resume", server.RepairRequest{Address: "p:e/01"},
-		func(string, server.RepairRequest) (server.RepairResult, error) { return server.RepairResult{}, nil }); err != nil {
+	if err := runServerRepair(context.Background(), cl, &out, true, "resume", wire.RepairRequest{Address: "p:e/01"},
+		func(string, wire.RepairRequest) (wire.RepairResult, error) { return wire.RepairResult{}, nil }); err != nil {
 		t.Fatalf("runServerRepair: %v", err)
 	}
 	got := decodeJSON(t, out.Bytes())
@@ -69,7 +69,7 @@ func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out bytes.Buffer
 	err := runServerQueueWrite(context.Background(), cl, &out, true,
-		func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.QueueAdd(ctx, "p:e/01", "")
 		})
 	if err != nil {
@@ -86,7 +86,7 @@ func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
 func TestEncodeProvenance_StampsObjectsLeavesArrays(t *testing.T) {
 	t.Parallel()
 	var obj bytes.Buffer
-	if err := encodeProvenance(&obj, server.Explanation{}, viaServer, actorHuman); err != nil {
+	if err := encodeProvenance(&obj, wire.Explanation{}, viaServer, actorHuman); err != nil {
 		t.Fatal(err)
 	}
 	if got := decodeJSON(t, obj.Bytes()); got["via"] != "server" || got["actor"] != "human" {
@@ -94,7 +94,7 @@ func TestEncodeProvenance_StampsObjectsLeavesArrays(t *testing.T) {
 	}
 
 	var arr bytes.Buffer
-	if err := encodeProvenance(&arr, []server.LockInfo{{}}, viaServer, actorHuman); err != nil {
+	if err := encodeProvenance(&arr, []wire.LockInfo{{}}, viaServer, actorHuman); err != nil {
 		t.Fatal(err)
 	}
 	var list []map[string]any

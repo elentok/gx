@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
@@ -33,7 +34,7 @@ type evolveEnv struct {
 	cwdProject string
 	cfg        config.Config
 	// submit hands the one-off to the server.
-	submit func(context.Context, server.OneOffRequest) (server.OneOffResult, error)
+	submit func(context.Context, wire.OneOffRequest) (wire.OneOffResult, error)
 	// confirm asks a yes/no question; `evolve all` asks before each submit.
 	confirm func(string) (bool, error)
 	now     func() time.Time
@@ -152,7 +153,7 @@ func submitRetro(ctx context.Context, env evolveEnv, w, errW io.Writer, project,
 	res, err := env.submit(ctx, server.RetroSubmit(project, epic, env.now()))
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.OneOffResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.OneOffResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -375,10 +376,10 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 			env.cwdProject = tickets.ProjectName(root)
 		}
 	}
-	env.submit = func(ctx context.Context, req server.OneOffRequest) (server.OneOffResult, error) {
+	env.submit = func(ctx context.Context, req wire.OneOffRequest) (wire.OneOffResult, error) {
 		cl, err := d.dial()()
 		if err != nil {
-			return server.OneOffResult{}, err
+			return wire.OneOffResult{}, err
 		}
 		return cl.OneOff(ctx, req)
 	}

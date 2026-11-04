@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -43,7 +44,7 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 	}
 
 	list, err := h.Client.Projects(ctx)
-	if err != nil || len(list) != 2 || !slices.ContainsFunc(list, func(p server.ProjectInfo) bool { return p.Name == name }) {
+	if err != nil || len(list) != 2 || !slices.ContainsFunc(list, func(p wire.ProjectInfo) bool { return p.Name == name }) {
 		t.Fatalf("list = %+v, %v", list, err)
 	}
 

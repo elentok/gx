@@ -51,7 +51,7 @@ func TestClaimHold_HarnessMissingHoldsTicket(t *testing.T) {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 
-			var ex server.Explanation
+			var ex wire.Explanation
 			var err error
 			servertest.WaitFor(t, 10*time.Second, "ticket held", func() bool {
 				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")
@@ -109,7 +109,7 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 
-			var ex server.Explanation
+			var ex wire.Explanation
 			var err error
 			servertest.WaitFor(t, 10*time.Second, "ticket held", func() bool {
 				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")

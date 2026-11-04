@@ -45,7 +45,7 @@ func (f *fakeServerClient) ReportFocus(context.Context, wire.FocusReport) (wire.
 }
 
 // QueueAdd is on both embedded interfaces, so the fake picks one.
-func (f *fakeServerClient) QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error) {
+func (f *fakeServerClient) QueueAdd(ctx context.Context, address, agent string) (wire.QueueResult, error) {
 	return f.ServerAPI.QueueAdd(ctx, address, agent)
 }
 

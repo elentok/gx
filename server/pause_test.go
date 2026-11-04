@@ -90,7 +90,7 @@ func TestSnapshot_ReportsQueueMode(t *testing.T) {
 	ctx := context.Background()
 	steps := []struct {
 		name string
-		do   func(context.Context) (server.QueueResult, error)
+		do   func(context.Context) (wire.QueueResult, error)
 		want wire.QueueMode
 	}{
 		{"initial", nil, wire.QueueModeRunning},

@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -462,7 +461,7 @@ func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
 }
 
 func TestCmdTicketMenu_PTYIterationOffersTheAgentRow(t *testing.T) {
-	api := fakeServerAPI{iterations: []server.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
+	api := fakeServerAPI{iterations: []wire.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
 	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01"}, true, "")
 	msg := cmdTicketMenu(api, config.Dirs{}, in)().(ticketMenuReadyMsg)
 	item := itemByLabel(t, msg.items, "Go to pane")

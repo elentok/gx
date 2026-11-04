@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -15,7 +16,7 @@ import (
 // branch to reset: the backed-up files go back into the target's checkout, the
 // ticket is done and the backup ref goes, so the epic can land. Any clash the
 // restore leaves is the person's to fix by hand.
-func (s *Server) startOverTrunkConflict(req RepairRequest, rc repairCtx, addr tickets.Address, t tickets.Ticket) (RepairResult, error) {
+func (s *Server) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, addr tickets.Address, t tickets.Ticket) (wire.RepairResult, error) {
 	if strings.TrimSpace(req.Reason) == "" {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "--reason is required"}), nil
 	}
@@ -28,17 +29,17 @@ func (s *Server) startOverTrunkConflict(req RepairRequest, rc repairCtx, addr ti
 	}
 	dir, err := s.targetCheckout(addr)
 	if err != nil {
-		return RepairResult{}, err
+		return wire.RepairResult{}, err
 	}
 	// Restored before anything is closed: a failure leaves the ticket as it was.
 	if err := git.RestoreFromTree(dir, e.TrunkConflictBackup, e.TrunkConflictFiles); err != nil {
-		return RepairResult{}, fmt.Errorf("restoring %s from %s: %w", listFiles(e.TrunkConflictFiles), e.TrunkConflictBackup, err)
+		return wire.RepairResult{}, fmt.Errorf("restoring %s from %s: %w", listFiles(e.TrunkConflictFiles), e.TrunkConflictBackup, err)
 	}
 	if err := tickets.EndOpenRound(t.Path, rc.origin, tickets.HowStartOver, "start-over"); err != nil {
-		return RepairResult{}, err
+		return wire.RepairResult{}, err
 	}
 	if err := ralphloop.MarkDone(t.Path); err != nil {
-		return RepairResult{}, fmt.Errorf("marking trunk-conflict ticket %s done: %w", addr.ID, err)
+		return wire.RepairResult{}, fmt.Errorf("marking trunk-conflict ticket %s done: %w", addr.ID, err)
 	}
 	s.dropTrunkConflictBackup(addr)
 	if _, fresh, ok := s.freshTicket(addr); ok && s.merges.begin() {

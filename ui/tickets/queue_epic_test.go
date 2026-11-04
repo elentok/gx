@@ -5,7 +5,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -18,9 +17,9 @@ func TestQueueEpic_QueuesOnlyOpenTicketsOfTheEpicInOrder(t *testing.T) {
 		{Address: "x:epic-impl/01", Status: "open"},
 	}}
 	var got []string
-	add := func(_ context.Context, addr, _ string) (server.QueueResult, error) {
+	add := func(_ context.Context, addr, _ string) (wire.QueueResult, error) {
 		got = append(got, addr)
-		return server.QueueResult{}, nil
+		return wire.QueueResult{}, nil
 	}
 	queued, refusals := QueueEpic(context.Background(), snap, add, "gx:epic-impl")
 	if want := []string{"gx:epic-impl/01", "gx:epic-impl/02"}; !slices.Equal(got, want) || queued != 2 || len(refusals) != 0 {

@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // newTicketsAskCmd is `gx tickets ask`: an agent's question, sent to the server
@@ -23,7 +23,7 @@ func newTicketsAskCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.TicketAsk(ctx, args[0], text)
 			})
 		},

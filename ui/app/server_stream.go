@@ -85,7 +85,7 @@ type streamEndedMsg struct {
 }
 
 type streamQueueMsg struct {
-	items []server.QueueItem
+	items []wire.QueueItem
 	err   error
 }
 

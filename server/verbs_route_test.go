@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -70,7 +71,7 @@ func TestBudget_KillStopsTheSessionThroughTheRunsRunner(t *testing.T) {
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour
 	})
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return 6, true })
+	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return 6, true })
 	if !servertest.Poll(10*time.Second, func() bool {
 		h.Server.PollBudget()
 		tk, err := schema.ParseTicket(ticketPath)

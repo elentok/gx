@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -30,7 +31,7 @@ func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			res, err := e.h.Server.ResumeAs(server.RepairRequest{Address: answerAddr}, origin)
+			res, err := e.h.Server.ResumeAs(wire.RepairRequest{Address: answerAddr}, origin)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -48,7 +49,7 @@ func TestResume_ZeroCommitPromptedLiveAgentKeepsTheRoundOpen(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
-	res, err := e.h.Client.Repair(context.Background(), "resume", server.RepairRequest{Address: answerAddr})
+	res, err := e.h.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
 	if err != nil {
 		t.Fatal(err)
 	}

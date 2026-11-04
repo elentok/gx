@@ -12,13 +12,14 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
 // addServerRepairCmds adds the four repair verbs to `gx server tickets`. They
 // send the caller's cwd and branch; the server evaluates the guards.
 func addServerRepairCmds(parent *cobra.Command, d deps) {
-	var req server.RepairRequest
+	var req wire.RepairRequest
 	var jsonOut bool
 	verb := func(name, use, short string, args cobra.PositionalArgs, flags func(*cobra.Command)) *cobra.Command {
 		c := &cobra.Command{
@@ -38,7 +39,7 @@ func addServerRepairCmds(parent *cobra.Command, d deps) {
 				if err != nil {
 					return err
 				}
-				direct := func(verb string, req server.RepairRequest) (server.RepairResult, error) {
+				direct := func(verb string, req wire.RepairRequest) (wire.RepairResult, error) {
 					return directRepair(d.dirs(), verb, req)
 				}
 				return runServerRepair(c.Context(), cl, c.OutOrStdout(), jsonOut, name, req, direct)
@@ -74,10 +75,10 @@ func addServerRepairCmds(parent *cobra.Command, d deps) {
 const directNotice = "server not running — ran directly under merge lock"
 
 // directRepair runs a verb in-process against the configured ticket store.
-func directRepair(dirs config.Dirs, verb string, req server.RepairRequest) (server.RepairResult, error) {
+func directRepair(dirs config.Dirs, verb string, req wire.RepairRequest) (wire.RepairResult, error) {
 	cfg, err := dirs.Load()
 	if err != nil {
-		return server.RepairResult{}, err
+		return wire.RepairResult{}, err
 	}
 	return server.RunRepairDirect(cfg.TicketStore.Path, verb, req)
 }
@@ -85,8 +86,8 @@ func directRepair(dirs config.Dirs, verb string, req server.RepairRequest) (serv
 // runServerRepair never starts the server. The repair verbs are the only
 // server writes with a fallback: a dead socket runs them directly via `direct`,
 // since they must work when the server is what's broken.
-func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, verb string, req server.RepairRequest,
-	direct func(verb string, req server.RepairRequest) (server.RepairResult, error)) error {
+func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, verb string, req wire.RepairRequest,
+	direct func(verb string, req wire.RepairRequest) (wire.RepairResult, error)) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}

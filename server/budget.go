@@ -405,8 +405,8 @@ func (l *budgetLedger) save(now time.Time) error {
 // iterationCostIn is the cumulative cost of a live iteration; ok is false when
 // it has none (no session yet, an agent without a transcript cost, or no HOME
 // in env to read the transcript under).
-func iterationCostIn(env []string) func(IterationInfo) (float64, bool) {
-	return func(it IterationInfo) (float64, bool) {
+func iterationCostIn(env []string) func(wire.IterationInfo) (float64, bool) {
+	return func(it wire.IterationInfo) (float64, bool) {
 		if it.Session == "" {
 			return 0, false
 		}
@@ -417,21 +417,21 @@ func iterationCostIn(env []string) func(IterationInfo) (float64, bool) {
 
 // budgetIteration is the live iteration of address as its runner sees it, so a
 // headless run is metered like a herdr pane.
-func (s *Server) budgetIteration(address string) (IterationInfo, bool) {
+func (s *Server) budgetIteration(address string) (wire.IterationInfo, bool) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
-		return IterationInfo{}, false
+		return wire.IterationInfo{}, false
 	}
 	_, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
 	r, sess, found, err := s.liveSession(a)
 	if err != nil || !found {
-		return IterationInfo{}, false
+		return wire.IterationInfo{}, false
 	}
 	st, err := r.Status(sess)
 	if err != nil {
-		return IterationInfo{}, false
+		return wire.IterationInfo{}, false
 	}
-	return IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: st.SessionID}, true
+	return wire.IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: st.SessionID}, true
 }
 
 // pollBudget adds every live iteration's cost delta to the ledger: claimed

@@ -285,7 +285,7 @@ func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL,
 			GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 20 * time.Millisecond}
 	})
-	f.h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return 0, false })
+	f.h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return 0, false })
 	f.lowerBelowSpend(t)
 
 	const done = "gx: 1 agents stopped — hard budget limit reached."

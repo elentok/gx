@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -407,7 +408,7 @@ func TestEpicMerge_MergeErrorReturnsAMergeErrorPause(t *testing.T) {
 }
 
 // assertMergePaused checks the merge returned a pause of kind with a message.
-func assertMergePaused(t *testing.T, res server.QueueResult, kind events.Kind) {
+func assertMergePaused(t *testing.T, res wire.QueueResult, kind events.Kind) {
 	t.Helper()
 	if !res.Paused || res.Merged || res.Refused || res.MergeTicket != "" || res.PauseKind != string(kind) || res.Message == "" {
 		t.Errorf("merge = %+v, want a %s pause with a message", res, kind)
@@ -466,7 +467,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeAtTheCapPauses(t *testing.T) {
 }
 
 // assertManualTicket checks the merge returned the one manual merge ticket.
-func (f *schedFixture) assertManualTicket(t *testing.T, res server.QueueResult, wantID string) {
+func (f *schedFixture) assertManualTicket(t *testing.T, res wire.QueueResult, wantID string) {
 	t.Helper()
 	if res.Refused || res.Merged || res.MergeTicket != "proj:"+schedEpic+"/"+wantID {
 		t.Fatalf("merge = %+v, want merge ticket %s", res, wantID)

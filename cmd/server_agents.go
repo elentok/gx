@@ -19,7 +19,7 @@ import (
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 type agentsWatchOpts struct {
@@ -139,17 +139,17 @@ func newServerAgentsCmd(d deps) *cobra.Command {
 	watch.MarkFlagsMutuallyExclusive("screen", "raw", "tail")
 	cmd.AddCommand(watch)
 	cmd.AddCommand(agentsWriteCmd(d, "prompt <project:epic/NN> <text>", "send a prompt to a ticket's live agent", cobra.ExactArgs(2),
-		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
+		func(ctx context.Context, cl *apiclient.Client, args []string) (wire.QueueResult, error) {
 			return cl.AgentPrompt(ctx, args[0], args[1])
 		}))
 	cmd.AddCommand(agentsWriteCmd(d, "interrupt <project:epic/NN>", "stop the current turn of a ticket's live agent", cobra.ExactArgs(1),
-		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
+		func(ctx context.Context, cl *apiclient.Client, args []string) (wire.QueueResult, error) {
 			return cl.AgentInterrupt(ctx, args[0])
 		}))
 	var requestID string
 	answer := agentsWriteCmd(d, "answer <project:epic/NN> <allow|deny> [reason]", "answer the permission request a ticket's agent waits on", cobra.RangeArgs(2, 3),
-		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
-			req := server.QueueRequest{Address: args[0], Decision: args[1], RequestID: requestID, Source: "cli"}
+		func(ctx context.Context, cl *apiclient.Client, args []string) (wire.QueueResult, error) {
+			req := wire.QueueRequest{Address: args[0], Decision: args[1], RequestID: requestID, Source: "cli"}
 			if len(args) == 3 {
 				req.Text = args[2]
 			}
@@ -161,14 +161,14 @@ func newServerAgentsCmd(d deps) *cobra.Command {
 }
 
 // agentsWriteCmd is one `gx server agents` verb that writes through the server.
-func agentsWriteCmd(d deps, use, short string, args cobra.PositionalArgs, do func(context.Context, *apiclient.Client, []string) (server.QueueResult, error)) *cobra.Command {
+func agentsWriteCmd(d deps, use, short string, args cobra.PositionalArgs, do func(context.Context, *apiclient.Client, []string) (wire.QueueResult, error)) *cobra.Command {
 	var jsonOut bool
 	c := &cobra.Command{
 		Use:   use,
 		Short: short,
 		Args:  args,
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return do(ctx, cl, args)
 			})
 		},

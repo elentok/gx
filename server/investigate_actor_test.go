@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -32,7 +33,7 @@ func startInvestigateEnv(t *testing.T, kind events.Kind) *servertest.Harness {
 	return h
 }
 
-func retryAs(t *testing.T, h *servertest.Harness, investigator string) server.QueueResult {
+func retryAs(t *testing.T, h *servertest.Harness, investigator string) wire.QueueResult {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

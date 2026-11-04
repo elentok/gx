@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -77,7 +78,7 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 	}
 	var mu sync.Mutex
 	cost := 0.0
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { mu.Lock(); defer mu.Unlock(); cost += 3; return cost, true })
+	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { mu.Lock(); defer mu.Unlock(); cost += 3; return cost, true })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -239,7 +240,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 	})
 	// Cost rises on every read, so the pane never goes quiet after ctrl+c.
 	cost := 0.0
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { cost += 3; return cost, true })
+	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { cost += 3; return cost, true })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -334,7 +335,7 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 		c.BudgetKillGrace = 50 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
 	})
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return cost(), true })
+	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return cost(), true })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -386,7 +387,7 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 		c.MaxAgents = n
 	})
 	var over atomic.Bool
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) {
+	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) {
 		if over.Load() {
 			return 6, true
 		}
@@ -463,7 +464,7 @@ func TestBudget_CodexRunIsNotMeteredOrKilled(t *testing.T) {
 		c.MaxAgents = 2
 	})
 	var claudeCost atomic.Int64
-	h.Server.SetCostOf(func(it server.IterationInfo) (float64, bool) {
+	h.Server.SetCostOf(func(it wire.IterationInfo) (float64, bool) {
 		if strings.HasPrefix(it.Address, "proj:epic-b/") {
 			return 100, true
 		}

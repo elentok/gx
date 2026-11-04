@@ -10,38 +10,12 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
-// IterationInfo is one live iteration in the /v1/iterations payload. The
-// transcript path is only located here: parsing it belongs to the transcript
-// module.
-type IterationInfo struct {
-	Address string `json:"address"`
-	Agent   string `json:"agent,omitempty"`
-	Pane    string `json:"pane"`
-	Tab     string `json:"tab,omitempty"`
-	// Runner names what hosts the iteration; QueueAgent is the PTY run's row id
-	// in the sessions listing, empty for every other runner.
-	Runner     string `json:"runner,omitempty"`
-	QueueAgent string `json:"queueAgent,omitempty"`
-	Worktree   string `json:"worktree"`
-	Branch     string `json:"branch"`
-	Base       string `json:"base,omitempty"`
-	Session    string `json:"session,omitempty"`
-	Transcript string `json:"transcript,omitempty"`
-}
-
-// QueueEntry is one ticket in the /v1/queue payload with the scheduler's own
-// verdict on it.
-type QueueEntry struct {
-	Address  string `json:"address"`
-	Decision string `json:"decision"`
-	Reason   string `json:"reason,omitempty"`
-}
-
 func (s *Server) iterations(w http.ResponseWriter, _ *http.Request) {
-	list := []IterationInfo{}
+	list := []wire.IterationInfo{}
 	for _, t := range s.idx.snapshot().Tickets {
 		if t.Status != "claimed" {
 			continue
@@ -56,7 +30,7 @@ func (s *Server) iterations(w http.ResponseWriter, _ *http.Request) {
 
 // liveIter is a live iteration with the runner and session hosting it.
 type liveIter struct {
-	info    IterationInfo
+	info    wire.IterationInfo
 	runner  agentrunner.Runner
 	session agentrunner.Session
 }
@@ -82,7 +56,7 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 		sess.SessionID = st.SessionID
 	}
 	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
-	it := IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
+	it := wire.IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
 	if runner.Name() == runnerPTY {
 		it.QueueAgent = queueAgentIDPrefix + iterationLabel(address)
 	}
@@ -123,7 +97,7 @@ func (s *Server) worktreeDir(project string) string {
 }
 
 func (s *Server) queue(w http.ResponseWriter, _ *http.Request) {
-	list := []QueueEntry{}
+	list := []wire.QueueEntry{}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -139,7 +113,7 @@ func (s *Server) queue(w http.ResponseWriter, _ *http.Request) {
 		for _, e := range epics {
 			epicName := filepath.Base(e.Path)
 			for _, d := range ralphloop.EpicQueue(e) {
-				list = append(list, QueueEntry{
+				list = append(list, wire.QueueEntry{
 					Address:  project + ":" + epicName + "/" + d.Ticket,
 					Decision: string(d.Decision), Reason: d.Reason,
 				})

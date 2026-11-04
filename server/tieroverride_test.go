@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
@@ -64,7 +65,7 @@ func TestResume_TierOverrideLaunchesOnceOnThatTier(t *testing.T) {
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec))
 	ctx := context.Background()
 
-	res, err := h.Client.Repair(ctx, "resume", server.RepairRequest{Address: "proj:epic-a/01", Tier: "strongest"})
+	res, err := h.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:epic-a/01", Tier: "strongest"})
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
@@ -92,7 +93,7 @@ func TestResume_WithoutTierLeavesTheWorkerModel(t *testing.T) {
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec))
 	ctx := context.Background()
 
-	if res, err := h.Client.Repair(ctx, "resume", server.RepairRequest{Address: "proj:epic-a/01"}); err != nil || res.Refused {
+	if res, err := h.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:epic-a/01"}); err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.TierOverride != "" {
@@ -180,7 +181,7 @@ func TestResume_InvalidTierIsRefusedAndChangesNothing(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Repair(context.Background(), "resume", server.RepairRequest{Address: "proj:epic-a/01", Tier: "huge"})
+	res, err := h.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: "proj:epic-a/01", Tier: "huge"})
 	if err != nil || !res.Refused || res.Reason != server.ReasonBadTier {
 		t.Fatalf("resume = %+v, %v; want refusal %s", res, err, server.ReasonBadTier)
 	}

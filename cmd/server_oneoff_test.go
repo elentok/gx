@@ -29,7 +29,7 @@ func dupServer(t *testing.T, status string) *apiclient.Client {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(server.OneOffResult{Refused: true, Reason: server.ReasonDuplicateLive, Address: "gx:p/1", Message: "dup"})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Refused: true, Reason: server.ReasonDuplicateLive, Address: "gx:p/1", Message: "dup"})
 	})
 	mux.HandleFunc("/v1/snapshot", func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(wire.Snapshot{Tickets: []wire.TicketInfo{{Address: "gx:p/1", Status: status}}})
@@ -46,11 +46,11 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.OneOffRequest
+	var got wire.OneOffRequest
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(server.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()
@@ -60,7 +60,7 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 		t.Fatal("no --type flag")
 	}
 	var out bytes.Buffer
-	req := server.OneOffRequest{Prompt: "retro", Type: "evolve"}
+	req := wire.OneOffRequest{Prompt: "retro", Type: "evolve"}
 	if err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
 		t.Fatal(err)
 	}
@@ -77,12 +77,12 @@ func TestServerOneOff_AgentFlagIsSentOnlyWhenGiven(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.OneOffRequest
+	var got wire.OneOffRequest
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
-		got = server.OneOffRequest{}
+		got = wire.OneOffRequest{}
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(server.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()
@@ -112,18 +112,18 @@ func TestServerOneOff_NameFlagPrintsTheSharedEpicAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.OneOffRequest
+	var got wire.OneOffRequest
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(server.OneOffResult{Address: "gx:one-offs/12", Status: server.OneOffStatusQueued})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:one-offs/12", Status: server.OneOffStatusQueued})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 
 	var out bytes.Buffer
-	req := server.OneOffRequest{Prompt: "x", Name: "foo"}
+	req := wire.OneOffRequest{Prompt: "x", Name: "foo"}
 	if err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestServerOneOff_RemovedFlagsAreUnknown(t *testing.T) {
 func TestServerOneOff_DuplicateWaitFollowsExistingTicket(t *testing.T) {
 	cl := dupServer(t, string(schema.StatusLegacyAnswer))
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, true, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, true, 0, wire.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 3 {
 		t.Fatalf("err = %v; want exit code 3 from the existing ticket", err)
@@ -156,7 +156,7 @@ func TestServerOneOff_DuplicateWaitFollowsExistingTicket(t *testing.T) {
 func TestServerOneOff_DuplicateWithoutWaitStillExitsSeven(t *testing.T) {
 	cl := dupServer(t, "claimed")
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, false, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, false, 0, wire.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != exitDuplicateLive {
 		t.Fatalf("err = %v; want exit code 7", err)
@@ -166,7 +166,7 @@ func TestServerOneOff_DuplicateWithoutWaitStillExitsSeven(t *testing.T) {
 func TestServerOneOff_JSONDuplicateWithoutWaitExitsSeven(t *testing.T) {
 	cl := dupServer(t, "claimed")
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, true, false, 0, wire.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != exitDuplicateLive {
 		t.Fatalf("err = %v; want exit code 7", err)
@@ -179,7 +179,7 @@ func TestServerOneOff_JSONDuplicateWithoutWaitExitsSeven(t *testing.T) {
 func TestServerOneOff_JSONDuplicateWaitFollowsExistingTicket(t *testing.T) {
 	cl := dupServer(t, string(schema.StatusLegacyAnswer))
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, true, true, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, true, true, 0, wire.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 3 {
 		t.Fatalf("err = %v; want exit code 3 from the existing ticket", err)
@@ -197,13 +197,13 @@ func TestServerOneOff_JSONOtherRefusalFails(t *testing.T) {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(server.OneOffResult{Refused: true, Reason: "bad-agent", Message: "no such agent"})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Refused: true, Reason: "bad-agent", Message: "no such agent"})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 	var out, errOut bytes.Buffer
-	err = runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), apiclient.New(sock), &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
+	err = runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), apiclient.New(sock), &out, &errOut, true, false, 0, wire.OneOffRequest{Prompt: "x"})
 	if err == nil {
 		t.Fatal("err = nil; want a refusal failure")
 	}
@@ -215,7 +215,7 @@ func TestServerOneOff_JSONOtherRefusalFails(t *testing.T) {
 func TestServerOneOff_ExitsEightWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, false, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, false, 0, wire.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 8 {
 		t.Fatalf("err = %v; want exit code 8", err)

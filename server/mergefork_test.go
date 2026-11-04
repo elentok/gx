@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -106,7 +107,7 @@ func (f *schedFixture) rootQueued(t *testing.T) bool {
 		t.Error(err)
 		return false
 	}
-	return slices.ContainsFunc(q, func(e server.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
+	return slices.ContainsFunc(q, func(e wire.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
 }
 
 func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) {

@@ -338,7 +338,7 @@ type Server struct {
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
 	extraUsage   extraUsageNotes
-	costOf       func(IterationInfo) (float64, bool) // swapped in tests
+	costOf       func(wire.IterationInfo) (float64, bool) // swapped in tests
 	events       *broker
 	herdr        herdrWatch
 	pauseFold    pauseFold

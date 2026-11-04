@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -273,7 +274,7 @@ func (s *Server) stalledNudgeDelay() time.Duration {
 
 // claimRootAfterAdoption is claimRoot once a late-finish adoption in flight is
 // done, so a root never launches an investigation the adoption is about to cancel.
-func (s *Server) claimRootAfterAdoption(item QueueItem) (bool, error) {
+func (s *Server) claimRootAfterAdoption(item wire.QueueItem) (bool, error) {
 	s.adoptMu.Lock()
 	defer s.adoptMu.Unlock()
 	return s.claimRoot(item)
@@ -320,7 +321,7 @@ func (s *Server) concurrencyLimit() int {
 
 // claimRoot reports whether it launched an iteration for item's root. A claim
 // that paused instead (ambiguous base) launched nothing, so it used no slot.
-func (s *Server) claimRoot(item QueueItem) (bool, error) {
+func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	addr, err := parseQueuedAddress(item.Address)
 	if err != nil {
 		return false, err

@@ -89,7 +89,7 @@ func (p *pauseState) save() error {
 }
 
 // setMode applies a mode change, persists the pause flag, then publishes.
-func (s *Server) setMode(paused bool) (QueueResult, error) {
+func (s *Server) setMode(paused bool) (wire.QueueResult, error) {
 	p := s.pause
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -97,21 +97,21 @@ func (s *Server) setMode(paused bool) (QueueResult, error) {
 	p.paused = paused
 	if err := p.save(); err != nil {
 		p.paused = prev
-		return QueueResult{}, err
+		return wire.QueueResult{}, err
 	}
 	s.events.publish(EventQueueChanged, "")
 	s.kickRunner()
-	return QueueResult{Queue: s.queued.list(), Mode: p.mode()}, nil
+	return wire.QueueResult{Queue: s.queued.list(), Mode: p.mode()}, nil
 }
 
-func (s *Server) queuePause() (QueueResult, error)  { return s.setMode(true) }
-func (s *Server) queueResume() (QueueResult, error) { return s.setMode(false) }
+func (s *Server) queuePause() (wire.QueueResult, error)  { return s.setMode(true) }
+func (s *Server) queueResume() (wire.QueueResult, error) { return s.setMode(false) }
 
 // queueFlush is the old name of Finish and pause, kept for one release.
-func (s *Server) queueFlush() (QueueResult, error) { return s.queuePause() }
+func (s *Server) queueFlush() (wire.QueueResult, error) { return s.queuePause() }
 
 // modeWrite adapts a mode change to a POST handler.
-func (s *Server) modeWrite(do func() (QueueResult, error)) http.HandlerFunc {
+func (s *Server) modeWrite(do func() (wire.QueueResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		res, err := do()
 		if err != nil {

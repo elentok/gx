@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/repair"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 // liveAgentFixture runs ticket 01 on the PTY runner with an agent that keeps
@@ -37,7 +37,7 @@ func liveAgentFixture(t *testing.T) (*schedFixture, context.Context) {
 func TestRepairMerge_LiveAgentOnPTYRefusesUnlessIgnored(t *testing.T) {
 	t.Parallel()
 	f, ctx := liveAgentFixture(t)
-	req := server.RepairRequest{Address: "proj:" + schedEpic + "/01"}
+	req := wire.RepairRequest{Address: "proj:" + schedEpic + "/01"}
 
 	res, err := f.h.Client.Repair(ctx, "merge", req)
 	if err != nil || !res.Refused || res.Reason != repair.ReasonLiveAgentOnTab {
@@ -55,7 +55,7 @@ func TestRepairVerify_ReportsAPTYLeftoverSession(t *testing.T) {
 	t.Parallel()
 	f, ctx := liveAgentFixture(t)
 
-	res, err := f.h.Client.Repair(ctx, "verify", server.RepairRequest{Address: "proj:" + schedEpic + "/01"})
+	res, err := f.h.Client.Repair(ctx, "verify", wire.RepairRequest{Address: "proj:" + schedEpic + "/01"})
 	if err != nil || res.Refused {
 		t.Fatalf("verify = %+v, %v", res, err)
 	}

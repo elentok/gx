@@ -4,7 +4,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -29,7 +28,7 @@ func wholeEpicSnapshot(extraStatus string) wire.Snapshot {
 }
 
 func TestQueueWholeEpic_NonItemTicketOfQueuedEpicRenders(t *testing.T) {
-	m, _ := deliverQueue(t, wholeEpicSnapshot("open"), []server.QueueItem{{Address: "gx:alpha/01"}})
+	m, _ := deliverQueue(t, wholeEpicSnapshot("open"), []wire.QueueItem{{Address: "gx:alpha/01"}})
 
 	got := queueRowPaths(m)
 	if !slices.Equal(got, []string{"gx:alpha/01", "gx:alpha/02"}) {
@@ -46,7 +45,7 @@ func TestQueueWholeEpic_EpicWithNoQueuedItemRendersNothing(t *testing.T) {
 }
 
 func TestQueueWholeEpic_HideCompleteHidesDoneExtraTicket(t *testing.T) {
-	m, _ := deliverQueue(t, wholeEpicSnapshot("done"), []server.QueueItem{{Address: "gx:alpha/01"}})
+	m, _ := deliverQueue(t, wholeEpicSnapshot("done"), []wire.QueueItem{{Address: "gx:alpha/01"}})
 	m.hideComplete = true
 
 	got := queueRowPaths(m)
@@ -56,7 +55,7 @@ func TestQueueWholeEpic_HideCompleteHidesDoneExtraTicket(t *testing.T) {
 }
 
 func TestQueueWholeEpic_DeleteIsNotOfferedOnNonItemRow(t *testing.T) {
-	m, _ := deliverQueue(t, wholeEpicSnapshot("open"), []server.QueueItem{{Address: "gx:alpha/01"}})
+	m, _ := deliverQueue(t, wholeEpicSnapshot("open"), []wire.QueueItem{{Address: "gx:alpha/01"}})
 	for i, e := range m.queueTree.Entries() {
 		if e.Value.kind == nodeQueueTicket && e.Value.ticket.ticket.Path == "gx:alpha/02" {
 			m.queueTree.SetSelectedIndex(i)

@@ -21,22 +21,22 @@ import (
 )
 
 type fakeServerAPI struct {
-	adds *[]server.QueueItem
+	adds *[]wire.QueueItem
 	// addRes is what QueueAdd returns per address.
-	addRes map[string]server.QueueResult
+	addRes map[string]wire.QueueResult
 	// calls records the ticket write verbs as "verb address" and the
 	// maintenance verbs by name.
 	calls *[]string
 	// replaced records the QueueReplace items; replaceRes is what it returns.
-	replaced   *[]server.QueueItem
-	replaceRes server.QueueResult
-	removeRes  server.QueueResult
-	mergeRes   server.QueueResult
+	replaced   *[]wire.QueueItem
+	replaceRes wire.QueueResult
+	removeRes  wire.QueueResult
+	mergeRes   wire.QueueResult
 	// detail and detailErr are what Detail returns for any address.
 	detail     wire.TicketDetail
 	detailErr  error
 	budget     wire.BudgetStatus
-	iterations []server.IterationInfo
+	iterations []wire.IterationInfo
 	// designWorktree is what DesignWorktree returns.
 	designWorktree    wire.DesignWorktreeResult
 	designWorktreeErr error
@@ -44,7 +44,7 @@ type fakeServerAPI struct {
 	fixAgent wire.FixAgentResult
 	// snap and queue are what Snapshot and QueueItems return.
 	snap  wire.Snapshot
-	queue []server.QueueItem
+	queue []wire.QueueItem
 	// harness is what DefaultHarness returns; harnessSets records the
 	// SetDefaultHarness requests and harnessRes is what it returns.
 	harness     server.DefaultHarnessStatus
@@ -72,19 +72,19 @@ func (f fakeServerAPI) verb(v string) {
 	}
 }
 
-func (f fakeServerAPI) QueueRemove(_ context.Context, a string) (server.QueueResult, error) {
+func (f fakeServerAPI) QueueRemove(_ context.Context, a string) (wire.QueueResult, error) {
 	f.verb("remove " + a)
 	return f.removeRes, nil
 }
 
-func (f fakeServerAPI) QueuePause(context.Context) (server.QueueResult, error) {
+func (f fakeServerAPI) QueuePause(context.Context) (wire.QueueResult, error) {
 	f.verb("pause")
-	return server.QueueResult{Mode: "paused"}, nil
+	return wire.QueueResult{Mode: "paused"}, nil
 }
 
-func (f fakeServerAPI) QueueResume(context.Context) (server.QueueResult, error) {
+func (f fakeServerAPI) QueueResume(context.Context) (wire.QueueResult, error) {
 	f.verb("resume")
-	return server.QueueResult{Mode: "running"}, nil
+	return wire.QueueResult{Mode: "running"}, nil
 }
 
 func (f fakeServerAPI) Budget(context.Context) (wire.BudgetStatus, error) { return f.budget, nil }
@@ -94,62 +94,62 @@ func (f fakeServerAPI) BudgetOverride(context.Context) (wire.BudgetResult, error
 	return wire.BudgetResult{}, nil
 }
 
-func (f fakeServerAPI) QueueReplace(_ context.Context, _ string, items []server.QueueItem) (server.QueueResult, error) {
+func (f fakeServerAPI) QueueReplace(_ context.Context, _ string, items []wire.QueueItem) (wire.QueueResult, error) {
 	if f.replaced != nil {
 		*f.replaced = append(*f.replaced, items...)
 	}
 	return f.replaceRes, nil
 }
 
-func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (server.QueueResult, error) {
+func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (wire.QueueResult, error) {
 	if f.adds != nil {
-		*f.adds = append(*f.adds, server.QueueItem{Address: address, Agent: agent})
+		*f.adds = append(*f.adds, wire.QueueItem{Address: address, Agent: agent})
 	}
 	return f.addRes[address], nil
 }
 
-func (f fakeServerAPI) TicketPause(_ context.Context, address, _ string) (server.QueueResult, error) {
+func (f fakeServerAPI) TicketPause(_ context.Context, address, _ string) (wire.QueueResult, error) {
 	f.record("pause " + address)
-	return server.QueueResult{}, nil
+	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketCancel(_ context.Context, address string, _ bool) (server.QueueResult, error) {
+func (f fakeServerAPI) TicketCancel(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
 	f.record("cancel " + address)
-	return server.QueueResult{}, nil
+	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string, _ bool) (server.QueueResult, error) {
+func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
 	f.record("relaunch " + address)
-	return server.QueueResult{}, nil
+	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketUnmute(_ context.Context, address string) (server.QueueResult, error) {
+func (f fakeServerAPI) TicketUnmute(_ context.Context, address string) (wire.QueueResult, error) {
 	f.record("unmute " + address)
-	return server.QueueResult{}, nil
+	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketApprove(_ context.Context, address string) (server.QueueResult, error) {
+func (f fakeServerAPI) TicketApprove(_ context.Context, address string) (wire.QueueResult, error) {
 	f.record("approve " + address)
-	return server.QueueResult{}, nil
+	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) EpicMerge(_ context.Context, address string) (server.QueueResult, error) {
+func (f fakeServerAPI) EpicMerge(_ context.Context, address string) (wire.QueueResult, error) {
 	f.record("merge " + address)
 	return f.mergeRes, nil
 }
 
-func (f fakeServerAPI) EpicStashMerge(_ context.Context, address string) (server.QueueResult, error) {
+func (f fakeServerAPI) EpicStashMerge(_ context.Context, address string) (wire.QueueResult, error) {
 	f.record("stash-merge " + address)
-	return server.QueueResult{}, nil
+	return wire.QueueResult{}, nil
 }
 
 func (f fakeServerAPI) Detail(context.Context, string) (wire.TicketDetail, error) {
 	return f.detail, f.detailErr
 }
 
-func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
+func (f fakeServerAPI) Repair(_ context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error) {
 	f.record(verb + " " + req.Address)
-	return server.RepairResult{}, nil
+	return wire.RepairResult{}, nil
 }
 
 func (f fakeServerAPI) DesignWorktree(_ context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error) {
@@ -172,7 +172,7 @@ func (f fakeServerAPI) Snapshot(context.Context) (wire.Snapshot, error) {
 	return f.snap, nil
 }
 func (fakeServerAPI) Events(context.Context, uint64) (<-chan server.Event, error) { return nil, nil }
-func (f fakeServerAPI) QueueItems(context.Context) ([]server.QueueItem, error)    { return f.queue, nil }
+func (f fakeServerAPI) QueueItems(context.Context) ([]wire.QueueItem, error)      { return f.queue, nil }
 
 // withRenderedStatus makes snap look like one from a current server, which
 // always sends rendered_status: a ticket without one gets its raw status word.
@@ -411,7 +411,7 @@ func TestServerMode_EditTargetIsTheTicketFile(t *testing.T) {
 	}
 }
 
-func (f fakeServerAPI) Iterations(context.Context) ([]server.IterationInfo, error) {
+func (f fakeServerAPI) Iterations(context.Context) ([]wire.IterationInfo, error) {
 	return f.iterations, nil
 }
 
@@ -420,7 +420,7 @@ type countingIterationsAPI struct {
 	calls *int
 }
 
-func (c countingIterationsAPI) Iterations(ctx context.Context) ([]server.IterationInfo, error) {
+func (c countingIterationsAPI) Iterations(ctx context.Context) ([]wire.IterationInfo, error) {
 	*c.calls++
 	return c.fakeServerAPI.Iterations(ctx)
 }
@@ -494,7 +494,7 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 
 	var calls []string
-	api := fakeServerAPI{calls: &calls, iterations: []server.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
+	api := fakeServerAPI{calls: &calls, iterations: []wire.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
 	m, cmd := chooseTicketMenuItem(t, openAnswerMenu(t, api), "Go to pane")
 	cmd()
 	if !slices.Equal(*focused, []string{"t1"}) {

@@ -7,25 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 const viModeFileName = "vimode.json"
 
 // EventViModeChanged announces that vi mode was switched.
 const EventViModeChanged = "vimode-changed"
-
-// ViModeRequest sets vi mode; a nil On toggles it.
-type ViModeRequest struct {
-	On *bool `json:"on,omitempty"`
-}
-
-// ViModeResult is vi mode after a write.
-type ViModeResult struct {
-	ViMode  bool   `json:"vi_mode"`
-	Refused bool   `json:"refused,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
 
 // viModeState is the web UI's vi mode, persisted so a restart keeps it.
 type viModeState struct {
@@ -74,7 +63,7 @@ func (v *viModeState) save() error {
 	return os.Rename(tmp, v.path)
 }
 
-func (s *Server) setViMode(req ViModeRequest) (ViModeResult, error) {
+func (s *Server) setViMode(req wire.ViModeRequest) (wire.ViModeResult, error) {
 	v := s.viMode
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -85,14 +74,14 @@ func (s *Server) setViMode(req ViModeRequest) (ViModeResult, error) {
 	}
 	if err := v.save(); err != nil {
 		v.on = prev
-		return ViModeResult{}, err
+		return wire.ViModeResult{}, err
 	}
 	s.events.publish(EventViModeChanged, "")
-	return ViModeResult{ViMode: v.on}, nil
+	return wire.ViModeResult{ViMode: v.on}, nil
 }
 
 func (s *Server) viModeWrite(w http.ResponseWriter, r *http.Request) {
-	var req ViModeRequest
+	var req wire.ViModeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

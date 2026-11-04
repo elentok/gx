@@ -280,7 +280,7 @@ func TestWeb_AgentAnswerNeedsRequestIDAndOrigin(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer resp.Body.Close()
-		var res server.QueueResult
+		var res wire.QueueResult
 		_ = json.NewDecoder(resp.Body).Decode(&res)
 		return resp.StatusCode, res.Reason
 	}

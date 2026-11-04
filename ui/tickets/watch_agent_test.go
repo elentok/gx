@@ -13,7 +13,6 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -490,7 +489,7 @@ func fakeHerdrOnlyLog(t *testing.T) {
 
 // herdrAPI is a server running one herdr iteration of agent on gx:alpha/01.
 func herdrAPI(agent, transcript string) fakeServerAPI {
-	return fakeServerAPI{iterations: []server.IterationInfo{
+	return fakeServerAPI{iterations: []wire.IterationInfo{
 		{Address: "gx:alpha/01", Agent: agent, Transcript: transcript, Pane: "p1", Tab: "t1"},
 	}}
 }

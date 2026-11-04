@@ -37,7 +37,7 @@ func newBudgetEventFixture(t *testing.T) *budgetEventFixture {
 		c.BudgetEventInterval = budgetEventInterval
 	})
 	f := &budgetEventFixture{h: h}
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) {
+	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		return f.cost, true

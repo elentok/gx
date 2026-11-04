@@ -190,7 +190,7 @@ func startSplitRunners(t *testing.T, store string, extra ...func(*server.Config)
 // typ) is paused with an iteration error, with ticket 02 as the investigate
 // ticket forked off it. earlierClaude gives 01 a Claude run that left a
 // transcript. It returns the Investigate retry of 01.
-func startRetryEnv(t *testing.T, typ string, earlierClaude bool, extra ...func(*server.Config)) server.QueueResult {
+func startRetryEnv(t *testing.T, typ string, earlierClaude bool, extra ...func(*server.Config)) wire.QueueResult {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: typ})

@@ -5,12 +5,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/notify"
 )
 
 type afkMsg struct {
-	result server.AFKResult
+	result wire.AFKResult
 	err    error
 }
 

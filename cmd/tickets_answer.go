@@ -8,13 +8,14 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // newTicketsAnswerCmd is `gx tickets answer`: a person's reply to a paused
 // agent's question. The server mirror also takes the state token of the
 // question being answered. It never starts the server.
 func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
-	var req server.QueueRequest
+	var req wire.QueueRequest
 	var body string
 	var jsonOut bool
 	cmd := &cobra.Command{
@@ -30,7 +31,7 @@ func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
 				}
 				req.Text = text
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				res, err := cl.TicketAnswer(ctx, req)
 				if err == nil && res.Refused && res.Reason == server.ReasonStale && !jsonOut {
 					res.Message = staleMessage(res)
@@ -51,7 +52,7 @@ func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
 
 // staleMessage adds the current question to a stale refusal, so the caller can
 // answer it.
-func staleMessage(res server.QueueResult) string {
+func staleMessage(res wire.QueueResult) string {
 	if res.Question == nil {
 		return res.Message
 	}

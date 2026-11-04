@@ -85,7 +85,7 @@ var allowed = map[string]allowance{
 	"ui/tickets/preview.go":       allow("highlights the legacy Needs Repair heading", "needsrepair"),
 	// Wire and persisted names kept for compatibility with running servers,
 	// stored logs and on-disk state.
-	"server/queue.go":                     allow("JSON wire fields parked, park_kind, park_reason", "park"),
+	"server/wire/queue.go":                allow("JSON wire fields parked, park_kind, park_reason", "park"),
 	"server/wire/epicsummary.go":          allow("JSON wire field parked", "park"),
 	"server/wire/epicdetail.go":           allow("JSON wire field needs_answer", "needsanswer"),
 	"server/reads.go":                     allow("persisted lock kind \"land\"", "land"),

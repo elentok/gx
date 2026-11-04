@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
@@ -97,7 +98,7 @@ func TestReclaim_BudgetHardLimitStopsAWaitingRun(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := startWaitingRestart(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return 6, true })
+	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return 6, true })
 	h.Server.PollBudget()
 	waitFor(t, func() bool {
 		data, _ := os.ReadFile(ticketPath)

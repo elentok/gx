@@ -26,14 +26,14 @@ func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
 
 // deliverQueue hands a fresh Queue tab the state the app shell would build
 // from snap and the queue order, as WithServerState does on every delivery.
-func deliverQueue(t *testing.T, snap wire.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
+func deliverQueue(t *testing.T, snap wire.Snapshot, queue []wire.QueueItem) (QueueModel, tea.Cmd) {
 	t.Helper()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(fakeServerAPI{}, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return deliverQueueTo(next.(QueueModel), snap, queue)
 }
 
-func deliverQueueTo(m QueueModel, snap wire.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
+func deliverQueueTo(m QueueModel, snap wire.Snapshot, queue []wire.QueueItem) (QueueModel, tea.Cmd) {
 	if snap.Epics == nil {
 		claimedAt := map[string]time.Time{}
 		for _, t := range snap.Tickets {
@@ -55,7 +55,7 @@ func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, her
 		{Address: "gx:alpha/01", Title: "First", Status: status, ClaimedAt: claimedAt},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
 	}}
-	return deliverQueue(t, snap, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+	return deliverQueue(t, snap, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 }
 
 func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
@@ -81,7 +81,7 @@ func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
 		{Address: "gx:alpha/01", Title: "First", Status: "done"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/03", Title: "Third", Status: "open"},
-	}}, []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}})
 
 	got := m.queueHeaderTitle()
 	if !strings.HasPrefix(got, "Queue · 1 of 3 done · ") || !strings.Contains(got, "implementing...") {
@@ -157,7 +157,7 @@ func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
-	}}, []server.QueueItem{{Address: "gx:alpha"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha"}})
 
 	var shown []string
 	for _, e := range m.buildQueueEntries() {
@@ -177,7 +177,7 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/01a", Title: "Conflict resolution for 01", Status: "claimed",
 			Type: "conflict-resolution", Parent: "gx:alpha/01"},
-	}}, []server.QueueItem{{Address: "gx:alpha/01"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}})
 
 	child := m.live["gx:alpha"]["01a"]
 	if !child.running || child.phase != livePhaseResolvingConflicts {
@@ -197,7 +197,7 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "done"},
 		{Address: "gx:alpha/02", Title: "Merge alpha", Status: "claimed", Type: "merge", ClaimedAt: time.Now()},
-	}}, []server.QueueItem{{Address: "gx:alpha/02"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/02"}})
 
 	live := m.live["gx:alpha"]["02"]
 	if !live.running || live.phase != livePhaseMerging {
@@ -218,7 +218,7 @@ func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 			ExternalBlockers: []string{"epic2/b"}, WidenedBlockers: map[string]string{"epic2/b": "epic2"}},
 		{Address: "gx:alpha/02", Title: "Whole epic", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic3"},
 			ExternalBlockers: []string{"epic3"}},
-	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
 	epic := m.epics[0]
 	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
@@ -250,7 +250,7 @@ func TestQueueServerMode_NewDeliveryUpdatesRunningStateWithoutReload(t *testing.
 	m, cmd := deliverQueueTo(m, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
-	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
 	if !m.runningEpics["gx:alpha"] || cmd == nil {
 		t.Errorf("runningEpics = %v, cmd = %v, want running with a spinner tick", m.runningEpics, cmd)
@@ -314,7 +314,7 @@ func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testi
 	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
-	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 	st, _ = st.Reduce(server.Event{Seq: 2, Type: server.EventTicketDone, Address: "gx:alpha/01"})
 
 	next, _ := m.WithServerState(&st, ServerLinkUp)

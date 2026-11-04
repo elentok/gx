@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -76,7 +77,7 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		return "", fmt.Errorf("refresh after writing %s: %w", path, err)
 	}
-	res, err := s.queueAdd(QueueRequest{Address: child.String(), Front: true})
+	res, err := s.queueAdd(wire.QueueRequest{Address: child.String(), Front: true})
 	if err != nil {
 		return "", err
 	}

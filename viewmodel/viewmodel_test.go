@@ -16,7 +16,7 @@ func snapshot() viewmodel.State {
 			{Address: "gx:e/01", Status: "open"},
 			{Address: "gx:e/02", Status: "open"},
 		},
-	}).SetQueue([]server.QueueItem{{Address: "gx:e/01"}, {Address: "gx:e/02"}})
+	}).SetQueue([]wire.QueueItem{{Address: "gx:e/01"}, {Address: "gx:e/02"}})
 }
 
 // reduce applies events that must each ask for a re-snapshot, as every

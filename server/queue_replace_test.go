@@ -9,10 +9,11 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
-func addresses(items []server.QueueItem) []string {
+func addresses(items []wire.QueueItem) []string {
 	out := make([]string, len(items))
 	for i, it := range items {
 		out[i] = it.Address
@@ -50,7 +51,7 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 		}
 	}
 
-	res, err := h.Client.QueueReplace(ctx, "proj", []server.QueueItem{{Address: "proj:epic-a/02", Agent: "codex"}})
+	res, err := h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{{Address: "proj:epic-a/02", Agent: "codex"}})
 	if err != nil || res.Refused {
 		t.Fatalf("replace: %+v, %v", res, err)
 	}
@@ -59,12 +60,12 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 		t.Fatalf("queue = %+v, want other kept and proj swapped", res.Queue)
 	}
 
-	res, err = h.Client.QueueReplace(ctx, "proj", []server.QueueItem{{Address: "proj:epic-a/01"}})
+	res, err = h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{{Address: "proj:epic-a/01"}})
 	if err != nil || res.Refused || res.Queue[len(res.Queue)-1].Agent != "" {
 		t.Fatalf("replace with no agent = %+v, %v; want an empty agent", res, err)
 	}
 
-	res, err = h.Client.QueueReplace(ctx, "proj", []server.QueueItem{{Address: "other:epic-b/01"}})
+	res, err = h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{{Address: "other:epic-b/01"}})
 	if err != nil || !res.Refused || res.Reason != server.ReasonInvalidAddress {
 		t.Fatalf("replace with a foreign ticket = %+v, %v", res, err)
 	}
@@ -113,7 +114,7 @@ func TestQueue_ReplaceAndRemoveRefuseWhileAnIterationIsLive(t *testing.T) {
 	}
 }
 
-func mustItems(t *testing.T, h *servertest.Harness) []server.QueueItem {
+func mustItems(t *testing.T, h *servertest.Harness) []wire.QueueItem {
 	t.Helper()
 	items, err := h.Client.QueueItems(context.Background())
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -155,7 +156,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 func TestRunner_UnpinnedOneOffAndRetroClaimOnTheDefaultHarness(t *testing.T) {
 	t.Parallel()
 	retro := server.RetroSubmit("proj", "epic-a", time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC))
-	for name, req := range map[string]server.OneOffRequest{
+	for name, req := range map[string]wire.OneOffRequest{
 		"plain": {Prompt: "plain job", Name: "plain-job", Project: "proj"},
 		"retro": retro,
 	} {

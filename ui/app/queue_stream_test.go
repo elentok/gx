@@ -46,7 +46,7 @@ func openQueueTab(h *harness) {
 func TestQueueStream_UpdatesOnEventWhileOpen(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.tickets = queuedTicket("open", time.Time{})
-	f.queue = []server.QueueItem{{Address: "gx:alpha/01"}}
+	f.queue = []wire.QueueItem{{Address: "gx:alpha/01"}}
 	openQueueTab(h)
 	if view := queueView(h); !strings.Contains(view, "Zeta ticket") || strings.Contains(view, "Running") {
 		t.Fatalf("idle queue:\n%s", view)
@@ -67,7 +67,7 @@ func TestQueueStream_UpdatesOnEventWhileOpen(t *testing.T) {
 func TestQueueStream_ClaimWhileHiddenShowsRunningOnOpen(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.tickets = queuedTicket("open", time.Time{})
-	f.queue = []server.QueueItem{{Address: "gx:alpha/01"}}
+	f.queue = []wire.QueueItem{{Address: "gx:alpha/01"}}
 	openQueueTab(h)
 	h.switchTo(nav.TabWorktrees)
 
@@ -88,7 +88,7 @@ func TestQueueStream_ClaimWhileHiddenShowsRunningOnOpen(t *testing.T) {
 func TestQueueStream_ModeChangeFromAnotherClientShows(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.tickets = queuedTicket("open", time.Time{})
-	f.queue = []server.QueueItem{{Address: "gx:alpha/01"}}
+	f.queue = []wire.QueueItem{{Address: "gx:alpha/01"}}
 	openQueueTab(h)
 
 	f.mu.Lock()

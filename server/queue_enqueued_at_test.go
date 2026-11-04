@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
-func enqueuedAt(t *testing.T, items []server.QueueItem, addr string) time.Time {
+func enqueuedAt(t *testing.T, items []wire.QueueItem, addr string) time.Time {
 	t.Helper()
 	for _, it := range items {
 		if it.Address == addr {
@@ -54,7 +54,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 
 	// A client-sent time is ignored; a kept address keeps its server time.
 	sent := time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
-	res, err = h.Client.QueueReplace(ctx, "proj", []server.QueueItem{
+	res, err = h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{
 		{Address: "proj:epic-a/01", EnqueuedAt: sent},
 		{Address: "proj:epic-a/02", EnqueuedAt: sent},
 	})

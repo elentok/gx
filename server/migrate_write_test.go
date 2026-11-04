@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -19,7 +19,7 @@ import (
 const pastCLINotice = 1500 * time.Millisecond
 
 type writeResult struct {
-	res server.QueueResult
+	res wire.QueueResult
 	err error
 }
 

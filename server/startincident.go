@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -41,7 +42,7 @@ func (s *Server) fileStartIncident(now time.Time) {
 		s.log.Info("start incident: not filed, needs a gx project", "err", err)
 		return
 	}
-	res, err := s.oneOff(OneOffRequest{
+	res, err := s.oneOff(wire.OneOffRequest{
 		Prompt:  startIncidentPrompt(string(note), path),
 		Project: OutboxProject,
 		Type:    string(schema.TypeDiagnose),

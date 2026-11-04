@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -122,15 +123,15 @@ func TestAgentVerbs_Refusals(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		name   string
-		do     func() (server.QueueResult, error)
+		do     func() (wire.QueueResult, error)
 		reason string
 	}{
-		{"prompt without text", func() (server.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", " ") }, server.ReasonTextRequired},
-		{"prompt unknown ticket", func() (server.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/77", "hi") }, server.ReasonUnknownTicket},
-		{"prompt not live", func() (server.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", "hi") }, server.ReasonIterationNotLive},
-		{"interrupt not live", func() (server.QueueResult, error) { return h.Client.AgentInterrupt(ctx, "proj:epic-a/01") }, server.ReasonIterationNotLive},
-		{"answer not live", func() (server.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "allow", "") }, server.ReasonIterationNotLive},
-		{"answer bad decision", func() (server.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "maybe", "") }, server.ReasonBadDecision},
+		{"prompt without text", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", " ") }, server.ReasonTextRequired},
+		{"prompt unknown ticket", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/77", "hi") }, server.ReasonUnknownTicket},
+		{"prompt not live", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", "hi") }, server.ReasonIterationNotLive},
+		{"interrupt not live", func() (wire.QueueResult, error) { return h.Client.AgentInterrupt(ctx, "proj:epic-a/01") }, server.ReasonIterationNotLive},
+		{"answer not live", func() (wire.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "allow", "") }, server.ReasonIterationNotLive},
+		{"answer bad decision", func() (wire.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "maybe", "") }, server.ReasonBadDecision},
 	} {
 		res, err := c.do()
 		if err != nil || !res.Refused || res.Reason != c.reason {

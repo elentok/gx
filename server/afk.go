@@ -7,25 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 const afkFileName = "afk.json"
 
 // EventAFKChanged announces that AFK mode was switched.
 const EventAFKChanged = "afk-changed"
-
-// AFKRequest sets AFK mode; a nil On toggles it.
-type AFKRequest struct {
-	On *bool `json:"on,omitempty"`
-}
-
-// AFKResult is AFK mode after a write.
-type AFKResult struct {
-	AFK     bool   `json:"afk"`
-	Refused bool   `json:"refused,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
 
 // afkState is AFK mode, persisted so a restart keeps sending to chat.
 type afkState struct {
@@ -74,7 +63,7 @@ func (a *afkState) save() error {
 	return os.Rename(tmp, a.path)
 }
 
-func (s *Server) setAFK(req AFKRequest) (AFKResult, error) {
+func (s *Server) setAFK(req wire.AFKRequest) (wire.AFKResult, error) {
 	a := s.afk
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -85,14 +74,14 @@ func (s *Server) setAFK(req AFKRequest) (AFKResult, error) {
 	}
 	if err := a.save(); err != nil {
 		a.on = prev
-		return AFKResult{}, err
+		return wire.AFKResult{}, err
 	}
 	s.events.publish(EventAFKChanged, "")
-	return AFKResult{AFK: a.on}, nil
+	return wire.AFKResult{AFK: a.on}, nil
 }
 
 func (s *Server) afkWrite(w http.ResponseWriter, r *http.Request) {
-	var req AFKRequest
+	var req wire.AFKRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

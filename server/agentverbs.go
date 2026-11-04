@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -29,11 +30,11 @@ const (
 
 // agentVerb resolves a ticket to the runner session of its live iteration, so
 // prompt, interrupt and answer reach the agent whichever runner hosts it.
-func (s *Server) agentVerb(req QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (QueueResult, error)) (QueueResult, error) {
-	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (wire.QueueResult, error)) (wire.QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		runner, sess, ok, err := s.liveSession(ref.addr)
 		if err != nil {
-			return QueueResult{}, err
+			return wire.QueueResult{}, err
 		}
 		if !ok {
 			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
@@ -42,27 +43,27 @@ func (s *Server) agentVerb(req QueueRequest, do func(agentrunner.Runner, agentru
 	})
 }
 
-func (s *Server) agentPrompt(req QueueRequest) (QueueResult, error) {
+func (s *Server) agentPrompt(req wire.QueueRequest) (wire.QueueResult, error) {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
 		return refusal(ReasonTextRequired, "text to send is required"), nil
 	}
-	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (QueueResult, error) {
+	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
 		err := r.Prompt(sess, text)
 		if errors.Is(err, agentrunner.ErrNotReady) {
 			return refusal(ReasonAgentNotReady, err.Error()), nil
 		}
-		return QueueResult{}, err
+		return wire.QueueResult{}, err
 	})
 }
 
-func (s *Server) agentInterrupt(req QueueRequest) (QueueResult, error) {
-	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (QueueResult, error) {
+func (s *Server) agentInterrupt(req wire.QueueRequest) (wire.QueueResult, error) {
+	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
 		err := r.Interrupt(sess)
 		if errors.Is(err, agentrunner.ErrNotReady) {
 			return refusal(ReasonAgentNotReady, err.Error()), nil
 		}
-		return QueueResult{}, err
+		return wire.QueueResult{}, err
 	})
 }
 
@@ -70,15 +71,15 @@ func (s *Server) agentInterrupt(req QueueRequest) (QueueResult, error) {
 // With a request ID the open request must be that one and approvable; without
 // one (the TUI and CLI) whatever is open is answered. A decision that reached
 // the agent is logged as pause.permission; a refusal logs nothing.
-func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
+func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 	decision := agentrunner.Decision(req.Decision)
 	if decision != agentrunner.DecisionAllow && decision != agentrunner.DecisionDeny {
 		return refusal(ReasonBadDecision, "decision must be allow or deny"), nil
 	}
-	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		runner, sess, ok, err := s.liveSession(ref.addr)
 		if err != nil {
-			return QueueResult{}, err
+			return wire.QueueResult{}, err
 		}
 		if !ok {
 			if req.RequestID != "" {
@@ -109,20 +110,20 @@ func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
 			ev.Shown = permissionShown(st.Pending)
 		}
 		if _, err := tickets.AppendLog(ref.ticket.Path, ev); err != nil {
-			return QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.addr, err)
 		}
 		if err := s.leaveBlocked(ref.addr.String()); err != nil {
-			return QueueResult{}, err
+			return wire.QueueResult{}, err
 		}
 		// The prompt is gone, so open pages re-read the detail and the snapshot.
 		s.events.publish(EventTicketChanged, ref.addr.String())
-		return QueueResult{}, nil
+		return wire.QueueResult{}, nil
 	})
 }
 
 // agentAnswerWeb is agentAnswer for the web mux: the person answered a card, so
 // the request must name the prompt they saw.
-func (s *Server) agentAnswerWeb(req QueueRequest) (QueueResult, error) {
+func (s *Server) agentAnswerWeb(req wire.QueueRequest) (wire.QueueResult, error) {
 	if req.RequestID == "" {
 		return refusal(ReasonRequestIDRequired, "a request ID is required; review the current prompt"), nil
 	}
@@ -130,7 +131,7 @@ func (s *Server) agentAnswerWeb(req QueueRequest) (QueueResult, error) {
 }
 
 // checkOpenRequest refuses unless st holds an approvable open request named id.
-func checkOpenRequest(st agentrunner.Status, statusErr error, id string) (QueueResult, bool) {
+func checkOpenRequest(st agentrunner.Status, statusErr error, id string) (wire.QueueResult, bool) {
 	switch {
 	case errors.Is(statusErr, agentrunner.ErrNotFound), errors.Is(statusErr, agentrunner.ErrSessionDied):
 		return refusal(ReasonAgentGone, statusErr.Error()), true
@@ -143,11 +144,11 @@ func checkOpenRequest(st agentrunner.Status, statusErr error, id string) (QueueR
 	case st.Pending.NotApprovable:
 		return refusal(ReasonNotApprovable, st.Pending.Tool+" needs a real answer, not an approval"), true
 	}
-	return QueueResult{}, false
+	return wire.QueueResult{}, false
 }
 
 // answerRefusal maps a runner's Answer error to its refusal; others are errors.
-func answerRefusal(err error) (QueueResult, error) {
+func answerRefusal(err error) (wire.QueueResult, error) {
 	switch {
 	case errors.Is(err, agentrunner.ErrRequestMismatch):
 		return refusal(ReasonRequestChanged, err.Error()), nil
@@ -160,7 +161,7 @@ func answerRefusal(err error) (QueueResult, error) {
 	case errors.Is(err, agentrunner.ErrInvalidDecision):
 		return refusal(ReasonBadDecision, "not a permission prompt; deny cancels it"), nil
 	}
-	return QueueResult{}, err
+	return wire.QueueResult{}, err
 }
 
 // permissionShown is what the person saw of p, each text capped for the log.

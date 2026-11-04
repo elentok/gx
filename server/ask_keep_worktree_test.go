@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
@@ -97,7 +98,7 @@ func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
 		return len(h.Server.Runs()) == 0
 	})
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	if res, err := h.Client.TicketAnswer(ctx, server.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
+	if res, err := h.Client.TicketAnswer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { _, ok, _ := fake.Find(label); return ok })
@@ -158,7 +159,7 @@ func TestAsk_CommitlessOnNonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testi
 	}
 
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	if res, err := h.Client.TicketAnswer(ctx, server.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
+	if res, err := h.Client.TicketAnswer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { _, ok, _ := fake.Find(label); return ok })

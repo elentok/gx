@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -270,7 +271,7 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "03", "running", servertest.TicketOpts{Type: "investigate", Parent: "01", Status: "claimed"})
 				ctx := context.Background()
 				if verb == "resume" {
-					res, err := p.h.Client.Repair(ctx, "resume", server.RepairRequest{Address: "proj:epic-a/01"})
+					res, err := p.h.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:epic-a/01"})
 					if err != nil || res.Refused || !strings.Contains(string(res.Data), `"adopted"`) {
 						t.Fatalf("resume = %+v (data %s), %v; want adopted", res, res.Data, err)
 					}

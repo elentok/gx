@@ -142,7 +142,7 @@ func TestQueueServerKeys_DequeueAndDelete(t *testing.T) {
 }
 
 func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
-	api := fakeServerAPI{removeRes: server.QueueResult{Refused: true, Reason: server.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}}
+	api := fakeServerAPI{removeRes: wire.QueueResult{Refused: true, Reason: server.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}}
 	m := newMaintenanceQueue(t, api)
 	msg := m.cmdServerRemove([]string{"gx:alpha/01"})()
 	got := msg.(serverRemovedMsg)

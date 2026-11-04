@@ -21,21 +21,21 @@ import (
 // epic's branch when it already fast-forwards, and forks a manual merge ticket
 // otherwise. A manual ticket resets the merge-ticket cap and merges the epic
 // whatever auto-ff-merge says.
-func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
+func (s *Server) epicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 	m, err := s.loadMergeEpic(req)
 	if err != nil {
 		return mergeVerbError(err)
 	}
 	first, _, target, err := s.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
-		return QueueResult{}, err
+		return wire.QueueResult{}, err
 	}
 	one := ralphloop.OneIteration{Epic: m.root.Epic, Ticket: first}
 	unlock := s.trunkLocks.lock(m.repo, target)
 	d, err := s.epicMergeLocked(m.root, one, m.repo, m.epics, m.epic, target)
 	unlock()
 	if err != nil {
-		return QueueResult{}, err
+		return wire.QueueResult{}, err
 	}
 	return s.actOnMerge(m.root, one, m.dir, m.epic, d), nil
 }
@@ -50,7 +50,7 @@ type mergeEpicRef struct {
 
 // mergeRefused is the error loadMergeEpic returns when the verb must stop with
 // a refusal rather than fail.
-type mergeRefused struct{ res QueueResult }
+type mergeRefused struct{ res wire.QueueResult }
 
 func (e mergeRefused) Error() string { return "merge refused: " + e.res.Reason }
 
@@ -60,12 +60,12 @@ func refuseMerge(reason, msg string) error {
 
 // mergeVerbError turns loadMergeEpic's error into the verb's return: a refusal
 // is a result, anything else an error.
-func mergeVerbError(err error) (QueueResult, error) {
+func mergeVerbError(err error) (wire.QueueResult, error) {
 	var refused mergeRefused
 	if errors.As(err, &refused) {
 		return refused.res, nil
 	}
-	return QueueResult{}, err
+	return wire.QueueResult{}, err
 }
 
 // shownEpicState is the state a merge request's token names, in the Epic
@@ -81,7 +81,7 @@ func shownEpicState(shown wire.EpicState, e tickets.Epic) wire.EpicState {
 // loadMergeEpic resolves req's epic address for a manual merge verb. A
 // mergeRefused error means the verb stops there; req's state token, when it has
 // one, must match the epic's current state.
-func (s *Server) loadMergeEpic(req QueueRequest) (mergeEpicRef, error) {
+func (s *Server) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 	project, epic, ok := tickets.ParseEpicAddress(req.Address)
 	if !ok {
 		return mergeEpicRef{}, refuseMerge(ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
@@ -144,7 +144,7 @@ func (s *Server) epicMergeLocked(root rootRef, one ralphloop.OneIteration, repo 
 	}
 	// mergeEpic clears the block for the merge paths; a fork that failed keeps it.
 	s.clearMergeBlock(root, e.Path)
-	return mergeDecision{result: QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}, nil
+	return mergeDecision{result: wire.QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}, nil
 }
 
 // lowestTicket is the epic's Root ticket: the lowest-numbered one, whatever
@@ -284,8 +284,8 @@ func (c *mergeTargetCache) put(a tickets.Address, stamp, target string) {
 // epicMergeRefusal is the refusal for a manual merge of e, nil when it may go.
 // A pending merge ticket is checked before completeness: it is the one
 // non-terminal ticket a person retrying the trigger is likely to meet.
-func epicMergeRefusal(root rootRef, e tickets.Epic, repo string) *QueueResult {
-	var r QueueResult
+func epicMergeRefusal(root rootRef, e tickets.Epic, repo string) *wire.QueueResult {
+	var r wire.QueueResult
 	switch {
 	case !tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero():
 		r = refusal(ReasonAlreadyMerged, root.String()+" is already merged")
@@ -335,10 +335,10 @@ func (s *Server) ensureFeatureWorktree(project, epic, repo string) error {
 // ensureRootQueued queues the root's first ticket unless the root is queued.
 func (s *Server) ensureRootQueued(root rootRef, first tickets.Ticket) error {
 	addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: first.Identifier}.String()
-	_, err := s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
+	_, err := s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {
 			if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && rootOf(a) == root {
-				r := QueueResult{}
+				r := wire.QueueResult{}
 				return nil, &r
 			}
 		}

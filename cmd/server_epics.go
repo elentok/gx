@@ -8,7 +8,6 @@ import (
 	"io"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -40,7 +39,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.EpicMerge(ctx, args[0])
 			})
 		},
@@ -56,7 +55,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.EpicStashMerge(ctx, args[0])
 			})
 		},

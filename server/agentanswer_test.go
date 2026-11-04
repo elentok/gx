@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 )
@@ -59,7 +60,7 @@ func (e answerEnv) permissionEvents(t *testing.T) []tickets.LogEvent {
 	return out
 }
 
-func (e answerEnv) answer(t *testing.T, req server.QueueRequest) server.QueueResult {
+func (e answerEnv) answer(t *testing.T, req wire.QueueRequest) wire.QueueResult {
 	t.Helper()
 	req.Address = "proj:epic-a/01"
 	res, err := e.h.Client.AgentAnswerRequest(context.Background(), req)
@@ -104,7 +105,7 @@ func TestAgentAnswer_RequestIDRefusalsLogNothing(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			e := startAnswerEnv(t, c.wrap)
 			c.setup(e)
-			res := e.answer(t, server.QueueRequest{Decision: "allow", RequestID: "req-1"})
+			res := e.answer(t, wire.QueueRequest{Decision: "allow", RequestID: "req-1"})
 			if !res.Refused || res.Reason != c.reason {
 				t.Fatalf("answer = %+v; want refusal %s", res, c.reason)
 			}
@@ -121,7 +122,7 @@ func TestAgentAnswer_AgentGoneWhenNoSessionLives(t *testing.T) {
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
 		t.Fatal(err)
 	}
-	res := e.answer(t, server.QueueRequest{Decision: "allow", RequestID: "req-1"})
+	res := e.answer(t, wire.QueueRequest{Decision: "allow", RequestID: "req-1"})
 	if !res.Refused || res.Reason != server.ReasonAgentGone {
 		t.Fatalf("answer = %+v; want refusal %s", res, server.ReasonAgentGone)
 	}
@@ -141,7 +142,7 @@ func TestAgentAnswer_DeliveredAllowLogsShownAndIgnoresNote(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	e.fake.SetPending(answerLabel, bashPending("req-1"))
 
-	res := e.answer(t, server.QueueRequest{Decision: "allow", RequestID: "req-1", Text: "ignored"})
+	res := e.answer(t, wire.QueueRequest{Decision: "allow", RequestID: "req-1", Text: "ignored"})
 	if res.Refused {
 		t.Fatalf("answer = %+v", res)
 	}
@@ -168,7 +169,7 @@ func TestAgentAnswer_DenyNoteIsSentAndCapped(t *testing.T) {
 		ID: "req-1", Tool: "Bash", Input: json.RawMessage(strings.Repeat("x", tickets.MaxLogTextChars+1)),
 	})
 
-	res := e.answer(t, server.QueueRequest{Decision: "deny", RequestID: "req-1", Text: strings.Repeat("n", tickets.MaxLogTextChars+10)})
+	res := e.answer(t, wire.QueueRequest{Decision: "deny", RequestID: "req-1", Text: strings.Repeat("n", tickets.MaxLogTextChars+10)})
 	if res.Refused {
 		t.Fatalf("answer = %+v", res)
 	}
@@ -190,7 +191,7 @@ func TestAgentAnswer_WithoutRequestIDAnswersWhateverIsOpen(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	e.fake.SetPending(answerLabel, bashPending("req-9"))
 
-	if res := e.answer(t, server.QueueRequest{Decision: "allow"}); res.Refused {
+	if res := e.answer(t, wire.QueueRequest{Decision: "allow"}); res.Refused {
 		t.Fatalf("answer = %+v", res)
 	}
 	if evs := e.permissionEvents(t); len(evs) != 1 || evs[0].Shown == nil || evs[0].Shown.RequestID != "req-9" {

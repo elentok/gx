@@ -9,7 +9,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
@@ -99,7 +98,7 @@ func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
 // status Add epic to queue tells apart; gx:alpha/06 is already queued.
 func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
-	st := applySnapshot(viewmodel.State{}.SetQueue([]server.QueueItem{{Address: "gx:alpha/06"}}), wire.Snapshot{Tickets: []wire.TicketInfo{
+	st := applySnapshot(viewmodel.State{}.SetQueue([]wire.QueueItem{{Address: "gx:alpha/06"}}), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Done", Status: "done", EpicStatus: "open"},
 		{Address: "gx:alpha/02", Title: "Draft", Status: "draft"},
 		{Address: "gx:alpha/03", Title: "Open", Status: "open"},
@@ -116,7 +115,7 @@ func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 }
 
 func TestEpicMenu_AddEpicToQueueSendsTheEpicAddressOnce(t *testing.T) {
-	var adds []server.QueueItem
+	var adds []wire.QueueItem
 	m := queueEpicModel(t, fakeServerAPI{adds: &adds})
 	m, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Add epic to queue")
 	if cmd == nil {

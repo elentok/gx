@@ -49,84 +49,12 @@ const (
 	ReasonNeedsRebase      = "needs-rebase"
 )
 
-// QueueItem is one queued ticket and the agent it will run under.
-type QueueItem struct {
-	Address string `json:"address"`
-	Agent   string `json:"agent"`
-	// EnqueuedAt is set by the server on enqueue, never taken from a client. Items
-	// from a queue file written before the field existed have none.
-	EnqueuedAt time.Time `json:"enqueued_at,omitzero"`
-}
-
-// QueueResult is what every queue write returns: the queue after the write, or
-// a refusal (the queue is then untouched).
-type QueueResult struct {
-	Queue []QueueItem `json:"queue,omitempty"`
-	// Mode is set by pause, resume and flush: running or paused.
-	Mode wire.QueueMode `json:"mode,omitempty"`
-	// ExtraUsage is the warning an enqueue carries while the account
-	// auto-purchases extra usage.
-	ExtraUsage bool `json:"extra_usage,omitempty"`
-	// Merged, MergeTicket and Paused are an epic merge's outcome: a direct
-	// merge, the address of the merge ticket it forked, or a pause of the root
-	// with PauseKind and Message.
-	Merged      bool   `json:"merged,omitempty"`
-	MergeTicket string `json:"merge_ticket,omitempty"`
-	// TrunkConflict is the address of the trunk-conflict ticket "Stash, merge and
-	// restore" added.
-	TrunkConflict string `json:"trunk_conflict,omitempty"`
-	Paused        bool   `json:"parked,omitempty"`
-	PauseKind     string `json:"park_kind,omitempty"`
-	// Outcome is an answer's result: delivered or adopted. A stale refusal
-	// carries the current Question and its State token.
-	Outcome  string            `json:"outcome,omitempty"`
-	Question *tickets.LogEvent `json:"question,omitempty"`
-	State    string            `json:"state,omitempty"`
-	Refused  bool              `json:"refused,omitempty"`
-	Reason   string            `json:"reason,omitempty"`
-	Message  string            `json:"message,omitempty"`
-}
-
-func refusal(reason, msg string) QueueResult {
-	return QueueResult{Refused: true, Reason: reason, Message: msg}
-}
-
-// QueueRequest is the body of the queue writes; each uses the fields it needs.
-type QueueRequest struct {
-	Address string `json:"address"`
-	Agent   string `json:"agent,omitempty"`
-	// Position is the 1-based slot a move puts the ticket in.
-	Position int `json:"position,omitempty"`
-	// Project and Items are what a replace swaps in.
-	Project string      `json:"project,omitempty"`
-	Items   []QueueItem `json:"items,omitempty"`
-	// PauseReason is the one-line reason a pause writes into the ticket.
-	PauseReason string `json:"park_reason,omitempty"`
-	// Stop lets a cancel stop the live pane of a claimed ticket instead of refusing.
-	Stop bool `json:"stop,omitempty"`
-	// Front makes an add merge at the head of the queue instead of the tail.
-	Front bool `json:"front,omitempty"`
-	// Text is what a nudge types into the live pane.
-	Text string `json:"text,omitempty"`
-	// Verb is the action a recommend stores; Text carries its diagnosis.
-	Verb string `json:"verb,omitempty"`
-	// Decision is allow or deny, for answering a blocked permission request.
-	Decision string `json:"decision,omitempty"`
-	// RequestID names the permission request a decision answers; empty answers
-	// whatever is open (the TUI and CLI).
-	RequestID string `json:"request_id,omitempty"`
-	// Choice, Note, State and Source are an answer's choice (an option id, yes or
-	// no), its note, the state token of the question it answers and where it
-	// came from. The server sets Source from the request's origin and ignores
-	// the body. A free-text answer uses Text.
-	Choice string `json:"choice,omitempty"`
-	Note   string `json:"note,omitempty"`
-	State  string `json:"state,omitempty"`
-	Source string `json:"source,omitempty"`
+func refusal(reason, msg string) wire.QueueResult {
+	return wire.QueueResult{Refused: true, Reason: reason, Message: msg}
 }
 
 // queueCtx is what the server knows about a queue write that the body does not
-// carry. It travels beside the QueueRequest, never inside it.
+// carry. It travels beside the wire.QueueRequest, never inside it.
 type queueCtx struct {
 	// actor is set only by the server's own recovery calls, never decoded from a
 	// client: a pause made by recovery must not trigger recovery again.
@@ -137,8 +65,8 @@ type queueCtx struct {
 }
 
 // ignoreCtx adapts a queue write that needs no queueCtx.
-func ignoreCtx(do func(QueueRequest) (QueueResult, error)) func(QueueRequest, queueCtx) (QueueResult, error) {
-	return func(req QueueRequest, _ queueCtx) (QueueResult, error) { return do(req) }
+func ignoreCtx(do func(wire.QueueRequest) (wire.QueueResult, error)) func(wire.QueueRequest, queueCtx) (wire.QueueResult, error) {
+	return func(req wire.QueueRequest, _ queueCtx) (wire.QueueResult, error) { return do(req) }
 }
 
 // queueStore is the server-wide queue. It lives in a state-dir file, never in a
@@ -146,11 +74,11 @@ func ignoreCtx(do func(QueueRequest) (QueueResult, error)) func(QueueRequest, qu
 type queueStore struct {
 	mu    sync.Mutex
 	path  string
-	items []QueueItem
+	items []wire.QueueItem
 }
 
 func openQueue(stateDir string) (*queueStore, error) {
-	q := &queueStore{path: filepath.Join(stateDir, queueFileName), items: []QueueItem{}}
+	q := &queueStore{path: filepath.Join(stateDir, queueFileName), items: []wire.QueueItem{}}
 	data, err := os.ReadFile(q.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return q, nil
@@ -186,19 +114,19 @@ func (q *queueStore) indexOf(address string) int {
 	return -1
 }
 
-func (q *queueStore) list() []QueueItem {
+func (q *queueStore) list() []wire.QueueItem {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return append([]QueueItem{}, q.items...)
+	return append([]wire.QueueItem{}, q.items...)
 }
 
 // writeQueue applies mutate under the lock, persists, then publishes, so events
 // arrive in queue order. A refusal from mutate leaves the queue untouched.
-func (s *Server) writeQueue(address string, mutate func(items []QueueItem) ([]QueueItem, *QueueResult)) (QueueResult, error) {
+func (s *Server) writeQueue(address string, mutate func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult)) (wire.QueueResult, error) {
 	q := s.queued
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	next, refused := mutate(append([]QueueItem{}, q.items...))
+	next, refused := mutate(append([]wire.QueueItem{}, q.items...))
 	if refused != nil {
 		return *refused, nil
 	}
@@ -206,16 +134,16 @@ func (s *Server) writeQueue(address string, mutate func(items []QueueItem) ([]Qu
 	q.items = next
 	if err := q.save(); err != nil {
 		q.items = prev
-		return QueueResult{}, err
+		return wire.QueueResult{}, err
 	}
 	s.events.publish(EventQueueChanged, address)
 	s.kickRunner()
-	return QueueResult{Queue: append([]QueueItem{}, next...)}, nil
+	return wire.QueueResult{Queue: append([]wire.QueueItem{}, next...)}, nil
 }
 
 // mapEpicRefusal refuses to queue a ticket of a map epic: a map's tickets are
 // decisions a person resolves by hand, never scheduled work.
-func (s *Server) mapEpicRefusal(address string) *QueueResult {
+func (s *Server) mapEpicRefusal(address string) *wire.QueueResult {
 	if !s.inMapEpic(address) {
 		return nil
 	}
@@ -246,7 +174,7 @@ func (s *Server) hasTicket(address string) bool {
 }
 
 // canonical normalises a request's address, or returns the refusal for it.
-func canonical(raw string) (string, *QueueResult) {
+func canonical(raw string) (string, *wire.QueueResult) {
 	a, err := tickets.ParseAddress(raw, tickets.AddressContext{})
 	if err != nil {
 		r := refusal(ReasonInvalidAddress, err.Error())
@@ -259,7 +187,7 @@ func canonical(raw string) (string, *QueueResult) {
 // on an accepted result. Extra usage is a Claude account matter, so the check
 // runs only when an enqueued agent runs on Claude. An empty agent follows the
 // project's Default harness.
-func (s *Server) withExtraUsage(project string, agents []string, res QueueResult, err error) (QueueResult, error) {
+func (s *Server) withExtraUsage(project string, agents []string, res wire.QueueResult, err error) (wire.QueueResult, error) {
 	if err != nil || res.Refused {
 		return res, err
 	}
@@ -272,14 +200,14 @@ func (s *Server) withExtraUsage(project string, agents []string, res QueueResult
 	return res, err
 }
 
-func (s *Server) queueAdd(req QueueRequest) (QueueResult, error) {
+func (s *Server) queueAdd(req wire.QueueRequest) (wire.QueueResult, error) {
 	res, err := s.queueAddItem(req)
 	return s.withExtraUsage(projectOfAddress(req.Address), []string{req.Agent}, res, err)
 }
 
 // resolveAgent keeps an empty agent empty (it follows the Default harness) and
 // refuses an unknown one.
-func resolveAgent(name string) (ralphloop.AgentKind, *QueueResult) {
+func resolveAgent(name string) (ralphloop.AgentKind, *wire.QueueResult) {
 	agent := ralphloop.AgentKind(name)
 	if name == "" {
 		return "", nil
@@ -301,7 +229,7 @@ type queueTarget struct {
 func (t queueTarget) isEpic() bool { return t.epic != "" }
 
 // parseQueueTarget parses a request address once, or returns the refusal.
-func parseQueueTarget(raw string) (queueTarget, *QueueResult) {
+func parseQueueTarget(raw string) (queueTarget, *wire.QueueResult) {
 	if project, epic, ok := tickets.ParseEpicAddress(raw); ok {
 		return queueTarget{address: raw, project: project, epic: epic}, nil
 	}
@@ -313,7 +241,7 @@ func parseQueueTarget(raw string) (queueTarget, *QueueResult) {
 }
 
 // refusal returns why t cannot be queued, or nil.
-func (s *Server) refusal(t queueTarget) *QueueResult {
+func (s *Server) refusal(t queueTarget) *wire.QueueResult {
 	if !t.isEpic() {
 		if !s.hasTicket(t.address) {
 			r := refusal(ReasonUnknownTicket, "no ticket "+t.address)
@@ -328,7 +256,7 @@ func (s *Server) refusal(t queueTarget) *QueueResult {
 		return &r
 	}
 	e := epics[i]
-	var r QueueResult
+	var r wire.QueueResult
 	switch {
 	case e.IsMap:
 		r = refusal(ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
@@ -348,7 +276,7 @@ func (s *Server) refusal(t queueTarget) *QueueResult {
 	return &r
 }
 
-func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
+func (s *Server) queueAddItem(req wire.QueueRequest) (wire.QueueResult, error) {
 	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
@@ -358,7 +286,7 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 	if badAgent != nil {
 		return *badAgent, nil
 	}
-	res, err := s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
+	res, err := s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		if r := s.refusal(target); r != nil {
 			return nil, r
 		}
@@ -370,7 +298,7 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 		}
 		item := newQueueItem(addr, agent)
 		if req.Front {
-			return append([]QueueItem{item}, items...), nil
+			return append([]wire.QueueItem{item}, items...), nil
 		}
 		return append(items, item), nil
 	})
@@ -399,13 +327,13 @@ func (s *Server) stampQueuedAt(t queueTarget) {
 	s.stampEpic(rootRef{Project: t.project, Epic: epic}, filepath.Join(dir, epic), "queued_at")
 }
 
-func (s *Server) queueRemove(req QueueRequest) (QueueResult, error) {
+func (s *Server) queueRemove(req wire.QueueRequest) (wire.QueueResult, error) {
 	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
 	addr := target.address
-	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
+	return s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		if indexOfAddr(items, addr) < 0 {
 			r := refusal(ReasonNotQueued, addr+" is not queued")
 			return nil, &r
@@ -421,7 +349,7 @@ func (s *Server) queueRemove(req QueueRequest) (QueueResult, error) {
 
 // queueReplace swaps one project's pending entries for req.Items, leaving the
 // other projects' entries where they are. The new entries go at the end.
-func (s *Server) queueReplace(req QueueRequest) (QueueResult, error) {
+func (s *Server) queueReplace(req wire.QueueRequest) (wire.QueueResult, error) {
 	res, err := s.queueReplaceItems(req)
 	agents := make([]string, len(req.Items))
 	for i, it := range req.Items {
@@ -430,8 +358,8 @@ func (s *Server) queueReplace(req QueueRequest) (QueueResult, error) {
 	return s.withExtraUsage(req.Project, agents, res, err)
 }
 
-func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
-	items := make([]QueueItem, 0, len(req.Items))
+func (s *Server) queueReplaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
+	items := make([]wire.QueueItem, 0, len(req.Items))
 	seen := map[string]bool{}
 	for _, it := range req.Items {
 		addr, bad := canonical(it.Address)
@@ -451,7 +379,7 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 		seen[addr] = true
 		items = append(items, newQueueItem(addr, agent))
 	}
-	return s.writeQueue("", func(cur []QueueItem) ([]QueueItem, *QueueResult) {
+	return s.writeQueue("", func(cur []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {
 			if !s.hasTicket(it.Address) {
 				r := refusal(ReasonUnknownTicket, "no ticket "+it.Address)
@@ -461,7 +389,7 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 				return nil, r
 			}
 		}
-		next := make([]QueueItem, 0, len(cur)+len(items))
+		next := make([]wire.QueueItem, 0, len(cur)+len(items))
 		for _, it := range cur {
 			if projectOfAddress(it.Address) != req.Project {
 				next = append(next, it)
@@ -488,8 +416,8 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 }
 
 // newQueueItem is the one place an enqueue time is stamped.
-func newQueueItem(addr string, agent ralphloop.AgentKind) QueueItem {
-	return QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()}
+func newQueueItem(addr string, agent ralphloop.AgentKind) wire.QueueItem {
+	return wire.QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()}
 }
 
 func projectOfAddress(addr string) string {
@@ -497,7 +425,7 @@ func projectOfAddress(addr string) string {
 	return project
 }
 
-func indexOfAddr(items []QueueItem, addr string) int {
+func indexOfAddr(items []wire.QueueItem, addr string) int {
 	for i, it := range items {
 		if it.Address == addr {
 			return i
@@ -532,7 +460,7 @@ func (s *Server) liveIn(set map[string]bool) string {
 	return ""
 }
 
-func dropAddresses(items []QueueItem, drop map[string]bool) []QueueItem {
+func dropAddresses(items []wire.QueueItem, drop map[string]bool) []wire.QueueItem {
 	out := items[:0]
 	for _, it := range items {
 		if !drop[it.Address] {
@@ -542,13 +470,13 @@ func dropAddresses(items []QueueItem, drop map[string]bool) []QueueItem {
 	return out
 }
 
-func (s *Server) queueMove(req QueueRequest) (QueueResult, error) {
+func (s *Server) queueMove(req wire.QueueRequest) (wire.QueueResult, error) {
 	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
 	addr := target.address
-	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
+	return s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		from := -1
 		for i, it := range items {
 			if it.Address == addr {
@@ -566,7 +494,7 @@ func (s *Server) queueMove(req QueueRequest) (QueueResult, error) {
 		it := items[from]
 		items = append(items[:from], items[from+1:]...)
 		to := req.Position - 1
-		items = append(items[:to], append([]QueueItem{it}, items[to:]...)...)
+		items = append(items[:to], append([]wire.QueueItem{it}, items[to:]...)...)
 		return items, nil
 	})
 }
@@ -577,24 +505,24 @@ func (s *Server) queueItems(w http.ResponseWriter, _ *http.Request) {
 
 // queueWrite adapts a queue write to a POST handler. Refusals are results, so
 // they answer 200; only a failure to persist is an HTTP error.
-func (s *Server) queueWrite(do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
+func (s *Server) queueWrite(do func(wire.QueueRequest) (wire.QueueResult, error)) http.HandlerFunc {
 	return queueWriteAs(false, ignoreCtx(do))
 }
 
 // queueWriteCtx is queueWrite for a write that reads the queueCtx.
-func (s *Server) queueWriteCtx(do func(QueueRequest, queueCtx) (QueueResult, error)) http.HandlerFunc {
+func (s *Server) queueWriteCtx(do func(wire.QueueRequest, queueCtx) (wire.QueueResult, error)) http.HandlerFunc {
 	return queueWriteAs(false, do)
 }
 
 // queueWriteWeb is queueWrite for the web mux: a request without a state token
 // is refused as stale before anything runs.
-func (s *Server) queueWriteWeb(do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
+func (s *Server) queueWriteWeb(do func(wire.QueueRequest) (wire.QueueResult, error)) http.HandlerFunc {
 	return queueWriteAs(true, ignoreCtx(do))
 }
 
-func queueWriteAs(web bool, do func(QueueRequest, queueCtx) (QueueResult, error)) http.HandlerFunc {
+func queueWriteAs(web bool, do func(wire.QueueRequest, queueCtx) (wire.QueueResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req QueueRequest
+		var req wire.QueueRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

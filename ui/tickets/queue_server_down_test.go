@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -48,7 +47,7 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	// Coming back clears the banner and brings the rows, in one delivery.
 	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}})
+	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}})
 	next, _ = m.WithServerState(&st, ServerLinkUp)
 	if next.(QueueModel).serverDown() {
 		t.Fatal("still down after an up delivery")
@@ -65,7 +64,7 @@ func TestQueueServerDown_StateDeliveredDownShowsOnceUp(t *testing.T) {
 
 	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/09", Title: "Ninth", Status: "open"},
-	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/09"}})
+	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/09"}})
 	next, _ := m.WithServerState(&st, ServerLinkDown)
 	m = next.(QueueModel)
 	if len(m.epics) != 0 {
@@ -113,7 +112,7 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
-	}}, []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}})
 
 	if want := map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}; !reflect.DeepEqual(m.checked, want) {
 		t.Errorf("checked = %v, want the server queue %v", m.checked, want)
@@ -133,7 +132,7 @@ func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "blog:beta/01", Title: "Second", Status: "open"},
-	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}})
 
 	view := ansi.Strip(m.View().Content)
 	for _, want := range []string{"gx:alpha", "blog:beta", " 01 First", " 01 Second"} {
@@ -167,7 +166,7 @@ func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 		Seq:     1,
 		Tickets: tickets,
 		Epics:   fixtureSummaries(epicsFromViewModel(viewmodel.State{Tickets: tickets}, viewmodel.Scope{}), nil),
-	}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:beta/01"}})
+	}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:beta/01"}})
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 	m = next.(QueueModel)
 

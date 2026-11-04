@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -59,7 +60,7 @@ func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 				t.Fatalf("add claude: %+v, %v", res, err)
 			}
 
-			var ex server.Explanation
+			var ex wire.Explanation
 			servertest.WaitFor(t, 10*time.Second, "codex ticket held", func() bool {
 				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")
 				return err == nil && ex.Verdict == server.VerdictHerdrDown

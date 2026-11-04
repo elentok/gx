@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -27,7 +27,7 @@ const (
 // events is the ticket's run-log events of one type.
 func (r *running) events(t *testing.T, addr, typ string) []ralphloop.Event {
 	t.Helper()
-	var h server.History
+	var h wire.History
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "tickets", "history", addr, "--json")), &h); err != nil {
 		t.Fatal(err)
 	}

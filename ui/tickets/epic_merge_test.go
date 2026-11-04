@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -27,7 +26,7 @@ func openEpicMenuOn(t *testing.T, m Model, name string) Model {
 
 func TestEpicMerge_TicketsTabMergesCompleteUnmergedEpicByAddress(t *testing.T) {
 	var calls []string
-	api := fakeServerAPI{calls: &calls, mergeRes: server.QueueResult{MergeTicket: "gx:alpha/02"}}
+	api := fakeServerAPI{calls: &calls, mergeRes: wire.QueueResult{MergeTicket: "gx:alpha/02"}}
 	m := withState(newServerModel(t).WithServer(api), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Done", Status: "done"},
 		{Address: "gx:beta/01", Title: "Open", Status: "open"},

@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/repair"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -36,7 +36,7 @@ func TestPersonVerb_MergeCancelsTheOpenInvestigateChild(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -47,7 +47,7 @@ func TestPersonVerb_StartOverCancelsTheOpenInvestigateChild(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
-	res, err := h.Client.Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	res, err := h.Client.Repair(context.Background(), "start-over", wire.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v; want started over", res, err)
 	}
@@ -58,7 +58,7 @@ func TestInvestigateVerb_MergeLeavesItsOwnTicket(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
-	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -69,7 +69,7 @@ func TestInvestigateVerb_StartOverLeavesItsOwnTicket(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
-	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "start-over", wire.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v; want started over", res, err)
 	}
@@ -79,7 +79,7 @@ func TestInvestigateVerb_StartOverLeavesItsOwnTicket(t *testing.T) {
 func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
 	t.Parallel()
 	h, _ := pausedIteration(t, string(events.ZeroCommit), true)
-	res, err := h.Server.StartOverAsWeb(server.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
+	res, err := h.Server.StartOverAsWeb(wire.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonReasonRequired {
 		t.Fatalf("start-over = %+v, %v; want %s refusal", res, err, repair.ReasonReasonRequired)
 	}
@@ -92,7 +92,7 @@ func TestPersonVerb_RefusedMergeLeavesTheInvestigateChild(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.SelfReported), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
+	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01"})
 	if err != nil || !res.Refused {
 		t.Fatalf("merge = %+v, %v; want refusal", res, err)
 	}
@@ -105,7 +105,7 @@ func TestPersonVerb_AnswerCancelsTheOpenInvestigateChild(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	child := writeInvestigateChild(t, ticketPath, "open")
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v; want delivered", res, err)
 	}

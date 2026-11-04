@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -36,7 +37,7 @@ const maxAnswerChars = 4000
 
 // answerRefused carries a refusal out of the log guard, which holds the ticket
 // lock: the recheck, the prompt and the log line are one step.
-type answerRefused struct{ res QueueResult }
+type answerRefused struct{ res wire.QueueResult }
 
 func (e answerRefused) Error() string { return e.res.Message }
 
@@ -107,7 +108,7 @@ func answerFrame(seq int, answer, note string) string {
 
 // validateAnswer checks the answer against the question's kind and returns the
 // text to deliver and log: the choice (or the free text) and the note.
-func validateAnswer(q tickets.Question, req QueueRequest) (answer, note string, bad *QueueResult) {
+func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note string, bad *wire.QueueResult) {
 	note = strings.TrimSpace(normalizeAnswer(req.Note))
 	switch q.Kind {
 	case tickets.QuestionText:
@@ -146,10 +147,10 @@ func validateAnswer(q tickets.Question, req QueueRequest) (answer, note string, 
 // state token, the prompt and the pause.answer line are one step under the
 // ticket lock, so a refusal logs nothing and a stale reply never reaches the
 // agent.
-func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
-	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
-			return QueueResult{Outcome: OutcomeAdopted}, nil
+			return wire.QueueResult{Outcome: OutcomeAdopted}, nil
 		}
 		address := ref.addr.String()
 		var run trackedRun
@@ -159,7 +160,7 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 			if err != nil {
 				return tickets.LogEvent{}, err
 			}
-			refuse := func(res QueueResult) (tickets.LogEvent, error) {
+			refuse := func(res wire.QueueResult) (tickets.LogEvent, error) {
 				return tickets.LogEvent{}, answerRefused{res}
 			}
 			open := tickets.OpenQuestion(evs)
@@ -222,28 +223,28 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 			return refused.res, nil
 		}
 		if err != nil {
-			return QueueResult{}, fmt.Errorf("answer %s: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("answer %s: %w", ref.addr, err)
 		}
 		if err := s.cancelInvestigateChild(ref, req.Source); err != nil {
-			return QueueResult{}, err
+			return wire.QueueResult{}, err
 		}
 		if queued {
 			// Open again for gx to claim; the dead run has nothing to settle.
 			s.registry.delete(address)
 			if err := ralphloop.ResumeTicket(ref.ticket.Path, time.Now()); err != nil {
-				return QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
+				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
 			}
 			s.rescan()
-			return QueueResult{Outcome: OutcomeQueued}, nil
+			return wire.QueueResult{Outcome: OutcomeQueued}, nil
 		}
 		if err := ralphloop.Claim(ref.ticket.Path); err != nil {
-			return QueueResult{}, fmt.Errorf("claim %s: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("claim %s: %w", ref.addr, err)
 		}
 		if err := s.resettleWaiting(run); err != nil {
-			return QueueResult{}, fmt.Errorf("settle %s: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("settle %s: %w", ref.addr, err)
 		}
 		s.rescan()
-		return QueueResult{Outcome: OutcomeDelivered}, nil
+		return wire.QueueResult{Outcome: OutcomeDelivered}, nil
 	})
 }
 

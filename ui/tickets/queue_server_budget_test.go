@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -12,7 +11,7 @@ func loadedServerQueueWithBudget(t *testing.T, budget wire.BudgetStatus) QueueMo
 	t.Helper()
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Budget: budget, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-	}}, []server.QueueItem{{Address: "gx:alpha/01"}})
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}})
 	return m
 }
 
@@ -59,7 +58,7 @@ func TestQueueServerMode_EpicStatusLineShowsTicketCostSum(t *testing.T) {
 		Tickets: []wire.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: "done", ActualCost: 1.5},
 			{Address: "gx:alpha/02", Title: "Second", Status: "open", ActualCost: 1.75},
-		}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+		}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
 	line := epicStatusLineText(t, m)
 	if !strings.Contains(line, "$3.25") || strings.Contains(line, "$99") {

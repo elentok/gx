@@ -5,13 +5,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 // QueueAddFunc is the queue-add call of the server client.
-type QueueAddFunc func(ctx context.Context, address, agent string) (server.QueueResult, error)
+type QueueAddFunc func(ctx context.Context, address, agent string) (wire.QueueResult, error)
 
 // QueueAddresses sends one queue-add per address, carrying on past refusals so
 // one blocked ticket doesn't keep the rest out. It returns how many the server

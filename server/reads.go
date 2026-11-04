@@ -8,48 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
-
-// ProjectInfo is one project in the /v1/projects payload.
-type ProjectInfo struct {
-	Name string `json:"name"`
-	Repo string `json:"repo,omitempty"`
-	VCS  string `json:"vcs,omitempty"`
-	// Tickets counts the project's tickets by status.
-	Tickets map[string]int `json:"tickets"`
-}
-
-// LockInfo is one held lock in the /v1/locks payload. Alive is false for a lock
-// a crashed process left behind.
-type LockInfo struct {
-	Kind   string    `json:"kind"`
-	Epic   string    `json:"epic"` // "project:epic"
-	Pid    int       `json:"pid"`
-	Since  time.Time `json:"since"`
-	Ticket string    `json:"ticket,omitempty"`
-	Alive  bool      `json:"alive"`
-}
-
-// History is the /v1/tickets/history payload: the ticket's events in log order.
-type History struct {
-	Address string            `json:"address"`
-	Events  []ralphloop.Event `json:"events"`
-}
-
-// Explanation is the /v1/tickets/explain payload: why the scheduler would or
-// wouldn't pick the ticket. Verdict is the scheduler's own decision word
-// (blocked, error, stalled, done, ...) or one of the queue and slot verdicts
-// in verdicts.go.
-type Explanation struct {
-	Address string `json:"address"`
-	Verdict string `json:"verdict"`
-	Reason  string `json:"reason,omitempty"`
-}
 
 const (
 	lockKindMerge = "land"
@@ -69,7 +33,7 @@ func (s *Server) projects(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, list)
 }
 
-func (s *Server) listProjects() ([]ProjectInfo, error) {
+func (s *Server) listProjects() ([]wire.ProjectInfo, error) {
 	counts := map[string]map[string]int{}
 	for _, t := range s.idx.snapshot().Tickets {
 		a, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
@@ -81,14 +45,14 @@ func (s *Server) listProjects() ([]ProjectInfo, error) {
 		}
 		counts[a.Project][t.Status]++
 	}
-	list := []ProjectInfo{}
+	list := []wire.ProjectInfo{}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return nil, err
 	}
 	for _, dir := range dirs {
 		name := tickets.ProjectName(dir)
-		p := ProjectInfo{Name: name, Tickets: counts[name]}
+		p := wire.ProjectInfo{Name: name, Tickets: counts[name]}
 		if p.Tickets == nil {
 			p.Tickets = map[string]int{}
 		}
@@ -107,7 +71,7 @@ func (s *Server) listProjects() ([]ProjectInfo, error) {
 }
 
 func (s *Server) locks(w http.ResponseWriter, _ *http.Request) {
-	list := []LockInfo{}
+	list := []wire.LockInfo{}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -125,7 +89,7 @@ func (s *Server) locks(w http.ResponseWriter, _ *http.Request) {
 			if err != nil || owner == nil {
 				continue
 			}
-			list = append(list, LockInfo{
+			list = append(list, wire.LockInfo{
 				Kind: lockKindMerge, Epic: project + ":" + filepath.Base(epicDir),
 				Pid: owner.PID, Since: owner.Time, Ticket: owner.Ticket, Alive: owner.Alive(),
 			})
@@ -146,7 +110,7 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	writeJSON(w, History{Address: addr.String(), Events: events})
+	writeJSON(w, wire.History{Address: addr.String(), Events: events})
 }
 
 func (s *Server) explain(w http.ResponseWriter, r *http.Request) {
@@ -165,10 +129,10 @@ func (s *Server) explain(w http.ResponseWriter, r *http.Request) {
 
 // explainTicket gives the stored ticket's verdict: the scheduler's own, then
 // the server's queue and slot state for a ticket nothing else holds back.
-func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
+func (s *Server) explainTicket(addr tickets.Address) (wire.Explanation, error) {
 	epics, err := s.projectEpics(addr.Project)
 	if err != nil {
-		return Explanation{}, err
+		return wire.Explanation{}, err
 	}
 	return s.explainIn(epics, addr)
 }
@@ -193,7 +157,7 @@ func (s *Server) projectEpics(project string) ([]tickets.Epic, error) {
 }
 
 // explainIn is explainTicket's lookup inside one project's epics.
-func (s *Server) explainIn(epics []tickets.Epic, addr tickets.Address) (Explanation, error) {
+func (s *Server) explainIn(epics []tickets.Epic, addr tickets.Address) (wire.Explanation, error) {
 	for _, e := range epics {
 		if e.Name != addr.Epic {
 			continue
@@ -204,7 +168,7 @@ func (s *Server) explainIn(epics []tickets.Epic, addr tickets.Address) (Explanat
 			}
 		}
 	}
-	return Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: "no ticket " + addr.String()}
+	return wire.Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: "no ticket " + addr.String()}
 }
 
 func (s *Server) readHistory(addr tickets.Address) ([]ralphloop.Event, error) {

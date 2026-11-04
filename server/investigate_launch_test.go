@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -119,7 +120,7 @@ func TestOneOffLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
 				default:
 				}
 			})
-			res, err := h.Client.OneOff(context.Background(), server.OneOffRequest{Prompt: "look around", Project: "proj", Type: typ})
+			res, err := h.Client.OneOff(context.Background(), wire.OneOffRequest{Prompt: "look around", Project: "proj", Type: typ})
 			if err != nil || res.Refused {
 				t.Fatalf("one-off: %+v, %v", res, err)
 			}

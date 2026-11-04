@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/elentok/gx/server/wire"
-
-	"github.com/elentok/gx/server"
 )
 
 // SessionClient is the slice of apiclient.Client the Agents tab uses to act on
@@ -20,7 +18,7 @@ type SessionClient interface {
 	SetAutoAdvance(ctx context.Context, id string, on bool) (wire.SessionResult, error)
 	CancelAutoAdvance(ctx context.Context, id string) (wire.SessionResult, error)
 	Snapshot(ctx context.Context) (wire.Snapshot, error)
-	QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error)
+	QueueAdd(ctx context.Context, address, agent string) (wire.QueueResult, error)
 	ReportFocus(ctx context.Context, req wire.FocusReport) (wire.SessionResult, error)
-	SetAFK(ctx context.Context, on *bool) (server.AFKResult, error)
+	SetAFK(ctx context.Context, on *bool) (wire.AFKResult, error)
 }

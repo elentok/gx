@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,7 @@ const exitServerNotRunning = 8
 const exitDuplicateLive = 7
 
 func newServerOneOffCmd(d deps) *cobra.Command {
-	var req server.OneOffRequest
+	var req wire.OneOffRequest
 	var jsonOut, wait bool
 	var timeout time.Duration
 	cmd := &cobra.Command{
@@ -78,11 +79,11 @@ func newServerOneOffCmd(d deps) *cobra.Command {
 
 // runServerOneOff never starts the server: a dead socket is a refusal with a
 // `gx server start` hint, exit code 8, and nothing spooled.
-func runServerOneOff(ctx context.Context, dirs config.Dirs, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, timeout time.Duration, req server.OneOffRequest) error {
+func runServerOneOff(ctx context.Context, dirs config.Dirs, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, timeout time.Duration, req wire.OneOffRequest) error {
 	res, err := cl.OneOff(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.OneOffResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.OneOffResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -118,7 +119,7 @@ type oneOffDecision struct {
 	printAddress bool   // text mode prints the address on stdout
 }
 
-func decideOneOff(res server.OneOffResult, wait bool) oneOffDecision {
+func decideOneOff(res wire.OneOffResult, wait bool) oneOffDecision {
 	refusal := fmt.Sprintf("refused (%s): %s", res.Reason, res.Message)
 	switch {
 	case !res.Refused:

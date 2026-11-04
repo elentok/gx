@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -147,7 +148,7 @@ func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "first", Project: "proj"})
+	res, err := h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "first", Project: "proj"})
 	if err != nil || res.Refused {
 		t.Fatalf("submit: %+v, %v", res, err)
 	}
@@ -157,7 +158,7 @@ func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
 	}
 	waitOneOffsQueued(t, h, false)
 
-	res, err = h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "second", Project: "proj"})
+	res, err = h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "second", Project: "proj"})
 	if err != nil || res.Refused {
 		t.Fatalf("second submit: %+v, %v", res, err)
 	}
@@ -177,7 +178,7 @@ func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
 			if _, err := h.Client.QueuePause(ctx); err != nil {
 				t.Fatal(err)
 			}
-			var res server.QueueResult
+			var res wire.QueueResult
 			var err error
 			if !servertest.Poll(5*time.Second, func() bool {
 				res, err = h.Client.QueueAdd(ctx, "proj:one-offs/01", "")
@@ -203,7 +204,7 @@ func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := range 10 {
-		res, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "p" + string(rune('a'+i)), Project: "proj"})
+		res, err := h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "p" + string(rune('a'+i)), Project: "proj"})
 		if err != nil || res.Refused {
 			t.Fatalf("submit %d: %+v, %v", i, res, err)
 		}
@@ -211,7 +212,7 @@ func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
 			t.Fatalf("cancel %d: %+v, %v", i, cres, err)
 		}
 	}
-	last, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "last", Project: "proj"})
+	last, err := h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "last", Project: "proj"})
 	if err != nil || last.Refused {
 		t.Fatalf("last submit: %+v, %v", last, err)
 	}

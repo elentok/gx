@@ -48,7 +48,7 @@ func stateOf(t *testing.T, ticketPath string) string {
 	return fmt.Sprintf("%d:%s", open.Seq, tk.PausedClass())
 }
 
-func webResume(t *testing.T, h *servertest.Harness, req server.RepairRequest) server.RepairResult {
+func webResume(t *testing.T, h *servertest.Harness, req wire.RepairRequest) wire.RepairResult {
 	t.Helper()
 	req.Address = answerAddr
 	res, err := h.Server.ResumeAsWeb(req)
@@ -58,7 +58,7 @@ func webResume(t *testing.T, h *servertest.Harness, req server.RepairRequest) se
 	return res
 }
 
-func resumeResult(t *testing.T, res server.RepairResult) repair.ResumeResult {
+func resumeResult(t *testing.T, res wire.RepairResult) repair.ResumeResult {
 	t.Helper()
 	if res.Refused {
 		t.Fatalf("resume refused: %+v", res)
@@ -91,7 +91,7 @@ func TestWebResume_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
 	pauseEnvZeroCommit(t, e)
 
 	for name, state := range map[string]string{"missing": "", "stale": "99:paused"} {
-		res := webResume(t, e.h, server.RepairRequest{State: state})
+		res := webResume(t, e.h, wire.RepairRequest{State: state})
 		if !res.Refused || res.Reason != server.ReasonStale {
 			t.Fatalf("%s: resume = %+v; want refusal %s", name, res, server.ReasonStale)
 		}
@@ -115,7 +115,7 @@ func TestWebResume_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T)
 		t.Fatal(err)
 	}
 
-	out := resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, e.h, wire.RepairRequest{State: state}))
 	if out.Status != "open" || out.Message != repair.MessageReopened {
 		t.Errorf("result = %+v; want open, %q", out, repair.MessageReopened)
 	}
@@ -141,7 +141,7 @@ func TestWebResume_SelfReportedWithAGoneAgentEndsTheRoundAsResume(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	resumeResult(t, webResume(t, h, server.RepairRequest{State: state}))
+	resumeResult(t, webResume(t, h, wire.RepairRequest{State: state}))
 	evs, err := tickets.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestWebResume_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T)
 	e := startAnswerEnv(t, nil)
 	state := pauseEnvZeroCommit(t, e)
 
-	out := resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, e.h, wire.RepairRequest{State: state}))
 	if out.Status != repair.ResumePrompted || out.Message != repair.MessagePrompted {
 		t.Errorf("result = %+v; want prompted", out)
 	}
@@ -180,7 +180,7 @@ func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
 		t.Fatalf("handshake = %+v, %v", hs, err)
 	}
 
-	resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
+	resumeResult(t, webResume(t, e.h, wire.RepairRequest{State: state}))
 
 	evs, err := tickets.ReadLog(e.ticket)
 	if err != nil {
@@ -233,7 +233,7 @@ func TestWebResume_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
 	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(true)); err != nil {
 		t.Fatal(err)
 	}
-	out := resumeResult(t, webResume(t, p.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, p.h, wire.RepairRequest{State: state}))
 	if out.Status != repair.ResumeAdopted || out.Message != repair.MessageAdopted {
 		t.Errorf("result = %+v; want adopted as done", out)
 	}
@@ -256,7 +256,7 @@ func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	}
 	path := filepath.Join(store, "proj", "epic-a", "issues", "03-third.md")
 	state := stateOf(t, path)
-	req := server.RepairRequest{Address: "proj:epic-a/03", State: state, Base: "99"}
+	req := wire.RepairRequest{Address: "proj:epic-a/03", State: state, Base: "99"}
 
 	res, err := h.Server.ResumeAsWeb(req)
 	if err != nil || !res.Refused || res.Reason != server.ReasonBadBase {
@@ -304,7 +304,7 @@ func TestResume_CLIWithoutATokenStillWorks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := e.h.Client.Repair(context.Background(), "resume", server.RepairRequest{Address: answerAddr})
+	res, err := e.h.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v; want reopened", res, err)
 	}
@@ -339,7 +339,7 @@ func TestWebResume_AFailedReopenLeavesNoAnswerAndTheNextResumeWorks(t *testing.T
 	}
 	defer restore()
 
-	if res, err := e.h.Server.ResumeAsWeb(server.RepairRequest{Address: answerAddr, State: state}); err == nil && !res.Refused {
+	if res, err := e.h.Server.ResumeAsWeb(wire.RepairRequest{Address: answerAddr, State: state}); err == nil && !res.Refused {
 		t.Fatalf("resume = %+v; want a failure", res)
 	}
 	restore()
@@ -347,7 +347,7 @@ func TestWebResume_AFailedReopenLeavesNoAnswerAndTheNextResumeWorks(t *testing.T
 		t.Errorf("failed resume logged %+v", got)
 	}
 
-	out := resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, e.h, wire.RepairRequest{State: state}))
 	if out.Status != "open" {
 		t.Errorf("retry = %+v; want open", out)
 	}
@@ -367,7 +367,7 @@ func TestWebResume_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
 	}
 	defer os.Chmod(logPath, 0o644)
 
-	res, err := e.h.Server.ResumeAsWeb(server.RepairRequest{Address: answerAddr, State: state})
+	res, err := e.h.Server.ResumeAsWeb(wire.RepairRequest{Address: answerAddr, State: state})
 	if err == nil {
 		t.Fatalf("resume = %+v; want an error", res)
 	}

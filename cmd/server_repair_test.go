@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestServerRepair_IgnoreLiveTabHelpNamesTheAgentSession(t *testing.T) {
@@ -40,11 +41,11 @@ func TestServerRepair_ResumeTierFlagReachesTheRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.RepairRequest
+	var got wire.RepairRequest
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/tickets/resume", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(server.RepairResult{Data: json.RawMessage(`{}`)})
+		_ = json.NewEncoder(w).Encode(wire.RepairResult{Data: json.RawMessage(`{}`)})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()
@@ -66,14 +67,14 @@ func TestServerRepair_RunsDirectlyWhenNoServerRunning(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
-	direct := func(verb string, req server.RepairRequest) (server.RepairResult, error) {
+	direct := func(verb string, req wire.RepairRequest) (wire.RepairResult, error) {
 		return server.RunRepairDirect(store, verb, req)
 	}
-	req := server.RepairRequest{Address: "proj:epic-a/01"}
+	req := wire.RepairRequest{Address: "proj:epic-a/01"}
 
 	var out bytes.Buffer
 	err := runServerRepair(context.Background(), cl, &out, true, "resume", req, direct)
-	var res server.RepairResult
+	var res wire.RepairResult
 	if jerr := json.Unmarshal(out.Bytes(), &res); jerr != nil {
 		t.Fatalf("json: %v (%s)", jerr, out.String())
 	}
@@ -82,7 +83,7 @@ func TestServerRepair_RunsDirectlyWhenNoServerRunning(t *testing.T) {
 	}
 
 	out.Reset()
-	_ = runServerRepair(context.Background(), cl, &out, false, "verify", server.RepairRequest{Address: "proj:epic-a", Cwd: t.TempDir()}, direct)
+	_ = runServerRepair(context.Background(), cl, &out, false, "verify", wire.RepairRequest{Address: "proj:epic-a", Cwd: t.TempDir()}, direct)
 	if !strings.HasPrefix(out.String(), directNotice) {
 		t.Errorf("output = %q; want the direct-run notice first", out.String())
 	}

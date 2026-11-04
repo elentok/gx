@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -60,7 +61,7 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{
+	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{
 		Address: answerAddr, State: state, Choice: "b", Note: "line1\r\nline2", Source: "cli",
 	})
 	if err != nil || res.Refused || res.Outcome != server.OutcomeDelivered {
@@ -99,7 +100,7 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 		if err := schema.UpdateTicket(ticketPath, pause); err != nil {
 			t.Fatal(err)
 		}
-		res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, Choice: "a"})
+		res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
 		if err != nil || res.Reason != server.ReasonNotAnswerable {
 			t.Errorf("%s: %+v, %v; want %s", name, res, err, server.ReasonNotAnswerable)
 		}
@@ -118,7 +119,7 @@ func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	h.Server.RecordSpend("spent", 6)
-	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Reason != server.ReasonBudgetLimit {
 		t.Fatalf("answer = %+v, %v; want %s", res, err, server.ReasonBudgetLimit)
 	}
@@ -139,7 +140,7 @@ func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
 	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(false)); err != nil {
 		t.Fatal(err)
 	}
-	res, err := p.h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, Choice: "a"})
+	res, err := p.h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
 	if err != nil || res.Refused || res.Outcome != server.OutcomeAdopted {
 		t.Fatalf("answer = %+v, %v; want adopted", res, err)
 	}
@@ -153,7 +154,7 @@ func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Outcome != server.OutcomeDelivered {
 		t.Fatalf("answer = %+v, %v; want delivered", res, err)
 	}
@@ -164,7 +165,7 @@ func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
 
 // requireQueued checks the outcome of an answer to a gone agent: logged,
 // reopened, answered, and nothing launched.
-func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake *headlessFake, res server.QueueResult, err error) {
+func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake *headlessFake, res wire.QueueResult, err error) {
 	t.Helper()
 	if err != nil || res.Refused || res.Outcome != server.OutcomeQueued {
 		t.Fatalf("answer = %+v, %v; want queued", res, err)
@@ -202,7 +203,7 @@ func TestAnswer_GoneAgentQueues(t *testing.T) {
 	if err := fake.Stop(sess); err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
 }
 
@@ -221,7 +222,7 @@ func TestAnswer_GoneAgentThenCodexClaimStartsFromTheHandoff(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	res, err := h.Client.TicketAnswer(ctx, server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.TicketAnswer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
 
 	if res, err := h.Client.QueueAdd(ctx, answerAddr, "codex"); err != nil || res.Refused {
@@ -256,7 +257,7 @@ func TestAnswer_DeathAfterPromptQueues(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	fake.DieAfterPrompt("epic-a-iter-01", agentrunner.SessionDied("claude exited (code 1)"))
-	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
 }
 
@@ -265,7 +266,7 @@ func TestAnswer_Refusals(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	ctx := context.Background()
-	ask := func(req server.QueueRequest) server.QueueResult {
+	ask := func(req wire.QueueRequest) wire.QueueResult {
 		t.Helper()
 		req.Address = answerAddr
 		res, err := h.Client.TicketAnswer(ctx, req)
@@ -274,30 +275,30 @@ func TestAnswer_Refusals(t *testing.T) {
 		}
 		return res
 	}
-	if res := ask(server.QueueRequest{Choice: "a"}); res.Reason != server.ReasonNotPaused {
+	if res := ask(wire.QueueRequest{Choice: "a"}); res.Reason != server.ReasonNotPaused {
 		t.Errorf("claimed ticket: %+v, want %s", res, server.ReasonNotPaused)
 	}
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	cases := []struct {
 		name   string
-		req    server.QueueRequest
+		req    wire.QueueRequest
 		reason string
 	}{
-		{"stale", server.QueueRequest{State: "99:paused", Choice: "a"}, server.ReasonStale},
-		{"bad choice", server.QueueRequest{State: state, Choice: "zzz"}, server.ReasonBadChoice},
-		{"empty", server.QueueRequest{State: state}, server.ReasonEmptyAnswer},
-		{"too long", server.QueueRequest{State: state, Choice: "a", Note: strings.Repeat("x", 4001)}, server.ReasonTooLong},
+		{"stale", wire.QueueRequest{State: "99:paused", Choice: "a"}, server.ReasonStale},
+		{"bad choice", wire.QueueRequest{State: state, Choice: "zzz"}, server.ReasonBadChoice},
+		{"empty", wire.QueueRequest{State: state}, server.ReasonEmptyAnswer},
+		{"too long", wire.QueueRequest{State: state, Choice: "a", Note: strings.Repeat("x", 4001)}, server.ReasonTooLong},
 	}
 	for _, c := range cases {
 		if res := ask(c.req); !res.Refused || res.Reason != c.reason {
 			t.Errorf("%s: %+v, want %s", c.name, res, c.reason)
 		}
 	}
-	if res := ask(server.QueueRequest{State: "99:paused", Choice: "a"}); res.Question == nil || res.State != state {
+	if res := ask(wire.QueueRequest{State: "99:paused", Choice: "a"}); res.Question == nil || res.State != state {
 		t.Errorf("stale carries question %v state %q, want the current one (%q)", res.Question, res.State, state)
 	}
 	fake.SetState("epic-a-iter-01", agentrunner.StateBlocked, "permission")
-	if res := ask(server.QueueRequest{State: state, Choice: "a"}); res.Reason != server.ReasonAgentNotReady {
+	if res := ask(wire.QueueRequest{State: state, Choice: "a"}); res.Reason != server.ReasonAgentNotReady {
 		t.Errorf("blocked agent: %+v, want %s", res, server.ReasonAgentNotReady)
 	}
 	if n := answerCount(t, ticketPath); n != 0 {

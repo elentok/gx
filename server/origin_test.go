@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -35,7 +36,7 @@ func TestOrigin_WebAnswerLogsWeb(t *testing.T) {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake = %+v, %v; want a web_url", hs, err)
 	}
-	body, _ := json.Marshal(server.QueueRequest{Address: answerAddr, State: state, Choice: "a", Source: "cli"})
+	body, _ := json.Marshal(wire.QueueRequest{Address: answerAddr, State: state, Choice: "a", Source: "cli"})
 	cookie := login(t, h.StateDir, hs.WebURL)
 	if code, out := webPostJSON(t, hs.WebURL+"/v1/tickets/answer", string(body), cookie, "", jsonPost(hs.WebURL)); code != 200 {
 		t.Fatalf("web answer = %d %s", code, out)
@@ -59,7 +60,7 @@ func TestOrigin_SocketAnswerLogsTUIOrCLI(t *testing.T) {
 			waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 			state := pauseWithQuestion(t, ticketPath, optionsBlock)
 			tc.mark(t, h)
-			res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+			res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 			if err != nil || res.Refused {
 				t.Fatalf("answer = %+v, %v", res, err)
 			}

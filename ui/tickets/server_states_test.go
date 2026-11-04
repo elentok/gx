@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -19,7 +18,7 @@ import (
 func olderServerState() viewmodel.State {
 	return viewmodel.State{}.ApplySnapshot(wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}})
+	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}})
 }
 
 func TestOlderServer_TicketsTabShowsNoticeAndNoTickets(t *testing.T) {

@@ -14,14 +14,15 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
 type evolveFixture struct {
 	env   evolveEnv
 	epic  string // path of proj:epic
-	sent  []server.OneOffRequest
-	reply server.OneOffResult
+	sent  []wire.OneOffRequest
+	reply wire.OneOffResult
 }
 
 func newEvolveFixture(t *testing.T, mode string, withGx bool, epicFM string) *evolveFixture {
@@ -44,13 +45,13 @@ func newEvolveFixture(t *testing.T, mode string, withGx bool, epicFM string) *ev
 	write(filepath.Join(epic, "ticket.md"), "---\nstatus: open\n"+epicFM+"---\n\n# epic\n")
 	write(filepath.Join(epic, "issues", "01-a.md"), "---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
 
-	f := &evolveFixture{epic: epic, reply: server.OneOffResult{Address: "proj:evolve-epic-x/01"}}
+	f := &evolveFixture{epic: epic, reply: wire.OneOffResult{Address: "proj:evolve-epic-x/01"}}
 	f.env = evolveEnv{
 		storePath: store,
 		cfg:       config.Config{Evolve: mode},
 		tempDir:   t.TempDir(),
 		now:       func() time.Time { return time.Date(2026, 3, 4, 5, 6, 0, 0, time.UTC) },
-		submit: func(_ context.Context, req server.OneOffRequest) (server.OneOffResult, error) {
+		submit: func(_ context.Context, req wire.OneOffRequest) (wire.OneOffResult, error) {
 			f.sent = append(f.sent, req)
 			return f.reply, nil
 		},

@@ -115,7 +115,7 @@ func (s *Server) PauseAs(address string, kind events.Kind, reason string) error 
 }
 
 // SetCostOf swaps how an iteration's cost is read.
-func (s *Server) SetCostOf(f func(IterationInfo) (float64, bool)) { s.costOf = f }
+func (s *Server) SetCostOf(f func(wire.IterationInfo) (float64, bool)) { s.costOf = f }
 
 // SetMergeInto swaps the merge core a root merge calls.
 func (s *Server) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error)) {
@@ -128,17 +128,17 @@ func (s *Server) SetMergedProbe(f func(repo, ancestor, descendant string) (bool,
 }
 
 // ResumeAsWeb is the resume the web mux serves: it needs a state token.
-func (s *Server) ResumeAsWeb(req RepairRequest) (RepairResult, error) {
+func (s *Server) ResumeAsWeb(req wire.RepairRequest) (wire.RepairResult, error) {
 	return s.repairResume(req, repairCtx{RequireState: true, origin: OriginWeb})
 }
 
 // StartOverAsWeb is the start-over the web mux serves.
-func (s *Server) StartOverAsWeb(req RepairRequest) (RepairResult, error) {
+func (s *Server) StartOverAsWeb(req wire.RepairRequest) (wire.RepairResult, error) {
 	return s.repairStartOver(req, repairCtx{RequireState: true, origin: OriginWeb})
 }
 
 // ResumeAs is the resume a client of the given origin sends over the socket.
-func (s *Server) ResumeAs(req RepairRequest, origin string) (RepairResult, error) {
+func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairResult, error) {
 	return s.repairResume(req, repairCtx{origin: origin})
 }
 

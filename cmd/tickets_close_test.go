@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -148,11 +148,11 @@ func TestExecute_TicketsClose_RefusalsWriteNothing(t *testing.T) {
 func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		queue []server.QueueItem
-		live  []server.IterationInfo
+		queue []wire.QueueItem
+		live  []wire.IterationInfo
 	}{
-		{"queued", []server.QueueItem{{Address: "mine:follow-ups/01", Agent: "claude"}}, nil},
-		{"live", nil, []server.IterationInfo{{Address: "mine:follow-ups/01"}}},
+		{"queued", []wire.QueueItem{{Address: "mine:follow-ups/01", Agent: "claude"}}, nil},
+		{"live", nil, []wire.IterationInfo{{Address: "mine:follow-ups/01"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := setupCloseProject(t)

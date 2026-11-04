@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -33,7 +34,7 @@ func TestResume_LiveWaitingAgentRefusesAndIsUntouched(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)
 
-	res, err := h.Client.Repair(context.Background(), "resume", server.RepairRequest{Address: answerAddr})
+	res, err := h.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
 	if err != nil || !res.Refused || res.Reason != server.ReasonAgentWaiting {
 		t.Fatalf("resume = %+v, %v; want refusal %s", res, err, server.ReasonAgentWaiting)
 	}
@@ -64,7 +65,7 @@ func TestResume_GoneAgentClosesTheQuestionAndReopens(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.Repair(context.Background(), "resume", server.RepairRequest{Address: answerAddr})
+	res, err := h.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v; want reopened", res, err)
 	}

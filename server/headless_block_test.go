@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -127,7 +128,7 @@ func TestHeadlessBlock_AnswerOnClaimedLeavesStatus(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, _ := startBlockable(t, "headless")
 	// The agent is working and the ticket claimed; the answer may be refused, but must not move it.
-	_, _ = h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
+	_, _ = h.Client.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +157,7 @@ func runsJSONHas(h *servertest.Harness, s string) bool {
 func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
-	res, err := h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
+	res, err := h.Client.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
 	if err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
@@ -172,7 +173,7 @@ func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
 func TestHeadlessBlock_PausesAgainAfterAnswer(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
-	if res, err := h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"}); err != nil || res.Refused {
+	if res, err := h.Client.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"}); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	waitStatus(t, ticketPath, schema.StatusClaimed)
@@ -210,7 +211,7 @@ func TestHeadlessBlock_AnyExitReturnsToClaimed(t *testing.T) {
 func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
-	req := server.RepairRequest{Address: answerAddr}
+	req := wire.RepairRequest{Address: answerAddr}
 	res, err := h.Server.ResumeAs(req, server.OriginCLI)
 	if err != nil || !res.Refused || res.Reason != server.ReasonAgentWaiting || !strings.Contains(res.Message, "gx server agents answer") {
 		t.Fatalf("resume live = %+v, %v; want %s naming the answer verb", res, err, server.ReasonAgentWaiting)

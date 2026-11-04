@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/cpuwatch"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -74,7 +75,7 @@ func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) CPUSpikeResult {
 	if last := s.cpuSpikes.lastFiled; !last.IsZero() && now.Sub(last) < set.CPUWatchdog.Cooldown {
 		return CPUSpikeResult{Message: fmt.Sprintf("cooling down: last ticket filed %s ago", now.Sub(last).Round(time.Second))}
 	}
-	res, err := s.oneOff(OneOffRequest{
+	res, err := s.oneOff(wire.OneOffRequest{
 		Prompt:  cpuSpikePrompt(sp, set.CPUWatchdog),
 		Project: OutboxProject,
 		Type:    string(schema.TypeDiagnose),

@@ -121,15 +121,15 @@ func TestServerEpicsMerge_RejectsNonEpicAddresses(t *testing.T) {
 
 func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 	cases := map[string]struct {
-		res     server.QueueResult
+		res     wire.QueueResult
 		out     string
 		errPart string
 	}{
-		"merged": {res: server.QueueResult{Merged: true}, out: "merged\n"},
-		"forked": {res: server.QueueResult{MergeTicket: "proj:epic/07"}, out: "proj:epic/07\n"},
-		"paused": {res: server.QueueResult{Paused: true, PauseKind: "conflict", Message: "merge conflict in a.go"},
+		"merged": {res: wire.QueueResult{Merged: true}, out: "merged\n"},
+		"forked": {res: wire.QueueResult{MergeTicket: "proj:epic/07"}, out: "proj:epic/07\n"},
+		"paused": {res: wire.QueueResult{Paused: true, PauseKind: "conflict", Message: "merge conflict in a.go"},
 			errPart: "paused (conflict): merge conflict in a.go"},
-		"paused needs-rebase": {res: server.QueueResult{Paused: true, PauseKind: "needs-rebase", Message: "branch is behind trunk"},
+		"paused needs-rebase": {res: wire.QueueResult{Paused: true, PauseKind: "needs-rebase", Message: "branch is behind trunk"},
 			errPart: "paused (needs-rebase): branch is behind trunk"},
 	}
 	for _, code := range []string{
@@ -137,15 +137,15 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 		server.ReasonMergePending, server.ReasonNotComplete, server.ReasonBranchMissing,
 	} {
 		cases[code] = struct {
-			res     server.QueueResult
+			res     wire.QueueResult
 			out     string
 			errPart string
-		}{res: server.QueueResult{Refused: true, Reason: code, Message: "why " + code}, errPart: "refused (" + code + "): why " + code}
+		}{res: wire.QueueResult{Refused: true, Reason: code, Message: "why " + code}, errPart: "refused (" + code + "): why " + code}
 	}
 	for name, tc := range cases {
 		var out bytes.Buffer
 		err := runServerQueueWrite(context.Background(), nil, &out, false,
-			func(context.Context, *apiclient.Client) (server.QueueResult, error) { return tc.res, nil })
+			func(context.Context, *apiclient.Client) (wire.QueueResult, error) { return tc.res, nil })
 		if tc.errPart == "" && (err != nil || out.String() != tc.out) {
 			t.Errorf("%s: out = %q, err = %v; want %q", name, out.String(), err, tc.out)
 		}
@@ -158,7 +158,7 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 func TestServerEpicsMerge_RefusesWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	err := runServerQueueWrite(context.Background(), cl, &bytes.Buffer{}, false,
-		func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.EpicMerge(ctx, "proj:epic")
 		})
 	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {

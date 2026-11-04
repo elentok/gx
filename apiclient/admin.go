@@ -9,16 +9,16 @@ import (
 )
 
 // SetAFK sets AFK mode; a nil on toggles it.
-func (c *Client) SetAFK(ctx context.Context, on *bool) (server.AFKResult, error) {
-	var res server.AFKResult
-	err := c.post(ctx, "/v1/afk", server.AFKRequest{On: on}, &res)
+func (c *Client) SetAFK(ctx context.Context, on *bool) (wire.AFKResult, error) {
+	var res wire.AFKResult
+	err := c.post(ctx, "/v1/afk", wire.AFKRequest{On: on}, &res)
 	return res, err
 }
 
 // SetViMode sets the web UI's vi mode; a nil on toggles it.
-func (c *Client) SetViMode(ctx context.Context, on *bool) (server.ViModeResult, error) {
-	var res server.ViModeResult
-	err := c.post(ctx, "/v1/vimode", server.ViModeRequest{On: on}, &res)
+func (c *Client) SetViMode(ctx context.Context, on *bool) (wire.ViModeResult, error) {
+	var res wire.ViModeResult
+	err := c.post(ctx, "/v1/vimode", wire.ViModeRequest{On: on}, &res)
 	return res, err
 }
 
@@ -155,8 +155,8 @@ func (c *Client) BudgetIncrease(ctx context.Context, req wire.BudgetIncreaseRequ
 
 // Repair runs a repair verb ("merge", "start-over", "resume" or "verify"). A refusal
 // is a result (Refused set), not an error.
-func (c *Client) Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
-	var res server.RepairResult
+func (c *Client) Repair(ctx context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error) {
+	var res wire.RepairResult
 	err := c.post(ctx, "/v1/tickets/"+verb, req, &res)
 	return res, err
 }

@@ -10,7 +10,7 @@ import (
 
 	"errors"
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -407,7 +407,7 @@ func moveWithServer(t *testing.T, f moveFixture, cl func() (*apiclient.Client, e
 	return execute([]string{"tickets", "move", "src/01", "dst"}, d)
 }
 
-func fakeMoveServer(t *testing.T, queue []server.QueueItem, live []server.IterationInfo) (func() (*apiclient.Client, error), *[]string) {
+func fakeMoveServer(t *testing.T, queue []wire.QueueItem, live []wire.IterationInfo) (func() (*apiclient.Client, error), *[]string) {
 	t.Helper()
 	sock := filepath.Join(shortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)
@@ -424,7 +424,7 @@ func fakeMoveServer(t *testing.T, queue []server.QueueItem, live []server.Iterat
 		_ = json.NewEncoder(w).Encode(live)
 	})
 	mux.HandleFunc("/v1/tickets/changed", func(w http.ResponseWriter, r *http.Request) {
-		var req server.ChangedRequest
+		var req wire.ChangedRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		mu.Lock()
 		pings = append(pings, req.Address)
@@ -448,11 +448,11 @@ func requireMoveActive(t *testing.T, err error) {
 func TestTicketsMove_RefusesQueuedAndLiveTickets(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		queue []server.QueueItem
-		live  []server.IterationInfo
+		queue []wire.QueueItem
+		live  []wire.IterationInfo
 	}{
-		{"queued", []server.QueueItem{{Address: "mine:src/01", Agent: "claude"}}, nil},
-		{"live", nil, []server.IterationInfo{{Address: "mine:src/01"}}},
+		{"queued", []wire.QueueItem{{Address: "mine:src/01", Agent: "claude"}}, nil},
+		{"live", nil, []wire.IterationInfo{{Address: "mine:src/01"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := setupMoveProject(t)

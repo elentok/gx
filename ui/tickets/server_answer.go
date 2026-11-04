@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -24,11 +24,11 @@ var focusIterationTab = func(tabID string) error {
 // server once.
 type iterationsSnapshot struct {
 	ServerAPI
-	list []server.IterationInfo
+	list []wire.IterationInfo
 	err  error
 }
 
-func (s iterationsSnapshot) Iterations(context.Context) ([]server.IterationInfo, error) {
+func (s iterationsSnapshot) Iterations(context.Context) ([]wire.IterationInfo, error) {
 	return s.list, s.err
 }
 
@@ -42,20 +42,20 @@ func snapshotIterations(api ServerAPI) ServerAPI {
 }
 
 // serverIteration is address's live iteration from the server's iterations read.
-func serverIteration(api ServerAPI, address string) (server.IterationInfo, bool) {
+func serverIteration(api ServerAPI, address string) (wire.IterationInfo, bool) {
 	if api == nil {
-		return server.IterationInfo{}, false
+		return wire.IterationInfo{}, false
 	}
 	list, err := api.Iterations(context.Background())
 	if err != nil {
-		return server.IterationInfo{}, false
+		return wire.IterationInfo{}, false
 	}
 	for _, it := range list {
 		if it.Address == address {
 			return it, true
 		}
 	}
-	return server.IterationInfo{}, false
+	return wire.IterationInfo{}, false
 }
 
 // ticketFile locates address's ticket file in the store.

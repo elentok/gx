@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -45,7 +46,7 @@ func (q *queueStore) removeRoot(root rootRef) (bool, error) {
 func (q *queueStore) removeRootIf(root rootRef, drop func() bool) (bool, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	kept := make([]QueueItem, 0, len(q.items))
+	kept := make([]wire.QueueItem, 0, len(q.items))
 	for _, it := range q.items {
 		if a, err := parseQueuedAddress(it.Address); err == nil && rootOf(a) == root {
 			continue

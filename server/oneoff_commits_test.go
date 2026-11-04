@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestOneOff_RemovedFileKeysAreRefusedAndNothingIsWritten(t *testing.T) {
@@ -20,7 +21,7 @@ func TestOneOff_RemovedFileKeysAreRefusedAndNothingIsWritten(t *testing.T) {
 			if err := os.WriteFile(file, []byte("---\n"+key+": main\n---\nbuild it\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			res, err := h.Client.OneOff(ctx, server.OneOffRequest{File: file, Cwd: repo, Name: "refused-job"})
+			res, err := h.Client.OneOff(ctx, wire.OneOffRequest{File: file, Cwd: repo, Name: "refused-job"})
 			if err != nil || !res.Refused || res.Reason != server.ReasonOptionRemoved {
 				t.Fatalf("got %+v, %v; want refusal %s", res, err, server.ReasonOptionRemoved)
 			}

@@ -198,7 +198,7 @@ func (s State) ApplySnapshot(snap wire.Snapshot) State {
 }
 
 // SetQueue replaces the queue with the given items' addresses.
-func (s State) SetQueue(items []server.QueueItem) State {
+func (s State) SetQueue(items []wire.QueueItem) State {
 	s.Queue = make([]string, len(items))
 	for i, it := range items {
 		s.Queue[i] = it.Address

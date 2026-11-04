@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
@@ -73,13 +72,13 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		var (
-			res server.QueueResult
+			res wire.QueueResult
 			err error
 		)
-		repair := func(repairVerb string, req server.RepairRequest) {
-			var rr server.RepairResult
+		repair := func(repairVerb string, req wire.RepairRequest) {
+			var rr wire.RepairResult
 			rr, err = api.Repair(ctx, repairVerb, req)
-			res = server.QueueResult{Refused: rr.Refused, Message: rr.Message}
+			res = wire.QueueResult{Refused: rr.Refused, Message: rr.Message}
 		}
 		switch verb {
 		case serverVerbPause:
@@ -96,11 +95,11 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 			epic, _, _ := tickets.SplitTrailerValue(address)
 			res, err = api.EpicStashMerge(ctx, epic)
 		case wire.ActionMerge:
-			repair(verb, server.RepairRequest{Address: address})
+			repair(verb, wire.RepairRequest{Address: address})
 		case wire.ActionStartOver:
-			repair(verb, server.RepairRequest{Address: address, Reason: serverStartOverReason})
+			repair(verb, wire.RepairRequest{Address: address, Reason: serverStartOverReason})
 		case wire.ActionResume:
-			repair(serverVerbResume, server.RepairRequest{Address: address})
+			repair(serverVerbResume, wire.RepairRequest{Address: address})
 		default:
 			return notify.Warning("unknown action " + verb)()
 		}

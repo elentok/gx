@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -205,7 +204,7 @@ func TestQueueTicketMenu_StaleLivenessOpensNothing(t *testing.T) {
 				{Address: "gx:alpha/01", Title: "First", Status: "open"},
 				{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 			}}
-			m, _ := deliverQueue(t, snap, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+			m, _ := deliverQueue(t, snap, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 			m = selectFirstQueueTicketRow(t, m)
 			m, ready := requestQueueMenu(t, m)
 			m = stale(m)

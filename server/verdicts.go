@@ -22,24 +22,24 @@ type verdictLog struct {
 }
 
 // verdictOf is the full explain for one stored ticket.
-func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Address) Explanation {
+func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Address) wire.Explanation {
 	// A launch is tracked before the index may have reread its claim.
 	claimed := t.Status == "claimed" || s.registry.has(addr.String())
 	// A rate-limit hold outranks every other wait reason.
 	if t, ok := s.registry.tracked(addr.String()); ok && t.RateLimited {
-		return Explanation{Address: addr.String(), Verdict: rateLimitVerdict(t.RateLimitReset)}
+		return wire.Explanation{Address: addr.String(), Verdict: rateLimitVerdict(t.RateLimitReset)}
 	}
 	// A live agent waiting for its answer outranks the stored status.
 	if v, ok := s.waitingVerdict(addr); ok {
-		return Explanation{Address: addr.String(), Verdict: v}
+		return wire.Explanation{Address: addr.String(), Verdict: v}
 	}
 	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, claimed, false)
 	switch d.Decision {
 	case ralphloop.DecisionStalled:
-		return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // asking, stuck or draft
+		return wire.Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // asking, stuck or draft
 	case ralphloop.DecisionUnclaimed:
 		if path, missing := s.unavailablePath(addr.Project); missing {
-			return Explanation{Address: addr.String(), Verdict: VerdictProjectUnavailable, Reason: path + " does not exist"}
+			return wire.Explanation{Address: addr.String(), Verdict: VerdictProjectUnavailable, Reason: path + " does not exist"}
 		}
 		return s.scheduleVerdict(e, t, addr)
 	case ralphloop.DecisionBlocked:
@@ -54,7 +54,7 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 			}
 		}
 	}
-	return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Reason}
+	return wire.Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Reason}
 }
 
 // rateLimitVerdict is the whole phrase a held run reads as: the verdict line
@@ -84,8 +84,8 @@ func (s *Server) waitingVerdict(addr tickets.Address) (string, bool) {
 
 // scheduleVerdict explains an unclaimed ticket that nothing in the store blocks:
 // where it stands in the queue and the slots.
-func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.Address) Explanation {
-	ex := Explanation{Address: addr.String()}
+func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.Address) wire.Explanation {
+	ex := wire.Explanation{Address: addr.String()}
 	if s.refused.has(ex.Address) {
 		ex.Verdict = VerdictClaimRereadMismatch
 		return ex
@@ -177,15 +177,15 @@ type loadResult struct {
 }
 
 // explainQueued is explainTicket with the project lookup shared across a pass.
-func (s *Server) explainQueued(addr tickets.Address, epicsOf func(project string) ([]tickets.Epic, error)) (Explanation, error) {
+func (s *Server) explainQueued(addr tickets.Address, epicsOf func(project string) ([]tickets.Epic, error)) (wire.Explanation, error) {
 	epics, err := epicsOf(addr.Project)
 	if err != nil {
 		// An unreadable project.json also fails the load; the Queue tab still
 		// says why the project stopped.
 		if reason, missing := s.trunkMissing.get(addr.Project); missing {
-			return Explanation{Address: addr.String(), Verdict: VerdictTrunkMissing, Reason: reason}, nil
+			return wire.Explanation{Address: addr.String(), Verdict: VerdictTrunkMissing, Reason: reason}, nil
 		}
-		return Explanation{}, err
+		return wire.Explanation{}, err
 	}
 	return s.explainIn(epics, addr)
 }
@@ -217,7 +217,7 @@ func (s *Server) pendingRows() []wire.PendingRow {
 		}
 		ex, err := s.explainQueued(target, epicsOf)
 		if err != nil {
-			ex = Explanation{Verdict: "error", Reason: err.Error()}
+			ex = wire.Explanation{Verdict: "error", Reason: err.Error()}
 		}
 		rows = append(rows, wire.PendingRow{Address: target.String(), Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
 	}
@@ -235,7 +235,7 @@ func (s *Server) pendingRows() []wire.PendingRow {
 // or the next ticket of a whole-epic entry. It is false for an unparseable
 // entry and for an epic entry whose next ticket is unknown or already covered;
 // a chosen epic ticket is marked covered.
-func (s *Server) queuedTarget(item QueueItem, covered map[string]bool, epicsOf func(project string) ([]tickets.Epic, error)) (tickets.Address, bool) {
+func (s *Server) queuedTarget(item wire.QueueItem, covered map[string]bool, epicsOf func(project string) ([]tickets.Epic, error)) (tickets.Address, bool) {
 	addr, err := parseQueuedAddress(item.Address)
 	if err != nil {
 		return tickets.Address{}, false

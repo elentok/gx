@@ -53,7 +53,7 @@ func newProjectCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) ([]server.ProjectInfo, error) { return cl.Projects(ctx) },
+				func(ctx context.Context, cl *apiclient.Client) ([]wire.ProjectInfo, error) { return cl.Projects(ctx) },
 				printProjects)
 		},
 	}
@@ -469,7 +469,7 @@ func newServerLocksCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) ([]server.LockInfo, error) { return cl.Locks(ctx) },
+				func(ctx context.Context, cl *apiclient.Client) ([]wire.LockInfo, error) { return cl.Locks(ctx) },
 				printLocks)
 		},
 	}
@@ -485,7 +485,7 @@ func newServerIterationsCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) ([]server.IterationInfo, error) {
+				func(ctx context.Context, cl *apiclient.Client) ([]wire.IterationInfo, error) {
 					return cl.Iterations(ctx)
 				},
 				printIterations)
@@ -504,7 +504,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) ([]server.QueueEntry, error) { return cl.Queue(ctx) },
+				func(ctx context.Context, cl *apiclient.Client) ([]wire.QueueEntry, error) { return cl.Queue(ctx) },
 				printQueue)
 		},
 	}
@@ -517,7 +517,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) ([]server.QueueItem, error) { return cl.QueueItems(ctx) },
+				func(ctx context.Context, cl *apiclient.Client) ([]wire.QueueItem, error) { return cl.QueueItems(ctx) },
 				printQueueItems)
 		},
 	}
@@ -530,7 +530,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Short: "append a ticket, or a whole epic, to the server-wide queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.QueueAdd(ctx, args[0], agent)
 			})
 		},
@@ -541,7 +541,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Short: "remove a ticket from the server-wide queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.QueueRemove(ctx, args[0])
 			})
 		},
@@ -552,11 +552,11 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Short: "replace one project's queued tickets with the listed ones",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			items := make([]server.QueueItem, 0, len(args)-1)
+			items := make([]wire.QueueItem, 0, len(args)-1)
 			for _, a := range args[1:] {
-				items = append(items, server.QueueItem{Address: a, Agent: replaceAgent})
+				items = append(items, wire.QueueItem{Address: a, Agent: replaceAgent})
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.QueueReplace(ctx, args[0], items)
 			})
 		},
@@ -571,18 +571,18 @@ func newServerQueueCmd(d deps) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("position %q is not a number", args[1])
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.QueueMove(ctx, args[0], pos)
 			})
 		},
 	}
-	mode := func(use, short string, do func(*apiclient.Client, context.Context) (server.QueueResult, error)) *cobra.Command {
+	mode := func(use, short string, do func(*apiclient.Client, context.Context) (wire.QueueResult, error)) *cobra.Command {
 		return &cobra.Command{
 			Use:   use,
 			Short: short,
 			Args:  cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {
-				return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 					return do(cl, ctx)
 				})
 			},
@@ -601,7 +601,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 
 // serverQueueWrite runs one queue write. With --json the result or refusal is
 // the output; otherwise a refusal is an error.
-func serverQueueWrite(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool, do func(context.Context, *apiclient.Client) (server.QueueResult, error)) error {
+func serverQueueWrite(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool, do func(context.Context, *apiclient.Client) (wire.QueueResult, error)) error {
 	ctx := c.Context()
 	if ctx == nil {
 		ctx = context.Background()
@@ -615,11 +615,11 @@ func serverQueueWrite(dial func() (*apiclient.Client, error), c *cobra.Command, 
 
 // runServerQueueWrite never starts the server: a dead socket is a refusal
 // with a `gx server start` hint.
-func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, do func(context.Context, *apiclient.Client) (server.QueueResult, error)) error {
+func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, do func(context.Context, *apiclient.Client) (wire.QueueResult, error)) error {
 	res, err := do(ctx, cl)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.QueueResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.QueueResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -654,7 +654,7 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	return nil
 }
 
-func printIterations(w io.Writer, its []server.IterationInfo) error {
+func printIterations(w io.Writer, its []wire.IterationInfo) error {
 	for _, it := range its {
 		if _, err := fmt.Fprintf(w, "%s\tpane %s\t%s\t%s\tbase %s\t%s\n",
 			it.Address, it.Pane, it.Worktree, it.Branch, it.Base, it.Transcript); err != nil {
@@ -664,7 +664,7 @@ func printIterations(w io.Writer, its []server.IterationInfo) error {
 	return nil
 }
 
-func printQueue(w io.Writer, entries []server.QueueEntry) error {
+func printQueue(w io.Writer, entries []wire.QueueEntry) error {
 	for _, e := range entries {
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", e.Address, e.Decision, e.Reason); err != nil {
 			return err
@@ -673,7 +673,7 @@ func printQueue(w io.Writer, entries []server.QueueEntry) error {
 	return nil
 }
 
-func printQueueItems(w io.Writer, items []server.QueueItem) error {
+func printQueueItems(w io.Writer, items []wire.QueueItem) error {
 	for _, it := range items {
 		if _, err := fmt.Fprintf(w, "%s\t%s\n", it.Address, it.Agent); err != nil {
 			return err
@@ -691,7 +691,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.History, error) {
+				func(ctx context.Context, cl *apiclient.Client) (wire.History, error) {
 					return cl.History(ctx, args[0])
 				},
 				printHistory)
@@ -707,7 +707,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), explainJSON, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.Explanation, error) {
+				func(ctx context.Context, cl *apiclient.Client) (wire.Explanation, error) {
 					return cl.Explain(ctx, args[0])
 				},
 				printExplanation)
@@ -750,7 +750,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 				return fmt.Errorf("server ping failed: %w", err)
 			}
 			if changedJSON {
-				return writeStamped(c.OutOrStdout(), server.ChangedRequest{Address: args[0]}, viaServer, callerActor(os.Getwd))
+				return writeStamped(c.OutOrStdout(), wire.ChangedRequest{Address: args[0]}, viaServer, callerActor(os.Getwd))
 			}
 			return nil
 		},
@@ -767,7 +767,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 			Args:   cobra.ExactArgs(1),
 			Hidden: name == "park",
 			RunE: func(c *cobra.Command, args []string) error {
-				return serverQueueWrite(d.dial(), c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return serverQueueWrite(d.dial(), c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 					return cl.TicketPause(ctx, args[0], pauseReason)
 				})
 			},
@@ -783,7 +783,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "clear a ticket's mutes and reopen it if it was paused by a fault",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.TicketUnmute(ctx, args[0])
 			})
 		},
@@ -797,7 +797,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "cancel a ticket and its non-terminal descendants",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.TicketCancel(ctx, args[0], cancelStop)
 			})
 		},
@@ -812,7 +812,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "run a ticket's latest recovery proposal",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.TicketApprove(ctx, args[0])
 			})
 		},
@@ -829,7 +829,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 			Args:   cobra.ExactArgs(1),
 			Hidden: name == "relaunch",
 			RunE: func(c *cobra.Command, args []string) error {
-				return serverQueueWrite(d.dial(), c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return serverQueueWrite(d.dial(), c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 					return cl.TicketRetry(ctx, args[0], retryStop)
 				})
 			},
@@ -845,7 +845,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "type text into the live pane of a ticket's iteration",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.TicketNudge(ctx, args[0], args[1])
 			})
 		},
@@ -868,7 +868,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 				}
 				diagnosis = string(b)
 			}
-			return serverQueueWrite(d.dial(), c, recJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, recJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.TicketRecommend(ctx, args[0], recVerb, diagnosis)
 			})
 		},
@@ -904,7 +904,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func printExplanation(w io.Writer, e server.Explanation) error {
+func printExplanation(w io.Writer, e wire.Explanation) error {
 	line := e.Verdict
 	if e.Reason != "" {
 		line += ": " + e.Reason
@@ -931,7 +931,7 @@ func printDetail(w io.Writer, d wire.TicketDetail) error {
 	return err
 }
 
-func printProjects(w io.Writer, projects []server.ProjectInfo) error {
+func printProjects(w io.Writer, projects []wire.ProjectInfo) error {
 	for _, p := range projects {
 		counts := make([]string, 0, len(p.Tickets))
 		for status, n := range p.Tickets {
@@ -959,7 +959,7 @@ func printProjectWorktrees(w io.Writer, projects []wire.ProjectWorktrees) error 
 	return nil
 }
 
-func printLocks(w io.Writer, locks []server.LockInfo) error {
+func printLocks(w io.Writer, locks []wire.LockInfo) error {
 	for _, l := range locks {
 		state := "alive"
 		if !l.Alive {
@@ -973,7 +973,7 @@ func printLocks(w io.Writer, locks []server.LockInfo) error {
 	return nil
 }
 
-func printHistory(w io.Writer, h server.History) error {
+func printHistory(w io.Writer, h wire.History) error {
 	for _, e := range h.Events {
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", e.Time.Format("2006-01-02T15:04:05Z07:00"), e.Type, e.Reason); err != nil {
 			return err

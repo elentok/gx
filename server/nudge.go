@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 )
 
 // EventTicketNudged is emitted after text was typed into an iteration's pane.
@@ -58,12 +59,12 @@ func (l *nudgeLimiter) allow(address string, now time.Time) bool {
 // ticketNudge types req.Text into the live pane of a ticket's iteration. It is
 // the only way to nudge a pane: every nudge is rate-limited, written to the
 // epic's run log and streamed.
-func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
+func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
 		return refusal(ReasonTextRequired, "text to type into the pane is required"), nil
 	}
-	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		address := ref.addr.String()
 		if r, err := s.iterationRunner(ref.addr); err == nil {
 			if reason, held := s.herdrHolds(r); held {
@@ -85,20 +86,20 @@ func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
 			if errors.Is(err, agentrunner.ErrNotReady) {
 				return refusal(ReasonAgentNotReady, err.Error()), nil
 			}
-			return QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
+			return wire.QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
 		}
 		err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{
 			Time: now, Type: string(events.Nudged), Ticket: ref.addr.ID, Address: address,
 			Pane: it.info.Pane, Text: text,
 		})
 		if err != nil {
-			return QueueResult{}, fmt.Errorf("logging nudge of %s: %w", address, err)
+			return wire.QueueResult{}, fmt.Errorf("logging nudge of %s: %w", address, err)
 		}
 		s.events.publish(EventTicketNudged, address)
 		if !s.registry.has(address) {
 			s.watchNudgedPane(ref, it)
 		}
-		return QueueResult{}, nil
+		return wire.QueueResult{}, nil
 	})
 }
 

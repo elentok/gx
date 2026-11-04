@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -134,7 +135,7 @@ const (
 // completed_at or merged_at stamp transition: that keeps the retro and the
 // epic notice once-only without holding the lock around them.
 type mergeDecision struct {
-	result  QueueResult
+	result  wire.QueueResult
 	outcome mergeOutcome
 	first   bool
 }
@@ -170,7 +171,7 @@ func (d mergeDecision) submitRetro() bool {
 
 func pauseDecision(first bool, reason string, kind events.Kind) mergeDecision {
 	return mergeDecision{
-		result:  QueueResult{Paused: true, PauseKind: string(kind), Message: reason},
+		result:  wire.QueueResult{Paused: true, PauseKind: string(kind), Message: reason},
 		outcome: outcomePaused,
 		first:   first,
 	}
@@ -205,7 +206,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		// The ticket is never manual, even under force: it counts against the cap.
 		if pause.reason != "" && pause.kind == events.NeedsRebase {
 			if id := s.forkMergeTicket(root, e, target, false); id != "" {
-				return mergeDecision{result: QueueResult{MergeTicket: tickets.Address{Project: project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}
+				return mergeDecision{result: wire.QueueResult{MergeTicket: tickets.Address{Project: project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}
 			}
 		}
 		if pause.reason != "" {
@@ -227,7 +228,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		s.stampEpic(root, e.Path, "completed_at")
 		merged = false
 	}
-	d := mergeDecision{result: QueueResult{Merged: merged}, outcome: outcomeCompleted, first: first}
+	d := mergeDecision{result: wire.QueueResult{Merged: merged}, outcome: outcomeCompleted, first: first}
 	if merged {
 		d.outcome = outcomeMerged
 	}
@@ -259,7 +260,7 @@ func (s *Server) removeLeftoverWorktrees(repo string, e tickets.Epic) {
 
 // actOnMerge sends d's notices and retro. It runs after the trunk lock is
 // released, and returns d's result.
-func (s *Server) actOnMerge(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) QueueResult {
+func (s *Server) actOnMerge(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) wire.QueueResult {
 	if d.result.Paused {
 		s.pauseRoot(root, one, dir, e, d)
 	} else if d.sendNotice() {

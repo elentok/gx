@@ -36,7 +36,7 @@ func TestMigrationBlock_FailedProjectIsNotClaimedAndOthersAre(t *testing.T) {
 
 	for _, addr := range []string{"proj:" + schedEpic + "/01", "other:" + schedEpic + "/01"} {
 		// The index may not have seen a ticket written after start yet.
-		var res server.QueueResult
+		var res wire.QueueResult
 		var err error
 		if !servertest.Poll(10*time.Second, func() bool {
 			res, err = f.h.Client.QueueAdd(ctx, addr, "claude")

@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
-
-	"github.com/elentok/gx/server"
 )
 
 // fakeSessionClient records every call and answers with result.
@@ -78,21 +76,21 @@ func (f *fakeSessionClient) Snapshot(context.Context) (wire.Snapshot, error) {
 }
 
 // QueueAdd refuses the addresses in queueRefusals with the reason they map to.
-func (f *fakeSessionClient) QueueAdd(_ context.Context, address, _ string) (server.QueueResult, error) {
+func (f *fakeSessionClient) QueueAdd(_ context.Context, address, _ string) (wire.QueueResult, error) {
 	f.record("queue " + address)
 	if reason, ok := f.queueRefusals[address]; ok {
-		return server.QueueResult{Refused: true, Message: reason}, nil
+		return wire.QueueResult{Refused: true, Message: reason}, nil
 	}
-	return server.QueueResult{}, nil
+	return wire.QueueResult{}, nil
 }
 
-func (f *fakeSessionClient) SetAFK(_ context.Context, on *bool) (server.AFKResult, error) {
+func (f *fakeSessionClient) SetAFK(_ context.Context, on *bool) (wire.AFKResult, error) {
 	call := "afk toggle"
 	if on != nil {
 		call = "afk " + strconv.FormatBool(*on)
 	}
 	_, err := f.record(call)
-	return server.AFKResult{}, err
+	return wire.AFKResult{}, err
 }
 
 // ReportFocus records reports apart from calls: every update may send one.

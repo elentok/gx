@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 )
 
-func recommendAs(t *testing.T, h *servertest.Harness, investigator, address, verb string) server.QueueResult {
+func recommendAs(t *testing.T, h *servertest.Harness, investigator, address, verb string) wire.QueueResult {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

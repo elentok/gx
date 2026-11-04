@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -58,7 +59,7 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
-	var ex server.Explanation
+	var ex wire.Explanation
 	servertest.Poll(10*time.Second, func() bool {
 		var err error
 		if ex, err = h.Client.Explain(ctx, "proj:epic-a/01"); err != nil {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -100,7 +101,7 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 
 	waitUntil(t, "the root to leave the queue", func() bool {
 		q, err := f.h.Client.QueueItems(context.Background())
-		return err == nil && !slices.ContainsFunc(q, func(e server.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
+		return err == nil && !slices.ContainsFunc(q, func(e wire.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
 	})
 	f.assertStamps(t, true)
 	if got := waitForChat(count, epicMergedText); got != 1 {
