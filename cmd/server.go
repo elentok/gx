@@ -24,6 +24,7 @@ import (
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/disk"
+	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
@@ -273,12 +274,12 @@ func runServer(ctx context.Context, d deps) error {
 	// health read interval, so a flow can steer the Tray meters from outside the process.
 	var systemHealth syshealth.Reader
 	if v := os.Getenv("GX_HEALTH_FILE"); v != "" {
-		systemHealth = server.FileSystemHealth(v)
+		systemHealth = health.FileSystemHealth(v)
 	}
 	// Test hook: the process table for the cause lists comes from a control file too.
 	var processSource syshealth.ProcessReader
 	if v := os.Getenv("GX_HEALTH_PROCESSES"); v != "" {
-		processSource = server.FileProcesses(v)
+		processSource = health.FileProcesses(v)
 		if _, err := processSource.Read(); err != nil {
 			return fmt.Errorf("GX_HEALTH_PROCESSES: %w", err)
 		}

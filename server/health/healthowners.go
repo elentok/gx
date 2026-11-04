@@ -1,4 +1,4 @@
-package server
+package health
 
 import (
 	"fmt"
@@ -42,7 +42,7 @@ func dialHolderOwners(dir string) ([]syshealth.OwnerKey, error) {
 
 // healthOwners is the owner map for one process read: tracked runs, live
 // sessions and the gx server itself.
-func (s *Server) healthOwners(t syshealth.ProcessTable) map[syshealth.OwnerKey]syshealth.Owner {
+func (s *Health) healthOwners(t syshealth.ProcessTable) map[syshealth.OwnerKey]syshealth.Owner {
 	owners := serverOwners(t)
 	if owners == nil {
 		owners = map[syshealth.OwnerKey]syshealth.Owner{}
@@ -52,7 +52,7 @@ func (s *Server) healthOwners(t syshealth.ProcessTable) map[syshealth.OwnerKey]s
 	return owners
 }
 
-func (s *Server) addRunOwners(owners map[syshealth.OwnerKey]syshealth.Owner) {
+func (s *Health) addRunOwners(owners map[syshealth.OwnerKey]syshealth.Owner) {
 	for _, t := range s.registry.List() {
 		runner := s.harness.RunnerForRun(t.Run)
 		if runner == nil {
@@ -70,7 +70,7 @@ func (s *Server) addRunOwners(owners map[syshealth.OwnerKey]syshealth.Owner) {
 	}
 }
 
-func (s *Server) addSessionOwners(owners map[syshealth.OwnerKey]syshealth.Owner, ping pingHolder) {
+func (s *Health) addSessionOwners(owners map[syshealth.OwnerKey]syshealth.Owner, ping pingHolder) {
 	entries, err := os.ReadDir(s.cfg.SessionsDir)
 	if err != nil {
 		return
@@ -84,7 +84,7 @@ func (s *Server) addSessionOwners(owners map[syshealth.OwnerKey]syshealth.Owner,
 			continue
 		}
 		dir := filepath.Join(s.cfg.SessionsDir, e.Name())
-		meta, err := readSessionMeta(dir)
+		meta, err := s.sessions.Meta(dir)
 		if err != nil {
 			continue
 		}

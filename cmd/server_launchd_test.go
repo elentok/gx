@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/health"
 )
 
 func newTestAgent(t *testing.T) (*launchdAgent, *[][]string) {
@@ -178,7 +178,7 @@ func TestLaunchdStart_LeavesAnIncidentNoteWhenItReloadsTheJob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	note, err := os.ReadFile(server.StartIncidentPath(a.stateDir))
+	note, err := os.ReadFile(health.StartIncidentPath(a.stateDir))
 	if err != nil || !strings.Contains(string(note), "spawn failed") {
 		t.Fatalf("incident note = %q, %v; want the launchd state", note, err)
 	}

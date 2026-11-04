@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/disk"
 	harnesschoice "github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/projects"
@@ -34,6 +35,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }, func() *queue.ViMode { return s.viMode }),
 		harnesschoice.Routes(func() *harnesschoice.Harness { return s.harness }),
 		disk.Routes(func() *disk.Disk { return s.disks }),
+		health.Routes(func() *health.Health { return s.health }),
 		limits.Routes(func() *limits.Limits { return s.limits }),
 		budget.Routes(func() *budget.Budget { return s.budget }),
 	)

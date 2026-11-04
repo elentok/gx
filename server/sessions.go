@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
@@ -517,6 +518,15 @@ func readSessionMeta(dir string) (sessionMeta, error) {
 		return meta, err
 	}
 	return meta, json.Unmarshal(data, &meta)
+}
+
+// sessionMetas gives the health owner probe its session reads until sessions
+// move out of the root.
+type sessionMetas struct{}
+
+func (sessionMetas) Meta(dir string) (health.SessionMeta, error) {
+	meta, err := readSessionMeta(dir)
+	return health.SessionMeta{Run: meta.Run, Name: meta.Name, Ticket: meta.Ticket}, err
 }
 
 // sessionWatches runs one watchSession per live session for the server's

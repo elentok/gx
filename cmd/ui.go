@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
@@ -381,10 +382,10 @@ func runApp(dirs config.Dirs, m tea.Model, cfg config.Config) error {
 	defer stop()
 	if stateDir, err := dirs.StateDir(); err == nil {
 		w := &cpuwatch.Watcher{
-			Config: server.CPUWatchConfig(cfg.CPUWatchdog),
+			Config: health.CPUWatchConfig(cfg.CPUWatchdog),
 			Source: "tui",
 			Build:  getVersion(),
-			Dir:    server.CPUSpikeDir(stateDir),
+			Dir:    health.CPUSpikeDir(stateDir),
 			Report: func(spike cpuwatch.Spike) {
 				// No server means nobody to file the ticket; the evidence stays on disk.
 				cl := apiclient.New(server.SocketPath(stateDir))

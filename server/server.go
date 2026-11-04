@@ -36,6 +36,7 @@ import (
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/disk"
 	harnesschoice "github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/projects"
@@ -101,12 +102,8 @@ type Server struct {
 	// restarting is set once a restart is under way and never cleared on
 	// success: the new server replaces this one.
 	restarting atomic.Bool
-	// cpuSpikes holds the CPU ticket cooldown.
-	cpuSpikes  cpuSpikes
 	disks      *disk.Disk
-	healthW    healthWatch
-	procs      procWatch
-	ownerCache ownerCache
+	health     *health.Health
 	// chats caches parsed session chats by transcript file.
 	chats chatCache
 	// transcripts caches where each conversation's transcript is.
@@ -414,7 +411,17 @@ func New(cfg Config) (*Server, error) {
 			StateDir: cfg.StateDir, TicketStore: cfg.TicketStore, Env: cfg.Env,
 		},
 		Settings: &s.settings, Projects: s.projects, Events: events, Chat: s.chat, Guards: s.guards, Log: log,
-		HealthSink: s.observeDiskHealth,
+		HealthSink: func(now time.Time) { s.health.ObserveDisk(now) },
+	})
+	s.health = health.New(health.Deps{
+		Config: health.Config{
+			Build: cfg.Build, StateDir: cfg.StateDir, SessionsDir: cfg.SessionsDir,
+			SystemHealth: cfg.SystemHealth, HealthPollInterval: cfg.HealthPollInterval,
+			ProcessSource: cfg.ProcessSource, ProcessSecondReadDelay: cfg.ProcessSecondReadDelay,
+			ProcessShareWindow: cfg.ProcessShareWindow, ProcessCutoff: cfg.ProcessCutoff, ProcessWaitCap: cfg.ProcessWaitCap,
+		},
+		Settings: &s.settings, Projects: s.projects, Events: events, Disks: s.disks, OneOffs: s.oneOffs,
+		Registry: s.registry, Harness: s.harness, Sessions: sessionMetas{}, Log: log,
 	})
 	s.limits = limits.New(limits.Deps{
 		Config: limits.Config{
@@ -443,7 +450,6 @@ func New(cfg Config) (*Server, error) {
 	s.bindWeb()
 	// A down herdr never stops the server; it is reported and retried.
 	s.checkHerdr()
-	s.initHealth()
 	return s, nil
 }
 
@@ -463,7 +469,6 @@ var routeTable = []struct {
 	{"POST /v1/web/set-password", (*Server).webSetPasswordCLI},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
-	{"GET /v1/health", (*Server).healthRead},
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
 	{"POST /v1/restart", (*Server).restartWrite},
 	{"GET /v1/tickets/explain", (*Server).explain},
@@ -473,7 +478,6 @@ var routeTable = []struct {
 	{"GET /v1/stats", (*Server).stats},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"GET /v1/queue", (*Server).queueView},
-	{"POST /v1/cpu-spike", (*Server).cpuSpikeWrite},
 	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.mergeInQueue)(w, r) }},
 	{"POST /v1/tickets/start-over", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.startOverInQueue)(w, r) }},
 	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
@@ -583,7 +587,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Budget = s.budget.Status(time.Now())
 	snap.ExtraUsage = s.budget.ExtraUsageOn()
 	snap.Disks = s.disks.Listed()
-	snap.Health = s.currentHealth()
+	snap.Health = s.health.Current()
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
 	snap.RecentlyFinished = recentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
@@ -755,18 +759,18 @@ func (s *Server) Serve(ctx context.Context) error {
 	gatesDone := make(chan struct{})
 	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
 	cpuDone := make(chan struct{})
-	go func() { defer close(cpuDone); s.keepCPUWatched(freshCtx) }()
+	go func() { defer close(cpuDone); s.health.KeepCPUWatched(freshCtx) }()
 	disksDone := make(chan struct{})
 	go func() { defer close(disksDone); s.disks.Run(freshCtx) }()
 	migFailDone := make(chan struct{})
 	go func() { defer close(migFailDone); s.migrator.KeepFailuresWatched(freshCtx) }()
 	healthDone := make(chan struct{})
-	go func() { defer close(healthDone); s.keepHealthWatched(freshCtx) }()
+	go func() { defer close(healthDone); s.health.KeepWatched(freshCtx) }()
 	usageDone := make(chan struct{})
 	go func() { defer close(usageDone); s.limits.Run(freshCtx) }()
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
-	s.fileStartIncident(time.Now())
+	s.health.FileStartIncident(time.Now())
 	var err error
 	select {
 	case <-ctx.Done():

@@ -1,4 +1,4 @@
-package server
+package health
 
 import (
 	"context"
@@ -37,7 +37,7 @@ type cpuSpikes struct {
 }
 
 // keepCPUWatched watches the server's own CPU use until ctx ends.
-func (s *Server) keepCPUWatched(ctx context.Context) {
+func (s *Health) KeepCPUWatched(ctx context.Context) {
 	w := &cpuwatch.Watcher{
 		Source:   "server",
 		Build:    s.cfg.Build,
@@ -51,7 +51,7 @@ func (s *Server) keepCPUWatched(ctx context.Context) {
 // cpuSpike logs a spike and, in evolve maintainer mode, files a diagnose ticket
 // in the gx project: gx-investigate finds the cause. The cooldown and the one-off's
 // dedupe key keep a busy gx from filing more than one at a time.
-func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult {
+func (s *Health) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult {
 	s.log.Warn("cpu spike", "source", sp.Source, "pid", sp.PID, "avg_percent", avgCPU(sp.Samples), "evidence", sp.Dir)
 	set := s.settings.Load()
 	if !set.CPUWatchdog.Enabled {
@@ -137,7 +137,7 @@ func avgCPU(samples []cpuwatch.Sample) float64 {
 }
 
 // cpuSpikeWrite takes a TUI's spike report.
-func (s *Server) cpuSpikeWrite(w http.ResponseWriter, r *http.Request) {
+func (s *Health) cpuSpikeWrite(w http.ResponseWriter, r *http.Request) {
 	var sp cpuwatch.Spike
 	if err := json.NewDecoder(r.Body).Decode(&sp); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -147,5 +147,5 @@ func (s *Server) cpuSpikeWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "a spike needs a source", http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, s.cpuSpike(sp, time.Now()))
+	wire.WriteJSON(w, s.cpuSpike(sp, time.Now()))
 }

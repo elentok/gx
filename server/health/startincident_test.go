@@ -1,4 +1,4 @@
-package server_test
+package health_test
 
 import (
 	"os"
@@ -9,19 +9,21 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	healthpkg "github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/servertest"
 )
 
 func TestStartIncident_MaintainerStartFilesATicketAndRemovesTheNote(t *testing.T) {
 	t.Parallel()
 	state := shortStateDir(t)
-	note := server.StartIncidentPath(state)
+	note := healthpkg.StartIncidentPath(state)
 	if err := os.WriteFile(note, []byte("job state = spawn failed\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	_, store := cpuSpikeServer(t, withEvolve(config.EvolveMaintainer), func(c *server.Config) { c.StateDir = state })
+	_, store := cpuSpikeServer(t, servertest.WithEvolve(config.EvolveMaintainer), func(c *server.Config) { c.StateDir = state })
 
 	// The server files it while starting, so the ticket may land after the
 	// harness returns.
@@ -51,7 +53,7 @@ func TestStartIncident_MaintainerStartFilesATicketAndRemovesTheNote(t *testing.T
 func TestStartIncident_OutsideMaintainerModeKeepsTheNote(t *testing.T) {
 	t.Parallel()
 	state := shortStateDir(t)
-	note := server.StartIncidentPath(state)
+	note := healthpkg.StartIncidentPath(state)
 	if err := os.WriteFile(note, []byte("job state = spawn failed\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

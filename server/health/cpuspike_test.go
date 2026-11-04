@@ -1,4 +1,4 @@
-package server_test
+package health_test
 
 import (
 	"context"
@@ -42,7 +42,7 @@ var testSpike = cpuwatch.Spike{Source: "tui", PID: 42, Dir: "/evidence", Samples
 
 func TestCPUSpike_MaintainerFilesOneTicketThenCoolsDown(t *testing.T) {
 	t.Parallel()
-	h, store := cpuSpikeServer(t, withEvolve(config.EvolveMaintainer))
+	h, store := cpuSpikeServer(t, servertest.WithEvolve(config.EvolveMaintainer))
 	ctx := context.Background()
 	res, err := h.Client.CPUSpike(ctx, testSpike)
 	if err != nil || res.Address == "" {
@@ -72,7 +72,7 @@ func TestCPUSpike_OnlyLoggedOutsideMaintainerMode(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []string{config.EvolveOff, config.EvolveContributor} {
 		t.Run(mode, func(t *testing.T) {
-			h, store := cpuSpikeServer(t, withEvolve(mode))
+			h, store := cpuSpikeServer(t, servertest.WithEvolve(mode))
 			res, err := h.Client.CPUSpike(context.Background(), testSpike)
 			if err != nil || res.Address != "" || res.Message == "" {
 				t.Fatalf("CPUSpike = %+v, %v; want no ticket and a reason", res, err)
@@ -86,7 +86,7 @@ func TestCPUSpike_OnlyLoggedOutsideMaintainerMode(t *testing.T) {
 
 func TestCPUSpike_OffFilesNothing(t *testing.T) {
 	t.Parallel()
-	h, _ := cpuSpikeServer(t, withEvolve(config.EvolveMaintainer), func(c *server.Config) { c.CPUWatchdog.Enabled = false })
+	h, _ := cpuSpikeServer(t, servertest.WithEvolve(config.EvolveMaintainer), func(c *server.Config) { c.CPUWatchdog.Enabled = false })
 	res, err := h.Client.CPUSpike(context.Background(), testSpike)
 	if err != nil || res.Address != "" || !strings.Contains(res.Message, "off") {
 		t.Fatalf("CPUSpike = %+v, %v; want it refused as off", res, err)

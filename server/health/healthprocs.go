@@ -1,4 +1,4 @@
-package server
+package health
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func durationOr(d, def time.Duration) time.Duration {
 }
 
 // fetchProcesses takes one read now, sharing it with a caller already reading.
-func (s *Server) fetchProcesses() {
+func (s *Health) fetchProcesses() {
 	p := &s.procs
 	p.mu.Lock()
 	if ch := p.inflight; ch != nil {
@@ -73,7 +73,7 @@ func (s *Server) fetchProcesses() {
 
 // ensureFresh reads the table unless a read younger than the share window holds.
 // It returns early when ctx ends.
-func (s *Server) ensureFresh(ctx context.Context) {
+func (s *Health) ensureFresh(ctx context.Context) {
 	p := &s.procs
 	window := durationOr(s.cfg.ProcessShareWindow, defaultProcessShareWindow)
 	for {
@@ -98,7 +98,7 @@ func (s *Server) ensureFresh(ctx context.Context) {
 
 // scheduleSecondRead starts the second read once; the returned channel closes
 // when it ends. The caller holds p.mu.
-func (s *Server) scheduleSecondRead() chan struct{} {
+func (s *Health) scheduleSecondRead() chan struct{} {
 	p := &s.procs
 	if p.second != nil {
 		return p.second
@@ -120,7 +120,7 @@ func (s *Server) scheduleSecondRead() chan struct{} {
 // healthCauses answers the route's two cause lists. With wait, a call that would
 // show the reading marker blocks until the second read ends, ctx ends or the
 // cap passes.
-func (s *Server) healthCauses(ctx context.Context, wait bool) wire.HealthCauses {
+func (s *Health) healthCauses(ctx context.Context, wait bool) wire.HealthCauses {
 	s.ensureFresh(ctx)
 	p := &s.procs
 	p.mu.Lock()

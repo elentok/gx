@@ -1,7 +1,6 @@
-package server
+package health
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,17 +9,20 @@ import (
 	"github.com/elentok/gx/syshealth"
 )
 
-func writeSession(t *testing.T, root, id string, meta sessionMeta) {
+// fakeSessions answers Meta from a map keyed by the session directory's name.
+type fakeSessions map[string]SessionMeta
+
+func (f fakeSessions) Meta(dir string) (SessionMeta, error) {
+	meta, ok := f[filepath.Base(dir)]
+	if !ok {
+		return SessionMeta{}, errors.New("no meta")
+	}
+	return meta, nil
+}
+
+func writeSession(t *testing.T, root, id string) {
 	t.Helper()
-	dir := filepath.Join(root, id)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	data, err := json.Marshal(meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, sessionMetaFile), data, 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, id), 0o755); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -31,9 +33,14 @@ func writeSession(t *testing.T, root, id string, meta sessionMeta) {
 func TestSessionOwners(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeSession(t, root, "a", sessionMeta{ID: "a", Name: "scratch"})
-	writeSession(t, root, "b", sessionMeta{ID: "b", Name: "other", Ticket: "gx:foo/03"})
-	writeSession(t, root, "old", sessionMeta{ID: "old", Name: "old"})
+	for _, id := range []string{"a", "b", "old"} {
+		writeSession(t, root, id)
+	}
+	sessions := fakeSessions{
+		"a":   {Name: "scratch"},
+		"b":   {Name: "other", Ticket: "gx:foo/03"},
+		"old": {Name: "old"},
+	}
 	pings := map[string]int{}
 	ping := func(dir string) ([]syshealth.OwnerKey, error) {
 		id := filepath.Base(dir)
@@ -46,7 +53,7 @@ func TestSessionOwners(t *testing.T) {
 		}
 		return nil, errors.New("holder sends no start times")
 	}
-	s := &Server{cfg: Config{SessionsDir: root}}
+	s := &Health{cfg: Config{SessionsDir: root}, sessions: sessions}
 
 	for range 2 {
 		owners := map[syshealth.OwnerKey]syshealth.Owner{}

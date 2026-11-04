@@ -40,8 +40,9 @@ var allowed = map[string]int{
 	"nativerunner/pty_launch_test.go":               1, // negative wait: the launch must still be waiting for delivery when cancelled
 	"nativerunner/pty_codexapproval_test.go":        2, // poll loops with a deadline
 	"server/blocked_pause_test.go":                  3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
+	"server/budget/extrausage_internal_test.go":     2, // poll loop with a deadline; negative wait: no second notice is sent
 	"server/servertest/longticket_test.go":          1, // a delayed transcript write
-	"server/startincident_test.go":                  2, // poll loops with a deadline
+	"server/health/startincident_test.go":           2, // poll loops with a deadline
 	"testutil/agentfake/codex_test.go":              1, // poll loop with a deadline
 	"testutil/agentfake/codexdesign_test.go":        1, // poll loop with a deadline
 	"testutil/agentfake/codexhooks_test.go":         4, // poll loops with a deadline; negative waits: a held hook keeps the dialog open
@@ -81,7 +82,7 @@ var allowed = map[string]int{
 	"server/disk/diskwatch_test.go":                 3,
 	"server/handmerged_test.go":                     1,
 	"server/headless_block_reclaim_test.go":         2,
-	"server/healthprocs_test.go":                    4,
+	"server/health/healthprocs_test.go":             4,
 	"server/latefinish_test.go":                     2,
 	"server/limits/limithistory_codex_test.go":      2, // settle wait for the event coalescer; received-at has second granularity
 	"server/map_done_test.go":                       1,

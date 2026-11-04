@@ -160,8 +160,6 @@ func (s *Server) webHandler() http.Handler {
 			s.epicDetail(w, r)
 		case r.URL.Path == "/v1/stats":
 			s.stats(w, r)
-		case r.URL.Path == "/v1/health":
-			s.healthRead(w, r)
 		case r.URL.Path == "/v1/restart/check":
 			s.restartCheckRead(w, r)
 		case r.URL.Path == "/v1/events":

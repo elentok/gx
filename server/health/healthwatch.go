@@ -1,4 +1,4 @@
-package server
+package health
 
 import (
 	"context"
@@ -70,15 +70,9 @@ type latestReading struct {
 	pressure                       int
 }
 
-func (s *Server) initHealth() {
-	s.healthW.health = wire.Health{CPU: waitingMeter, Memory: waitingMeter, Disk: waitingMeter}
-	s.healthW.cpu = meterTrack{high: syshealth.CPUHigh, crit: syshealth.CPUCritical}
-	s.healthW.mem = meterTrack{high: syshealth.MemHigh, crit: syshealth.MemCritical}
-}
-
 // observeHealth applies one read result and publishes an event when a level or
 // state changed.
-func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
+func (s *Health) observeHealth(r syshealth.Reading, err error, now time.Time) {
 	w := &s.healthW
 	w.mu.Lock()
 	old := w.health
@@ -117,10 +111,10 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 	}
 }
 
-// observeDiskHealth recomputes the disk meter from the disk watcher's own
+// ObserveDisk recomputes the disk meter from the disk watcher's own
 // status, the same list the disk status route shows, so the Tray and the banner
 // agree. It publishes an event only when the disk level or state changed.
-func (s *Server) observeDiskHealth(now time.Time) {
+func (s *Health) ObserveDisk(now time.Time) {
 	in := syshealthDisks(s.disks.Statuses(false), uint64(s.settings.Load().DiskSpace.CleanBelow))
 	worst := syshealth.WorstDisk(in)
 	w := &s.healthW
@@ -147,15 +141,16 @@ func meterChanged(a, b wire.MeterHealth) bool {
 	return a.Level != b.Level || a.State != b.State || a.Reason != b.Reason
 }
 
-func (s *Server) currentHealth() wire.Health {
+// Current is the CPU, memory and disk meters as they stand.
+func (s *Health) Current() wire.Health {
 	s.healthW.mu.Lock()
 	defer s.healthW.mu.Unlock()
 	return s.healthW.health
 }
 
-// keepHealthWatched reads CPU and memory on a timer until ctx ends, taking the
+// KeepWatched reads CPU and memory on a timer until ctx ends, taking the
 // first reading at once.
-func (s *Server) keepHealthWatched(ctx context.Context) {
+func (s *Health) KeepWatched(ctx context.Context) {
 	read := s.cfg.SystemHealth
 	if read == nil {
 		read = syshealth.Default()

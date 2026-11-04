@@ -1,4 +1,4 @@
-package server
+package health
 
 import (
 	"errors"
@@ -21,11 +21,11 @@ func StartIncidentPath(stateDir string) string {
 	return filepath.Join(stateDir, "server-start-incident.md")
 }
 
-// fileStartIncident files a diagnose ticket for a start incident left by the
+// FileStartIncident files a diagnose ticket for a start incident left by the
 // previous run, then removes the note. Like a CPU spike it needs evolve
 // maintainer mode and a gx project; without them the note stays for a later
 // start.
-func (s *Server) fileStartIncident(now time.Time) {
+func (s *Health) FileStartIncident(now time.Time) {
 	path := StartIncidentPath(s.cfg.StateDir)
 	note, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {

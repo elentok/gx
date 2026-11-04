@@ -138,6 +138,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   increase, the poll, the budget kill, the hard-limit grace countdown, the notices and the
   budget-changed events (imports `limits`; the root implements `Host.PauseTicket`; the extra-usage
   check and the long-ticket check stay in the root);
+  `server/health/` holds the system health report: the CPU, memory and disk meters, the process
+  and owner probes, the CPU spike watch and the start incident note (the root implements `Sessions`
+  for the session meta read; `cmd` imports it for `CPUSpikeDir`, `CPUWatchConfig`,
+  `StartIncidentPath`, `FileSystemHealth` and `FileProcesses`);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

@@ -1,4 +1,4 @@
-package server
+package health
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func pressureName(level int) string {
 	return ""
 }
 
-func (s *Server) healthReport(ctx context.Context, wait bool) wire.HealthReport {
+func (s *Health) healthReport(ctx context.Context, wait bool) wire.HealthReport {
 	w := &s.healthW
 	w.mu.Lock()
 	h, l := w.health, w.latest
@@ -57,7 +57,7 @@ func (s *Server) healthReport(ctx context.Context, wait bool) wire.HealthReport 
 	}
 }
 
-func (s *Server) healthRead(w http.ResponseWriter, r *http.Request) {
+func (s *Health) healthRead(w http.ResponseWriter, r *http.Request) {
 	_, wait := r.URL.Query()["wait"]
-	writeJSON(w, s.healthReport(r.Context(), wait))
+	wire.WriteJSON(w, s.healthReport(r.Context(), wait))
 }
