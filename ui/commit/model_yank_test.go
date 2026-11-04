@@ -136,3 +136,92 @@ func TestYankContentOnlyWithYYWithoutDiffFocusWarns(t *testing.T) {
 		t.Fatal("expected warn cmd from yy without diff focus")
 	}
 }
+
+func TestYankFilenameWithYF(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "base")
+
+	var got string
+	prev := commitClipboardWrite
+	commitClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { commitClipboardWrite = prev })
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+	m = updated.(Model)
+
+	if got != "a.txt" {
+		t.Fatalf("expected yanked filename, got %q", got)
+	}
+}
+
+func TestYankAllContextWithYAInDiff(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "old-1\nold-2\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "new-1\nnew-2\n")
+	testutil.CommitAll(t, repo, "change")
+
+	var got string
+	prev := commitClipboardWrite
+	commitClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { commitClipboardWrite = prev })
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.syncDiffViewport()
+	m.focusDiff = true
+	m.diffModel.SetNavMode(diffview.NavModeLine)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+
+	if !strings.Contains(got, "@a.txt L") {
+		t.Fatalf("expected ya output to include location, got %q", got)
+	}
+	if !strings.Contains(got, "-old-1") {
+		t.Fatalf("expected ya output to include selected diff line, got %q", got)
+	}
+}
+
+func TestYankCommitBodyWithYYInHeader(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "subject\n\nline 1\nline 2")
+
+	var got string
+	prev := commitClipboardWrite
+	commitClipboardWrite = func(s string) error {
+		got = s
+		return nil
+	}
+	t.Cleanup(func() { commitClipboardWrite = prev })
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+	m.focusHeader = true
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	m = updated.(Model)
+
+	if got != "line 1\nline 2" {
+		t.Fatalf("expected yanked commit body, got %q", got)
+	}
+}

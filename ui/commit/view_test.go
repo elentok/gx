@@ -1,11 +1,15 @@
 package commit
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -252,5 +256,118 @@ func TestInputFocused_DiffSearchDelegatesIntoDiffModel(t *testing.T) {
 	m.diffModel.Search().Start("diff")
 	if !m.InputFocused() {
 		t.Fatal("expected InputFocused=true when diffModel search is active")
+	}
+}
+
+func TestRenderDiffPaneShowsActiveHunkMarkerInUnifiedMode(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, "dir"), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	testutil.WriteFile(t, repo, "dir/file.txt", "one\ntwo\nthree\nfour\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "dir/file.txt", "one\nTWO\nTHREE\nfour\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+	m.focusDiff = true
+	m.syncDiffViewport()
+
+	pane := m.renderDiffPane(70, 10)
+	if !strings.Contains(pane, "▌") {
+		t.Fatalf("expected active hunk marker in diff pane, got:\n%s", pane)
+	}
+}
+
+func TestViewFitsWindowHeight(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\n")
+	testutil.CommitAll(t, repo, "base")
+	testutil.WriteFile(t, repo, "a.txt", "ONE\nTWO\n")
+	testutil.CommitAll(t, repo, "change")
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+
+	view := m.View().Content
+	lines := strings.Split(strings.TrimRight(view, "\n"), "\n")
+	if len(lines) != m.height {
+		t.Fatalf("expected exactly %d lines, got %d", m.height, len(lines))
+	}
+	for i, line := range lines {
+		if got := ansi.StringWidth(line); got != m.width {
+			t.Fatalf("line %d width: got %d want %d", i, got, m.width)
+		}
+	}
+}
+
+func TestHeaderViewportMaxRowsAndScrollMarkers(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "subject\n\nl1\nl2\nl3\nl4\nl5\nl6\nl7\nl8")
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+
+	if got := m.headerViewportRowsCount(); got != 9 {
+		t.Fatalf("expected header viewport rows capped at 9 (50%% of height=24), got %d", got)
+	}
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if !m.focusHeader {
+		t.Fatalf("expected second tab to open the header popup")
+	}
+
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "↓") && !strings.Contains(view, "") {
+		t.Fatalf("expected bottom overflow marker at top of header scroll")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'J', Text: "J", ShiftedCode: 'J'})
+	m = updated.(Model)
+	view = ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "↑") && !strings.Contains(view, "") {
+		t.Fatalf("expected top overflow marker after scrolling header")
+	}
+}
+
+func TestHeaderScrollRequiresHeaderFocus(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "a.txt", "one\n")
+	testutil.CommitAll(t, repo, "subject\n\nl1\nl2\nl3\nl4\nl5\nl6\nl7\nl8")
+
+	m := newTestModel(repo, "HEAD")
+	m.ready = true
+	m.width = 100
+	m.height = 24
+
+	before := m.headerOffset
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.headerOffset != before {
+		t.Fatalf("expected j without header focus not to scroll header")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	m = updated.(Model)
+	if !m.focusHeader {
+		t.Fatalf("expected header focus after second tab")
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if m.headerOffset <= before {
+		t.Fatalf("expected j with header focus to scroll header")
 	}
 }
