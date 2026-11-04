@@ -119,7 +119,17 @@ test.describe("74. Question sheet layout", () => {
         top: (await questions.boundingBox())!.y,
       });
       await body.evaluate((el) => (el.scrollTop = 0));
-      const before = await where();
+      // Under load the sheet is still reflowing (fonts, the opened note) when it first shows: wait until
+      // two reads agree before taking the baseline.
+      let before = await where();
+      await expect
+        .poll(async () => {
+          const now = await where();
+          const settled = JSON.stringify(now) === JSON.stringify(before);
+          before = now;
+          return settled;
+        })
+        .toBe(true);
       await toEnd();
       expect(await where()).toEqual(before);
       for (const el of [dot, count, prev, next]) await expect(el).toBeInViewport();
