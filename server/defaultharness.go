@@ -28,7 +28,7 @@ func refuseDefaultHarness(reason, msg string) (wire.SetDefaultHarnessResult, err
 }
 
 func (s *Server) defaultHarnessRead(w http.ResponseWriter, _ *http.Request) {
-	st, err := s.defaultHarnessStatus()
+	st, err := s.harness.Status()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -36,26 +36,28 @@ func (s *Server) defaultHarnessRead(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, st)
 }
 
-func (s *Server) defaultHarnessStatus() (wire.DefaultHarnessStatus, error) {
-	projects, err := s.idx.ListProjects()
+// Status is the Default harness, the configured runner and every project's own
+// override.
+func (h *Harness) Status() (wire.DefaultHarnessStatus, error) {
+	projects, err := h.idx.ListProjects()
 	if err != nil {
 		return wire.DefaultHarnessStatus{}, err
 	}
 	st := wire.DefaultHarnessStatus{
-		Default:  string(defaultOrClaude(s.settings.Load().AgentsDefaultHarness)),
-		Runner:   s.cfg.AgentRunner,
+		Default:  string(defaultOrClaude(h.settings.Load().AgentsDefaultHarness)),
+		Runner:   h.cfg.AgentRunner,
 		Projects: []wire.ProjectDefaultHarness{},
 	}
 	for _, p := range projects {
-		st.Projects = append(st.Projects, wire.ProjectDefaultHarness{Project: p.Name, Harness: s.projectOverride(p.Name)})
+		st.Projects = append(st.Projects, wire.ProjectDefaultHarness{Project: p.Name, Harness: h.projectOverride(p.Name)})
 	}
 	return st, nil
 }
 
 // projectOverride is project's own agents.default-harness, "" when it follows
 // the global default.
-func (s *Server) projectOverride(project string) string {
-	dir, err := s.projects.Dir(project)
+func (h *Harness) projectOverride(project string) string {
+	dir, err := h.projects.Dir(project)
 	if err != nil {
 		return ""
 	}
@@ -72,7 +74,7 @@ func (s *Server) defaultHarnessWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.setDefaultHarness(req)
+	res, err := s.harness.SetDefault(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -80,7 +82,9 @@ func (s *Server) defaultHarnessWrite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
-func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
+// SetDefault writes the Default harness of a scope and reports what the switch
+// changes.
+func (h *Harness) SetDefault(req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
 	if req.Harness != "" && req.Harness != config.HarnessClaude && req.Harness != config.HarnessCodex {
 		return refuseDefaultHarness(wire.ReasonBadHarness, "harness must be "+config.HarnessClaude+" or "+config.HarnessCodex)
 	}
@@ -90,12 +94,12 @@ func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetD
 		if req.Harness == "" {
 			return refuseDefaultHarness(wire.ReasonNoGlobalHarnessSet, "the global default needs a harness")
 		}
-		if s.cfg.ConfigPath == "" {
+		if h.cfg.ConfigPath == "" {
 			return refuseDefaultHarness(wire.ReasonReloadUnavailable, "this server has no config file to write")
 		}
-		path = s.cfg.ConfigPath
+		path = h.cfg.ConfigPath
 	case wire.DefaultHarnessProject:
-		dir, err := s.projects.Dir(req.Project)
+		dir, err := h.projects.Dir(req.Project)
 		if err != nil {
 			return refuseDefaultHarness(wire.ReasonUnknownProject, "no project named "+req.Project)
 		}
@@ -104,39 +108,39 @@ func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetD
 		return refuseDefaultHarness(wire.ReasonBadScope, "scope must be "+wire.DefaultHarnessGlobal+" or "+wire.DefaultHarnessProject)
 	}
 	if req.Harness != "" {
-		if program, missing := s.missingProgram(req.Harness); missing {
+		if program, missing := h.MissingProgram(req.Harness); missing {
 			return refuseDefaultHarness(wire.ReasonHarnessNotOnPath, program+" is not on PATH")
 		}
 	}
 
-	before := s.effectiveDefault(project)
+	before := h.effectiveDefault(project)
 	if err := setAgentsKey(path, defaultHarnessKey, req.Harness); err != nil {
 		return wire.SetDefaultHarnessResult{}, err
 	}
 	if req.Scope == wire.DefaultHarnessGlobal {
-		if rr := s.settings.Reload(settings.TriggerCommand); rr.Refused {
+		if rr := h.settings.Reload(settings.TriggerCommand); rr.Refused {
 			return refuseDefaultHarness(rr.Reason, rr.Message)
 		}
 	}
-	after := s.effectiveDefault(project)
+	after := h.effectiveDefault(project)
 
 	res := wire.SetDefaultHarnessResult{Scope: req.Scope, Project: project, Harness: string(after), Path: path}
 	if before == after {
 		return res, nil
 	}
 	res.Changed = true
-	res.Waiting, res.Running = s.switchCounts(project, after)
+	res.Waiting, res.Running = h.switchCounts(project, after)
 	res.Notice = defaultHarnessNotice(project, after, res.Waiting, res.Running)
 	return res, nil
 }
 
 // effectiveDefault is the Default harness in effect: project's, or the global
 // one when project is empty.
-func (s *Server) effectiveDefault(project string) ralphloop.AgentKind {
+func (h *Harness) effectiveDefault(project string) ralphloop.AgentKind {
 	if project == "" {
-		return defaultOrClaude(s.settings.Load().AgentsDefaultHarness)
+		return defaultOrClaude(h.settings.Load().AgentsDefaultHarness)
 	}
-	return s.DefaultHarness(project)
+	return h.DefaultHarness(project)
 }
 
 // setAgentsKey sets agents.<key> in the JSON file at path, or removes it (and
@@ -190,28 +194,28 @@ func setAgentsKey(path, key, value string) error {
 // switchCounts counts, in scope, the waiting tickets that will use the new
 // Default and the running agents that keep another harness. An empty project is
 // the global scope: only projects that inherit count.
-func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting, running int) {
+func (h *Harness) switchCounts(project string, now ralphloop.AgentKind) (waiting, running int) {
 	inScope := func(p string) bool {
 		if project != "" {
 			return p == project
 		}
-		return s.projectOverride(p) == ""
+		return h.projectOverride(p) == ""
 	}
 	seen := map[queue.RootRef]bool{}
-	for _, item := range s.queue.List() {
+	for _, item := range h.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || !inScope(addr.Project) || seen[queue.RootOf(addr)] {
 			continue
 		}
 		seen[queue.RootOf(addr)] = true
-		waiting += s.waitingOnDefault(addr)
+		waiting += h.waitingOnDefault(addr)
 	}
-	for _, t := range s.registry.List() {
+	for _, t := range h.registry.List() {
 		if a, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil && inScope(a.Project) && t.Agent != string(now) {
 			running++
 		}
 	}
-	sessions, _ := s.ListSessions()
+	sessions, _ := h.host.ListSessions()
 	for _, si := range sessions {
 		if inScope(si.Project) && si.Status.State != wire.SessionExited && si.Harness != string(now) {
 			running++
@@ -222,8 +226,8 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 
 // waitingOnDefault counts the open or blocked tickets of epic's root whose
 // harness comes from the Default: no pin and never ran.
-func (s *Server) waitingOnDefault(epic tickets.Address) int {
-	epics, err := s.projects.Epics(epic.Project)
+func (h *Harness) waitingOnDefault(epic tickets.Address) int {
+	epics, err := h.projects.Epics(epic.Project)
 	if err != nil {
 		return 0
 	}
@@ -238,7 +242,7 @@ func (s *Server) waitingOnDefault(epic tickets.Address) int {
 				continue
 			}
 			addr := tickets.Address{Project: epic.Project, Epic: epic.Epic, ID: t.Identifier}
-			if s.resolveTicket(addr, t).Source == HarnessFromDefault {
+			if h.ResolveTicket(addr, t).Source == HarnessFromDefault {
 				n++
 			}
 		}

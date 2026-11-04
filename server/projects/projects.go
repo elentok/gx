@@ -23,7 +23,6 @@ import (
 // RegistryBack is what the Registry reads from the Server.
 type RegistryBack interface {
 	SessionFinished(sess agentrunner.Session) bool
-	LaunchHarness(project string) string
 	// BusyAddresses is the address of every queued ticket, then of every run.
 	BusyAddresses() []string
 }
@@ -179,6 +178,14 @@ func (p *Registry) AgentsConfig(project string) config.AgentsConfig {
 		}
 	}
 	return cfg.Agents
+}
+
+// LaunchHarness is the harness a new interactive session in project starts on
+// when its request names none. Unlike the Default harness it keeps an
+// unregistered name, so createSession refuses it instead of silently running
+// Claude.
+func (p *Registry) LaunchHarness(project string) string {
+	return cmp.Or(p.AgentsConfig(project).DefaultHarness, string(ralphloop.AgentClaude))
 }
 
 // RunAgentConfig is the model and effort run's agent launched under, else

@@ -122,7 +122,7 @@ func (s *Server) liveWorkIn(root queue.RootRef, path string) string {
 // runLive is liveIteration's rule applied to a registry entry, which settleRun
 // can leave behind after the agent stopped.
 func (s *Server) runLive(run runs.Run) bool {
-	runner := s.RunnerForRun(run)
+	runner := s.harness.RunnerForRun(run)
 	if runner == nil || run.Session.ID == "" {
 		return false
 	}

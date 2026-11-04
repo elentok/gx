@@ -166,15 +166,15 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	if !s.queue.RootQueued(queue.RootOf(addr)) {
 		return res, nil
 	}
-	if _, t, ok := s.freshTicket(addr); ok && s.guards.Merges.Begin() {
+	if _, t, ok := s.FreshTicket(addr); ok && s.guards.Merges.Begin() {
 		defer s.guards.Merges.End()
 		s.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	}
 	return res, nil
 }
 
-// freshTicket loads addr's ticket, and its epic, straight from disk.
-func (s *Server) freshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
+// FreshTicket loads addr's ticket, and its epic, straight from disk.
+func (s *Server) FreshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
 	e, ok := s.freshEpic(addr.Project, addr.Epic)
 	if !ok {
 		return tickets.Epic{}, tickets.Ticket{}, false
@@ -249,7 +249,7 @@ func (s *Server) hostingDeps(addr tickets.Address) ralphloop.Deps {
 	}
 	// An unavailable runner is nil, which reports no session, as for an
 	// unreachable host.
-	runner, _ := s.iterationRunner(addr)
+	runner, _ := s.harness.IterationRunner(addr)
 	return s.projects.DepsWith(runner)
 }
 
@@ -500,12 +500,12 @@ func (s *Server) iterationSession(dir string, addr tickets.Address) (agentrunner
 		return nil, agentrunner.Session{}, false, nil
 	}
 	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.projects.WorktreeDir(addr.Project))
-	runner := s.runnerFor(addr.Project)
+	runner := s.harness.RunnerFor(addr.Project)
 	if pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
 		if pause.Label != "" {
 			label = pause.Label
 		}
-		if r := s.RunnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
+		if r := s.harness.RunnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
 			runner = r
 		}
 	}

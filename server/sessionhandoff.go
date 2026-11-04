@@ -41,7 +41,7 @@ func (s *Server) handoffRefusal(meta sessionMeta, action []string) (wire.Session
 	if !s.chartingHandoffDue(meta, action) {
 		return wire.SessionResult{}, false
 	}
-	msg := s.interactiveMissingReason(meta.Harness, "the session's harness")
+	msg := s.harness.InteractiveMissingReason(meta.Harness, "the session's harness")
 	if msg == "" {
 		return wire.SessionResult{}, false
 	}

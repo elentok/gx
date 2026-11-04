@@ -179,7 +179,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 					return refuse(res)
 				}
 				run, _ = s.registry.Tracked(address)
-				runner, err := s.runnerOf(run.Run)
+				runner, err := s.harness.RunnerOf(run.Run)
 				if err != nil {
 					return tickets.LogEvent{}, err
 				}
@@ -241,7 +241,7 @@ func (s *Server) agentGone(address string) (bool, error) {
 	if !ok || run.WaitingSince.IsZero() {
 		return true, nil
 	}
-	runner, err := s.runnerOf(run.Run)
+	runner, err := s.harness.RunnerOf(run.Run)
 	if err != nil {
 		return false, err
 	}
@@ -255,7 +255,7 @@ func (s *Server) agentGone(address string) (bool, error) {
 // resettleWaiting ends a run's wait for an answer and settles it as a normal
 // run: the run context is rebuilt from the registry entry, as a restart does.
 func (s *Server) resettleWaiting(t runs.TrackedRun) error {
-	runner, err := s.runnerOf(t.Run)
+	runner, err := s.harness.RunnerOf(t.Run)
 	if err != nil {
 		return err
 	}

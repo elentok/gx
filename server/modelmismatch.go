@@ -43,7 +43,7 @@ func modelMismatchFollowUp(from tickets.Address, m *ralphloop.ModelMismatchError
 // model names recorded, and files or updates the follow-up.
 func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralphloop.ModelMismatchError) {
 	var stopErr error
-	if r, err := s.runnerOf(rc.run); err != nil {
+	if r, err := s.harness.RunnerOf(rc.run); err != nil {
 		stopErr = err
 	} else {
 		stopErr = r.Stop(rc.run.Session)

@@ -45,7 +45,7 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 	if err != nil {
 		return liveIter{}, false
 	}
-	runner, sess, ok, err := s.liveSession(a)
+	runner, sess, ok, err := s.harness.LiveSession(a)
 	if err != nil || !ok || sess.ID == "" {
 		return liveIter{}, false
 	}

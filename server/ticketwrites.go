@@ -183,7 +183,7 @@ func (s *Server) promptsOnRetry(address string) bool {
 	if err != nil {
 		return false
 	}
-	_, t, ok := s.freshTicket(addr)
+	_, t, ok := s.FreshTicket(addr)
 	if !ok {
 		return false
 	}
@@ -233,8 +233,8 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.Queue
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
 			return wire.QueueResult{}, nil
 		}
-		agent := s.resolveTicket(ref.addr, ref.ticket).Harness
-		if reason, held := s.herdrHolds(s.launchRunner(ref.addr.Project, agent)); held {
+		agent := s.harness.ResolveTicket(ref.addr, ref.ticket).Harness
+		if reason, held := s.herdrHolds(s.harness.LaunchRunner(ref.addr.Project, agent)); held {
 			return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
 		}
 		if res, refused := s.budgetRefusal(); refused {
@@ -392,7 +392,7 @@ func (s *Server) settleLive(addrs []tickets.Address, stop bool, reason string, b
 	}
 	var found []live
 	for _, a := range addrs {
-		r, sess, ok, err := s.liveSession(a)
+		r, sess, ok, err := s.harness.LiveSession(a)
 		if err != nil {
 			return wire.QueueResult{}, false, fmt.Errorf("find the live session of %s: %w", a, err)
 		}

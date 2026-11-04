@@ -228,7 +228,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 			return false, nil
 		}
 		s.guards.Refused.Set(ticketAddr, false)
-		resolved := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t)
+		resolved := s.harness.ResolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t)
 		if _, held := s.claimHold(addr.Project, t, resolved.ResolvedHarness); held {
 			return false, nil
 		}
@@ -312,12 +312,12 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),
 	}
-	deps := s.projects.DepsWith(s.launchRunner(ticket.Project, agent))
+	deps := s.projects.DepsWith(s.harness.LaunchRunner(ticket.Project, agent))
 	deps.GateReleased = s.registry.GateReleased(ticketAddr)
 	// Only Claude and Codex on the pty runner resume; every other claim starts
 	// cold, and so does one under another harness than the answered session's:
 	// the Handoff carries it over. launch drops a Codex id whose rollout is gone.
-	earlier := s.earlierRunHarness(ticket)
+	earlier := s.harness.EarlierRunHarness(ticket)
 	switchedHarness := earlier != "" && earlier != string(agent)
 	if (agent == ralphloop.AgentClaude || agent == ralphloop.AgentCodex) && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
 		one.ResumeSessionID = answered
@@ -723,7 +723,7 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 	if !s.chat.Enabled() || queue.IsOneOffTicket(ticketPath) {
 		return
 	}
-	if e, t, ok := s.freshTicket(addr); ok && !queue.IsOneOffEpic(e) {
+	if e, t, ok := s.FreshTicket(addr); ok && !queue.IsOneOffEpic(e) {
 		s.chat.TicketDone(addr.Project, s.projects.ChatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
 	}
 }

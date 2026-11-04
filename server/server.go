@@ -93,8 +93,6 @@ type Server struct {
 	// restarting is set once a restart is under way and never cleared on
 	// success: the new server replaces this one.
 	restarting atomic.Bool
-	// recorded caches sessionRecorded, which globs every Claude project dir.
-	recorded recordedCache
 	// cpuSpikes holds the CPU ticket cooldown.
 	cpuSpikes  cpuSpikes
 	disks      diskWatch
@@ -137,8 +135,8 @@ type Server struct {
 	webRenewed     sync.Map // map web login id -> time its cookie was last renewed
 	logf           *rotatingFile
 	log            *slog.Logger
-	logGiven       sync.Mutex // see giveLog
 	idx            *index.Index
+	harness        *Harness
 	projects       *projects.Registry
 	migrator       *projects.Migrator
 	checks         *projects.Checks
@@ -368,9 +366,17 @@ func New(cfg Config) (*Server, error) {
 		focus:          newFocusReports(),
 	}
 	s.initProjects()
-	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: s})
-	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: s, TicketStore: cfg.TicketStore})
-	s.giveLog(cfg.Runner)
+	s.harness = NewHarness(HarnessDeps{
+		Config: HarnessConfig{
+			Env: cfg.Env, LookPath: cfg.LookPath, Runner: cfg.Runner, RunnerFor: cfg.RunnerFor,
+			AgentRunner: cfg.AgentRunner, ConfigPath: cfg.ConfigPath,
+		},
+		Host: s, Log: log, Index: idx, Projects: s.projects, Queue: q, Registry: registry, Settings: &s.settings,
+	})
+	host := queueHost{s, s.harness}
+	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: host})
+	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: host, TicketStore: cfg.TicketStore})
+	s.harness.GiveLog(cfg.Runner)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.SessionFinished
 	}
@@ -551,7 +557,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.HerdrText, snap.HerdrUnavailable = s.herdrBanner()
 	for i, t := range snap.Tickets {
 		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
-			snap.Tickets[i].HarnessLabel = s.harnessLabelFor(addr, agents[i], cmp.Or(t.RenderedStatus, t.Status))
+			snap.Tickets[i].HarnessLabel = s.harness.LabelFor(addr, agents[i], cmp.Or(t.RenderedStatus, t.Status))
 		}
 		switch t.Status {
 		case string(schema.StatusClaimed):

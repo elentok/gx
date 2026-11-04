@@ -22,10 +22,10 @@ type claimHold struct {
 // hold's reason wins; a handoff restart (an answered ticket) is never gated.
 func (s *Server) claimHold(project string, t tickets.Ticket, rh ResolvedHarness) (claimHold, bool) {
 	agent := rh.Harness
-	if reason := s.queueMissingReason(project, rh); reason != "" {
+	if reason := s.harness.QueueMissingReason(project, rh); reason != "" {
 		return claimHold{Verdict: wire.VerdictHarnessMissing, Reason: reason}, true
 	}
-	if reason, held := s.herdrHolds(s.launchRunner(project, agent)); held {
+	if reason, held := s.herdrHolds(s.harness.LaunchRunner(project, agent)); held {
 		return claimHold{Verdict: wire.VerdictHerdrDown, Reason: reason}, true
 	}
 	if limited, held := s.registry.RateLimitHeld(string(agent)); held {

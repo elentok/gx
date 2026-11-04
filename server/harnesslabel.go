@@ -18,21 +18,21 @@ func harnessDisplayName(h ralphloop.AgentKind) string {
 	return "Claude"
 }
 
-// harnessLabelFor is the label of the ticket at addr with frontmatter agent
+// LabelFor is the label of the ticket at addr with frontmatter agent
 // agent and the given rendered status. Only open, blocked and claimed tickets
 // carry one.
-func (s *Server) harnessLabelFor(addr tickets.Address, agent string, status string) wire.HarnessLabel {
+func (h *Harness) LabelFor(addr tickets.Address, agent string, status string) wire.HarnessLabel {
 	switch status {
 	case tickets.StatusClaimed.Word():
-		run, ok := s.registry.RunOf(addr.String())
+		run, ok := h.registry.RunOf(addr.String())
 		if !ok {
 			return wire.HarnessLabel{}
 		}
 		kind := ralphloop.AgentKind(run.Agent)
-		model, effort := s.projects.RunAgentConfig(addr.Project, kind, run)
+		model, effort := h.projects.RunAgentConfig(addr.Project, kind, run)
 		return wire.HarnessLabel{Harness: run.Agent, Tier: string(ralphloop.TierWorker), Model: model, Effort: effort}
 	case tickets.StatusOpen.Word(), tickets.StatusBlocked.Word():
-		r := s.resolveTicket(addr, tickets.Ticket{Agent: agent})
+		r := h.ResolveTicket(addr, tickets.Ticket{Agent: agent})
 		switch r.Source {
 		case HarnessFromFrontmatter, HarnessFromQueueItem:
 			return wire.HarnessLabel{Harness: string(r.Harness), HarnessNote: harnessNotePinned}

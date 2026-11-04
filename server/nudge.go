@@ -59,7 +59,7 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		address := ref.addr.String()
-		if r, err := s.iterationRunner(ref.addr); err == nil {
+		if r, err := s.harness.IterationRunner(ref.addr); err == nil {
 			if reason, held := s.herdrHolds(r); held {
 				return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
 			}

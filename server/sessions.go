@@ -107,13 +107,13 @@ func (s *Server) createSession(req wire.CreateSessionRequest, sc sessionCtx) (wi
 	}
 	from := "the request"
 	if req.Harness == "" {
-		req.Harness = s.LaunchHarness(req.Project)
-		from = s.defaultHarnessSource(req.Project)
+		req.Harness = s.projects.LaunchHarness(req.Project)
+		from = s.harness.DefaultHarnessSource(req.Project)
 	}
 	if _, err := harness.Lookup(agentrunner.Kind(req.Harness)); err != nil {
 		return sessionRefusal(wire.ReasonSessionUnknownHarness, err.Error()), nil
 	}
-	if msg := s.interactiveMissingReason(req.Harness, from); msg != "" {
+	if msg := s.harness.InteractiveMissingReason(req.Harness, from); msg != "" {
 		return sessionRefusal(wire.ReasonSessionHarnessMissing, msg), nil
 	}
 	conv, err := nativerunner.NewUUID()

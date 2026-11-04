@@ -187,7 +187,7 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 	if t.LongTicketTurns > 0 {
 		row.LongTicketTurns, row.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns
 	}
-	row.HarnessLabel = s.harnessLabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
+	row.HarnessLabel = s.harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if t.Parent != nil {
 		row.Parent = ticketAddress(root, *t.Parent)
 	}
@@ -200,7 +200,7 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 	}
 	if status == tickets.StatusPausedRepair {
 		row.State = repairState(evs, t.PausedClass())
-		row.FixPrompt = fixAgentPrompt(s.LaunchHarness(root.Project), row.Address, t)
+		row.FixPrompt = fixAgentPrompt(s.projects.LaunchHarness(root.Project), row.Address, t)
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()

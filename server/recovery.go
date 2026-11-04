@@ -609,7 +609,7 @@ func (s *Server) recoveryWait(req wire.QueueRequest, _ recovery.Call) (wire.Queu
 // agentState is the run's agent state, read fresh through the run's runner.
 // idle is true for an agent that is not working: idle, or done.
 func (s *Server) agentState(addr tickets.Address) (state agentrunner.State, idle bool, err error) {
-	runner, sess, ok, err := s.liveSession(addr)
+	runner, sess, ok, err := s.harness.LiveSession(addr)
 	if err != nil || !ok {
 		return "", false, cmp.Or(err, fmt.Errorf("no agent for %s", addr))
 	}
@@ -736,7 +736,7 @@ func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("no ticket %s", address)
 	}
-	return launchPrompt(v.s.resolveTicket(ref.addr, ref.ticket).Harness, launchSkill(ref.ticket), investigatePrompt(ref.ticket), address), nil
+	return launchPrompt(v.s.harness.ResolveTicket(ref.addr, ref.ticket).Harness, launchSkill(ref.ticket), investigatePrompt(ref.ticket), address), nil
 }
 
 // ticketCommitlessDone marks a ticket done with no commits of its own, for work

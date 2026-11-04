@@ -1,7 +1,6 @@
 package server
 
 import (
-	"cmp"
 	"time"
 
 	"github.com/elentok/gx/codexsession"
@@ -71,15 +70,8 @@ func defaultOrClaude(name string) ralphloop.AgentKind {
 
 // DefaultHarness is the Default harness for project: its agents.default-harness
 // over the global one, claude when neither is set.
-func (s *Server) DefaultHarness(project string) ralphloop.AgentKind {
-	return defaultOrClaude(s.projects.AgentsConfig(project).DefaultHarness)
-}
-
-// LaunchHarness is the harness a new interactive session in project starts on
-// when its request names none. Unlike defaultHarness it keeps an unregistered
-// name, so createSession refuses it instead of silently running Claude.
-func (s *Server) LaunchHarness(project string) string {
-	return cmp.Or(s.projects.AgentsConfig(project).DefaultHarness, string(ralphloop.AgentClaude))
+func (h *Harness) DefaultHarness(project string) ralphloop.AgentKind {
+	return defaultOrClaude(h.projects.AgentsConfig(project).DefaultHarness)
 }
 
 // ticketHarness is a ticket's resolved harness and the harness of its earlier
@@ -95,17 +87,17 @@ func (h ticketHarness) DiffersFromEarlierRun() bool {
 	return h.ResolvedHarness.DiffersFromEarlierRun(h.EarlierRun)
 }
 
-// resolveTicket gathers the resolver's inputs for the ticket at addr: its
+// ResolveTicket gathers the resolver's inputs for the ticket at addr: its
 // frontmatter agent, the queue item of its root, its earlier run and the
 // Default harness. Every site that picks a harness for a ticket calls it.
-func (s *Server) resolveTicket(addr tickets.Address, t tickets.Ticket) ticketHarness {
-	earlier := s.earlierRunHarness(addr)
+func (h *Harness) ResolveTicket(addr tickets.Address, t tickets.Ticket) ticketHarness {
+	earlier := h.EarlierRunHarness(addr)
 	return ticketHarness{
 		ResolvedHarness: resolveHarness(harnessInputs{
 			Frontmatter: t.Agent,
-			QueueItem:   s.queueItemAgent(addr),
+			QueueItem:   h.queueItemAgent(addr),
 			EarlierRun:  earlier,
-			Default:     string(s.DefaultHarness(addr.Project)),
+			Default:     string(h.DefaultHarness(addr.Project)),
 		}),
 		EarlierRun: earlier,
 	}
@@ -113,8 +105,8 @@ func (s *Server) resolveTicket(addr tickets.Address, t tickets.Ticket) ticketHar
 
 // queueItemAgent is the agent of the queue item for addr's root, "" when none
 // names one.
-func (s *Server) queueItemAgent(addr tickets.Address) string {
-	for _, item := range s.queue.List() {
+func (h *Harness) queueItemAgent(addr tickets.Address) string {
+	for _, item := range h.queue.List() {
 		if a, err := tickets.ParseQueuedAddress(item.Address); err == nil && queue.RootOf(a) == queue.RootOf(addr) && item.Agent != "" {
 			return item.Agent
 		}
@@ -122,11 +114,11 @@ func (s *Server) queueItemAgent(addr tickets.Address) string {
 	return ""
 }
 
-// earlierRunHarness is the harness of the newest run of addr whose session left
+// EarlierRunHarness is the harness of the newest run of addr whose session left
 // a transcript (Claude) or a rollout (Codex). A run that died before its first
 // prompt left neither, so it does not count and the ticket is never-run.
-func (s *Server) earlierRunHarness(addr tickets.Address) string {
-	dir, err := s.projects.Dir(addr.Project)
+func (h *Harness) EarlierRunHarness(addr tickets.Address) string {
+	dir, err := h.projects.Dir(addr.Project)
 	if err != nil {
 		return ""
 	}
@@ -135,35 +127,35 @@ func (s *Server) earlierRunHarness(addr tickets.Address) string {
 		return ""
 	}
 	for _, r := range ralphloop.IterationSessions(evs, addr.ID) {
-		if s.sessionRecorded(r) {
+		if h.sessionRecorded(r) {
 			return string(r.Agent)
 		}
 	}
 	return ""
 }
 
-func (s *Server) sessionRecorded(r ralphloop.IterationSession) bool {
+func (h *Harness) sessionRecorded(r ralphloop.IterationSession) bool {
 	key := string(r.Agent) + "\x00" + r.Cwd + "\x00" + r.Session
 	now := time.Now()
-	if found, ok := s.recorded.lookup(key, now); ok {
+	if found, ok := h.recorded.lookup(key, now); ok {
 		return found
 	}
-	found := s.sessionRecordedUncached(r)
-	s.recorded.store(key, found, now)
+	found := h.sessionRecordedUncached(r)
+	h.recorded.store(key, found, now)
 	return found
 }
 
-func (s *Server) sessionRecordedUncached(r ralphloop.IterationSession) bool {
+func (h *Harness) sessionRecordedUncached(r ralphloop.IterationSession) bool {
 	switch r.Agent {
 	case ralphloop.AgentClaude:
-		home, err := s.projects.EnvHome()
+		home, err := h.projects.EnvHome()
 		if err != nil {
 			return false
 		}
 		found, err := transcript.FindByID(home, r.Session)
 		return err == nil && len(found) > 0
 	case ralphloop.AgentCodex:
-		home, err := s.projects.CodexHome()
+		home, err := h.projects.CodexHome()
 		if err != nil {
 			return false
 		}

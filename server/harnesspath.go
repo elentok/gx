@@ -14,32 +14,32 @@ func defaultLookPath(env []string) func(string) (string, error) {
 	return func(program string) (string, error) { return brief.LookPath(env, program) }
 }
 
-// missingProgram is the program a launch of kind runs and whether it is off
+// MissingProgram is the program a launch of kind runs and whether it is off
 // the server's PATH. An unregistered kind is not missing: its own refusal
 // names it.
-func (s *Server) missingProgram(kind string) (program string, missing bool) {
-	h, err := harness.Lookup(agentrunner.Kind(kind))
+func (h *Harness) MissingProgram(kind string) (program string, missing bool) {
+	hr, err := harness.Lookup(agentrunner.Kind(kind))
 	if err != nil {
 		return "", false
 	}
-	program = h.Launch(harness.LaunchOptions{Env: s.cfg.Env}).Name
-	_, err = s.cfg.LookPath(program)
+	program = hr.Launch(harness.LaunchOptions{Env: h.cfg.Env}).Name
+	_, err = h.cfg.LookPath(program)
 	return program, err != nil
 }
 
 // harnessMissingStem is the one message stem of every missing-harness block:
 // the program and what chose the harness. Empty when the program is found.
-func (s *Server) harnessMissingStem(kind, from string) string {
-	program, missing := s.missingProgram(kind)
+func (h *Harness) harnessMissingStem(kind, from string) string {
+	program, missing := h.MissingProgram(kind)
 	if !missing {
 		return ""
 	}
 	return fmt.Sprintf("%s is not on PATH (from %s)", program, from)
 }
 
-// defaultHarnessSource names where project's Default harness comes from.
-func (s *Server) defaultHarnessSource(project string) string {
-	if dir, err := s.projects.Dir(project); err == nil {
+// DefaultHarnessSource names where project's Default harness comes from.
+func (h *Harness) DefaultHarnessSource(project string) string {
+	if dir, err := h.projects.Dir(project); err == nil {
 		if pf, err := config.ReadProjectFile(dir); err == nil && pf.Agents != nil && pf.Agents.DefaultHarness != "" {
 			return "the project default"
 		}
@@ -47,18 +47,18 @@ func (s *Server) defaultHarnessSource(project string) string {
 	return "the global default"
 }
 
-// queueMissingReason is why a ticket resolved to rh cannot be claimed because
+// QueueMissingReason is why a ticket resolved to rh cannot be claimed because
 // its harness is not on PATH; empty when it is found.
-func (s *Server) queueMissingReason(project string, rh ResolvedHarness) string {
+func (h *Harness) QueueMissingReason(project string, rh ResolvedHarness) string {
 	from := map[HarnessSource]string{
 		HarnessFromFrontmatter: "the ticket's agent",
 		HarnessFromQueueItem:   "the queue item",
 		HarnessFromEarlierRun:  "the ticket's earlier run",
 	}[rh.Source]
 	if rh.Source == HarnessFromDefault {
-		from = s.defaultHarnessSource(project)
+		from = h.DefaultHarnessSource(project)
 	}
-	stem := s.harnessMissingStem(string(rh.Harness), from)
+	stem := h.harnessMissingStem(string(rh.Harness), from)
 	if stem == "" {
 		return ""
 	}
@@ -68,10 +68,10 @@ func (s *Server) queueMissingReason(project string, rh ResolvedHarness) string {
 	return stem + ". Install it, or requeue with --agent <other>"
 }
 
-// interactiveMissingReason is the refusal message of an interactive launch of
+// InteractiveMissingReason is the refusal message of an interactive launch of
 // kind whose program is not on PATH; empty when it is found.
-func (s *Server) interactiveMissingReason(kind, from string) string {
-	stem := s.harnessMissingStem(kind, from)
+func (h *Harness) InteractiveMissingReason(kind, from string) string {
+	stem := h.harnessMissingStem(kind, from)
 	if stem == "" {
 		return ""
 	}

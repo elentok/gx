@@ -424,7 +424,7 @@ func (s *Server) budgetIteration(address string) (wire.IterationInfo, bool) {
 		return wire.IterationInfo{}, false
 	}
 	_, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.projects.WorktreeDir(a.Project))
-	r, sess, found, err := s.liveSession(a)
+	r, sess, found, err := s.harness.LiveSession(a)
 	if err != nil || !found {
 		return wire.IterationInfo{}, false
 	}
@@ -518,7 +518,7 @@ func (s *Server) killRuns(now time.Time, list []runs.TrackedRun) int {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r, err := s.runnerOf(t.Run)
+			r, err := s.harness.RunnerOf(t.Run)
 			if err == nil {
 				err = r.Interrupt(t.Session)
 			}
@@ -551,7 +551,7 @@ func (s *Server) pauseBudgetKilled(t runs.TrackedRun) error {
 	if err != nil {
 		return err
 	}
-	r, closeErr := s.runnerOf(t.Run)
+	r, closeErr := s.harness.RunnerOf(t.Run)
 	if closeErr == nil {
 		closeErr = r.Stop(t.Session)
 	}

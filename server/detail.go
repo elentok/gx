@@ -181,7 +181,7 @@ func fillHeader(d *wire.TicketDetail, ref ticketRef, t schema.Ticket) {
 // A prompt the web cannot approve (a herdr-hosted agent, an unnamed dialog, a
 // tool that needs a real answer) gets a card with a hint and no request ID.
 func (s *Server) permissionCard(addr tickets.Address) (*wire.PermissionCard, error) {
-	runner, sess, ok, err := s.liveSession(addr)
+	runner, sess, ok, err := s.harness.LiveSession(addr)
 	if err != nil || !ok {
 		return nil, err
 	}

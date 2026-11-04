@@ -38,7 +38,7 @@ func (s *Server) leaveBlocked(address string) error {
 	if err != nil {
 		return err
 	}
-	_, t, ok := s.freshTicket(addr)
+	_, t, ok := s.FreshTicket(addr)
 	if !ok {
 		return nil
 	}
@@ -69,7 +69,7 @@ func (s *Server) retryBlocked(address string) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	runner, err := s.runnerOf(run.Run)
+	runner, err := s.harness.RunnerOf(run.Run)
 	if err != nil {
 		return false, err
 	}

@@ -222,7 +222,7 @@ func (s *Server) CompleteRootIfDone(address string) error {
 	if err != nil {
 		return err
 	}
-	_, t, ok := s.freshTicket(addr)
+	_, t, ok := s.FreshTicket(addr)
 	if !ok {
 		return errors.New("no ticket " + address)
 	}

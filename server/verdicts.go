@@ -109,7 +109,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		ex.Verdict, ex.Reason = wire.VerdictDiskLow, diskLowReason(d)
 		return ex
 	}
-	if h, held := s.claimHold(addr.Project, t, s.resolveTicket(addr, t).ResolvedHarness); held {
+	if h, held := s.claimHold(addr.Project, t, s.harness.ResolveTicket(addr, t).ResolvedHarness); held {
 		ex.Verdict, ex.Reason = h.Verdict, h.Reason
 		return ex
 	}

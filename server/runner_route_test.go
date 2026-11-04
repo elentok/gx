@@ -1,11 +1,13 @@
 package server
 
 import (
-	"github.com/elentok/gx/server/runs"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets"
 )
 
 type namedRunner struct {
@@ -15,12 +17,20 @@ type namedRunner struct {
 
 func (r *namedRunner) Name() string { return r.name }
 
+// fakeHarnessHost is a HarnessHost with no sessions and no tickets on disk.
+type fakeHarnessHost struct{}
+
+func (fakeHarnessHost) ListSessions() ([]wire.SessionInfo, error) { return nil, nil }
+func (fakeHarnessHost) FreshTicket(tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
+	return tickets.Epic{}, tickets.Ticket{}, false
+}
+
 // routingServer is configured with headless and can also build herdr and pty;
 // RunnerFor hands out one runner per (runner, project) pair.
-func routingServer() (*Server, *namedRunner) {
+func routingServer() (*Harness, *namedRunner) {
 	built := map[[2]string]*namedRunner{}
 	configured := &namedRunner{Runner: runnerfake.NewRunner(), name: "headless", project: "_default"}
-	return &Server{cfg: Config{
+	return NewHarness(HarnessDeps{Host: fakeHarnessHost{}, Config: HarnessConfig{
 		Runner: configured,
 		RunnerFor: func(runner, project string) agentrunner.Runner {
 			if runner != "herdr" && runner != "headless" && runner != "pty" {
@@ -32,7 +42,7 @@ func routingServer() (*Server, *namedRunner) {
 			}
 			return built[key]
 		},
-	}}, configured
+	}}), configured
 }
 
 func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
@@ -62,11 +72,11 @@ func TestRunnerForRun_UnbuildableRunnerIsNil(t *testing.T) {
 func TestRunnerFor_LaunchesStillUseTheConfiguredRunner(t *testing.T) {
 	t.Parallel()
 	s, _ := routingServer()
-	r, ok := s.runnerFor("proj").(*namedRunner)
+	r, ok := s.RunnerFor("proj").(*namedRunner)
 	if !ok || r.name != "headless" || r.project != "proj" {
 		t.Errorf("got %+v, want headless for proj", r)
 	}
-	if s.runnerFor("proj") != agentrunner.Runner(r) {
+	if s.RunnerFor("proj") != agentrunner.Runner(r) {
 		t.Error("a pair must keep one runner")
 	}
 }

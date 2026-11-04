@@ -57,7 +57,7 @@ func (s *Server) pruneAgentLogs(now time.Time) {
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
-		p, ok := s.runnerNamed(string(agentrunner.ChoiceHeadless), project).(logPruner)
+		p, ok := s.harness.RunnerNamed(string(agentrunner.ChoiceHeadless), project).(logPruner)
 		if !ok {
 			continue
 		}

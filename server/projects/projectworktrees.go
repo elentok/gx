@@ -15,7 +15,7 @@ import (
 // launches.
 func (p *Registry) TierModels(project string) map[string]string {
 	agents := p.AgentsConfig(project)
-	agent := ralphloop.AgentFor(p.back.LaunchHarness(project))
+	agent := ralphloop.AgentFor(p.LaunchHarness(project))
 	out := map[string]string{}
 	for _, t := range ralphloop.AllTiers {
 		out[string(t)], _ = ralphloop.ResolveTier(agents, agent, t)

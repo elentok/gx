@@ -150,7 +150,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		Session: agentrunner.Session{Label: label, SessionID: lf.pause.AgentSession},
 		Model:   lf.pause.Model, Effort: lf.pause.Effort,
 	}
-	runner := s.RunnerForRun(run)
+	runner := s.harness.RunnerForRun(run)
 	if runner == nil {
 		s.log.Warn("late finish: runner unavailable", "ticket", addr, "runner", lf.pause.Runner)
 		return false

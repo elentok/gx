@@ -79,7 +79,7 @@ func TestQueue_StoredAgentSurvivesDefaultSwitch(t *testing.T) {
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
 	servertest.WriteConfig(t, path, store, nil)
 	ctx := context.Background()
-	if got := h.Server.DefaultHarness("proj"); got != "claude" {
+	if got := h.Server.Harness().DefaultHarness("proj"); got != "claude" {
 		t.Fatalf("default = %q, want claude", got)
 	}
 	for _, w := range []struct{ addr, agent string }{{"proj:epic-a/01", "claude"}, {"proj:epic-a/02", ""}} {
@@ -92,7 +92,7 @@ func TestQueue_StoredAgentSurvivesDefaultSwitch(t *testing.T) {
 	if res, err := h.Client.ReloadConfig(ctx); err != nil || res.Refused {
 		t.Fatalf("reload: %+v, %v", res, err)
 	}
-	if got := h.Server.DefaultHarness("proj"); got != "codex" {
+	if got := h.Server.Harness().DefaultHarness("proj"); got != "codex" {
 		t.Errorf("default after reload = %q, want codex", got)
 	}
 	items, _ := h.Client.QueueItems(ctx)

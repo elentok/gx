@@ -15,7 +15,7 @@ import (
 // prompt, interrupt and answer reach the agent whichever runner hosts it.
 func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (wire.QueueResult, error)) (wire.QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		runner, sess, ok, err := s.liveSession(ref.addr)
+		runner, sess, ok, err := s.harness.LiveSession(ref.addr)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
@@ -60,7 +60,7 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		return queue.Refusal(wire.ReasonBadDecision, "decision must be allow or deny"), nil
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		runner, sess, ok, err := s.liveSession(ref.addr)
+		runner, sess, ok, err := s.harness.LiveSession(ref.addr)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}

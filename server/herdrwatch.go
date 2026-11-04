@@ -80,7 +80,7 @@ func (w *herdrWatch) probe(r agentrunner.Runner, configured bool) (changed bool)
 // herdrRunner is the runner that hosts herdr tickets, or nil when the server
 // cannot build one.
 func (s *Server) herdrRunner() agentrunner.Runner {
-	return s.runnerNamed(runs.RunnerHerdr, runnerbuild.FallbackProject)
+	return s.harness.RunnerNamed(runs.RunnerHerdr, runnerbuild.FallbackProject)
 }
 
 // herdrWaiting is the tickets that need herdr: queued ones that launch on it
@@ -99,13 +99,13 @@ func (s *Server) herdrWaiting() []string {
 		if !ok {
 			continue
 		}
-		agent := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t).Harness
-		if r := s.launchRunner(addr.Project, agent); r != nil && r.Name() == runs.RunnerHerdr {
+		agent := s.harness.ResolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t).Harness
+		if r := s.harness.LaunchRunner(addr.Project, agent); r != nil && r.Name() == runs.RunnerHerdr {
 			out = append(out, item.Address)
 		}
 	}
 	for _, t := range s.registry.List() {
-		if r := s.RunnerForRun(t.Run); r != nil && r.Name() == runs.RunnerHerdr {
+		if r := s.harness.RunnerForRun(t.Run); r != nil && r.Name() == runs.RunnerHerdr {
 			out = append(out, t.Address)
 		}
 	}
