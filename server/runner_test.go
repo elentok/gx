@@ -73,7 +73,7 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 
 	claimedOnDisk := false
 	for ev := range evs {
-		if ev.Type == server.EventTicketClaimed {
+		if ev.Type == wire.EventTicketClaimed {
 			data, err := os.ReadFile(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"))
 			if err != nil {
 				t.Fatal(err)
@@ -83,7 +83,7 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 				t.Errorf("claim event address = %q", ev.Address)
 			}
 		}
-		if ev.Type == server.EventIterationStarted {
+		if ev.Type == wire.EventIterationStarted {
 			break
 		}
 	}
@@ -132,7 +132,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventIterationStarted {
+		if ev.Type == wire.EventIterationStarted {
 			break
 		}
 	}
@@ -171,7 +171,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			for ev := range evs {
-				if ev.Type == server.EventIterationStarted {
+				if ev.Type == wire.EventIterationStarted {
 					break
 				}
 			}
@@ -232,7 +232,7 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 		if err != nil {
 			t.Fatal(err)
 		}
-		return ex.Verdict == server.VerdictClaimRereadMismatch
+		return ex.Verdict == wire.VerdictClaimRereadMismatch
 	})
 	if got, _ := os.ReadFile(path); !strings.Contains(string(got), "status: open") {
 		t.Fatalf("ticket was claimed on a stale index view:\n%s", got)
@@ -284,15 +284,15 @@ func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
 	var seen []string
 	for ev := range evs {
 		switch ev.Type {
-		case server.EventTicketClaimed, server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted,
-			server.EventIterationFailed, server.EventIterationPaused:
+		case wire.EventTicketClaimed, wire.EventIterationStarted, wire.EventTicketDone, wire.EventRootCompleted,
+			wire.EventIterationFailed, wire.EventIterationPaused:
 			seen = append(seen, ev.Type)
 		}
-		if ev.Type == server.EventRootCompleted || ev.Type == server.EventIterationFailed {
+		if ev.Type == wire.EventRootCompleted || ev.Type == wire.EventIterationFailed {
 			break
 		}
 	}
-	want := []string{server.EventTicketClaimed, server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted}
+	want := []string{wire.EventTicketClaimed, wire.EventIterationStarted, wire.EventTicketDone, wire.EventRootCompleted}
 	if strings.Join(seen, ",") != strings.Join(want, ",") {
 		t.Fatalf("events = %v, want %v", seen, want)
 	}
@@ -335,7 +335,7 @@ func TestRunner_AFinishThatErrorsPausesTheTicketStuckAndFreesTheRoot(t *testing.
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventIterationFailed {
+		if ev.Type == wire.EventIterationFailed {
 			break
 		}
 	}
@@ -414,19 +414,19 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	completed := 0
 	for ev := range evs {
 		switch ev.Type {
-		case server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted:
+		case wire.EventIterationStarted, wire.EventTicketDone, wire.EventRootCompleted:
 			seen = append(seen, ev.Type+" "+ev.Address)
-		case server.EventIterationFailed, server.EventIterationPaused:
+		case wire.EventIterationFailed, wire.EventIterationPaused:
 			t.Fatalf("unexpected %s for %s", ev.Type, ev.Address)
 		}
-		if ev.Type == server.EventRootCompleted {
+		if ev.Type == wire.EventRootCompleted {
 			if completed++; completed == 2 {
 				break
 			}
 		}
 	}
 	// With one slot, root B starts only after root A's ticket is done.
-	if len(seen) != 6 || !strings.HasPrefix(seen[1], server.EventTicketDone) {
+	if len(seen) != 6 || !strings.HasPrefix(seen[1], wire.EventTicketDone) {
 		t.Errorf("events = %v, want start/done/completed per root, one root at a time", seen)
 	}
 }
@@ -466,7 +466,7 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 		}
 		started := false
 		for ev := range evs {
-			if ev.Type == server.EventIterationStarted {
+			if ev.Type == wire.EventIterationStarted {
 				started = true
 				break
 			}
@@ -506,7 +506,7 @@ func TestRunner_SkipsAFrontierTicketThatIsAlreadyTracked(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventIterationStarted {
+		if ev.Type == wire.EventIterationStarted {
 			if ev.Address != "proj:epic-a/02" {
 				t.Fatalf("started %s, want proj:epic-a/02", ev.Address)
 			}
@@ -555,7 +555,7 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 	}
 	nextStart := func() string {
 		for ev := range evs {
-			if ev.Type == server.EventIterationStarted {
+			if ev.Type == wire.EventIterationStarted {
 				return ev.Address
 			}
 		}
@@ -751,7 +751,7 @@ func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventTicketPaused {
+		if ev.Type == wire.EventTicketPaused {
 			break
 		}
 	}
@@ -798,15 +798,15 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	var seen []string
 	for ev := range evs {
 		switch ev.Type {
-		case server.EventReclaimed, server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted,
-			server.EventIterationFailed, server.EventIterationPaused:
+		case wire.EventReclaimed, wire.EventIterationStarted, wire.EventTicketDone, wire.EventRootCompleted,
+			wire.EventIterationFailed, wire.EventIterationPaused:
 			seen = append(seen, ev.Type)
 		}
-		if ev.Type == server.EventRootCompleted || ev.Type == server.EventIterationFailed {
+		if ev.Type == wire.EventRootCompleted || ev.Type == wire.EventIterationFailed {
 			break
 		}
 	}
-	want := []string{server.EventReclaimed, server.EventTicketDone, server.EventRootCompleted}
+	want := []string{wire.EventReclaimed, wire.EventTicketDone, wire.EventRootCompleted}
 	if strings.Join(seen, ",") != strings.Join(want, ",") {
 		log, _ := os.ReadFile(server.LogPath(h.StateDir))
 		t.Fatalf("events = %v, want %v\nserver log:\n%s", seen, want, log)
@@ -856,7 +856,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 	}
 	for _, evs := range streams {
 		for ev := range evs {
-			if ev.Type == server.EventIterationPaused {
+			if ev.Type == wire.EventIterationPaused {
 				break
 			}
 		}
@@ -899,7 +899,7 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventIterationStarted {
+		if ev.Type == wire.EventIterationStarted {
 			break
 		}
 	}
@@ -955,7 +955,7 @@ func TestRunner_CodexEvolveLaunchGetsTheFollowUpsAndGxDirs(t *testing.T) {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			for ev := range evs {
-				if ev.Type == server.EventIterationStarted {
+				if ev.Type == wire.EventIterationStarted {
 					break
 				}
 			}

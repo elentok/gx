@@ -40,9 +40,6 @@ import (
 	"github.com/elentok/gx/tokenledger"
 )
 
-// APIVersion is bumped on any incompatible change to the /v1 wire contract.
-const APIVersion = 3
-
 const (
 	lockFileName   = "server.lock"
 	socketFileName = "server.sock"
@@ -826,7 +823,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	h := wire.Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr}
+	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr}
 	h.HerdrText, h.HerdrUnavailable = s.herdrBanner()
 	h.Migrating = s.migrating()
 	if s.web != nil {

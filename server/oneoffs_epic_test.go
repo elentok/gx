@@ -46,7 +46,7 @@ func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, liv
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventIterationStarted {
+		if ev.Type == wire.EventIterationStarted {
 			return true
 		}
 	}

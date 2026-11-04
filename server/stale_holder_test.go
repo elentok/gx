@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -55,7 +55,7 @@ func TestLaunch_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
 	for _, state := range []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone} {
 		t.Run(string(state), func(t *testing.T) {
 			spy, holder := spyWithHolder(t, state)
-			h := launchOne(t, spy, server.EventIterationStarted)
+			h := launchOne(t, spy, wire.EventIterationStarted)
 			t.Cleanup(func() { spy.SetState(holderLabel, agentrunner.StateDone, "") })
 			closed := ofType(runLog(t, h), events.StalePaneClosed)
 			if len(closed) != 1 || closed[0].Pane != holder.ID || closed[0].Reason != string(state) || closed[0].Ticket != "01" {
@@ -101,7 +101,7 @@ func assertPausedNameTaken(t *testing.T, h *servertest.Harness, want ...string) 
 func TestLaunch_WorkingHolderPausesNameTakenAndKeepsThePane(t *testing.T) {
 	t.Parallel()
 	spy, holder := spyWithHolder(t, agentrunner.StateWorking)
-	h := launchOne(t, spy, server.EventIterationLaunchFailed)
+	h := launchOne(t, spy, wire.EventIterationLaunchFailed)
 	assertPausedNameTaken(t, h, holder.ID, "working")
 	if closed := ofType(runLog(t, h), events.StalePaneClosed); len(closed) != 0 {
 		t.Errorf("stale-pane-closed = %+v, want none", closed)
@@ -115,7 +115,7 @@ func TestLaunch_SecondNameTakenAfterClosingPauses(t *testing.T) {
 	t.Parallel()
 	spy, _ := spyWithHolder(t, agentrunner.StateIdle)
 	spy.SetStartErr(holderLabel, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, holderLabel))
-	h := launchOne(t, spy, server.EventIterationLaunchFailed)
+	h := launchOne(t, spy, wire.EventIterationLaunchFailed)
 	assertPausedNameTaken(t, h)
 	if closed := ofType(runLog(t, h), events.StalePaneClosed); len(closed) != 1 {
 		t.Errorf("stale-pane-closed = %+v, want exactly one: the retry happens once", closed)

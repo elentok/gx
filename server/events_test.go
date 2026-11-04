@@ -1,6 +1,10 @@
 package server
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/elentok/gx/server/wire"
+)
 
 func TestBroker_SlowSubscriberIsDroppedOthersKeepContiguousSeq(t *testing.T) {
 	t.Parallel()
@@ -17,7 +21,7 @@ func TestBroker_SlowSubscriberIsDroppedOthersKeepContiguousSeq(t *testing.T) {
 
 	var got []uint64
 	for range 5 {
-		b.publish(EventTicketChanged, "p:e/01")
+		b.publish(wire.EventTicketChanged, "p:e/01")
 		got = append(got, (<-fast).Seq) // keeps up
 	}
 	for i, seq := range got {
@@ -39,7 +43,7 @@ func TestBroker_SubscribeReplaysFromSeqAndRefusesUnknownSeq(t *testing.T) {
 	t.Parallel()
 	b := newBroker(0)
 	for range 3 {
-		b.publish(EventTicketChanged, "p:e/01")
+		b.publish(wire.EventTicketChanged, "p:e/01")
 	}
 
 	ch, cancel, err := b.subscribe(1)

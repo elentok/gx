@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -315,7 +314,7 @@ func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testi
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
-	st, _ = st.Reduce(wire.Event{Seq: 2, Type: server.EventTicketDone, Address: "gx:alpha/01"})
+	st, _ = st.Reduce(wire.Event{Seq: 2, Type: wire.EventTicketDone, Address: "gx:alpha/01"})
 
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 	view := next.(QueueModel).View().Content

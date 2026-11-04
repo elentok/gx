@@ -2,13 +2,13 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -39,7 +39,7 @@ func TestConfigStatus_KeepsLastReloadAndPendingKeysUntilRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	last := st.LastReload
-	if last == nil || last.Outcome != server.EventLevelWarning || last.Trigger != "command" ||
+	if last == nil || last.Outcome != wire.EventLevelWarning || last.Trigger != "command" ||
 		!strings.Contains(last.Message, "restart needed for server.tcp-listen") || last.At.Before(before) {
 		t.Errorf("last reload = %+v, want a command warning about server.tcp-listen", last)
 	}
@@ -53,7 +53,7 @@ func TestConfigStatus_KeepsLastReloadAndPendingKeysUntilRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.LastReload == nil || st.LastReload.Outcome != server.EventLevelSuccess {
+	if st.LastReload == nil || st.LastReload.Outcome != wire.EventLevelSuccess {
 		t.Errorf("last reload = %+v, want success", st.LastReload)
 	}
 	if !slices.Equal(st.PendingRestart, []string{"server.tcp-listen"}) {

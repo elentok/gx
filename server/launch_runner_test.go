@@ -2,12 +2,12 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -60,7 +60,7 @@ func TestLaunchRunner_CodexRunsOnPtyUnlessHerdrIsConfigured(t *testing.T) {
 				t.Fatalf("add claude: %+v, %v", res, err)
 			}
 			for started := 0; started < 2; {
-				if (<-evs).Type == server.EventIterationStarted {
+				if (<-evs).Type == wire.EventIterationStarted {
 					started++
 				}
 			}

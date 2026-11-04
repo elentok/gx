@@ -17,10 +17,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// EventQueueChanged is emitted once per queue write; Address is the ticket it
-// touched. Clients re-read the queue on it.
-const EventQueueChanged = "queue-changed"
-
 const queueFileName = "queue.json"
 
 func refusal(reason, msg string) wire.QueueResult {
@@ -110,7 +106,7 @@ func (s *Server) writeQueue(address string, mutate func(items []wire.QueueItem) 
 		q.items = prev
 		return wire.QueueResult{}, err
 	}
-	s.events.publish(EventQueueChanged, address)
+	s.events.publish(wire.EventQueueChanged, address)
 	s.kickRunner()
 	return wire.QueueResult{Queue: append([]wire.QueueItem{}, next...)}, nil
 }
@@ -508,7 +504,7 @@ func queueWriteAs(web bool, do func(wire.QueueRequest, queueCtx) (wire.QueueResu
 		req.Source = requestOrigin(r, web)
 		var qc queueCtx
 		if !web {
-			qc.investigator = r.Header.Get(InvestigateHeader)
+			qc.investigator = r.Header.Get(wire.InvestigateHeader)
 		}
 		res, err := do(req, qc)
 		if err != nil {

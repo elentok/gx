@@ -10,7 +10,6 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -30,7 +29,7 @@ func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
 	rounds := endedRounds(t, ticketPath)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowManualMerge || rounds[0].End.Source != server.OriginCLI {
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowManualMerge || rounds[0].End.Source != wire.OriginCLI {
 		t.Errorf("rounds = %+v; want one ended by cli manual-merge", rounds)
 	}
 }

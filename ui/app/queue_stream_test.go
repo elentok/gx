@@ -8,7 +8,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -56,7 +55,7 @@ func TestQueueStream_UpdatesOnEventWhileOpen(t *testing.T) {
 	f.tickets = queuedTicket("claimed", time.Now())
 	f.epics = runningEpic()
 	f.mu.Unlock()
-	f.stream(0).ch <- wire.Event{Seq: 11, Type: server.EventTicketClaimed, Address: "gx:alpha/01"}
+	f.stream(0).ch <- wire.Event{Seq: 11, Type: wire.EventTicketClaimed, Address: "gx:alpha/01"}
 	h.pump()
 
 	if view := queueView(h); !strings.Contains(view, "Running") {
@@ -75,7 +74,7 @@ func TestQueueStream_ClaimWhileHiddenShowsRunningOnOpen(t *testing.T) {
 	f.tickets = queuedTicket("claimed", time.Now())
 	f.epics = runningEpic()
 	f.mu.Unlock()
-	f.stream(0).ch <- wire.Event{Seq: 11, Type: server.EventTicketClaimed, Address: "gx:alpha/01"}
+	f.stream(0).ch <- wire.Event{Seq: 11, Type: wire.EventTicketClaimed, Address: "gx:alpha/01"}
 	h.pump()
 	h.switchTo(nav.TabQueue)
 	h.pump()
@@ -94,7 +93,7 @@ func TestQueueStream_ModeChangeFromAnotherClientShows(t *testing.T) {
 	f.mu.Lock()
 	f.mode = wire.QueueModePaused
 	f.mu.Unlock()
-	f.stream(0).ch <- wire.Event{Seq: 11, Type: server.EventQueueChanged}
+	f.stream(0).ch <- wire.Event{Seq: 11, Type: wire.EventQueueChanged}
 	h.pump()
 
 	// The pause key offers resume only if the tab knows the queue is paused.

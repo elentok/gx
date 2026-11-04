@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -64,7 +63,7 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{
 		Address: answerAddr, State: state, Choice: "b", Note: "line1\r\nline2", Source: "cli",
 	})
-	if err != nil || res.Refused || res.Outcome != server.OutcomeDelivered {
+	if err != nil || res.Refused || res.Outcome != wire.OutcomeDelivered {
 		t.Fatalf("answer = %+v, %v; want delivered", res, err)
 	}
 	prompts := fake.Prompts("epic-a-iter-01")
@@ -141,7 +140,7 @@ func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, err := p.h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
-	if err != nil || res.Refused || res.Outcome != server.OutcomeAdopted {
+	if err != nil || res.Refused || res.Outcome != wire.OutcomeAdopted {
 		t.Fatalf("answer = %+v, %v; want adopted", res, err)
 	}
 	if n := answerCount(t, p.ticketPath); n != 0 {
@@ -155,7 +154,7 @@ func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
-	if err != nil || res.Outcome != server.OutcomeDelivered {
+	if err != nil || res.Outcome != wire.OutcomeDelivered {
 		t.Fatalf("answer = %+v, %v; want delivered", res, err)
 	}
 	fake.SetState("epic-a-iter-01", agentrunner.StateIdle, "")
@@ -167,7 +166,7 @@ func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
 // reopened, answered, and nothing launched.
 func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake *headlessFake, res wire.QueueResult, err error) {
 	t.Helper()
-	if err != nil || res.Refused || res.Outcome != server.OutcomeQueued {
+	if err != nil || res.Refused || res.Outcome != wire.OutcomeQueued {
 		t.Fatalf("answer = %+v, %v; want queued", res, err)
 	}
 	if n := answerCount(t, ticketPath); n != 1 {

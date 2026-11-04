@@ -14,22 +14,8 @@ import (
 )
 
 const (
-	// EventTrunkMissing streams once when a project with queued roots enters
-	// Missing trunk. Address is the project; Message is the reason.
-	EventTrunkMissing = "trunk-missing"
-	// EventTrunkFound streams once when that project's trunk resolves again.
-	EventTrunkFound = "trunk-found"
-
 	NoticeTrunkMissing = "trunk-missing"
 	NoticeTrunkFound   = "trunk-found"
-
-	// VerdictTrunkMissing is the explain verdict for a queued ticket of a
-	// project in Missing trunk.
-	VerdictTrunkMissing = "trunk missing"
-
-	// VerdictMigrationBlocked is the explain verdict for a queued ticket of a
-	// project whose migration failed.
-	VerdictMigrationBlocked = "Migration blocked"
 )
 
 // missingTrunks holds the projects in Missing trunk and why. Memory only: a
@@ -95,7 +81,7 @@ func (s *Server) checkTrunks() {
 		if !missing {
 			if s.trunkMissing.clear(addr.Project) {
 				s.log.Info("trunk found", "project", addr.Project)
-				s.events.publishEvent(wire.Event{Type: EventTrunkFound, Address: addr.Project, Level: EventLevelSuccess, Message: "trunk found, claiming resumes"})
+				s.events.publishEvent(wire.Event{Type: wire.EventTrunkFound, Address: addr.Project, Level: wire.EventLevelSuccess, Message: "trunk found, claiming resumes"})
 				s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkFound, Emoji: "🌳", Title: "project " + addr.Project + ": trunk found",
 					Detail: "trunk found, claiming resumes"})
 			}
@@ -111,7 +97,7 @@ func (s *Server) enterTrunkMissing(project, reason string) {
 		return
 	}
 	s.log.Warn("trunk missing", "project", project, "reason", reason)
-	s.events.publishEvent(wire.Event{Type: EventTrunkMissing, Address: project, Level: EventLevelWarning, Message: reason})
+	s.events.publishEvent(wire.Event{Type: wire.EventTrunkMissing, Address: project, Level: wire.EventLevelWarning, Message: reason})
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
 		Detail: reason + "; its tickets will not be claimed until it is fixed"})
 }

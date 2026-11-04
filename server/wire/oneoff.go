@@ -49,3 +49,7 @@ const (
 	ReasonDuplicateLive = "duplicate-live"
 	ReasonBadType       = "invalid-type"
 )
+
+// OneOffStatusQueued is the status a successful submit reports: it is created
+// and already at the queue tail.
+const OneOffStatusQueued = "queued"

@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -28,7 +28,7 @@ func runMergeTicket(t *testing.T, turn func(f *schedFixture, cwd string) string)
 		case <-ctx.Done():
 			t.Fatal("merge ticket never settled")
 		case ev := <-evs:
-			if ev.Type != server.EventTicketDone && ev.Type != server.EventIterationPaused {
+			if ev.Type != wire.EventTicketDone && ev.Type != wire.EventIterationPaused {
 				continue
 			}
 			tk, err := schema.ParseTicket(f.ticketFile(t, "01"))

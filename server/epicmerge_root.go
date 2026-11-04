@@ -236,7 +236,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 	if err != nil {
 		s.log.Warn("dequeue completed root", "root", root, "err", err)
 	} else if removed {
-		s.events.publish(EventQueueChanged, root.String())
+		s.events.publish(wire.EventQueueChanged, root.String())
 	}
 	// An epic merged elsewhere notifies with the dequeue, so a double merge sends one.
 	if already && !removed {
@@ -271,7 +271,7 @@ func (s *Server) actOnMerge(root rootRef, one ralphloop.OneIteration, dir string
 	}
 	// Last, so a watcher of root-completed sees the retro already filed.
 	if d.completed() {
-		s.events.publish(EventRootCompleted, root.String())
+		s.events.publish(wire.EventRootCompleted, root.String())
 	}
 	return d.result
 }
@@ -280,7 +280,7 @@ func (s *Server) actOnMerge(root rootRef, one ralphloop.OneIteration, dir string
 func (s *Server) pauseRoot(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) {
 	project := root.Project
 	reason, kind := d.result.Message, d.result.PauseKind
-	s.events.publishEvent(wire.Event{Type: EventRootPaused, Address: root.String(), Kind: kind, Level: EventLevelWarning, Message: reason})
+	s.events.publishEvent(wire.Event{Type: wire.EventRootPaused, Address: root.String(), Kind: kind, Level: wire.EventLevelWarning, Message: reason})
 	s.log.Warn("root paused", "root", root, "kind", kind, "reason", reason)
 	if !d.sendNotice() {
 		return

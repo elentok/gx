@@ -15,7 +15,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -30,7 +29,7 @@ type Client struct {
 // AsTUI marks the client's writes as coming from the TUI; an unmarked client
 // writes as the CLI.
 func (c *Client) AsTUI() *Client {
-	c.origin = server.OriginTUI
+	c.origin = wire.OriginTUI
 	return c
 }
 
@@ -45,14 +44,14 @@ func (c *Client) AsInvestigator(addr string) *Client {
 // setOrigin tags a write request with the client's origin.
 func (c *Client) setOrigin(r *http.Request) {
 	if c.origin != "" {
-		r.Header.Set(server.OriginHeader, c.origin)
+		r.Header.Set(wire.OriginHeader, c.origin)
 	}
 	addr := c.investigator
 	if addr == "" {
-		addr = os.Getenv(server.InvestigateEnv)
+		addr = os.Getenv(wire.InvestigateEnv)
 	}
 	if addr != "" {
-		r.Header.Set(server.InvestigateHeader, addr)
+		r.Header.Set(wire.InvestigateHeader, addr)
 	}
 }
 
@@ -77,9 +76,9 @@ func (c *Client) Negotiate(ctx context.Context, build string) (Negotiation, erro
 	}
 	n := Negotiation{Handshake: h}
 	switch {
-	case h.APIVersion != server.APIVersion:
+	case h.APIVersion != wire.APIVersion:
 		n.ReadOnly = true
-		n.Hint = fmt.Sprintf("read-only: server API v%d, client API v%d; run `gx server restart`", h.APIVersion, server.APIVersion)
+		n.Hint = fmt.Sprintf("read-only: server API v%d, client API v%d; run `gx server restart`", h.APIVersion, wire.APIVersion)
 	case h.Build != build:
 		n.Hint = fmt.Sprintf("server is an older build (%s, client %s); run `gx server restart` to upgrade", h.Build, build)
 	}

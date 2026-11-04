@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"slices"
 
 	"github.com/elentok/gx/agentrunner"
@@ -101,7 +102,7 @@ func (s *Server) runAgentConfig(project string, agent ralphloop.AgentKind, run R
 func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) []string {
 	env := append(slices.Clone(tabEnv), AgentEnv+"="+string(agent))
 	if t.Type == string(schema.TypeInvestigate) {
-		env = append(env, InvestigateEnv+"="+addr.String())
+		env = append(env, wire.InvestigateEnv+"="+addr.String())
 	}
 	return env
 }

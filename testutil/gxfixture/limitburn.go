@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -58,9 +57,9 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		first := localMidnight(now).Add(now.Sub(localMidnight(now)) / 2)
 		return limitBurnSeed{
 			report: wire.LimitsReport{SevenDay: limitWindow(now, 22, reset.Sub(now), 0)},
-			samples: map[string][]wire.LimitSample{server.LimitIDClaudeWeekly: {
-				limitSample(server.LimitIDClaudeWeekly, 15, reset, first),
-				limitSample(server.LimitIDClaudeWeekly, 22, reset, now),
+			samples: map[string][]wire.LimitSample{wire.LimitIDClaudeWeekly: {
+				limitSample(wire.LimitIDClaudeWeekly, 15, reset, first),
+				limitSample(wire.LimitIDClaudeWeekly, 22, reset, now),
 			}},
 		}
 	},
@@ -73,9 +72,9 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		return limitBurnSeed{
 			report: wire.LimitsReport{SevenDay: limitWindow(now, 52, claudeReset.Sub(now), age)},
 			samples: map[string][]wire.LimitSample{
-				server.LimitIDClaudeWeekly: weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, age,
+				wire.LimitIDClaudeWeekly: weeklyHistory(wire.LimitIDClaudeWeekly, now, claudeReset, age,
 					[]float64{8, 16, 24, 33, 40}, 52, []float64{50, 70}),
-				server.LimitIDCodexWeekly: weeklyHistory(server.LimitIDCodexWeekly, now, codexReset, age,
+				wire.LimitIDCodexWeekly: weeklyHistory(wire.LimitIDCodexWeekly, now, codexReset, age,
 					[]float64{5, 10, 17, 25}, 40, []float64{20, 33}),
 			},
 		}
@@ -85,10 +84,10 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		reset := now.Add(-2 * time.Hour)
 		return limitBurnSeed{
 			report: wire.LimitsReport{SevenDay: limitWindow(now, 75, -2*time.Hour, 6*time.Hour)},
-			samples: map[string][]wire.LimitSample{server.LimitIDClaudeWeekly: {
-				limitSample(server.LimitIDClaudeWeekly, 30, reset, now.Add(-72*time.Hour)),
-				limitSample(server.LimitIDClaudeWeekly, 60, reset, now.Add(-30*time.Hour)),
-				limitSample(server.LimitIDClaudeWeekly, 75, reset, now.Add(-6*time.Hour)),
+			samples: map[string][]wire.LimitSample{wire.LimitIDClaudeWeekly: {
+				limitSample(wire.LimitIDClaudeWeekly, 30, reset, now.Add(-72*time.Hour)),
+				limitSample(wire.LimitIDClaudeWeekly, 60, reset, now.Add(-30*time.Hour)),
+				limitSample(wire.LimitIDClaudeWeekly, 75, reset, now.Add(-6*time.Hour)),
 			}},
 		}
 	},
@@ -103,10 +102,10 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		fiveHour := []int{14, 6, 0}
 		s := limitBurnSeed{
 			samples: map[string][]wire.LimitSample{
-				server.LimitIDClaudeWeekly: burnHistory(server.LimitIDClaudeWeekly, now, historyDays, 7*24*time.Hour, weekly, 3),
-				server.LimitIDCodexWeekly:  burnHistory(server.LimitIDCodexWeekly, now, historyDays, 7*24*time.Hour, weekly, 5),
-				server.LimitIDClaude5h:     burnHistory(server.LimitIDClaude5h, now, historyDays, 5*time.Hour, fiveHour, 2),
-				server.LimitIDCodex5h:      burnHistory(server.LimitIDCodex5h, now, historyDays, 5*time.Hour, fiveHour, 4),
+				wire.LimitIDClaudeWeekly: burnHistory(wire.LimitIDClaudeWeekly, now, historyDays, 7*24*time.Hour, weekly, 3),
+				wire.LimitIDCodexWeekly:  burnHistory(wire.LimitIDCodexWeekly, now, historyDays, 7*24*time.Hour, weekly, 5),
+				wire.LimitIDClaude5h:     burnHistory(wire.LimitIDClaude5h, now, historyDays, 5*time.Hour, fiveHour, 2),
+				wire.LimitIDCodex5h:      burnHistory(wire.LimitIDCodex5h, now, historyDays, 5*time.Hour, fiveHour, 4),
 			},
 			ledger: statsLedger(now),
 		}
@@ -115,7 +114,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 			l := last(id)
 			return &wire.LimitWindow{UsedPercentage: l.UsedPercentage, ResetsAt: l.ResetsAt, ReceivedAt: l.ReceivedAt}
 		}
-		s.report = wire.LimitsReport{FiveHour: window(server.LimitIDClaude5h), SevenDay: window(server.LimitIDClaudeWeekly)}
+		s.report = wire.LimitsReport{FiveHour: window(wire.LimitIDClaude5h), SevenDay: window(wire.LimitIDClaudeWeekly)}
 		return s
 	},
 }
@@ -131,12 +130,12 @@ func menuSeed(now time.Time) limitBurnSeed {
 		},
 		samples: map[string][]wire.LimitSample{},
 	}
-	s.samples[server.LimitIDClaudeWeekly] = weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, 0,
+	s.samples[wire.LimitIDClaudeWeekly] = weeklyHistory(wire.LimitIDClaudeWeekly, now, claudeReset, 0,
 		[]float64{20, 36, 52, 69, 74}, 81, []float64{20, 99})
-	s.samples[server.LimitIDCodexWeekly] = weeklyHistory(server.LimitIDCodexWeekly, now, codexReset, 0,
+	s.samples[wire.LimitIDCodexWeekly] = weeklyHistory(wire.LimitIDCodexWeekly, now, codexReset, 0,
 		[]float64{14, 20, 24, 36}, 40, []float64{2, 45})
-	s.samples[server.LimitIDClaude5h] = fiveHourHistory(server.LimitIDClaude5h, now, 2*time.Hour+10*time.Minute, 10, 34)
-	s.samples[server.LimitIDCodex5h] = fiveHourHistory(server.LimitIDCodex5h, now, 3*time.Hour, 5, 12)
+	s.samples[wire.LimitIDClaude5h] = fiveHourHistory(wire.LimitIDClaude5h, now, 2*time.Hour+10*time.Minute, 10, 34)
+	s.samples[wire.LimitIDCodex5h] = fiveHourHistory(wire.LimitIDCodex5h, now, 3*time.Hour, 5, 12)
 	return s
 }
 

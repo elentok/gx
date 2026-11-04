@@ -68,7 +68,7 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 	evs := f.queueEpic(ctx, t, "01")
 	counts := map[string]int{}
 	next := func(want string) { t.Helper(); countUntil(ctx, t, evs, counts, want) }
-	next(server.EventTrunkMissing)
+	next(wire.EventTrunkMissing)
 	servertest.Poll(10*time.Second, func() bool { return chatCount("proj: trunk missing") > 0 })
 	time.Sleep(300 * time.Millisecond) // many polls pass; the state must stay announced once
 
@@ -76,8 +76,8 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snap.Pending) != 1 || snap.Pending[0].Verdict != server.VerdictTrunkMissing || !strings.Contains(snap.Pending[0].Reason, wantReason) {
-		t.Fatalf("queue rows = %+v, want one %q naming %q", snap.Pending, server.VerdictTrunkMissing, wantReason)
+	if len(snap.Pending) != 1 || snap.Pending[0].Verdict != wire.VerdictTrunkMissing || !strings.Contains(snap.Pending[0].Reason, wantReason) {
+		t.Fatalf("queue rows = %+v, want one %q naming %q", snap.Pending, wire.VerdictTrunkMissing, wantReason)
 	}
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: open") {
 		t.Fatalf("ticket claimed or paused while trunk missing:\n%s", body)
@@ -87,9 +87,9 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 	}
 
 	fixTrunk(f)
-	next(server.EventTrunkFound)
-	next(server.EventRootCompleted)
-	if counts[server.EventTrunkMissing] != 1 || counts[server.EventTrunkFound] != 1 {
+	next(wire.EventTrunkFound)
+	next(wire.EventRootCompleted)
+	if counts[wire.EventTrunkMissing] != 1 || counts[wire.EventTrunkFound] != 1 {
 		t.Fatalf("events = %v, want one trunk-missing and one trunk-found", counts)
 	}
 	servertest.Poll(10*time.Second, func() bool { return chatCount("proj: trunk found") > 0 })
@@ -130,7 +130,7 @@ func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
 
 	evs := f.queueEpic(ctx, t, "01")
 	counts := map[string]int{}
-	countUntil(ctx, t, evs, counts, server.EventTrunkMissing)
+	countUntil(ctx, t, evs, counts, wire.EventTrunkMissing)
 	if res, err := f.h.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
@@ -140,8 +140,8 @@ func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
 	if res, err := f.h.Client.QueueAdd(ctx, "proj:"+schedEpic+"/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("re-add: %+v, %v", res, err)
 	}
-	countUntil(ctx, t, evs, counts, server.EventRootCompleted)
-	if counts[server.EventTrunkFound] != 0 {
+	countUntil(ctx, t, evs, counts, wire.EventRootCompleted)
+	if counts[wire.EventTrunkFound] != 0 {
 		t.Fatalf("events = %v, want no stale trunk-found", counts)
 	}
 }

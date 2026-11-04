@@ -103,3 +103,7 @@ const (
 	ReasonNotDirtyTrunk    = "not-dirty-trunk"
 	ReasonNeedsRebase      = "needs-rebase"
 )
+
+// EventQueueChanged is emitted once per queue write; Address is the ticket it
+// touched. Clients re-read the queue on it.
+const EventQueueChanged = "queue-changed"

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -28,11 +27,11 @@ func TestLimitHistory_ReportSurvivesRestart(t *testing.T) {
 	if err := json.Unmarshal(data, &f); err != nil {
 		t.Fatal(err)
 	}
-	five := f.Samples[server.LimitIDClaude5h]
+	five := f.Samples[wire.LimitIDClaude5h]
 	if len(five) != 2 || five[0].UsedPercentage != 10 || five[1].UsedPercentage != 25.5 || five[1].ResetsAt != 4_000_000_000 || five[1].ReceivedAt <= 0 {
 		t.Errorf("5h samples = %+v, want 10 then 25.5", five)
 	}
-	if n := len(f.Samples[server.LimitIDClaudeWeekly]); n != 1 {
+	if n := len(f.Samples[wire.LimitIDClaudeWeekly]); n != 1 {
 		t.Errorf("weekly samples = %d, want 1", n)
 	}
 
@@ -42,7 +41,7 @@ func TestLimitHistory_ReportSurvivesRestart(t *testing.T) {
 	if err := json.Unmarshal(data, &f); err != nil {
 		t.Fatal(err)
 	}
-	if n := len(f.Samples[server.LimitIDClaude5h]); n != 3 {
+	if n := len(f.Samples[wire.LimitIDClaude5h]); n != 3 {
 		t.Errorf("5h samples after restart = %d, want 3", n)
 	}
 }

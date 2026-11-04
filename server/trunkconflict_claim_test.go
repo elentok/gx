@@ -2,13 +2,13 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -48,7 +48,7 @@ func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing
 	case <-ctx.Done():
 		t.Fatal("the trunk-conflict ticket was never claimed")
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 	if body := readFile(t, f.ticketFile(t, "02")); !strings.Contains(body, "status: done") {
 		t.Errorf("trunk-conflict ticket not done:\n%s", body)
 	}
@@ -71,12 +71,12 @@ func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *test
 	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/02")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 
 	if res, err := f.h.Client.QueueAdd(ctx, "proj:other/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventTicketDone, "proj:other/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventTicketDone, "proj:other/01")
 	otherMerged := func() bool {
 		out := f.git(t, "ls-tree", "-r", "--name-only", "main")
 		return strings.Contains(out, "other.txt")
@@ -107,7 +107,7 @@ func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *test
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:other")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:other")
 	if !otherMerged() {
 		t.Error("other did not land after the ticket was done")
 	}

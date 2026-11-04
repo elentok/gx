@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server/wire"
 	"log/slog"
 	"maps"
 	"os"
@@ -20,10 +21,6 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
-
-// EventReclaimed streams when a restarted server takes over an iteration that
-// was already running.
-const EventReclaimed = "reclaimed"
 
 const runsFileName = "runs.json"
 
@@ -620,7 +617,7 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 	}
 	t.State = ""
 	s.registry.put(t)
-	s.events.publish(EventReclaimed, t.Address)
+	s.events.publish(wire.EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished || reportedFinished(t.TicketPath) {
@@ -702,7 +699,7 @@ func (s *Server) reclaim(t trackedRun) error {
 	t.Session = agentrunner.Session{Label: label, ID: session.ID, SessionID: t.Session.SessionID}
 	t.State = ""
 	s.registry.put(t)
-	s.events.publish(EventReclaimed, t.Address)
+	s.events.publish(wire.EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	rc := runContext{deps, root, mode, one, wt, t.Run, t.Address}
@@ -775,7 +772,7 @@ func (s *Server) reopenEmptyClaim(t trackedRun) (bool, error) {
 		s.log.Warn("log claim-reopened", "ticket", t.Address, "err", err)
 	}
 	s.log.Info("reopened empty claim", "ticket", t.Address)
-	s.events.publish(EventTicketChanged, t.Address)
+	s.events.publish(wire.EventTicketChanged, t.Address)
 	return true, nil
 }
 

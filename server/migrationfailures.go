@@ -13,9 +13,6 @@ import (
 )
 
 const (
-	// EventMigrationFailuresChanged is emitted when the migration failure record changes on disk.
-	EventMigrationFailuresChanged = "migration-failures-changed"
-
 	defaultMigrationFailurePoll = 2 * time.Second
 )
 
@@ -71,7 +68,7 @@ func (s *Server) keepMigrationFailuresWatched(ctx context.Context) {
 		case <-tick.C:
 			if cur := read(); !bytes.Equal(cur, last) {
 				last = cur
-				s.events.publish(EventMigrationFailuresChanged, "")
+				s.events.publish(wire.EventMigrationFailuresChanged, "")
 				s.kickRunner() // a clear ends a Migration block: claim now, not at the next tick
 			}
 		}

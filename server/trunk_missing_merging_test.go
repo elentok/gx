@@ -1,11 +1,11 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -30,7 +30,7 @@ func trunkDeletedMidRun(t *testing.T, autoMerge bool) (f *schedFixture, develop 
 func TestTrunkMissingAtMerging_TicketMergesOnItsRootAndTheRootPauses(t *testing.T) {
 	t.Parallel()
 	f, develop, chatCount := trunkDeletedMidRun(t, true)
-	f.runEpic(t, server.EventRootPaused)
+	f.runEpic(t, wire.EventRootPaused)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket did not merge on its root's branch:\n%s", body)
@@ -52,7 +52,7 @@ func TestTrunkMissingAtMerging_TicketMergesOnItsRootAndTheRootPauses(t *testing.
 func TestTrunkMissingAtMerging_AutoMergeOffIsNotPaused(t *testing.T) {
 	t.Parallel()
 	f, _, _ := trunkDeletedMidRun(t, false)
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket not done:\n%s", body)

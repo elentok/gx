@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -46,7 +46,7 @@ func claimFirstChild(t *testing.T, repo string) string {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventIterationStarted {
+		if ev.Type == wire.EventIterationStarted {
 			break
 		}
 	}

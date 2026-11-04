@@ -35,3 +35,9 @@ const (
 	ReasonDirtyChecks   = "dirty-checks"
 	ReasonCommitFailed  = "commit-failed"
 )
+
+// Save targets of a check config.
+const (
+	SaveTargetRepo        = "repo"
+	SaveTargetProjectJSON = "project.json"
+)

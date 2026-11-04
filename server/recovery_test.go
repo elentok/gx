@@ -699,7 +699,7 @@ func queueToZeroCommitPause(t *testing.T, h *servertest.Harness) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	// The loop's own finish debounce outlasts waitFor.
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:epic-a/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:epic-a/01")
 }
 
 // R2 and R3 read the transcript the pause's session left: the matcher sees the

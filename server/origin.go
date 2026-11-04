@@ -1,22 +1,9 @@
 package server
 
-import "net/http"
+import (
+	"net/http"
 
-// Where a write came from. The web mux decides it itself; the socket reads
-// OriginHeader, which only the TUI's API client sets.
-const (
-	OriginHeader = "X-Gx-Origin"
-	OriginWeb    = "web"
-	OriginTUI    = "tui"
-	OriginCLI    = "cli"
-)
-
-// An investigate agent's launch sets InvestigateEnv to its ticket's address and
-// the CLI sends it as InvestigateHeader. The server accepts it only when it
-// names a live investigate ticket, and never on the web mux.
-const (
-	InvestigateEnv    = "GX_INVESTIGATE_TICKET"
-	InvestigateHeader = "X-Gx-Investigate"
+	"github.com/elentok/gx/server/wire"
 )
 
 // AgentEnv names the agent ("claude" or "codex") a ralph-loop run launched
@@ -28,10 +15,10 @@ const AgentEnv = "GX_AGENT"
 func requestOrigin(r *http.Request, web bool) string {
 	switch {
 	case web:
-		return OriginWeb
-	case r.Header.Get(OriginHeader) == OriginTUI:
-		return OriginTUI
+		return wire.OriginWeb
+	case r.Header.Get(wire.OriginHeader) == wire.OriginTUI:
+		return wire.OriginTUI
 	default:
-		return OriginCLI
+		return wire.OriginCLI
 	}
 }

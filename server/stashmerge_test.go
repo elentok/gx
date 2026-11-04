@@ -197,7 +197,7 @@ func TestStashMerge_RefusesAnEpicThatIsNotPausedOnADirtyTrunk(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, "a.txt")
 	})
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	res, err := f.h.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
 

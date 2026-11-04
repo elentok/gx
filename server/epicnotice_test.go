@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -57,7 +58,7 @@ func TestEpicNotice_MergeSendsEpicMerged(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	}, chat)
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := waitForChat(count, epicMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicMergedText, got)
@@ -74,7 +75,7 @@ func TestEpicNotice_AutoFFMergeOffSendsNotMerged(t *testing.T) {
 		commitWork(t, p, id)
 	}, chat)
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicNotMergedText, got)
@@ -92,7 +93,7 @@ func TestEpicNotice_NeedsRebasePauseSendsNotMerged(t *testing.T) {
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")
 	}, chat)
-	f.runEpic(t, server.EventRootPaused)
+	f.runEpic(t, wire.EventRootPaused)
 
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicNotMergedText, got)

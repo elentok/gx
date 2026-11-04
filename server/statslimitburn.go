@@ -46,9 +46,9 @@ func (s *Server) buildLimitBurns(n int, now time.Time) wire.StatsLimitBurns {
 		return buildLimitBurn(s.limitHistory.Samples(id), latest, ok, weekly, n, now)
 	}
 	return wire.StatsLimitBurns{
-		Claude5h:     build(LimitIDClaude5h, false),
-		ClaudeWeekly: build(LimitIDClaudeWeekly, true),
-		Codex5h:      build(LimitIDCodex5h, false),
-		CodexWeekly:  build(LimitIDCodexWeekly, true),
+		Claude5h:     build(wire.LimitIDClaude5h, false),
+		ClaudeWeekly: build(wire.LimitIDClaudeWeekly, true),
+		Codex5h:      build(wire.LimitIDCodex5h, false),
+		CodexWeekly:  build(wire.LimitIDCodexWeekly, true),
 	}
 }

@@ -15,12 +15,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// Save targets of a check config.
-const (
-	SaveTargetRepo        = "repo"
-	SaveTargetProjectJSON = "project.json"
-)
-
 func refuseSave(reason, msg string) (wire.SaveChecksResult, error) {
 	return wire.SaveChecksResult{Refused: true, Reason: reason, Message: msg}, nil
 }
@@ -55,15 +49,15 @@ func (s *Server) saveChecks(req wire.SaveChecksRequest) (wire.SaveChecksResult, 
 		return wire.SaveChecksResult{}, err
 	}
 	switch req.Target {
-	case SaveTargetProjectJSON:
+	case wire.SaveTargetProjectJSON:
 		return saveChecksToProjectJSON(dir, pf, req)
-	case SaveTargetRepo:
+	case wire.SaveTargetRepo:
 		if pf.VCS != nil && *pf.VCS == config.VCSNone {
 			return refuseSave(wire.ReasonVCSNone, req.Project+" has no VCS; save to project.json")
 		}
 		return s.saveChecksToRepo(dir, req)
 	}
-	return refuseSave(wire.ReasonBadTarget, "target must be "+SaveTargetRepo+" or "+SaveTargetProjectJSON)
+	return refuseSave(wire.ReasonBadTarget, "target must be "+wire.SaveTargetRepo+" or "+wire.SaveTargetProjectJSON)
 }
 
 func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {

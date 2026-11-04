@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -58,9 +57,9 @@ func newServerDefaultHarnessSetCmd(d deps) *cobra.Command {
 		Short: "Set the Default harness, globally or for one project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			req := wire.SetDefaultHarnessRequest{Scope: server.DefaultHarnessGlobal, Harness: args[0]}
+			req := wire.SetDefaultHarnessRequest{Scope: wire.DefaultHarnessGlobal, Harness: args[0]}
 			if project != "" {
-				req.Scope, req.Project = server.DefaultHarnessProject, project
+				req.Scope, req.Project = wire.DefaultHarnessProject, project
 			}
 			if args[0] == followGlobal {
 				if project == "" {

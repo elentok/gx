@@ -161,7 +161,7 @@ func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" || evs[1].How != tickets.HowRelaunch || evs[1].Source != server.OriginCLI {
+	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" || evs[1].How != tickets.HowRelaunch || evs[1].Source != wire.OriginCLI {
 		t.Errorf("log = %+v, want the question then pause.closed{question 1, relaunch, cli}", evs)
 	}
 }

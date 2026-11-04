@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -28,7 +27,7 @@ func TestTrunkConflict_MarkersLeftPauseTheTicketAndKeepTheBackup(t *testing.T) {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/02")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 
 	md := readFile(t, f.ticketFile(t, "02"))
 	if !strings.Contains(md, "status: paused") || !strings.Contains(md, "pause_reason: conflict-markers") {
@@ -56,7 +55,7 @@ func TestTrunkConflict_NoMarkersLeftMakesTheTicketDoneDeletesTheBackupAndLandsTh
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
 	if md := readFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
 		t.Errorf("ticket not done:\n%s", md)
@@ -79,7 +78,7 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/02")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 	if got := f.read(t, "same.txt"); !strings.Contains(got, "<<<<<<<") {
 		t.Fatalf("same.txt = %q, want conflict markers", got)
 	}
@@ -88,7 +87,7 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
 	if got := f.read(t, "same.txt"); got != "local" {
 		t.Errorf("same.txt = %q, want the backed-up local edit", got)
@@ -114,7 +113,7 @@ func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
 	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/02")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 	late := time.Now().Add(90 * 24 * time.Hour)
 
 	f.h.Server.PruneBackups(f.repo, late)

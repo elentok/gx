@@ -17,7 +17,7 @@ import (
 func limitBurnStats(t *testing.T) func(query string) wire.Stats {
 	t.Helper()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	seedLimitHistory(t, h, []string{server.LimitIDClaudeWeekly}, 0)
+	seedLimitHistory(t, h, []string{wire.LimitIDClaudeWeekly}, 0)
 	hs, err := h.Client.Handshake(context.Background())
 	if err != nil {
 		t.Fatal(err)

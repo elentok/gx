@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +35,7 @@ func newServerChecksSaveCmd(d deps) *cobra.Command {
 	}
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	c.Flags().StringVar(&req.Project, "project", "", "project to save for")
-	c.Flags().StringVar(&req.Target, "target", server.SaveTargetRepo, "repo or project.json")
+	c.Flags().StringVar(&req.Target, "target", wire.SaveTargetRepo, "repo or project.json")
 	c.Flags().StringVar(&checks, "checks", "", "the check config, as the JSON .gx/checks.json holds")
 	_ = c.MarkFlagRequired("project")
 	_ = c.MarkFlagRequired("checks")

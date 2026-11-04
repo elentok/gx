@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,7 +15,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -87,7 +87,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventIterationStarted {
+		if ev.Type == wire.EventIterationStarted {
 			break
 		}
 	}

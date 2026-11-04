@@ -14,14 +14,6 @@ import (
 // limitHistoryFile keeps every limit sample, beside claude-limits.json.
 const limitHistoryFile = "limit-history.json"
 
-// Limit ids in the history.
-const (
-	LimitIDClaude5h     = "claude-5h"
-	LimitIDClaudeWeekly = "claude-weekly"
-	LimitIDCodex5h      = "codex-5h"
-	LimitIDCodexWeekly  = "codex-weekly"
-)
-
 // limitConfirmEverySeconds is how often an unchanged limit still saves a
 // confirming sample.
 const limitConfirmEverySeconds = 3600
@@ -144,7 +136,7 @@ func (h *limitHistory) newerCodexReading(id string, seen int64) bool {
 
 // codexLimitIDs maps the two window lengths in minutes the forecast knows to
 // their limit ids; a window of any other length is not saved.
-var codexLimitIDs = map[int]string{300: LimitIDCodex5h, 10080: LimitIDCodexWeekly}
+var codexLimitIDs = map[int]string{300: wire.LimitIDCodex5h, 10080: wire.LimitIDCodexWeekly}
 
 // recordCodex saves history from one scan's Codex samples, merged across
 // agents per limit: the later reset wins, and among equal resets the highest
@@ -177,7 +169,7 @@ func (h *limitHistory) recordCodex(samples []codexsession.UsageSample, now int64
 	}
 	var saved bool
 	var errs []error
-	for _, id := range []string{LimitIDCodex5h, LimitIDCodexWeekly} {
+	for _, id := range []string{wire.LimitIDCodex5h, wire.LimitIDCodexWeekly} {
 		r, ok := merged[id]
 		if !ok {
 			continue
@@ -201,8 +193,8 @@ func (h *limitHistory) recordClaude(report wire.LimitsReport, res wire.LimitsApp
 		in  *wire.LimitWindow
 		res *wire.LimitResult
 	}{
-		{LimitIDClaude5h, report.FiveHour, res.FiveHour},
-		{LimitIDClaudeWeekly, report.SevenDay, res.SevenDay},
+		{wire.LimitIDClaude5h, report.FiveHour, res.FiveHour},
+		{wire.LimitIDClaudeWeekly, report.SevenDay, res.SevenDay},
 	} {
 		if c.in == nil || c.res == nil || c.res.Outcome == wire.LimitDropped {
 			continue

@@ -3,6 +3,7 @@ package server
 import (
 	"cmp"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"slices"
 
 	"github.com/elentok/gx/tickets"
@@ -60,6 +61,6 @@ func (s *Server) forkMergeTicket(root rootRef, e tickets.Epic, target string, ma
 		return ""
 	}
 	s.log.Info("merge ticket forked", "root", root, "ticket", id, "manual", manual)
-	s.events.publish(EventQueueChanged, root.String())
+	s.events.publish(wire.EventQueueChanged, root.String())
 	return id
 }

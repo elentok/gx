@@ -302,7 +302,7 @@ func (s *Server) budgetOverride(now time.Time) (wire.BudgetResult, error) {
 	s.cancelHardGrace()
 	status := s.budgetStatus(now)
 	s.rearmBudgetNotes(status)
-	s.events.publish(EventQueueChanged, "")
+	s.events.publish(wire.EventQueueChanged, "")
 	s.kickRunner()
 	return wire.BudgetResult{Budget: &status}, nil
 }
@@ -344,7 +344,7 @@ func (s *Server) budgetIncrease(now time.Time, req wire.BudgetIncreaseRequest) (
 	s.cancelHardGrace()
 	status := s.budgetStatus(now)
 	s.rearmBudgetNotes(status)
-	s.events.publish(EventQueueChanged, "")
+	s.events.publish(wire.EventQueueChanged, "")
 	s.kickRunner()
 	return wire.BudgetResult{Budget: &status}, nil
 }

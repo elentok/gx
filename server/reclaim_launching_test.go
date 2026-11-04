@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -85,7 +86,7 @@ func launchOne(t *testing.T, spy *launchSpy, want string) *servertest.Harness {
 func TestRunner_LaunchWritesALaunchingEntryBeforeTheAgentStartsAndFlipsIt(t *testing.T) {
 	t.Parallel()
 	spy := &launchSpy{Runner: runnerfake.NewRunner()}
-	h := launchOne(t, spy, server.EventIterationStarted)
+	h := launchOne(t, spy, wire.EventIterationStarted)
 	t.Cleanup(func() { spy.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
 	spy.mu.Lock()
 	atStart := spy.atStart
@@ -103,7 +104,7 @@ func TestRunner_AFailedLaunchLeavesNoEntry(t *testing.T) {
 	t.Parallel()
 	spy := &launchSpy{Runner: runnerfake.NewRunner()}
 	spy.SetStartErr("epic-a-iter-01", errors.New("boom"))
-	h := launchOne(t, spy, server.EventIterationLaunchFailed)
+	h := launchOne(t, spy, wire.EventIterationLaunchFailed)
 	if runs := readRuns(t, filepath.Join(h.StateDir, "runs.json")); len(runs) != 0 {
 		t.Errorf("runs.json = %v, want empty", runs)
 	}

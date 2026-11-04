@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"time"
 
@@ -83,5 +84,5 @@ wait:
 	if design.Conversation != "" {
 		s.detectDesignActionable(dir, id, design)
 	}
-	s.events.publish(EventSessionChatChanged, id)
+	s.events.publish(wire.EventSessionChatChanged, id)
 }

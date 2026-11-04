@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -74,17 +73,17 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 			if l.FiveHour == nil || l.SevenDay == nil || l.SevenDay.UsedPercentage != 81 {
 				t.Fatalf("want Claude 5h and weekly at 81%%: %+v", l)
 			}
-			claude := h.Samples[server.LimitIDClaudeWeekly]
+			claude := h.Samples[wire.LimitIDClaudeWeekly]
 			if got := daysCovered(claude, now); got < 7 {
 				t.Errorf("Claude weekly history covers %d days, want 7", got)
 			}
 			if today, yesterday := dayGain(claude, now, 0), dayGain(claude, now, 1); today != 7 || yesterday != 5 {
 				t.Errorf("Claude weekly gained %v today and %v yesterday, want 7 and 5", today, yesterday)
 			}
-			if codex := h.Latest[server.LimitIDCodexWeekly]; codex.UsedPercentage != 40 || codex.ResetsAt <= now.Unix() {
+			if codex := h.Latest[wire.LimitIDCodexWeekly]; codex.UsedPercentage != 40 || codex.ResetsAt <= now.Unix() {
 				t.Errorf("Codex weekly latest = %+v, want 40%% with the reset ahead", codex)
 			}
-			for _, id := range []string{server.LimitIDClaude5h, server.LimitIDCodex5h} {
+			for _, id := range []string{wire.LimitIDClaude5h, wire.LimitIDCodex5h} {
 				if len(h.Samples[id]) == 0 {
 					t.Errorf("no history for %s", id)
 				}
@@ -94,16 +93,16 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 			if l.SevenDay == nil || l.SevenDay.UsedPercentage != 22 {
 				t.Fatalf("want Claude weekly at 22%%: %+v", l)
 			}
-			claude := h.Samples[server.LimitIDClaudeWeekly]
+			claude := h.Samples[wire.LimitIDClaudeWeekly]
 			if first := time.Unix(claude[0].ReceivedAt, 0); first.Before(localMidnight(now)) || !first.Before(now) {
 				t.Errorf("first sample at %v, want earlier today", first)
 			}
-			if _, ok := h.Latest[server.LimitIDCodexWeekly]; ok || len(h.Samples[server.LimitIDCodexWeekly]) > 0 {
+			if _, ok := h.Latest[wire.LimitIDCodexWeekly]; ok || len(h.Samples[wire.LimitIDCodexWeekly]) > 0 {
 				t.Errorf("Codex data seeded: %+v", h.Samples)
 			}
 		}},
 		{"stale", func(t *testing.T, now time.Time, l wire.UsageLimits, h seededHistory) {
-			for _, id := range []string{server.LimitIDClaudeWeekly, server.LimitIDCodexWeekly} {
+			for _, id := range []string{wire.LimitIDClaudeWeekly, wire.LimitIDCodexWeekly} {
 				samples := h.Samples[id]
 				if got := daysCovered(samples, now); got < 7 {
 					t.Errorf("%s history covers %d days, want 7", id, got)
@@ -244,7 +243,7 @@ func TestLimitBurnFixture_UnknownShapeNamesTheValidOnes(t *testing.T) {
 func TestLimitBurnFixture_AppendedTokenCountSavesACodexSample(t *testing.T) {
 	r := startWith(t, "limit-burn", nil)
 	defer r.stop(t)
-	before := len(readSeededHistory(t, r.StateDir).Samples[server.LimitIDCodexWeekly])
+	before := len(readSeededHistory(t, r.StateDir).Samples[wire.LimitIDCodexWeekly])
 
 	var rollout string
 	deadline := time.Now().Add(30 * time.Second)
@@ -273,7 +272,7 @@ func TestLimitBurnFixture_AppendedTokenCountSavesACodexSample(t *testing.T) {
 
 	deadline = time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if len(readSeededHistory(t, r.StateDir).Samples[server.LimitIDCodexWeekly]) > before {
+		if len(readSeededHistory(t, r.StateDir).Samples[wire.LimitIDCodexWeekly]) > before {
 			return
 		}
 		time.Sleep(200 * time.Millisecond)

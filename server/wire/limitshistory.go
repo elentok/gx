@@ -8,3 +8,11 @@ type LimitSample struct {
 	ResetsAt       int64   `json:"resets_at"`
 	ReceivedAt     int64   `json:"received_at"`
 }
+
+// Limit ids in the history.
+const (
+	LimitIDClaude5h     = "claude-5h"
+	LimitIDClaudeWeekly = "claude-weekly"
+	LimitIDCodex5h      = "codex-5h"
+	LimitIDCodexWeekly  = "codex-weekly"
+)

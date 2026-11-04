@@ -1,15 +1,12 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 )
-
-// VerdictHerdrDown is the explain verdict for a queued ticket that launches on
-// herdr while herdr is down or not installed.
-const VerdictHerdrDown = "herdr down"
 
 // claimHold is why a ticket is held from claiming: the explain verdict and
 // reason that name the wait.
@@ -25,10 +22,10 @@ type claimHold struct {
 func (s *Server) claimHold(project string, t tickets.Ticket, rh ResolvedHarness) (claimHold, bool) {
 	agent := rh.Harness
 	if reason := s.queueMissingReason(project, rh); reason != "" {
-		return claimHold{Verdict: VerdictHarnessMissing, Reason: reason}, true
+		return claimHold{Verdict: wire.VerdictHarnessMissing, Reason: reason}, true
 	}
 	if reason, held := s.herdrHolds(s.launchRunner(project, agent)); held {
-		return claimHold{Verdict: VerdictHerdrDown, Reason: reason}, true
+		return claimHold{Verdict: wire.VerdictHerdrDown, Reason: reason}, true
 	}
 	if limited, held := s.registry.rateLimitHeld(string(agent)); held {
 		return claimHold{Verdict: rateLimitVerdict(limited.RateLimitReset)}, true

@@ -23,9 +23,6 @@ const (
 
 	// defaultCleanTimeout is a constant, not a setting: the spec does not make it one.
 	defaultCleanTimeout = 10 * time.Minute
-
-	// NoCleanCommand is the text for a clean with no cleanup command to run.
-	NoCleanCommand = "no cleanup command set"
 )
 
 // cleanCmd is one cleanup command of a disk and the directory it runs in.

@@ -12,3 +12,6 @@ type AFKResult struct {
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+// EventAFKChanged announces that AFK mode was switched.
+const EventAFKChanged = "afk-changed"

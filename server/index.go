@@ -91,10 +91,10 @@ func (i *index) refresh(storePath string) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	for _, addr := range changedAddresses(i.list, list) {
-		i.events.publish(EventTicketChanged, addr)
+		i.events.publish(wire.EventTicketChanged, addr)
 	}
 	for _, addr := range changedEpicMeta(i.loaded, loaded) {
-		i.events.publish(EventTicketChanged, addr)
+		i.events.publish(wire.EventTicketChanged, addr)
 	}
 	i.list, i.loaded = list, loaded
 	return nil

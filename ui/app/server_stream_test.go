@@ -14,7 +14,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
@@ -197,7 +196,7 @@ func (h *harness) switchTo(tab nav.TabID) {
 }
 
 func herdrEvent(seq uint64) wire.Event {
-	return wire.Event{Seq: seq, Type: server.EventHerdrUnavailable}
+	return wire.Event{Seq: seq, Type: wire.EventHerdrUnavailable}
 }
 
 func newStreamHarness(t *testing.T) (*harness, *streamFake) {
@@ -249,7 +248,7 @@ func TestServerStream_EventsAreReadWhateverTabIsOpen(t *testing.T) {
 				t.Errorf("event not applied while %s is open", tab)
 			}
 			h.switchTo(nav.TabWorktrees)
-			f.stream(0).ch <- wire.Event{Seq: 12, Type: server.EventHerdrAvailable}
+			f.stream(0).ch <- wire.Event{Seq: 12, Type: wire.EventHerdrAvailable}
 			h.pump()
 			if h.m.stream.vm.HerdrUnavailable {
 				t.Errorf("event not applied after switching from %s", tab)
@@ -433,7 +432,7 @@ func TestServerStream_ActivePageGetsEachChangeAndCurrentStateOnSwitch(t *testing
 
 	h.switchTo(nav.TabStatus)
 	calls := stub.calls
-	f.stream(0).ch <- wire.Event{Seq: 12, Type: server.EventHerdrAvailable}
+	f.stream(0).ch <- wire.Event{Seq: 12, Type: wire.EventHerdrAvailable}
 	h.pump()
 	if stub.calls != calls {
 		t.Errorf("hidden page was delivered to")
@@ -558,7 +557,7 @@ func TestServerStream_PauseToastsOnLiveEventsOnly(t *testing.T) {
 	f.tickets = pausedRepairTickets()
 	h.probeUp() // the snapshot holds a paused ticket: state, not news
 
-	pause := wire.Event{Seq: 11, Type: server.EventIterationPaused, Address: "gx:alpha/01"}
+	pause := wire.Event{Seq: 11, Type: wire.EventIterationPaused, Address: "gx:alpha/01"}
 	events := h.m.stream.streamEvents
 	next, cmd := h.m.Update(streamEventMsg{ev: pause, events: events})
 	if got := toastTexts(cmd); len(got) != 1 || got[0].Kind != notify.KindWarning {
@@ -717,7 +716,7 @@ func TestServerStream_EventResnapshotKeepsStreamAndQueue(t *testing.T) {
 	snapsBefore, streamsBefore, _ := f.counts()
 	_, queueBefore := f.fetches()
 
-	f.stream(0).ch <- wire.Event{Seq: 11, Type: server.EventIterationStarted, Address: "gx:alpha/01"}
+	f.stream(0).ch <- wire.Event{Seq: 11, Type: wire.EventIterationStarted, Address: "gx:alpha/01"}
 	h.pump()
 
 	snaps, streams, live := f.counts()
@@ -740,7 +739,7 @@ func TestServerStream_EventBurstResnapshotsOnce(t *testing.T) {
 	f.seq = 15 // the server's snapshot is as new as its last event
 	f.mu.Unlock()
 	for seq := uint64(11); seq <= 15; seq++ {
-		f.stream(0).ch <- wire.Event{Seq: seq, Type: server.EventIterationStarted, Address: "gx:alpha/01"}
+		f.stream(0).ch <- wire.Event{Seq: seq, Type: wire.EventIterationStarted, Address: "gx:alpha/01"}
 	}
 	h.pump()
 
@@ -779,7 +778,7 @@ func TestServerStream_QueueChangedRefetchesQueueOnce(t *testing.T) {
 	h.probeUp()
 	_, queueBefore := f.fetches()
 
-	f.stream(0).ch <- wire.Event{Seq: 11, Type: server.EventQueueChanged}
+	f.stream(0).ch <- wire.Event{Seq: 11, Type: wire.EventQueueChanged}
 	h.pump()
 
 	if _, queue := f.fetches(); queue-queueBefore != 1 {

@@ -39,7 +39,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 	}
 	recovering := func(addr string) string {
 		if addr == "proj:epic/03" {
-			return RecoveryPending
+			return wire.RecoveryPending
 		}
 		return ""
 	}
@@ -201,7 +201,7 @@ func TestSummarizeEpic_PausedDetails(t *testing.T) {
 		func(string) (time.Time, bool) { return time.Time{}, false },
 		func(addr string) string {
 			if addr == "proj:epic/03" {
-				return RecoveryEscalated
+				return wire.RecoveryEscalated
 			}
 			return ""
 		}, noLog)
@@ -209,7 +209,7 @@ func TestSummarizeEpic_PausedDetails(t *testing.T) {
 		t.Fatalf("paused = %+v", got.Paused)
 	}
 	p := got.Paused[0]
-	if p.Title != "title 03" || p.Status != tickets.StatusPausedRepair.Word() || p.Recovery != RecoveryEscalated || p.Reason != "the really long reason" {
+	if p.Title != "title 03" || p.Status != tickets.StatusPausedRepair.Word() || p.Recovery != wire.RecoveryEscalated || p.Reason != "the really long reason" {
 		t.Errorf("paused[0] = %+v", p)
 	}
 	if got.Paused[1].Reason != "cannot read it" {

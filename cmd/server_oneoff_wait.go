@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -115,7 +114,7 @@ func waitOnce(ctx context.Context, src eventSource, moved movedLookup, address s
 			continue
 		}
 		present = true
-		if _, stop := waitExitCode(t); stop && t.Recovery != server.RecoveryPending {
+		if _, stop := waitExitCode(t); stop && t.Recovery != wire.RecoveryPending {
 			return t, true, nil
 		}
 	}
@@ -158,7 +157,7 @@ func runOneOffWait(ctx context.Context, src eventSource, moved movedLookup, w, e
 		return err
 	}
 	code, _ := waitExitCode(t)
-	if t.Recovery == server.RecoveryEscalated {
+	if t.Recovery == wire.RecoveryEscalated {
 		fmt.Fprintf(errW, "%s: %s, recovery escalated\n", address, t.Status)
 		return &ExitError{Code: exitWaitEscalated}
 	}

@@ -12,10 +12,6 @@ import (
 // NoticeProjectUnavailable is the notify kind for a project whose path is gone.
 const NoticeProjectUnavailable = "project-unavailable"
 
-// VerdictProjectUnavailable is the explain verdict for a ticket of a project
-// whose path is missing.
-const VerdictProjectUnavailable = "project unavailable"
-
 // unavailableNotes latches the projects already announced as unavailable, so
 // one that stays missing notifies once and not on every poll. A project that
 // comes back leaves the set, so a second disappearance notifies again.

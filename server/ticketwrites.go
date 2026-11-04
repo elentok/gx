@@ -167,7 +167,7 @@ func (s *Server) retryWrite(web bool) http.HandlerFunc {
 		var req struct {
 			Address string `json:"address"`
 		}
-		if json.Unmarshal(body, &req) == nil && (web || r.Header.Get(InvestigateHeader) == "") && s.promptsOnRetry(req.Address) {
+		if json.Unmarshal(body, &req) == nil && (web || r.Header.Get(wire.InvestigateHeader) == "") && s.promptsOnRetry(req.Address) {
 			resume(w, r)
 			return
 		}
@@ -337,7 +337,7 @@ func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) e
 			s.log.Warn("remove cancelled worktree", "ticket", ref.address(t), "err", err)
 		}
 	}
-	s.events.publish(EventTicketCancelled, ref.address(t))
+	s.events.publish(wire.EventTicketCancelled, ref.address(t))
 	return nil
 }
 

@@ -435,7 +435,7 @@ func TestPty_LeavePtyRunLiveReattachesAfterRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	WaitForEvent(ctx, t, evs, server.EventReclaimed, "proj:epic-a/01")
+	WaitForEvent(ctx, t, evs, wire.EventReclaimed, "proj:epic-a/01")
 
 	if runs := h.Server.Runs(); len(runs) != 1 || runs[0].Runner != "pty" || runs[0].Session.Label == "" {
 		t.Errorf("runs = %+v, want the live run reattached on pty", runs)
@@ -503,7 +503,7 @@ func TestPty_RestartBuildsFreshRunnersAndReclaimsTheLiveRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	WaitForEvent(ctx, t, evs, server.EventReclaimed, "proj:epic-a/01")
+	WaitForEvent(ctx, t, evs, wire.EventReclaimed, "proj:epic-a/01")
 
 	if ptyOf(t, h, "proj") == before {
 		t.Error("Restart kept the old runner, want a fresh one")
@@ -542,7 +542,7 @@ func TestPty_ResumeAfterRestartStartsNoSecondClaude(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	WaitForEvent(ctx, t, evs, server.EventReclaimed, "proj:epic-a/01")
+	WaitForEvent(ctx, t, evs, wire.EventReclaimed, "proj:epic-a/01")
 
 	if after := holderPID(t, h, "proj", label); after != before {
 		t.Errorf("holder pid %d -> %d, want the same holder adopted", before, after)

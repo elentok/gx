@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -30,9 +29,9 @@ func (f *schedFixture) pauseRoot(t *testing.T) wire.Event {
 				t.Fatal("event stream ended before root-paused")
 			}
 			switch ev.Type {
-			case server.EventIterationFailed:
+			case wire.EventIterationFailed:
 				t.Fatalf("iteration-failed on a merge error: %+v", ev)
-			case server.EventRootPaused:
+			case wire.EventRootPaused:
 				return ev
 			}
 		case <-ctx.Done():
@@ -250,7 +249,7 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	reopened := strings.Replace(readFile(t, path), "status: done", "status: open", 1)
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), reopened)
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if md := f.epicMD(t); strings.Contains(md, "land_block") {
 		t.Errorf("default-path finish left the block on the epic:\n%s", md)
@@ -263,7 +262,7 @@ func TestMergeError_NonOverlappingLocalChangeDoesNotBlockTheMerge(t *testing.T) 
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
 	})
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip", got)

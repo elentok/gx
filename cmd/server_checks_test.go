@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -17,7 +16,7 @@ func TestServerChecksSave_JSONPrintsTheRouteResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	req := wire.SaveChecksRequest{Project: "demo", Target: server.SaveTargetProjectJSON, Checks: json.RawMessage(`{"test":false}`)}
+	req := wire.SaveChecksRequest{Project: "demo", Target: wire.SaveTargetProjectJSON, Checks: json.RawMessage(`{"test":false}`)}
 	if err := runServerChecksSave(context.Background(), h.Client, &out, req, true); err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +24,7 @@ func TestServerChecksSave_JSONPrintsTheRouteResult(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Refused || got.Path == "" || got.Target != server.SaveTargetProjectJSON {
+	if got.Refused || got.Path == "" || got.Target != wire.SaveTargetProjectJSON {
 		t.Errorf("--json = %s", out.String())
 	}
 }

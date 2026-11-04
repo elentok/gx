@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -68,8 +67,8 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		select {
 		case ev := <-evs:
-			if ev.Type != server.EventQueueChanged {
-				t.Errorf("event %d = %+v, want %s", i, ev, server.EventQueueChanged)
+			if ev.Type != wire.EventQueueChanged {
+				t.Errorf("event %d = %+v, want %s", i, ev, wire.EventQueueChanged)
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatalf("only %d of 5 queue events streamed", i)

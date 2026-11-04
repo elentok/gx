@@ -78,7 +78,7 @@ func TestServerRepair_RunsDirectlyWhenNoServerRunning(t *testing.T) {
 	if jerr := json.Unmarshal(out.Bytes(), &res); jerr != nil {
 		t.Fatalf("json: %v (%s)", jerr, out.String())
 	}
-	if err != nil || res.Via != server.ViaDirect || res.Reason != repair.ReasonNotPaused {
+	if err != nil || res.Via != wire.ViaDirect || res.Reason != repair.ReasonNotPaused {
 		t.Errorf("res = %+v, err = %v; want direct run refused %s", res, err, repair.ReasonNotPaused)
 	}
 

@@ -197,17 +197,17 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 		banner osnotify.Notification
 	}{
 		{"success", func() { servertest.WriteConfig(t, path, store, maxAgents(4)) },
-			server.EventLevelSuccess, osnotify.Notification{Title: "gx config reloaded successfully", Body: "changed: execution-queue.max-agents", Group: "gx-config"}},
+			wire.EventLevelSuccess, osnotify.Notification{Title: "gx config reloaded successfully", Body: "changed: execution-queue.max-agents", Group: "gx-config"}},
 		{"unchanged", func() {},
-			server.EventLevelSuccess, osnotify.Notification{Title: "gx config reloaded successfully", Body: "no changes", Group: "gx-config"}},
+			wire.EventLevelSuccess, osnotify.Notification{Title: "gx config reloaded successfully", Body: "no changes", Group: "gx-config"}},
 		{"warning", func() {
 			servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 4}, "server": map[string]any{"tcp-listen": true}})
-		}, server.EventLevelWarning, osnotify.Notification{Title: "gx config reloaded with warnings", Body: "restart needed for server.tcp-listen", Group: "gx-config"}},
+		}, wire.EventLevelWarning, osnotify.Notification{Title: "gx config reloaded with warnings", Body: "restart needed for server.tcp-listen", Group: "gx-config"}},
 		{"invalid", func() {
 			if err := os.WriteFile(path, []byte(`{`), 0o644); err != nil {
 				t.Fatal(err)
 			}
-		}, server.EventLevelError, osnotify.Notification{Title: "gx config reload failed", Group: "gx-config"}},
+		}, wire.EventLevelError, osnotify.Notification{Title: "gx config reload failed", Group: "gx-config"}},
 	}
 	// Baseline: the harness settings differ from any file in many keys.
 	servertest.WriteConfig(t, path, store, maxAgents(3))
@@ -224,7 +224,7 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 	for i, tc := range cases {
 		tc.write()
 		reload(t, h)
-		ev := servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
+		ev := servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
 		if ev.Level != tc.level || !strings.HasPrefix(ev.Message, tc.banner.Title) {
 			t.Errorf("%s: event = %+v, want level %s and message from %q", tc.name, ev, tc.level, tc.banner.Title)
 		}

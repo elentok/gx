@@ -7,22 +7,12 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// EventTicketChanged is emitted once per ticket whose indexed state changed
-// (added, edited or removed).
-const EventTicketChanged = "ticket-changed"
-
 const (
 	defaultSubscriberBuffer = 64
 	// Recent events kept so a client can snapshot, then subscribe from the
 	// snapshot's seq without losing what happened in between. Not persisted:
 	// events are ephemeral and a restart starts over.
 	replayWindow = 256
-)
-
-const (
-	EventLevelSuccess = "success"
-	EventLevelWarning = "warning"
-	EventLevelError   = "error"
 )
 
 // errSeqGone means the requested seq is outside the replay window: the client

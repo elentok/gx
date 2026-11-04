@@ -32,8 +32,8 @@ func (s *Server) codexSummary(now time.Time) *wire.UsageLimits {
 		weekly bool
 		dst    **wire.UsageLimitWindow
 	}{
-		{LimitIDCodex5h, false, &out.FiveHour},
-		{LimitIDCodexWeekly, true, &out.SevenDay},
+		{wire.LimitIDCodex5h, false, &out.FiveHour},
+		{wire.LimitIDCodexWeekly, true, &out.SevenDay},
 	} {
 		latest, ok := s.limitHistory.Latest(c.id)
 		if !ok {
@@ -57,10 +57,10 @@ func (s *Server) usageSummaryRead(w http.ResponseWriter, _ *http.Request) {
 	now := time.Now()
 	var claude wire.UsageLimits
 	if limits.FiveHour != nil {
-		claude.FiveHour = s.usageLimitWindow(*limits.FiveHour, LimitIDClaude5h, false, now)
+		claude.FiveHour = s.usageLimitWindow(*limits.FiveHour, wire.LimitIDClaude5h, false, now)
 	}
 	if limits.SevenDay != nil {
-		claude.SevenDay = s.usageLimitWindow(*limits.SevenDay, LimitIDClaudeWeekly, true, now)
+		claude.SevenDay = s.usageLimitWindow(*limits.SevenDay, wire.LimitIDClaudeWeekly, true, now)
 	}
 	sw := computeSpendWindows(now, s.ledger.daysCopy())
 	writeJSON(w, wire.UsageSummary{

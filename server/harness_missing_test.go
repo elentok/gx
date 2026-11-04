@@ -55,7 +55,7 @@ func TestClaimHold_HarnessMissingHoldsTicket(t *testing.T) {
 			var err error
 			servertest.WaitFor(t, 10*time.Second, "ticket held", func() bool {
 				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")
-				return err == nil && ex.Verdict == server.VerdictHarnessMissing
+				return err == nil && ex.Verdict == wire.VerdictHarnessMissing
 			})
 			for _, want := range []string{tc.missing + " is not on PATH", tc.wantFrom, tc.wantTail} {
 				if !strings.Contains(ex.Reason, want) {
@@ -113,7 +113,7 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 			var err error
 			servertest.WaitFor(t, 10*time.Second, "ticket held", func() bool {
 				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")
-				return err == nil && ex.Verdict == server.VerdictHarnessMissing
+				return err == nil && ex.Verdict == wire.VerdictHarnessMissing
 			})
 			for _, want := range []string{"codex is not on PATH", tc.wantFrom, "requeue with --agent <other>"} {
 				if !strings.Contains(ex.Reason, want) {

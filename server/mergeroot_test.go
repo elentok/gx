@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -22,7 +22,7 @@ func TestMergeRoot_FastForwardMergesOntoTheTarget(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip", got)
@@ -41,7 +41,7 @@ func TestMergeRoot_AutoFFMergeOffLeavesTheBranchAndDequeuesTheRoot(t *testing.T)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
 		t.Errorf("main contains the feature branch: %q", out)
@@ -66,7 +66,7 @@ func TestMergeRoot_OpenCodeReviewTicketHoldsTheMergeUntilItIsDone(t *testing.T) 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if mergedDuringReview.Load() {
 		t.Error("main contained the feature branch while the code-review ticket was open")
@@ -87,7 +87,7 @@ func TestMergeRoot_NeedsRebasePausesTheRootWithoutRebasing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
 	main := strings.TrimSpace(f.git(t, "rev-parse", "main"))
 	if got := strings.TrimSpace(f.git(t, "log", "-1", "--format=%s", "main")); got != "main moves on" {
@@ -132,7 +132,7 @@ func TestMergeRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	f.assertStamps(t, false)
 }
@@ -145,7 +145,7 @@ func TestMergeRoot_StampsMergedAtAndCompletedAtWhenTheEpicMerges(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	f.assertStamps(t, true)
 }
@@ -172,7 +172,7 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			evs := f.queueEpic(ctx, t, "01")
-			servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+			servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 			f.assertStamps(t, true)
 			if got := f.git(t, "rev-parse", "main"); got != main {
@@ -192,7 +192,7 @@ func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
 	f.assertStamps(t, false)
 }

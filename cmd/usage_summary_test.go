@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -41,11 +40,11 @@ func TestUsageSummary_JSONVerbCarriesForecastAndCodex(t *testing.T) {
 	var samples []wire.LimitSample
 	for d := 5; d >= 1; d-- {
 		day := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()-d, 1, 0, 0, 0, time.Local)
-		samples = append(samples, wire.LimitSample{LimitID: server.LimitIDCodexWeekly, UsedPercentage: float64(10 * (6 - d)), ResetsAt: resets, ReceivedAt: day.Unix()})
+		samples = append(samples, wire.LimitSample{LimitID: wire.LimitIDCodexWeekly, UsedPercentage: float64(10 * (6 - d)), ResetsAt: resets, ReceivedAt: day.Unix()})
 	}
 	data, err := json.Marshal(map[string]any{
-		"samples": map[string]any{server.LimitIDCodexWeekly: samples},
-		"latest":  map[string]any{server.LimitIDCodexWeekly: wire.LimitSample{LimitID: server.LimitIDCodexWeekly, UsedPercentage: 50, ResetsAt: resets, ReceivedAt: time.Now().Unix()}},
+		"samples": map[string]any{wire.LimitIDCodexWeekly: samples},
+		"latest":  map[string]any{wire.LimitIDCodexWeekly: wire.LimitSample{LimitID: wire.LimitIDCodexWeekly, UsedPercentage: 50, ResetsAt: resets, ReceivedAt: time.Now().Unix()}},
 	})
 	if err != nil {
 		t.Fatal(err)

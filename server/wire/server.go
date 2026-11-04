@@ -22,3 +22,6 @@ type Handshake struct {
 	// migration of every project has ended, pass or fail.
 	Migrating bool `json:"migrating,omitempty"`
 }
+
+// APIVersion is bumped on any incompatible change to the /v1 wire contract.
+const APIVersion = 3

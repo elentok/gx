@@ -45,7 +45,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &st); err != nil {
 		t.Fatal(err)
 	}
-	if st.LastReload == nil || st.LastReload.Outcome != server.EventLevelWarning || !slices.Equal(st.PendingRestart, []string{"server.tcp-listen"}) {
+	if st.LastReload == nil || st.LastReload.Outcome != wire.EventLevelWarning || !slices.Equal(st.PendingRestart, []string{"server.tcp-listen"}) {
 		t.Errorf("config-status --json = %s", out.String())
 	}
 

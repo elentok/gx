@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -49,9 +50,9 @@ func (s *Server) alertLongTicket(addr tickets.Address, ticketPath string, turns 
 	}); err != nil {
 		s.log.Warn("mark long ticket", "ticket", addr.String(), "err", err)
 	}
-	s.events.publish(EventTicketChanged, addr.String())
+	s.events.publish(wire.EventTicketChanged, addr.String())
 	body := fmt.Sprintf("%s has run %d assistant turns", addr, turns)
-	s.banner(EventLevelWarning, "Long ticket", body)
+	s.banner(wire.EventLevelWarning, "Long ticket", body)
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeLongTicket, Emoji: "⏳", Title: "long ticket", Detail: body})
 	if _, err := s.writeFollowUp(addr, longTicketFollowUp(addr, turns)); err != nil {
 		s.log.Warn("file long-ticket follow-up", "ticket", addr.String(), "err", err)

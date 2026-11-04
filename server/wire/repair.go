@@ -50,3 +50,6 @@ const ReasonBadBase = "bad-base"
 
 // ReasonBadTier refuses a resume whose tier is not one of ralphloop.AllTiers.
 const ReasonBadTier = "bad-tier"
+
+// ViaDirect marks a repair verb the CLI ran without a server.
+const ViaDirect = "direct"

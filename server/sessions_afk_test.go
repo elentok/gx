@@ -101,7 +101,7 @@ func TestAFK_ToggleSnapshotEventAndRestart(t *testing.T) {
 	if err != nil || !res.AFK {
 		t.Fatalf("toggle = %+v, %v; want on", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventAFKChanged, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventAFKChanged, "")
 	if snap, err := h.Client.Snapshot(ctx); err != nil || !snap.AFK {
 		t.Fatalf("snapshot afk = %v, %v; want on", snap.AFK, err)
 	}

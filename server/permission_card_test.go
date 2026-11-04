@@ -178,7 +178,7 @@ func awaitTicketChanged(t *testing.T, ctx context.Context, evs <-chan wire.Event
 	for {
 		select {
 		case ev := <-evs:
-			if ev.Type == server.EventTicketChanged && ev.Address == addr {
+			if ev.Type == wire.EventTicketChanged && ev.Address == addr {
 				return
 			}
 		case <-ctx.Done():

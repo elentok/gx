@@ -13,9 +13,6 @@ import (
 
 const viModeFileName = "vimode.json"
 
-// EventViModeChanged announces that vi mode was switched.
-const EventViModeChanged = "vimode-changed"
-
 // viModeState is the web UI's vi mode, persisted so a restart keeps it.
 type viModeState struct {
 	mu   sync.Mutex
@@ -76,7 +73,7 @@ func (s *Server) setViMode(req wire.ViModeRequest) (wire.ViModeResult, error) {
 		v.on = prev
 		return wire.ViModeResult{}, err
 	}
-	s.events.publish(EventViModeChanged, "")
+	s.events.publish(wire.EventViModeChanged, "")
 	return wire.ViModeResult{ViMode: v.on}, nil
 }
 

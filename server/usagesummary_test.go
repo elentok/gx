@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -82,7 +81,7 @@ func seedLimitHistory(t *testing.T, h *servertest.Harness, ids []string, latestA
 
 func TestUsageSummary_WeeklyCarriesChipAndForecast(t *testing.T) {
 	h := limitsHarness(t)
-	resets := seedLimitHistory(t, h, []string{server.LimitIDClaudeWeekly}, 0)
+	resets := seedLimitHistory(t, h, []string{wire.LimitIDClaudeWeekly}, 0)
 	sendLimits(t, h, wire.LimitsReport{
 		FiveHour: limitWin(20, 4_000_000_000),
 		SevenDay: limitWin(50, resets),
@@ -116,7 +115,7 @@ func TestUsageSummary_NoChipWithoutAFullDay(t *testing.T) {
 
 func TestUsageSummary_CodexRowsAreStaleByLatestReceivedAt(t *testing.T) {
 	h := limitsHarness(t)
-	seedLimitHistory(t, h, []string{server.LimitIDCodex5h, server.LimitIDCodexWeekly}, 3*time.Hour)
+	seedLimitHistory(t, h, []string{wire.LimitIDCodex5h, wire.LimitIDCodexWeekly}, 3*time.Hour)
 
 	u := usageSummary(t, h)
 	if u.Codex == nil || u.Codex.FiveHour == nil || u.Codex.SevenDay == nil {

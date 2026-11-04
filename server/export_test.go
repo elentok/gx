@@ -129,12 +129,12 @@ func (s *Server) SetMergedProbe(f func(repo, ancestor, descendant string) (bool,
 
 // ResumeAsWeb is the resume the web mux serves: it needs a state token.
 func (s *Server) ResumeAsWeb(req wire.RepairRequest) (wire.RepairResult, error) {
-	return s.repairResume(req, repairCtx{RequireState: true, origin: OriginWeb})
+	return s.repairResume(req, repairCtx{RequireState: true, origin: wire.OriginWeb})
 }
 
 // StartOverAsWeb is the start-over the web mux serves.
 func (s *Server) StartOverAsWeb(req wire.RepairRequest) (wire.RepairResult, error) {
-	return s.repairStartOver(req, repairCtx{RequireState: true, origin: OriginWeb})
+	return s.repairStartOver(req, repairCtx{RequireState: true, origin: wire.OriginWeb})
 }
 
 // ResumeAs is the resume a client of the given origin sends over the socket.

@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func runFailingInstall(t *testing.T, typ string) (f *schedFixture, starts func()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationLaunchFailed, "proj:"+schedEpic+"/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:"+schedEpic+"/01")
 	return f, f.h.Starts
 }
 

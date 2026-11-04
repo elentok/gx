@@ -22,29 +22,6 @@ import (
 )
 
 const (
-	// EventTicketClaimed streams once the ticket file says claimed.
-	EventTicketClaimed = "ticket-claimed"
-	// EventIterationStarted streams once the agent has taken its prompt.
-	EventIterationStarted = "iteration-started"
-	// EventIterationLaunchFailed streams when the launch failed and the claim
-	// was rolled back.
-	EventIterationLaunchFailed = "iteration-launch-failed"
-	// EventTicketDone streams once the ticket's commits are merged and the file says done.
-	EventTicketDone = "ticket-done"
-	// EventIterationPaused streams when a finished iteration ended without merging
-	// (asking or zero commits).
-	EventIterationPaused = "iteration-paused"
-	// EventTicketPaused streams once a person's pause is written to the ticket file.
-	EventTicketPaused = "ticket-paused"
-	// EventTicketCancelled streams once per ticket a cancel wrote.
-	EventTicketCancelled = "ticket-cancelled"
-	// EventIterationFailed streams when finishing or merging errored; the ticket stays claimed.
-	EventIterationFailed = "iteration-failed"
-	// EventRootCompleted streams once every ticket of a queued root is done.
-	EventRootCompleted = "root-completed"
-	// EventRootPaused streams when a finished root cannot fast-forward onto its target.
-	EventRootPaused = "root-paused"
-
 	implementSkill   = "gx-implement"
 	codeReviewSkill  = "gx-code-review"
 	verifySkill      = "gx-verify-epic"
@@ -54,10 +31,6 @@ const (
 	// mergeSkill carries its flag: the prompt appends the ticket address to it.
 	mergeSkill = "gx-merge --ticket"
 )
-
-// VerdictClaimRereadMismatch is the explain verdict for a ticket whose file
-// changed since the index saw it, so the last claim pass skipped it.
-const VerdictClaimRereadMismatch = "claim re-read mismatch"
 
 // refusals holds the tickets the last claim pass refused for a changed file,
 // until a claim or a later pass that finds the file unchanged clears them.
@@ -502,7 +475,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
 	s.rescan() // the claim must show now, not when the backstop poll comes
-	s.events.publish(EventTicketClaimed, ticketAddr)
+	s.events.publish(wire.EventTicketClaimed, ticketAddr)
 
 	if err := clearLongTicketMark(t.Path); err != nil {
 		s.log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
@@ -560,13 +533,13 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		if perr := s.pauseTicket(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
 			err = errors.Join(err, fmt.Errorf("pause: %w", perr))
 		}
-		s.events.publish(EventIterationLaunchFailed, ticketAddr)
+		s.events.publish(wire.EventIterationLaunchFailed, ticketAddr)
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
 	s.registry.put(trackedRun{
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
-	s.events.publish(EventIterationStarted, ticketAddr)
+	s.events.publish(wire.EventIterationStarted, ticketAddr)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
 	return true, nil
 }
@@ -795,7 +768,7 @@ func (s *Server) watchBlocked(r agentrunner.Runner, sess agentrunner.Session, ad
 			return
 		}
 		blocked = !blocked
-		s.events.publish(EventTicketChanged, addr)
+		s.events.publish(wire.EventTicketChanged, addr)
 	}
 }
 
@@ -846,7 +819,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		// person: hand the run to the waiting-run machinery as a question does.
 		keepRun = true
 		s.registry.markWaiting(ticketAddr, time.Now())
-		s.events.publish(EventIterationPaused, ticketAddr)
+		s.events.publish(wire.EventIterationPaused, ticketAddr)
 		s.announcePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
 		go s.watchUnblock(deps.Runner, run.Session, ticketAddr)
 		return
@@ -877,7 +850,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		if perr := s.pauseTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
 			s.log.Warn("pause failed finish", "ticket", ticketAddr, "err", perr)
 		}
-		s.events.publish(EventIterationFailed, ticketAddr)
+		s.events.publish(wire.EventIterationFailed, ticketAddr)
 		return
 	}
 	if !out.Merged {
@@ -887,7 +860,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			keepRun = true
 			s.registry.markWaiting(ticketAddr, time.Now())
 		}
-		s.events.publish(EventIterationPaused, ticketAddr)
+		s.events.publish(wire.EventIterationPaused, ticketAddr)
 		s.announcePause(addr, one.Ticket.Path, out.Kind, out.Reason)
 		return
 	}
@@ -896,7 +869,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	if cerr := agentrunner.Cleanup(deps.Runner, run.Session.Label); cerr != nil {
 		s.log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
 	}
-	s.events.publish(EventTicketDone, ticketAddr)
+	s.events.publish(wire.EventTicketDone, ticketAddr)
 	s.stampFinished(addr, one.Ticket.Path, false)
 	s.notifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)

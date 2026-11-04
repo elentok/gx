@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -50,11 +49,11 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 		select {
 		case ev := <-evs:
 			switch ev.Type {
-			case server.EventIterationFailed:
+			case wire.EventIterationFailed:
 				t.Fatalf("iteration-failed: %+v", ev)
-			case server.EventRootCompleted:
+			case wire.EventRootCompleted:
 				completed = append(completed, ev)
-			case server.EventRootPaused:
+			case wire.EventRootPaused:
 				paused = append(paused, ev)
 			}
 		case <-ctx.Done():
@@ -93,7 +92,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 	})
 	main := f.git(t, "rev-parse", "main")
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := f.git(t, "rev-parse", "main"); got != main {
 		t.Errorf("main moved to %s", got)

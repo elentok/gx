@@ -7,7 +7,6 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/repair"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -23,7 +22,7 @@ func endedRounds(t *testing.T, ticketPath string) []tickets.PauseRound {
 
 func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
 	t.Parallel()
-	for name, origin := range map[string]string{"cli": server.OriginCLI, "tui": server.OriginTUI} {
+	for name, origin := range map[string]string{"cli": wire.OriginCLI, "tui": wire.OriginTUI} {
 		t.Run(name, func(t *testing.T) {
 			e := startAnswerEnv(t, nil)
 			pauseEnvZeroCommit(t, e)
@@ -76,7 +75,7 @@ func TestUnmute_EndsTheRepairPausesRound(t *testing.T) {
 		t.Fatalf("unmute = %+v, %v", res, err)
 	}
 	rounds := endedRounds(t, path)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowResume || rounds[0].End.Source != server.OriginCLI {
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowResume || rounds[0].End.Source != wire.OriginCLI {
 		t.Errorf("rounds = %+v; want one ended by cli resume", rounds)
 	}
 }

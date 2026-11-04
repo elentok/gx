@@ -18,12 +18,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Scopes of a Default harness write.
-const (
-	DefaultHarnessGlobal  = "global"
-	DefaultHarnessProject = "project"
-)
-
 const defaultHarnessKey = "default-harness"
 
 func refuseDefaultHarness(reason, msg string) (wire.SetDefaultHarnessResult, error) {
@@ -89,7 +83,7 @@ func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetD
 	}
 	var path, project string
 	switch req.Scope {
-	case DefaultHarnessGlobal:
+	case wire.DefaultHarnessGlobal:
 		if req.Harness == "" {
 			return refuseDefaultHarness(wire.ReasonNoGlobalHarnessSet, "the global default needs a harness")
 		}
@@ -97,14 +91,14 @@ func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetD
 			return refuseDefaultHarness(wire.ReasonReloadUnavailable, "this server has no config file to write")
 		}
 		path = s.cfg.ConfigPath
-	case DefaultHarnessProject:
+	case wire.DefaultHarnessProject:
 		dir, err := s.projectDir(req.Project)
 		if err != nil {
 			return refuseDefaultHarness(wire.ReasonUnknownProject, "no project named "+req.Project)
 		}
 		path, project = filepath.Join(dir, config.ProjectFileName), req.Project
 	default:
-		return refuseDefaultHarness(wire.ReasonBadScope, "scope must be "+DefaultHarnessGlobal+" or "+DefaultHarnessProject)
+		return refuseDefaultHarness(wire.ReasonBadScope, "scope must be "+wire.DefaultHarnessGlobal+" or "+wire.DefaultHarnessProject)
 	}
 	if req.Harness != "" {
 		if program, missing := s.missingProgram(req.Harness); missing {
@@ -116,7 +110,7 @@ func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetD
 	if err := setAgentsKey(path, defaultHarnessKey, req.Harness); err != nil {
 		return wire.SetDefaultHarnessResult{}, err
 	}
-	if req.Scope == DefaultHarnessGlobal {
+	if req.Scope == wire.DefaultHarnessGlobal {
 		if rr := s.reloadConfig(reloadTriggerCommand); rr.Refused {
 			return refuseDefaultHarness(rr.Reason, rr.Message)
 		}

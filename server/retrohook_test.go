@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +27,7 @@ func (f *schedFixture) completeEpic(t *testing.T) []string {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	retros, err := filepath.Glob(filepath.Join(f.store, "proj", server.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +155,7 @@ func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
@@ -168,7 +169,7 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
@@ -189,7 +190,7 @@ func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)

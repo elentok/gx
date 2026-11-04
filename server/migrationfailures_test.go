@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,7 +47,7 @@ func TestMigrationFailures_FileChangeIsSeenWithoutRestart(t *testing.T) {
 	if err := migratefail.Record(h.StateDir, "removed", "ignored"); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventMigrationFailuresChanged, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventMigrationFailuresChanged, "")
 	servertest.WaitFor(t, 10*time.Second, "failure reported", func() bool {
 		got := h.Server.MigrationFailures()
 		return len(got) == 1 && got[0].Project == "proj" && got[0].Error == "boom"

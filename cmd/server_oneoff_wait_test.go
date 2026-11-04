@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -135,7 +134,7 @@ func TestWaitExitCode_BlockedPaneStopsWithThree(t *testing.T) {
 }
 
 func TestOneOffWait_WaitsThroughPendingRecovery(t *testing.T) {
-	const pending, escalated = server.RecoveryPending, server.RecoveryEscalated
+	const pending, escalated = wire.RecoveryPending, wire.RecoveryEscalated
 	for name, tc := range map[string]struct {
 		statuses, recoveries []string
 		want                 int
@@ -151,7 +150,7 @@ func TestOneOffWait_WaitsThroughPendingRecovery(t *testing.T) {
 }
 
 func TestOneOffWait_WakesOnItsInvestigation(t *testing.T) {
-	const pending, escalated = server.RecoveryPending, server.RecoveryEscalated
+	const pending, escalated = wire.RecoveryPending, wire.RecoveryEscalated
 	for name, tc := range map[string]struct {
 		statuses, recoveries []string
 		want                 int

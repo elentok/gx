@@ -6,6 +6,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,7 +53,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationLaunchFailed, "proj:epic-a/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:epic-a/01")
 
 	if posts := chat.postsSince(started); len(posts) != 1 || !strings.Contains(posts[0], "Herdr rejected Codex integration") {
 		t.Errorf("chat sends = %v, want exactly 1 carrying the launch error", posts)
@@ -105,7 +106,7 @@ func TestLaunchPort_RestartReattachesAndMergesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if prompts.Load() != 0 || starts.Load() != 0 {
 		t.Errorf("agent starts = %d, prompts = %d, want the live session reused", starts.Load(), prompts.Load())

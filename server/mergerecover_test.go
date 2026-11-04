@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,7 +83,7 @@ func TestMergeRecovery_OrphanLockForAMergedTicketFinishesIt(t *testing.T) {
 		t.Fatalf("cherry-pick: %v\n%s", err, out)
 	}
 
-	restartAndSettle(t, h, server.EventTicketDone)
+	restartAndSettle(t, h, wire.EventTicketDone)
 
 	if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusDone {
 		t.Errorf("status=%q err=%v, want done", tk.Status, err)
@@ -103,7 +104,7 @@ func TestMergeRecovery_OrphanLockForAnUnmergedTicketRollsBackTheHalfPick(t *test
 	testutil.CommitAll(t, feature, "conflict")
 	_ = exec.Command("git", "-C", feature, "cherry-pick", ralphloop.IterationBranch("epic-a", "01")).Run()
 
-	restartAndSettle(t, h, server.EventMergeRolledBack)
+	restartAndSettle(t, h, wire.EventMergeRolledBack)
 
 	if err := exec.Command("git", "-C", feature, "rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD").Run(); err == nil {
 		t.Error("cherry-pick still in progress")
@@ -124,7 +125,7 @@ func TestMergeRecovery_OrphanLockWithNoEvidencePausesAmbiguousMerge(t *testing.T
 		t.Fatal(err)
 	}
 
-	restartAndSettle(t, h, server.EventTicketPaused)
+	restartAndSettle(t, h, wire.EventTicketPaused)
 
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {

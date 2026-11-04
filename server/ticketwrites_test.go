@@ -33,7 +33,7 @@ func TestCancel_EndsThePausedTicketsRoundWithTheRequestsSource(t *testing.T) {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	rounds := endedRounds(t, path)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowCancel || rounds[0].End.Source != server.OriginCLI {
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowCancel || rounds[0].End.Source != wire.OriginCLI {
 		t.Errorf("rounds = %+v; want one ended by cli cancel", rounds)
 	}
 }
@@ -150,8 +150,8 @@ func TestCancel_FailedWorktreeRemovalDoesNotStopTheCancel(t *testing.T) {
 	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventTicketCancelled, "proj:epic-a/01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventTicketCancelled, "proj:epic-a/02")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventTicketCancelled, "proj:epic-a/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventTicketCancelled, "proj:epic-a/02")
 	for _, p := range []string{filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"), kidPath} {
 		if b, err := os.ReadFile(p); err != nil || !strings.Contains(string(b), "status: cancelled") {
 			t.Errorf("%s not cancelled: %v\n%s", p, err, b)

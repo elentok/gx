@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -89,7 +88,7 @@ func runDiskClean(ctx context.Context, cl *apiclient.Client, w io.Writer, disk s
 		}
 		lead := "freed " + config.ByteSize(res.FreedBytes).String()
 		if res.NoCleanupCommand {
-			lead = server.NoCleanCommand
+			lead = wire.NoCleanCommand
 		}
 		if _, err := fmt.Fprintf(w, "%s, %s free now, dispatch %s\n",
 			lead, config.ByteSize(res.FreeBytes).String(), held); err != nil {

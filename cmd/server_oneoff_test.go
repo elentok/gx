@@ -13,7 +13,6 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -50,7 +49,7 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:p/01", Status: wire.OneOffStatusQueued})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()
@@ -82,7 +81,7 @@ func TestServerOneOff_AgentFlagIsSentOnlyWhenGiven(t *testing.T) {
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
 		got = wire.OneOffRequest{}
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:p/01", Status: wire.OneOffStatusQueued})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()
@@ -116,7 +115,7 @@ func TestServerOneOff_NameFlagPrintsTheSharedEpicAddress(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:one-offs/12", Status: server.OneOffStatusQueued})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Address: "gx:one-offs/12", Status: wire.OneOffStatusQueued})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()

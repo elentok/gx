@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -365,9 +364,9 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 
 func toastCmd(t viewmodel.Toast) tea.Cmd {
 	switch t.Level {
-	case server.EventLevelSuccess:
+	case wire.EventLevelSuccess:
 		return notify.Success(t.Text)
-	case server.EventLevelError:
+	case wire.EventLevelError:
 		return notify.Error(t.Text)
 	}
 	return notify.Warning(t.Text)

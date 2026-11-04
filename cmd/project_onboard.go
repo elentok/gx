@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/check"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
@@ -124,11 +123,11 @@ func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, p
 		return nil
 	}
 
-	target := server.SaveTargetProjectJSON
-	if slices.Contains(pc.SaveTargets, server.SaveTargetRepo) {
+	target := wire.SaveTargetProjectJSON
+	if slices.Contains(pc.SaveTargets, wire.SaveTargetRepo) {
 		repoLabel := fmt.Sprintf("commit %s on %s", check.RepoConfigPath, pc.Trunk)
 		if choose(in, w, "Where to save?", []string{repoLabel, "keep it in project.json"}) == 0 {
-			target = server.SaveTargetRepo
+			target = wire.SaveTargetRepo
 		}
 	}
 	res, err := cl.SaveChecks(ctx, wire.SaveChecksRequest{Project: project, Target: target, Checks: proposal})
@@ -139,7 +138,7 @@ func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, p
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
 	}
 	switch {
-	case target == server.SaveTargetProjectJSON:
+	case target == wire.SaveTargetProjectJSON:
 		fmt.Fprintf(w, "Saved checks to %s\n", res.Path)
 	case res.Commit == "":
 		fmt.Fprintf(w, "%s on %s already holds this config\n", check.RepoConfigPath, res.Trunk)

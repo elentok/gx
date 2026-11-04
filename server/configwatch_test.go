@@ -60,7 +60,7 @@ func noReloadEvent(t *testing.T, evs <-chan wire.Event, why string) {
 	for {
 		select {
 		case ev := <-evs:
-			if ev.Type == server.EventConfigReloaded {
+			if ev.Type == wire.EventConfigReloaded {
 				t.Fatalf("%s: got %+v, want no reload", why, ev)
 			}
 		case <-timeout:
@@ -79,14 +79,14 @@ func TestConfigWatch_SavesReloadOnceEach(t *testing.T) {
 
 	noReloadEvent(t, evs, "startup")
 	saveByRename(t, path, store, 4)
-	ev := servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
-	if ev.Level != server.EventLevelSuccess || !strings.Contains(ev.Message, "execution-queue.max-agents") {
+	ev := servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
+	if ev.Level != wire.EventLevelSuccess || !strings.Contains(ev.Message, "execution-queue.max-agents") {
 		t.Errorf("rename save = %+v, want max-agents changed", ev)
 	}
 	noReloadEvent(t, evs, "after the rename save")
 
 	writeWatched(t, path, store, 5)
-	servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
 	noReloadEvent(t, evs, "after the in-place save")
 
 	writeWatched(t, path, store, 5)
@@ -107,8 +107,8 @@ func TestConfigWatch_MissingFileReportedOnce(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	ev := servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
-	if ev.Level != server.EventLevelError || !strings.Contains(ev.Message, "does not exist") {
+	ev := servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
+	if ev.Level != wire.EventLevelError || !strings.Contains(ev.Message, "does not exist") {
 		t.Errorf("delete = %+v, want a config-missing failure", ev)
 	}
 	if err := os.WriteFile(path+".tmp", []byte("{}"), 0o644); err != nil {
@@ -120,7 +120,7 @@ func TestConfigWatch_MissingFileReportedOnce(t *testing.T) {
 	noReloadEvent(t, evs, "still missing")
 
 	writeWatched(t, path, store, 3)
-	if ev := servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, ""); ev.Level != server.EventLevelSuccess {
+	if ev := servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, ""); ev.Level != wire.EventLevelSuccess {
 		t.Errorf("re-created = %+v, want success", ev)
 	}
 }
@@ -134,7 +134,7 @@ func TestConfigWatch_TurnsItselfOffWithoutDeadlock(t *testing.T) {
 	h, path, store, evs := watchHarness(t, ctx)
 
 	servertest.WriteConfig(t, path, store, map[string]any{"server": map[string]any{"watch-config": false}})
-	ev := servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
+	ev := servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
 	if !strings.Contains(ev.Message, "server.watch-config") {
 		t.Errorf("turn off = %+v, want server.watch-config changed", ev)
 	}
@@ -146,9 +146,9 @@ func TestConfigWatch_TurnsItselfOffWithoutDeadlock(t *testing.T) {
 	if res := reload(t, h); res.Refused || !strings.Contains(strings.Join(res.Changed, ","), "server.watch-config") {
 		t.Fatalf("turn on = %+v", res)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
 	writeWatched(t, path, store, 5)
-	servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
 }
 
 // Seam: a config.json symlink reloads when its target is saved.
@@ -177,5 +177,5 @@ func TestConfigWatch_FollowsSymlinkTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	saveByRename(t, target, store, 4)
-	servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
 }

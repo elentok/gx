@@ -65,9 +65,9 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 		if ex, err = h.Client.Explain(ctx, "proj:epic-a/01"); err != nil {
 			t.Fatal(err)
 		}
-		return ex.Verdict == server.VerdictProjectUnavailable
+		return ex.Verdict == wire.VerdictProjectUnavailable
 	})
-	if ex.Verdict != server.VerdictProjectUnavailable || !strings.Contains(ex.Reason, repo) {
+	if ex.Verdict != wire.VerdictProjectUnavailable || !strings.Contains(ex.Reason, repo) {
 		t.Fatalf("explain = %+v, want project unavailable naming %s", ex, repo)
 	}
 	servertest.Poll(15*time.Second, func() bool { return unavailableSends() > 0 })
@@ -84,7 +84,7 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ex.Verdict == server.VerdictProjectUnavailable {
+	if ex.Verdict == wire.VerdictProjectUnavailable {
 		t.Fatalf("explain after set-path = %+v, want available again", ex)
 	}
 }

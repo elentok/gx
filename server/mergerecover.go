@@ -3,16 +3,13 @@ package server
 import (
 	"fmt"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 )
-
-// EventMergeRolledBack streams when startup recovery found a merge that never
-// reached the feature branch and undid what it left half done.
-const EventMergeRolledBack = "land-rolled-back"
 
 // recoverMerges runs before anything is scheduled. A merge lock whose owner is
 // dead and that has no conflict marker means a merge was in flight when a
@@ -89,12 +86,12 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 		if err := ralphloop.RecordManualMerge(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
 			return fmt.Errorf("finishing merge of %s: %w", addr, err)
 		}
-		s.events.publish(EventTicketDone, addr)
+		s.events.publish(wire.EventTicketDone, addr)
 	case ralphloop.MergingRecoverable:
 		if err := s.abortHalfPick(run.FeatureWorktree); err != nil {
 			return fmt.Errorf("rolling back merge of %s: %w", addr, err)
 		}
-		s.events.publish(EventMergeRolledBack, addr)
+		s.events.publish(wire.EventMergeRolledBack, addr)
 	default:
 		reason := fmt.Sprintf("merge interrupted by a crash (lock owner %s) and verify cannot tell whether it merged: %s", owner.Describe(), v.Merging)
 		if err := s.pauseTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, Run{}); err != nil {

@@ -123,9 +123,9 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 		if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 			t.Fatal(err)
 		}
-		waitRecoveryState(t, h, server.RecoveryPending)
+		waitRecoveryState(t, h, wire.RecoveryPending)
 		close(release)
-		waitRecoveryState(t, h, server.RecoveryEscalated)
+		waitRecoveryState(t, h, wire.RecoveryEscalated)
 	})
 	t.Run("cleared when the hold expires", func(t *testing.T) {
 		release := make(chan struct{})
@@ -155,12 +155,12 @@ func TestRecoveryState_FromInvestigations(t *testing.T) {
 		want string
 	}{
 		"none":              {"", []wire.TicketInfo{other}, ""},
-		"open":              {"", []wire.TicketInfo{inv("open")}, server.RecoveryPending},
-		"claimed":           {"", []wire.TicketInfo{inv("claimed")}, server.RecoveryPending},
-		"paused":            {"", []wire.TicketInfo{inv("needs-repair")}, server.RecoveryEscalated},
+		"open":              {"", []wire.TicketInfo{inv("open")}, wire.RecoveryPending},
+		"claimed":           {"", []wire.TicketInfo{inv("claimed")}, wire.RecoveryPending},
+		"paused":            {"", []wire.TicketInfo{inv("needs-repair")}, wire.RecoveryEscalated},
 		"landed":            {"", []wire.TicketInfo{inv("done")}, ""},
-		"open beats paused": {"", []wire.TicketInfo{inv("needs-answer"), inv("claimed")}, server.RecoveryPending},
-		"hold wins":         {server.RecoveryEscalated, []wire.TicketInfo{inv("claimed")}, server.RecoveryEscalated},
+		"open beats paused": {"", []wire.TicketInfo{inv("needs-answer"), inv("claimed")}, wire.RecoveryPending},
+		"hold wins":         {wire.RecoveryEscalated, []wire.TicketInfo{inv("claimed")}, wire.RecoveryEscalated},
 	} {
 		if got := server.RecoveryState(tc.held, "p:e/01", tc.all); got != tc.want {
 			t.Errorf("%s: state = %q; want %q", name, got, tc.want)
@@ -177,7 +177,7 @@ func TestRecoveryNotify_SnapshotFollowsTheInvestigation(t *testing.T) {
 	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
-	waitRecoveryState(t, h, server.RecoveryEscalated)
+	waitRecoveryState(t, h, wire.RecoveryEscalated)
 	child := filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01a-investigate.md")
 	if err := schema.UpdateTicket(child, func(tk *schema.Ticket) { tk.Status = schema.StatusDone }); err != nil {
 		t.Fatal(err)

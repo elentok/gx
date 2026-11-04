@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -63,7 +64,7 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Fatalf("%q sent %d times, want once", epicNotMergedText, got)
 	}
@@ -71,7 +72,7 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 	if err := f.h.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	time.Sleep(3 * testFlushInterval) // negative wait: a repeat notice would flush within a few intervals
 
 	if got := count(epicNotMergedText); got != 1 {
@@ -105,7 +106,7 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 	if err := f.h.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 	time.Sleep(3 * testFlushInterval) // negative wait: a repeat notice would flush within a few intervals
 
 	if pauses != 1 {

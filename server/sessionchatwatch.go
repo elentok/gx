@@ -1,14 +1,11 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"sync"
 	"time"
 )
-
-// EventSessionChatChanged announces that a working session's transcript grew
-// or shrank; its address is the session id.
-const EventSessionChatChanged = "session-chat-changed"
 
 const defaultChatPollInterval = 2 * time.Second
 
@@ -86,7 +83,7 @@ func (p *chatPoll) run(stop <-chan struct{}, done chan<- struct{}) {
 		// The first reading is the baseline: growth that predates the poll
 		// is already in the chat the page loads.
 		if prev >= 0 && size != prev {
-			p.s.events.publish(EventSessionChatChanged, p.id)
+			p.s.events.publish(wire.EventSessionChatChanged, p.id)
 		}
 	}
 }

@@ -47,3 +47,9 @@ const (
 	ReasonHarnessNotOnPath   = "harness-not-on-path"
 	ReasonNoGlobalHarnessSet = "global-needs-harness"
 )
+
+// Scopes of a Default harness write.
+const (
+	DefaultHarnessGlobal  = "global"
+	DefaultHarnessProject = "project"
+)

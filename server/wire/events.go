@@ -14,3 +14,13 @@ type Event struct {
 	// Client names the TUI an event is for, by its event-stream client id.
 	Client string `json:"client,omitempty"`
 }
+
+// EventTicketChanged is emitted once per ticket whose indexed state changed
+// (added, edited or removed).
+const EventTicketChanged = "ticket-changed"
+
+const (
+	EventLevelSuccess = "success"
+	EventLevelWarning = "warning"
+	EventLevelError   = "error"
+)

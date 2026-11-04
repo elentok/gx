@@ -2,11 +2,11 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -39,7 +39,7 @@ func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 	main := f.rev(t, "main")
 	develop := f.rev(t, "develop")
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: develop@"+develop) {
 		t.Errorf("ticket lacks resolved_base develop@%s:\n%s", develop, body)
@@ -58,7 +58,7 @@ func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 	f.git(t, "branch", "release-1.2")
 	release := f.rev(t, "release-1.2")
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: release-1.2@"+release) {
 		t.Errorf("ticket lacks resolved_base release-1.2@%s:\n%s", release, body)
@@ -80,7 +80,7 @@ func TestTrunk_EditedBetweenClaimAndMergingMergesOnTheNewTrunk(t *testing.T) {
 	})
 	develop := f.rev(t, "develop")
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := f.rev(t, "next"); got != f.rev(t, schedEpic) {
 		t.Errorf("next at %s, want the feature branch tip", got)
@@ -105,7 +105,7 @@ func TestTrunk_DivergedNewTrunkNeedsRebase(t *testing.T) {
 		servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "next")
 	})
 
-	f.runEpic(t, server.EventRootPaused)
+	f.runEpic(t, wire.EventRootPaused)
 
 	if got := strings.TrimSpace(f.git(t, "log", "-1", "--format=%s", "next")); got != "next moves on" {
 		t.Errorf("next head = %q, want it untouched", got)

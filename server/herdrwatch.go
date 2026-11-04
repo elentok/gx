@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"os/exec"
 	"strings"
 	"sync"
@@ -15,11 +16,6 @@ import (
 )
 
 const (
-	// EventHerdrUnavailable and EventHerdrAvailable are emitted on transition
-	// only, never per failed retry.
-	EventHerdrUnavailable = "herdr-unavailable"
-	EventHerdrAvailable   = "herdr-available"
-
 	defaultHerdrRetryInterval = 30 * time.Second
 )
 
@@ -153,13 +149,13 @@ func (s *Server) syncHerdrBanner() {
 		return
 	}
 	if show {
-		s.events.publish(EventHerdrUnavailable, "")
-		s.chat.Notice(ralphloop.ServerNotice{Kind: EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text})
+		s.events.publish(wire.EventHerdrUnavailable, "")
+		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text})
 		return
 	}
-	s.events.publish(EventHerdrAvailable, "")
+	s.events.publish(wire.EventHerdrAvailable, "")
 	if !s.herdr.isUnavailable() {
-		s.chat.Notice(ralphloop.ServerNotice{Kind: EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
+		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
 	}
 }
 

@@ -150,7 +150,7 @@ func TestSchedulingPort_TicketCreatesSubticketsAndTheRootWaitsForThem(t *testing
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	order := f.turns()
 	if len(order) != 3 || order[0] != "01" {
@@ -179,7 +179,7 @@ func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	order := f.turns()
 	if len(order) != 4 || order[0] != "01" || order[1] != "02" {
@@ -199,7 +199,7 @@ func TestSchedulingPort_ABlocksBAndCAndTheyMergeInOrder(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if order := f.turns(); len(order) != 3 || order[0] != "01" {
 		t.Errorf("turns = %v, want 01 before 02 and 03", order)
@@ -236,7 +236,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:epic/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:epic/01")
 
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {
@@ -260,7 +260,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 	if err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	for _, name := range []string{"pre", "post"} {
 		if got := f.git(t, "show", schedEpic+":"+name+".txt"); got != name {

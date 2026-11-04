@@ -212,7 +212,7 @@ func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
 	req := wire.RepairRequest{Address: answerAddr}
-	res, err := h.Server.ResumeAs(req, server.OriginCLI)
+	res, err := h.Server.ResumeAs(req, wire.OriginCLI)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentWaiting || !strings.Contains(res.Message, "gx server agents answer") {
 		t.Fatalf("resume live = %+v, %v; want %s naming the answer verb", res, err, wire.ReasonAgentWaiting)
 	}
@@ -223,7 +223,7 @@ func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
 	if err := turn.Stop(sess); err != nil {
 		t.Fatal(err)
 	}
-	res, err = h.Server.ResumeAs(req, server.OriginCLI)
+	res, err = h.Server.ResumeAs(req, wire.OriginCLI)
 	if err != nil || res.Refused {
 		t.Fatalf("resume gone = %+v, %v", res, err)
 	}

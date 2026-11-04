@@ -16,9 +16,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// EventConfigReloaded reports one reload result; its Level and Message are set.
-const EventConfigReloaded = "config-reloaded"
-
 // Reload triggers, as logged.
 const (
 	reloadTriggerCommand = "command"
@@ -126,7 +123,7 @@ func (s *Server) applyBudgetLimits(old, next Settings) {
 	}
 	s.cancelHardGrace()
 	s.rearmBudgetNotes(s.budgetStatus(now))
-	s.events.publish(EventQueueChanged, "")
+	s.events.publish(wire.EventQueueChanged, "")
 }
 
 // reloadableSettings is next with the chat test seams, which are not config
@@ -253,7 +250,7 @@ func (s *Server) banner(level, title, body string) {
 			s.log.Warn("OS banner failed", "title", title, "error", err)
 		}
 	}()
-	s.events.publishEvent(wire.Event{Type: EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
+	s.events.publishEvent(wire.Event{Type: wire.EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
 }
 
 func joinBanner(title, body string) string {
@@ -273,11 +270,11 @@ func reloadBanner(res wire.ReloadResult) (level, title, body string) {
 		if r := []rune(body); len(r) > maxBannerBody {
 			body = string(r[:maxBannerBody-1]) + "…"
 		}
-		return EventLevelError, "gx config reload failed", body
+		return wire.EventLevelError, "gx config reload failed", body
 	case len(res.Warnings) > 0:
-		return EventLevelWarning, "gx config reloaded with warnings", strings.Join(res.Warnings, "; ")
+		return wire.EventLevelWarning, "gx config reloaded with warnings", strings.Join(res.Warnings, "; ")
 	case len(res.Changed) > 0:
-		return EventLevelSuccess, "gx config reloaded successfully", "changed: " + strings.Join(res.Changed, ", ")
+		return wire.EventLevelSuccess, "gx config reloaded successfully", "changed: " + strings.Join(res.Changed, ", ")
 	}
-	return EventLevelSuccess, "gx config reloaded successfully", "no changes"
+	return wire.EventLevelSuccess, "gx config reloaded successfully", "no changes"
 }

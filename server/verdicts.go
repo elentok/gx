@@ -39,7 +39,7 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 		return wire.Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // asking, stuck or draft
 	case ralphloop.DecisionUnclaimed:
 		if path, missing := s.unavailablePath(addr.Project); missing {
-			return wire.Explanation{Address: addr.String(), Verdict: VerdictProjectUnavailable, Reason: path + " does not exist"}
+			return wire.Explanation{Address: addr.String(), Verdict: wire.VerdictProjectUnavailable, Reason: path + " does not exist"}
 		}
 		return s.scheduleVerdict(e, t, addr)
 	case ralphloop.DecisionBlocked:
@@ -87,7 +87,7 @@ func (s *Server) waitingVerdict(addr tickets.Address) (string, bool) {
 func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.Address) wire.Explanation {
 	ex := wire.Explanation{Address: addr.String()}
 	if s.refused.has(ex.Address) {
-		ex.Verdict = VerdictClaimRereadMismatch
+		ex.Verdict = wire.VerdictClaimRereadMismatch
 		return ex
 	}
 	root := addr.Project + ":" + addr.Epic
@@ -97,11 +97,11 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		return ex
 	}
 	if reason, missing := s.trunkMissing.get(addr.Project); missing {
-		ex.Verdict, ex.Reason = VerdictTrunkMissing, reason
+		ex.Verdict, ex.Reason = wire.VerdictTrunkMissing, reason
 		return ex
 	}
 	if reason, blocked := s.migrationBlock(addr.Project); blocked {
-		ex.Verdict, ex.Reason = VerdictMigrationBlocked, reason
+		ex.Verdict, ex.Reason = wire.VerdictMigrationBlocked, reason
 		return ex
 	}
 	if d, held := s.heldDiskOf(addr.Project); held {
@@ -183,7 +183,7 @@ func (s *Server) explainQueued(addr tickets.Address, epicsOf func(project string
 		// An unreadable project.json also fails the load; the Queue tab still
 		// says why the project stopped.
 		if reason, missing := s.trunkMissing.get(addr.Project); missing {
-			return wire.Explanation{Address: addr.String(), Verdict: VerdictTrunkMissing, Reason: reason}, nil
+			return wire.Explanation{Address: addr.String(), Verdict: wire.VerdictTrunkMissing, Reason: reason}, nil
 		}
 		return wire.Explanation{}, err
 	}

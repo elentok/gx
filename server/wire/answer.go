@@ -9,3 +9,10 @@ const (
 	ReasonEmptyAnswer   = "empty-answer"
 	ReasonTooLong       = "too-long"
 )
+
+// Outcomes of the answer verb.
+const (
+	OutcomeDelivered = "delivered"
+	OutcomeAdopted   = "adopted"
+	OutcomeQueued    = "queued"
+)

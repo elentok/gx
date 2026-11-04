@@ -48,9 +48,6 @@ var retryPrompts = map[schema.PauseReason]string{
 		"Finish the work.",
 }
 
-// ViaDirect marks a repair verb the CLI ran without a server.
-const ViaDirect = "direct"
-
 // RunRepairDirect runs a repair verb without a server, for the CLI's
 // server-down fallback. The verbs take the merge lock themselves, so a live
 // server and a direct run still exclude each other.
@@ -71,7 +68,7 @@ func RunRepairDirect(ticketStore, verb string, req wire.RepairRequest) (wire.Rep
 		return wire.RepairResult{}, fmt.Errorf("unknown repair verb %q", verb)
 	}
 	res, err := do(req, repairCtx{})
-	res.Via = ViaDirect
+	res.Via = wire.ViaDirect
 	return res, err
 }
 
@@ -619,7 +616,7 @@ func repairWriteAs(web bool, do func(wire.RepairRequest, repairCtx) (wire.Repair
 		}
 		rc := repairCtx{RequireState: web, origin: requestOrigin(r, web)}
 		if !web {
-			rc.investigator = r.Header.Get(InvestigateHeader)
+			rc.investigator = r.Header.Get(wire.InvestigateHeader)
 		}
 		if web && req.State == "" {
 			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: wire.ReasonStale, Message: "a state token is required; review the current pause"}))

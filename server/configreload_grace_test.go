@@ -91,14 +91,14 @@ func (f graceFixture) lowerBelowSpend(t *testing.T) {
 	if res.Refused || len(res.Warnings) != 0 || !slices.Contains(res.Changed, "budget.hard-limit") {
 		t.Fatalf("reload = %+v, want budget.hard-limit changed with no warnings", res)
 	}
-	ev := servertest.WaitForEvent(f.ctx, t, f.evs, server.EventConfigReloaded, "")
+	ev := servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventConfigReloaded, "")
 	want := f.startTitle + ": New hard budget limit ($6.00) is below today's spend ($8.00). 1 agents will stop. " +
 		"Raise the limit in config.json or run `gx budget increase` to cancel."
-	if ev.Level != server.EventLevelWarning || ev.Message != want {
+	if ev.Level != wire.EventLevelWarning || ev.Message != want {
 		t.Fatalf("start event = %+v, want warning %q", ev, want)
 	}
-	ev = servertest.WaitForEvent(f.ctx, t, f.evs, server.EventConfigReloaded, "")
-	if ev.Level != server.EventLevelSuccess || !strings.HasPrefix(ev.Message, "gx config reloaded successfully") {
+	ev = servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventConfigReloaded, "")
+	if ev.Level != wire.EventLevelSuccess || !strings.HasPrefix(ev.Message, "gx config reloaded successfully") {
 		t.Fatalf("reload event = %+v, want the success banner", ev)
 	}
 	if !f.hasBanner(f.startTitle) {
@@ -193,11 +193,11 @@ func TestHardLimitGrace_ExpiryStopsAgents(t *testing.T) {
 	f.expectHeld(t)
 
 	const done = "gx: 1 agents stopped — hard budget limit reached."
-	ev := servertest.WaitForEvent(f.ctx, t, f.evs, server.EventConfigReloaded, "")
+	ev := servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventConfigReloaded, "")
 	for strings.HasPrefix(ev.Message, "gx config reloaded") {
-		ev = servertest.WaitForEvent(f.ctx, t, f.evs, server.EventConfigReloaded, "")
+		ev = servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventConfigReloaded, "")
 	}
-	if ev.Level != server.EventLevelError || ev.Message != done {
+	if ev.Level != wire.EventLevelError || ev.Message != done {
 		t.Fatalf("done event = %+v, want error %q", ev, done)
 	}
 	if !f.hasBanner(done) {

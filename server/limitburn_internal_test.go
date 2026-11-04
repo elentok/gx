@@ -385,8 +385,8 @@ func TestLimitBurnCodexSamples(t *testing.T) {
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.Local)
 	r := time.Date(2026, 10, 9, 0, 0, 0, 0, time.Local)
 	samples := []wire.LimitSample{
-		{LimitID: LimitIDCodexWeekly, UsedPercentage: 10, ResetsAt: r.Unix(), ReceivedAt: time.Date(2026, 10, 6, 0, 0, 0, 0, time.Local).Unix()},
-		{LimitID: LimitIDCodexWeekly, UsedPercentage: 14, ResetsAt: r.Unix(), ReceivedAt: time.Date(2026, 10, 6, 9, 0, 0, 0, time.Local).Unix()},
+		{LimitID: wire.LimitIDCodexWeekly, UsedPercentage: 10, ResetsAt: r.Unix(), ReceivedAt: time.Date(2026, 10, 6, 0, 0, 0, 0, time.Local).Unix()},
+		{LimitID: wire.LimitIDCodexWeekly, UsedPercentage: 14, ResetsAt: r.Unix(), ReceivedAt: time.Date(2026, 10, 6, 9, 0, 0, 0, time.Local).Unix()},
 	}
 	if c := limitBurnChip(samples, now); c == nil || c.Yesterday != 4 || c.Today != 0 {
 		t.Errorf("codex chip = %+v", c)

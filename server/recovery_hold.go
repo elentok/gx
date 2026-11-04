@@ -8,12 +8,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// TicketInfo.Recovery values.
-const (
-	RecoveryPending   = "pending"
-	RecoveryEscalated = "escalated"
-)
-
 // recoveryHold keeps a pause's chat message back while recovery works on the
 // ticket. Exactly one of three things then happens to it: recovery succeeds
 // and drops it, recovery fails and sends it, or the cap expires and sends it.
@@ -119,9 +113,9 @@ func recoveryState(held, address string, all []wire.TicketInfo) string {
 		switch schema.Status(t.Status) {
 		case schema.StatusDone, schema.StatusCancelled:
 		case schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
-			state = RecoveryEscalated
+			state = wire.RecoveryEscalated
 		default:
-			return RecoveryPending
+			return wire.RecoveryPending
 		}
 	}
 	return state
@@ -133,9 +127,9 @@ func (h *recoveryHold) state(key string) string {
 	defer h.mu.Unlock()
 	switch {
 	case h.held[key] != nil, h.starting[key]:
-		return RecoveryPending
+		return wire.RecoveryPending
 	case h.escalated[key]:
-		return RecoveryEscalated
+		return wire.RecoveryEscalated
 	}
 	return ""
 }

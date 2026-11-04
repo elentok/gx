@@ -13,9 +13,6 @@ import (
 
 const afkFileName = "afk.json"
 
-// EventAFKChanged announces that AFK mode was switched.
-const EventAFKChanged = "afk-changed"
-
 // afkState is AFK mode, persisted so a restart keeps sending to chat.
 type afkState struct {
 	mu   sync.Mutex
@@ -76,7 +73,7 @@ func (s *Server) setAFK(req wire.AFKRequest) (wire.AFKResult, error) {
 		a.on = prev
 		return wire.AFKResult{}, err
 	}
-	s.events.publish(EventAFKChanged, "")
+	s.events.publish(wire.EventAFKChanged, "")
 	return wire.AFKResult{AFK: a.on}, nil
 }
 

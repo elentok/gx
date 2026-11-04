@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -38,7 +37,7 @@ func codexEventWithin(evs <-chan wire.Event, t *testing.T, path, id string, d ti
 	for {
 		select {
 		case ev := <-evs:
-			if ev.Type == server.EventSessionChatChanged && ev.Address == id {
+			if ev.Type == wire.EventSessionChatChanged && ev.Address == id {
 				return true
 			}
 		case <-tick.C:

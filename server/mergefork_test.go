@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -140,7 +139,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 		t.Fatalf("add dep: %+v, %v", res, err)
 	}
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
 	if got := f.merges.Load(); got != 1 {
 		t.Errorf("merge turns = %d, want 1", got)

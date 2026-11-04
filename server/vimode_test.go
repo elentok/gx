@@ -1,9 +1,9 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -22,7 +22,7 @@ func TestViMode_SetClearToggleSnapshotEventAndRestart(t *testing.T) {
 	if err != nil || !res.ViMode {
 		t.Fatalf("toggle = %+v, %v; want on", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventViModeChanged, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventViModeChanged, "")
 	if snap, err := h.Client.Snapshot(ctx); err != nil || !snap.ViMode {
 		t.Fatalf("snapshot vi_mode = %v, %v; want on", snap.ViMode, err)
 	}
@@ -63,10 +63,10 @@ func TestViMode_OneWritePublishesOneEvent(t *testing.T) {
 	if _, err := h.Client.SetViMode(ctx, &on); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventViModeChanged, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventViModeChanged, "")
 	// A second write is a second event: the first wait consumed exactly one.
 	if _, err := h.Client.SetViMode(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventViModeChanged, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventViModeChanged, "")
 }

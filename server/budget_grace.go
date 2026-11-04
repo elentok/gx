@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"sync"
 	"time"
 
@@ -46,7 +47,7 @@ func (s *Server) startHardGrace(now time.Time, limit, spent float64) {
 	g.until = now.Add(grace)
 	g.timer = time.AfterFunc(grace, func() { s.endHardGrace(gen) })
 	g.mu.Unlock()
-	s.banner(EventLevelWarning, hardGraceTitle(grace), fmt.Sprintf(
+	s.banner(wire.EventLevelWarning, hardGraceTitle(grace), fmt.Sprintf(
 		"New hard budget limit (%s) is below today's spend (%s). %d agents will stop. Raise the limit in config.json or run `gx budget increase` to cancel.",
 		tickets.FormatCost(limit), tickets.FormatCost(spent), len(s.registry.list())))
 }
@@ -66,7 +67,7 @@ func (s *Server) cancelHardGrace() {
 		return
 	}
 	s.kickRunner()
-	s.banner(EventLevelSuccess, "gx: agent stop cancelled — hard budget limit raised.", "")
+	s.banner(wire.EventLevelSuccess, "gx: agent stop cancelled — hard budget limit raised.", "")
 }
 
 // stopHardGrace stops the countdown and reports whether one was running.
@@ -115,11 +116,11 @@ func (s *Server) endHardGrace(gen int) {
 		s.rearmBudgetNotes(s.budgetStatus(now))
 	}
 	s.reloadMu.Unlock()
-	s.events.publish(EventQueueChanged, "")
+	s.events.publish(wire.EventQueueChanged, "")
 	if !hard {
 		s.kickRunner()
 		return
 	}
 	n := s.killRuns(now, runs)
-	s.banner(EventLevelError, fmt.Sprintf("gx: %d agents stopped — hard budget limit reached.", n), "")
+	s.banner(wire.EventLevelError, fmt.Sprintf("gx: %d agents stopped — hard budget limit reached.", n), "")
 }

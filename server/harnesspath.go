@@ -9,10 +9,6 @@ import (
 	"github.com/elentok/gx/harness"
 )
 
-// VerdictHarnessMissing is the explain verdict for a queued ticket whose
-// resolved harness is not on PATH.
-const VerdictHarnessMissing = "harness missing"
-
 // defaultLookPath looks program up over env's PATH, never the process env.
 func defaultLookPath(env []string) func(string) (string, error) {
 	return func(program string) (string, error) { return brief.LookPath(env, program) }

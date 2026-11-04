@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/migratefail"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -64,8 +63,8 @@ func TestMigrationBlock_FailedProjectIsNotClaimedAndOthersAre(t *testing.T) {
 			row = r
 		}
 	}
-	if row.Verdict != server.VerdictMigrationBlocked || row.Reason != "boom" {
-		t.Fatalf("queue row = %+v, want %q with reason boom", row, server.VerdictMigrationBlocked)
+	if row.Verdict != wire.VerdictMigrationBlocked || row.Reason != "boom" {
+		t.Fatalf("queue row = %+v, want %q with reason boom", row, wire.VerdictMigrationBlocked)
 	}
 
 	// A person can still act on a ticket of the blocked project.

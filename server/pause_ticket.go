@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 
 	"github.com/elentok/gx/events"
@@ -27,7 +28,7 @@ func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		s.log.Warn("refresh after pause", "ticket", addr.String(), "err", err)
 	}
-	s.events.publish(EventTicketPaused, addr.String())
+	s.events.publish(wire.EventTicketPaused, addr.String())
 	s.announcePause(addr, ticketPath, kind, reason)
 	return nil
 }

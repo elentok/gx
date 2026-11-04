@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,7 +108,7 @@ func TestWorktreeRemoval_FastForwardMergeRemovesTheWorktreeAndKeepsTheBranch(t *
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	f.assertStamps(t, true)
 
 	f.settle(t)
@@ -122,7 +123,7 @@ func TestWorktreeRemoval_NothingToMergeRemovesTheWorktree(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	f.assertStamps(t, true)
 
 	f.settle(t)

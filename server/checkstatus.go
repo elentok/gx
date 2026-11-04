@@ -52,13 +52,13 @@ func (s *Server) checksStatus(project string) (wire.ChecksStatus, error) {
 func (s *Server) projectChecks(dir string) wire.ProjectChecks {
 	name := tickets.ProjectName(dir)
 	pf, err := config.ReadProjectFile(dir)
-	pc := wire.ProjectChecks{Project: name, SaveTargets: []string{SaveTargetRepo, SaveTargetProjectJSON}, Kinds: []wire.KindCheck{}}
+	pc := wire.ProjectChecks{Project: name, SaveTargets: []string{wire.SaveTargetRepo, wire.SaveTargetProjectJSON}, Kinds: []wire.KindCheck{}}
 	if err != nil {
 		pc.Error = err.Error()
 	}
 	vcsNone := pf.VCS != nil && *pf.VCS == config.VCSNone
 	if vcsNone {
-		pc.SaveTargets = []string{SaveTargetProjectJSON}
+		pc.SaveTargets = []string{wire.SaveTargetProjectJSON}
 	}
 	root := tickets.TrunkCheckout(s.cfg.TicketStore, name)
 	if repo := tickets.ProjectRepoRoot(s.cfg.TicketStore, name); repo != "" {

@@ -45,7 +45,7 @@ func TestHandshake_ReturnsAPIVersionAndBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.APIVersion != server.APIVersion || got.Build != "test-build" || got.Pid != os.Getpid() {
+	if got.APIVersion != wire.APIVersion || got.Build != "test-build" || got.Pid != os.Getpid() {
 		t.Errorf("handshake = %+v", got)
 	}
 }
@@ -115,7 +115,7 @@ func TestEvents_SnapshotThenSubscribeSeesTicketEditAsOneEventWithNextSeq(t *test
 
 	select {
 	case ev := <-events:
-		want := wire.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/02"}
+		want := wire.Event{Seq: snap.Seq + 1, Type: wire.EventTicketChanged, Address: "proj:epic/02"}
 		if ev != want {
 			t.Errorf("event = %+v, want %+v", ev, want)
 		}
@@ -163,7 +163,7 @@ func TestEvents_TicketChangedPingPublishesAtOnce(t *testing.T) {
 
 	select {
 	case ev := <-events:
-		want := wire.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/01"}
+		want := wire.Event{Seq: snap.Seq + 1, Type: wire.EventTicketChanged, Address: "proj:epic/01"}
 		if ev != want {
 			t.Errorf("event = %+v, want %+v", ev, want)
 		}
@@ -403,7 +403,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 		for {
 			select {
 			case ev := <-events:
-				if ev.Type == server.EventHerdrUnavailable || ev.Type == server.EventHerdrAvailable {
+				if ev.Type == wire.EventHerdrUnavailable || ev.Type == wire.EventHerdrAvailable {
 					return ev
 				}
 			case <-ctx.Done():
@@ -413,7 +413,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 		}
 	}
 	queueHerdrTicket(ctx, t, h)
-	if ev := next(); ev.Type != server.EventHerdrUnavailable {
+	if ev := next(); ev.Type != wire.EventHerdrUnavailable {
 		t.Fatalf("first event = %+v", ev)
 	}
 	if snap, err = h.Client.Snapshot(ctx); err != nil || !snap.HerdrUnavailable || !strings.Contains(snap.HerdrText, "proj:epic-a/01") {
@@ -423,7 +423,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 	// Several failed retries must not repeat the event.
 	time.Sleep(100 * time.Millisecond) // negative wait: a repeat event would show within a few retries
 	h.SetHerdrDown(false)
-	if ev := next(); ev.Type != server.EventHerdrAvailable {
+	if ev := next(); ev.Type != wire.EventHerdrAvailable {
 		t.Fatalf("second event = %+v, want herdr-available", ev)
 	}
 	after, err := h.Client.Snapshot(ctx)

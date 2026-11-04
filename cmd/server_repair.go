@@ -105,8 +105,8 @@ func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 	}
 	if jsonOut {
 		via := viaServer
-		if res.Via == server.ViaDirect {
-			via = server.ViaDirect
+		if res.Via == wire.ViaDirect {
+			via = wire.ViaDirect
 		}
 		stamped, err := stampProvenance(res, via, actorRecovery)
 		if err != nil {

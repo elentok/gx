@@ -116,7 +116,7 @@ func completedUnmerged(ctx context.Context, t *testing.T, f *schedFixture) <-cha
 	t.Helper()
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 	f.assertStamps(t, false)
 	if f.rootQueued(t) {
 		t.Fatal("root still queued after completing with auto-ff-merge off")
@@ -350,7 +350,7 @@ func TestEpicMerge_DirtyTrunkPausesTheRootAndLeavesItQueued(t *testing.T) {
 	if !strings.Contains(res.Message, "01.txt") {
 		t.Errorf("message = %q, want the blocking file", res.Message)
 	}
-	ev := servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "proj:"+schedEpic)
+	ev := servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "proj:"+schedEpic)
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q (%s)", ev.Kind, events.DirtyTrunk, ev.Message)
 	}
@@ -444,7 +444,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeForksANormalTicket(t *testing.T) {
 	if body := readFile(t, f.ticketFile(t, "02")); strings.Contains(body, "manual:") {
 		t.Errorf("race-forked ticket is manual:\n%s", body)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 }
 
 func TestEpicMerge_TrunkMovingDuringTheMergeAtTheCapPauses(t *testing.T) {
@@ -493,7 +493,7 @@ func TestEpicMerge_NonFFForksAManualTicketWhoseFinishMergesTheEpic(t *testing.T)
 		t.Fatal(err)
 	}
 	f.assertManualTicket(t, res, "02")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
 	if got := f.merges.Load(); got != 1 {
 		t.Errorf("merge turns = %d, want 1", got)
@@ -548,7 +548,7 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 		t.Fatal(err)
 	}
 	f.assertManualTicket(t, res, "02")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
 	if got := f.merges.Load(); got != 2 {
 		t.Errorf("merge turns = %d, want 2", got)
@@ -578,7 +578,7 @@ func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.assertManualTicket(t, res, "05")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
 	if got := f.merges.Load(); got != 1 {
 		t.Errorf("merge turns = %d, want 1", got)

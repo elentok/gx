@@ -102,7 +102,7 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	got := turns()
 	if len(got) != 1 {
@@ -137,14 +137,14 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/01")
 	f.assertFeatureKept(t, "pause")
 
 	// The server holds the paused PTY run, so the resume goes through it.
 	if res, err := f.h.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:" + schedEpic + "/01"}); err != nil || res.Refused {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	got := turns()
 	if len(got) != 2 {
@@ -164,7 +164,7 @@ func TestMergeTicket_FailedLaunchKeepsTheFeatureWorktree(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationLaunchFailed, "proj:"+schedEpic+"/01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:"+schedEpic+"/01")
 
 	f.assertFeatureKept(t, "discard")
 }

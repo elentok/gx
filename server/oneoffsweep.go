@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"time"
 
@@ -71,7 +72,7 @@ func (s *Server) dequeueIdleOneOffs(dir string) {
 	if err != nil {
 		s.log.Warn("dequeue idle one-offs", "root", root, "err", err)
 	} else if removed {
-		s.events.publish(EventQueueChanged, root.String())
+		s.events.publish(wire.EventQueueChanged, root.String())
 	}
 }
 

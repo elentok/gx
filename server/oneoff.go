@@ -21,10 +21,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// OneOffStatusQueued is the status a successful submit reports: it is created
-// and already at the queue tail.
-const OneOffStatusQueued = "queued"
-
 // oneOffNameWords is how many of the prompt's first words seed a default name.
 const oneOffNameWords = 4
 
@@ -262,7 +258,7 @@ func (s *Server) oneOffQueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult, 
 	if q.Refused {
 		return oneOffRefusal(q.Reason, q.Message), nil
 	}
-	return wire.OneOffResult{Address: w.addr.String(), Status: OneOffStatusQueued}, nil
+	return wire.OneOffResult{Address: w.addr.String(), Status: wire.OneOffStatusQueued}, nil
 }
 
 // queueRoot queues the root of addr. The shared epic is queued once, as a root:

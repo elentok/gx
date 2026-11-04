@@ -12,3 +12,6 @@ type ViModeResult struct {
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+// EventViModeChanged announces that vi mode was switched.
+const EventViModeChanged = "vimode-changed"

@@ -63,7 +63,7 @@ func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 			var ex wire.Explanation
 			servertest.WaitFor(t, 10*time.Second, "codex ticket held", func() bool {
 				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")
-				return err == nil && ex.Verdict == server.VerdictHerdrDown
+				return err == nil && ex.Verdict == wire.VerdictHerdrDown
 			})
 			if !strings.Contains(ex.Reason, tc.wantReason) {
 				t.Errorf("reason = %q, want it to contain %q", ex.Reason, tc.wantReason)
@@ -87,7 +87,7 @@ func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 			for sawDown := false; !sawDown; {
 				select {
 				case ev := <-evs:
-					sawDown = ev.Type == server.EventHerdrUnavailable
+					sawDown = ev.Type == wire.EventHerdrUnavailable
 				case <-ctx.Done():
 					t.Fatal("no herdr-unavailable event for the waiting codex ticket")
 				}
@@ -170,7 +170,7 @@ func TestHerdrBanner_HiddenWhileNoTicketNeedsHerdr(t *testing.T) {
 	for done := false; !done; {
 		select {
 		case ev := <-evs:
-			if ev.Type == server.EventHerdrUnavailable || ev.Type == server.EventHerdrAvailable {
+			if ev.Type == wire.EventHerdrUnavailable || ev.Type == wire.EventHerdrAvailable {
 				t.Errorf("unexpected herdr event %+v", ev)
 			}
 		default:

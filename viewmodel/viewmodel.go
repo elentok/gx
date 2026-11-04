@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
-
-	"github.com/elentok/gx/server"
 )
 
 // Effect is what the caller must do after a reduction. Events carry no
@@ -155,9 +153,9 @@ func (s State) PendingRowFor(address string) (wire.PendingRow, bool) {
 // something that just happened, so it must never produce a toast.
 func ToastFor(ev wire.Event) (Toast, bool) {
 	switch ev.Type {
-	case server.EventIterationPaused, server.EventTicketPaused:
-		return Toast{Level: server.EventLevelWarning, Text: ev.Address + " paused"}, true
-	case server.EventConfigReloaded:
+	case wire.EventIterationPaused, wire.EventTicketPaused:
+		return Toast{Level: wire.EventLevelWarning, Text: ev.Address + " paused"}, true
+	case wire.EventConfigReloaded:
 		return Toast{Level: ev.Level, Text: ev.Message}, true
 	}
 	return Toast{}, false
@@ -223,38 +221,38 @@ func (s State) Reduce(ev wire.Event) (State, Effect) {
 	// The in-place updates below only make the row react before that snapshot
 	// arrives.
 	switch ev.Type {
-	case server.EventHerdrUnavailable:
+	case wire.EventHerdrUnavailable:
 		s.HerdrUnavailable = true
 		return s, EffectNone
-	case server.EventHerdrAvailable:
+	case wire.EventHerdrAvailable:
 		s.HerdrUnavailable, s.HerdrText = false, ""
 		return s, EffectNone
 	case wire.EventSessionFocus:
 		return s, EffectNone
-	case server.EventQueueChanged:
+	case wire.EventQueueChanged:
 		return s, EffectResnapshot | EffectRefetchQueue
-	case server.EventConfigReloaded:
+	case wire.EventConfigReloaded:
 		// A failed reload kept the old settings, so there is nothing to refresh.
-		if ev.Level == server.EventLevelError {
+		if ev.Level == wire.EventLevelError {
 			return s, EffectNone
 		}
-	case server.EventTicketClaimed:
+	case wire.EventTicketClaimed:
 		s = s.withStatus(ev.Address, statusClaimed).withIteration(ev.Address, IterationClaimed)
-	case server.EventIterationStarted:
+	case wire.EventIterationStarted:
 		s = s.withIteration(ev.Address, IterationRunning)
-	case server.EventIterationPaused:
+	case wire.EventIterationPaused:
 		s = s.withIteration(ev.Address, IterationPaused)
-	case server.EventIterationFailed:
+	case wire.EventIterationFailed:
 		s = s.withIteration(ev.Address, IterationFailed)
-	case server.EventIterationLaunchFailed:
+	case wire.EventIterationLaunchFailed:
 		// The claim was rolled back, so the on-disk status is not ours to guess.
 		s = s.withoutIteration(ev.Address)
-	case server.EventTicketDone:
+	case wire.EventTicketDone:
 		// The server dequeues a root only when its epic completes, never a
 		// single ticket, so the address stays queued until the queue says
 		// otherwise. The same holds for cancel, which only writes the file.
 		s = s.withStatus(ev.Address, statusDone).withoutIteration(ev.Address)
-	case server.EventTicketCancelled:
+	case wire.EventTicketCancelled:
 		s = s.withStatus(ev.Address, statusCancelled).withoutIteration(ev.Address)
 	}
 	return s, EffectResnapshot

@@ -118,7 +118,7 @@ func (st *diskState) endTransition(free, warn, clean uint64, end cleanEnd) diskC
 	case end.failed != "":
 		st.lastClean = "failed: " + end.failed
 	case end.noWork:
-		st.lastClean = NoCleanCommand
+		st.lastClean = wire.NoCleanCommand
 	default:
 		st.lastClean = "freed " + humanize.Bytes(max(free, st.cleanFree)-st.cleanFree)
 	}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -92,8 +93,8 @@ func (s *Server) stampMerged(root rootRef, e tickets.Epic, repo, target string) 
 		return false
 	}
 	if removed {
-		s.events.publish(EventQueueChanged, root.String())
-		s.events.publish(EventRootCompleted, root.String())
+		s.events.publish(wire.EventQueueChanged, root.String())
+		s.events.publish(wire.EventRootCompleted, root.String())
 	}
 	return removed
 }

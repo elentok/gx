@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -40,7 +39,7 @@ func fakeServer(t *testing.T, h wire.Handshake) *apiclient.Client {
 }
 
 func TestNegotiate_MatchingBuildHasNoHintAndAllowsWrites(t *testing.T) {
-	c := fakeServer(t, wire.Handshake{APIVersion: server.APIVersion, Build: "b1"})
+	c := fakeServer(t, wire.Handshake{APIVersion: wire.APIVersion, Build: "b1"})
 
 	n, err := c.Negotiate(context.Background(), "b1")
 	if err != nil {
@@ -55,7 +54,7 @@ func TestNegotiate_MatchingBuildHasNoHintAndAllowsWrites(t *testing.T) {
 }
 
 func TestNegotiate_BuildMismatchOnlyHints(t *testing.T) {
-	c := fakeServer(t, wire.Handshake{APIVersion: server.APIVersion, Build: "old"})
+	c := fakeServer(t, wire.Handshake{APIVersion: wire.APIVersion, Build: "old"})
 
 	n, err := c.Negotiate(context.Background(), "new")
 	if err != nil {
@@ -71,7 +70,7 @@ func TestNegotiate_BuildMismatchOnlyHints(t *testing.T) {
 
 func TestNegotiate_APIVersionMismatchGoesReadOnly(t *testing.T) {
 	// The older version is the server a build before the pause terminology runs.
-	for _, version := range []int{server.APIVersion + 1, server.APIVersion - 1} {
+	for _, version := range []int{wire.APIVersion + 1, wire.APIVersion - 1} {
 		c := fakeServer(t, wire.Handshake{APIVersion: version, Build: "x"})
 
 		n, err := c.Negotiate(context.Background(), "x")

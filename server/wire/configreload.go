@@ -16,3 +16,6 @@ const (
 	ReasonConfigMissing     = "config-missing"
 	ReasonReloadUnavailable = "reload-unavailable"
 )
+
+// EventConfigReloaded reports one reload result; its Level and Message are set.
+const EventConfigReloaded = "config-reloaded"

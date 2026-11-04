@@ -236,7 +236,7 @@ func (s *Server) usageOverride(now time.Time, agent ralphloop.AgentKind) (wire.U
 		return wire.UsageOverrideResult{Refused: true, Reason: wire.ReasonNotGated,
 			Message: fmt.Sprintf("no %s usage window is at its limit", strings.TrimSuffix(prefix, " usage: "))}, nil
 	}
-	s.events.publish(EventQueueChanged, "")
+	s.events.publish(wire.EventQueueChanged, "")
 	s.kickRunner()
 	return wire.UsageOverrideResult{Windows: names, Until: until}, nil
 }

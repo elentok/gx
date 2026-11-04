@@ -15,13 +15,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Outcomes of the answer verb.
-const (
-	OutcomeDelivered = "delivered"
-	OutcomeAdopted   = "adopted"
-	OutcomeQueued    = "queued"
-)
-
 // maxAnswerChars caps a note, and the text of a free-text answer.
 const maxAnswerChars = 4000
 
@@ -140,7 +133,7 @@ func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note str
 func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
-			return wire.QueueResult{Outcome: OutcomeAdopted}, nil
+			return wire.QueueResult{Outcome: wire.OutcomeAdopted}, nil
 		}
 		address := ref.addr.String()
 		var run trackedRun
@@ -225,7 +218,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
 			}
 			s.rescan()
-			return wire.QueueResult{Outcome: OutcomeQueued}, nil
+			return wire.QueueResult{Outcome: wire.OutcomeQueued}, nil
 		}
 		if err := ralphloop.Claim(ref.ticket.Path); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("claim %s: %w", ref.addr, err)
@@ -234,7 +227,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			return wire.QueueResult{}, fmt.Errorf("settle %s: %w", ref.addr, err)
 		}
 		s.rescan()
-		return wire.QueueResult{Outcome: OutcomeDelivered}, nil
+		return wire.QueueResult{Outcome: wire.OutcomeDelivered}, nil
 	})
 }
 

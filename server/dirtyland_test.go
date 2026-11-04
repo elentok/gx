@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -74,7 +74,7 @@ func TestDirtyLand_CleanRestoreLandsWithoutAPauseAndKeepsTheLocalContent(t *test
 	t.Parallel()
 	f := dirtyLandFixture(t, false, nil)
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip", got)
@@ -96,7 +96,7 @@ func TestDirtyLand_BackupRefHoldsTheFilesAndRefsStashIsUntouched(t *testing.T) {
 	t.Parallel()
 	f := dirtyLandFixture(t, false, nil)
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	refs := f.backupRefs(t)
 	if len(refs) != 1 {
@@ -120,7 +120,7 @@ func TestDirtyLand_RunLogNamesTheFilesAndTheBackupRef(t *testing.T) {
 	t.Parallel()
 	f := dirtyLandFixture(t, false, nil)
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	got := f.landedEvents(t)
 	refs := f.backupRefs(t)
@@ -151,7 +151,7 @@ func TestDirtyLand_PruneDropsAnOldBackupAndKeepsAFreshOne(t *testing.T) {
 		backup("refs/gx/backups/fresh", time.Now().Add(-29*24*time.Hour))
 	})
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	refs := f.backupRefs(t)
 	if len(refs) != 2 || !slices.Contains(refs, "refs/gx/backups/fresh") || slices.Contains(refs, "refs/gx/backups/old") {
@@ -167,7 +167,7 @@ func TestDirtyLand_CheckedOutTargetOtherThanTrunkLandsToo(t *testing.T) {
 		f.git(t, "checkout", "develop")
 	})
 
-	f.runEpic(t, server.EventRootCompleted)
+	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := f.git(t, "rev-parse", "develop"); got != f.git(t, "rev-parse", schedEpic) {
 		t.Errorf("develop at %s, want the feature branch tip", got)
