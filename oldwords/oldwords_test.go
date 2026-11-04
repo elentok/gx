@@ -67,7 +67,7 @@ var allowed = map[string]allowance{
 	"events/legacy.go":              allow("read shim", "park", "needsanswer", "needsrepair", "land", "reset"),
 	// Hidden aliases.
 	"config/config.go":    allow("resume-on-start alias", "resumeonstart"),
-	"apiclient/client.go": allow("QueueDrain alias client for the hidden drain route", "drain"),
+	"apiclient/queue.go":  allow("QueueDrain alias client for the hidden drain route", "drain"),
 	"cmd/server_reads.go": allow("hidden drain and park command aliases", "drain", "park"),
 	"server/server.go":    allow("hidden /v1/queue/drain, /v1/tickets/park and unpark routes", "drain", "park"),
 	"server/web.go":       allow("hidden /v1/tickets/unpark route", "park"),
