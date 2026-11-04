@@ -89,7 +89,7 @@ var allowed = map[string]int{
 	"server/mergedecide_test.go":                    3,
 	"server/mergefork_test.go":                      1,
 	"server/migrate_gate_test.go":                   1, // negative wait: a gate that leaks would have acted by now
-	"server/migrate_test.go":                        1, // negative wait: a step that ignored the gate would have run by now
+	"server/projects/migrate_test.go":               1, // negative wait: a step that ignored the gate would have run by now
 	"server/missingtrunk_test.go":                   2,
 	"server/oneoffsweep_test.go":                    2,
 	"server/pause_test.go":                          1,

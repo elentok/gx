@@ -1,4 +1,4 @@
-package server
+package projects_test
 
 import (
 	"os"

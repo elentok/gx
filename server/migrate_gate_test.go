@@ -4,36 +4,15 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
 )
-
-// heldMigration returns a Config option whose migration step blocks until the
-// returned release is called, and a channel closed once the step is running.
-func heldMigration(t *testing.T) (opt func(*server.Config), entered <-chan struct{}, release func()) {
-	t.Helper()
-	in := make(chan struct{})
-	gate := make(chan struct{})
-	var once, relOnce sync.Once
-	reg := &migrations.Registry{}
-	reg.Register(migrations.Step{Name: "hold", Run: func(migrations.Env) ([]tickets.MigrationChange, error) {
-		once.Do(func() { close(in) })
-		<-gate
-		return nil, nil
-	}})
-	release = func() { relOnce.Do(func() { close(gate) }) }
-	t.Cleanup(release)
-	return func(c *server.Config) { c.Migrations = reg }, in, release
-}
 
 // Seam 1 and 2: while migrating, a queued ready ticket is not claimed and a
 // pending recovery does not start, yet reads and a queue add still work; after
@@ -44,7 +23,7 @@ func TestMigrate_SchedulerHoldsUntilTheRunEnds(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	opt, entered, release := heldMigration(t)
+	opt, entered, release := servertest.HeldMigration(t)
 	h := servertest.StartWithStore(t, store, opt, func(c *server.Config) {
 		c.Recovery = recovery.Catalog{Enabled: true}
 	})

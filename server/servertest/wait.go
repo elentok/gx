@@ -2,10 +2,14 @@ package servertest
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/migrations"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 )
 
 // WaitFor polls cond every few milliseconds until it holds, failing the test
@@ -25,6 +29,34 @@ func Poll(timeout time.Duration, cond func() bool) bool {
 		}
 	}
 	return true
+}
+
+// WaitMigrations fails the test unless h's start-up migrations end in time.
+func WaitMigrations(t *testing.T, h *Harness) {
+	t.Helper()
+	select {
+	case <-h.Server.MigrationsDone():
+	case <-time.After(10 * time.Second):
+		t.Fatal("migrations did not end")
+	}
+}
+
+// HeldMigration returns a Config option whose migration step blocks until the
+// returned release is called, and a channel closed once the step is running.
+func HeldMigration(t *testing.T) (opt func(*server.Config), entered <-chan struct{}, release func()) {
+	t.Helper()
+	in := make(chan struct{})
+	gate := make(chan struct{})
+	var once, relOnce sync.Once
+	reg := &migrations.Registry{}
+	reg.Register(migrations.Step{Name: "hold", Run: func(migrations.Env) ([]tickets.MigrationChange, error) {
+		once.Do(func() { close(in) })
+		<-gate
+		return nil, nil
+	}})
+	release = func() { relOnce.Do(func() { close(gate) }) }
+	t.Cleanup(release)
+	return func(c *server.Config) { c.Migrations = reg }, in, release
 }
 
 // WaitForEvent returns the first streamed event of typ for address (any

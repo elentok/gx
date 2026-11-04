@@ -1,4 +1,4 @@
-package server_test
+package projects_test
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func TestMigrate_AgentOutputWriteWaitsForTheMigrationThenLands(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake.SetState(label, agentrunner.StateBlocked, "permission to use Bash")
-	opt, entered, release := heldMigration(t)
+	opt, entered, release := servertest.HeldMigration(t)
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), opt)
 	<-entered
 	ticket := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
@@ -90,7 +90,7 @@ func TestMigrate_LandWriteWaitsForTheMigrationThenLands(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	opt, entered, release := heldMigration(t)
+	opt, entered, release := servertest.HeldMigration(t)
 	h := servertest.StartWithStore(t, store, opt)
 	<-entered
 

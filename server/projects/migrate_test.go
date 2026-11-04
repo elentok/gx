@@ -1,4 +1,4 @@
-package server_test
+package projects_test
 
 import (
 	"context"
@@ -52,13 +52,11 @@ func appliedOf(t *testing.T, store, project string) string {
 	return string(data)
 }
 
-func waitMigrations(t *testing.T, h *servertest.Harness) {
+var waitMigrations = servertest.WaitMigrations
+
+func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
-	select {
-	case <-h.Server.MigrationsDone():
-	case <-time.After(10 * time.Second):
-		t.Fatal("migrations did not end")
-	}
+	servertest.WaitFor(t, 15*time.Second, "the condition", ok)
 }
 
 // Seam: a start migrates, records, keeps going past a failure, clears a stale

@@ -536,7 +536,7 @@ func TestTokenPoll_WaitsForMigrations(t *testing.T) {
 		t.Fatalf("polled %d times while a migration was held", n)
 	}
 	release()
-	waitMigrations(t, f.h)
+	servertest.WaitMigrations(t, f.h)
 	deadline := time.Now().Add(10 * time.Second)
 	for f.readCount() == 0 {
 		if time.Now().After(deadline) {
