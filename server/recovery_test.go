@@ -559,7 +559,9 @@ func TestRecovery_UnmatchedPauseForksAQueuedInvestigateChildAndNeverRecurses(t *
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	waitFor(t, func() bool { return len(queueAddresses(t, h)) > 0 && queueAddresses(t, h)[0] == "proj:epic-a/01a" })
+	waitFor(t, func() bool {
+		return len(servertest.QueueAddresses(t, h)) > 0 && servertest.QueueAddresses(t, h)[0] == "proj:epic-a/01a"
+	})
 
 	epic := epicTickets(t, h)
 	var parent, child tickets.Ticket

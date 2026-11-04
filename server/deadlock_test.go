@@ -234,7 +234,7 @@ func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 	if child.Type != "investigate" || child.Parent != nil {
 		t.Errorf("03 = %+v, want a top-level investigate ticket", child)
 	}
-	if q := queueAddresses(t, h); !slices.Contains(q, "proj:epic-a/03") {
+	if q := servertest.QueueAddresses(t, h); !slices.Contains(q, "proj:epic-a/03") {
 		t.Errorf("queue = %v, want 03 queued", q)
 	}
 

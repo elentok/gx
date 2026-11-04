@@ -1,4 +1,4 @@
-package server_test
+package queue_test
 
 import (
 	"github.com/elentok/gx/server/wire"

@@ -44,7 +44,7 @@ func TestMigrate_SchedulerHoldsUntilTheRunEnds(t *testing.T) {
 		}
 		added <- err
 	}()
-	waitFor(t, func() bool { return slices.Contains(queueAddresses(t, h), "proj:epic-a/01") })
+	waitFor(t, func() bool { return slices.Contains(servertest.QueueAddresses(t, h), "proj:epic-a/01") })
 	h.Server.ClaimNext()
 	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is paused"})
 	time.Sleep(300 * time.Millisecond) // negative wait: a gate that leaks would have acted by now

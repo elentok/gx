@@ -1,4 +1,4 @@
-package server
+package queue_test
 
 import (
 	"testing"

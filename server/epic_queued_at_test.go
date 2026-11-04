@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
@@ -102,7 +103,7 @@ func TestQueueAdd_DraftImplEpicRefusesEpicDraftAndWritesNothing(t *testing.T) {
 	if got := queuedAtLine(epicTicketMD(t, storeDir, "feature-impl")); got != "" {
 		t.Errorf("refused add stamped %q", got)
 	}
-	if got := queueAddresses(t, h); len(got) != 0 {
+	if got := servertest.QueueAddresses(t, h); len(got) != 0 {
 		t.Errorf("queue = %v, want empty", got)
 	}
 }

@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,7 +10,6 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -80,35 +78,6 @@ func TestRunner_OneOffsEpicUsesTheOneOffCapNotThePerRootCap(t *testing.T) {
 	}
 }
 
-// waitForAgentKinds returns the kind of each of the one-off agents (labelled
-// one-offs-iter-<id>) once all of them have started.
-func waitForAgentKinds(t *testing.T, fake *runnerfake.Runner, ids ...string) map[string]agentrunner.Kind {
-	t.Helper()
-	var kinds map[string]agentrunner.Kind
-	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("%d agent starts", len(ids)), func() bool {
-		kinds = map[string]agentrunner.Kind{}
-		for _, id := range ids {
-			label := "one-offs-iter-" + id
-			if k := fake.Kind(label); k != "" {
-				kinds[label] = k
-			}
-		}
-		return len(kinds) == len(ids)
-	})
-	return kinds
-}
-
-func startOneOffsHarness(t *testing.T, store string, opts ...func(*server.Config)) *servertest.Harness {
-	t.Helper()
-	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	return servertest.StartWithStore(t, store, append(opts, func(c *server.Config) {
-		c.MaxAgentsPerRoot = 1
-		c.MaxOneOffAgents = 2
-		c.MaxAgents = 10
-		c.PollInterval = 50 * time.Millisecond
-	})...)
-}
-
 // A claude one-off and a codex one-off run side by side under one cap, each
 // under its own ticket's agent, whatever agent the queue items name.
 func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
@@ -117,7 +86,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "claude"})
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "codex"})
 	fake := runnerfake.NewRunner()
-	h := startOneOffsHarness(t, store, servertest.WithRunner(fake))
+	h := servertest.StartOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -125,7 +94,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	got := waitForAgentKinds(t, fake, "01", "02")
+	got := servertest.WaitForAgentKinds(t, fake, "01", "02")
 	if got["one-offs-iter-01"] != "claude" || got["one-offs-iter-02"] != "codex" {
 		t.Errorf("agent kinds = %v, want 01 claude and 02 codex", got)
 	}
@@ -139,7 +108,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
 	fake := runnerfake.NewRunner()
-	h := startOneOffsHarness(t, store, servertest.WithRunner(fake))
+	h := servertest.StartOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -147,38 +116,10 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	for name, kind := range waitForAgentKinds(t, fake, "01", "02") {
+	for name, kind := range servertest.WaitForAgentKinds(t, fake, "01", "02") {
 		if kind != "codex" {
 			t.Errorf("%s started as %q, want the queue item's codex", name, kind)
 		}
-	}
-}
-
-// A plain one-off and the evolve retro pin no harness, so with the default on
-// codex both claim on codex.
-func TestRunner_UnpinnedOneOffAndRetroClaimOnTheDefaultHarness(t *testing.T) {
-	t.Parallel()
-	retro := server.RetroSubmit("proj", "epic-a", time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC))
-	for name, req := range map[string]wire.OneOffRequest{
-		"plain": {Prompt: "plain job", Name: "plain-job", Project: "proj"},
-		"retro": retro,
-	} {
-		// A harness per request: the epic's root runs one ticket at a time.
-		store := t.TempDir()
-		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
-		fake := runnerfake.NewRunner()
-		h := startOneOffsHarness(t, store, servertest.WithRunner(fake), func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		res, err := h.Client.OneOff(ctx, req)
-		if err != nil || res.Refused {
-			t.Fatalf("%s: %+v, %v", name, res, err)
-		}
-		for label, kind := range waitForAgentKinds(t, fake, "01") {
-			if kind != "codex" {
-				t.Errorf("%s: %s started as %q, want the default codex", name, label, kind)
-			}
-		}
-		cancel()
 	}
 }
 
@@ -188,7 +129,7 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
-	h := startOneOffsHarness(t, store)
+	h := servertest.StartOneOffsHarness(t, store)
 	start, _, _ := registerTurn(h)
 	merged := false
 	h.Server.SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
