@@ -196,8 +196,25 @@ func family(match string) string {
 	return norm
 }
 
+// stems are lowercase substrings every old-word regexp needs. Almost no line
+// has one, and testing them is far cheaper than running the regexps.
+var stems = []string{"park", "drain", "needs", "resume-on-start", "land", "reset"}
+
+func hasStem(line string) bool {
+	lower := strings.ToLower(line)
+	for _, s := range stems {
+		if strings.Contains(lower, s) {
+			return true
+		}
+	}
+	return false
+}
+
 // oldWordFamilies returns the family of every old word on a line.
 func oldWordFamilies(rel, line string) []string {
+	if !hasStem(line) {
+		return nil
+	}
 	var res []*regexp.Regexp
 	if strings.HasPrefix(rel, "skills/") && strings.HasSuffix(rel, ".md") {
 		res = []*regexp.Regexp{skillWords}
