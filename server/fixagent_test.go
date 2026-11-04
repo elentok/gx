@@ -30,9 +30,9 @@ func startFixAgent(t *testing.T, seed func(store string)) designsFixture {
 	return startDesignsIn(t, store)
 }
 
-func (f designsFixture) fix(t *testing.T, address string) server.FixAgentResult {
+func (f designsFixture) fix(t *testing.T, address string) wire.FixAgentResult {
 	t.Helper()
-	res, err := f.h.Client.FixAgent(f.ctx, server.FixAgentRequest{Address: address})
+	res, err := f.h.Client.FixAgent(f.ctx, wire.FixAgentRequest{Address: address})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,10 +91,10 @@ func TestFixAgent_WebRefusesAnAnswerPausedTicket(t *testing.T) {
 	f := startFixAgent(t, func(store string) {
 		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "asking", servertest.TicketOpts{PauseReason: "manual"})
 	})
-	body, _ := json.Marshal(server.FixAgentRequest{Address: "proj:loop/03", State: "0:answer"})
+	body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/03", State: "0:answer"})
 	code, out := webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base))
-	if code != http.StatusOK || reasonOf(t, out) != server.ReasonFixNotRepair {
-		t.Errorf("web fix = %d %s, want %s", code, out, server.ReasonFixNotRepair)
+	if code != http.StatusOK || reasonOf(t, out) != wire.ReasonFixNotRepair {
+		t.Errorf("web fix = %d %s, want %s", code, out, wire.ReasonFixNotRepair)
 	}
 }
 
@@ -125,9 +125,9 @@ func TestFixAgent_Refusals(t *testing.T) {
 		servertest.WriteTicketWith(t, store, "proj", "loop", "04", "probe", servertest.TicketOpts{Type: "investigate", Parent: "03"})
 	})
 	for _, tc := range []struct{ addr, reason, msg string }{
-		{"proj:loop/02", server.ReasonFixNotRepair, "not paused or in error"},
-		{"proj:loop/03", server.ReasonFixInvestigating, "proj:loop/04"},
-		{"proj:loop/99", server.ReasonFixUnknownTicket, "no ticket"},
+		{"proj:loop/02", wire.ReasonFixNotRepair, "not paused or in error"},
+		{"proj:loop/03", wire.ReasonFixInvestigating, "proj:loop/04"},
+		{"proj:loop/99", wire.ReasonFixUnknownTicket, "no ticket"},
 	} {
 		res := f.fix(t, tc.addr)
 		if !res.Refused || res.Reason != tc.reason || !strings.Contains(res.Message, tc.msg) {
@@ -145,7 +145,7 @@ func TestFixAgent_NoTrunkCheckout(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "loop", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", t.TempDir()) // not a git repo, so no trunk
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
-	res, err := h.Client.FixAgent(context.Background(), server.FixAgentRequest{Address: "proj:loop/01"})
+	res, err := h.Client.FixAgent(context.Background(), wire.FixAgentRequest{Address: "proj:loop/01"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestFixAgent_ConcurrentStartsCreateOneSession(t *testing.T) {
 	t.Parallel()
 	f := startFixAgent(t, nil)
 	var wg sync.WaitGroup
-	results := make([]server.FixAgentResult, 4)
+	results := make([]wire.FixAgentResult, 4)
 	for i := range results {
 		wg.Add(1)
 		go func() {
@@ -221,14 +221,14 @@ func TestFixAgent_ProjectWithoutFailureIsRefused(t *testing.T) {
 	t.Parallel()
 	f := startFixAgent(t, nil)
 	res := f.fixProject(t, "proj")
-	if !res.Refused || res.Reason != server.ReasonFixNoFailure {
+	if !res.Refused || res.Reason != wire.ReasonFixNoFailure {
 		t.Errorf("fix = %+v", res)
 	}
 }
 
-func (f designsFixture) fixProject(t *testing.T, project string) server.FixAgentResult {
+func (f designsFixture) fixProject(t *testing.T, project string) wire.FixAgentResult {
 	t.Helper()
-	res, err := f.h.Client.FixAgent(f.ctx, server.FixAgentRequest{Project: project})
+	res, err := f.h.Client.FixAgent(f.ctx, wire.FixAgentRequest{Project: project})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestFixAgent_WebNeedsTheStateToken(t *testing.T) {
 	t.Parallel()
 	f := startFixAgent(t, nil)
 	post := func(state string) (int, string) {
-		body, _ := json.Marshal(server.FixAgentRequest{Address: "proj:loop/01", State: state})
+		body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: state})
 		return webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base))
 	}
 	for _, state := range []string{"", "5:repair", "0:answer"} {

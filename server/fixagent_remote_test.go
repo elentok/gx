@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -36,7 +36,7 @@ func startRemoteFix(t *testing.T, on bool) (*servertest.Harness, string, func(bo
 func TestFixAgent_RemoteControlKeyOn(t *testing.T) {
 	t.Parallel()
 	h, addr, _ := startRemoteFix(t, true)
-	res, err := h.Client.FixAgent(context.Background(), server.FixAgentRequest{Address: addr})
+	res, err := h.Client.FixAgent(context.Background(), wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}
@@ -51,7 +51,7 @@ func TestFixAgent_RemoteControlKeyOn(t *testing.T) {
 func TestFixAgent_RemoteControlKeyOff(t *testing.T) {
 	t.Parallel()
 	h, addr, _ := startRemoteFix(t, false)
-	res, err := h.Client.FixAgent(context.Background(), server.FixAgentRequest{Address: addr})
+	res, err := h.Client.FixAgent(context.Background(), wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}
@@ -73,7 +73,7 @@ func TestFixAgent_ResumeKeepsRemoteControlAfterKeyOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.FixAgent(ctx, server.FixAgentRequest{Address: addr})
+	res, err := h.Client.FixAgent(ctx, wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}

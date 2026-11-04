@@ -67,7 +67,7 @@ func newProjectCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), worktreesJSON, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) ([]server.ProjectWorktrees, error) {
+				func(ctx context.Context, cl *apiclient.Client) ([]wire.ProjectWorktrees, error) {
 					return cl.ProjectWorktrees(ctx)
 				},
 				printProjectWorktrees)
@@ -945,7 +945,7 @@ func printProjects(w io.Writer, projects []server.ProjectInfo) error {
 	return nil
 }
 
-func printProjectWorktrees(w io.Writer, projects []server.ProjectWorktrees) error {
+func printProjectWorktrees(w io.Writer, projects []wire.ProjectWorktrees) error {
 	for _, p := range projects {
 		if _, err := fmt.Fprintf(w, "%s\t%s\n", p.Project, p.Root); err != nil {
 			return err

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -53,7 +54,7 @@ type EpicDetailRow struct {
 	Current bool `json:"current,omitempty"`
 	Blocked bool `json:"blocked,omitempty"`
 	// HarnessLabel is set on a loop epic's open, blocked and claimed rows.
-	HarnessLabel `tstype:",extends"`
+	wire.HarnessLabel `tstype:",extends"`
 }
 
 // MapStepState is where a Progress step stands.

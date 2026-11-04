@@ -52,9 +52,9 @@ type TicketInfo struct {
 	Compactions           int     `json:"compactions,omitempty"`
 
 	// HarnessLabel is filled by the snapshot handler for open, blocked and claimed tickets.
-	HarnessLabel `tstype:",extends"`
-	Category     string    `json:"category,omitempty"`
-	ExportedAt   time.Time `json:"exported_at,omitzero"`
+	wire.HarnessLabel `tstype:",extends"`
+	Category          string    `json:"category,omitempty"`
+	ExportedAt        time.Time `json:"exported_at,omitzero"`
 	// Mutes is what the Context menu's "Unmute & Reopen" keys off.
 	Mutes []schema.MuteRecord `json:"mutes,omitempty"`
 

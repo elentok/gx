@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +14,7 @@ func runAgentsFix(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOu
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.FixAgent(ctx, server.FixAgentRequest{Address: address})
+	res, err := cl.FixAgent(ctx, wire.FixAgentRequest{Address: address})
 	return printSessionResult(w, jsonOut, res.SessionResult, err)
 }
 

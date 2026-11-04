@@ -93,7 +93,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		{"fix agent", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
-			res, err := f.h.Client.FixAgent(f.ctx, server.FixAgentRequest{Address: "proj:loop/01"})
+			res, err := f.h.Client.FixAgent(f.ctx, wire.FixAgentRequest{Address: "proj:loop/01"})
 			if err != nil {
 				t.Fatal(err)
 			}

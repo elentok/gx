@@ -204,6 +204,54 @@ export interface DiskReport {
 }
 
 //////////
+// source: fixagent.go
+
+export const ReasonFixUnknownTicket = "unknown-ticket";
+export const ReasonFixNotRepair = "not-paused-for-repair";
+export const ReasonFixInvestigating = "investigating";
+export const ReasonFixNoFailure = "no-migration-failure";
+/**
+ * Refusal reasons of the fix-agent route, beside the session ones.
+ */
+export type ReasonFix = typeof ReasonFixUnknownTicket | typeof ReasonFixNotRepair | typeof ReasonFixInvestigating | typeof ReasonFixNoFailure;
+/**
+ * FixAgentRequest is the body of POST /v1/tickets/fix-agent. State is the
+ * token of the row paused for repair the web saw, required on the web mux.
+ * Project instead of Address asks for an agent fixing that project's saved
+ * failed migration.
+ */
+export interface FixAgentRequest {
+  address?: string;
+  project?: string;
+  state?: string;
+}
+/**
+ * FixAgentResult is the session result plus whether remote control was applied.
+ */
+export interface FixAgentResult extends SessionResult {
+  remote_control: boolean;
+}
+
+//////////
+// source: harnesslabel.go
+
+/**
+ * HarnessLabel is what a ticket row shows as `harness · tier · model effort`.
+ * A waiting ticket carries the harness it will launch under and why in
+ * HarnessNote; a running one carries what its run launched under.
+ */
+export interface HarnessLabel {
+  /**
+   * Harness is "claude" or "codex"; empty for a waiting ticket that follows the default.
+   */
+  harness?: string;
+  tier?: string;
+  model?: string;
+  effort?: string;
+  harness_note?: string;
+}
+
+//////////
 // source: healthreport.go
 
 export const PressureNormal = "normal";
@@ -494,6 +542,21 @@ export interface LimitResult {
 export interface LimitsApplyResult {
   FiveHour?: LimitResult;
   SevenDay?: LimitResult;
+}
+
+//////////
+// source: projectworktrees.go
+
+/**
+ * ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
+ * repo root, the dirs of its other worktrees and the model each tier runs under
+ * for the chat harness (empty when that tier inherits the CLI's own setting).
+ */
+export interface ProjectWorktrees {
+  project: string;
+  root: string;
+  worktrees: string[];
+  tiers: { [key: string]: string};
 }
 
 //////////

@@ -11,11 +11,8 @@ packages:
       - epicdetail.go
       - epiclist.go
       - epicsummary.go
-      - fixagent.go
-      - harnesslabel.go
       - index.go
       - pause.go
-      - projectworktrees.go
       - recentlyfinished.go
       - migrate.go
       - verdicts.go
@@ -24,13 +21,14 @@ packages:
     # below (tygo loads syntax only, so it cannot resolve wire.X itself).
     frontmatter: |
       export * from './wire';
-      import type { BudgetStatus, DiskStatus, Health, SessionInfo, SessionResult } from './wire';
+      import type { BudgetStatus, DiskStatus, Health, HarnessLabel, SessionInfo, SessionResult } from './wire';
     type_mappings:
       time.Time: "string"
       tickets.DesignStep: "string"
       wire.BudgetStatus: "BudgetStatus"
       wire.DiskStatus: "DiskStatus"
       wire.Health: "Health"
+      wire.HarnessLabel: "HarnessLabel"
       wire.SessionInfo: "SessionInfo"
       wire.SessionResult: "SessionResult"
     enum_style: "union"
@@ -43,11 +41,14 @@ packages:
       - checkstatus.go
       - diskcleannow.go
       - diskwatch.go
+      - fixagent.go
+      - harnesslabel.go
       - healthreport.go
       - healthtypes.go
       - limitburn.go
       - limitsevents.go
       - limitsstore.go
+      - projectworktrees.go
       - restart.go
       - restartcheck.go
       - sessionautoadvance.go

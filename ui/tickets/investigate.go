@@ -20,7 +20,7 @@ func investigateCmd(api ServerAPI, address string) tea.Cmd {
 	}
 	return func() tea.Msg {
 		ctx := context.Background()
-		res, err := api.FixAgent(ctx, server.FixAgentRequest{Address: address})
+		res, err := api.FixAgent(ctx, wire.FixAgentRequest{Address: address})
 		switch {
 		case err != nil:
 			return notify.Error("investigate: " + err.Error())()

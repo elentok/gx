@@ -41,7 +41,7 @@ type fakeServerAPI struct {
 	designWorktree    server.DesignWorktreeResult
 	designWorktreeErr error
 	// fixAgent is what FixAgent returns.
-	fixAgent server.FixAgentResult
+	fixAgent wire.FixAgentResult
 	// snap and queue are what Snapshot and QueueItems return.
 	snap  server.Snapshot
 	queue []server.QueueItem
@@ -157,7 +157,7 @@ func (f fakeServerAPI) DesignWorktree(_ context.Context, req server.DesignWorktr
 	return f.designWorktree, f.designWorktreeErr
 }
 
-func (f fakeServerAPI) FixAgent(_ context.Context, req server.FixAgentRequest) (server.FixAgentResult, error) {
+func (f fakeServerAPI) FixAgent(_ context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error) {
 	f.record("fix-agent " + req.Address)
 	return f.fixAgent, nil
 }

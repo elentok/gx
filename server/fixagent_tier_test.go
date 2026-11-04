@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestFixAgent_RunsOnStrongestAndResumeKeepsIt(t *testing.T) {
@@ -17,7 +17,7 @@ func TestFixAgent_RunsOnStrongestAndResumeKeepsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.FixAgent(ctx, server.FixAgentRequest{Address: addr})
+	res, err := h.Client.FixAgent(ctx, wire.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("fix = %+v, %v", res, err)
 	}

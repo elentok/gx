@@ -8,18 +8,9 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
-
-// ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
-// repo root, the dirs of its other worktrees and the model each tier runs under
-// for the chat harness (empty when that tier inherits the CLI's own setting).
-type ProjectWorktrees struct {
-	Project   string            `json:"project"`
-	Root      string            `json:"root"`
-	Worktrees []string          `json:"worktrees"`
-	Tiers     map[string]string `json:"tiers"`
-}
 
 func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
 	list, err := s.listProjectWorktrees()
@@ -43,12 +34,12 @@ func (s *Server) tierModels(project string) map[string]string {
 }
 
 // listProjectWorktrees lists each project that has a repo in project.json.
-func (s *Server) listProjectWorktrees() ([]ProjectWorktrees, error) {
+func (s *Server) listProjectWorktrees() ([]wire.ProjectWorktrees, error) {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return nil, err
 	}
-	list := []ProjectWorktrees{}
+	list := []wire.ProjectWorktrees{}
 	for _, dir := range dirs {
 		pf, err := config.ReadProjectFile(dir)
 		if err != nil || pf.Repo == nil {
@@ -59,7 +50,7 @@ func (s *Server) listProjectWorktrees() ([]ProjectWorktrees, error) {
 			continue
 		}
 		name := tickets.ProjectName(dir)
-		p := ProjectWorktrees{Project: name, Root: repo.Root, Worktrees: []string{}, Tiers: s.tierModels(name)}
+		p := wire.ProjectWorktrees{Project: name, Root: repo.Root, Worktrees: []string{}, Tiers: s.tierModels(name)}
 		wts, _ := git.ListWorktrees(*repo)
 		for _, wt := range wts {
 			if filepath.Clean(wt.Path) != filepath.Clean(repo.Root) {

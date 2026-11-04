@@ -17,8 +17,8 @@ func (c *Client) Projects(ctx context.Context) ([]server.ProjectInfo, error) {
 }
 
 // ProjectWorktrees returns each project's repo root and other worktree dirs.
-func (c *Client) ProjectWorktrees(ctx context.Context) ([]server.ProjectWorktrees, error) {
-	var p []server.ProjectWorktrees
+func (c *Client) ProjectWorktrees(ctx context.Context) ([]wire.ProjectWorktrees, error) {
+	var p []wire.ProjectWorktrees
 	err := c.get(ctx, "/v1/projects/worktrees", &p)
 	return p, err
 }

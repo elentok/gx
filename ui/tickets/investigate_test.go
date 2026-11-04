@@ -12,7 +12,7 @@ import (
 
 func TestInvestigate_PostsTheAddressAndLandsOnTheNewSession(t *testing.T) {
 	var calls []string
-	api := fakeServerAPI{calls: &calls, fixAgent: server.FixAgentResult{SessionResult: wire.SessionResult{Session: &wire.SessionInfo{ID: "fix-1"}}}}
+	api := fakeServerAPI{calls: &calls, fixAgent: wire.FixAgentResult{SessionResult: wire.SessionResult{Session: &wire.SessionInfo{ID: "fix-1"}}}}
 
 	got := investigateCmd(api, "gx:map/01")()
 
@@ -26,7 +26,7 @@ func TestInvestigate_PostsTheAddressAndLandsOnTheNewSession(t *testing.T) {
 
 func TestInvestigate_NameTakenSelectsTheExistingFixAgent(t *testing.T) {
 	api := fakeServerAPI{
-		fixAgent: server.FixAgentResult{SessionResult: wire.SessionResult{Refused: true, Reason: wire.ReasonSessionNameTaken}},
+		fixAgent: wire.FixAgentResult{SessionResult: wire.SessionResult{Refused: true, Reason: wire.ReasonSessionNameTaken}},
 		snap: server.Snapshot{Sessions: []wire.SessionInfo{
 			{ID: "other", Name: "alpha"},
 			{ID: "fix-1", Name: server.FixAgentName("gx:map/01")},
@@ -42,7 +42,7 @@ func TestInvestigate_NameTakenSelectsTheExistingFixAgent(t *testing.T) {
 
 func TestInvestigate_InvestigatingRefusalIsAToast(t *testing.T) {
 	msg := "gx:map/01 is already being investigated in gx:map/05"
-	api := fakeServerAPI{fixAgent: server.FixAgentResult{SessionResult: wire.SessionResult{Refused: true, Reason: server.ReasonFixInvestigating, Message: msg}}}
+	api := fakeServerAPI{fixAgent: wire.FixAgentResult{SessionResult: wire.SessionResult{Refused: true, Reason: wire.ReasonFixInvestigating, Message: msg}}}
 
 	got := investigateCmd(api, "gx:map/01")()
 

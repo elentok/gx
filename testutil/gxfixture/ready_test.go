@@ -373,7 +373,7 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 		t.Errorf("b2 has %d chat messages, want none", n)
 	}
 
-	var projects []server.ProjectWorktrees
+	var projects []wire.ProjectWorktrees
 	if err := json.Unmarshal([]byte(r.gx(t, "project", "worktrees", "--json")), &projects); err != nil {
 		t.Fatal(err)
 	}

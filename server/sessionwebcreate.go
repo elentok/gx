@@ -53,7 +53,7 @@ func (s *Server) checkProjectDir(project, dir string) (*wire.SessionResult, erro
 	if err != nil {
 		return nil, err
 	}
-	i := slices.IndexFunc(list, func(p ProjectWorktrees) bool { return p.Project == project })
+	i := slices.IndexFunc(list, func(p wire.ProjectWorktrees) bool { return p.Project == project })
 	if i < 0 {
 		res := sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %q is not configured", project))
 		return &res, nil

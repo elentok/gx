@@ -41,7 +41,7 @@ type ServerAPI interface {
 	DesignWorktree(ctx context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error)
 	Iterations(ctx context.Context) ([]server.IterationInfo, error)
 	TicketChanged(ctx context.Context, address string) error
-	FixAgent(ctx context.Context, req server.FixAgentRequest) (server.FixAgentResult, error)
+	FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error)
 	DefaultHarness(ctx context.Context) (server.DefaultHarnessStatus, error)
 	SetDefaultHarness(ctx context.Context, req server.SetDefaultHarnessRequest) (server.SetDefaultHarnessResult, error)
 }

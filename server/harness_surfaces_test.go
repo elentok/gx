@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -137,7 +138,7 @@ func TestFixAgent_StartsOnACodexDefault(t *testing.T) {
 					t.Fatalf("fix = %+v", res)
 				}
 			} else {
-				body, _ := json.Marshal(server.FixAgentRequest{Address: "proj:loop/01", State: repairToken})
+				body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: repairToken})
 				if code, out := webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base)); code != 200 || reasonOf(t, out) != "" {
 					t.Fatalf("web fix = %d %s", code, out)
 				}

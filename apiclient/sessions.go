@@ -44,8 +44,8 @@ func (c *Client) DesignWorktree(ctx context.Context, req server.DesignWorktreeRe
 
 // FixAgent starts a fix agent for a ticket paused for repair. A refusal is a
 // result (Refused set), not an error.
-func (c *Client) FixAgent(ctx context.Context, req server.FixAgentRequest) (server.FixAgentResult, error) {
-	var res server.FixAgentResult
+func (c *Client) FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error) {
+	var res wire.FixAgentResult
 	err := c.post(ctx, "/v1/tickets/fix-agent", req, &res)
 	return res, err
 }

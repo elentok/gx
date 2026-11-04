@@ -15,32 +15,8 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Refusal reasons of the fix-agent route, beside the session ones.
-const (
-	ReasonFixUnknownTicket = "unknown-ticket"
-	ReasonFixNotRepair     = "not-paused-for-repair"
-	ReasonFixInvestigating = "investigating"
-	ReasonFixNoFailure     = "no-migration-failure"
-)
-
-// FixAgentRequest is the body of POST /v1/tickets/fix-agent. State is the
-// token of the row paused for repair the web saw, required on the web mux.
-// Project instead of Address asks for an agent fixing that project's saved
-// failed migration.
-type FixAgentRequest struct {
-	Address string `json:"address,omitempty"`
-	Project string `json:"project,omitempty"`
-	State   string `json:"state,omitempty"`
-}
-
-// FixAgentResult is the session result plus whether remote control was applied.
-type FixAgentResult struct {
-	wire.SessionResult `tstype:",extends"`
-	RemoteControl      bool `json:"remote_control"`
-}
-
-func fixAgentRefusal(reason, msg string) FixAgentResult {
-	return FixAgentResult{SessionResult: sessionRefusal(reason, msg)}
+func fixAgentRefusal(reason, msg string) wire.FixAgentResult {
+	return wire.FixAgentResult{SessionResult: sessionRefusal(reason, msg)}
 }
 
 // repairState is the web state token of a ticket paused for repair: the answerState
@@ -62,7 +38,7 @@ func (s *Server) fixAgentWeb() http.HandlerFunc { return s.fixAgentHandler(true)
 
 func (s *Server) fixAgentHandler(web bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req FixAgentRequest
+		var req wire.FixAgentRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -109,7 +85,7 @@ func fixProjectPrompt(agent string, f MigrationFailure) string {
 }
 
 // startFixProjectAgent starts the agent fixing a project's saved failed migration.
-func (s *Server) startFixProjectAgent(project string) (FixAgentResult, error) {
+func (s *Server) startFixProjectAgent(project string) (wire.FixAgentResult, error) {
 	var failure *MigrationFailure
 	for _, f := range s.MigrationFailures() {
 		if f.Project == project {
@@ -118,7 +94,7 @@ func (s *Server) startFixProjectAgent(project string) (FixAgentResult, error) {
 		}
 	}
 	if failure == nil {
-		return fixAgentRefusal(ReasonFixNoFailure, fmt.Sprintf("project %s has no saved migration failure", project)), nil
+		return fixAgentRefusal(wire.ReasonFixNoFailure, fmt.Sprintf("project %s has no saved migration failure", project)), nil
 	}
 	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, project)
 	if checkout == "" {
@@ -136,13 +112,13 @@ func (s *Server) startFixProjectAgent(project string) (FixAgentResult, error) {
 	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
 		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+project), nil
 	}
-	return FixAgentResult{SessionResult: res}, err
+	return wire.FixAgentResult{SessionResult: res}, err
 }
 
 // startFixAgent starts a /gx-investigate session in the project's trunk
 // checkout for a ticket paused for an answer or repair, or in error (web: repair only),
 // or for a project's failed migration.
-func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, error) {
+func (s *Server) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAgentResult, error) {
 	if req.Project != "" {
 		return s.startFixProjectAgent(req.Project)
 	}
@@ -154,7 +130,7 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 		return fixAgentRefusal(wire.ReasonSessionBadRequest, err.Error()), nil
 	}
 	if !ok {
-		return fixAgentRefusal(ReasonFixUnknownTicket, fmt.Sprintf("no ticket %s", req.Address)), nil
+		return fixAgentRefusal(wire.ReasonFixUnknownTicket, fmt.Sprintf("no ticket %s", req.Address)), nil
 	}
 	addr := ref.addr.String()
 	t := ref.ticket
@@ -162,17 +138,17 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 	// the parent as waiting for children, which would hide this refusal.
 	for _, c := range ref.epic.Tickets {
 		if c.Parent != nil && *c.Parent == t.DisplayNumber() && c.Type == string(schema.TypeInvestigate) && !c.IsTerminal() {
-			return fixAgentRefusal(ReasonFixInvestigating, fmt.Sprintf("%s is already being investigated in %s", addr, ticketAddress(ref.root(), c.DisplayNumber()))), nil
+			return fixAgentRefusal(wire.ReasonFixInvestigating, fmt.Sprintf("%s is already being investigated in %s", addr, ticketAddress(ref.root(), c.DisplayNumber()))), nil
 		}
 	}
 	// The web button stays repair-only; the TUI's Investigate also takes an
 	// answer-paused or error ticket.
 	if web {
 		if t.PausedClass() != schema.PauseClassRepair {
-			return fixAgentRefusal(ReasonFixNotRepair, fmt.Sprintf("%s is not paused for repair", addr)), nil
+			return fixAgentRefusal(wire.ReasonFixNotRepair, fmt.Sprintf("%s is not paused for repair", addr)), nil
 		}
 	} else if st := ref.epic.RenderedStatus(t); st != tickets.StatusPausedAnswer && st != tickets.StatusPausedRepair && st != tickets.StatusError {
-		return fixAgentRefusal(ReasonFixNotRepair, fmt.Sprintf("%s is not paused or in error", addr)), nil
+		return fixAgentRefusal(wire.ReasonFixNotRepair, fmt.Sprintf("%s is not paused or in error", addr)), nil
 	}
 	if web && req.State != repairState(readLogLenient(t), t.PausedClass()) {
 		return fixAgentRefusal(ReasonStale, "the pause changed; review the current one"), nil
@@ -199,5 +175,5 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
 		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+addr), nil
 	}
-	return FixAgentResult{SessionResult: res, RemoteControl: remote && !res.Refused && err == nil}, err
+	return wire.FixAgentResult{SessionResult: res, RemoteControl: remote && !res.Refused && err == nil}, err
 }
