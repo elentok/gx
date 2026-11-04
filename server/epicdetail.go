@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -155,20 +156,8 @@ func epicFriction(f *schema.FrictionSummary) *wire.EpicFriction {
 		return nil
 	}
 	out := &wire.EpicFriction{PausesByReason: f.PausesByReason, RunEvents: f.RunEvents, PausedSecs: f.TotalPausedSecs}
-	out.WebShare = webShare(f.PauseEndings)
+	out.WebShare = stats.WebShare(f.PauseEndings)
 	return out
-}
-
-// webShare is web / (web + TUI + CLI) over pause endings by source; gx- and
-// unknown-ended pauses are not person endings, so with none it returns nil.
-func webShare(endings map[string]int) *float64 {
-	web := endings[tickets.SourceWeb]
-	person := web + endings[tickets.SourceTUI] + endings[tickets.SourceCLI]
-	if person == 0 {
-		return nil
-	}
-	share := float64(web) / float64(person)
-	return &share
 }
 
 // baseRow is the part of a row both epic kinds share; status is e.RenderedStatus(t).

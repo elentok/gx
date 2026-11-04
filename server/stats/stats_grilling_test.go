@@ -1,4 +1,4 @@
-package server_test
+package stats_test
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ func grillItem(id string, at time.Time, q, w int) conversations.GrillingItem {
 func grillingStats(t *testing.T, recs []conversations.Record) (get func(query string) wire.Stats) {
 	t.Helper()
 	h, base := servertest.StartEpicDetail(t, func(store string) {
-		writeProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", nil)
+		servertest.WriteProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", nil)
 	})
 
 	for _, r := range recs {

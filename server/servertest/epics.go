@@ -32,6 +32,27 @@ func WriteEpicFiles(t *testing.T, store, epic, ticketMD string, issues map[strin
 	}
 }
 
+// WriteProjectEpic is WriteEpicFiles for any project, not only "proj".
+func WriteProjectEpic(t *testing.T, store, project, epic, ticketMD string, issues map[string]string) {
+	t.Helper()
+	dir := filepath.Join(store, project, epic)
+	if err := os.MkdirAll(filepath.Join(dir, "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		filepath.Join(store, project, "project.json"): `{"name":"` + project + `"}`,
+		filepath.Join(dir, "ticket.md"):               ticketMD,
+	}
+	for name, content := range issues {
+		files[filepath.Join(dir, "issues", name)] = content
+	}
+	for path, content := range files {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 // IssueMD returns the whole file of an implement ticket.
 func IssueMD(id, status, extra, title string) string {
 	return "---\nid: \"" + id + "\"\nstatus: " + status + "\ntype: implement\n" + extra + "---\n\n# " + title + "\n"

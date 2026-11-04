@@ -41,6 +41,7 @@ import (
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -151,6 +152,7 @@ type Server struct {
 	budget       *budget.Budget
 	tokens       *tokenledger.Ledger
 	limits       *limits.Limits
+	stats        *stats.Stats
 	events       *broker.Broker
 	herdr        herdrWatch
 	pauseFold    pauseFold
@@ -433,6 +435,10 @@ func New(cfg Config) (*Server, error) {
 		Registry: s.registry, Tokens: s.tokens, TokenHost: tokenHost{s},
 		SpendDays: s.budget.DaysCopy,
 	})
+	s.stats = stats.New(stats.Deps{
+		TicketStore: cfg.TicketStore, ConversationsDir: cfg.ConversationsDir,
+		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s},
+	})
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
@@ -475,7 +481,6 @@ var routeTable = []struct {
 	{"GET /v1/tickets/detail", (*Server).detail},
 	{"GET /v1/epics", (*Server).epicList},
 	{"GET /v1/epics/detail", (*Server).epicDetail},
-	{"GET /v1/stats", (*Server).stats},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"GET /v1/queue", (*Server).queueView},
 	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.mergeInQueue)(w, r) }},

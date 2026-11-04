@@ -66,7 +66,7 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 		servertest.WriteEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict\n---\n", done)
 		servertest.WriteEpicFiles(t, store, "awaiting", loop, done)
 		servertest.WriteEpicFiles(t, store, "ready", loop, map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
-		writeProjectEpic(t, store, "auto", "awaiting", loop, done)
+		servertest.WriteProjectEpic(t, store, "auto", "awaiting", loop, done)
 		if err := servertest.WriteProjectRepo(store, "auto", t.TempDir(), `,"auto-ff-merge":true`); err != nil {
 			t.Fatal(err)
 		}

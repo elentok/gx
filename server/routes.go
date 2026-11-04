@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -38,6 +39,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		health.Routes(func() *health.Health { return s.health }),
 		limits.Routes(func() *limits.Limits { return s.limits }),
 		budget.Routes(func() *budget.Budget { return s.budget }),
+		stats.Routes(func() *stats.Stats { return s.stats }),
 	)
 }
 

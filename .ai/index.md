@@ -142,6 +142,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   and owner probes, the CPU spike watch and the start incident note (the root implements `Sessions`
   for the session meta read; `cmd` imports it for `CPUSpikeDir`, `CPUWatchConfig`,
   `StartIncidentPath`, `FileSystemHealth` and `FileProcesses`);
+  `server/stats/` holds the stats read model behind GET /v1/stats: throughput, friction, cost and
+  grilling (imports `limits`; the root implements `MapEpics`; `WebShare` lives here for the epic
+  detail);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

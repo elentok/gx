@@ -1,4 +1,4 @@
-package server
+package stats
 
 import (
 	"github.com/elentok/gx/server/limits"
@@ -40,20 +40,20 @@ type costLedger struct {
 
 // costLedger reads the in-memory ledger for the window's days. It never reads
 // transcripts.
-func (s *Server) costLedger(win limits.StatsWindow) (costLedger, error) {
+func (s *Stats) costLedger(win limits.StatsWindow) (costLedger, error) {
 	var out costLedger
 	for _, day := range win.Labels() {
-		rows, err := s.tokens.Day(day)
+		rows, err := s.Tokens.Day(day)
 		if err != nil {
 			return out, err
 		}
 		out.Rows = append(out.Rows, rows...)
 	}
 	var err error
-	if out.FirstRebuilt, err = s.tokens.FirstRebuiltDay(); err != nil {
+	if out.FirstRebuilt, err = s.Tokens.FirstRebuiltDay(); err != nil {
 		return out, err
 	}
-	out.FirstLive, err = s.tokens.FirstLiveDay()
+	out.FirstLive, err = s.Tokens.FirstLiveDay()
 	return out, err
 }
 

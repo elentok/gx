@@ -1,4 +1,4 @@
-package server
+package stats
 
 import (
 	"slices"
@@ -253,7 +253,7 @@ func (f *frictionTally) fill(out *wire.StatsFriction) {
 			total[src] += n
 		}
 	}
-	out.WebShare = webShare(total)
+	out.WebShare = WebShare(total)
 	if len(f.personSecs) > 0 {
 		secs := slices.Clone(f.personSecs)
 		slices.Sort(secs)
@@ -264,6 +264,18 @@ func (f *frictionTally) fill(out *wire.StatsFriction) {
 		}
 		out.MedianResumeSec = &median
 	}
+}
+
+// WebShare is web / (web + TUI + CLI) over pause endings by source; gx- and
+// unknown-ended pauses are not person endings, so with none it returns nil.
+func WebShare(endings map[string]int) *float64 {
+	web := endings[tickets.SourceWeb]
+	person := web + endings[tickets.SourceTUI] + endings[tickets.SourceCLI]
+	if person == 0 {
+		return nil
+	}
+	share := float64(web) / float64(person)
+	return &share
 }
 
 // originalEpic is the epic a ticket was first created in, wherever it lives

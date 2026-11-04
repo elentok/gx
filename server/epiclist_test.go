@@ -3,8 +3,6 @@ package server_test
 import (
 	"maps"
 	"net/http"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -196,7 +194,7 @@ func TestEpicList_FollowUpCounts(t *testing.T) {
 			"none":  {"work": {"01-a.md": servertest.IssueMD("01", "open", "", "A")}},
 		} {
 			for epic, issues := range epics {
-				writeProjectEpic(t, store, project, epic, loop, issues)
+				servertest.WriteProjectEpic(t, store, project, epic, loop, issues)
 			}
 		}
 	})
@@ -223,7 +221,7 @@ func TestEpicList_FollowUpsCardCountsByCategoryAndComesFirst(t *testing.T) {
 		})
 
 		servertest.WriteEpicFiles(t, store, "aaa", "---\nstatus: draft\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
-		writeProjectEpic(t, store, "empty", "follow-ups", loop, map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")})
+		servertest.WriteProjectEpic(t, store, "empty", "follow-ups", loop, map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")})
 	})
 
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
@@ -303,26 +301,6 @@ func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
 	want := []string{"proj:one-offs-archived/03", "proj:one-offs-archived/02", "proj:newer-epic", "proj:older-epic"}
 	if !slices.Equal(got, want) {
 		t.Errorf("Finished = %v, want %v (all cards: %v)", got, want, addrs)
-	}
-}
-
-func writeProjectEpic(t *testing.T, store, project, epic, ticketMD string, issues map[string]string) {
-	t.Helper()
-	dir := filepath.Join(store, project, epic)
-	if err := os.MkdirAll(filepath.Join(dir, "issues"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	files := map[string]string{
-		filepath.Join(store, project, "project.json"): `{"name":"` + project + `"}`,
-		filepath.Join(dir, "ticket.md"):               ticketMD,
-	}
-	for name, content := range issues {
-		files[filepath.Join(dir, "issues", name)] = content
-	}
-	for path, content := range files {
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
 	}
 }
 
