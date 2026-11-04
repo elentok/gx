@@ -58,6 +58,11 @@ func (f designsFixture) open(t *testing.T, epic string, isNew bool) wire.Session
 	return f.shared().Open(t, epic, isNew)
 }
 
+func sessionSnapshotOf(t *testing.T, f designsFixture, id string) wire.SessionInfo {
+	t.Helper()
+	return servertest.SessionSnapshotOf(t, f.shared(), id)
+}
+
 func (f designsFixture) live(t *testing.T) []wire.SessionInfo {
 	t.Helper()
 	return f.shared().Live(t)

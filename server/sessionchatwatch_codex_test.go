@@ -9,8 +9,6 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const codexMessageLine = `{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hi"}]}}`
-
 // A Codex session is watched by its own recorded harness, whatever the chat
 // harness setting says.
 func TestSessionChatChanged_CodexRolloutGrowthPublishes(t *testing.T) {
@@ -26,24 +24,5 @@ func TestSessionChatChanged_CodexRolloutGrowthPublishes(t *testing.T) {
 	waitSessionState(ctx, t, h, id, wire.SessionWorking)
 	if !codexEventWithin(evs, t, path, id, 5*time.Second) {
 		t.Fatal("no session-chat-changed event while the rollout grew")
-	}
-}
-
-func codexEventWithin(evs <-chan wire.Event, t *testing.T, path, id string, d time.Duration) bool {
-	t.Helper()
-	deadline := time.After(d)
-	tick := time.NewTicker(chatPollTestInterval)
-	defer tick.Stop()
-	for {
-		select {
-		case ev := <-evs:
-			if ev.Type == wire.EventSessionChatChanged && ev.Address == id {
-				return true
-			}
-		case <-tick.C:
-			appendLines(t, path, codexMessageLine)
-		case <-deadline:
-			return false
-		}
 	}
 }

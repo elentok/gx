@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -110,19 +109,6 @@ func startInputSession(t *testing.T, settle time.Duration) (*servertest.Harness,
 		c.ActionStepStartTimeout = time.Minute
 		c.ActionSlashSettle = settle
 	})
-}
-
-func submitted(t *testing.T, conv string) string {
-	t.Helper()
-	data, _ := os.ReadFile(agentfake.ProgramSubmittedPath(conv))
-	return string(data)
-}
-
-func waitForSubmitted(t *testing.T, conv, want string) {
-	t.Helper()
-	if !servertest.Poll(10*time.Second, func() bool { return submitted(t, conv) == want }) {
-		t.Fatalf("submitted = %q, want %q", submitted(t, conv), want)
-	}
 }
 
 func TestRunAction_SlashStepEndsOnNewConversationWithoutWaiting(t *testing.T) {

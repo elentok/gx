@@ -1,7 +1,6 @@
 package server_test
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -540,14 +538,6 @@ func TestCreateSession_RefusesBadWorktrees(t *testing.T) {
 	}
 }
 
-func report(t *testing.T, conv string, c agentfake.Control) {
-	t.Helper()
-	c.Action = agentfake.ActionReport
-	if err := agentfake.SendProgramControl(conv, c); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func title(t *testing.T, conv, title string) {
 	t.Helper()
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionTitle, Title: title}); err != nil {
@@ -569,54 +559,6 @@ func waitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
 	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("the screen to show %q", text), func() bool { return screenHas(t, c, text) })
 }
 
-// startFakeSession creates a fake-harness session and waits for its first
-// report, returning its id and conversation id.
-func startFakeSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
-	t.Helper()
-	return startFakeSessionWith(t, wire.CreateSessionRequest{}, opts...)
-}
-
-// startFakeSessionWith is startFakeSession for req in project proj.
-func startFakeSessionWith(t *testing.T, req wire.CreateSessionRequest, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
-	t.Helper()
-	h := servertest.StartWithStore(t, t.TempDir(), append([]func(*server.Config){servertest.WithTestHolder()}, opts...)...)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	t.Cleanup(cancel)
-	evs, err := h.Client.Events(ctx, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Project, req.Dir, req.Harness = "proj", t.TempDir(), cmp.Or(req.Harness, string(agentfake.HarnessKind))
-	res, err := h.Client.CreateSession(ctx, req)
-	if err != nil || res.Session == nil {
-		t.Fatalf("create = %+v, %v", res, err)
-	}
-	id := res.Session.ID
-	conv, _ := readMeta(t, h, id)["conversation_id"].(string)
-	return h, ctx, evs, id, conv
-}
-
-// waitForSession waits until the snapshot's session id satisfies ok. It reads
-// the snapshot before each wait: a change that landed together with the one
-// the caller just waited for sends no further event.
-func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id string, ok func(wire.SessionInfo) bool) wire.SessionInfo {
-	t.Helper()
-	for {
-		snap, err := h.Client.Snapshot(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, s := range snap.Sessions {
-			if s.ID == id && ok(s) {
-				return s
-			}
-		}
-		servertest.WaitForEvent(ctx, t, evs, wire.EventSessionChanged, id)
-	}
-}
-
-var readMeta = servertest.ReadMeta
-
 // killHolder SIGKILLs the session's holder, leaving its child, and returns
 // the child's pid.
 func killHolder(t *testing.T, h *servertest.Harness, id string) int {
@@ -634,17 +576,4 @@ func killHolder(t *testing.T, h *servertest.Harness, id string) int {
 		t.Fatal(err)
 	}
 	return child
-}
-
-func waitForHolder(t *testing.T, dir string) *nativerunner.HolderClient {
-	t.Helper()
-	var c *nativerunner.HolderClient
-	var err error
-	if !servertest.Poll(30*time.Second, func() bool {
-		c, err = nativerunner.DialHolder(dir)
-		return err == nil
-	}) {
-		t.Fatalf("no holder in %s: %v", dir, err)
-	}
-	return c
 }

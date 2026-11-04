@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -23,88 +22,31 @@ type handoffFixture struct {
 
 func startHandoff(t *testing.T, step string, opts ...func(*server.Config)) handoffFixture {
 	t.Helper()
-	cfg := t.TempDir()
-	store := t.TempDir()
-	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
-	servertest.WriteTicket(t, store, "proj", "map-impl", "01", "first", "")
-	setMapStep(t, store, step)
-	f := startDesignsIn(t, store, append(opts, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))...)
-	res := f.open(t, "proj:map", false)
-	if res.Refused || res.Session == nil {
-		t.Fatalf("open = %+v", res)
+	s := servertest.StartHandoff(t, step, opts...)
+	d := s.DesignsFixture
+	return handoffFixture{
+		designsFixture: designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck},
+		store:          s.Store, cfg: s.Cfg, id: s.ID, conv: s.Conv,
 	}
-	id := res.Session.ID
-	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
-	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
-	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	// Idle can precede the launch prompt: a /clear typed meanwhile lands in the
-	// same input box and is never submitted alone.
-	waitForSubmitted(t, conv, "\"/gx-design proj:map\"\n")
-	return handoffFixture{designsFixture: f, store: store, cfg: cfg, id: id, conv: conv}
 }
 
-func setMapStep(t *testing.T, store, step string) {
-	t.Helper()
-	body := "---\nkind: map\ndesign_step: " + step + "\n---\n"
-	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
+func (f handoffFixture) shared() servertest.HandoffFixture {
+	return servertest.HandoffFixture{DesignsFixture: f.designsFixture.shared(), Store: f.store, Cfg: f.cfg, ID: f.id, Conv: f.conv}
 }
 
 func (f handoffFixture) continueSession(t *testing.T) {
 	t.Helper()
-	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})
-	if err != nil || res.Refused {
-		t.Fatalf("continue = %+v, %v", res, err)
-	}
+	f.shared().ContinueSession(t)
 }
 
-// newConversation waits for the session to move off conv and returns its meta.
 func (f handoffFixture) newConversation(t *testing.T, old string) map[string]any {
 	t.Helper()
-	var meta map[string]any
-	servertest.WaitFor(t, 10*time.Second, "a new conversation id", func() bool {
-		meta = readMeta(t, f.h, f.id)
-		return meta["conversation_id"] != old
-	})
-	return meta
+	return f.shared().NewConversation(t, old)
 }
 
 func (f handoffFixture) wantRestartedOnWorker(t *testing.T) {
 	t.Helper()
-	meta := f.newConversation(t, f.conv)
-	newConv, _ := meta["conversation_id"].(string)
-	if meta["tier"] != "worker" || meta["launch_design"] != true || meta["ticket"] != "proj:map" {
-		t.Errorf("meta tier=%v launch_design=%v ticket=%v, want worker, true, proj:map", meta["tier"], meta["launch_design"], meta["ticket"])
-	}
-	for _, c := range []string{f.conv, newConv} {
-		if _, err := conversations.Read(f.h.ConversationsDir, c); err != nil {
-			t.Errorf("conversation %s not recorded: %v", c, err)
-		}
-	}
-	waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	report(t, newConv, agentfake.Control{State: "idle"})
-	waitForSubmitted(t, newConv, "\"/gx-design map\"\n")
-	snap := sessionSnapshotOf(t, f.designsFixture, f.id)
-	if snap.Status.State == wire.SessionExited {
-		t.Errorf("session = %+v, want it alive", snap)
-	}
-}
-
-func sessionSnapshotOf(t *testing.T, f designsFixture, id string) wire.SessionInfo {
-	t.Helper()
-	snap, err := f.h.Client.Snapshot(f.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range snap.Sessions {
-		if s.ID == id {
-			return s
-		}
-	}
-	t.Fatalf("session %s not in the snapshot", id)
-	return wire.SessionInfo{}
+	f.shared().WantRestartedOnWorker(t)
 }
 
 func TestChartingHandoff_ContinueRestartsUnderWorkerArgs(t *testing.T) {

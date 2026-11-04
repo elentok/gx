@@ -38,16 +38,6 @@ func startChatSession(t *testing.T, kind string) (*servertest.Harness, context.C
 	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl")
 }
 
-func writeTranscript(t *testing.T, path string, lines ...string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestSessionChat_ShowsVisibleMessagesInOrder(t *testing.T) {
 	t.Parallel()
 	h, ctx, _, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))

@@ -1,31 +1,17 @@
 package server_test
 
 import (
-	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
-
-// stopFakeSession stops a session and waits for it to exit.
-func stopFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id string) {
-	t.Helper()
-	waitForHolder(t, filepath.Join(h.SessionsDir, id))
-	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
-		t.Fatalf("stop = %+v, %v", res, err)
-	}
-	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
-}
 
 func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
 	t.Parallel()
@@ -86,37 +72,6 @@ func TestResumeSession_CodexNeedsItsRollout(t *testing.T) {
 	res, err = h.Client.ResumeSession(ctx, id)
 	if err != nil || res.Reason == wire.ReasonSessionNoResume {
 		t.Errorf("resume with rollout = %+v, %v; want it past the rollout check", res, err)
-	}
-}
-
-// stoppedCodexSession is an Exited session whose meta says it ran on Codex.
-func stoppedCodexSession(t *testing.T, opts ...func(*server.Config)) (h *servertest.Harness, ctx context.Context, id, conv, dir string) {
-	t.Helper()
-	h, ctx, evs, id, conv := startFakeSession(t, opts...)
-	stopFakeSession(ctx, t, h, evs, id)
-	meta := readMeta(t, h, id)
-	meta["harness"] = "codex"
-	data, err := json.Marshal(meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(h.SessionsDir, id, "meta.json"), data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	dir, _ = meta["dir"].(string)
-	return h, ctx, id, conv, dir
-}
-
-// writeCodexRollout gives conv a rollout under codexHome, as Codex writes one for a session in dir.
-func writeCodexRollout(t *testing.T, codexHome, conv, dir string) {
-	t.Helper()
-	rollouts := filepath.Join(codexHome, "sessions", "2026", "10", "30")
-	if err := os.MkdirAll(rollouts, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	line := `{"type":"session_meta","payload":{"id":` + strconv.Quote(conv) + `,"cwd":` + strconv.Quote(dir) + `}}` + "\n"
-	if err := os.WriteFile(filepath.Join(rollouts, "rollout-2026-10-30T00-00-00-"+conv+".jsonl"), []byte(line), 0o644); err != nil {
-		t.Fatal(err)
 	}
 }
 

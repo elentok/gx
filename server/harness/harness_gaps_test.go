@@ -1,4 +1,4 @@
-package server_test
+package harness_test
 
 import (
 	"context"
@@ -129,8 +129,8 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 	t.Parallel()
 	codexHome := t.TempDir()
-	h, ctx, id, conv, dir := stoppedCodexSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
-	writeCodexRollout(t, codexHome, conv, dir)
+	h, ctx, id, conv, dir := servertest.StoppedCodexSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
+	servertest.WriteCodexRollout(t, codexHome, conv, dir)
 	h.Programs.Missing("codex")
 
 	res, err := h.Client.ResumeSession(ctx, id)
@@ -153,30 +153,30 @@ func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 // same Continue works once the harness is back.
 func TestHarnessMissing_ChartingHandoffRefusesBeforeStoppingTheOldAgent(t *testing.T) {
 	t.Parallel()
-	f := startHandoff(t, "chart")
-	setMapStep(t, f.store, "resolve-tickets")
-	before := readMeta(t, f.h, f.id)
-	beforeSnap := sessionSnapshotOf(t, f.designsFixture, f.id)
-	f.h.Programs.Missing(os.Args[0])
+	f := servertest.StartHandoff(t, "chart")
+	servertest.SetMapStep(t, f.Store, "resolve-tickets")
+	before := servertest.ReadMeta(t, f.H, f.ID)
+	beforeSnap := servertest.SessionSnapshotOf(t, f.DesignsFixture, f.ID)
+	f.H.Programs.Missing(os.Args[0])
 
-	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})
+	res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 		t.Fatalf("continue = %+v, %v; want a harness-missing refusal", res, err)
 	}
-	after := readMeta(t, f.h, f.id)
+	after := servertest.ReadMeta(t, f.H, f.ID)
 	for _, k := range []string{"conversation_id", "run", "tier"} {
 		if !reflect.DeepEqual(before[k], after[k]) {
 			t.Errorf("meta %s = %v, want %v kept", k, after[k], before[k])
 		}
 	}
-	afterSnap := sessionSnapshotOf(t, f.designsFixture, f.id)
+	afterSnap := servertest.SessionSnapshotOf(t, f.DesignsFixture, f.ID)
 	if afterSnap.Status.State == wire.SessionExited || !reflect.DeepEqual(beforeSnap.Actionable, afterSnap.Actionable) {
 		t.Errorf("session = %+v, want it alive with actionable %+v kept", afterSnap, beforeSnap.Actionable)
 	}
 
-	f.h.Programs.Install(os.Args[0])
-	f.continueSession(t)
-	f.wantRestartedOnWorker(t)
+	f.H.Programs.Install(os.Args[0])
+	f.ContinueSession(t)
+	f.WantRestartedOnWorker(t)
 }
 
 // keptSession is a fake session relabelled as label, on a server whose
@@ -197,7 +197,7 @@ func startKept(t *testing.T, label string) keptSession {
 	servertest.WriteConfig(t, cfg, store, nil)
 	fake := string(agentfake.HarnessKind)
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithConfigFile(cfg),
-		servertest.WithChatHarness(fake), servertest.WithDefaultHarness(fake), servertest.WithChatPollInterval(chatPollTestInterval),
+		servertest.WithChatHarness(fake), servertest.WithDefaultHarness(fake), servertest.WithChatPollInterval(servertest.ChatPollTestInterval),
 		servertest.WithEnv("CLAUDE_CONFIG_DIR="+claudeCfg, "CODEX_HOME="+codexHome))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
@@ -210,7 +210,7 @@ func startKept(t *testing.T, label string) keptSession {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	id := res.Session.ID
-	meta := readMeta(t, h, id)
+	meta := servertest.ReadMeta(t, h, id)
 	conv, _ := meta["conversation_id"].(string)
 	path := filepath.Join(claudeCfg, "projects", "-repo", conv+".jsonl")
 	if label == "codex" {
@@ -224,7 +224,7 @@ func startKept(t *testing.T, label string) keptSession {
 		}
 		path = filepath.Join(codexHome, "sessions", "2026", "01", "01", "rollout-2026-01-01T10-00-00-"+conv+".jsonl")
 	}
-	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	servertest.WaitForHolder(t, filepath.Join(h.SessionsDir, id))
 	return keptSession{h: h, ctx: ctx, evs: evs, id: id, conv: conv, transcript: path, store: store, cfg: cfg}
 }
 
@@ -241,7 +241,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 	t.Run("chat", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		writeTranscript(t, k.transcript, reply)
+		servertest.WriteTranscript(t, k.transcript, servertest.Reply)
 		k.switchDefault(t, "codex")
 		got, err := k.h.Client.SessionChat(k.ctx, k.id)
 		if err != nil || got.Unsupported || got.Unreadable || len(got.Messages) != 1 || got.Messages[0].Text != "hi" {
@@ -251,39 +251,39 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 	t.Run("chat watch", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		writeTranscript(t, k.transcript, reply)
+		servertest.WriteTranscript(t, k.transcript, servertest.Reply)
 		k.switchDefault(t, "codex")
-		report(t, k.conv, agentfake.Control{State: "working"})
-		waitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
-		if !chatEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second, true) {
+		servertest.Report(t, k.conv, agentfake.Control{State: "working"})
+		servertest.WaitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
+		if !servertest.ChatEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second, true) {
 			t.Error("no session-chat-changed event while the transcript grew")
 		}
 	})
 	t.Run("turn settle", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		writeTranscript(t, k.transcript, reply)
+		servertest.WriteTranscript(t, k.transcript, servertest.Reply)
 		k.switchDefault(t, "codex")
-		report(t, k.conv, agentfake.Control{State: "done"})
-		waitSessionState(k.ctx, t, k.h, k.id, wire.SessionIdle)
-		if !chatEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second, true) {
+		servertest.Report(t, k.conv, agentfake.Control{State: "done"})
+		servertest.WaitSessionState(k.ctx, t, k.h, k.id, wire.SessionIdle)
+		if !servertest.ChatEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second, true) {
 			t.Error("no session-chat-changed event after the transcript grew past the idle edge")
 		}
 	})
 	t.Run("failure detection", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "claude")
-		writeTranscript(t, k.transcript, apiError401)
+		servertest.WriteTranscript(t, k.transcript, servertest.APIError401)
 		k.switchDefault(t, "codex")
-		report(t, k.conv, agentfake.Control{State: "done"})
-		if got := waitForFailure(k.ctx, t, k.h, k.id, "auth"); got.Label != "Claude login needed" {
+		servertest.Report(t, k.conv, agentfake.Control{State: "done"})
+		if got := servertest.WaitForFailure(k.ctx, t, k.h, k.id, "auth"); got.Label != "Claude login needed" {
 			t.Errorf("failure = %+v, want the Claude login failure", got)
 		}
 	})
 	t.Run("codex session chat", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "codex")
-		writeTranscript(t, k.transcript,
+		servertest.WriteTranscript(t, k.transcript,
 			`{"ordinal":0,"type":"session_meta","payload":{"cli_version":"0.166.0"}}`,
 			`{"ordinal":1,"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hi"}]}}`,
 			`{"ordinal":2,"type":"event_msg","payload":{"type":"task_complete"}}`,
@@ -297,11 +297,11 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 	t.Run("codex session chat watch", func(t *testing.T) {
 		t.Parallel()
 		k := startKept(t, "codex")
-		writeTranscript(t, k.transcript, codexMessageLine)
+		servertest.WriteTranscript(t, k.transcript, servertest.CodexMessageLine)
 		k.switchDefault(t, "claude")
-		report(t, k.conv, agentfake.Control{State: "working"})
-		waitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
-		if !codexEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second) {
+		servertest.Report(t, k.conv, agentfake.Control{State: "working"})
+		servertest.WaitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
+		if !servertest.CodexEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second) {
 			t.Error("no session-chat-changed event while the rollout grew")
 		}
 	})
@@ -312,13 +312,13 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 func TestHarnessSwitch_ChartingHandoffKeepsTheSessionsKind(t *testing.T) {
 	t.Parallel()
 	cfg := filepath.Join(t.TempDir(), "config.json")
-	f := startHandoff(t, "chart", servertest.WithConfigFile(cfg))
-	servertest.WriteConfig(t, cfg, f.store, nil)
-	servertest.SwitchDefaultHarness(t, f.h, cfg, f.store, "codex")
-	setMapStep(t, f.store, "resolve-tickets")
-	f.continueSession(t)
-	f.wantRestartedOnWorker(t)
-	if got := readMeta(t, f.h, f.id)["harness"]; got != string(agentfake.HarnessKind) {
+	f := servertest.StartHandoff(t, "chart", servertest.WithConfigFile(cfg))
+	servertest.WriteConfig(t, cfg, f.Store, nil)
+	servertest.SwitchDefaultHarness(t, f.H, cfg, f.Store, "codex")
+	servertest.SetMapStep(t, f.Store, "resolve-tickets")
+	f.ContinueSession(t)
+	f.WantRestartedOnWorker(t)
+	if got := servertest.ReadMeta(t, f.H, f.ID)["harness"]; got != string(agentfake.HarnessKind) {
 		t.Errorf("harness after the handoff = %v, want %s", got, agentfake.HarnessKind)
 	}
 }

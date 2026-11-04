@@ -14,11 +14,6 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const (
-	apiError401 = `{"type":"assistant","uuid":"e1","isApiErrorMessage":true,"error":"authentication_error","apiErrorStatus":401,"timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"Invalid API key"}]}}`
-	reply       = `{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:01Z","message":{"content":[{"type":"text","text":"hi"}]}}`
-)
-
 // startFailureSession starts a fake session; chat makes its harness the chat
 // harness, whose transcripts auth and stalled read.
 func startFailureSession(t *testing.T, chat bool, stall time.Duration) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
@@ -30,53 +25,6 @@ func startFailureSession(t *testing.T, chat bool, stall time.Duration) (*servert
 	}
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, opts...)
 	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl")
-}
-
-// failureNow is the failure on /v1/sessions and on the chat route.
-func failureNow(ctx context.Context, t *testing.T, h *servertest.Harness, id string) (list, chat *wire.SessionFailure) {
-	t.Helper()
-	sessions, err := h.Client.Sessions(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range sessions {
-		if s.ID == id {
-			list = s.Failure
-		}
-	}
-	res, err := h.Client.SessionChat(ctx, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return list, res.Failure
-}
-
-// waitForFailure polls until the session's failure has kind ("" for none) on
-// both routes and returns it.
-func waitForFailure(ctx context.Context, t *testing.T, h *servertest.Harness, id, kind string) *wire.SessionFailure {
-	t.Helper()
-	var list, chat *wire.SessionFailure
-	for {
-		list, chat = failureNow(ctx, t, h, id)
-		if kindOf(list) == kind && kindOf(chat) == kind {
-			if list != nil && *list != *chat {
-				t.Fatalf("list failure %+v differs from chat failure %+v", list, chat)
-			}
-			return list
-		}
-		select {
-		case <-ctx.Done():
-			t.Fatalf("failure never became %q; list %+v, chat %+v", kind, list, chat)
-		case <-time.After(20 * time.Millisecond):
-		}
-	}
-}
-
-func kindOf(f *wire.SessionFailure) string {
-	if f == nil {
-		return ""
-	}
-	return f.Kind
 }
 
 func TestSessionFailure_Kinds(t *testing.T) {
