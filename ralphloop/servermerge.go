@@ -159,7 +159,7 @@ func addIterationWorktrees(d Deps, o OneIteration) (IterationWorktree, error) {
 	featurePath := filepath.Join(wtDir, o.Epic)
 	worktreeLock.Lock()
 	defer worktreeLock.Unlock()
-	if err := d.AddWorktree(o.RepoDir, featurePath, o.Epic, o.RootBase); err != nil {
+	if err := addFeatureWorktree(d, o, featurePath); err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
 	branch := iterBranch(o.Epic, o.Ticket.Identifier)

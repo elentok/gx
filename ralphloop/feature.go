@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 
@@ -16,7 +17,7 @@ func PrepareFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 	if err != nil {
 		return IterationWorktree{}, err
 	}
-	err = withWorktreeLock(func() error { return d.AddWorktree(o.RepoDir, w.Path, o.Epic, o.RootBase) })
+	err = withWorktreeLock(func() error { return addFeatureWorktree(d, o, w.Path) })
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
@@ -138,4 +139,37 @@ func claimTargetTip(o OneIteration) string {
 		}
 	}
 	return ""
+}
+
+// addFeatureWorktree creates the epic's feature worktree (see Deps.AddWorktree).
+// When it attaches a missing worktree to a branch that already exists, as for
+// a design's <map>-impl branch cut when the design ended, and the branch lacks
+// the base's newer commits, it rebases the branch onto the base first, so the
+// epic does not start from a stale tree. Callers hold the worktree lock.
+// A conflicting or failing rebase is skipped: the branch keeps its old tip and
+// the merge step rebases it later.
+func addFeatureWorktree(d Deps, o OneIteration, path string) error {
+	exists, err := d.WorktreeExists(path)
+	if err != nil {
+		return err
+	}
+	preexisting := !exists && branchExists(d, o.RepoDir, o.Epic)
+	if err := d.AddWorktree(o.RepoDir, path, o.Epic, o.RootBase); err != nil {
+		return err
+	}
+	if !preexisting || d.RebaseOntoOrAbort == nil {
+		return nil
+	}
+	base, err := d.RevParse(o.RepoDir, cmp.Or(o.RootBase, "HEAD"))
+	if err != nil {
+		return nil
+	}
+	if behind, err := d.IsAncestor(path, base, o.Epic); err != nil || behind {
+		return nil
+	}
+	if changes, err := d.UncommittedChanges(path); err != nil || len(changes) > 0 {
+		return nil
+	}
+	_ = d.RebaseOntoOrAbort(path, base)
+	return nil
 }

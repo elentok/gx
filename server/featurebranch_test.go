@@ -84,7 +84,9 @@ func TestFeatureBranch_AnExistingBranchIsAdoptedAndItsMergeBaseRecorded(t *testi
 	if !strings.Contains(ticket, "resolved_base: main@"+base) {
 		t.Errorf("ticket lacks the merge-base main@%s:\n%s", base, ticket)
 	}
-	if got := gitOut(t, repo, "rev-parse", "refs/heads/epic-a"); got != base {
-		t.Errorf("adopted branch moved to %s, want %s", got, base)
+	// The claim stamps the branch's start before the first run rebases the
+	// untouched branch onto main, so the stamp keeps the pre-rebase base.
+	if got := gitOut(t, repo, "rev-parse", "refs/heads/epic-a"); got != gitOut(t, repo, "rev-parse", "main") {
+		t.Errorf("adopted branch at %s, want it rebased onto main", got)
 	}
 }

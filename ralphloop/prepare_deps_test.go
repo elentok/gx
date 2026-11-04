@@ -142,3 +142,34 @@ func TestPrepareIteration_LogsDepsInstalled(t *testing.T) {
 		t.Errorf("events = %+v, want one deps-installed for ticket 01", evs)
 	}
 }
+
+func TestPrepare_RebasesAnExistingEpicBranchOntoTheBaseOnFirstAttach(t *testing.T) {
+	for name, prepare := range map[string]func(Deps, OneIteration) error{
+		"iteration": func(d Deps, o OneIteration) error { _, err := PrepareIteration(d, o); return err },
+		"feature":   func(d Deps, o OneIteration) error { _, err := PrepareFeature(d, o); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, _, o := prepareDepsFixture(t)
+			gitIn(t, o.RepoDir, "branch", o.Epic)
+			gitIn(t, o.RepoDir, "commit", "--allow-empty", "-m", "newer trunk commit")
+
+			if err := prepare(d, o); err != nil {
+				t.Fatal(err)
+			}
+			if ok, err := d.IsAncestor(o.RepoDir, "main", o.Epic); err != nil || !ok {
+				t.Errorf("main is not an ancestor of %s after the first attach (err %v)", o.Epic, err)
+			}
+		})
+	}
+}
+
+func TestPrepareFeature_KeepsTheBranchWhenTheRebaseFails(t *testing.T) {
+	d, _, o := prepareDepsFixture(t)
+	gitIn(t, o.RepoDir, "branch", o.Epic)
+	gitIn(t, o.RepoDir, "commit", "--allow-empty", "-m", "newer trunk commit")
+	d.RebaseOntoOrAbort = func(string, string) error { return errors.New("conflict") }
+
+	if _, err := PrepareFeature(d, o); err != nil {
+		t.Fatalf("a failed rebase must not fail the prepare: %v", err)
+	}
+}

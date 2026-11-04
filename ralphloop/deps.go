@@ -108,6 +108,10 @@ type Deps struct {
 	// rev or range) to its commit; `merge --continue` reads it to tell its own
 	// unstamped pick from other tickets' merges.
 	TrailerMap func(dir, ref, key string) (map[string]string, error)
+	// RebaseOntoOrAbort rebases dir's checked-out branch onto onto. A rebase
+	// that conflicts is aborted, leaving the branch at its old tip, and
+	// returns an error. nil skips the rebase.
+	RebaseOntoOrAbort func(dir, onto string) error
 	// WorktreeExists reports whether an iteration worktree still exists at
 	// path, used by startup reconciliation to detect leftover state a crash
 	// left uncleaned.
@@ -284,6 +288,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		PatchesApplied:       git.PatchesApplied,
 		AppendTrailers:       git.AppendTrailers,
 		TrailerMap:           git.TrailerMap,
+		RebaseOntoOrAbort:    rebaseOntoOrAbort,
 		WorktreeExists:       worktreeExists,
 		InstallDeps: func(path, logDir string) ([]string, error) {
 			return installDependenciesWithin(path, overrides.Path, logDir, installTimeout)
@@ -631,4 +636,19 @@ func worktreeExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// rebaseOntoOrAbort implements Deps.RebaseOntoOrAbort against the real git package.
+func rebaseOntoOrAbort(dir, onto string) error {
+	out, err := git.Rebase(dir, onto)
+	if err == nil {
+		return nil
+	}
+	if inProgress, _ := git.RebaseInProgress(dir); inProgress {
+		if abortErr := git.AbortRebase(dir); abortErr != nil {
+			return fmt.Errorf("the rebase conflicted and could not be aborted: %w", abortErr)
+		}
+		return errors.New("the rebase conflicted and was aborted")
+	}
+	return fmt.Errorf("%s: %w", strings.TrimSpace(out), err)
 }
