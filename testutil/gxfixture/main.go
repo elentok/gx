@@ -40,10 +40,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/agentfake"
 )
 
 func main() {
@@ -54,70 +52,16 @@ func main() {
 }
 
 func run(args []string) (err error) {
-	var gxBin, fakeBin, fakeCodexBin, name, autoAdvance, commandListAge, stallThreshold, mockDir, shape string
-	var configs []string
-	var hold, shellEnv, hideCodex bool
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--hide-codex":
-			hideCodex = true
-		case "--hold":
-			hold = true
-		case "--env":
-			shellEnv = true
-		case "--auto-advance-delay":
-			if i+1 == len(args) {
-				return fmt.Errorf("%s needs a value", args[i])
-			}
-			autoAdvance = args[i+1]
-			i++
-		case "--command-list-age":
-			if i+1 == len(args) {
-				return fmt.Errorf("%s needs a value", args[i])
-			}
-			commandListAge = args[i+1]
-			i++
-		case "--stall-threshold":
-			if i+1 == len(args) {
-				return fmt.Errorf("%s needs a value", args[i])
-			}
-			stallThreshold = args[i+1]
-			i++
-		case "--config", "--mock-dir", "--shape":
-			if i+1 == len(args) {
-				return fmt.Errorf("%s needs a value", args[i])
-			}
-			switch args[i] {
-			case "--config":
-				configs = append(configs, args[i+1])
-			case "--shape":
-				shape = args[i+1]
-			default:
-				mockDir = args[i+1]
-			}
-			i++
-		case "--gx", "--fakeclaude", "--fakecodex":
-			if i+1 == len(args) {
-				return fmt.Errorf("%s needs a value", args[i])
-			}
-			switch args[i] {
-			case "--gx":
-				gxBin = args[i+1]
-			case "--fakeclaude":
-				fakeBin = args[i+1]
-			default:
-				fakeCodexBin = args[i+1]
-			}
-			i++
-		default:
-			name = args[i]
-		}
+	o, err := parseArgs(args)
+	if err != nil {
+		return err
 	}
-	sc, ok := scenarios[name]
+	sc, ok := scenarios[o.scenario]
 	if !ok {
-		return fmt.Errorf("unknown scenario %q; known: %s", name, strings.Join(scenarioNames(), ", "))
+		return fmt.Errorf("unknown scenario %q; known: %s", o.scenario, strings.Join(scenarioNames(), ", "))
 	}
-	if shape, err = checkShape(sc, shape); err != nil {
+	shape, err := checkShape(sc, o.shape)
+	if err != nil {
 		return err
 	}
 	if sc.limitBurn && shape == "live" {
@@ -138,34 +82,8 @@ func run(args []string) (err error) {
 	if root, err = filepath.EvalSymlinks(root); err != nil {
 		return err
 	}
-	if gxBin, err = binary(gxBin, filepath.Join(root, "gx"), "github.com/elentok/gx"); err != nil {
-		return err
-	}
-	binDir := filepath.Join(root, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		return err
-	}
-	if fakeBin, err = binary(fakeBin, filepath.Join(binDir, "claude"), "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude"); err != nil {
-		return err
-	}
-	if filepath.Base(fakeBin) != "claude" || filepath.Dir(fakeBin) != binDir {
-		if err := os.Symlink(fakeBin, filepath.Join(binDir, "claude")); err != nil {
-			return err
-		}
-	}
-	// Without the flag codex stays off PATH, which is how a host without Codex looks. A scenario that
-	// needs codex has it anyway; --hide-codex takes it off PATH once the scenario is seeded.
-	if fakeCodexBin != "" || sc.codex {
-		if fakeCodexBin, err = binary(fakeCodexBin, filepath.Join(root, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex"); err != nil {
-			return err
-		}
-		if err := os.Symlink(fakeCodexBin, filepath.Join(binDir, "codex")); err != nil {
-			return err
-		}
-	}
-	installedCodex := fakeCodexBin != ""
-	// Agent hooks run a bare `gx`; it must be the build under test, not the host's.
-	if err := os.Symlink(gxBin, filepath.Join(binDir, "gx")); err != nil {
+	gxBin, binDir, codex, err := installBinaries(root, o, sc)
+	if err != nil {
 		return err
 	}
 
@@ -173,143 +91,20 @@ func run(args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	f := &fixture{
-		root:   root,
-		gx:     gxBin,
-		hold:   filepath.Join(root, "hold"),
-		store:  filepath.Join(root, "data", "gx", "tickets"),
-		stateD: filepath.Join(root, "state", "gx"),
-		codex:  installedCodex,
-	}
-	f.env, f.cliEnv = isolatedEnv(root, binDir)
-	if autoAdvance != "" {
-		if _, err := time.ParseDuration(autoAdvance); err != nil {
-			return fmt.Errorf("--auto-advance-delay: %w", err)
-		}
-		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
-	}
-	if commandListAge != "" {
-		if _, err := time.ParseDuration(commandListAge); err != nil {
-			return fmt.Errorf("--command-list-age: %w", err)
-		}
-		f.env = append(f.env, "GX_COMMAND_LIST_AGE="+commandListAge)
-	}
-	if sc.commands != nil {
-		data, err := json.Marshal(sc.commands)
-		if err != nil {
-			return err
-		}
-		path := filepath.Join(root, "agentfake-commands.json")
-		if err := os.WriteFile(path, data, 0o644); err != nil {
-			return err
-		}
-		f.env = append(f.env, agentfake.CommandsFileEnv+"="+path)
-	}
-	if stallThreshold == "" {
-		stallThreshold = sc.stallThreshold
-	}
-	if stallThreshold != "" {
-		if _, err := time.ParseDuration(stallThreshold); err != nil {
-			return fmt.Errorf("--stall-threshold: %w", err)
-		}
-		f.env = append(f.env, "GX_STALL_THRESHOLD="+stallThreshold)
-	}
-	if sc.dropAskedAgent {
-		f.env = append(f.env, "GX_DROP_ASKED_AGENT=1")
-	}
-	if sc.unknownSkill {
-		f.env = append(f.env, agentfake.TUIUnknownSkillEnv+"=1")
-	}
-	// Later entries win over the harness default of a ready signal at once.
-	if sc.readyDelay != "" {
-		f.env = append(f.env, agentfake.TUIReadyDelayEnv+"="+sc.readyDelay)
-	}
-	if sc.readyWait != "" {
-		f.env = append(f.env, "GX_PTY_READY_WAIT="+sc.readyWait)
-	}
-	f.env = append(f.env, sc.env...)
-	if err := f.setupDisk(); err != nil {
+	f := newFixture(root, gxBin, binDir, codex)
+	if err := f.applyScenarioEnv(o, sc); err != nil {
 		return err
 	}
-	if err := f.setupHealth(); err != nil {
+	if err := f.prepareStore(sc, port, o.configs); err != nil {
 		return err
 	}
-	// Any scenario that cleans needs the fake ps: the real one sees the `go test` running this fixture.
-	if sc.fakeGo || sc.diskLow {
-		if err := f.setupFakeGo(); err != nil {
-			return err
-		}
-	}
-	if sc.restart != nil {
-		if err := f.setupRestart(*sc.restart, sc.projectNames()); err != nil {
-			return err
-		}
-	}
-	if sc.migrate {
-		if err := f.setupMigrate(sc.migrateHold); err != nil {
-			return err
-		}
-	}
-	if err := f.writeConfig(port, sc.recentlyFinished, append(slices.Clone(sc.config), configs...)); err != nil {
-		return err
-	}
-	if err := f.seed(sc); err != nil {
-		return err
-	}
-	// The server migrates on every start. The seed is already in the current
-	// shape, so only the migrate scenarios leave steps pending.
-	if !sc.migrate {
-		for _, p := range sc.projectNames() {
-			if err := migrations.WriteFullApplied(filepath.Join(f.store, p)); err != nil {
-				return err
-			}
-		}
-	}
-	// The migration's steps read the store's git log.
-	if err := f.commitStore(); err != nil {
-		return fmt.Errorf("commit store: %w", err)
-	}
-	if hideCodex {
+	if o.hideCodex {
 		if err := os.Remove(filepath.Join(binDir, "codex")); err != nil {
 			return err
 		}
 	}
-	// The running server has no test clock, so the old logins are written first.
-	if len(sc.extraLogins) > 0 {
-		if err := os.MkdirAll(f.stateD, 0o700); err != nil {
-			return err
-		}
-	}
-	for i, ago := range sc.extraLogins {
-		if _, err := server.SeedWebLogin(f.stateD, fmt.Sprintf("gxfixture browser %d", i+1), time.Now().Add(-ago)); err != nil {
-			return fmt.Errorf("seed web login: %w", err)
-		}
-	}
-
-	if sc.limits {
-		if err := f.seedLimits(shape); err != nil {
-			return fmt.Errorf("seed limits: %w", err)
-		}
-	}
-	if sc.limitBurn {
-		if err := f.seedLimitBurn(shape); err != nil {
-			return fmt.Errorf("seed limit burn: %w", err)
-		}
-	}
-	if sc.rateLimitFromUsage {
-		f.env = append(f.env, "GX_RATE_LIMIT_BUFFER=1s")
-	}
-	if sc.promptGrace != "" {
-		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.promptGrace)
-	}
-	if sc.tokenPoll {
-		f.env = append(f.env, "GX_TOKEN_POLL_INTERVAL="+liveTokenPollInterval)
-	}
-	if sc.spend {
-		if err := f.seedSpend(shape); err != nil {
-			return fmt.Errorf("seed spend: %w", err)
-		}
-		f.env = append(f.env, "GX_BUDGET_POLL_INTERVAL="+spendPollInterval)
+	if err := f.seedBeforeStart(sc, shape); err != nil {
+		return err
 	}
 
 	srv := exec.Command(gxBin, "server")
@@ -363,7 +158,7 @@ func run(args []string) (err error) {
 		}
 	}
 	// --hold freezes every worker as running until the caller removes the hold file.
-	if hold || sc.hold {
+	if o.hold || sc.hold {
 		if err := os.WriteFile(f.hold, nil, 0o644); err != nil {
 			return err
 		}
@@ -495,38 +290,20 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript, CheckWaitingFile: checkWaitingFile}
-	if sc.fakeGo {
-		o.GateDir = f.gateDir()
-	}
-	o.Transcripts = transcripts
-	if sc.limitBurn {
-		o.CodexSessionsDir = filepath.Join(root, "home", ".codex", "sessions")
-	}
-	if sc.restart != nil {
-		o.RestartDir = f.restartDir()
-	}
-	if sc.migrate {
-		o.MigrateDir = f.migrateDir()
-	}
-	if sc.commands != nil {
-		o.FeatureWorktree = filepath.Join(f.root, "repo", ".worktrees", "feature")
-	}
-	if cwd, err := os.Getwd(); err == nil {
-		o.BrowserSession = filepath.Base(cwd)
-	}
-	if mockDir != "" {
-		stopMock, mockURL, err := serveMock(mockDir)
+	res := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript, CheckWaitingFile: checkWaitingFile}
+	f.addScenarioOutput(&res, sc, transcripts)
+	if o.mockDir != "" {
+		stopMock, mockURL, err := serveMock(o.mockDir)
 		if err != nil {
 			return err
 		}
 		defer stopMock()
-		o.MockURL = mockURL
+		res.MockURL = mockURL
 	}
-	if shellEnv {
-		fmt.Print(o.ShellEnv())
+	if o.shellEnv {
+		fmt.Print(res.ShellEnv())
 	} else {
-		out, err := json.Marshal(o)
+		out, err := json.Marshal(res)
 		if err != nil {
 			return err
 		}
