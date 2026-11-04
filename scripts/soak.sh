@@ -32,17 +32,29 @@ root=$(git rev-parse --show-toplevel)
 work=$(mktemp -d)
 cd "$root"
 
-# failing_names <round output>: each failing test name in the round's test
-# log, once.
+# failing_names <round output>: each failing test name of the round, once. Two
+# sources: the test log, and the run's record in <data>/check/*.jsonl, which
+# also lists failing slow tests that the test log never names. The round's first
+# output line is the summary path, <data>/check/<run>/summary.txt.
 failing_names() {
-	local log
-	log=$(sed -n 's/^test log: //p' "$1" | head -n 1)
-	[[ -n $log && -f $log ]] || return 0
-	awk '
-		/^FAIL .*: ([0-9]+ failed|exit [0-9]+) in / { inblock = 1; next }
-		/^$/ || /^==/ { inblock = 0 }
-		inblock && /^  ( {2})?[^ ]/ { sub(/^ +/, ""); print }
-	' "$log" | sort -u
+	{
+		local log
+		log=$(sed -n 's/^test log: //p' "$1" | head -n 1)
+		if [[ -n $log && -f $log ]]; then
+			awk '
+				/^FAIL .*: ([0-9]+ failed|exit [0-9]+) in / { inblock = 1; next }
+				/^$/ || /^==/ { inblock = 0 }
+				inblock && /^  ( {2})?[^ ]/ { sub(/^ +/, ""); print }
+			' "$log"
+		fi
+		local rundir
+		rundir=$(dirname "$(head -n 1 "$1")")
+		if [[ -d $rundir ]]; then
+			cat "$(dirname "$rundir")"/*.jsonl 2>/dev/null |
+				jq -r --arg run "$(basename "$rundir")" \
+					'select(.run == $run) | .kinds[] | select(.status == "fail") | .failed[]?' || true
+		fi
+	} | sort -u
 }
 
 failed_rounds=()

@@ -184,6 +184,27 @@ exit 1
 	}
 }
 
+// A Playwright failure prints no names in the test log; the names are only in
+// the run's record. The fake test command appends a second record for its own
+// run, the way the real record would list them, since gx writes its record only
+// after the command exits.
+func TestSoak_ListsFailedNamesFromRunRecord(t *testing.T) {
+	repo := soakRepo(t, `
+printf 'FAIL e2e 448s\nFAIL playwright: exit 1 in 7m16.65s\nError: boom\n    at stack.js:1\n'
+printf '{"run":"%s","kinds":[{"kind":"test","status":"fail","failed":["TestSlowOne","74. Flow seventy-four"]}]}\n' \
+  "$GX_CHECK_RUN" >>"$XDG_DATA_HOME/gx/check/fake.jsonl"
+exit 1
+`)
+
+	out, _ := runSoak(t, repo, "1")
+
+	for _, want := range []string{"1× TestSlowOne", "1× 74. Flow seventy-four"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestSoak_WithoutFailFastRunsEveryRound(t *testing.T) {
 	repo := soakRepo(t, failInRound2)
 
