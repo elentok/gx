@@ -1,8 +1,32 @@
 # Changelog
 
-## Unreleased
+## v0.45.0 - 2026-11-04
 
-- Added Codex support. A Default harness setting (Settings > Agents, or `agents.default-harness`) picks claude or codex for new agents. `gx codex doctor` checks the Codex features gx relies on, and `gx codex setup` installs the approvals. Codex runs on the PTY runner and needs Codex 0.166.0 or newer.
+- Added Codex support. Codex runs as a second agent harness beside Claude, on the PTY runner, and needs Codex 0.166.0 or newer. A Default harness setting (Settings > Agents, or `agents.default-harness`) picks claude or codex for new agents; `H` in the Queue tab also picks it. `gx codex doctor` checks the Codex features gx relies on, and `gx codex setup` installs the hooks and approvals. Codex approvals show as a card in the web UI.
+- Added a completion menu to the web Agents composer, design composer, vi editor and New session form. Type `/` (Claude) or `$` (Codex) to open it. Command output appears in the chat. New `gx agents commands` and `gx agents keys` commands back it.
+- Added a vi-mode setting in the top-right web menu, also set with `gx vimode`. The large editor now runs on CodeMirror 6.
+- Added Claude and Codex limits, a Spending block and a weekly burn chip with a forecast to the web menu. They are fed by `gx claude report-limits` and `gx usage summary`.
+- Added four limit-burn cards to Stats, and split Tokens and Spend by agent group. Token usage is tracked in a new ledger. The Stats range now defaults to 7 days.
+- Added a restart dialog, a "new version" strip and a failed-migration strip with a Fix agent button on every page of the web UI.
+- Added background ticket migrations at server start. A project whose migration failed is not scheduled until it is fixed, and a Retry migration button reruns it.
+- Added a Long-running badge on tickets that pass the turn threshold, set with `budget.long-ticket-turns`. An implement session on the wrong model now pauses, with a Resume on worker button.
+- Added `gx tickets publish` to write a batch of tickets with rollback, plus `gx tickets calibration` and claim lint.
+- Added a Clean now button to the health popover, multi-project selection in the epics project picker, the bundled `gx-gopls` and `gx-playwright-cli` skills, and `gx brief go-clean-cache` to clear the Go build cache.
+- Changed restart to only stop and start the server. The `--migrate` flag was removed.
+- Changed dollar totals, budget limits and the extra-usage check to count only Claude. Codex shows a dash for dollars.
+- Changed every Claude agent to launch in normal editor mode. Loop agents and PTY Claude agents now launch without synced claude.ai skills, connectors or unused tools.
+- Changed the web UI: the top bar is sticky with banners above it, inline code in chat is blue with looser line height, permission notices offer Allow once and Deny, and Escape closes only the topmost modal. Epic ticket cards show harness info as one dim line instead of pills.
+- Changed the project lock file to live in the state directory, and let the `gx check` gate waive one known failure.
+- Updated TypeScript to 7.0.2 in the web UI and set Go 1.27.3 in `go.mod`.
+- Fixed Claude agents typing a stray `i` or losing their launch prompt. A vim-mode probe and a ready signal now guard the launch.
+- Fixed the editor-mode override being lost on server restart, and fixed detection of `/config` toggles.
+- Fixed `/rename` and `/name` in the web prompt to rename the session, and `/clear` to reset the open chat.
+- Fixed the completion menu collapsing on phones after an app switch.
+- Fixed a lost Go build cache by retrying once, and made the disk cleaner wait on the Go cache gate.
+- Fixed a stuck ralph loop flooding its run log.
+- Fixed holder start failures to show the holder's own error.
+- Fixed launchd refusing to spawn the server: the job is now reloaded, and a failed start saves a report.
+- Fixed the limit-burn chip, the pace line and a format typo.
 
 ## v0.44.0 - 2026-10-30
 
