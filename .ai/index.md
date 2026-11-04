@@ -145,6 +145,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/stats/` holds the stats read model behind GET /v1/stats: throughput, friction, cost and
   grilling (imports `limits`; the root implements `MapEpics`; `WebShare` lives here for the epic
   detail);
+  `server/sessions/chat/` holds the session chat pieces that need no `Server`: the transcript path
+  and file caches (`TranscriptPaths`, `FileCache`, `AuthFailures`), the parsed-chat `Cache`, the
+  Grilling round and run-end parsers, `DesignContinueAction` and `AcceptsKeys` (imports `wire`);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

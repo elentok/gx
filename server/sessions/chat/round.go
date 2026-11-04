@@ -1,4 +1,4 @@
-package server
+package chat
 
 import (
 	"fmt"
@@ -24,35 +24,35 @@ var (
 	sentenceEndRE = regexp.MustCompile(`[.?!:](\s|$)`)
 )
 
-// roundCards splits an agent message holding a Grilling round into cards.
-func roundCards(text string) []wire.SessionRoundCard {
+// RoundCards splits an agent message holding a Grilling round into cards.
+func RoundCards(text string) []wire.SessionRoundCard {
 	var cards []wire.SessionRoundCard
 	for i, seg := range grillround.Segments(text) {
-		cards = append(cards, parseRoundSegment(i+1, seg).Card)
+		cards = append(cards, ParseRoundSegment(i+1, seg).Card)
 	}
 	return cards
 }
 
-// parsedRound is one parsed round segment. Err is set only when the segment
+// ParsedRound is one parsed round segment. Err is set only when the segment
 // holds gx-question blocks that cannot be read (Raw is their text); a segment
 // with no block is plain text and has no Err.
-type parsedRound struct {
+type ParsedRound struct {
 	Card wire.SessionRoundCard
 	Err  error
 	Raw  string
 }
 
-// parseRoundSegment parses one segment (the text after the marker). It is the
+// ParseRoundSegment parses one segment (the text after the marker). It is the
 // single place that decides whether a block is readable, so the card shown and
 // the bad block filed cannot disagree.
-func parseRoundSegment(seq int, seg string) parsedRound {
+func ParseRoundSegment(seq int, seg string) ParsedRound {
 	body, blocks := grillround.SplitFences(seg)
 	header, rest, _ := strings.Cut(body, "\n")
 	card := wire.SessionRoundCard{Label: strconv.Itoa(seq), Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
 	if m := roundNumberRE.FindStringSubmatch(header); m != nil {
 		card.Label = m[1] + m[2]
 	}
-	res := parsedRound{Card: card}
+	res := ParsedRound{Card: card}
 	if len(blocks) == 0 {
 		res.Card.Note = roundBlockNote
 		return res
@@ -116,16 +116,16 @@ func afterRoundNumber(header string) string {
 func chatRound(msgs []transcript.ChatMessage) []wire.SessionRoundCard {
 	for _, text := range transcript.TrailingAgentTexts(msgs) {
 		if grillround.HasMarker(text) {
-			return roundCards(text)
+			return RoundCards(text)
 		}
 	}
 	return nil
 }
 
-// chatNext is the run-end line of the agent's last turn, or nil.
-func chatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ticket string, final bool) *wire.SessionNext {
+// ChatNext is the run-end line of the agent's last turn, or nil.
+func ChatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ticket string, final bool) *wire.SessionNext {
 	for _, text := range transcript.TrailingAgentTexts(msgs) {
-		if a, ok := runEndNext(text, ticket, string(kind), final); ok {
+		if a, ok := RunEndNext(text, ticket, string(kind), final); ok {
 			return &wire.SessionNext{Action: a}
 		}
 	}

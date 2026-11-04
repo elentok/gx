@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -39,7 +40,7 @@ func (s *Server) readSessionPermission(id string) (wire.SessionResult, wire.Sess
 		return res, out, err
 	}
 	switch st := meta.Status.State; {
-	case !acceptsKeys(st):
+	case !chat.AcceptsKeys(st):
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", id, st)), out, nil
 	case st != wire.SessionBlocked:
 		return sessionRefusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", id, st)), out, nil

@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
@@ -89,7 +90,7 @@ func (s *Server) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 	}
 	st := meta.info().Status
 	switch {
-	case !acceptsKeys(st.State):
+	case !chat.AcceptsKeys(st.State):
 		return dir, sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
 	case req.OnlyBlocked && st.State != wire.SessionBlocked:
 		return dir, sessionRefusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", req.ID, st.State)), nil
@@ -130,10 +131,6 @@ func (s *Server) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 	return dir, wire.SessionResult{Session: &info}, nil
 }
 
-func acceptsKeys(state string) bool {
-	return state == wire.SessionWorking || state == wire.SessionIdle || state == wire.SessionBlocked || state == wire.SessionRateLimited
-}
-
 // answerSessionPermission answers the permission dialog of a Blocked session.
 // It is guarded, so it leaves a Design session's countdown alone.
 func (s *Server) answerSessionPermission(req wire.SessionKeysRequest, source string) (wire.SessionResult, error) {
@@ -145,7 +142,7 @@ func (s *Server) answerSessionPermission(req wire.SessionKeysRequest, source str
 	}
 	st := meta.info().Status
 	switch {
-	case !acceptsKeys(st.State):
+	case !chat.AcceptsKeys(st.State):
 		s.sessionWatches.metaMu.Unlock()
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
 	case st.State != wire.SessionBlocked || st.Kind != "permission":

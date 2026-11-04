@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -21,7 +22,7 @@ import (
 // prompt prefix only by convention. This fails when either side drifts.
 func TestRunEndLine_MatchesAgentfakeDesignRunEnd(t *testing.T) {
 	t.Parallel()
-	got, ok := runEndNext("Thanks, that settles it.\n\n"+agentfake.DesignRunEnd, "gx:epic/03", "claude", false)
+	got, ok := chat.RunEndNext("Thanks, that settles it.\n\n"+agentfake.DesignRunEnd, "gx:epic/03", "claude", false)
 	if !ok {
 		t.Fatalf("runEndLine does not match agentfake.DesignRunEnd %q", agentfake.DesignRunEnd)
 	}
@@ -32,7 +33,7 @@ func TestRunEndLine_MatchesAgentfakeDesignRunEnd(t *testing.T) {
 
 func TestDesignContinueAction_UsesAgentfakeDesignPromptPrefix(t *testing.T) {
 	t.Parallel()
-	action := designContinueAction("gx:epic/03", "claude")
+	action := chat.DesignContinueAction("gx:epic/03", "claude")
 	if len(action) != 2 || !strings.HasPrefix(action[1], agentfake.DesignPromptPrefix) {
 		t.Errorf("action = %q, want second entry to start with %q", action, agentfake.DesignPromptPrefix)
 	}
@@ -220,7 +221,7 @@ func TestDesignContinueAction_ResetsEachHarnessItsOwnWay(t *testing.T) {
 		"codex":  {"/new", "$gx-design epic"},
 		"fake":   {"/clear", "/gx-design epic"},
 	} {
-		if got := designContinueAction("gx:epic/03", agent); !slices.Equal(got, want) {
+		if got := chat.DesignContinueAction("gx:epic/03", agent); !slices.Equal(got, want) {
 			t.Errorf("%s action = %q, want %q", agent, got, want)
 		}
 	}
@@ -234,7 +235,7 @@ func TestChatNext_NamesTheSessionsHarnessCommand(t *testing.T) {
 		harness.Claude: {"/clear", "/gx-design epic"},
 		harness.Codex:  {"/new", "$gx-design epic"},
 	} {
-		next := chatNext(msgs, kind, "gx:epic/03", false)
+		next := chat.ChatNext(msgs, kind, "gx:epic/03", false)
 		if next == nil || !slices.Equal(next.Action.Action, want) {
 			t.Errorf("%s next = %+v, want action %q", kind, next, want)
 		}

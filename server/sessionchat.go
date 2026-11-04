@@ -3,124 +3,16 @@ package server
 import (
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/codexsession"
-	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/transcript"
 )
-
-// maxChatMessages caps how many of the newest visible messages the chat loads.
-const maxChatMessages = 300
-
-// chatCache keeps each transcript's parsed chat until its size or mtime
-// changes, so polling a quiet session never rereads the file. The design's
-// final-step flag and the harness are part of the key: a step change alone
-// must refresh Next, and the same path read as another harness builds a
-// different Next.
-type chatCache struct {
-	mu      sync.Mutex
-	entries map[string]chatCacheEntry
-}
-
-type chatCacheEntry struct {
-	size  int64
-	mtime time.Time
-	kind  agentrunner.Kind
-	final bool
-	chat  chatSnapshot
-}
-
-// chatSnapshot is everything one read of a transcript yields. Tasks keeps the
-// unresolved markers, which age out at request time.
-type chatSnapshot struct {
-	msgs      []wire.SessionChatMessage
-	truncated bool
-	round     []wire.SessionRoundCard
-	next      *wire.SessionNext
-	tasks     []transcript.BackgroundTaskMarker
-	// unreadable and codexVersion are set for a Codex rollout gx cannot read.
-	unreadable   bool
-	codexVersion string
-}
-
-func (c *chatCache) read(path string, kind agentrunner.Kind, final bool, load func(string) (chatSnapshot, error)) (chatSnapshot, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return chatSnapshot{}, err
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) && e.kind == kind && e.final == final {
-		return e.chat, nil
-	}
-	chat, err := load(path)
-	if err != nil {
-		return chatSnapshot{}, err
-	}
-	if c.entries == nil {
-		c.entries = map[string]chatCacheEntry{}
-	}
-	c.entries[path] = chatCacheEntry{size: info.Size(), mtime: info.ModTime(), kind: kind, final: final, chat: chat}
-	return chat, nil
-}
-
-// chatLoader returns the load func for a session whose design ticket is ticket;
-// final is whether its map is at a step with no Continue.
-func chatLoader(kind agentrunner.Kind, ticket string, final bool) func(string) (chatSnapshot, error) {
-	return func(path string) (chatSnapshot, error) {
-		read, _, err := chatreader.ReadFile(kind, path)
-		if err != nil {
-			return chatSnapshot{}, err
-		}
-		snap := snapshotOf(read, kind, ticket, final)
-		// Codex has no background markers: its Background flag comes from the status.
-		if kind == harness.Codex {
-			return snap, nil
-		}
-		// A zero now keeps every unresolved marker fresh; the cache serves the
-		// read later, so ageing out waits for the request.
-		reading, err := transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, time.Time{})
-		if err != nil {
-			return chatSnapshot{}, err
-		}
-		for _, mk := range reading.Markers {
-			if mk.Status != transcript.BackgroundTaskResolved {
-				snap.tasks = append(snap.tasks, mk)
-			}
-		}
-		return snap, nil
-	}
-}
-
-// snapshotOf turns one read of a conversation into what the chat serves.
-func snapshotOf(read chatreader.Result, kind agentrunner.Kind, ticket string, final bool) chatSnapshot {
-	loaded := read.Messages
-	// Read before the cap and the fence strip: both cut what the parsers need.
-	// An open round wins over the run-end line, as in designActionable.
-	snap := chatSnapshot{round: chatRound(loaded), unreadable: read.Unreadable, codexVersion: read.CodexVersion}
-	if snap.round == nil {
-		snap.next = chatNext(loaded, kind, ticket, final)
-	}
-	if len(loaded) > maxChatMessages {
-		loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
-	}
-	snap.msgs = make([]wire.SessionChatMessage, 0, len(loaded))
-	for _, m := range loaded {
-		text := m.Text
-		if m.Role == transcript.ChatRoleAgent && m.Kind == transcript.ChatKindText {
-			text, _ = grillround.SplitFences(text)
-		}
-		snap.msgs = append(snap.msgs, wire.SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls})
-	}
-	return snap
-}
 
 // codexArchive finds the zstd rollout of a Codex session whose plain rollout is
 // gone. It only looks for the file; nothing is decoded.
@@ -168,24 +60,13 @@ func (s *Server) sessionChatArchiveRead(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "cannot decode the archived rollout: "+err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	snap := snapshotOf(read, harness.Codex, meta.Ticket, s.designFinal(meta.Ticket))
+	snap := chat.SnapshotOf(read, harness.Codex, meta.Ticket, s.designFinal(meta.Ticket))
 	writeJSON(w, wire.SessionChatResponse{
-		ConversationID: meta.ConversationID, Messages: snap.msgs, Truncated: snap.truncated,
-		Round: snap.round, Next: snap.next, Background: []wire.SessionBackgroundTask{},
+		ConversationID: meta.ConversationID, Messages: snap.Msgs, Truncated: snap.Truncated,
+		Round: snap.Round, Next: snap.Next, Background: []wire.SessionBackgroundTask{},
 		Failure:    s.sessionInfo(meta).Failure,
-		Unreadable: snap.unreadable, CodexVersion: snap.codexVersion,
+		Unreadable: snap.Unreadable, CodexVersion: snap.CodexVersion,
 	})
-}
-
-// background lists the tasks still within their cap at now.
-func (c chatSnapshot) background(now time.Time) []wire.SessionBackgroundTask {
-	out := []wire.SessionBackgroundTask{}
-	for _, mk := range c.tasks {
-		if now.Sub(mk.StartedAt) <= mk.Cap {
-			out = append(out, wire.SessionBackgroundTask{Kind: mk.Kind, Label: mk.Label, StartedAt: mk.StartedAt.Format(time.RFC3339)})
-		}
-	}
-	return out
 }
 
 // chatTranscript finds the conversation file of a session with a chat reader,
@@ -205,7 +86,7 @@ func (s *Server) codexRollout(id string, meta sessionMeta) (string, bool) {
 	if meta.ConversationID == "" {
 		return "", false
 	}
-	return s.transcripts.resolve(meta.ConversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
+	return s.transcripts.Resolve(meta.ConversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
 		home, err := s.projects.CodexHome()
 		if err != nil {
 			s.log.Warn("codex home", "session", id, "err", err)
@@ -243,22 +124,22 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	}
 	// The page reads only on an event, so a remembered miss from before the
 	// transcript existed would hide the message the event announces.
-	s.transcripts.forgetMiss(meta.ConversationID)
+	s.transcripts.ForgetMiss(meta.ConversationID)
 	path, kind, found := s.chatTranscript(id, meta)
 	if !found {
 		_, out.Archived = s.codexArchive(id, meta)
 	} else {
 		final := s.designFinal(meta.Ticket)
-		chat, err := s.chats.read(path, kind, final, chatLoader(kind, meta.Ticket, final))
+		snap, err := s.chats.Read(path, kind, final, chat.Loader(kind, meta.Ticket, final))
 		switch {
 		case os.IsNotExist(err): // vanished since the lookup: no chat yet
 		case err != nil:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		default:
-			out.Messages, out.Truncated = chat.msgs, chat.truncated
-			out.Round, out.Next, out.Background = chat.round, chat.next, chat.background(time.Now())
-			out.Unreadable, out.CodexVersion = chat.unreadable, chat.codexVersion
+			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
+			out.Round, out.Next, out.Background = snap.Round, snap.Next, snap.Background(time.Now())
+			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
 		}
 	}
 	writeJSON(w, out)

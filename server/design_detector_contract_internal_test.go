@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/grillround"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -139,7 +140,7 @@ func TestAgentfakeDefaultedRounds_UseTheRealFormat(t *testing.T) {
 		if !strings.Contains(before, "❓") {
 			t.Errorf("%s round = %q, want the card before the defaults", turn, text)
 		}
-		cards := roundCards(text)
+		cards := chat.RoundCards(text)
 		if len(cards) != wantCards || strings.Contains(cards[0].Body, "Q10") {
 			t.Errorf("%s round cards = %+v, want %d card without the defaults", turn, cards, wantCards)
 		}
@@ -148,7 +149,7 @@ func TestAgentfakeDefaultedRounds_UseTheRealFormat(t *testing.T) {
 
 func TestAgentfakeTextRound_ParsesToOneTextCard(t *testing.T) {
 	t.Parallel()
-	cards := roundCards(agentfake.DesignRoundText(agentfake.DesignTurnText))
+	cards := chat.RoundCards(agentfake.DesignRoundText(agentfake.DesignTurnText))
 	if len(cards) != 1 {
 		t.Fatalf("text round cards = %+v, want 1", cards)
 	}
@@ -172,7 +173,7 @@ func TestGxGrillingAllDefaultedTemplate_IsGrilling(t *testing.T) {
 	if !ok || !a.Grilling || a.Reason != grillingReason {
 		t.Errorf("all-defaulted template yields (%+v, %v), want the grilling Actionable", a, ok)
 	}
-	if cards := roundCards(found); len(cards) != 1 || strings.Contains(cards[0].Body, "Decided unless") {
+	if cards := chat.RoundCards(found); len(cards) != 1 || strings.Contains(cards[0].Body, "Decided unless") {
 		t.Errorf("all-defaulted template cards = %+v, want one card without the defaults", cards)
 	}
 }

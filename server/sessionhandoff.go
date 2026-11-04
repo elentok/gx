@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/harness"
@@ -30,7 +31,7 @@ func (s *Server) chartingHandoffDue(meta sessionMeta, action []string) bool {
 	return meta.LaunchDesign && meta.Design &&
 		s.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == ralphloop.TierStrongest &&
-		slices.Equal(action, designContinueAction(meta.Ticket, meta.Harness)) &&
+		slices.Equal(action, chat.DesignContinueAction(meta.Ticket, meta.Harness)) &&
 		s.designLaunchTier(meta.Ticket) == ralphloop.TierWorker
 }
 
@@ -107,7 +108,7 @@ func (s *Server) restartOnWorker(dir string, meta *sessionMeta, old string) erro
 	meta.ConversationID = conv
 	s.applyTier(meta, ralphloop.TierWorker)
 	meta.HandoffTier = true
-	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", ticketEpic(meta.Ticket))
+	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
 	meta.Actionable = wire.SessionActionable{}
 	s.recordConversation(*meta)
 	if err := clearOldHolder(dir); err != nil {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/grillround"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -33,7 +34,7 @@ type badRoundBlock struct {
 func badRoundBlocks(text string) []badRoundBlock {
 	var bad []badRoundBlock
 	for i, seg := range grillround.Segments(text) {
-		if p := parseRoundSegment(i+1, seg); p.Err != nil {
+		if p := chat.ParseRoundSegment(i+1, seg); p.Err != nil {
 			bad = append(bad, badRoundBlock{p.Card.Label, p.Err, p.Raw})
 		}
 	}

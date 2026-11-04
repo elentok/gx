@@ -56,7 +56,7 @@ func (s *Server) reportedModel(m sessionMeta) string {
 	if !ok {
 		return m.Model
 	}
-	model, err := s.reportedModels.read(path, func(p string) (string, error) {
+	model, err := s.reportedModels.Read(path, func(p string) (string, error) {
 		usage, _, err := transcript.LastAssistantUsage(p)
 		return usage.Model, err
 	})
@@ -78,7 +78,7 @@ func (s *Server) reportedCodexTurn(m sessionMeta) codexsession.TurnModel {
 	if err != nil || !ok {
 		return saved
 	}
-	turn, err := s.codexTurns.read(path, func(p string) (codexsession.TurnModel, error) {
+	turn, err := s.codexTurns.Read(path, func(p string) (codexsession.TurnModel, error) {
 		t, _, err := codexsession.ReadTurnModel(p)
 		return t, err
 	})
@@ -131,7 +131,7 @@ func (s *Server) transcriptFailure(m sessionMeta) *wire.SessionFailure {
 	}
 	switch state {
 	case wire.SessionIdle:
-		auth, err := s.authFailures.read(path, func(p string) (bool, error) {
+		auth, err := s.authFailures.Read(path, func(p string) (bool, error) {
 			e, ok, err := transcript.LastAPIError(p)
 			return ok && (e.Status == 401 || e.Error == "authentication_error"), err
 		})

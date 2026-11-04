@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
@@ -107,7 +108,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if req.Continue {
 		// The server builds the slash commands, so the prefix rule stays closed
 		// to the page.
-		action := designContinueAction(meta.Ticket, meta.Harness)
+		action := chat.DesignContinueAction(meta.Ticket, meta.Harness)
 		if res, refused := s.handoffRefusal(meta, action); refused {
 			return res, nil
 		}
@@ -174,14 +175,14 @@ func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) 
 		return "", nil
 	}
 	final := s.designFinal(meta.Ticket)
-	chat, err := s.chats.read(path, kind, final, chatLoader(kind, meta.Ticket, final))
-	if os.IsNotExist(err) || len(chat.msgs) == 0 {
+	snap, err := s.chats.Read(path, kind, final, chat.Loader(kind, meta.Ticket, final))
+	if os.IsNotExist(err) || len(snap.Msgs) == 0 {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return chat.msgs[len(chat.msgs)-1].ID, nil
+	return snap.Msgs[len(snap.Msgs)-1].ID, nil
 }
 
 // renameCommandArg is the new name in a "/rename <name>" or "/name <name>"

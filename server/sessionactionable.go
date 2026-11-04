@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/grillround"
@@ -64,21 +65,7 @@ func designActionable(text, ticket, agent string, final bool) (wire.SessionActio
 	if grillround.HasMarker(text) {
 		return wire.SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
 	}
-	return runEndNext(text, ticket, agent, final)
-}
-
-// runEndNext is the Actionable a gx-design run-end line raises: Continue in a
-// fresh conversation, or just the line when the design is at its final step.
-func runEndNext(text, ticket, agent string, final bool) (wire.SessionActionable, bool) {
-	line := grillround.RunEndLine.FindString(text)
-	if line == "" {
-		return wire.SessionActionable{}, false
-	}
-	a := wire.SessionActionable{Reason: strings.TrimSpace(line), Derived: true}
-	if !final {
-		a.Action = designContinueAction(ticket, agent)
-	}
-	return a, true
+	return chat.RunEndNext(text, ticket, agent, final)
 }
 
 // designFinal reports whether the map behind a design ticket is at Branch or
@@ -98,24 +85,6 @@ func (s *Server) designFinal(ticket string) bool {
 		}
 	}
 	return false
-}
-
-// designContinueAction starts the next gx-design phase in a fresh conversation:
-// Codex resets with /new, Claude with /clear.
-func designContinueAction(ticket, agent string) []string {
-	reset := "/clear"
-	if agent == string(harness.Codex) {
-		reset = "/new"
-	}
-	return []string{reset, harness.SkillCommand(agent, "gx-design", ticketEpic(ticket))}
-}
-
-// ticketEpic is the epic of a ticket address like "project:epic" or
-// "project:epic/03".
-func ticketEpic(addr string) string {
-	_, rest, _ := strings.Cut(addr, ":")
-	epic, _, _ := strings.Cut(rest, "/")
-	return epic
 }
 
 // epicAddress is the "project:epic" part of a ticket address, whatever project
@@ -141,7 +110,7 @@ func (s *Server) claudeTranscript(id string, meta sessionMeta) (string, bool) {
 	if conversationID == "" {
 		return "", false
 	}
-	return s.transcripts.resolve(conversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
+	return s.transcripts.Resolve(conversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
 		projects, err := harness.ClaudeProjectsDirIn(s.cfg.Env)
 		if err != nil {
 			s.log.Warn("claude projects dir", "session", id, "err", err)

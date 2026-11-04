@@ -40,6 +40,7 @@ import (
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/webauth"
@@ -106,19 +107,19 @@ type Server struct {
 	disks      *disk.Disk
 	health     *health.Health
 	// chats caches parsed session chats by transcript file.
-	chats chatCache
+	chats chat.Cache
 	// transcripts caches where each conversation's transcript is.
-	transcripts transcriptPaths
+	transcripts chat.TranscriptPaths
 	// commandLists caches the harnesses' command lists.
 	commandLists *commandlist.Cache
 	// autoAdvances holds the running auto-advance countdowns.
 	autoAdvances autoAdvances
 	// authFailures caches whether each transcript ends in an auth error.
-	authFailures authFailures
+	authFailures chat.AuthFailures
 	// reportedModels caches the model ID on each transcript's newest reply.
-	reportedModels fileCache[string]
+	reportedModels chat.FileCache[string]
 	// codexTurns caches the model and effort on each rollout's newest turn.
-	codexTurns fileCache[codexsession.TurnModel]
+	codexTurns chat.FileCache[codexsession.TurnModel]
 	// filedRounds holds the round markers already in the follow-ups epic, so an
 	// Idle detection never rescans its tickets.
 	filedRounds sync.Map
@@ -215,7 +216,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.TurnSettleTimeout = defaultTurnSettleTimeout
 	}
 	if cfg.TranscriptMissTTL == 0 {
-		cfg.TranscriptMissTTL = defaultTranscriptMissTTL
+		cfg.TranscriptMissTTL = chat.DefaultTranscriptMissTTL
 	}
 	if cfg.SessionsDir == "" {
 		data, err := config.DataDir()
