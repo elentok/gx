@@ -10,9 +10,9 @@ import (
 )
 
 func snapshot() viewmodel.State {
-	return viewmodel.State{}.ApplySnapshot(server.Snapshot{
+	return viewmodel.State{}.ApplySnapshot(wire.Snapshot{
 		Seq: 10,
-		Tickets: []server.TicketInfo{
+		Tickets: []wire.TicketInfo{
 			{Address: "gx:e/01", Status: "open"},
 			{Address: "gx:e/02", Status: "open"},
 		},
@@ -34,9 +34,9 @@ func reduce(t *testing.T, s viewmodel.State, evs ...server.Event) viewmodel.Stat
 }
 
 func TestOlderServer(t *testing.T) {
-	withRendered := viewmodel.State{}.ApplySnapshot(server.Snapshot{
+	withRendered := viewmodel.State{}.ApplySnapshot(wire.Snapshot{
 		Seq:     1,
-		Tickets: []server.TicketInfo{{Address: "gx:e/01", Status: "open", RenderedStatus: "open"}},
+		Tickets: []wire.TicketInfo{{Address: "gx:e/01", Status: "open", RenderedStatus: "open"}},
 	})
 	cases := []struct {
 		name string
@@ -44,7 +44,7 @@ func TestOlderServer(t *testing.T) {
 		want bool
 	}{
 		{"no snapshot yet", viewmodel.State{}, true},
-		{"fresh server snapshot (seq 0)", viewmodel.State{}.ApplySnapshot(server.Snapshot{}), false},
+		{"fresh server snapshot (seq 0)", viewmodel.State{}.ApplySnapshot(wire.Snapshot{}), false},
 		{"tickets without rendered status", snapshot(), true},
 		{"tickets with rendered status", withRendered, false},
 	}
@@ -71,7 +71,7 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 		{server.EventTicketPaused, resnap},
 		{server.EventTicketChanged, resnap},
 		{server.EventReclaimed, resnap},
-		{server.EventExplainVerdictChange, resnap},
+		{wire.EventExplainVerdictChange, resnap},
 		{server.EventRootCompleted, resnap},
 		{server.EventRootPaused, resnap},
 		{server.EventMergeRolledBack, resnap},
@@ -96,7 +96,7 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 
 func TestApplySnapshot_CarriesSessions(t *testing.T) {
 	sessions := []wire.SessionInfo{{ID: "s1"}, {ID: "s2"}}
-	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 12, Sessions: sessions})
+	s := snapshot().ApplySnapshot(wire.Snapshot{Seq: 12, Sessions: sessions})
 	if len(s.Sessions) != 2 || s.Sessions[0].ID != "s1" || s.Sessions[1].ID != "s2" {
 		t.Fatalf("sessions = %+v, want s1, s2", s.Sessions)
 	}
@@ -104,13 +104,13 @@ func TestApplySnapshot_CarriesSessions(t *testing.T) {
 	if s.Sessions[0].ID != "s1" {
 		t.Fatal("state shares the snapshot's sessions slice")
 	}
-	if s = s.ApplySnapshot(server.Snapshot{Seq: 13}); len(s.Sessions) != 0 {
+	if s = s.ApplySnapshot(wire.Snapshot{Seq: 13}); len(s.Sessions) != 0 {
 		t.Fatalf("sessions after empty snapshot = %+v, want none", s.Sessions)
 	}
 }
 
 func TestActionableCount(t *testing.T) {
-	s := viewmodel.State{}.ApplySnapshot(server.Snapshot{Sessions: []wire.SessionInfo{
+	s := viewmodel.State{}.ApplySnapshot(wire.Snapshot{Sessions: []wire.SessionInfo{
 		{ID: "a", Actionable: wire.SessionActionable{Reason: "blocked"}},
 		{ID: "b"},
 		{ID: "c", Actionable: wire.SessionActionable{Reason: "review"}},
@@ -254,7 +254,7 @@ func TestReduce_QueueChangedRefetchesQueue(t *testing.T) {
 }
 
 func TestApplySnapshot_CarriesEpicSummaries(t *testing.T) {
-	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{
+	st := viewmodel.State{}.ApplySnapshot(wire.Snapshot{
 		Epics: []wire.EpicSummary{{Address: "gx:e", State: wire.EpicStatePaused, Done: 1, Total: 3}},
 	})
 
@@ -264,8 +264,8 @@ func TestApplySnapshot_CarriesEpicSummaries(t *testing.T) {
 }
 
 func TestApplySnapshot_CarriesQueueMode(t *testing.T) {
-	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 20, Mode: server.QueueModePaused})
-	if s.Mode != server.QueueModePaused {
+	s := snapshot().ApplySnapshot(wire.Snapshot{Seq: 20, Mode: wire.QueueModePaused})
+	if s.Mode != wire.QueueModePaused {
 		t.Fatalf("mode = %q", s.Mode)
 	}
 }
@@ -275,7 +275,7 @@ func TestApplySnapshot_KeepsIterationsOnlyForClaimedTickets(t *testing.T) {
 		server.Event{Seq: 11, Type: server.EventTicketClaimed, Address: "gx:e/01"},
 		server.Event{Seq: 12, Type: server.EventTicketClaimed, Address: "gx:e/02"},
 	)
-	s = s.ApplySnapshot(server.Snapshot{Seq: 20, Tickets: []server.TicketInfo{
+	s = s.ApplySnapshot(wire.Snapshot{Seq: 20, Tickets: []wire.TicketInfo{
 		{Address: "gx:e/01", Status: "claimed"},
 		{Address: "gx:e/02", Status: "done"},
 	}})

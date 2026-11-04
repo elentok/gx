@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
@@ -101,7 +100,7 @@ func startSessionCmd(api ServerAPI, storePath, address string) tea.Cmd {
 		var dir, note, agent string
 		madeWorktree := false
 		if api != nil {
-			res, err := api.DesignWorktree(context.Background(), server.DesignWorktreeRequest{Epic: epic})
+			res, err := api.DesignWorktree(context.Background(), wire.DesignWorktreeRequest{Epic: epic})
 			switch {
 			case err == nil && res.Refused:
 				return notify.Error("start session refused: " + res.Message)()

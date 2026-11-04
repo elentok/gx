@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -20,11 +19,11 @@ import (
 
 func TestDesignOpenRequest(t *testing.T) {
 	got, err := designOpenRequest("fresh", "an idea", "proj", false)
-	want := server.DesignOpenRequest{Epic: "fresh", NewDesign: true, Idea: "an idea", Project: "proj"}
+	want := wire.DesignOpenRequest{Epic: "fresh", NewDesign: true, Idea: "an idea", Project: "proj"}
 	if err != nil || got != want {
 		t.Errorf("request = %+v, %v, want %+v", got, err, want)
 	}
-	if got, err := designOpenRequest("proj:map", "", "", true); err != nil || got != (server.DesignOpenRequest{Epic: "proj:map", New: true}) {
+	if got, err := designOpenRequest("proj:map", "", "", true); err != nil || got != (wire.DesignOpenRequest{Epic: "proj:map", New: true}) {
 		t.Errorf("plain request = %+v, %v", got, err)
 	}
 }
@@ -90,7 +89,7 @@ func TestDesignsDelete_RefusalIsAnErrorAndSuccessDeletes(t *testing.T) {
 
 	var out bytes.Buffer
 	err := runDesignsDelete(context.Background(), h.Client, &out, false, "proj:plain")
-	if err == nil || !strings.Contains(err.Error(), server.ReasonDesignNotMapEpic) {
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonDesignNotMapEpic) {
 		t.Errorf("delete of a loop epic: err = %v, want a refusal", err)
 	}
 	if err := runDesignsDelete(context.Background(), h.Client, &out, false, "proj:bare"); err != nil {
@@ -112,13 +111,13 @@ func TestDesignsWorktree_JSON(t *testing.T) {
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
 
-	run := func() server.DesignWorktreeResult {
+	run := func() wire.DesignWorktreeResult {
 		t.Helper()
 		var out bytes.Buffer
-		if err := runDesignsWorktree(context.Background(), h.Client, &out, true, server.DesignWorktreeRequest{Epic: "proj:map"}); err != nil {
+		if err := runDesignsWorktree(context.Background(), h.Client, &out, true, wire.DesignWorktreeRequest{Epic: "proj:map"}); err != nil {
 			t.Fatal(err)
 		}
-		var res server.DesignWorktreeResult
+		var res wire.DesignWorktreeResult
 		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 			t.Fatalf("output %q: %v", out.String(), err)
 		}
@@ -162,7 +161,7 @@ func TestDesignsOpen_JSON(t *testing.T) {
 	var first, second wire.SessionResult
 	for _, res := range []*wire.SessionResult{&first, &second} {
 		var out bytes.Buffer
-		if err := runDesignsOpen(context.Background(), h.Client, &out, true, server.DesignOpenRequest{Epic: "proj:map"}); err != nil {
+		if err := runDesignsOpen(context.Background(), h.Client, &out, true, wire.DesignOpenRequest{Epic: "proj:map"}); err != nil {
 			t.Fatal(err)
 		}
 		if err := json.Unmarshal(out.Bytes(), res); err != nil {

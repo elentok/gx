@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -62,7 +63,7 @@ type QueueItem struct {
 type QueueResult struct {
 	Queue []QueueItem `json:"queue,omitempty"`
 	// Mode is set by pause, resume and flush: running or paused.
-	Mode QueueMode `json:"mode,omitempty"`
+	Mode wire.QueueMode `json:"mode,omitempty"`
 	// ExtraUsage is the warning an enqueue carries while the account
 	// auto-purchases extra usage.
 	ExtraUsage bool `json:"extra_usage,omitempty"`

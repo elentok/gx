@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/viewmodel"
@@ -25,14 +26,14 @@ func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
 
 // deliverQueue hands a fresh Queue tab the state the app shell would build
 // from snap and the queue order, as WithServerState does on every delivery.
-func deliverQueue(t *testing.T, snap server.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
+func deliverQueue(t *testing.T, snap wire.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
 	t.Helper()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(fakeServerAPI{}, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return deliverQueueTo(next.(QueueModel), snap, queue)
 }
 
-func deliverQueueTo(m QueueModel, snap server.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
+func deliverQueueTo(m QueueModel, snap wire.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
 	if snap.Epics == nil {
 		claimedAt := map[string]time.Time{}
 		for _, t := range snap.Tickets {
@@ -50,7 +51,7 @@ func deliverQueueTo(m QueueModel, snap server.Snapshot, queue []server.QueueItem
 
 func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, herdrDown bool) (QueueModel, tea.Cmd) {
 	t.Helper()
-	snap := server.Snapshot{Seq: 1, HerdrUnavailable: herdrDown, Tickets: []server.TicketInfo{
+	snap := wire.Snapshot{Seq: 1, HerdrUnavailable: herdrDown, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: status, ClaimedAt: claimedAt},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
 	}}
@@ -76,7 +77,7 @@ func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 }
 
 func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "done"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/03", Title: "Third", Status: "open"},
@@ -142,7 +143,7 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 }
 
 func TestQueueServerMode_HerdrDownBannerNamesWhatWaits(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, HerdrUnavailable: true, HerdrText: "herdr is down; waiting: gx:alpha/01"}, nil)
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, HerdrUnavailable: true, HerdrText: "herdr is down; waiting: gx:alpha/01"}, nil)
 
 	body := strings.Join(m.queueHeaderBodyLines(), "\n")
 	if !strings.Contains(body, "waiting: gx:alpha/01") {
@@ -153,7 +154,7 @@ func TestQueueServerMode_HerdrDownBannerNamesWhatWaits(t *testing.T) {
 // The web UI queues a whole epic as one epic-address item, which names no
 // ticket; every ticket of that epic must still show.
 func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
 	}}, []server.QueueItem{{Address: "gx:alpha"}})
@@ -172,7 +173,7 @@ func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
 // A conflict-resolution child runs inside its parent's merge, so the server has
 // no run for it: it still shows as resolving, and the parent as waiting on it.
 func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/01a", Title: "Conflict resolution for 01", Status: "claimed",
 			Type: "conflict-resolution", Parent: "gx:alpha/01"},
@@ -193,7 +194,7 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 }
 
 func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "done"},
 		{Address: "gx:alpha/02", Title: "Merge alpha", Status: "claimed", Type: "merge", ClaimedAt: time.Now()},
 	}}, []server.QueueItem{{Address: "gx:alpha/02"}})
@@ -212,7 +213,7 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 }
 
 func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Widened", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic2/b"},
 			ExternalBlockers: []string{"epic2/b"}, WidenedBlockers: map[string]string{"epic2/b": "epic2"}},
 		{Address: "gx:alpha/02", Title: "Whole epic", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic3"},
@@ -246,7 +247,7 @@ func TestQueueServerMode_NewDeliveryUpdatesRunningStateWithoutReload(t *testing.
 		t.Fatalf("runningEpics = %v, want idle before the claim", m.runningEpics)
 	}
 
-	m, cmd := deliverQueueTo(m, server.Snapshot{Seq: 2, Tickets: []server.TicketInfo{
+	m, cmd := deliverQueueTo(m, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
 	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
@@ -277,7 +278,7 @@ func TestQueueServerMode_PausedFollowsDeliveredMode(t *testing.T) {
 		t.Fatal("paused before any mode change")
 	}
 
-	st := viewmodel.State{Seq: 1, Loaded: true, Mode: server.QueueModePaused}
+	st := viewmodel.State{Seq: 1, Loaded: true, Mode: wire.QueueModePaused}
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 
 	if !next.(QueueModel).paused {
@@ -310,7 +311,7 @@ func TestQueueServerMode_InitDoesNotFetch(t *testing.T) {
 // turns done after a ticket-done event keeps its row without a queue refetch.
 func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testing.T) {
 	m, _ := loadedServerQueue(t, "claimed")
-	st := applySnapshot(viewmodel.State{}, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})

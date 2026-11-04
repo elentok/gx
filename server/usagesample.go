@@ -197,9 +197,9 @@ func (u *usageSamples) lift(now time.Time) ([]string, time.Time, error) {
 func (s *Server) usageFor(agent ralphloop.AgentKind) (*usageSamples, string) {
 	switch agent {
 	case ralphloop.AgentClaude:
-		return s.usage, VerdictUsagePrefixClaude
+		return s.usage, wire.VerdictUsagePrefixClaude
 	case ralphloop.AgentCodex:
-		return s.usageCodex, VerdictUsagePrefixCodex
+		return s.usageCodex, wire.VerdictUsagePrefixCodex
 	}
 	return nil, ""
 }

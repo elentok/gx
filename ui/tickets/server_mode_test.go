@@ -38,12 +38,12 @@ type fakeServerAPI struct {
 	budget     wire.BudgetStatus
 	iterations []server.IterationInfo
 	// designWorktree is what DesignWorktree returns.
-	designWorktree    server.DesignWorktreeResult
+	designWorktree    wire.DesignWorktreeResult
 	designWorktreeErr error
 	// fixAgent is what FixAgent returns.
 	fixAgent wire.FixAgentResult
 	// snap and queue are what Snapshot and QueueItems return.
-	snap  server.Snapshot
+	snap  wire.Snapshot
 	queue []server.QueueItem
 	// harness is what DefaultHarness returns; harnessSets records the
 	// SetDefaultHarness requests and harnessRes is what it returns.
@@ -152,7 +152,7 @@ func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairR
 	return server.RepairResult{}, nil
 }
 
-func (f fakeServerAPI) DesignWorktree(_ context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error) {
+func (f fakeServerAPI) DesignWorktree(_ context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error) {
 	f.record("design-worktree " + req.Epic)
 	return f.designWorktree, f.designWorktreeErr
 }
@@ -168,7 +168,7 @@ func (f fakeServerAPI) record(call string) {
 	}
 }
 
-func (f fakeServerAPI) Snapshot(context.Context) (server.Snapshot, error) {
+func (f fakeServerAPI) Snapshot(context.Context) (wire.Snapshot, error) {
 	return f.snap, nil
 }
 func (fakeServerAPI) Events(context.Context, uint64) (<-chan server.Event, error) { return nil, nil }
@@ -177,7 +177,7 @@ func (f fakeServerAPI) QueueItems(context.Context) ([]server.QueueItem, error)  
 // withRenderedStatus makes snap look like one from a current server, which
 // always sends rendered_status: a ticket without one gets its raw status word.
 // A snapshot with none at all reads as an older server's.
-func withRenderedStatus(snap server.Snapshot) server.Snapshot {
+func withRenderedStatus(snap wire.Snapshot) wire.Snapshot {
 	if snap.Seq == 0 {
 		snap.Seq = 1
 	}
@@ -190,18 +190,18 @@ func withRenderedStatus(snap server.Snapshot) server.Snapshot {
 	return snap
 }
 
-func applySnapshot(st viewmodel.State, snap server.Snapshot) viewmodel.State {
+func applySnapshot(st viewmodel.State, snap wire.Snapshot) viewmodel.State {
 	return st.ApplySnapshot(withRenderedStatus(snap))
 }
 
 // pausedAnswerInfo and pausedRepairInfo are server tickets paused for each
 // class: status paused, rendered as the class's word.
-func pausedAnswerInfo(address, title string) server.TicketInfo {
-	return server.TicketInfo{Address: address, Title: title, Status: "paused", RenderedStatus: gxtickets.StatusPausedAnswer.Word()}
+func pausedAnswerInfo(address, title string) wire.TicketInfo {
+	return wire.TicketInfo{Address: address, Title: title, Status: "paused", RenderedStatus: gxtickets.StatusPausedAnswer.Word()}
 }
 
-func pausedRepairInfo(address, title string) server.TicketInfo {
-	return server.TicketInfo{Address: address, Title: title, Status: "paused", RenderedStatus: gxtickets.StatusPausedRepair.Word()}
+func pausedRepairInfo(address, title string) wire.TicketInfo {
+	return wire.TicketInfo{Address: address, Title: title, Status: "paused", RenderedStatus: gxtickets.StatusPausedRepair.Word()}
 }
 
 func newServerModel(t *testing.T) Model {
@@ -211,7 +211,7 @@ func newServerModel(t *testing.T) Model {
 
 // withState hands the tab the state the app shell would deliver for snap,
 // then expands its open epics.
-func withState(m Model, snap server.Snapshot) Model {
+func withState(m Model, snap wire.Snapshot) Model {
 	st := applySnapshot(viewmodel.State{}, snap)
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 	m = next.(Model)
@@ -220,7 +220,7 @@ func withState(m Model, snap server.Snapshot) Model {
 }
 
 func TestServerMode_SnapshotRendersReducedRows(t *testing.T) {
-	snap := server.Snapshot{Seq: 4, Tickets: []server.TicketInfo{
+	snap := wire.Snapshot{Seq: 4, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Fork", Status: "open", Parent: "gx:alpha/01"},
 	}}
@@ -249,7 +249,7 @@ func TestServerMode_ResnapshotRequestFromRefresh(t *testing.T) {
 	}
 }
 
-var scopeSnap = server.Snapshot{Seq: 4, Tickets: []server.TicketInfo{
+var scopeSnap = wire.Snapshot{Seq: 4, Tickets: []wire.TicketInfo{
 	{Address: "gx:alpha/01", Status: "open"},
 	{Address: "other:beta/01", Status: "open"},
 }}
@@ -317,9 +317,9 @@ func toastsOf(cmd tea.Cmd) []notify.NotifyMsg {
 
 func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 	m := newServerModel(t)
-	snap := server.Snapshot{Seq: 1,
-		Tickets: []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "open"}},
-		Pending: []server.PendingRow{{Address: "gx:alpha/01", Verdict: "blocked", Reason: "waiting on 00"}},
+	snap := wire.Snapshot{Seq: 1,
+		Tickets: []wire.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "open"}},
+		Pending: []wire.PendingRow{{Address: "gx:alpha/01", Verdict: "blocked", Reason: "waiting on 00"}},
 	}
 	m = withState(m, snap)
 
@@ -338,12 +338,12 @@ func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 // shows a verdict.
 func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing.T) {
 	m := newServerModel(t)
-	snap := server.Snapshot{Seq: 1,
-		Tickets: []server.TicketInfo{
+	snap := wire.Snapshot{Seq: 1,
+		Tickets: []wire.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: "open"},
 			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 		},
-		Pending: []server.PendingRow{{Address: "gx:alpha/01", Verdict: "disk low", Reason: "2 GB free"}},
+		Pending: []wire.PendingRow{{Address: "gx:alpha/01", Verdict: "disk low", Reason: "2 GB free"}},
 	}
 	m = withState(m, snap)
 
@@ -362,7 +362,7 @@ func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)})
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		// The wire carries no pause reason, so only the retired repair status
 		// tells the client this pause is a repair.
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: gxtickets.StatusPausedRepair.Word()},
@@ -395,7 +395,7 @@ func serverModelWithStoreTicket(t *testing.T, api fakeServerAPI, isMap bool) (Mo
 	file := writeStoreTicket(t, store, "20-a.md", "---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n")
 	m := newServerModel(t).WithServer(api)
 	m.settings.TicketStore = store
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file, EpicIsMap: isMap},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -448,7 +448,7 @@ func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 		api.detail = detailWith(wire.ActionAnswer, wire.ActionResume)
 	}
 	m := newServerModel(t).WithServer(api)
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -469,7 +469,7 @@ func pressMenuKey(t *testing.T, m Model) Model {
 func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "paused"} {
 		m := newServerModel(t).WithServer(fakeServerAPI{})
-		m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+		m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: status},
 			// Keeps the epic open: a fully done epic starts collapsed.
 			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
@@ -524,7 +524,7 @@ func TestServerMode_PausedAnswerMenuHasNoAnswerAction(t *testing.T) {
 }
 
 func TestEpicsFromViewModel_KeepsTheDoneMetrics(t *testing.T) {
-	vm := applySnapshot(viewmodel.State{}, server.Snapshot{Tickets: []server.TicketInfo{
+	vm := applySnapshot(viewmodel.State{}, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "proj:epic-a/01", Status: "done", ActualContextWindow: 66395, ElapsedTime: 316, Compactions: 2},
 	}})
 	epics := epicsFromViewModel(vm, viewmodel.Scope{})
@@ -538,7 +538,7 @@ func TestEpicsFromViewModel_KeepsTheDoneMetrics(t *testing.T) {
 }
 
 func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
-	vm := applySnapshot(viewmodel.State{}, server.Snapshot{Tickets: []server.TicketInfo{
+	vm := applySnapshot(viewmodel.State{}, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "proj:epic-a/27", Status: "done"},
 		{Address: "proj:epic-a/27a", Status: "done", Parent: "proj:epic-a/27"},
 		{Address: "proj:epic-a/27a1", Status: "done", Parent: "proj:epic-a/27a"},

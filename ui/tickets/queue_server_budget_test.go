@@ -10,7 +10,7 @@ import (
 
 func loadedServerQueueWithBudget(t *testing.T, budget wire.BudgetStatus) QueueModel {
 	t.Helper()
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Budget: budget, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Budget: budget, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}, []server.QueueItem{{Address: "gx:alpha/01"}})
 	return m
@@ -54,9 +54,9 @@ func TestQueueServerMode_HeaderColourBands(t *testing.T) {
 }
 
 func TestQueueServerMode_EpicStatusLineShowsTicketCostSum(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1,
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1,
 		Budget: wire.BudgetStatus{Total: 5, SoftLimit: 50, Roots: map[string]float64{"gx:alpha": 99}},
-		Tickets: []server.TicketInfo{
+		Tickets: []wire.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: "done", ActualCost: 1.5},
 			{Address: "gx:alpha/02", Title: "Second", Status: "open", ActualCost: 1.75},
 		}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})

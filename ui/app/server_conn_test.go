@@ -49,8 +49,8 @@ func (f *fakeServerClient) QueueAdd(ctx context.Context, address, agent string) 
 	return f.ServerAPI.QueueAdd(ctx, address, agent)
 }
 
-func (f *fakeServerClient) Snapshot(context.Context) (server.Snapshot, error) {
-	return server.Snapshot{}, errors.New("not needed")
+func (f *fakeServerClient) Snapshot(context.Context) (wire.Snapshot, error) {
+	return wire.Snapshot{}, errors.New("not needed")
 }
 
 func (f *fakeServerClient) Negotiate(context.Context, string) (apiclient.Negotiation, error) {

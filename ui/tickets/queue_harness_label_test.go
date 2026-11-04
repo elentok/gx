@@ -3,7 +3,6 @@ package tickets
 import (
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -12,7 +11,7 @@ func TestQueue_HarnessLabelsByAddress(t *testing.T) {
 	label := func(h, tier, model, effort, note string) wire.HarnessLabel {
 		return wire.HarnessLabel{Harness: h, Tier: tier, Model: model, Effort: effort, HarnessNote: note}
 	}
-	st := viewmodel.State{Tickets: []server.TicketInfo{
+	st := viewmodel.State{Tickets: []wire.TicketInfo{
 		{Address: "gx:a/01", HarnessLabel: label("", "", "", "", "follows default")},
 		{Address: "gx:a/02", HarnessLabel: label("codex", "", "", "", "pinned")},
 		{Address: "gx:a/03", HarnessLabel: label("claude", "", "", "", "keeps Claude (ran before)")},

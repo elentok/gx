@@ -776,7 +776,7 @@ func runServerTicketsFollow(ctx context.Context, c *apiclient.Client, addr strin
 		}
 		_, werr = fmt.Fprintln(w, text)
 	}
-	err := c.Follow(ctx, func(s *server.Snapshot, ev *server.Event) {
+	err := c.Follow(ctx, func(s *wire.Snapshot, ev *server.Event) {
 		if ev != nil {
 			if ev.Address == addr {
 				print(fmt.Sprintf("%d\t%s\t%s", ev.Seq, ev.Type, ev.Address), ev)

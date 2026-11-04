@@ -15,7 +15,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
 )
@@ -212,11 +211,11 @@ func assertGolden(t *testing.T, name, text string) {
 
 // withQueue gives m an epic of seven tickets, three done, the fourth claimed;
 // running decides whether the server holds a run for the claimed one.
-func withQueue(m Model, mode server.QueueMode, running bool) Model {
+func withQueue(m Model, mode wire.QueueMode, running bool) Model {
 	statuses := []string{"done", "done", "done", "claimed", "open", "open", "open"}
 	m.stream.vm.Tickets = nil
 	for i, st := range statuses {
-		info := server.TicketInfo{Address: fmt.Sprintf("gx:alpha/%02d", i+1), Title: "t", Status: st}
+		info := wire.TicketInfo{Address: fmt.Sprintf("gx:alpha/%02d", i+1), Title: "t", Status: st}
 		if st == "claimed" && running {
 			info.ClaimedAt = time.Now()
 		}
@@ -232,13 +231,13 @@ func TestTitleRow_QueueStatus(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name    string
-		mode    server.QueueMode
+		mode    wire.QueueMode
 		running bool
 		want    string
 	}{
-		{"running", server.QueueModeRunning, true, "▶ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
-		{"paused", server.QueueModePaused, false, "‖ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
-		{"queued but idle", server.QueueModeRunning, false, "gx › worktrees ▾ agents 2 ● ? help"},
+		{"running", wire.QueueModeRunning, true, "▶ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"paused", wire.QueueModePaused, false, "‖ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"queued but idle", wire.QueueModeRunning, false, "gx › worktrees ▾ agents 2 ● ? help"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -254,7 +253,7 @@ func TestTitleRow_QueueStatus(t *testing.T) {
 
 func TestTitleRow_QueueBarDropsFirst(t *testing.T) {
 	t.Parallel()
-	m := withQueue(titleModel(t, false, 44, connUp, 2), server.QueueModeRunning, true)
+	m := withQueue(titleModel(t, false, 44, connUp, 2), wire.QueueModeRunning, true)
 	got := strings.Join(strings.Fields(titleText(m)), " ")
 	if want := "gx › worktrees ▾ ▶ 3/7 agents 2 ● ?"; got != want {
 		t.Errorf("title = %q, want %q", got, want)

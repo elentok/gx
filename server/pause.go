@@ -7,17 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 const pauseFileName = "queue-mode.json"
-
-// QueueMode is the queue's mode, as reported in QueueResult.Mode.
-type QueueMode string
-
-const (
-	QueueModeRunning QueueMode = "running"
-	QueueModePaused  QueueMode = "paused"
-)
 
 // pauseState gates claiming. A pause is persisted so a restart does not start
 // work the operator held back. Pausing never touches runs already started, so
@@ -66,17 +60,17 @@ func (p *pauseState) blocked() bool {
 }
 
 // currentMode is mode for callers that do not already hold the lock.
-func (p *pauseState) currentMode() QueueMode {
+func (p *pauseState) currentMode() wire.QueueMode {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.mode()
 }
 
-func (p *pauseState) mode() QueueMode {
+func (p *pauseState) mode() wire.QueueMode {
 	if p.paused {
-		return QueueModePaused
+		return wire.QueueModePaused
 	}
-	return QueueModeRunning
+	return wire.QueueModeRunning
 }
 
 // save writes through a rename so a crash never leaves a torn file.

@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -23,7 +24,7 @@ func TestRateLimitHold_RunKeepsSlotAndExplainsTheHold(t *testing.T) {
 		want  string
 	}{
 		{"known reset", func(r *runnerfake.Runner) { r.SetRateLimit("epic-a-iter-01", reset) }, "rate-limited: resets " + reset.Format(time.RFC3339)},
-		{"unknown reset", func(r *runnerfake.Runner) { r.SetLimitedUnknownReset("epic-a-iter-01") }, server.VerdictRateLimited},
+		{"unknown reset", func(r *runnerfake.Runner) { r.SetLimitedUnknownReset("epic-a-iter-01") }, wire.VerdictRateLimited},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

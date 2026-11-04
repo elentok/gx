@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -19,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -145,7 +144,7 @@ func (r *running) gx(t *testing.T, args ...string) string {
 
 func (r *running) ticketStatus(t *testing.T, address string) string {
 	t.Helper()
-	var snap server.Snapshot
+	var snap wire.Snapshot
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "snapshot", "--json")), &snap); err != nil {
 		t.Fatal(err)
 	}

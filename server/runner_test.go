@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -593,7 +594,7 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	var snap server.Snapshot
+	var snap wire.Snapshot
 	// The claim reaches the index after the watch debounce, so the first row
 	// reads claimed a moment after the cap shows up.
 	servertest.WaitFor(t, 30*time.Second, "the first root claimed and the second at the cap", func() bool {
@@ -601,7 +602,7 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 		if snap, err = h.Client.Snapshot(ctx); err != nil {
 			t.Fatal(err)
 		}
-		return len(snap.Pending) == 2 && snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == server.VerdictConcurrencyCap
+		return len(snap.Pending) == 2 && snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == wire.VerdictConcurrencyCap
 	})
 	evs, err := h.Client.Events(ctx, snap.Seq)
 	if err != nil {
@@ -610,14 +611,14 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 
 	free()
 	for ev := range evs {
-		if ev.Type != server.EventExplainVerdictChange || ev.Address != "proj:epic-b/01" {
+		if ev.Type != wire.EventExplainVerdictChange || ev.Address != "proj:epic-b/01" {
 			continue
 		}
 		ex, err := h.Client.Explain(ctx, ev.Address)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ex.Verdict == server.VerdictConcurrencyCap {
+		if ex.Verdict == wire.VerdictConcurrencyCap {
 			t.Errorf("verdict-change event but explain still says %+v", ex)
 		}
 		return
@@ -650,8 +651,8 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "project cap 1/1, global cap 1/1"; ex.Verdict != server.VerdictConcurrencyCap || ex.Reason != want {
-		t.Errorf("explain = %+v, want %s: %s", ex, server.VerdictConcurrencyCap, want)
+	if want := "project cap 1/1, global cap 1/1"; ex.Verdict != wire.VerdictConcurrencyCap || ex.Reason != want {
+		t.Errorf("explain = %+v, want %s: %s", ex, wire.VerdictConcurrencyCap, want)
 	}
 }
 
@@ -676,7 +677,7 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	defer cancel()
 
 	order := []string{"proj-a:epic-a/01", "proj-b:epic-b/01", "proj-a:epic-c/01"}
-	var last []server.PendingRow
+	var last []wire.PendingRow
 	for _, addr := range order {
 		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
@@ -690,7 +691,7 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 			t.Fatalf("snapshot: %v; last pending = %+v", err, last)
 		}
 		last = snap.Pending
-		return len(snap.Pending) == 3 && snap.Pending[2].Verdict == server.VerdictConcurrencyCap &&
+		return len(snap.Pending) == 3 && snap.Pending[2].Verdict == wire.VerdictConcurrencyCap &&
 			snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == "claimed"
 	})
 	if runs := h.Server.Runs(); len(runs) != 2 {

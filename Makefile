@@ -30,7 +30,7 @@ web-e2e: web-build
 	cd webui && pnpm exec playwright install chromium
 	$(GX) brief -C webui playwright
 
-# Regenerates webui/src/generated/server.ts and wire.ts from the server's wire types.
+# Regenerates webui/src/generated/server.ts from the server's wire types.
 web-types:
 	go run github.com/gzuidhof/tygo@v0.2.21 generate
 

@@ -14,38 +14,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// EventExplainVerdictChange streams when a queued ticket's explain verdict
-// moves to a different word. Address is the ticket; clients re-explain it.
-const EventExplainVerdictChange = "explain-verdict-change"
-
-// Verdicts only the server's queue and slot state can give. The rest are the
-// scheduler's own decision words (blocked, stalled, done, error, claimed, ...).
-const (
-	VerdictEligible       = "eligible"
-	VerdictWaitingInQueue = "waiting in queue"
-	VerdictConcurrencyCap = "concurrency cap"
-	VerdictNotQueued      = "not queued"
-
-	VerdictRateLimited = "rate-limited"
-
-	// These start every usage-gate verdict, one per harness (the rest is the
-	// window and its reset); the web shows its override button on them.
-	VerdictUsagePrefixClaude = "Claude usage: "
-	VerdictUsagePrefixCodex  = "Codex usage: "
-
-	VerdictWaitingOnAnswer    = "waiting on answer"
-	VerdictWaitingReleased    = "waiting (slot released)"
-	VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)"
-)
-
-// PendingRow is one queue entry with its explain verdict.
-type PendingRow struct {
-	Address string `json:"address"`
-	Agent   string `json:"agent"`
-	Verdict string `json:"verdict"`
-	Reason  string `json:"reason,omitempty"`
-}
-
 // verdictLog remembers the verdict word last seen per queued ticket, to tell
 // when one changed.
 type verdictLog struct {
@@ -93,9 +61,9 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 // joins verdict and reason with a colon, so the phrase is carried as the verdict.
 func rateLimitVerdict(resetAt time.Time) string {
 	if resetAt.IsZero() {
-		return VerdictRateLimited
+		return wire.VerdictRateLimited
 	}
-	return VerdictRateLimited + ": resets " + resetAt.UTC().Format(time.RFC3339)
+	return wire.VerdictRateLimited + ": resets " + resetAt.UTC().Format(time.RFC3339)
 }
 
 // waitingVerdict is the verdict of a ticket whose live agent waits for an answer.
@@ -107,11 +75,11 @@ func (s *Server) waitingVerdict(addr tickets.Address) (string, bool) {
 	case !w.Waiting:
 		return "", false
 	case w.Released:
-		return VerdictWaitingReleased, true
+		return wire.VerdictWaitingReleased, true
 	case w.CapHeld:
-		return VerdictWaitingReleaseCapd, true
+		return wire.VerdictWaitingReleaseCapd, true
 	}
-	return VerdictWaitingOnAnswer, true
+	return wire.VerdictWaitingOnAnswer, true
 }
 
 // scheduleVerdict explains an unclaimed ticket that nothing in the store blocks:
@@ -125,7 +93,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	root := addr.Project + ":" + addr.Epic
 	ahead, queued := s.rootsAhead(root)
 	if !queued {
-		ex.Verdict = VerdictNotQueued
+		ex.Verdict = wire.VerdictNotQueued
 		return ex
 	}
 	if reason, missing := s.trunkMissing.get(addr.Project); missing {
@@ -160,13 +128,13 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	}
 	switch {
 	case len(full) > 0:
-		ex.Verdict, ex.Reason = VerdictConcurrencyCap, strings.Join(full, ", ")
+		ex.Verdict, ex.Reason = wire.VerdictConcurrencyCap, strings.Join(full, ", ")
 	case frontierIndex(e, t) >= rootCap-s.registry.countRoot(root):
-		ex.Verdict, ex.Reason = VerdictWaitingInQueue, "earlier tickets of the epic go first"
+		ex.Verdict, ex.Reason = wire.VerdictWaitingInQueue, "earlier tickets of the epic go first"
 	case ahead >= free:
-		ex.Verdict, ex.Reason = VerdictWaitingInQueue, fmt.Sprintf("%d queued root(s) ahead for %d free slot(s)", ahead, free)
+		ex.Verdict, ex.Reason = wire.VerdictWaitingInQueue, fmt.Sprintf("%d queued root(s) ahead for %d free slot(s)", ahead, free)
 	default:
-		ex.Verdict = VerdictEligible
+		ex.Verdict = wire.VerdictEligible
 	}
 	return ex
 }
@@ -223,8 +191,8 @@ func (s *Server) explainQueued(addr tickets.Address, epicsOf func(project string
 }
 
 // pendingRows explains every queue entry, in queue order.
-func (s *Server) pendingRows() []PendingRow {
-	rows := []PendingRow{}
+func (s *Server) pendingRows() []wire.PendingRow {
+	rows := []wire.PendingRow{}
 	byProject := map[string]loadResult{}
 	epicsOf := func(project string) ([]tickets.Epic, error) {
 		if r, ok := byProject[project]; ok {
@@ -251,13 +219,13 @@ func (s *Server) pendingRows() []PendingRow {
 		if err != nil {
 			ex = Explanation{Verdict: "error", Reason: err.Error()}
 		}
-		rows = append(rows, PendingRow{Address: target.String(), Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
+		rows = append(rows, wire.PendingRow{Address: target.String(), Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
 	}
 	// A running ticket is no queue target; a held run still gets a row so the
 	// verdict plumbing shows its hold.
 	for _, t := range s.registry.rateLimitedRuns() {
 		if !covered[t.Address] {
-			rows = append(rows, PendingRow{Address: t.Address, Agent: t.Agent, Verdict: rateLimitVerdict(t.RateLimitReset)})
+			rows = append(rows, wire.PendingRow{Address: t.Address, Agent: t.Agent, Verdict: rateLimitVerdict(t.RateLimitReset)})
 		}
 	}
 	return rows
@@ -311,7 +279,7 @@ func (s *Server) publishVerdictChanges() {
 	for _, r := range rows {
 		next[r.Address] = r.Verdict
 		if prev, ok := l.seen[r.Address]; ok && prev != r.Verdict {
-			s.events.publish(EventExplainVerdictChange, r.Address)
+			s.events.publish(wire.EventExplainVerdictChange, r.Address)
 		}
 	}
 	l.seen = next

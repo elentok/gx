@@ -19,7 +19,7 @@ import (
 
 // ServerAPI is the slice of apiclient.Client the tab uses in server mode.
 type ServerAPI interface {
-	Snapshot(ctx context.Context) (server.Snapshot, error)
+	Snapshot(ctx context.Context) (wire.Snapshot, error)
 	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
 	QueueItems(ctx context.Context) ([]server.QueueItem, error)
 	QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error)
@@ -38,7 +38,7 @@ type ServerAPI interface {
 	EpicStashMerge(ctx context.Context, address string) (server.QueueResult, error)
 	Detail(ctx context.Context, address string) (wire.TicketDetail, error)
 	Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error)
-	DesignWorktree(ctx context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error)
+	DesignWorktree(ctx context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error)
 	Iterations(ctx context.Context) ([]server.IterationInfo, error)
 	TicketChanged(ctx context.Context, address string) error
 	FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error)
@@ -191,7 +191,7 @@ func epicsFromViewModel(vm viewmodel.State, scope viewmodel.Scope) []gxtickets.E
 	return epics
 }
 
-func ticketFromInfo(info server.TicketInfo, id string) gxtickets.Ticket {
+func ticketFromInfo(info wire.TicketInfo, id string) gxtickets.Ticket {
 	// The number is the leading digits only: a multi-level fork id like
 	// "27a1" ends in a digit, so trimming trailing letters would leave it
 	// unparseable and every parent/blocker lookup for it would miss.

@@ -78,7 +78,7 @@ func fixAgentPrompt(agent, addr string, t tickets.Ticket) string {
 }
 
 // fixProjectPrompt is the prompt of an agent fixing a project's failed migration.
-func fixProjectPrompt(agent string, f MigrationFailure) string {
+func fixProjectPrompt(agent string, f wire.MigrationFailure) string {
 	return harness.SkillCommand(agent, "gx-investigate", fmt.Sprintf(
 		"the migration of project %s failed with: %s\nAfter fixing it, run `%s` to retry.",
 		f.Project, f.Error, f.RetryCommand))
@@ -86,7 +86,7 @@ func fixProjectPrompt(agent string, f MigrationFailure) string {
 
 // startFixProjectAgent starts the agent fixing a project's saved failed migration.
 func (s *Server) startFixProjectAgent(project string) (wire.FixAgentResult, error) {
-	var failure *MigrationFailure
+	var failure *wire.MigrationFailure
 	for _, f := range s.MigrationFailures() {
 		if f.Project == project {
 			failure = &f

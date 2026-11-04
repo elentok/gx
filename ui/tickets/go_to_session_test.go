@@ -10,15 +10,14 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/contextmenu"
 )
 
 func goToSessionModel(t *testing.T, ticketStatus string, sessions ...wire.SessionInfo) Model {
 	t.Helper()
 	m := newServerModel(t).WithServer(fakeServerAPI{})
-	m = withState(m, server.Snapshot{
-		Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{
+		Tickets: []wire.TicketInfo{
 			{Address: "gx:map/01", Title: "One", Status: ticketStatus, EpicIsMap: true},
 			{Address: "gx:map/02", Title: "Two", Status: "open", EpicIsMap: true},
 		},
@@ -89,8 +88,8 @@ func TestGoToSession_TicketMenuMatching(t *testing.T) {
 
 func TestGoToSession_NotOfferedOnNonMapTicket(t *testing.T) {
 	m := newServerModel(t).WithServer(fakeServerAPI{})
-	m = withState(m, server.Snapshot{
-		Tickets:  []server.TicketInfo{{Address: "gx:plain/01", Title: "One", Status: "claimed"}},
+	m = withState(m, wire.Snapshot{
+		Tickets:  []wire.TicketInfo{{Address: "gx:plain/01", Title: "One", Status: "claimed"}},
 		Sessions: []wire.SessionInfo{{ID: "s1", Ticket: "gx:plain/01"}},
 	})
 	setCollapsedSection(&m, sectionOpenMaps, false)

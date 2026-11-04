@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
@@ -120,7 +120,7 @@ func TestQueueTicketMenu_UnmuteByAddress(t *testing.T) {
 func TestQueueTicketMenu_ServerTicketMutesEnableUnmute(t *testing.T) {
 	m := newMaintenanceQueue(t, fakeServerAPI{})
 	m, _ = m.applyServerState(&viewmodel.State{
-		Tickets: []server.TicketInfo{withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted)},
+		Tickets: []wire.TicketInfo{withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted)},
 		Queue:   []string{"gx:alpha/01"},
 	})
 	m = selectFirstQueueTicketRow(t, m)
@@ -201,7 +201,7 @@ func TestQueueTicketMenu_StaleLivenessOpensNothing(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			snap := server.Snapshot{Tickets: []server.TicketInfo{
+			snap := wire.Snapshot{Tickets: []wire.TicketInfo{
 				{Address: "gx:alpha/01", Title: "First", Status: "open"},
 				{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 			}}

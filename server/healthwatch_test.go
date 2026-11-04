@@ -24,7 +24,7 @@ func startHealth(t *testing.T, fake *servertest.FakeSystem, interval time.Durati
 	})
 }
 
-func snapshotHealth(t *testing.T, h *servertest.Harness) server.Snapshot {
+func snapshotHealth(t *testing.T, h *servertest.Harness) wire.Snapshot {
 	t.Helper()
 	snap, err := h.Client.Snapshot(context.Background())
 	if err != nil {

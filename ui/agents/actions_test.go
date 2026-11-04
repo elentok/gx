@@ -11,7 +11,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -246,7 +245,7 @@ func TestActions_QueueActionListsTheQueue(t *testing.T) {
 // action and returns the model and the commands the confirmed action left.
 func confirmQueueAction(t *testing.T, f *fakeSessionClient) (Model, []tea.Msg) {
 	t.Helper()
-	f.snapshot = server.Snapshot{Tickets: []server.TicketInfo{
+	f.snapshot = wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:epic-impl/02", Status: "open"},
 		{Address: "gx:epic-impl/01", Status: "open"},
 		{Address: "gx:epic-impl/00", Status: "done"},

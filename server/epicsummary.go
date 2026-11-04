@@ -1,17 +1,17 @@
 package server
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 // epicSummaries summarizes every epic with a queue item, in queue order. A
 // Merged epic and a map epic have no card.
-func (s *Server) epicSummaries(all []TicketInfo) []wire.EpicSummary {
+func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 	out := []wire.EpicSummary{}
 	seen := map[rootRef]bool{}
 	recoveryOf := func(addr string) string { return recoveryState(s.pauseHold.state(addr), addr, all) }

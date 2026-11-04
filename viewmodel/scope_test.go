@@ -3,18 +3,18 @@ package viewmodel_test
 import (
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/viewmodel"
 )
 
-func scopeSnapshot() server.Snapshot {
-	return server.Snapshot{Tickets: []server.TicketInfo{
+func scopeSnapshot() wire.Snapshot {
+	return wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "alpha:e/01"},
 		{Address: "beta:e/01"},
 	}}
 }
 
-func addresses(ts []server.TicketInfo) []string {
+func addresses(ts []wire.TicketInfo) []string {
 	var out []string
 	for _, t := range ts {
 		out = append(out, t.Address)

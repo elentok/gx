@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -96,7 +97,7 @@ func resume(t *testing.T, h *servertest.Harness) {
 // waitRecoveryState polls the snapshot until the paused ticket shows want.
 func waitRecoveryState(t *testing.T, h *servertest.Harness, want string) {
 	t.Helper()
-	var got server.TicketInfo
+	var got wire.TicketInfo
 	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("the ticket stuck with recovery %q", want), func() bool {
 		snap, err := h.Client.Snapshot(context.Background())
 		if err != nil {
@@ -144,22 +145,22 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 
 func TestRecoveryState_FromInvestigations(t *testing.T) {
 	t.Parallel()
-	inv := func(status string) server.TicketInfo {
-		return server.TicketInfo{Address: "p:e/01a", Type: "investigate", Status: status, Parent: "p:e/01"}
+	inv := func(status string) wire.TicketInfo {
+		return wire.TicketInfo{Address: "p:e/01a", Type: "investigate", Status: status, Parent: "p:e/01"}
 	}
-	other := server.TicketInfo{Address: "p:e/01b", Type: "implement", Status: "claimed", Parent: "p:e/01"}
+	other := wire.TicketInfo{Address: "p:e/01b", Type: "implement", Status: "claimed", Parent: "p:e/01"}
 	for name, tc := range map[string]struct {
 		held string
-		all  []server.TicketInfo
+		all  []wire.TicketInfo
 		want string
 	}{
-		"none":              {"", []server.TicketInfo{other}, ""},
-		"open":              {"", []server.TicketInfo{inv("open")}, server.RecoveryPending},
-		"claimed":           {"", []server.TicketInfo{inv("claimed")}, server.RecoveryPending},
-		"paused":            {"", []server.TicketInfo{inv("needs-repair")}, server.RecoveryEscalated},
-		"landed":            {"", []server.TicketInfo{inv("done")}, ""},
-		"open beats paused": {"", []server.TicketInfo{inv("needs-answer"), inv("claimed")}, server.RecoveryPending},
-		"hold wins":         {server.RecoveryEscalated, []server.TicketInfo{inv("claimed")}, server.RecoveryEscalated},
+		"none":              {"", []wire.TicketInfo{other}, ""},
+		"open":              {"", []wire.TicketInfo{inv("open")}, server.RecoveryPending},
+		"claimed":           {"", []wire.TicketInfo{inv("claimed")}, server.RecoveryPending},
+		"paused":            {"", []wire.TicketInfo{inv("needs-repair")}, server.RecoveryEscalated},
+		"landed":            {"", []wire.TicketInfo{inv("done")}, ""},
+		"open beats paused": {"", []wire.TicketInfo{inv("needs-answer"), inv("claimed")}, server.RecoveryPending},
+		"hold wins":         {server.RecoveryEscalated, []wire.TicketInfo{inv("claimed")}, server.RecoveryEscalated},
 	} {
 		if got := server.RecoveryState(tc.held, "p:e/01", tc.all); got != tc.want {
 			t.Errorf("%s: state = %q; want %q", name, got, tc.want)

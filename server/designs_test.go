@@ -65,7 +65,7 @@ func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) de
 
 func (f designsFixture) open(t *testing.T, epic string, isNew bool) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.OpenDesign(f.ctx, server.DesignOpenRequest{Epic: epic, New: isNew})
+	res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: epic, New: isNew})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestDesignsOpen_ClashRefusalKeepsTheLiveSession(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "map-design", "01", "first", "")
 
 	res := f.open(t, "proj:map", true)
-	if !res.Refused || res.Reason != server.ReasonDesignBranchClash {
+	if !res.Refused || res.Reason != wire.ReasonDesignBranchClash {
 		t.Fatalf("open = %+v, want design-branch-clash", res)
 	}
 	live := f.live(t)
@@ -341,7 +341,7 @@ func TestDesignsOpen_RefusesAnEpicNamedLikeTheDesignBranch(t *testing.T) {
 	}
 	f := startDesignsIn(t, store)
 	res := f.open(t, "proj:map", false)
-	if !res.Refused || res.Reason != server.ReasonDesignBranchClash || !strings.Contains(res.Message, "map-design") {
+	if !res.Refused || res.Reason != wire.ReasonDesignBranchClash || !strings.Contains(res.Message, "map-design") {
 		t.Fatalf("open = %+v, want design-branch-clash naming map-design", res)
 	}
 	if gitOut(t, f.repo, "branch", "--list", "map-design") != "" {
@@ -349,9 +349,9 @@ func TestDesignsOpen_RefusesAnEpicNamedLikeTheDesignBranch(t *testing.T) {
 	}
 }
 
-func (f designsFixture) worktree(t *testing.T, epic, exclude string) server.DesignWorktreeResult {
+func (f designsFixture) worktree(t *testing.T, epic, exclude string) wire.DesignWorktreeResult {
 	t.Helper()
-	res, err := f.h.Client.DesignWorktree(f.ctx, server.DesignWorktreeRequest{Epic: epic, ExcludeSession: exclude})
+	res, err := f.h.Client.DesignWorktree(f.ctx, wire.DesignWorktreeRequest{Epic: epic, ExcludeSession: exclude})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,9 +431,9 @@ func TestDesignsWorktree_Refusals(t *testing.T) {
 	}
 	f := startDesignsIn(t, store)
 	for _, tc := range []struct{ epic, reason string }{
-		{"proj:plain", server.ReasonDesignNotMapEpic},
-		{"proj:nope", server.ReasonDesignUnknownEpic},
-		{"proj:map", server.ReasonDesignBranchClash},
+		{"proj:plain", wire.ReasonDesignNotMapEpic},
+		{"proj:nope", wire.ReasonDesignUnknownEpic},
+		{"proj:map", wire.ReasonDesignBranchClash},
 		{"proj", wire.ReasonSessionBadRequest},
 	} {
 		if res := f.worktree(t, tc.epic, ""); !res.Refused || res.Reason != tc.reason || res.Path != "" {
@@ -511,7 +511,7 @@ func TestDesignsOpen_ConcurrentCallsMakeOneSession(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if res, err := f.h.Client.OpenDesign(f.ctx, server.DesignOpenRequest{Epic: "proj:map"}); err == nil && res.Session != nil {
+			if res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"}); err == nil && res.Session != nil {
 				ids[i] = res.Session.ID
 			}
 		}()
@@ -570,9 +570,9 @@ func TestDesignsOpen_Refusals(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	for epic, want := range map[string]string{
-		"proj:plain":   server.ReasonDesignNotMapEpic,
-		"proj:nope":    server.ReasonDesignUnknownEpic,
-		"nope:map":     server.ReasonDesignUnknownEpic,
+		"proj:plain":   wire.ReasonDesignNotMapEpic,
+		"proj:nope":    wire.ReasonDesignUnknownEpic,
+		"nope:map":     wire.ReasonDesignUnknownEpic,
 		"map":          wire.ReasonSessionBadRequest,
 		"proj:map/abc": wire.ReasonSessionBadRequest,
 	} {

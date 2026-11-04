@@ -9,7 +9,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -32,7 +31,7 @@ func exitDesign(t *testing.T, frontmatter string, code int) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.OpenDesign(ctx, server.DesignOpenRequest{Epic: "proj:map"})
+	res, err := h.Client.OpenDesign(ctx, wire.DesignOpenRequest{Epic: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("open = %+v, %v", res, err)
 	}

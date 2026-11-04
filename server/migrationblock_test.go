@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -57,7 +58,7 @@ func TestMigrationBlock_FailedProjectIsNotClaimedAndOthersAre(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var row server.PendingRow
+	var row wire.PendingRow
 	for _, r := range snap.Pending {
 		if r.Address == "proj:"+schedEpic+"/01" {
 			row = r

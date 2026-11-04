@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -24,7 +25,7 @@ var waitPauseExitCodes = map[schema.PauseClass]int{
 // waitExitCode is the exit code of a ticket a --wait stops on, and false when
 // the ticket has not ended. A paused ticket maps by its class, whichever
 // spelling the status travels in.
-func waitExitCode(t server.TicketInfo) (int, bool) {
+func waitExitCode(t wire.TicketInfo) (int, bool) {
 	switch schema.Status(t.Status) {
 	case schema.StatusDone:
 		return 0, true
@@ -46,7 +47,7 @@ var waitRetry = time.Second
 
 // eventSource is the slice of apiclient.Client a wait needs.
 type eventSource interface {
-	Snapshot(ctx context.Context) (server.Snapshot, error)
+	Snapshot(ctx context.Context) (wire.Snapshot, error)
 	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
 }
 
@@ -56,7 +57,7 @@ type eventSource interface {
 // stream or a dead server is not an end: it re-snapshots after a pause, so a
 // restart mid-wait only delays the answer. Events carry no status, so any
 // event for the ticket just triggers a fresh snapshot.
-func waitForTicket(ctx context.Context, src eventSource, moved movedLookup, address string) (server.TicketInfo, error) {
+func waitForTicket(ctx context.Context, src eventSource, moved movedLookup, address string) (wire.TicketInfo, error) {
 	for {
 		if t, ok, err := waitOnce(ctx, src, moved, address); err != nil && ctx.Err() == nil {
 			select {
@@ -67,40 +68,40 @@ func waitForTicket(ctx context.Context, src eventSource, moved movedLookup, addr
 			return t, nil
 		}
 		if ctx.Err() != nil {
-			return server.TicketInfo{}, ctx.Err()
+			return wire.TicketInfo{}, ctx.Err()
 		}
 	}
 }
 
 // movedLookup finds where an address went once it is gone from the server's
 // snapshot: an ended one-off is archived under a new address. nil looks nowhere.
-type movedLookup func(address string) (server.TicketInfo, bool)
+type movedLookup func(address string) (wire.TicketInfo, bool)
 
 // archivedLookup is the movedLookup that reads the store, so it needs no
 // server and works across a restart.
 func archivedLookup(dirs config.Dirs, cwd string) movedLookup {
-	return func(address string) (server.TicketInfo, bool) {
+	return func(address string) (wire.TicketInfo, bool) {
 		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 		if err != nil || a.Project == "" {
-			return server.TicketInfo{}, false
+			return wire.TicketInfo{}, false
 		}
 		root, err := projectRoot(dirs, cwd, a.Project)
 		if err != nil {
-			return server.TicketInfo{}, false
+			return wire.TicketInfo{}, false
 		}
 		moved, t, err := tickets.FindOriginal(a.Project, root, a)
 		if err != nil {
-			return server.TicketInfo{}, false
+			return wire.TicketInfo{}, false
 		}
-		return server.TicketInfo{Address: moved.String(), Status: t.Status, File: t.Path}, true
+		return wire.TicketInfo{Address: moved.String(), Status: t.Status, File: t.Path}, true
 	}
 }
 
 // waitOnce takes one snapshot and streams from it until the ticket changes.
-func waitOnce(ctx context.Context, src eventSource, moved movedLookup, address string) (server.TicketInfo, bool, error) {
+func waitOnce(ctx context.Context, src eventSource, moved movedLookup, address string) (wire.TicketInfo, bool, error) {
 	snap, err := src.Snapshot(ctx)
 	if err != nil {
-		return server.TicketInfo{}, false, err
+		return wire.TicketInfo{}, false, err
 	}
 	// The ticket's forks include its investigations, whose progress is its
 	// recovery's.
@@ -129,14 +130,14 @@ func waitOnce(ctx context.Context, src eventSource, moved movedLookup, address s
 	defer cancel()
 	evs, err := src.Events(sctx, snap.Seq)
 	if err != nil {
-		return server.TicketInfo{}, false, err
+		return wire.TicketInfo{}, false, err
 	}
 	for ev := range evs {
 		if watched[ev.Address] {
-			return server.TicketInfo{}, false, nil
+			return wire.TicketInfo{}, false, nil
 		}
 	}
-	return server.TicketInfo{}, false, nil
+	return wire.TicketInfo{}, false, nil
 }
 
 // runOneOffWait waits for address, prints its ## Result, and maps its status to

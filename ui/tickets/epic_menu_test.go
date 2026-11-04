@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -29,7 +29,7 @@ func epicMenuModel(t *testing.T, api fakeServerAPI) (Model, string) {
 	}
 	m := newServerModel(t).WithServer(api)
 	m.settings.TicketStore = store
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "A", Status: "done"},
 		{Address: "gx:alpha/02", Title: "B", Status: "open"},
 	}})
@@ -82,7 +82,7 @@ func TestEpicMenu_MergeLabelNamesTheBranch(t *testing.T) {
 }
 
 func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
-	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}), server.Snapshot{Tickets: []server.TicketInfo{
+	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "A", Status: "open", EpicStatus: "draft", EpicMergeTarget: "main"},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -99,7 +99,7 @@ func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
 // status Add epic to queue tells apart; gx:alpha/06 is already queued.
 func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
-	st := applySnapshot(viewmodel.State{}.SetQueue([]server.QueueItem{{Address: "gx:alpha/06"}}), server.Snapshot{Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}.SetQueue([]server.QueueItem{{Address: "gx:alpha/06"}}), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Done", Status: "done", EpicStatus: "open"},
 		{Address: "gx:alpha/02", Title: "Draft", Status: "draft"},
 		{Address: "gx:alpha/03", Title: "Open", Status: "open"},

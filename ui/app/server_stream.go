@@ -64,7 +64,7 @@ func (s *serverStream) setVM(vm viewmodel.State) {
 
 type streamSnapshotMsg struct {
 	gen  uint64
-	snap server.Snapshot
+	snap wire.Snapshot
 	err  error
 }
 
@@ -222,7 +222,7 @@ func (m Model) onSnapshotErr(err error) (Model, tea.Cmd) {
 // since the stream already carries what follows; a fresh subscription, an
 // explicit R, or a first load is also when the queue order is fetched (otherwise
 // only queue-changed refetches it).
-func (m Model) onSnapshot(snap server.Snapshot) (Model, tea.Cmd) {
+func (m Model) onSnapshot(snap wire.Snapshot) (Model, tea.Cmd) {
 	m.stream.snapshotFailing = false
 	firstLoad := !m.stream.loaded
 	m.stream.setVM(m.stream.vm.ApplySnapshot(snap))

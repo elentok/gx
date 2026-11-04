@@ -4,7 +4,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -12,8 +12,8 @@ import (
 // QueueStatus is the queue at a glance, for the title row: its mode and the
 // done/total ticket counts of the epics it is working on.
 type QueueStatus struct {
-	// Mode is server.QueueModeRunning or QueueModePaused.
-	Mode        server.QueueMode
+	// Mode is wire.QueueModeRunning or QueueModePaused.
+	Mode        wire.QueueMode
 	Done, Total int
 }
 
@@ -40,9 +40,9 @@ func QueueStatusOf(vm viewmodel.State) (s QueueStatus, ok bool) {
 	}
 	s.Mode = vm.Mode
 	if s.Mode == "" {
-		s.Mode = server.QueueModeRunning
+		s.Mode = wire.QueueModeRunning
 	}
-	held := s.Mode != server.QueueModeRunning && len(vm.Queue) > 0
+	held := s.Mode != wire.QueueModeRunning && len(vm.Queue) > 0
 	return s, s.Total > 0 && (running || held)
 }
 

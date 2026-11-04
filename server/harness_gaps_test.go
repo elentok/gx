@@ -84,7 +84,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		{"design step", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
-			res, err := f.h.Client.OpenDesign(f.ctx, server.DesignOpenRequest{Epic: "proj:map"})
+			res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"})
 			if err != nil {
 				t.Fatal(err)
 			}

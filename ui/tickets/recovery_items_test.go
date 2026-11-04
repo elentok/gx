@@ -2,14 +2,13 @@ package tickets
 
 import (
 	"errors"
-	"github.com/elentok/gx/server/wire"
 	"slices"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -115,7 +114,7 @@ func TestServerMode_EnterSkipsWebOnlyActions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
 			m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)})
-			m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+			m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 				{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 			}})
 			updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -192,7 +191,7 @@ func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionRetry, wire.ActionStartOver)}
 	m := newServerModel(t).WithServer(api)
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -211,7 +210,7 @@ func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 func TestServerMode_EnterWithNoActionsDoesNothing(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith()})
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

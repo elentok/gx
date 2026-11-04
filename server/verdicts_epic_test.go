@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -46,8 +47,8 @@ func TestPending_WholeEpicEntryGivesOneRowForItsFrontierTicket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snap.Pending) != 1 || snap.Pending[0].Address != "proj:epic-b/01" || snap.Pending[0].Verdict != server.VerdictConcurrencyCap {
-		t.Fatalf("pending = %+v, want one %s row for proj:epic-b/01", snap.Pending, server.VerdictConcurrencyCap)
+	if len(snap.Pending) != 1 || snap.Pending[0].Address != "proj:epic-b/01" || snap.Pending[0].Verdict != wire.VerdictConcurrencyCap {
+		t.Fatalf("pending = %+v, want one %s row for proj:epic-b/01", snap.Pending, wire.VerdictConcurrencyCap)
 	}
 }
 
@@ -126,7 +127,7 @@ func TestPending_WholeEpicRowStreamsAVerdictChange(t *testing.T) {
 		}
 	}()
 	for ev := range evs {
-		if ev.Type == server.EventExplainVerdictChange && ev.Address == "proj:epic-b/01" {
+		if ev.Type == wire.EventExplainVerdictChange && ev.Address == "proj:epic-b/01" {
 			return
 		}
 	}

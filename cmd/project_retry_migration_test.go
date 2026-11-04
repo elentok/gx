@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -28,12 +29,12 @@ func TestProjectRetryMigration_StartsAndRefuses(t *testing.T) {
 	var err error
 	testutil.WaitFor(t, 30*time.Second, "the start-up migration to end", func() bool {
 		out, err = run(server.ScratchProject)
-		return err == nil || !strings.Contains(err.Error(), server.ReasonRetryRunning)
+		return err == nil || !strings.Contains(err.Error(), wire.ReasonRetryRunning)
 	})
 	if err != nil || !strings.Contains(out, "migration of project "+server.ScratchProject+" started") {
 		t.Errorf("started = %q, %v", out, err)
 	}
-	if _, err = run("nope"); err == nil || !strings.Contains(err.Error(), server.ReasonRetryUnknownProject) || !strings.Contains(err.Error(), "no project nope") {
+	if _, err = run("nope"); err == nil || !strings.Contains(err.Error(), wire.ReasonRetryUnknownProject) || !strings.Contains(err.Error(), "no project nope") {
 		t.Errorf("unknown err = %v", err)
 	}
 }

@@ -53,7 +53,7 @@ type State struct {
 	// ExtraUsage is the snapshot's extra-usage warning flag.
 	ExtraUsage bool
 	// Tickets is in snapshot order (by address, forks under their parent).
-	Tickets []server.TicketInfo
+	Tickets []wire.TicketInfo
 	// Epics is the server's summary of each epic holding a queue item, in queue
 	// order, as the last snapshot delivered it.
 	Epics []wire.EpicSummary
@@ -66,10 +66,10 @@ type State struct {
 	Iterations map[string]IterationState
 	// Pending is each queue entry's explain verdict, as the last snapshot
 	// delivered it.
-	Pending []server.PendingRow
-	// Mode is the queue mode (server.QueueModeRunning, or QueueModePaused)
+	Pending []wire.PendingRow
+	// Mode is the queue mode (wire.QueueModeRunning, or QueueModePaused)
 	// from the last snapshot.
-	Mode server.QueueMode
+	Mode wire.QueueMode
 	// AFK is AFK mode from the last snapshot.
 	AFK bool
 	// Sessions is the interactive sessions, oldest first, as the last snapshot
@@ -84,7 +84,7 @@ func (s State) OlderServer() bool {
 	if !s.Loaded {
 		return true
 	}
-	return len(s.Tickets) > 0 && !slices.ContainsFunc(s.Tickets, func(t server.TicketInfo) bool {
+	return len(s.Tickets) > 0 && !slices.ContainsFunc(s.Tickets, func(t wire.TicketInfo) bool {
 		return t.RenderedStatus != ""
 	})
 }
@@ -131,21 +131,21 @@ func (sc Scope) UnregisteredHint() string {
 
 // ScopedTickets is Tickets narrowed to the scope's cwd project, unless the
 // scope says all or the cwd is not a registered project.
-func (s State) ScopedTickets(sc Scope) []server.TicketInfo {
+func (s State) ScopedTickets(sc Scope) []wire.TicketInfo {
 	if sc.CwdProject == "" || sc.AllProjects {
 		return s.Tickets
 	}
 	prefix := sc.CwdProject + ":"
-	return slices.DeleteFunc(slices.Clone(s.Tickets), func(t server.TicketInfo) bool {
+	return slices.DeleteFunc(slices.Clone(s.Tickets), func(t wire.TicketInfo) bool {
 		return !strings.HasPrefix(t.Address, prefix)
 	})
 }
 
 // PendingRowFor is the pending row for a ticket address, if it is queued.
-func (s State) PendingRowFor(address string) (server.PendingRow, bool) {
-	i := slices.IndexFunc(s.Pending, func(p server.PendingRow) bool { return p.Address == address })
+func (s State) PendingRowFor(address string) (wire.PendingRow, bool) {
+	i := slices.IndexFunc(s.Pending, func(p wire.PendingRow) bool { return p.Address == address })
 	if i < 0 {
-		return server.PendingRow{}, false
+		return wire.PendingRow{}, false
 	}
 	return s.Pending[i], true
 }
@@ -172,7 +172,7 @@ type Toast struct {
 // ApplySnapshot replaces the ticket rows and resets Seq. Live iteration state
 // survives only for tickets still claimed on disk, since the snapshot itself
 // does not describe iterations.
-func (s State) ApplySnapshot(snap server.Snapshot) State {
+func (s State) ApplySnapshot(snap wire.Snapshot) State {
 	next := State{
 		Seq:              snap.Seq,
 		Loaded:           true,
@@ -267,7 +267,7 @@ const (
 )
 
 func (s State) withStatus(address, status string) State {
-	i := slices.IndexFunc(s.Tickets, func(t server.TicketInfo) bool { return t.Address == address })
+	i := slices.IndexFunc(s.Tickets, func(t wire.TicketInfo) bool { return t.Address == address })
 	if i < 0 {
 		return s
 	}

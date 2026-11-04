@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestQueueEpic_QueuesOnlyOpenTicketsOfTheEpicInOrder(t *testing.T) {
-	snap := server.Snapshot{Tickets: []server.TicketInfo{
+	snap := wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:epic-impl/02", Status: "open"},
 		{Address: "gx:epic-impl/01", Status: "open"},
 		{Address: "gx:epic-impl/00", Status: "done"},

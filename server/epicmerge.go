@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -157,7 +157,7 @@ func lowestTicket(e tickets.Epic) tickets.Ticket {
 
 // fillEpicMergeTargets sets each ticket's EpicMergeTarget to the branch
 // epicMerge would merge its epic on. rootRefs runs git, so once per epic.
-func (s *Server) fillEpicMergeTargets(list []TicketInfo) {
+func (s *Server) fillEpicMergeTargets(list []wire.TicketInfo) {
 	targets := map[tickets.Address]string{}
 	for i, info := range list {
 		a, err := tickets.ParseAddress(info.Address, tickets.AddressContext{})

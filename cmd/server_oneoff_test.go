@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -31,7 +32,7 @@ func dupServer(t *testing.T, status string) *apiclient.Client {
 		_ = json.NewEncoder(w).Encode(server.OneOffResult{Refused: true, Reason: server.ReasonDuplicateLive, Address: "gx:p/1", Message: "dup"})
 	})
 	mux.HandleFunc("/v1/snapshot", func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(server.Snapshot{Tickets: []server.TicketInfo{{Address: "gx:p/1", Status: status}}})
+		_ = json.NewEncoder(w).Encode(wire.Snapshot{Tickets: []wire.TicketInfo{{Address: "gx:p/1", Status: status}}})
 	})
 	srv := &http.Server{Handler: mux}
 	go func() { _ = srv.Serve(ln) }()

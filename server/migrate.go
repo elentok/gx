@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/projectlock"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -69,27 +70,8 @@ func (s *Server) migrateAll(ctx context.Context) {
 	}
 }
 
-// Refusal reasons of the retry-migration route.
-const (
-	ReasonRetryRunning        = "migrating"
-	ReasonRetryUnknownProject = "unknown-project"
-)
-
-// RetryMigrationRequest is the body of POST /v1/projects/retry-migration.
-type RetryMigrationRequest struct {
-	Project string `json:"project"`
-}
-
-// RetryMigrationResult answers it: Started, or Refused with a Reason.
-type RetryMigrationResult struct {
-	Started bool   `json:"started"`
-	Refused bool   `json:"refused,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
 func (s *Server) retryMigrationWrite(w http.ResponseWriter, r *http.Request) {
-	var req RetryMigrationRequest
+	var req wire.RetryMigrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -99,7 +81,7 @@ func (s *Server) retryMigrationWrite(w http.ResponseWriter, r *http.Request) {
 
 // retryMigration runs the project's pending steps in the background, the same
 // code path as the start-up run.
-func (s *Server) retryMigration(project string) RetryMigrationResult {
+func (s *Server) retryMigration(project string) wire.RetryMigrationResult {
 	dir := ""
 	if s.cfg.TicketStore != "" {
 		dirs, _ := tickets.ProjectDirs(s.cfg.TicketStore)
@@ -110,16 +92,16 @@ func (s *Server) retryMigration(project string) RetryMigrationResult {
 		}
 	}
 	if dir == "" {
-		return RetryMigrationResult{Refused: true, Reason: ReasonRetryUnknownProject, Message: "no project " + project}
+		return wire.RetryMigrationResult{Refused: true, Reason: wire.ReasonRetryUnknownProject, Message: "no project " + project}
 	}
 	if !s.beginMigration(project) {
-		return RetryMigrationResult{Refused: true, Reason: ReasonRetryRunning, Message: "project " + project + " is migrating"}
+		return wire.RetryMigrationResult{Refused: true, Reason: wire.ReasonRetryRunning, Message: "project " + project + " is migrating"}
 	}
 	go func() {
 		defer s.endMigration(project)
 		s.migrateProject(s.migrationRegistry(), dir, &migrations.Pass{})
 	}()
-	return RetryMigrationResult{Started: true}
+	return wire.RetryMigrationResult{Started: true}
 }
 
 // beginMigration marks project as migrating; it reports false when another run

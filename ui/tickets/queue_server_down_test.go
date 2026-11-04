@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -45,7 +46,7 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	}
 
 	// Coming back clears the banner and brings the rows, in one delivery.
-	st := applySnapshot(viewmodel.State{}, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}})
 	next, _ = m.WithServerState(&st, ServerLinkUp)
@@ -62,7 +63,7 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 func TestQueueServerDown_StateDeliveredDownShowsOnceUp(t *testing.T) {
 	m := newServerQueueModel(t, func(context.Context) error { return nil })
 
-	st := applySnapshot(viewmodel.State{}, server.Snapshot{Seq: 2, Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/09", Title: "Ninth", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/09"}})
 	next, _ := m.WithServerState(&st, ServerLinkDown)
@@ -109,7 +110,7 @@ func TestQueueServerDown_SOpensStartConfirm(t *testing.T) {
 
 // In server mode the Queue tab shows the server's queue.
 func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}}, []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}})
@@ -129,7 +130,7 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 // only — a row prefix misaligned idle titles against live ones — and "tp"
 // filters them by project.
 func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "blog:beta/01", Title: "Second", Status: "open"},
 	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}})
@@ -158,11 +159,11 @@ func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
 
 func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 	m := newServerQueueModel(t, func(context.Context) error { return nil }).WithFocusEpic("gx:beta")
-	tickets := []server.TicketInfo{
+	tickets := []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open", RenderedStatus: "open"},
 		{Address: "gx:beta/01", Title: "Second", Status: "open", RenderedStatus: "open"},
 	}
-	st := applySnapshot(viewmodel.State{}, server.Snapshot{
+	st := applySnapshot(viewmodel.State{}, wire.Snapshot{
 		Seq:     1,
 		Tickets: tickets,
 		Epics:   fixtureSummaries(epicsFromViewModel(viewmodel.State{Tickets: tickets}, viewmodel.Scope{}), nil),

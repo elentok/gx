@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -32,7 +33,7 @@ func QueueAddresses(ctx context.Context, add QueueAddFunc, addrs []string) (queu
 
 // QueueEpic queues, in address order, the open tickets of epic ("project:epic")
 // found in snap, with QueueAddresses' counts.
-func QueueEpic(ctx context.Context, snap server.Snapshot, add QueueAddFunc, epic string) (queued int, refusals []string) {
+func QueueEpic(ctx context.Context, snap wire.Snapshot, add QueueAddFunc, epic string) (queued int, refusals []string) {
 	prefix := epic + "/"
 	var addrs []string
 	for _, t := range snap.Tickets {

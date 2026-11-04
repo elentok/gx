@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -24,9 +25,9 @@ func TestExplain_WaitingRunVerdicts(t *testing.T) {
 		maxFree   int
 		want      string
 	}{
-		{"within grace", time.Second, 5, server.VerdictWaitingOnAnswer},
-		{"past grace", 10 * time.Minute, 5, server.VerdictWaitingReleased},
-		{"past grace at the release cap", 10 * time.Minute, 0, server.VerdictWaitingReleaseCapd},
+		{"within grace", time.Second, 5, wire.VerdictWaitingOnAnswer},
+		{"past grace", 10 * time.Minute, 5, wire.VerdictWaitingReleased},
+		{"past grace at the release cap", 10 * time.Minute, 0, wire.VerdictWaitingReleaseCapd},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

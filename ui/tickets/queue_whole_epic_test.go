@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func queueRowPaths(m QueueModel) []string {
@@ -19,8 +20,8 @@ func queueRowPaths(m QueueModel) []string {
 
 // An epic with one queued item and a parentless ticket added afterwards: the
 // server schedules that ticket too, so the tab must show it.
-func wholeEpicSnapshot(extraStatus string) server.Snapshot {
-	return server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+func wholeEpicSnapshot(extraStatus string) wire.Snapshot {
+	return wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Queued", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Added later", Status: extraStatus},
 		{Address: "gx:beta/01", Title: "Unqueued epic", Status: "open"},

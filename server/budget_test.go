@@ -34,7 +34,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 	}
 	s.ledger.record("", "a", 4.25, time.Now())
 
-	var snap Snapshot
+	var snap wire.Snapshot
 	rec := httptest.NewRecorder()
 	s.snapshot(rec, httptest.NewRequest("GET", "/v1/snapshot", nil))
 	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {

@@ -27,7 +27,7 @@ func TestInvestigate_PostsTheAddressAndLandsOnTheNewSession(t *testing.T) {
 func TestInvestigate_NameTakenSelectsTheExistingFixAgent(t *testing.T) {
 	api := fakeServerAPI{
 		fixAgent: wire.FixAgentResult{SessionResult: wire.SessionResult{Refused: true, Reason: wire.ReasonSessionNameTaken}},
-		snap: server.Snapshot{Sessions: []wire.SessionInfo{
+		snap: wire.Snapshot{Sessions: []wire.SessionInfo{
 			{ID: "other", Name: "alpha"},
 			{ID: "fix-1", Name: server.FixAgentName("gx:map/01")},
 		}},

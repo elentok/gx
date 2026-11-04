@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
@@ -129,20 +129,20 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 }
 
 // summaryQueue delivers one epic with the given ticket rows and server summary.
-func summaryQueue(t *testing.T, sum wire.EpicSummary, infos ...server.TicketInfo) QueueModel {
+func summaryQueue(t *testing.T, sum wire.EpicSummary, infos ...wire.TicketInfo) QueueModel {
 	t.Helper()
 	items := make([]server.QueueItem, len(infos))
 	for i, info := range infos {
 		items[i] = server.QueueItem{Address: info.Address}
 	}
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: infos, Epics: []wire.EpicSummary{sum}}, items)
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: infos, Epics: []wire.EpicSummary{sum}}, items)
 	return m
 }
 
 func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
 	m := summaryQueue(t,
 		wire.EpicSummary{Address: "gx:alpha", Name: "alpha", State: wire.EpicStateWaiting, Done: 3, Total: 7},
-		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		wire.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	)
 
 	body := ansi.Strip(m.View().Content)
@@ -177,7 +177,7 @@ func TestQueueServerMode_ShowsPauseReasonFromSummary(t *testing.T) {
 func TestQueueServerMode_DeadlockedWord(t *testing.T) {
 	m := summaryQueue(t,
 		wire.EpicSummary{Address: "gx:alpha", Name: "alpha", State: wire.EpicStatePaused, Total: 1, Reason: wire.EpicReasonDeadlock, Detail: "01 waits on itself"},
-		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		wire.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	)
 
 	if body := ansi.Strip(m.View().Content); !strings.Contains(body, "Paused: Dependency deadlock") {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/migratefail"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -20,7 +21,7 @@ const (
 
 // MigrationFailures reads the saved failed migrations of the projects now in
 // the ticket store. The CLI writes the record, so each call reads the file.
-func (s *Server) MigrationFailures() []MigrationFailure {
+func (s *Server) MigrationFailures() []wire.MigrationFailure {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return nil
@@ -37,9 +38,9 @@ func (s *Server) MigrationFailures() []MigrationFailure {
 		s.log.Warn("read migration failures", "err", err)
 		return nil
 	}
-	out := make([]MigrationFailure, 0, len(recorded))
+	out := make([]wire.MigrationFailure, 0, len(recorded))
 	for _, f := range recorded {
-		out = append(out, MigrationFailure{Project: f.Project, Error: f.Error, RetryCommand: "gx tickets migrate '" + strings.ReplaceAll(dirOf[f.Project], "'", `'\''`) + "'"})
+		out = append(out, wire.MigrationFailure{Project: f.Project, Error: f.Error, RetryCommand: "gx tickets migrate '" + strings.ReplaceAll(dirOf[f.Project], "'", `'\''`) + "'"})
 	}
 	return out
 }

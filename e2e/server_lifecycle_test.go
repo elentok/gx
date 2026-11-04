@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/herdrctl"
@@ -94,7 +95,7 @@ func (e *lifecycleEnv) running() (server.Handshake, bool) {
 
 func (e *lifecycleEnv) ticketStatus(address string) string {
 	e.t.Helper()
-	var snap server.Snapshot
+	var snap wire.Snapshot
 	if err := json.Unmarshal([]byte(e.gx("server", "snapshot", "--json")), &snap); err != nil {
 		e.t.Fatal(err)
 	}

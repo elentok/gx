@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // fakeServer answers /v1/handshake with h on a temp unix socket.
@@ -134,7 +135,7 @@ func followServer(t *testing.T, streams [][]server.Event) (*apiclient.Client, *i
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/snapshot", func(w http.ResponseWriter, _ *http.Request) {
 		snaps++
-		_ = json.NewEncoder(w).Encode(server.Snapshot{Seq: uint64(snaps * 10)})
+		_ = json.NewEncoder(w).Encode(wire.Snapshot{Seq: uint64(snaps * 10)})
 	})
 	mux.HandleFunc("GET /v1/events", func(w http.ResponseWriter, r *http.Request) {
 		i := evCalls
@@ -162,7 +163,7 @@ func TestFollow_ResnapshotsOnStreamEndAndOnSeqGap(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var got []string
-	err := c.Follow(ctx, func(s *server.Snapshot, ev *server.Event) {
+	err := c.Follow(ctx, func(s *wire.Snapshot, ev *server.Event) {
 		if s != nil {
 			got = append(got, "snap")
 		} else {

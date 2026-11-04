@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -248,7 +249,7 @@ func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	m := newServerModel(t).WithServer(fakeServerAPI{})
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "claimed"}}})
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "claimed"}}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
 
@@ -273,7 +274,7 @@ func requestMenu(t *testing.T) (Model, tea.Msg) {
 	t.Helper()
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	m := newServerModel(t).WithServer(fakeServerAPI{})
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "claimed"},
 	}})
@@ -335,7 +336,7 @@ func endedFunc(ended bool) func() bool { return func() bool { return ended } }
 func watchTicketTab(t *testing.T, status string) Model {
 	t.Helper()
 	// The open sibling keeps the epic expanded when status is done.
-	m := withState(newServerModel(t), server.Snapshot{Tickets: []server.TicketInfo{
+	m := withState(newServerModel(t), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: status},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}})

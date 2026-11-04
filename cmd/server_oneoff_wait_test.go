@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -40,22 +41,22 @@ type fakeSource struct {
 
 const investigationAddr = "gx:p/1a"
 
-func (f *fakeSource) Snapshot(context.Context) (server.Snapshot, error) {
+func (f *fakeSource) Snapshot(context.Context) (wire.Snapshot, error) {
 	f.snaps++
 	if f.snaps <= f.failFirst {
-		return server.Snapshot{}, errors.New("connection refused")
+		return wire.Snapshot{}, errors.New("connection refused")
 	}
 	i := min(f.snaps-f.failFirst-1, len(f.statuses)-1)
-	t := server.TicketInfo{Address: "gx:p/1", Status: f.statuses[i], File: f.file}
+	t := wire.TicketInfo{Address: "gx:p/1", Status: f.statuses[i], File: f.file}
 	if i < len(f.recoveries) {
 		t.Recovery = f.recoveries[i]
 	}
-	snap := server.Snapshot{Seq: uint64(f.snaps), Tickets: []server.TicketInfo{t}}
+	snap := wire.Snapshot{Seq: uint64(f.snaps), Tickets: []wire.TicketInfo{t}}
 	if f.gone {
 		snap.Tickets = nil
 	}
 	if f.investigation {
-		snap.Tickets = append(snap.Tickets, server.TicketInfo{Address: investigationAddr, Status: "claimed", Type: "investigate", Parent: "gx:p/1"})
+		snap.Tickets = append(snap.Tickets, wire.TicketInfo{Address: investigationAddr, Status: "claimed", Type: "investigate", Parent: "gx:p/1"})
 	}
 	return snap, nil
 }
@@ -121,14 +122,14 @@ func TestOneOffWait_ExitCodesByStatus(t *testing.T) {
 // with 3 where it used to stop with 4.
 func TestWaitExitCode_ManualPauseStopsWithThree(t *testing.T) {
 	paused := tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}
-	if code, stop := waitExitCode(server.TicketInfo{Status: paused.LegacyStatus()}); !stop || code != 3 {
+	if code, stop := waitExitCode(wire.TicketInfo{Status: paused.LegacyStatus()}); !stop || code != 3 {
 		t.Errorf("code, stop = %d, %v; want 3, true", code, stop)
 	}
 }
 
 // A blocked-pane pause travels as the answer status and stops --wait with 3.
 func TestWaitExitCode_BlockedPaneStopsWithThree(t *testing.T) {
-	if code, stop := waitExitCode(server.TicketInfo{Status: wireAnswer}); !stop || code != 3 {
+	if code, stop := waitExitCode(wire.TicketInfo{Status: wireAnswer}); !stop || code != 3 {
 		t.Errorf("code, stop = %d, %v; want 3, true", code, stop)
 	}
 }
@@ -193,11 +194,11 @@ func TestOneOffWait_PrintsResultAfterTheTicketIsArchived(t *testing.T) {
 	}
 	// The first snapshots fail (a restart), then the old address is gone.
 	f := &fakeSource{statuses: []string{"claimed"}, failFirst: 2, gone: true,
-		moved: func(address string) (server.TicketInfo, bool) {
+		moved: func(address string) (wire.TicketInfo, bool) {
 			if address != "gx:p/1" {
-				return server.TicketInfo{}, false
+				return wire.TicketInfo{}, false
 			}
-			return server.TicketInfo{Address: "gx:one-offs-archived/1", Status: "done", File: file}, true
+			return wire.TicketInfo{Address: "gx:one-offs-archived/1", Status: "done", File: file}, true
 		}}
 	out, code := runWait(t, f)
 	if code != 0 || strings.TrimSpace(out) != "all good" {

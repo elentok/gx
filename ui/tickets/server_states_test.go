@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -16,7 +17,7 @@ import (
 
 // olderServerState is a snapshot from a server that predates rendered status.
 func olderServerState() viewmodel.State {
-	return viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	return viewmodel.State{}.ApplySnapshot(wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}})
 }
@@ -52,7 +53,7 @@ func TestOlderServer_CurrentServerClearsNotice(t *testing.T) {
 	m := newServerModel(t)
 	st := olderServerState()
 	next, _ := m.WithServerState(&st, ServerLinkUp)
-	current := applySnapshot(viewmodel.State{}, server.Snapshot{Seq: 2, Tickets: []server.TicketInfo{
+	current := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}})
 	next, _ = next.(Model).WithServerState(&current, ServerLinkUp)

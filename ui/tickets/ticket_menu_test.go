@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"slices"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
@@ -81,7 +81,7 @@ func orchestrationLabels() []string {
 	return []string{"Unmute & Reopen", "Pause", "Cancel"}
 }
 
-func withMutes(info server.TicketInfo, mutes []schema.MuteRecord) server.TicketInfo {
+func withMutes(info wire.TicketInfo, mutes []schema.MuteRecord) wire.TicketInfo {
 	info.Mutes = mutes
 	return info
 }
@@ -89,7 +89,7 @@ func withMutes(info server.TicketInfo, mutes []schema.MuteRecord) server.TicketI
 func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)})
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -123,7 +123,7 @@ func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 func TestTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted),
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -149,7 +149,7 @@ func TestTicketMenu_ServerTicketMutesDecideUnmute(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := newServerModel(t).WithServer(fakeServerAPI{})
-			m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+			m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 				withMutes(pausedRepairInfo("gx:alpha/01", "First"), tt.mutes),
 			}})
 			updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 )
 
 func TestTicketStatus_ServerWordWinsOverComputed(t *testing.T) {
-	info := server.TicketInfo{
+	info := wire.TicketInfo{
 		Address: "p:e/01", Title: "one", Status: "open", RenderedStatus: "waiting-for-children",
 	}
 	tk := ticketFromInfo(info, "01")

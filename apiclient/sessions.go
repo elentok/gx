@@ -5,8 +5,6 @@ import (
 	"net/url"
 
 	"github.com/elentok/gx/server/wire"
-
-	"github.com/elentok/gx/server"
 )
 
 // CreateSession starts an interactive session. A refusal is a result
@@ -19,7 +17,7 @@ func (c *Client) CreateSession(ctx context.Context, req wire.CreateSessionReques
 
 // OpenDesign returns the Design's live session or starts one. A refusal is a
 // result (Refused set), not an error.
-func (c *Client) OpenDesign(ctx context.Context, req server.DesignOpenRequest) (wire.SessionResult, error) {
+func (c *Client) OpenDesign(ctx context.Context, req wire.DesignOpenRequest) (wire.SessionResult, error) {
 	var res wire.SessionResult
 	err := c.post(ctx, "/v1/designs/open", req, &res)
 	return res, err
@@ -27,7 +25,7 @@ func (c *Client) OpenDesign(ctx context.Context, req server.DesignOpenRequest) (
 
 // DeleteDesign deletes an uncharted design's epic. A refusal is a result
 // (Refused set), not an error.
-func (c *Client) DeleteDesign(ctx context.Context, req server.DesignDeleteRequest) (wire.SessionResult, error) {
+func (c *Client) DeleteDesign(ctx context.Context, req wire.DesignDeleteRequest) (wire.SessionResult, error) {
 	var res wire.SessionResult
 	err := c.post(ctx, "/v1/designs/delete", req, &res)
 	return res, err
@@ -36,8 +34,8 @@ func (c *Client) DeleteDesign(ctx context.Context, req server.DesignDeleteReques
 // DesignWorktree returns a map's design worktree, made and rebased if needed,
 // or the trunk checkout after Branch. A refusal is a result (Refused set), not
 // an error.
-func (c *Client) DesignWorktree(ctx context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error) {
-	var res server.DesignWorktreeResult
+func (c *Client) DesignWorktree(ctx context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error) {
+	var res wire.DesignWorktreeResult
 	err := c.post(ctx, "/v1/designs/worktree", req, &res)
 	return res, err
 }
@@ -52,8 +50,8 @@ func (c *Client) FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.F
 
 // RetryMigration runs a project's pending migration steps again in the server.
 // A refusal is a result (Refused set), not an error.
-func (c *Client) RetryMigration(ctx context.Context, req server.RetryMigrationRequest) (server.RetryMigrationResult, error) {
-	var res server.RetryMigrationResult
+func (c *Client) RetryMigration(ctx context.Context, req wire.RetryMigrationRequest) (wire.RetryMigrationResult, error) {
+	var res wire.RetryMigrationResult
 	err := c.post(ctx, "/v1/projects/retry-migration", req, &res)
 	return res, err
 }

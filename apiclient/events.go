@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // Snapshot returns every indexed ticket plus the server-wide sequence number.
-func (c *Client) Snapshot(ctx context.Context) (server.Snapshot, error) {
-	var s server.Snapshot
+func (c *Client) Snapshot(ctx context.Context) (wire.Snapshot, error) {
+	var s wire.Snapshot
 	err := c.get(ctx, "/v1/snapshot", &s)
 	return s, err
 }
@@ -75,7 +76,7 @@ func (c *Client) EventsAs(ctx context.Context, since uint64, client string) (<-c
 // reconnecting) triggers a fresh snapshot, so the consumer never has to
 // reason about missed events. Exactly one of the callback's arguments is
 // non-nil. It returns only when ctx is done.
-func (c *Client) Follow(ctx context.Context, fn func(*server.Snapshot, *server.Event)) error {
+func (c *Client) Follow(ctx context.Context, fn func(*wire.Snapshot, *server.Event)) error {
 	for {
 		if err := c.followOnce(ctx, fn); err != nil && ctx.Err() == nil {
 			select {
@@ -92,7 +93,7 @@ func (c *Client) Follow(ctx context.Context, fn func(*server.Snapshot, *server.E
 const followRetry = time.Second
 
 // followOnce runs one snapshot+stream round and returns when it must restart.
-func (c *Client) followOnce(ctx context.Context, fn func(*server.Snapshot, *server.Event)) error {
+func (c *Client) followOnce(ctx context.Context, fn func(*wire.Snapshot, *server.Event)) error {
 	snap, err := c.Snapshot(ctx)
 	if err != nil {
 		return err

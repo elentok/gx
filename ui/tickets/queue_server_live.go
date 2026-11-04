@@ -1,13 +1,12 @@
 package tickets
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
@@ -57,7 +56,7 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 	hadFinished := len(m.finished) > 0
 	m.finished = st.RecentlyFinished
 	m.herdrDown, m.herdrText, m.serverBudget = st.HerdrUnavailable, st.HerdrText, st.Budget
-	m.paused = st.Mode == server.QueueModePaused
+	m.paused = st.Mode == wire.QueueModePaused
 	m.checked = make(map[string]bool, len(st.Queue))
 	m.checkOrder = make(map[string]uint64, len(st.Queue))
 	for i, addr := range st.Queue {

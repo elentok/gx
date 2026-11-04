@@ -10,7 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
@@ -34,7 +34,7 @@ func selectTicketByAddress(t *testing.T, m *Model, address string) {
 
 func startSessionModel(t *testing.T) Model {
 	t.Helper()
-	m := withState(newServerModel(t), server.Snapshot{Tickets: []server.TicketInfo{
+	m := withState(newServerModel(t), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:map/01", Title: "Open", Status: "open", EpicIsMap: true},
 		{Address: "gx:map/02", Title: "Done", Status: "done", EpicIsMap: true},
 		{Address: "gx:loop/01", Title: "Loop", Status: "open"},
@@ -71,7 +71,7 @@ func TestStartSession_OfferedOnMapEpicAndItsOpenTicketsOnly(t *testing.T) {
 }
 
 func TestStartSession_CompletedMapEpicSuggestsStartAndMerge(t *testing.T) {
-	m := withState(newServerModel(t), server.Snapshot{Tickets: []server.TicketInfo{
+	m := withState(newServerModel(t), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:done-map/01", Title: "Done", Status: "done", EpicIsMap: true},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -131,7 +131,7 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 }
 
 func TestStartSession_FillsDirWithTheDesignWorktree(t *testing.T) {
-	api := fakeServerAPI{designWorktree: server.DesignWorktreeResult{Path: "/wt/design-map"}}
+	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Path: "/wt/design-map"}}
 	m := startSessionModel(t).WithServer(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	msg, ok := cmd().(StartSessionMsg)
@@ -144,7 +144,7 @@ func TestStartSession_FillsDirWithTheDesignWorktree(t *testing.T) {
 }
 
 func TestStartSession_CarriesTheRebaseNoteAndTrustFlag(t *testing.T) {
-	api := fakeServerAPI{designWorktree: server.DesignWorktreeResult{Path: "/wt/design-map", Note: "not rebased: dirty"}}
+	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Path: "/wt/design-map", Note: "not rebased: dirty"}}
 	m := startSessionModel(t).WithServer(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	msg, ok := cmd().(StartSessionMsg)
@@ -183,7 +183,7 @@ func TestStartSession_NotRunningFallsBackToTrunk(t *testing.T) {
 }
 
 func TestStartSession_RefusalShowsMessageAndOpensNoForm(t *testing.T) {
-	api := fakeServerAPI{designWorktree: server.DesignWorktreeResult{Refused: true, Message: "another session is live"}}
+	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Refused: true, Message: "another session is live"}}
 	m := startSessionModel(t).WithServer(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	got := cmd()

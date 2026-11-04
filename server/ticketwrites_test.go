@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -460,7 +461,7 @@ func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var claimed server.TicketInfo
+	var claimed wire.TicketInfo
 	servertest.WaitFor(t, 5*time.Second, "the ticket to show as claimed", func() bool {
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {

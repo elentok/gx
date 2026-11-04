@@ -5,11 +5,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestEpicSection_MapsSplitByDoneTicket(t *testing.T) {
-	m := withState(newServerModel(t), server.Snapshot{Tickets: []server.TicketInfo{
+	m := withState(newServerModel(t), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:started/01", Title: "A", Status: "done", EpicIsMap: true},
 		{Address: "gx:started/02", Title: "B", Status: "open", EpicIsMap: true},
 		{Address: "gx:cancelled/01", Title: "A", Status: "cancelled", EpicIsMap: true},

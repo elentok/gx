@@ -19,7 +19,7 @@ type SessionClient interface {
 	RunSessionAction(ctx context.Context, id string) (wire.SessionResult, error)
 	SetAutoAdvance(ctx context.Context, id string, on bool) (wire.SessionResult, error)
 	CancelAutoAdvance(ctx context.Context, id string) (wire.SessionResult, error)
-	Snapshot(ctx context.Context) (server.Snapshot, error)
+	Snapshot(ctx context.Context) (wire.Snapshot, error)
 	QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error)
 	ReportFocus(ctx context.Context, req wire.FocusReport) (wire.SessionResult, error)
 	SetAFK(ctx context.Context, on *bool) (server.AFKResult, error)

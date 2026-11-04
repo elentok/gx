@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -256,7 +257,7 @@ func TestSnapshot_HandEditShowsUpWithWatchAndWithPollOnly(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var snap server.Snapshot
+			var snap wire.Snapshot
 			servertest.WaitFor(t, 5*time.Second, "the edit to reach the snapshot", func() bool {
 				var err error
 				if snap, err = h.Client.Snapshot(context.Background()); err != nil {

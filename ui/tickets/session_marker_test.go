@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 )
 
@@ -14,8 +13,8 @@ func sessionMarkerModel(t *testing.T, nerdFont bool, sessions ...wire.SessionInf
 	t.Helper()
 	m := newServerModel(t)
 	m.settings.UseNerdFontIcons = nerdFont
-	m = withState(m, server.Snapshot{
-		Tickets: []server.TicketInfo{
+	m = withState(m, wire.Snapshot{
+		Tickets: []wire.TicketInfo{
 			{Address: "gx:map/01", Title: "Open", Status: "open", EpicIsMap: true},
 			{Address: "gx:map/02", Title: "Other", Status: "open", EpicIsMap: true},
 		},
@@ -70,8 +69,8 @@ func TestSessionMarker_FollowsSessionExit(t *testing.T) {
 	live := wire.SessionInfo{ID: "a", Ticket: "gx:map/01", Status: wire.SessionStatus{State: wire.SessionWorking}}
 	m := sessionMarkerModel(t, false, live)
 	live.Status.State = wire.SessionExited
-	m = withState(m, server.Snapshot{
-		Tickets:  []server.TicketInfo{{Address: "gx:map/01", Title: "Open", Status: "open", EpicIsMap: true}},
+	m = withState(m, wire.Snapshot{
+		Tickets:  []wire.TicketInfo{{Address: "gx:map/01", Title: "Open", Status: "open", EpicIsMap: true}},
 		Sessions: []wire.SessionInfo{live},
 	})
 	if got := renderedTicketRow(t, m, "gx:map/01"); strings.Contains(got, marker) {

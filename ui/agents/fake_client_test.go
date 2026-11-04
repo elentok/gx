@@ -22,7 +22,7 @@ type fakeSessionClient struct {
 
 	creates []wire.CreateSessionRequest
 
-	snapshot      server.Snapshot
+	snapshot      wire.Snapshot
 	queueRefusals map[string]string
 
 	reports     []wire.FocusReport
@@ -73,7 +73,7 @@ func (f *fakeSessionClient) CancelAutoAdvance(_ context.Context, id string) (wir
 	return f.record("cancel-auto-advance " + id)
 }
 
-func (f *fakeSessionClient) Snapshot(context.Context) (server.Snapshot, error) {
+func (f *fakeSessionClient) Snapshot(context.Context) (wire.Snapshot, error) {
 	return f.snapshot, nil
 }
 

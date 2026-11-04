@@ -29,12 +29,12 @@ type streamFake struct {
 
 	mu        sync.Mutex
 	seq       uint64
-	tickets   []server.TicketInfo
+	tickets   []wire.TicketInfo
 	epics     []wire.EpicSummary
 	snapErr   error
 	snapshots int
 	streams   []*fakeStream
-	mode      server.QueueMode
+	mode      wire.QueueMode
 	sessions  []wire.SessionInfo
 	queue     []server.QueueItem
 	queueGets int
@@ -47,19 +47,19 @@ type fakeStream struct {
 	ch     chan server.Event
 }
 
-func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
+func (f *streamFake) Snapshot(context.Context) (wire.Snapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.snapshots++
 	if f.snapErr != nil {
-		return server.Snapshot{}, f.snapErr
+		return wire.Snapshot{}, f.snapErr
 	}
-	return server.Snapshot{Seq: f.seq, Tickets: withRenderedStatus(f.tickets), Epics: f.epics, Mode: f.mode, Sessions: f.sessions}, nil
+	return wire.Snapshot{Seq: f.seq, Tickets: withRenderedStatus(f.tickets), Epics: f.epics, Mode: f.mode, Sessions: f.sessions}, nil
 }
 
 // withRenderedStatus makes tickets look like a current server's, which always
 // sends rendered_status; a snapshot with none reads as an older server's.
-func withRenderedStatus(tickets []server.TicketInfo) []server.TicketInfo {
+func withRenderedStatus(tickets []wire.TicketInfo) []wire.TicketInfo {
 	out := slices.Clone(tickets)
 	for i := range out {
 		if out[i].RenderedStatus == "" {
@@ -489,7 +489,7 @@ func TestServerStream_OneStreamWhateverTabsAreVisited(t *testing.T) {
 
 func TestServerStream_TicketsTabLoadingThenCurrentState(t *testing.T) {
 	h, f := newStreamHarness(t)
-	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "Zeta ticket", Status: "open"}}
+	f.tickets = []wire.TicketInfo{{Address: "gx:alpha/01", Title: "Zeta ticket", Status: "open"}}
 
 	if view := ticketsTab(h).View().Content; !strings.Contains(view, "loading…") || strings.Contains(view, "Zeta ticket") {
 		t.Fatalf("before the first snapshot the tab must show loading…:\n%s", view)
@@ -549,8 +549,8 @@ func toastTexts(cmd tea.Cmd) []notify.NotifyMsg {
 }
 
 // pausedRepairTickets is one ticket paused for a repair.
-func pausedRepairTickets() []server.TicketInfo {
-	return []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "paused", RenderedStatus: gxtickets.StatusPausedRepair.Word()}}
+func pausedRepairTickets() []wire.TicketInfo {
+	return []wire.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "paused", RenderedStatus: gxtickets.StatusPausedRepair.Word()}}
 }
 
 func TestServerStream_PauseToastsOnLiveEventsOnly(t *testing.T) {
@@ -575,7 +575,7 @@ func TestServerStream_PauseToastsOnLiveEventsOnly(t *testing.T) {
 func TestServerStream_SnapshotNeverToastsButFailureDoes(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.tickets = pausedRepairTickets()
-	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3, Tickets: withRenderedStatus(f.tickets)}})
+	next, cmd := h.m.Update(streamSnapshotMsg{snap: wire.Snapshot{Seq: 3, Tickets: withRenderedStatus(f.tickets)}})
 	h.m = next.(Model)
 	for _, got := range toastTexts(cmd) {
 		if got.Kind == notify.KindWarning { // the unregistered-project hint is Info
@@ -680,13 +680,13 @@ func TestServerStream_UnregisteredHintComesFromShellOnFirstSnapshotOnly(t *testi
 		}
 		return n
 	}
-	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3}})
+	next, cmd := h.m.Update(streamSnapshotMsg{snap: wire.Snapshot{Seq: 3}})
 	if got := hints(cmd); got != 1 {
 		t.Fatalf("first snapshot hints = %d, want 1", got)
 	}
 	h.m = next.(Model)
 	h.m.stream.snapshotting = true
-	_, cmd = h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen, snap: server.Snapshot{Seq: 4}})
+	_, cmd = h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen, snap: wire.Snapshot{Seq: 4}})
 	if got := hints(cmd); got != 0 {
 		t.Fatalf("later snapshot hints = %d, want 0", got)
 	}
@@ -767,7 +767,7 @@ func TestServerStream_ResnapshotDueDuringFlightRunsAfterIt(t *testing.T) {
 		t.Fatalf("snapshots while one is in flight = %d, want 0", after-before)
 	}
 
-	h.send(streamSnapshotMsg{gen: h.m.stream.gen, snap: server.Snapshot{Seq: 10}})
+	h.send(streamSnapshotMsg{gen: h.m.stream.gen, snap: wire.Snapshot{Seq: 10}})
 	h.pump()
 	if after, _ := f.fetches(); after-before != 1 {
 		t.Errorf("snapshots after the in-flight one landed = %d, want 1", after-before)

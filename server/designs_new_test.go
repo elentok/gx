@@ -17,7 +17,7 @@ import (
 
 func (f designsFixture) openNew(t *testing.T, slug, idea string) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.OpenDesign(f.ctx, server.DesignOpenRequest{Epic: slug, NewDesign: true, Idea: idea, Project: "proj"})
+	res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: slug, NewDesign: true, Idea: idea, Project: "proj"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness("no-such-harness"), servertest.WithDefaultHarness("no-such-harness"))
-	res, err := h.Client.OpenDesign(context.Background(), server.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "idea", Project: "proj"})
+	res, err := h.Client.OpenDesign(context.Background(), wire.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "idea", Project: "proj"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestDesignsOpenNew_SecondCallIsRefusedAsEpicExists(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	f.openNew(t, "fresh-idea", "one")
-	if second := f.openNew(t, "fresh-idea", "two"); !second.Refused || second.Reason != server.ReasonDesignEpicExists || second.EpicCreated {
+	if second := f.openNew(t, "fresh-idea", "two"); !second.Refused || second.Reason != wire.ReasonDesignEpicExists || second.EpicCreated {
 		t.Fatalf("second = %+v, want epic-exists with no marker", second)
 	}
 	if got := len(f.live(t)); got != 1 {
@@ -173,7 +173,7 @@ func TestDesignsOpenNew_BranchClashLeavesNothingBehind(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "fresh-idea-design", "01", "first", "")
 	f := startDesignsIn(t, store)
 	res := f.openNew(t, "fresh-idea", "idea")
-	if !res.Refused || res.Reason != server.ReasonDesignBranchClash || !strings.Contains(res.Message, "fresh-idea-design") {
+	if !res.Refused || res.Reason != wire.ReasonDesignBranchClash || !strings.Contains(res.Message, "fresh-idea-design") {
 		t.Fatalf("open = %+v, want design-branch-clash naming fresh-idea-design", res)
 	}
 	if _, err := os.Stat(filepath.Join(store, "proj", "fresh-idea")); err == nil {
@@ -190,8 +190,8 @@ func TestDesignsOpenNew_Refusals(t *testing.T) {
 	for name, tc := range map[string]struct{ slug, idea, want string }{
 		"bad slug":     {"Bad Slug", "idea", wire.ReasonSessionBadRequest},
 		"path slug":    {"a/b", "idea", wire.ReasonSessionBadRequest},
-		"epic exists":  {"plain", "idea", server.ReasonDesignEpicExists},
-		"map exists":   {"map", "idea", server.ReasonDesignEpicExists},
+		"epic exists":  {"plain", "idea", wire.ReasonDesignEpicExists},
+		"map exists":   {"map", "idea", wire.ReasonDesignEpicExists},
 		"empty idea":   {"fresh-idea", " \n", server.ReasonEmptyPrompt},
 		"idea too big": {"fresh-idea", strings.Repeat("a", 32*1024+1), wire.ReasonPromptTextTooLong},
 	} {

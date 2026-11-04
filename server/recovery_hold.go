@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -106,7 +107,7 @@ func (h *recoveryHold) forget(key string) {
 // else what its investigations say. It is read from the index rather than
 // kept, so a server restart mid-investigation still reports it. An open
 // investigation is pending; a paused one is a person's, so recovery escalated.
-func recoveryState(held, address string, all []TicketInfo) string {
+func recoveryState(held, address string, all []wire.TicketInfo) string {
 	if held != "" {
 		return held
 	}

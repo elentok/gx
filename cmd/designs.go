@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -23,14 +24,14 @@ func newDesignsCmd(d deps) *cobra.Command {
 
 // runDesignsWorktree never starts the server: a dead socket is a refusal. The
 // caller's own gx session, when set, is left out of the rebase's live check.
-func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.DesignWorktreeRequest) error {
+func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.DesignWorktreeRequest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	res, err := cl.DesignWorktree(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.DesignWorktreeResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.DesignWorktreeResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -67,7 +68,7 @@ func newDesignsWorktreeCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			req := server.DesignWorktreeRequest{Epic: args[0], ExcludeSession: os.Getenv(nativerunner.AgentSessionEnv)}
+			req := wire.DesignWorktreeRequest{Epic: args[0], ExcludeSession: os.Getenv(nativerunner.AgentSessionEnv)}
 			return runDesignsWorktree(c.Context(), cl, c.OutOrStdout(), jsonOut, req)
 		},
 	}
@@ -80,7 +81,7 @@ func runDesignsDelete(ctx context.Context, cl *apiclient.Client, w io.Writer, js
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.DeleteDesign(ctx, server.DesignDeleteRequest{Epic: epic})
+	res, err := cl.DeleteDesign(ctx, wire.DesignDeleteRequest{Epic: epic})
 	return printSessionResult(w, jsonOut, res, err)
 }
 
@@ -103,7 +104,7 @@ func newDesignsDeleteCmd(d deps) *cobra.Command {
 }
 
 // runDesignsOpen never starts the server: a dead socket is a refusal.
-func runDesignsOpen(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.DesignOpenRequest) error {
+func runDesignsOpen(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.DesignOpenRequest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -114,8 +115,8 @@ func runDesignsOpen(ctx context.Context, cl *apiclient.Client, w io.Writer, json
 // designOpenRequest builds the request for `gx designs open`. --idea and
 // --project start a New Design, where the argument is the slug the map will
 // take; they go together and exclude --new.
-func designOpenRequest(arg, idea, project string, fresh bool) (server.DesignOpenRequest, error) {
-	req := server.DesignOpenRequest{Epic: arg, New: fresh}
+func designOpenRequest(arg, idea, project string, fresh bool) (wire.DesignOpenRequest, error) {
+	req := wire.DesignOpenRequest{Epic: arg, New: fresh}
 	if idea == "" && project == "" {
 		return req, nil
 	}

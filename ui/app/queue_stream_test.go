@@ -1,7 +1,6 @@
 package app
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 )
@@ -23,8 +23,8 @@ func queueView(h *harness) string {
 	return ansi.Strip(q.View().Content)
 }
 
-func queuedTicket(status string, claimedAt time.Time) []server.TicketInfo {
-	return []server.TicketInfo{{Address: "gx:alpha/01", Title: "Zeta ticket", Status: status, ClaimedAt: claimedAt}}
+func queuedTicket(status string, claimedAt time.Time) []wire.TicketInfo {
+	return []wire.TicketInfo{{Address: "gx:alpha/01", Title: "Zeta ticket", Status: status, ClaimedAt: claimedAt}}
 }
 
 // runningEpic is the server's summary of gx:alpha once 01 is claimed.
@@ -92,7 +92,7 @@ func TestQueueStream_ModeChangeFromAnotherClientShows(t *testing.T) {
 	openQueueTab(h)
 
 	f.mu.Lock()
-	f.mode = server.QueueModePaused
+	f.mode = wire.QueueModePaused
 	f.mu.Unlock()
 	f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventQueueChanged}
 	h.pump()
