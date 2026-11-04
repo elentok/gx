@@ -77,7 +77,7 @@ func (s *Server) removeUnlessKept(root rootRef, path string, repo *git.Repo) str
 	if reason := s.liveWorkIn(root, path); reason != "" {
 		return reason
 	}
-	if s.rootQueued(root) {
+	if s.queue.RootQueued(root) {
 		return "the root is queued"
 	}
 	e, ok := s.freshEpic(root.Project, root.Epic)
@@ -98,7 +98,7 @@ func (s *Server) removeUnlessKept(root rootRef, path string, repo *git.Repo) str
 // liveWorkIn returns which live session or run works inside the
 // worktree at path, or "".
 func (s *Server) liveWorkIn(root rootRef, path string) string {
-	if sessions, err := s.listSessions(); err != nil {
+	if sessions, err := s.ListSessions(); err != nil {
 		return "sessions could not be listed: " + err.Error()
 	} else {
 		for _, in := range sessions {
@@ -120,7 +120,7 @@ func (s *Server) liveWorkIn(root rootRef, path string) string {
 // runLive is liveIteration's rule applied to a registry entry, which settleRun
 // can leave behind after the agent stopped.
 func (s *Server) runLive(run runs.Run) bool {
-	runner := s.runnerForRun(run)
+	runner := s.RunnerForRun(run)
 	if runner == nil || run.Session.ID == "" {
 		return false
 	}

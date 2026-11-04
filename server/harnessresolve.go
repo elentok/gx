@@ -68,9 +68,9 @@ func defaultOrClaude(name string) ralphloop.AgentKind {
 	return ralphloop.AgentClaude
 }
 
-// defaultHarness is the Default harness for project: its agents.default-harness
+// DefaultHarness is the Default harness for project: its agents.default-harness
 // over the global one, claude when neither is set.
-func (s *Server) defaultHarness(project string) ralphloop.AgentKind {
+func (s *Server) DefaultHarness(project string) ralphloop.AgentKind {
 	return defaultOrClaude(s.projects.AgentsConfig(project).DefaultHarness)
 }
 
@@ -104,7 +104,7 @@ func (s *Server) resolveTicket(addr tickets.Address, t tickets.Ticket) ticketHar
 			Frontmatter: t.Agent,
 			QueueItem:   s.queueItemAgent(addr),
 			EarlierRun:  earlier,
-			Default:     string(s.defaultHarness(addr.Project)),
+			Default:     string(s.DefaultHarness(addr.Project)),
 		}),
 		EarlierRun: earlier,
 	}
@@ -113,7 +113,7 @@ func (s *Server) resolveTicket(addr tickets.Address, t tickets.Ticket) ticketHar
 // queueItemAgent is the agent of the queue item for addr's root, "" when none
 // names one.
 func (s *Server) queueItemAgent(addr tickets.Address) string {
-	for _, item := range s.queued.list() {
+	for _, item := range s.queue.List() {
 		if a, err := tickets.ParseQueuedAddress(item.Address); err == nil && rootOf(a) == rootOf(addr) && item.Agent != "" {
 			return item.Agent
 		}

@@ -72,7 +72,7 @@ func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
 // stalled come from the transcript, not the status, so they carry their label
 // as the reason; a status failure already has its banner text.
 func (s *Server) noteFailure(id string) {
-	_, m, res, err := s.sessionDir(id)
+	_, m, res, err := s.SessionDir(id)
 	if res.Refused || err != nil {
 		return
 	}
@@ -152,11 +152,11 @@ func (s *Server) fireBanner(id string) {
 	t := b.pending[id]
 	delete(b.pending, id)
 	b.mu.Unlock()
-	afk, onScreen := s.afk.isOn(), s.focus.onScreen(id)
+	afk, onScreen := s.afk.IsOn(), s.focus.onScreen(id)
 	if s.sessionWatches.isStopped() || s.focus.webOnScreen(id) || (onScreen && !afk) {
 		return
 	}
-	_, m, res, err := s.sessionDir(id)
+	_, m, res, err := s.SessionDir(id)
 	if res.Refused || err != nil {
 		return
 	}

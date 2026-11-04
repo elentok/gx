@@ -22,15 +22,6 @@ func mergeBlockActions(kind string) []string {
 	return actions
 }
 
-// epicQueueable reports whether an epic can be queued: an unqueued, unmerged
-// loop epic that still has an open ticket. The epic list shares this rule.
-func epicQueueable(e tickets.Epic, queued bool) bool {
-	if e.IsMap || queued || !e.MergedAt.IsZero() || e.QueueRefusal() != tickets.QueueRefusalNone {
-		return false
-	}
-	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return t.Status == string(schema.StatusOpen) })
-}
-
 func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	root, err := parseRootRef(address)
@@ -68,11 +59,11 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 	for _, other := range epics {
 		byName[other.Name] = other
 	}
-	queued := s.rootQueued(root)
+	queued := s.queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: epicQueueable(e, queued), Queued: queued,
+		Queueable: EpicQueueable(e, queued), Queued: queued,
 	}
 	if deletable, err := s.designUncharted(root.String(), e); err != nil {
 		s.log.Warn("design deletable check", "epic", root.String(), "err", err)
@@ -105,12 +96,12 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 }
 
 func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
-	queued := s.rootQueued(root)
+	queued := s.queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
 		State: epicStateFor(root, e, s.registry.StartedAtOf),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: epicQueueable(e, queued), Queued: queued,
+		Queueable: EpicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),
 	}
 	if epicMergeBlocked(e) {

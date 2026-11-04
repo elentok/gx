@@ -73,13 +73,13 @@ func (s *Server) keepClaiming(ctx context.Context) {
 // frontier tickets of each queued root, up to its per-root cap, until the concurrency limit is reached.
 // claimRoot skips a ticket the claim hold names: a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
-	if s.migrator.Migrating() || s.pause.blocked() || s.budgetSoftReached(time.Now()) {
+	if s.migrator.Migrating() || s.queue.Blocked() || s.budgetSoftReached(time.Now()) {
 		return
 	}
 	limit := s.concurrencyLimit()
 	running := s.registry.Count()
 	seen := map[string]bool{}
-	for _, item := range s.queued.list() {
+	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || seen[rootOf(addr).String()] {
 			continue
@@ -693,7 +693,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	}
 	s.events.Publish(wire.EventTicketDone, ticketAddr)
 	s.stampFinished(addr, one.Ticket.Path, false)
-	s.notifyResult(addr, one.Ticket.Path)
+	s.oneOffs.NotifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)
 	s.fileFollowUp(addr, one.Ticket.Path)
 	if mode.afterDone != nil {

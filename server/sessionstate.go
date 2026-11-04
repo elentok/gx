@@ -23,7 +23,7 @@ func (s *Server) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.Sessio
 // checkDesignWrite returns the refusal for a web write on a session that is not
 // a design session or whose state moved since the page saw it.
 func (s *Server) checkDesignWrite(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := s.sessionDir(req.ID)
+	_, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -46,7 +46,7 @@ func (s *Server) sessionWriteAgentWeb(do func(wire.SessionRequest) (wire.Session
 // checkAgentWrite returns the refusal for a web write on a Queue session or on
 // a session whose state moved since the page saw it.
 func (s *Server) checkAgentWrite(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := s.sessionDir(req.ID)
+	_, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

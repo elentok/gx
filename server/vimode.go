@@ -8,20 +8,22 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
 )
 
 const viModeFileName = "vimode.json"
 
-// viModeState is the web UI's vi mode, persisted so a restart keeps it.
-type viModeState struct {
-	mu   sync.Mutex
-	path string
-	on   bool
+// ViMode is the web UI's vi mode, persisted so a restart keeps it.
+type ViMode struct {
+	mu     sync.Mutex
+	path   string
+	on     bool
+	events *broker.Broker
 }
 
-func openViMode(stateDir string) (*viModeState, error) {
-	v := &viModeState{path: filepath.Join(stateDir, viModeFileName)}
+func openViMode(stateDir string, events *broker.Broker) (*ViMode, error) {
+	v := &ViMode{path: filepath.Join(stateDir, viModeFileName), events: events}
 	data, err := os.ReadFile(v.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return v, nil
@@ -39,14 +41,15 @@ func openViMode(stateDir string) (*viModeState, error) {
 	return v, nil
 }
 
-func (v *viModeState) isOn() bool {
+// IsOn reports whether vi mode is on.
+func (v *ViMode) IsOn() bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return v.on
 }
 
 // save writes through a rename so a crash never leaves a torn file.
-func (v *viModeState) save() error {
+func (v *ViMode) save() error {
 	data, err := json.Marshal(struct {
 		On bool `json:"on"`
 	}{v.on})
@@ -60,8 +63,8 @@ func (v *viModeState) save() error {
 	return os.Rename(tmp, v.path)
 }
 
-func (s *Server) setViMode(req wire.ViModeRequest) (wire.ViModeResult, error) {
-	v := s.viMode
+// Set turns vi mode on, off, or (with no value) flips it.
+func (v *ViMode) Set(req wire.ViModeRequest) (wire.ViModeResult, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	prev := v.on
@@ -73,7 +76,7 @@ func (s *Server) setViMode(req wire.ViModeRequest) (wire.ViModeResult, error) {
 		v.on = prev
 		return wire.ViModeResult{}, err
 	}
-	s.events.Publish(wire.EventViModeChanged, "")
+	v.events.Publish(wire.EventViModeChanged, "")
 	return wire.ViModeResult{ViMode: v.on}, nil
 }
 
@@ -83,7 +86,7 @@ func (s *Server) viModeWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.setViMode(req)
+	res, err := s.viMode.Set(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

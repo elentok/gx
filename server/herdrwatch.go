@@ -87,7 +87,7 @@ func (s *Server) herdrRunner() agentrunner.Runner {
 func (s *Server) herdrWaiting() []string {
 	var out []string
 	seen := map[string]bool{}
-	for _, item := range s.queued.list() {
+	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || seen[rootOf(addr).String()] {
 			continue
@@ -103,7 +103,7 @@ func (s *Server) herdrWaiting() []string {
 		}
 	}
 	for _, t := range s.registry.List() {
-		if r := s.runnerForRun(t.Run); r != nil && r.Name() == runs.RunnerHerdr {
+		if r := s.RunnerForRun(t.Run); r != nil && r.Name() == runs.RunnerHerdr {
 			out = append(out, t.Address)
 		}
 	}

@@ -593,7 +593,7 @@ func (s *Server) liveDesignSession(epicAddr string) (*wire.SessionInfo, error) {
 // liveDesignSessionExcept is liveDesignSession leaving out the session
 // excludeID, so a caller never counts itself. Empty excludes none.
 func (s *Server) liveDesignSessionExcept(epicAddr, excludeID string) (*wire.SessionInfo, error) {
-	list, err := s.listSessions()
+	list, err := s.ListSessions()
 	if err != nil {
 		return nil, err
 	}

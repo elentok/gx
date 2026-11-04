@@ -14,16 +14,16 @@ import (
 // crash between a move's two writes is finished by the first rescan of the next
 // server. A ticket whose run is still tracked stays: the run's post-merging
 // steps (retro stamp, result, follow-up) still read it at its old address.
-func (s *Server) sweepOneOffs() {
-	if s.cfg.TicketStore == "" {
+func (o *OneOffs) Sweep() {
+	if o.TicketStore == "" {
 		return
 	}
-	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
+	o.sweepMu.Lock()
+	defer o.sweepMu.Unlock()
 
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(o.TicketStore)
 	if err != nil {
-		s.log.Warn("sweep one-offs", "err", err)
+		o.Log.Warn("sweep one-offs", "err", err)
 		return
 	}
 	moved := false
@@ -31,7 +31,7 @@ func (s *Server) sweepOneOffs() {
 	for _, dir := range dirs {
 		live, archived, err := tickets.LoadOneOffs(dir)
 		if err != nil {
-			s.log.Warn("sweep one-offs", "dir", dir, "err", err)
+			o.Log.Warn("sweep one-offs", "dir", dir, "err", err)
 			continue
 		}
 		for _, t := range live.Tickets {
@@ -39,23 +39,23 @@ func (s *Server) sweepOneOffs() {
 				continue
 			}
 			addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: OneOffsEpic, ID: t.Identifier}
-			if _, tracked := s.registry.Tracked(addr.String()); tracked {
+			if _, tracked := o.Registry.Tracked(addr.String()); tracked {
 				continue
 			}
-			if err := archiveOneOff(dir, archived, addr, t, now); err != nil {
-				s.log.Warn("archive one-off", "ticket", addr.String(), "err", err)
+			if err := o.archiveOneOff(dir, archived, addr, t, now); err != nil {
+				o.Log.Warn("archive one-off", "ticket", addr.String(), "err", err)
 				continue
 			}
 			moved = true
 		}
 	}
 	if moved {
-		if err := s.idx.Refresh(); err != nil {
-			s.log.Warn("refresh after one-off sweep", "err", err)
+		if err := o.Index.Refresh(); err != nil {
+			o.Log.Warn("refresh after one-off sweep", "err", err)
 		}
 	}
 	for _, dir := range dirs {
-		s.dequeueIdleOneOffs(dir)
+		o.dequeueIdleOneOffs(dir)
 	}
 }
 
@@ -64,28 +64,28 @@ func (s *Server) sweepOneOffs() {
 // ticket before it looks at the queue, so the disk check under the queue lock
 // either sees that ticket (root stays) or the submit finds the root gone and
 // queues it afresh.
-func (s *Server) dequeueIdleOneOffs(dir string) {
+func (o *OneOffs) dequeueIdleOneOffs(dir string) {
 	root := rootRef{Project: tickets.ProjectName(dir), Epic: OneOffsEpic}
-	removed, err := s.queued.removeRootIf(root, func() bool {
-		return !s.oneOffsLive(dir, root)
+	removed, err := o.Queue.removeRootIf(root, func() bool {
+		return !o.oneOffsLive(dir, root)
 	})
 	if err != nil {
-		s.log.Warn("dequeue idle one-offs", "root", root, "err", err)
+		o.Log.Warn("dequeue idle one-offs", "root", root, "err", err)
 	} else if removed {
-		s.events.Publish(wire.EventQueueChanged, root.String())
+		o.Events.Publish(wire.EventQueueChanged, root.String())
 	}
 }
 
 // oneOffsLive reports whether a one-off is still pending, or its run is tracked.
 // Failed, paused and needs-* tickets are not terminal, so they count.
-func (s *Server) oneOffsLive(dir string, root rootRef) bool {
+func (o *OneOffs) oneOffsLive(dir string, root rootRef) bool {
 	live, _, err := tickets.LoadOneOffs(dir)
 	if err != nil {
 		return true
 	}
 	for _, t := range live.Tickets {
 		addr := tickets.Address{Project: root.Project, Epic: OneOffsEpic, ID: t.Identifier}
-		if _, tracked := s.registry.Tracked(addr.String()); tracked {
+		if _, tracked := o.Registry.Tracked(addr.String()); tracked {
 			return true
 		}
 		if !tickets.IsTerminalStatus(t.Status) {
@@ -99,9 +99,9 @@ func (s *Server) oneOffsLive(dir string, root rootRef) bool {
 // epic on the first move. The archive copy is written before the original is
 // removed; a copy already there (its Resolution names addr) means an earlier
 // move was cut short, so only its leftovers are finished.
-func archiveOneOff(projectDir string, archived tickets.Epic, addr tickets.Address, t tickets.Ticket, now time.Time) error {
+func (o *OneOffs) archiveOneOff(projectDir string, archived tickets.Epic, addr tickets.Address, t tickets.Ticket, now time.Time) error {
 	archivePath := filepath.Join(projectDir, OneOffsArchivedEpic)
-	if err := ensureDraftEpic(archivePath); err != nil {
+	if err := o.Host.EnsureDraftEpic(archivePath); err != nil {
 		return err
 	}
 	unlock, err := tickets.LockEpics(filepath.Join(projectDir, OneOffsEpic), archivePath)

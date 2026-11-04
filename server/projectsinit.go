@@ -33,7 +33,7 @@ func withProjects(s *Server) *Server {
 // BusyAddresses implements projects.RegistryBack.
 func (s *Server) BusyAddresses() []string {
 	var out []string
-	for _, it := range s.queued.list() {
+	for _, it := range s.queue.List() {
 		out = append(out, it.Address)
 	}
 	for _, r := range s.registry.List() {

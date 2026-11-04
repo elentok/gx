@@ -123,7 +123,7 @@ func (s *Server) cancelAutoAdvance(id, why string) bool {
 // cancelAutoAdvanceRoute is the cancel route: it stops a running countdown and
 // is a no-op with none.
 func (s *Server) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := s.sessionDir(req.ID)
+	_, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -135,7 +135,7 @@ func (s *Server) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionRe
 // sendAutoAdvance sends the Continue action if the session still waits on it
 // with the switch on.
 func (s *Server) sendAutoAdvance(id string) {
-	_, meta, res, err := s.sessionDir(id)
+	_, meta, res, err := s.SessionDir(id)
 	if res.Refused || err != nil || !meta.canAutoAdvance() {
 		return
 	}

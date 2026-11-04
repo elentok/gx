@@ -183,8 +183,8 @@ func lastActivity(e tickets.Epic) time.Time {
 
 func (s *Server) epicListRow(project string, e tickets.Epic, queue queueIndex) wire.EpicListRow {
 	root := rootRef{Project: project, Epic: e.Name}
-	queued := s.rootQueued(root)
-	queueable := epicQueueable(e, queued)
+	queued := s.queue.RootQueued(root)
+	queueable := EpicQueueable(e, queued)
 	row := wire.EpicListRow{
 		Address: root.String(), Project: project, Name: e.Name, Kind: wire.EpicKindLoop,
 		Done: e.DoneCount(), Total: e.TotalCount(),

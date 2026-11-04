@@ -33,7 +33,7 @@ func (s *Server) sessionCommandsRead(w http.ResponseWriter, r *http.Request) {
 	// A First prompt has no harness field: it starts Claude.
 	name := string(harness.Claude)
 	if bySession {
-		_, meta, res, err := s.sessionDir(id)
+		_, meta, res, err := s.SessionDir(id)
 		if res.Refused || err != nil {
 			writeCommandsFailure(w, res, err)
 			return

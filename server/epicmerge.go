@@ -335,7 +335,7 @@ func (s *Server) ensureFeatureWorktree(project, epic, repo string) error {
 // ensureRootQueued queues the root's first ticket unless the root is queued.
 func (s *Server) ensureRootQueued(root rootRef, first tickets.Ticket) error {
 	addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: first.Identifier}.String()
-	_, err := s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
+	_, err := s.queue.Write(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {
 			if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && rootOf(a) == root {
 				r := wire.QueueResult{}

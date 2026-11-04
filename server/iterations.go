@@ -83,7 +83,7 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 	return liveIter{info: it, runner: runner, session: sess}, true
 }
 
-func (s *Server) queue(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) queueView(w http.ResponseWriter, _ *http.Request) {
 	list := []wire.QueueEntry{}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {

@@ -25,9 +25,9 @@ func (s *Server) launchRunner(project string, agent ralphloop.AgentKind) agentru
 	return s.runnerFor(project)
 }
 
-// runnerForRun is the runner that started run, whatever the configured one is.
+// RunnerForRun is the runner that started run, whatever the configured one is.
 // It is nil when that runner cannot be built.
-func (s *Server) runnerForRun(run runs.Run) agentrunner.Runner {
+func (s *Server) RunnerForRun(run runs.Run) agentrunner.Runner {
 	name := run.Runner
 	if name == "" {
 		name = runs.RunnerHerdr
@@ -41,7 +41,7 @@ func (s *Server) runnerForRun(run runs.Run) agentrunner.Runner {
 
 // runnerOf is runnerForRun, failing when the run's runner cannot be built.
 func (s *Server) runnerOf(run runs.Run) (agentrunner.Runner, error) {
-	if r := s.runnerForRun(run); r != nil {
+	if r := s.RunnerForRun(run); r != nil {
 		return r, nil
 	}
 	name := run.Runner
@@ -70,7 +70,7 @@ func (s *Server) iterationRunner(addr tickets.Address) (agentrunner.Runner, erro
 	if run, ok := s.registry.RunOf(addr.String()); ok {
 		return s.runnerOf(run)
 	}
-	agent := s.defaultHarness(addr.Project)
+	agent := s.DefaultHarness(addr.Project)
 	if _, t, ok := s.freshTicket(addr); ok {
 		agent = s.resolveTicket(addr, t).Harness
 	}

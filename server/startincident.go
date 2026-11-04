@@ -43,7 +43,7 @@ func (s *Server) fileStartIncident(now time.Time) {
 		s.log.Info("start incident: not filed, needs a gx project", "err", err)
 		return
 	}
-	res, err := s.oneOff(wire.OneOffRequest{
+	res, err := s.oneOffs.Submit(wire.OneOffRequest{
 		Prompt:  startIncidentPrompt(string(note), path),
 		Project: projects.OutboxProject,
 		Type:    string(schema.TypeDiagnose),

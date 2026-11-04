@@ -338,14 +338,14 @@ func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
 	}
 	addr := tickets.Address{Project: "scratch", Epic: "e", ID: "01"}
 
-	s.notifyResult(addr, write("01-quiet.md", false))
+	s.oneOffs.NotifyResult(addr, write("01-quiet.md", false))
 	s.chat.Close()
 	if got := wait(-1); len(got) != 0 {
 		t.Fatalf("a ticket without --notify sent %v", got)
 	}
 
 	s, wait = chatServer(t, 0, 0)
-	s.notifyResult(addr, write("01-loud.md", true))
+	s.oneOffs.NotifyResult(addr, write("01-loud.md", true))
 	s.chat.Close()
 	got := wait(1)
 	if len(got) != 1 || !strings.Contains(got[0], "the answer is 42") {

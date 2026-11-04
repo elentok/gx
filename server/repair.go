@@ -161,7 +161,7 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	if err := s.cancelInvestigateUnlessSelf(req, rc); err != nil {
 		return wire.RepairResult{}, err
 	}
-	if !s.rootQueued(rootOf(addr)) {
+	if !s.queue.RootQueued(rootOf(addr)) {
 		return res, nil
 	}
 	if _, t, ok := s.freshTicket(addr); ok && s.guards.Merges.Begin() {
@@ -169,15 +169,6 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 		s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	}
 	return res, nil
-}
-
-func (s *Server) rootQueued(root rootRef) bool {
-	for _, it := range s.queued.list() {
-		if a, err := tickets.ParseQueuedAddress(it.Address); err == nil && rootOf(a) == root {
-			return true
-		}
-	}
-	return false
 }
 
 // freshTicket loads addr's ticket, and its epic, straight from disk.
@@ -512,7 +503,7 @@ func (s *Server) iterationSession(dir string, addr tickets.Address) (agentrunner
 		if pause.Label != "" {
 			label = pause.Label
 		}
-		if r := s.runnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
+		if r := s.RunnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
 			runner = r
 		}
 	}

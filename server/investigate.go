@@ -77,7 +77,7 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 	if err := s.idx.Refresh(); err != nil {
 		return "", fmt.Errorf("refresh after writing %s: %w", path, err)
 	}
-	res, err := s.queueAdd(wire.QueueRequest{Address: child.String(), Front: true})
+	res, err := s.queue.Add(wire.QueueRequest{Address: child.String(), Front: true})
 	if err != nil {
 		return "", err
 	}

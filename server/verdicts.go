@@ -153,7 +153,7 @@ func frontierIndex(e tickets.Epic, t tickets.Ticket) int {
 // root is queued at all. Running roots hold a slot already, so they don't count.
 func (s *Server) rootsAhead(root string) (ahead int, queued bool) {
 	seen := map[string]bool{}
-	for _, item := range s.queued.list() {
+	for _, item := range s.queue.List() {
 		a, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil {
 			continue
@@ -202,7 +202,7 @@ func (s *Server) pendingRows() []wire.PendingRow {
 		byProject[project] = loadResult{epics, err}
 		return epics, err
 	}
-	items := s.queued.list()
+	items := s.queue.List()
 	// A ticket queued alone has its own row; its epic's entry adds none for it.
 	covered := map[string]bool{}
 	for _, item := range items {

@@ -37,7 +37,7 @@ func (s *Server) markSessionActionable(req wire.MarkActionableRequest) (wire.Ses
 	if req.Reason == "" {
 		return sessionRefusal(wire.ReasonSessionBadRequest, "an actionable needs a reason"), nil
 	}
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

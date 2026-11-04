@@ -33,7 +33,7 @@ func (s *Server) readSessionPermission(id string) (wire.SessionResult, wire.Sess
 	if strings.HasPrefix(id, queueAgentIDPrefix) {
 		return sessionRefusal(wire.ReasonSessionReadOnly, fmt.Sprintf("%s is a Queue agent; its loop owns it", id)), out, nil
 	}
-	dir, meta, res, err := s.sessionDir(id)
+	dir, meta, res, err := s.SessionDir(id)
 	if res.Refused || err != nil {
 		return res, out, err
 	}

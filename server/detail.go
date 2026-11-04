@@ -59,7 +59,7 @@ func (s *Server) ticketDetail(ref ticketRef) (wire.TicketDetail, error) {
 	d := newTicketDetail(ref)
 	fillHeader(&d, ref, t)
 	if t.Status == schema.StatusClaimed {
-		d.WaitingLabel = s.checkWaitingLabel(ref.addr.String())
+		d.WaitingLabel = s.CheckWaitingLabel(ref.addr.String())
 	}
 	if t.LongTicketTurns > 0 {
 		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns

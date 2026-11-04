@@ -14,7 +14,7 @@ import (
 func (s *Server) interruptSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

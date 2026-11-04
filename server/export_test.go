@@ -23,9 +23,6 @@ var (
 	HardGraceTitle = hardGraceTitle
 )
 
-// DefaultHarness is the project's Default harness.
-func (s *Server) DefaultHarness(project string) ralphloop.AgentKind { return s.defaultHarness(project) }
-
 // ServeAsset is serveAsset over a fake build, so a test can name hashed assets
 // the placeholder embed does not have.
 func ServeAsset(assets fs.FS) http.Handler { return serveAsset(assets) }

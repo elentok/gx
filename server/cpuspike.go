@@ -68,7 +68,7 @@ func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult 
 	if last := s.cpuSpikes.lastFiled; !last.IsZero() && now.Sub(last) < set.CPUWatchdog.Cooldown {
 		return wire.CPUSpikeResult{Message: fmt.Sprintf("cooling down: last ticket filed %s ago", now.Sub(last).Round(time.Second))}
 	}
-	res, err := s.oneOff(wire.OneOffRequest{
+	res, err := s.oneOffs.Submit(wire.OneOffRequest{
 		Prompt:  cpuSpikePrompt(sp, set.CPUWatchdog),
 		Project: projects.OutboxProject,
 		Type:    string(schema.TypeDiagnose),

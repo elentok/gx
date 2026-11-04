@@ -63,7 +63,7 @@ func (m sessionMeta) canAutoAdvance() bool {
 // setAutoAdvance flips a Design session's auto-advance switch. Turning it off
 // stops a running countdown.
 func (s *Server) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

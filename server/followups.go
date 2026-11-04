@@ -197,3 +197,6 @@ func ensureDraftEpic(epicPath string) error {
 	}
 	return tickets.WriteEpicTicketMD(epicPath, schema.StatusDraft)
 }
+
+// EnsureDraftEpic is ensureDraftEpic for the Host interface.
+func (s *Server) EnsureDraftEpic(epicPath string) error { return ensureDraftEpic(epicPath) }

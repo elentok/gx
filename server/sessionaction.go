@@ -26,7 +26,7 @@ func (s *Server) runSessionAction(req wire.SessionRequest) (wire.SessionResult, 
 func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

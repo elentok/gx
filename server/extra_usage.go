@@ -45,14 +45,14 @@ func (s *Server) extraUsageOn() bool {
 // runs only when the global Default harness is Claude.
 func (s *Server) startExtraUsageCheck(now time.Time) {
 	if defaultOrClaude(s.settings.Load().AgentsDefaultHarness) == ralphloop.AgentClaude {
-		s.checkExtraUsage(now)
+		s.CheckExtraUsage(now)
 	}
 }
 
-// checkExtraUsage runs at server start and on every enqueue. When extra usage
+// CheckExtraUsage runs at server start and on every enqueue. When extra usage
 // is on it sends at most one chat notice per day, and reports the state so the
 // caller can hand the client its warning.
-func (s *Server) checkExtraUsage(now time.Time) bool {
+func (s *Server) CheckExtraUsage(now time.Time) bool {
 	if !s.extraUsageOn() {
 		return false
 	}

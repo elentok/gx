@@ -4,18 +4,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -125,25 +130,47 @@ type writtenOneOff struct {
 	path string
 }
 
-// oneOff creates a top-level ticket carrying the prompt and appends it to the
+// OneOffsDeps is what the one-offs need from the rest of the server.
+type OneOffsDeps struct {
+	Queue       *Queue
+	Index       *index.Index
+	Projects    *projects.Registry
+	Registry    *runs.Registry
+	Events      *broker.Broker
+	Log         *slog.Logger
+	Chat        *ralphloop.ServerChat
+	Host        Host
+	TicketStore string
+}
+
+// OneOffs submits, announces and archives one-off tickets.
+type OneOffs struct {
+	OneOffsDeps
+	sweepMu sync.Mutex // one archive sweep at a time; the move's own writes wake the watcher
+}
+
+// NewOneOffs wires the one-offs to the parts of the server they use.
+func NewOneOffs(d OneOffsDeps) *OneOffs { return &OneOffs{OneOffsDeps: d} }
+
+// Submit creates a top-level ticket carrying the prompt and appends it to the
 // queue in one call. Everything that can refuse is checked before the first
 // write, and a refusal after the write removes the ticket again, so a refused
 // submit leaves nothing behind for a retry to collide with.
-func (s *Server) oneOff(req wire.OneOffRequest) (wire.OneOffResult, error) {
+func (o *OneOffs) Submit(req wire.OneOffRequest) (wire.OneOffResult, error) {
 	var plan oneOffPlan
-	if res, err := s.oneOffValidate(req, &plan); err != nil || res.Refused {
+	if res, err := o.oneOffValidate(req, &plan); err != nil || res.Refused {
 		return res, err
 	}
-	written, err := oneOffWrite(plan)
+	written, err := o.oneOffWrite(plan)
 	if err != nil {
 		return wire.OneOffResult{}, err
 	}
-	return s.oneOffEnqueue(plan, written)
+	return o.oneOffEnqueue(plan, written)
 }
 
 // oneOffValidate checks the submit and fills plan. A refusal (or error) means
 // plan is unusable; nothing has been written.
-func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.OneOffResult, error) {
+func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.OneOffResult, error) {
 	if req.File != "" {
 		if err := applyOneOffFile(&req); err != nil {
 			var removed removedKeyError
@@ -177,7 +204,7 @@ func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.
 	default:
 		return oneOffRefusal(wire.ReasonBadType, "type "+req.Type+" is not supported by a one-off"), nil
 	}
-	project, dir, err := s.oneOffProject(req)
+	project, dir, err := o.oneOffProject(req)
 	if err != nil {
 		return wire.OneOffResult{}, err
 	}
@@ -192,13 +219,13 @@ func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.
 	if _, err := tickets.ParseAddress(tickets.Address{Project: project, Epic: slug, ID: "01"}.String(), tickets.AddressContext{}); err != nil {
 		return oneOffRefusal(wire.ReasonInvalidAddress, "name "+slug+" is not usable in a ticket address"), nil
 	}
-	if dup, err := s.liveDuplicate(dir, req.Unique); err != nil {
+	if dup, err := liveDuplicate(dir, req.Unique); err != nil {
 		return wire.OneOffResult{}, err
 	} else if dup != nil {
 		return dup.refusal(project, dir)
 	}
 	tk := schema.Ticket{Status: schema.StatusOpen, Type: typ, Notify: req.Notify, Unique: req.Unique, ExpectedContextWindow: req.ExpectedContextWindow}
-	if refused := s.oneOffOptionsRefusal(project, req); refused != nil {
+	if refused := o.oneOffOptionsRefusal(project, req); refused != nil {
 		return *refused, nil
 	}
 	for _, b := range req.BlockedBy {
@@ -217,8 +244,8 @@ func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.
 }
 
 // oneOffWrite puts the ticket on disk in the shared epic.
-func oneOffWrite(p oneOffPlan) (writtenOneOff, error) {
-	path, id, err := writeOneOffTicket(p.dir, p.slug, p.tk, p.prompt)
+func (o *OneOffs) oneOffWrite(p oneOffPlan) (writtenOneOff, error) {
+	path, id, err := o.writeOneOffTicket(p.dir, p.slug, p.tk, p.prompt)
 	if err != nil {
 		return writtenOneOff{}, err
 	}
@@ -228,14 +255,14 @@ func oneOffWrite(p oneOffPlan) (writtenOneOff, error) {
 // oneOffEnqueue queues the written ticket and only then records `submitted`.
 // Any failure removes the new ticket file again so nothing unqueued stays
 // behind; the shared epic stays.
-func (s *Server) oneOffEnqueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult, error) {
-	res, err := s.oneOffQueue(p, w)
+func (o *OneOffs) oneOffEnqueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult, error) {
+	res, err := o.oneOffQueue(p, w)
 	if err != nil || res.Refused {
 		if rmErr := os.Remove(w.path); rmErr != nil {
-			s.log.Warn("remove unqueued one-off", "ticket", w.addr.String(), "err", rmErr)
+			o.Log.Warn("remove unqueued one-off", "ticket", w.addr.String(), "err", rmErr)
 		}
-		if refreshErr := s.idx.Refresh(); refreshErr != nil {
-			s.log.Warn("refresh after one-off cleanup", "err", refreshErr)
+		if refreshErr := o.Index.Refresh(); refreshErr != nil {
+			o.Log.Warn("refresh after one-off cleanup", "err", refreshErr)
 		}
 		return res, err
 	}
@@ -247,12 +274,12 @@ func (s *Server) oneOffEnqueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult
 	return res, nil
 }
 
-func (s *Server) oneOffQueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult, error) {
-	// queueAdd checks the index, so it must see the new ticket first.
-	if err := s.idx.Refresh(); err != nil {
+func (o *OneOffs) oneOffQueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult, error) {
+	// Queue.Add checks the index, so it must see the new ticket first.
+	if err := o.Index.Refresh(); err != nil {
 		return wire.OneOffResult{}, err
 	}
-	q, err := s.queueRoot(w.addr, p.agent, p.front)
+	q, err := o.Queue.queueRoot(w.addr, p.agent, p.front)
 	if err != nil {
 		return wire.OneOffResult{}, err
 	}
@@ -264,25 +291,25 @@ func (s *Server) oneOffQueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult, 
 
 // queueRoot queues the root of addr. The shared epic is queued once, as a root:
 // a later submit only moves it.
-func (s *Server) queueRoot(addr tickets.Address, agent string, front bool) (wire.QueueResult, error) {
+func (q *Queue) queueRoot(addr tickets.Address, agent string, front bool) (wire.QueueResult, error) {
 	root := rootOf(addr)
-	if !s.rootQueued(root) {
-		return s.queueAdd(wire.QueueRequest{Address: addr.String(), Agent: agent, Front: front})
+	if !q.RootQueued(root) {
+		return q.Add(wire.QueueRequest{Address: addr.String(), Agent: agent, Front: front})
 	}
-	res, err := s.queueRaise(root, front)
+	res, err := q.queueRaise(root, front)
 	var agents []string
-	for _, it := range s.queued.list() {
+	for _, it := range q.List() {
 		if a, perr := tickets.ParseAddress(it.Address, tickets.AddressContext{}); perr == nil && rootOf(a) == root {
 			agents = append(agents, it.Agent)
 		}
 	}
-	return s.withExtraUsage(root.Project, agents, res, err)
+	return q.withExtraUsage(root.Project, agents, res, err)
 }
 
 // queueRaise moves every queued item of root to the head, keeping their order.
 // Without front the queue is left as it is.
-func (s *Server) queueRaise(root rootRef, front bool) (wire.QueueResult, error) {
-	return s.writeQueue(root.String(), func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
+func (q *Queue) queueRaise(root rootRef, front bool) (wire.QueueResult, error) {
+	return q.Write(root.String(), func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		if !front {
 			return items, nil
 		}
@@ -306,7 +333,7 @@ type duplicate struct {
 // liveDuplicate finds a ticket of the project carrying key that is not done or
 // cancelled; paused copies count as live. Reads the files, not the index, so a
 // just-written ticket is seen.
-func (s *Server) liveDuplicate(projectDir, key string) (*duplicate, error) {
+func liveDuplicate(projectDir, key string) (*duplicate, error) {
 	if key == "" {
 		return nil, nil
 	}
@@ -342,25 +369,25 @@ func (d *duplicate) refusal(project, projectDir string) (wire.OneOffResult, erro
 	return res, nil
 }
 
-// notifyResult sends a merged ticket's ## Result to chat when its submit asked
+// NotifyResult sends a merged ticket's ## Result to chat when its submit asked
 // for it. A ticket without the flag stays silent; pauses never reach here.
-func (s *Server) notifyResult(addr tickets.Address, ticketPath string) {
+func (o *OneOffs) NotifyResult(addr tickets.Address, ticketPath string) {
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil || !tk.Notify {
 		return
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
-		s.log.Warn("read result", "ticket", addr.String(), "err", err)
+		o.Log.Warn("read result", "ticket", addr.String(), "err", err)
 		return
 	}
 	dir := filepath.Dir(filepath.Dir(filepath.Dir(ticketPath))) // project/epic/issues/file
-	s.chat.Result(addr.Project, s.projects.ChatOverride(addr.Project), dir, addr.Epic, addr.String(), schema.Section(schema.ParseBody(string(raw)), "Result"))
+	o.Chat.Result(addr.Project, o.Projects.ChatOverride(addr.Project), dir, addr.Epic, addr.String(), schema.Section(schema.ParseBody(string(raw)), "Result"))
 }
 
 // oneOffOptionsRefusal checks the submit options before anything is written. A
 // blocker must be a ticket of the same project (no cross-project blocking).
-func (s *Server) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *wire.OneOffResult {
+func (o *OneOffs) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *wire.OneOffResult {
 	refuse := func(reason, msg string) *wire.OneOffResult {
 		r := oneOffRefusal(reason, msg)
 		return &r
@@ -371,7 +398,7 @@ func (s *Server) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *w
 	if len(req.BlockedBy) == 0 {
 		return nil
 	}
-	if err := s.idx.Refresh(); err != nil {
+	if err := o.Index.Refresh(); err != nil {
 		r := oneOffRefusal(wire.ReasonBadBlocker, err.Error())
 		return &r
 	}
@@ -382,7 +409,7 @@ func (s *Server) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *w
 			return refuse(wire.ReasonBadBlocker, err.Error())
 		case a.Project != project:
 			return refuse(wire.ReasonBadBlocker, b+" is in another project (cross-project blocking not supported)")
-		case !s.hasTicket(a.String()):
+		case !o.Queue.hasTicket(a.String()):
 			return refuse(wire.ReasonBadBlocker, "no ticket "+b)
 		}
 	}
@@ -391,8 +418,8 @@ func (s *Server) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *w
 
 // oneOffProject picks the project: the explicit one, else the registered
 // project owning Cwd, else scratch. dir is empty when the project is unknown.
-func (s *Server) oneOffProject(req wire.OneOffRequest) (project, dir string, err error) {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+func (o *OneOffs) oneOffProject(req wire.OneOffRequest) (project, dir string, err error) {
+	dirs, err := tickets.ProjectDirs(o.TicketStore)
 	if err != nil {
 		return "", "", err
 	}
@@ -511,9 +538,9 @@ func nextOneOffNumber(projectDir string, epic *tickets.Epic) (int, error) {
 // writeOneOffTicket adds the ticket to the shared one-offs epic, creating the
 // epic as a draft on the first submit. The id is above the highest in both
 // one-offs epics, so an archived number is never reused.
-func writeOneOffTicket(projectDir, slug string, tk schema.Ticket, prompt string) (path, id string, err error) {
+func (o *OneOffs) writeOneOffTicket(projectDir, slug string, tk schema.Ticket, prompt string) (path, id string, err error) {
 	epicDir := filepath.Join(projectDir, OneOffsEpic)
-	if err := ensureDraftEpic(epicDir); err != nil {
+	if err := o.Host.EnsureDraftEpic(epicDir); err != nil {
 		return "", "", err
 	}
 	epic, unlock, err := tickets.LoadLockedEpic(epicDir)
@@ -549,7 +576,7 @@ func (s *Server) oneOffHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.oneOff(req)
+	res, err := s.oneOffs.Submit(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

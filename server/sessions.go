@@ -83,7 +83,7 @@ func (s *Server) sessionCreateWrite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sessionsRead(w http.ResponseWriter, _ *http.Request) {
-	list, err := s.listSessionsWithQueue()
+	list, err := s.queue.ListSessionsWithQueue()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -263,7 +263,7 @@ func (s *Server) saveNewSession(meta *sessionMeta, unique bool) (string, error) 
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	if meta.Name == "" || unique {
-		list, err := s.listSessions()
+		list, err := s.ListSessions()
 		if err != nil {
 			return "", err
 		}
@@ -468,9 +468,9 @@ func writeSessionMeta(dir string, meta sessionMeta) error {
 	return os.Rename(tmp, filepath.Join(dir, sessionMetaFile))
 }
 
-// listSessions reads every session dir, oldest first. A dir without a
+// ListSessions reads every session dir, oldest first. A dir without a
 // readable meta is skipped: it is a create still in flight or a torn one.
-func (s *Server) listSessions() ([]wire.SessionInfo, error) {
+func (s *Server) ListSessions() ([]wire.SessionInfo, error) {
 	metas, err := s.listSessionMetas()
 	if err != nil {
 		return nil, err
@@ -893,9 +893,9 @@ func sessionWriteAs(check func(wire.SessionRequest) (wire.SessionResult, error),
 	}
 }
 
-// sessionDir resolves a request's session to its state dir and meta, or the
+// SessionDir resolves a request's session to its state dir and meta, or the
 // refusal for an id that names none.
-func (s *Server) sessionDir(id string) (string, sessionMeta, wire.SessionResult, error) {
+func (s *Server) SessionDir(id string) (string, sessionMeta, wire.SessionResult, error) {
 	if id == "" || filepath.Base(id) != id || strings.HasPrefix(id, ".") {
 		return "", sessionMeta{}, sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("bad session id %q", id)), nil
 	}
@@ -946,7 +946,7 @@ func (s *Server) stopSession(req wire.SessionRequest) (wire.SessionResult, error
 func (s *Server) markSessionStopped(id string) (dir string, starting bool, res wire.SessionResult, err error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(id)
+	dir, meta, res, err := s.SessionDir(id)
 	if res.Refused || err != nil {
 		return "", false, res, err
 	}
@@ -972,7 +972,7 @@ func waitForFile(path string, timeout time.Duration) {
 func (s *Server) removeSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

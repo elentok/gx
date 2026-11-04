@@ -88,7 +88,7 @@ type queueIndex struct {
 // have no enqueue time has no entry in enqueued.
 func (s *Server) newQueueIndex() queueIndex {
 	idx := queueIndex{slots: map[string]int{}, enqueued: map[string]time.Time{}}
-	for _, it := range s.queued.list() {
+	for _, it := range s.queue.List() {
 		a, err := tickets.ParseQueuedAddress(it.Address)
 		if err != nil {
 			continue

@@ -28,7 +28,7 @@ const resumeCrashWindow = 10 * time.Second
 func (s *Server) resumeSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -119,7 +119,7 @@ func clearOldHolder(dir string) error {
 // exit, or of a session the person stopped, ended its session. Any other dead
 // holder is auto-resumed once.
 func (s *Server) restoreSessions() {
-	list, err := s.listSessions()
+	list, err := s.ListSessions()
 	if err != nil {
 		s.log.Warn("restore sessions", "err", err)
 		return
@@ -170,7 +170,7 @@ func (s *Server) restoreSessions() {
 func (s *Server) autoResumeSession(id string) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(id)
+	dir, meta, res, err := s.SessionDir(id)
 	if res.Refused || err != nil {
 		s.log.Warn("auto-resume session", "session", id, "err", err, "refusal", res.Message)
 		return

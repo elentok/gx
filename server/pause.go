@@ -52,18 +52,18 @@ func QueuePaused(stateDir string) (bool, error) {
 	return p.paused, nil
 }
 
-// blocked reports whether claiming a new root is held back.
-func (p *pauseState) blocked() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.paused
+// Blocked reports whether claiming a new root is held back.
+func (q *Queue) Blocked() bool {
+	q.pause.mu.Lock()
+	defer q.pause.mu.Unlock()
+	return q.pause.paused
 }
 
-// currentMode is mode for callers that do not already hold the lock.
-func (p *pauseState) currentMode() wire.QueueMode {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.mode()
+// Mode is the queue mode for callers that do not already hold the pause lock.
+func (q *Queue) Mode() wire.QueueMode {
+	q.pause.mu.Lock()
+	defer q.pause.mu.Unlock()
+	return q.pause.mode()
 }
 
 func (p *pauseState) mode() wire.QueueMode {
@@ -89,8 +89,8 @@ func (p *pauseState) save() error {
 }
 
 // setMode applies a mode change, persists the pause flag, then publishes.
-func (s *Server) setMode(paused bool) (wire.QueueResult, error) {
-	p := s.pause
+func (q *Queue) setMode(paused bool) (wire.QueueResult, error) {
+	p := q.pause
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	prev := p.paused
@@ -99,16 +99,19 @@ func (s *Server) setMode(paused bool) (wire.QueueResult, error) {
 		p.paused = prev
 		return wire.QueueResult{}, err
 	}
-	s.events.Publish(wire.EventQueueChanged, "")
-	s.guards.Kick()
-	return wire.QueueResult{Queue: s.queued.list(), Mode: p.mode()}, nil
+	q.events.Publish(wire.EventQueueChanged, "")
+	q.guards.Kick()
+	return wire.QueueResult{Queue: q.List(), Mode: p.mode()}, nil
 }
 
-func (s *Server) queuePause() (wire.QueueResult, error)  { return s.setMode(true) }
-func (s *Server) queueResume() (wire.QueueResult, error) { return s.setMode(false) }
+// Pause holds back new claims. Runs already started are untouched.
+func (q *Queue) Pause() (wire.QueueResult, error) { return q.setMode(true) }
 
-// queueFlush is the old name of Finish and pause, kept for one release.
-func (s *Server) queueFlush() (wire.QueueResult, error) { return s.queuePause() }
+// Resume lifts the pause.
+func (q *Queue) Resume() (wire.QueueResult, error) { return q.setMode(false) }
+
+// Flush is the old name of Finish and pause, kept for one release.
+func (q *Queue) Flush() (wire.QueueResult, error) { return q.Pause() }
 
 // modeWrite adapts a mode change to a POST handler.
 func (s *Server) modeWrite(do func() (wire.QueueResult, error)) http.HandlerFunc {

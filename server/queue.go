@@ -11,8 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -40,16 +44,66 @@ func ignoreCtx(do func(wire.QueueRequest) (wire.QueueResult, error)) func(wire.Q
 	return func(req wire.QueueRequest, _ queueCtx) (wire.QueueResult, error) { return do(req) }
 }
 
-// queueStore is the server-wide queue. It lives in a state-dir file, never in a
-// ticket's markdown, so order survives a restart without touching the store.
-type queueStore struct {
-	mu    sync.Mutex
-	path  string
-	items []wire.QueueItem
+// Host is what the queue, the Queue agent rows and the one-offs need from the
+// rest of the server: the back edges to harness, sched, sessions, budget, merge
+// and recovery. The root implements it; tests use a fake.
+type Host interface {
+	DefaultHarness(project string) ralphloop.AgentKind
+	RunnerForRun(run runs.Run) agentrunner.Runner
+	Runs() []runs.Run
+	CheckWaitingLabel(address string) string
+	ListSessions() ([]wire.SessionInfo, error)
+	CheckExtraUsage(now time.Time) bool
+	StampEpic(root rootRef, epicPath string, keys ...string)
+	EnsureDraftEpic(epicPath string) error
 }
 
-func openQueue(stateDir string) (*queueStore, error) {
-	q := &queueStore{path: filepath.Join(stateDir, queueFileName), items: []wire.QueueItem{}}
+// QueueDeps is what a Queue needs beside its state files, handed over once the
+// rest of the server exists.
+type QueueDeps struct {
+	Events   *broker.Broker
+	Guards   *runs.Guards
+	Index    *index.Index
+	Projects *projects.Registry
+	Registry *runs.Registry
+	Host     Host
+}
+
+// Queue is the server-wide queue and the pause gate in front of it. It lives in
+// state-dir files, never in a ticket's markdown, so order survives a restart
+// without touching the store.
+type Queue struct {
+	mu       sync.Mutex
+	path     string
+	items    []wire.QueueItem
+	pause    *pauseState
+	stateDir string
+
+	events   *broker.Broker
+	guards   *runs.Guards
+	idx      *index.Index
+	projects *projects.Registry
+	registry *runs.Registry
+	host     Host
+}
+
+// Attach hands the queue the parts of the server that only exist after it is
+// loaded.
+func (q *Queue) Attach(d QueueDeps) {
+	q.events, q.guards, q.idx, q.projects, q.registry, q.host = d.Events, d.Guards, d.Index, d.Projects, d.Registry, d.Host
+}
+
+// EpicQueueable reports whether an epic can be queued: an unqueued, unmerged
+// loop epic that still has an open ticket. The epic list shares this rule.
+func EpicQueueable(e tickets.Epic, queued bool) bool {
+	if e.IsMap || queued || !e.MergedAt.IsZero() || e.QueueRefusal() != tickets.QueueRefusalNone {
+		return false
+	}
+	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return t.Status == string(schema.StatusOpen) })
+}
+
+func openQueue(stateDir string) (*Queue, error) {
+	q := &Queue{path: filepath.Join(stateDir, queueFileName), items: []wire.QueueItem{}, stateDir: stateDir}
 	data, err := os.ReadFile(q.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return q, nil
@@ -64,7 +118,7 @@ func openQueue(stateDir string) (*queueStore, error) {
 }
 
 // save writes through a rename so a crash never leaves a torn queue file.
-func (q *queueStore) save() error {
+func (q *Queue) save() error {
 	data, err := json.Marshal(q.items)
 	if err != nil {
 		return err
@@ -76,7 +130,7 @@ func (q *queueStore) save() error {
 	return os.Rename(tmp, q.path)
 }
 
-func (q *queueStore) indexOf(address string) int {
+func (q *Queue) indexOf(address string) int {
 	for i, it := range q.items {
 		if it.Address == address {
 			return i
@@ -85,16 +139,16 @@ func (q *queueStore) indexOf(address string) int {
 	return -1
 }
 
-func (q *queueStore) list() []wire.QueueItem {
+// List is a copy of the queued items, in order.
+func (q *Queue) List() []wire.QueueItem {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return append([]wire.QueueItem{}, q.items...)
 }
 
-// writeQueue applies mutate under the lock, persists, then publishes, so events
+// Write applies mutate under the lock, persists, then publishes, so events
 // arrive in queue order. A refusal from mutate leaves the queue untouched.
-func (s *Server) writeQueue(address string, mutate func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult)) (wire.QueueResult, error) {
-	q := s.queued
+func (q *Queue) Write(address string, mutate func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult)) (wire.QueueResult, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	next, refused := mutate(append([]wire.QueueItem{}, q.items...))
@@ -107,15 +161,15 @@ func (s *Server) writeQueue(address string, mutate func(items []wire.QueueItem) 
 		q.items = prev
 		return wire.QueueResult{}, err
 	}
-	s.events.Publish(wire.EventQueueChanged, address)
-	s.guards.Kick()
+	q.events.Publish(wire.EventQueueChanged, address)
+	q.guards.Kick()
 	return wire.QueueResult{Queue: append([]wire.QueueItem{}, next...)}, nil
 }
 
 // mapEpicRefusal refuses to queue a ticket of a map epic: a map's tickets are
 // decisions a person resolves by hand, never scheduled work.
-func (s *Server) mapEpicRefusal(address string) *wire.QueueResult {
-	if !s.inMapEpic(address) {
+func (q *Queue) mapEpicRefusal(address string) *wire.QueueResult {
+	if !q.inMapEpic(address) {
 		return nil
 	}
 	r := refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
@@ -123,20 +177,20 @@ func (s *Server) mapEpicRefusal(address string) *wire.QueueResult {
 }
 
 // inMapEpic reports whether address names a ticket (or root) of a map epic.
-func (s *Server) inMapEpic(address string) bool {
+func (q *Queue) inMapEpic(address string) bool {
 	a, err := tickets.ParseQueuedAddress(address)
 	if err != nil {
 		return false
 	}
-	dir, err := s.projects.Dir(a.Project)
+	dir, err := q.projects.Dir(a.Project)
 	if err != nil {
 		return false
 	}
 	return tickets.IsMapEpic(filepath.Join(dir, a.Epic))
 }
 
-func (s *Server) hasTicket(address string) bool {
-	for _, t := range s.idx.Snapshot().Tickets {
+func (q *Queue) hasTicket(address string) bool {
+	for _, t := range q.idx.Snapshot().Tickets {
 		if t.Address == address {
 			return true
 		}
@@ -158,22 +212,23 @@ func canonical(raw string) (string, *wire.QueueResult) {
 // on an accepted result. Extra usage is a Claude account matter, so the check
 // runs only when an enqueued agent runs on Claude. An empty agent follows the
 // project's Default harness.
-func (s *Server) withExtraUsage(project string, agents []string, res wire.QueueResult, err error) (wire.QueueResult, error) {
+func (q *Queue) withExtraUsage(project string, agents []string, res wire.QueueResult, err error) (wire.QueueResult, error) {
 	if err != nil || res.Refused {
 		return res, err
 	}
 	for _, agent := range agents {
-		if agent == "" && s.defaultHarness(project) == ralphloop.AgentClaude || agent == string(ralphloop.AgentClaude) {
-			res.ExtraUsage = s.checkExtraUsage(time.Now())
+		if agent == "" && q.host.DefaultHarness(project) == ralphloop.AgentClaude || agent == string(ralphloop.AgentClaude) {
+			res.ExtraUsage = q.host.CheckExtraUsage(time.Now())
 			break
 		}
 	}
 	return res, err
 }
 
-func (s *Server) queueAdd(req wire.QueueRequest) (wire.QueueResult, error) {
-	res, err := s.queueAddItem(req)
-	return s.withExtraUsage(projectOfAddress(req.Address), []string{req.Agent}, res, err)
+// Add queues req.Address (a ticket, or a whole epic).
+func (q *Queue) Add(req wire.QueueRequest) (wire.QueueResult, error) {
+	res, err := q.addItem(req)
+	return q.withExtraUsage(projectOfAddress(req.Address), []string{req.Agent}, res, err)
 }
 
 // resolveAgent keeps an empty agent empty (it follows the Default harness) and
@@ -212,15 +267,15 @@ func parseQueueTarget(raw string) (queueTarget, *wire.QueueResult) {
 }
 
 // refusal returns why t cannot be queued, or nil.
-func (s *Server) refusal(t queueTarget) *wire.QueueResult {
+func (q *Queue) refusal(t queueTarget) *wire.QueueResult {
 	if !t.isEpic() {
-		if !s.hasTicket(t.address) {
+		if !q.hasTicket(t.address) {
 			r := refusal(wire.ReasonUnknownTicket, "no ticket "+t.address)
 			return &r
 		}
-		return s.mapEpicRefusal(t.address)
+		return q.mapEpicRefusal(t.address)
 	}
-	epics, err := s.projects.Epics(t.project)
+	epics, err := q.projects.Epics(t.project)
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == t.epic })
 	if err != nil || i < 0 {
 		r := refusal(wire.ReasonUnknownTicket, "no epic "+t.address)
@@ -239,7 +294,7 @@ func (s *Server) refusal(t queueTarget) *wire.QueueResult {
 		r = refusal(wire.ReasonEpicDraft, t.address+" is a draft; its tickets are still being created")
 	case e.QueueRefusal() == tickets.QueueRefusalNotOpen:
 		r = refusal(wire.ReasonEpicNotOpen, t.address+" is "+e.Status+", not open")
-	case !epicQueueable(e, false):
+	case !EpicQueueable(e, false):
 		r = refusal(wire.ReasonNoOpenTickets, t.address+" has no open ticket")
 	default:
 		return nil
@@ -247,7 +302,7 @@ func (s *Server) refusal(t queueTarget) *wire.QueueResult {
 	return &r
 }
 
-func (s *Server) queueAddItem(req wire.QueueRequest) (wire.QueueResult, error) {
+func (q *Queue) addItem(req wire.QueueRequest) (wire.QueueResult, error) {
 	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
@@ -257,8 +312,8 @@ func (s *Server) queueAddItem(req wire.QueueRequest) (wire.QueueResult, error) {
 	if badAgent != nil {
 		return *badAgent, nil
 	}
-	res, err := s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
-		if r := s.refusal(target); r != nil {
+	res, err := q.Write(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
+		if r := q.refusal(target); r != nil {
 			return nil, r
 		}
 		for _, it := range items {
@@ -274,7 +329,7 @@ func (s *Server) queueAddItem(req wire.QueueRequest) (wire.QueueResult, error) {
 		return append(items, item), nil
 	})
 	if err == nil && !res.Refused {
-		s.stampQueuedAt(target)
+		q.stampQueuedAt(target)
 	}
 	return res, err
 }
@@ -282,7 +337,7 @@ func (s *Server) queueAddItem(req wire.QueueRequest) (wire.QueueResult, error) {
 // stampQueuedAt records the epic's first enqueue. StampEpicFields never
 // overwrites, so a later remove and add keeps the first time. A failed stamp is
 // logged, never fatal: the item is already queued.
-func (s *Server) stampQueuedAt(t queueTarget) {
+func (q *Queue) stampQueuedAt(t queueTarget) {
 	epic := t.epic
 	if !t.isEpic() {
 		a, err := tickets.ParseQueuedAddress(t.address)
@@ -291,26 +346,27 @@ func (s *Server) stampQueuedAt(t queueTarget) {
 		}
 		epic = a.Epic
 	}
-	dir, err := s.projects.Dir(t.project)
+	dir, err := q.projects.Dir(t.project)
 	if err != nil {
 		return
 	}
-	s.stampEpic(rootRef{Project: t.project, Epic: epic}, filepath.Join(dir, epic), "queued_at")
+	q.host.StampEpic(rootRef{Project: t.project, Epic: epic}, filepath.Join(dir, epic), "queued_at")
 }
 
-func (s *Server) queueRemove(req wire.QueueRequest) (wire.QueueResult, error) {
+// Remove takes req.Address and everything forked from it off the queue.
+func (q *Queue) Remove(req wire.QueueRequest) (wire.QueueResult, error) {
 	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
 	addr := target.address
-	return s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
+	return q.Write(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		if indexOfAddr(items, addr) < 0 {
 			r := refusal(wire.ReasonNotQueued, addr+" is not queued")
 			return nil, &r
 		}
-		subtree := s.subtree(addr)
-		if live := s.liveIn(subtree); live != "" {
+		subtree := q.subtree(addr)
+		if live := q.liveIn(subtree); live != "" {
 			r := refusal(wire.ReasonTicketLive, live+" has a live iteration")
 			return nil, &r
 		}
@@ -318,18 +374,18 @@ func (s *Server) queueRemove(req wire.QueueRequest) (wire.QueueResult, error) {
 	})
 }
 
-// queueReplace swaps one project's pending entries for req.Items, leaving the
+// Replace swaps one project's pending entries for req.Items, leaving the
 // other projects' entries where they are. The new entries go at the end.
-func (s *Server) queueReplace(req wire.QueueRequest) (wire.QueueResult, error) {
-	res, err := s.queueReplaceItems(req)
+func (q *Queue) Replace(req wire.QueueRequest) (wire.QueueResult, error) {
+	res, err := q.replaceItems(req)
 	agents := make([]string, len(req.Items))
 	for i, it := range req.Items {
 		agents[i] = it.Agent
 	}
-	return s.withExtraUsage(req.Project, agents, res, err)
+	return q.withExtraUsage(req.Project, agents, res, err)
 }
 
-func (s *Server) queueReplaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
+func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 	items := make([]wire.QueueItem, 0, len(req.Items))
 	seen := map[string]bool{}
 	for _, it := range req.Items {
@@ -350,13 +406,13 @@ func (s *Server) queueReplaceItems(req wire.QueueRequest) (wire.QueueResult, err
 		seen[addr] = true
 		items = append(items, newQueueItem(addr, agent))
 	}
-	return s.writeQueue("", func(cur []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
+	return q.Write("", func(cur []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {
-			if !s.hasTicket(it.Address) {
+			if !q.hasTicket(it.Address) {
 				r := refusal(wire.ReasonUnknownTicket, "no ticket "+it.Address)
 				return nil, &r
 			}
-			if r := s.mapEpicRefusal(it.Address); r != nil {
+			if r := q.mapEpicRefusal(it.Address); r != nil {
 				return nil, r
 			}
 		}
@@ -368,7 +424,7 @@ func (s *Server) queueReplaceItems(req wire.QueueRequest) (wire.QueueResult, err
 			}
 			// A dropped entry must not have a live run under it.
 			if !seen[it.Address] {
-				if live := s.liveIn(s.subtree(it.Address)); live != "" {
+				if live := q.liveIn(q.subtree(it.Address)); live != "" {
 					r := refusal(wire.ReasonTicketLive, live+" has a live iteration")
 					return nil, &r
 				}
@@ -406,8 +462,8 @@ func indexOfAddr(items []wire.QueueItem, addr string) int {
 }
 
 // subtree is addr plus every ticket forked from it, directly or not.
-func (s *Server) subtree(addr string) map[string]bool {
-	all := s.idx.Snapshot().Tickets
+func (q *Queue) subtree(addr string) map[string]bool {
+	all := q.idx.Snapshot().Tickets
 	in := map[string]bool{addr: true}
 	for grew := true; grew; {
 		grew = false
@@ -422,8 +478,8 @@ func (s *Server) subtree(addr string) map[string]bool {
 }
 
 // liveIn returns the address of a live run inside set, or "".
-func (s *Server) liveIn(set map[string]bool) string {
-	for _, r := range s.Runs() {
+func (q *Queue) liveIn(set map[string]bool) string {
+	for _, r := range q.host.Runs() {
 		if set[r.Address] {
 			return r.Address
 		}
@@ -441,13 +497,14 @@ func dropAddresses(items []wire.QueueItem, drop map[string]bool) []wire.QueueIte
 	return out
 }
 
-func (s *Server) queueMove(req wire.QueueRequest) (wire.QueueResult, error) {
+// Move puts req.Address at req.Position (1-based).
+func (q *Queue) Move(req wire.QueueRequest) (wire.QueueResult, error) {
 	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
 	addr := target.address
-	return s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
+	return q.Write(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		from := -1
 		for i, it := range items {
 			if it.Address == addr {
@@ -471,7 +528,7 @@ func (s *Server) queueMove(req wire.QueueRequest) (wire.QueueResult, error) {
 }
 
 func (s *Server) queueItems(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, s.queued.list())
+	writeJSON(w, s.queue.List())
 }
 
 // queueWrite adapts a queue write to a POST handler. Refusals are results, so

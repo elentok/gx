@@ -36,7 +36,7 @@ func (s *Server) linkSession(req wire.LinkSessionRequest) (wire.SessionResult, e
 	if req.Ticket == "" {
 		return sessionRefusal(wire.ReasonSessionBadRequest, "a link needs a ticket address"), nil
 	}
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -77,7 +77,7 @@ func (s *Server) reportSessionStep(req wire.ReportStepRequest) (wire.SessionResu
 	if req.Step == "" {
 		return sessionRefusal(wire.ReasonSessionBadRequest, "a step report needs a step"), nil
 	}
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

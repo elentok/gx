@@ -79,7 +79,7 @@ func (s *Server) keysSession(req wire.SessionKeysRequest, source string) (wire.S
 func (s *Server) sendSessionKeys(req wire.SessionKeysRequest, source, seq string, n int, refusal *wire.SessionResult) (string, wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return dir, res, err
 	}
@@ -137,7 +137,7 @@ func acceptsKeys(state string) bool {
 // It is guarded, so it leaves a Design session's countdown alone.
 func (s *Server) answerSessionPermission(req wire.SessionKeysRequest, source string) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		s.sessionWatches.metaMu.Unlock()
 		return res, err

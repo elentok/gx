@@ -193,11 +193,11 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 	switch {
 	case already:
 		if first {
-			s.stampEpic(root, e.Path, "completed_at")
+			s.StampEpic(root, e.Path, "completed_at")
 		}
 	case s.nothingToMerge(project, epics, one, repo):
 		s.stampMergedEpic(root, e, 0, 0, nil)
-		s.stampEpic(root, e.Path, "merged_at", "completed_at")
+		s.StampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
 	case force || s.autoFFMerge(project) || hasManualMergeTicket(e):
 		trunkBefore, revErr := git.RevParse(repo, "refs/heads/"+target)
@@ -211,7 +211,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 			}
 		}
 		if pause.reason != "" {
-			s.stampEpic(root, e.Path, "completed_at")
+			s.StampEpic(root, e.Path, "completed_at")
 			s.storeMergeBlock(root, e.Path, pause)
 			return pauseDecision(first, pause.reason, pause.kind)
 		}
@@ -221,19 +221,19 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 			added, removed, countErr = git.DiffLines(repo, trunkBefore, "refs/heads/"+target)
 		}
 		s.stampMergedEpic(root, e, added, removed, countErr)
-		s.stampEpic(root, e.Path, "merged_at", "completed_at")
+		s.StampEpic(root, e.Path, "merged_at", "completed_at")
 		// On the settle group: it takes the worktree lock, which the merge must not wait on.
 		s.guards.GoSettle(func() { s.removeLeftoverWorktrees(repo, e) })
 		first = true
 	default:
-		s.stampEpic(root, e.Path, "completed_at")
+		s.StampEpic(root, e.Path, "completed_at")
 		merged = false
 	}
 	d := mergeDecision{result: wire.QueueResult{Merged: merged}, outcome: outcomeCompleted, first: first}
 	if merged {
 		d.outcome = outcomeMerged
 	}
-	removed, err := s.queued.removeRoot(root)
+	removed, err := s.queue.RemoveRoot(root)
 	if err != nil {
 		s.log.Warn("dequeue completed root", "root", root, "err", err)
 	} else if removed {
@@ -336,7 +336,7 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic) {
 			return
 		}
 	}
-	res, err := s.oneOff(RetroSubmit(root.Project, filepath.Base(e.Path), time.Now()))
+	res, err := s.oneOffs.Submit(RetroSubmit(root.Project, filepath.Base(e.Path), time.Now()))
 	switch {
 	case err != nil:
 		s.log.Warn("retro hook: submit", "root", root, "err", err)
@@ -345,9 +345,9 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic) {
 	}
 }
 
-// stampEpic stamps each of keys with now on the epic. A failed stamp is
+// StampEpic stamps each of keys with now on the epic. A failed stamp is
 // logged, never fatal: the merge it records has already happened.
-func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
+func (s *Server) StampEpic(root rootRef, epicPath string, keys ...string) {
 	now := time.Now().UTC()
 	fields := make(map[string]any, len(keys))
 	for _, k := range keys {

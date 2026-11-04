@@ -165,7 +165,7 @@ func (s *Server) reclaim(t runs.TrackedRun) error {
 	if name == "" {
 		name = runs.RunnerHerdr
 	}
-	runner := s.runnerForRun(t.Run)
+	runner := s.RunnerForRun(t.Run)
 	if runner == nil {
 		return fmt.Errorf("%w: started by %s; %s unavailable", errHandleMismatch, name, name)
 	}

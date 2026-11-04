@@ -72,7 +72,7 @@ func (m *missingTrunks) get(project string) (string, bool) {
 func (s *Server) checkTrunks() {
 	seen := map[string]bool{}
 	defer s.trunkMissing.keepOnly(seen)
-	for _, item := range s.queued.list() {
+	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || seen[addr.Project] {
 			continue

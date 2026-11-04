@@ -13,7 +13,7 @@ import (
 // the disk, so an out-of-scope epic costs no I/O at all.
 func (s *Server) stampHandMerged() {
 	queued := map[rootRef]bool{}
-	for _, item := range s.queued.list() {
+	for _, item := range s.queue.List() {
 		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil {
 			queued[rootOf(addr)] = true
 		}
@@ -85,9 +85,9 @@ func (s *Server) stampMerged(root rootRef, e tickets.Epic, repo, target string) 
 	}
 	added, deleted, err := ralphloop.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
 	s.stampMergedEpic(root, e, added, deleted, err)
-	s.stampEpic(root, e.Path, "merged_at")
+	s.StampEpic(root, e.Path, "merged_at")
 	s.log.Info("epic merged outside the server", "root", root, "target", target)
-	removed, err = s.queued.removeRoot(root)
+	removed, err = s.queue.RemoveRoot(root)
 	if err != nil {
 		s.log.Warn("dequeue merged root", "root", root, "err", err)
 		return false

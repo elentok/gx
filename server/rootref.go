@@ -27,14 +27,24 @@ func (r rootRef) String() string { return r.Project + ":" + r.Epic }
 
 func rootOf(addr tickets.Address) rootRef { return rootRef{Project: addr.Project, Epic: addr.Epic} }
 
-// removeRoot drops every queued ticket of root and reports whether any went.
-func (q *queueStore) removeRoot(root rootRef) (bool, error) {
+// RemoveRoot drops every queued ticket of root and reports whether any went.
+func (q *Queue) RemoveRoot(root rootRef) (bool, error) {
 	return q.removeRootIf(root, func() bool { return true })
 }
 
-// removeRootIf is removeRoot gated by drop, which runs under the queue lock so a
+// RootQueued reports whether any ticket of root is queued.
+func (q *Queue) RootQueued(root rootRef) bool {
+	for _, it := range q.List() {
+		if a, err := tickets.ParseQueuedAddress(it.Address); err == nil && rootOf(a) == root {
+			return true
+		}
+	}
+	return false
+}
+
+// removeRootIf is RemoveRoot gated by drop, which runs under the queue lock so a
 // submit's enqueue cannot slip between the check and the removal.
-func (q *queueStore) removeRootIf(root rootRef, drop func() bool) (bool, error) {
+func (q *Queue) removeRootIf(root rootRef, drop func() bool) (bool, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	kept := make([]wire.QueueItem, 0, len(q.items))

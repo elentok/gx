@@ -69,7 +69,7 @@ func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.sessionDir(req.ID)
+	dir, meta, res, err := s.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

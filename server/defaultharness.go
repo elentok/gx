@@ -134,7 +134,7 @@ func (s *Server) effectiveDefault(project string) ralphloop.AgentKind {
 	if project == "" {
 		return defaultOrClaude(s.settings.Load().AgentsDefaultHarness)
 	}
-	return s.defaultHarness(project)
+	return s.DefaultHarness(project)
 }
 
 // setAgentsKey sets agents.<key> in the JSON file at path, or removes it (and
@@ -196,7 +196,7 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 		return s.projectOverride(p) == ""
 	}
 	seen := map[rootRef]bool{}
-	for _, item := range s.queued.list() {
+	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || !inScope(addr.Project) || seen[rootOf(addr)] {
 			continue
@@ -209,7 +209,7 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 			running++
 		}
 	}
-	sessions, _ := s.listSessions()
+	sessions, _ := s.ListSessions()
 	for _, si := range sessions {
 		if inScope(si.Project) && si.Status.State != wire.SessionExited && si.Harness != string(now) {
 			running++

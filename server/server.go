@@ -141,10 +141,10 @@ type Server struct {
 	migrator       *projects.Migrator
 	checks         *projects.Checks
 
-	queued       *queueStore
-	pause        *pauseState
-	afk          *afkState
-	viMode       *viModeState
+	queue        *Queue
+	afk          *AFK
+	viMode       *ViMode
+	oneOffs      *OneOffs
 	ledger       *budgetLedger
 	tokens       *tokenledger.Ledger
 	tokenPoll    tokenPoller
@@ -167,7 +167,6 @@ type Server struct {
 	designSteps  sync.Map // map address -> design step at the last rescan
 	deadlocks    deadlocks
 	gatesRaised  map[gateHold]bool // touched only by the gate watchdog
-	sweepMu      sync.Mutex        // one archive sweep at a time; the move's own writes wake the watcher
 
 	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry       *runs.Registry
@@ -263,22 +262,21 @@ func New(cfg Config) (*Server, error) {
 		}
 	}
 	events := broker.New(cfg.SubscriberBuffer)
-	queued, err := openQueue(cfg.StateDir)
+	queue, err := openQueue(cfg.StateDir)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load queue: %w", err)
 	}
-	pause, err := openPause(cfg.StateDir)
-	if err != nil {
+	if queue.pause, err = openPause(cfg.StateDir); err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load queue pause: %w", err)
 	}
-	afk, err := openAFK(cfg.StateDir)
+	afk, err := openAFK(cfg.StateDir, events)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load afk mode: %w", err)
 	}
-	viMode, err := openViMode(cfg.StateDir)
+	viMode, err := openViMode(cfg.StateDir, events)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load vi mode: %w", err)
@@ -351,8 +349,7 @@ func New(cfg Config) (*Server, error) {
 
 		instanceID: newInstanceID(),
 
-		queued:       queued,
-		pause:        pause,
+		queue:        queue,
 		afk:          afk,
 		viMode:       viMode,
 		ledger:       ledger,
@@ -373,6 +370,8 @@ func New(cfg Config) (*Server, error) {
 		focus:          newFocusReports(),
 	}
 	s.initProjects()
+	s.queue.Attach(QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: s})
+	s.oneOffs = NewOneOffs(OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: s, TicketStore: cfg.TicketStore})
 	s.giveLog(cfg.Runner)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.SessionFinished
@@ -411,7 +410,7 @@ func New(cfg Config) (*Server, error) {
 	// The rescan steps run in this order after every store scan.
 	s.idx.OnRescan(s.scanParentDefects)
 	s.idx.OnRescan(s.scanLateFinishes)
-	s.idx.OnRescan(s.sweepOneOffs)
+	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.scanDesignCleanups)
 	s.idx.SetReady(s.migrationsEnded)
 	s.routes = subsystemRoutes(s)
@@ -458,17 +457,17 @@ var routeTable = []struct {
 	{"GET /v1/epics/detail", (*Server).epicDetail},
 	{"GET /v1/stats", (*Server).stats},
 	{"GET /v1/iterations", (*Server).iterations},
-	{"GET /v1/queue", (*Server).queue},
+	{"GET /v1/queue", (*Server).queueView},
 	{"GET /v1/queue/items", (*Server).queueItems},
-	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueAdd)(w, r) }},
+	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Add)(w, r) }},
 	{"POST /v1/oneoff", (*Server).oneOffHandler},
 	{"POST /v1/cpu-spike", (*Server).cpuSpikeWrite},
-	{"POST /v1/queue/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueRemove)(w, r) }},
-	{"POST /v1/queue/move", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueMove)(w, r) }},
-	{"POST /v1/queue/replace", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueReplace)(w, r) }},
-	{"POST /v1/queue/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queuePause)(w, r) }},
-	{"POST /v1/queue/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueResume)(w, r) }},
-	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueFlush)(w, r) }},
+	{"POST /v1/queue/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Remove)(w, r) }},
+	{"POST /v1/queue/move", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Move)(w, r) }},
+	{"POST /v1/queue/replace", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Replace)(w, r) }},
+	{"POST /v1/queue/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queue.Pause)(w, r) }},
+	{"POST /v1/queue/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queue.Resume)(w, r) }},
+	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queue.Flush)(w, r) }},
 	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.mergeInQueue)(w, r) }},
 	{"POST /v1/tickets/start-over", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.startOverInQueue)(w, r) }},
 	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
@@ -586,15 +585,15 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
 	snap.RecentlyFinished = recentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
-	snap.Mode = s.pause.currentMode()
-	snap.AFK = s.afk.isOn()
-	snap.ViMode = s.viMode.isOn()
+	snap.Mode = s.queue.Mode()
+	snap.AFK = s.afk.IsOn()
+	snap.ViMode = s.viMode.IsOn()
 	snap.SkillsInstallProblem = skills.ReadProblem(skills.StatusPath(s.cfg.StateDir))
 	// Checked on every snapshot: a PATH entry can vanish while the server
 	// runs, like an fnm per-shell dir once its shell exits.
 	_, nodeErr := brief.LookPath(s.cfg.Env, "node")
 	snap.NodeMissing = nodeErr != nil
-	sessions, err := s.listSessionsWithQueue()
+	sessions, err := s.queue.ListSessionsWithQueue()
 	if err != nil {
 		s.log.Warn("list sessions for snapshot", "err", err)
 	}

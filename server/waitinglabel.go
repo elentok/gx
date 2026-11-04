@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 )
 
-// checkWaitingLabel is the status label of a claimed ticket whose `gx check
+// CheckWaitingLabel is the status label of a claimed ticket whose `gx check
 // --full` waits for the check lock, or "". It is a label only: no pause kind,
 // no status change.
 //
@@ -14,7 +14,7 @@ import (
 // the two meet on that path. check.ReadWaiting drops a waiter whose process is
 // gone, so a killed waiter never leaves a label, and a run with no tracked
 // ticket matches nothing.
-func (s *Server) checkWaitingLabel(address string) string {
+func (s *Server) CheckWaitingLabel(address string) string {
 	t, ok := s.registry.Tracked(address)
 	if !ok || t.Cwd == "" {
 		return ""
