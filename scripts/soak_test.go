@@ -171,6 +171,19 @@ func TestSoak_FailFastStopsAtFirstFailedRound(t *testing.T) {
 	}
 }
 
+func TestSoak_ListsPlaywrightFailuresIndentedFourSpaces(t *testing.T) {
+	repo := soakRepo(t, `
+printf 'FAIL playwright: exit 1 in 1s\n    74. Flow seventy-four\n/tmp/log\n'
+exit 1
+`)
+
+	out, _ := runSoak(t, repo, "1")
+
+	if !strings.Contains(out, "1× 74. Flow seventy-four") {
+		t.Errorf("playwright failure not listed:\n%s", out)
+	}
+}
+
 func TestSoak_WithoutFailFastRunsEveryRound(t *testing.T) {
 	repo := soakRepo(t, failInRound2)
 

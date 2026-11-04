@@ -39,9 +39,9 @@ failing_names() {
 	log=$(sed -n 's/^test log: //p' "$1" | head -n 1)
 	[[ -n $log && -f $log ]] || return 0
 	awk '
-		/^FAIL .*: [0-9]+ failed in / { inblock = 1; next }
+		/^FAIL .*: ([0-9]+ failed|exit [0-9]+) in / { inblock = 1; next }
 		/^$/ || /^==/ { inblock = 0 }
-		inblock && /^  [^ ]/ { sub(/^  /, ""); print }
+		inblock && /^  ( {2})?[^ ]/ { sub(/^ +/, ""); print }
 	' "$log" | sort -u
 }
 
