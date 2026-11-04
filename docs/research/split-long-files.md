@@ -212,27 +212,7 @@ end. 13 lines from the limit. Other scenario families already have their own sou
 (`readyscenarios.go`, `stallscenarios.go`, `commandsscenarios.go`, `limitburn.go`, `migrate.go`),
 so the same convention fits: `designscenarios.go` for the design and charting entries (727-838),
 `websetup` entries stay. Cutting the map literal itself cannot be done by moving: a Go map literal
-cannot span files. The established way here is that the family file adds its entries in `init()`
-or a function the table calls (see `readyscenarios.go` for which one the repo uses). Moves with a
-package split: no. Do this with the gxfixture cut, because the next scenario added crosses 1000.
-
-## 3. `server/servertest/servertest.go` (1026 lines)
-
-Imports `server`, `apiclient`, `config`, `git`, `harness` and 8 more. One shared harness used by
-247 test files, so its public names must not move or be renamed. It already has sibling files
-(`sessions.go`, `webclient.go`, `ptyrunner.go`, `procs.go`, ...). It has ten jobs:
-
-| Cut | Lines | Size |
-|---|---|--:|
-| `tickets.go` (`WriteConfig`, `WriteTicket*`, `WriteEpic`, `TicketOpts`) | 106-256 | 151 |
-| `turn.go` (`Turn`, `Stall`, `Block`, `Exit`, `Hold`, `Transcript`, `OnTurn`, `AgentStart`, `Starts`) | 257-376, 415-545 | ~250 |
-| `notify.go` (`Banners`, `Sounds`) | 545-588 | 44 |
-| `wait.go` (`WaitFor`, `Poll`, `WaitForEvent`) | 589-627 | 39 |
-| `projects.go` (`SetProject*`, `WriteProjectRepo`) | 628-666 | 39 |
-| `runner.go` (`runnerChoice`, `WithRunner*`, `WithHerdr`, `resolveRunner`) | 704-772 | ~70 |
-| `servertest.go` keeps: `Harness`, `Start*`, `startWith` (170 lines), `Restart`, `serve` | | ~440 |
-
-Moves with a package split? Yes in one respect. `servertest` wraps `server.Config`, `server.Event`
+cannot span files. The repo's way is a constructor in the family file that the map calls (`"design-two-live": designTwoLive()` at line 487, `limitBurnLive()` in `limitburn.go`, `agentsFailuresScenario()` in `sessions.go`). So move the inline entries into such constructors in a new file and leave one call per key. Moves with a package split? Yes in one respect. `servertest` wraps `server.Config`, `server.Event`
 and friends. When `server` splits, `Harness`, `Start*` and `startWith` change with it (which
 sub-package's `Config` they build is the open design question for the server research). The file
 cut itself does not conflict: `tickets.go`, `wait.go`, `projects.go`, `notify.go` do not touch the
