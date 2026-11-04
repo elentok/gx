@@ -31,16 +31,12 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -107,191 +103,23 @@ func run(args []string) (err error) {
 		return err
 	}
 
-	srv := exec.Command(gxBin, "server")
-	srv.Env = f.env
-	logPath := filepath.Join(root, "server.out")
-	logFile, err := os.Create(logPath)
+	rs, err := f.startServer(ctx, sc)
+	if rs != nil {
+		defer rs.logFile.Close()
+	}
 	if err != nil {
 		return err
 	}
-	defer logFile.Close()
-	srv.Stdout, srv.Stderr = logFile, logFile
-	if err := srv.Start(); err != nil {
-		return err
-	}
-	if sc.migrate {
-		if err := f.writeServerControl(srv.Process.Pid, logPath); err != nil {
-			_ = srv.Process.Kill()
-			return err
-		}
-	}
-	exited := make(chan error, 1)
-	go func() {
-		defer close(exited)
-		err := srv.Wait()
-		select {
-		case exited <- err:
-		case <-ctx.Done():
-		}
-	}()
-	defer func() { err = errors.Join(err, f.shutdown(srv, exited)) }()
+	defer f.runShutdown(&err, rs)
 
-	webURL, setupCode, err := f.waitReady(ctx, exited)
-	if err != nil {
-		return fmt.Errorf("%w\n%s", err, f.serverOutput())
-	}
-	var in signIn
-	password := ""
-	if sc.web != webSetupPending {
-		if in, err = webSetup(f.stateD, webURL, setupCode); err != nil {
-			return fmt.Errorf("web setup: %w\n%s", err, f.serverOutput())
-		}
-		password = fixturePassword
-	}
-	if sc.web == webSignedOut {
-		in.cookieName, in.cookie = "", ""
-	}
-	// The earlier run goes first so no held worker holds its slot.
-	for _, addr := range sc.ranOnClaude {
-		if err := f.seedRanOnClaude(addr); err != nil {
-			return err
-		}
-	}
-	// --hold freezes every worker as running until the caller removes the hold file.
-	if o.hold || sc.hold {
-		if err := os.WriteFile(f.hold, nil, 0o644); err != nil {
-			return err
-		}
-	}
-	queueAll := func() error {
-		for _, addr := range sc.queue {
-			args := []string{"server", "queue", "add", addr}
-			if agent := sc.queueAgents[addr]; agent != "" {
-				args = append(args, "--agent", agent)
-			}
-			// A held migration holds the queue verb too; it finishes once the hold is released.
-			if sc.migrateHold {
-				cmd := exec.CommandContext(ctx, f.gx, args...)
-				cmd.Env = f.env
-				if err := cmd.Start(); err != nil {
-					return fmt.Errorf("queue %s: %w", addr, err)
-				}
-				go func() { _ = cmd.Wait() }()
-				continue
-			}
-			if out, err := f.cli(args...); err != nil {
-				return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
-			}
-		}
-		return nil
-	}
-	if !sc.queueAfterSessions {
-		if err := queueAll(); err != nil {
-			return err
-		}
-	}
-	if len(sc.queueAfterUsage) > 0 {
-		sampleFile := "usage-sample.json"
-		if sc.codexUsage {
-			sampleFile = "usage-sample-codex.json"
-		}
-		sample := filepath.Join(f.root, "state", "gx", sampleFile)
-		deadline := time.Now().Add(30 * time.Second)
-		for _, err := os.Stat(sample); err != nil; _, err = os.Stat(sample) {
-			if time.Now().After(deadline) {
-				return fmt.Errorf("no usage sample at %s", sample)
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-		for _, addr := range sc.queueAfterUsage {
-			args := []string{"server", "queue", "add", addr}
-			if agent := sc.queueAgents[addr]; agent != "" {
-				args = append(args, "--agent", agent)
-			}
-			if out, err := f.cli(args...); err != nil {
-				return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
-			}
-		}
-	}
-	if sc.agentProcs {
-		if err := f.tieAgentProcesses(ctx); err != nil {
-			return err
-		}
-	}
-	agentTranscript := ""
-	if sc.spend {
-		if agentTranscript, err = f.agentTranscript(ctx); err != nil {
-			return err
-		}
-	}
-	checkWaitingFile := ""
-	if sc.checkWaiting {
-		if checkWaitingFile, err = f.writeCheckWaiting(ctx); err != nil {
-			return err
-		}
-	}
-	if err := f.seedSessions(sc); err != nil {
+	if err := f.loginWeb(ctx, sc, rs); err != nil {
 		return err
 	}
-	if sc.queueAfterSessions {
-		if err := queueAll(); err != nil {
-			return err
-		}
+	s, err := f.seedAfterStart(ctx, o, sc)
+	if err != nil {
+		return err
 	}
-	// Plain sessions are made before openDesigns, which then starts the newer
-	// run, but linked after it: a map with a live design session makes `designs
-	// open` return that one instead of starting another.
-	plain := make(map[string]string)
-	for _, addr := range sc.linkedDesigns {
-		id, err := f.createSession(project, filepath.Join(f.root, "repo"), "hello", "")
-		if err != nil {
-			return err
-		}
-		plain[addr] = id
-	}
-	for _, addr := range sc.openDesigns {
-		out, err := f.cli("designs", "open", addr, "--json")
-		if err != nil {
-			return fmt.Errorf("open design %s: %w\n%s", addr, err, out)
-		}
-		var res server.SessionResult
-		if err := json.Unmarshal(out, &res); err != nil || res.Session == nil {
-			return fmt.Errorf("open design %s: no session in %s", addr, out)
-		}
-		// The step moves while the opening turn still runs, so that turn's end finds the map past its
-		// step and the handoff fires. After the wait the run end would already be behind it.
-		if step, ok := sc.advanceSteps[addr]; ok {
-			if out, err := f.cli("tickets", "set", addr, "--design-step", step); err != nil {
-				return fmt.Errorf("advance %s to %s: %w\n%s", addr, step, err, out)
-			}
-		}
-		// The opening prompt is still running when `designs open` returns. A control the test sends
-		// meanwhile (Block) is overwritten when that turn ends.
-		if err := f.waitFor(res.Session.ID, "past its opening turn", func(si server.SessionInfo, _ server.SessionChatResponse) bool {
-			return si.Status.State != server.SessionStarting && si.Status.State != server.SessionWorking
-		}); err != nil {
-			return fmt.Errorf("open design %s: %w", addr, err)
-		}
-		if slices.Contains(sc.autoAdvanceOff, addr) {
-			// Not the CLI verb: its on|off arg validation rejects the session id.
-			if res, err := apiclient.New(server.SocketPath(f.stateD)).SetAutoAdvance(ctx, res.Session.ID, false); err != nil || res.Refused {
-				return fmt.Errorf("auto-advance off for %s: %v %+v", addr, err, res)
-			}
-		}
-	}
-	for addr, id := range plain {
-		if err := f.linkSession(id, addr); err != nil {
-			return err
-		}
-	}
-	var transcripts map[string]string
-	if sc.tokenPoll {
-		if transcripts, err = f.liveTranscripts(ctx); err != nil {
-			return err
-		}
-	}
-	res := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript, CheckWaitingFile: checkWaitingFile}
-	f.addScenarioOutput(&res, sc, transcripts)
+	res := f.buildOutput(sc, rs, s)
 	if o.mockDir != "" {
 		stopMock, mockURL, err := serveMock(o.mockDir)
 		if err != nil {
@@ -300,39 +128,10 @@ func run(args []string) (err error) {
 		defer stopMock()
 		res.MockURL = mockURL
 	}
-	if o.shellEnv {
-		fmt.Print(res.ShellEnv())
-	} else {
-		out, err := json.Marshal(res)
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(out))
+	if err := printOutput(o, res); err != nil {
+		return err
 	}
-
-	lifeCtx, cancelLife := context.WithCancel(ctx)
-	defer cancelLife()
-	ended := make(chan string, 1)
-	go func() { ended <- watchLifetime(lifeCtx, os.Getppid(), os.Getppid, lifetimeTTL, parentPoll) }()
-
-	select {
-	case <-ctx.Done():
-		return nil
-	case <-ended:
-		return nil
-	case err := <-exited:
-		// A migrate scenario's flow kills and starts the server itself (migrate.go);
-		// a cache-gate flow stops it to run gx brief go-clean-cache without one.
-		if sc.restart == nil && !sc.migrate && !sc.fakeGo {
-			return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
-		}
-		f.restarted = true
-		select {
-		case <-ctx.Done():
-		case <-ended:
-		}
-		return nil
-	}
+	return f.waitForEnd(ctx, sc, rs.exited)
 }
 
 // serveMock serves dir on a loopback port (`file://` is blocked in the
