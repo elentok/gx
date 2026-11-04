@@ -2,9 +2,7 @@ package ralphloop
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -30,20 +28,16 @@ func retryTurnSelfReport(t *testing.T, d Deps, path string, mutate func(*schema.
 	})
 }
 
-// TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported pins
+// TestFinishIteration_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported pins
 // ticket 04's first case: when the corrective retry's own turn ends
 // ahead == 0 and self-reports paused (answer), the ticket must pause with the
 // self-reported kind and the agent's actual question, not
 // PauseKindZeroCommit/"no commits merged" — even though the pre-retry turn
 // matched the unexecuted-tool-call detector and carried no report of its own.
-func TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testing.T) {
+func TestFinishIteration_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	scratchDir, path := finishFixture(t)
 	d, prompts, _ := fakeDeps()
-
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
@@ -56,13 +50,12 @@ func TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testin
 	})
 
 	sink := &recordingSink{}
-	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	driveIteration(t, d, scratchDir, path, sink)
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
 		t.Fatalf("prompts = %v, want %d (initial launch + one corrective retry)", *prompts, wantPrompts)
 	}
-
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
@@ -78,32 +71,21 @@ func TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testin
 	}
 }
 
-// TestRun_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge
+// TestFinishIteration_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge
 // pins ticket 04's second case, ADR 0019's failure mode replayed on the
 // retry's own turn: when the corrective retry merges commits (ahead > 0)
 // alongside a paused (answer) self-report, the ticket must pause on the
 // self-report rather than silently cherry-picking the partial work while
 // dropping the unanswered question.
-func TestRun_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge(t *testing.T) {
+func TestFinishIteration_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	scratchDir, path := finishFixture(t)
 	d, prompts, _ := fakeDeps()
-
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
 	fakeRunner(d).PromptState = agentrunner.StateIdle
-	var calls int32
-	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
-		n := atomic.AddInt32(&calls, 1)
-		if n <= 2 {
-			return 0, nil
-		}
-		return 1, nil
-	}
+	retryThenMergeCommits(&d)
 	cherryPickCalled := false
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
 		cherryPickCalled = true
@@ -113,17 +95,15 @@ func TestRun_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge(t *te
 		tk.IterationStatus = schema.IterationStatusAsking
 	})
 
-	sink := &recordingSink{}
-	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	out := driveIteration(t, d, scratchDir, path, &recordingSink{})
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
 		t.Fatalf("prompts = %v, want %d (initial launch + one corrective retry)", *prompts, wantPrompts)
 	}
-	if cherryPickCalled {
-		t.Errorf("CherryPickRange called, want the retry's merged commits left unmerged behind the self-report")
+	if cherryPickCalled || out.Merged {
+		t.Errorf("CherryPickRange called = %v, outcome = %+v, want the retry's merged commits left unmerged behind the self-report", cherryPickCalled, out)
 	}
-
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
@@ -134,18 +114,14 @@ func TestRun_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge(t *te
 	}
 }
 
-// TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone pins ticket 04's
+// TestFinishIteration_RetryTurnSelfReportsCommitlessFinished_MarkedDone pins ticket 04's
 // third case: when the corrective retry's own turn self-reports
 // commitless-and-finished, the ticket is marked done via the existing
 // commitless path rather than paused as a stall.
-func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
+func TestFinishIteration_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	scratchDir, path := finishFixture(t)
 	d, prompts, _ := fakeDeps()
-
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
@@ -158,13 +134,14 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 		tk.Commitless = true
 	})
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
+	out := driveIteration(t, d, scratchDir, path, noopEventSink{})
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
 		t.Fatalf("prompts = %v, want %d (initial launch + one corrective retry)", *prompts, wantPrompts)
+	}
+	if !out.Merged {
+		t.Errorf("outcome = %+v, want done for the retry's declared-commitless finish", out)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, "epic")
