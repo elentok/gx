@@ -11,10 +11,10 @@ import (
 // interruptSession ends a Working session's current turn and keeps the session,
 // with the Ctrl+C the TUI uses. The holder protocol has no interrupt verb: its
 // keys reach claude as typed.
-func (s *Server) interruptSession(req wire.SessionRequest) (wire.SessionResult, error) {
-	s.sessionWatches.metaMu.Lock()
-	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.SessionDir(req.ID)
+func (mg *Manager) interruptSession(req wire.SessionRequest) (wire.SessionResult, error) {
+	mg.watches.metaMu.Lock()
+	defer mg.watches.metaMu.Unlock()
+	dir, meta, res, err := mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

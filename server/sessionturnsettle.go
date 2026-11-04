@@ -70,7 +70,7 @@ wait:
 		select {
 		case <-cancel:
 			return
-		case <-s.sessionWatches.stop:
+		case <-s.sessions.watches.stop:
 			return
 		case <-deadline.C:
 			break wait

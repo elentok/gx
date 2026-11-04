@@ -11,21 +11,21 @@ import (
 // before the Design flag existed are Design when their ticket is on a map
 // epic. A record whose transcript or rollout is missing stays uncounted; a
 // later end recounts and replaces.
-func (s *Server) sweepDesignCounts() {
-	recs, err := conversations.List(s.cfg.ConversationsDir)
+func (mg *Manager) sweepDesignCounts() {
+	recs, err := conversations.List(mg.srv.cfg.ConversationsDir)
 	if err != nil {
-		s.log.Warn("sweep conversation counts", "err", err)
+		mg.srv.log.Warn("sweep conversation counts", "err", err)
 		return
 	}
 	for _, r := range recs {
 		if r.Grilling != nil {
 			continue
 		}
-		if !r.Design && !(r.Ticket != "" && s.onMapEpic(r.Ticket)) {
+		if !r.Design && !(r.Ticket != "" && mg.srv.onMapEpic(r.Ticket)) {
 			continue
 		}
-		if err := s.recountGrilling(agentrunner.Kind(r.Harness), r.ID, r.Dir); err != nil {
-			s.log.Warn("sweep conversation counts", "conversation", r.ID, "err", err)
+		if err := mg.recountGrilling(agentrunner.Kind(r.Harness), r.ID, r.Dir); err != nil {
+			mg.srv.log.Warn("sweep conversation counts", "conversation", r.ID, "err", err)
 		}
 	}
 }

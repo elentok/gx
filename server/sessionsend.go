@@ -41,7 +41,7 @@ func (s *Server) sendPrompt(dir, text string) {
 // through, so the person doesn't see a stale stop on a session that runs.
 func (s *Server) clearSendFailed(dir string) {
 	id := filepath.Base(dir)
-	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+	s.sessions.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
 		if !m.Actionable.GxRaised || !strings.HasPrefix(m.Actionable.Reason, sendFailedPrefix) {
 			return false
 		}

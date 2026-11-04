@@ -17,7 +17,8 @@ func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 	root := t.TempDir()
 	m := sessionMeta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
 	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{ConversationsDir: root, Env: []string{"HOME=" + home, "CODEX_HOME=" + codexHome}}})
-	s.recordConversation(m)
+	s.sessions = newManager(s)
+	s.sessions.recordConversation(m)
 
 	dir := filepath.Join(codexHome, "sessions", "2026", "01", "02")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -31,7 +32,7 @@ func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.saveConversationTotals(m, m.ConversationID)
+	s.sessions.saveConversationTotals(m, m.ConversationID)
 	rec, err := conversations.Read(root, m.ConversationID)
 	if err != nil {
 		t.Fatal(err)

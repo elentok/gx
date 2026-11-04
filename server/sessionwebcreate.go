@@ -38,7 +38,7 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 		res = sessionRefusal(wire.ReasonSessionBadRequest, err.Error())
 	} else {
 		var err error
-		if res, err = s.createWebSession(req); err != nil {
+		if res, err = s.sessions.createWebSession(req); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -48,8 +48,8 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 
 // checkProjectDir returns a refusal when project is not configured or a
 // non-empty dir is neither its root nor one of its worktrees; nil means ok.
-func (s *Server) checkProjectDir(project, dir string) (*wire.SessionResult, error) {
-	list, err := s.projects.ListWorktrees()
+func (mg *Manager) checkProjectDir(project, dir string) (*wire.SessionResult, error) {
+	list, err := mg.srv.projects.ListWorktrees()
 	if err != nil {
 		return nil, err
 	}
@@ -69,19 +69,19 @@ func (s *Server) checkProjectDir(project, dir string) (*wire.SessionResult, erro
 	return nil, nil
 }
 
-func (s *Server) createWebSession(req WebCreateSessionRequest) (wire.SessionResult, error) {
+func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionResult, error) {
 	prompt, refusal := validatePromptText(req.Prompt, "the first prompt")
 	if refusal != nil {
 		return *refusal, nil
 	}
-	refusal, err := s.checkProjectDir(req.Project, req.Dir)
+	refusal, err := mg.checkProjectDir(req.Project, req.Dir)
 	if err != nil {
 		return wire.SessionResult{}, err
 	}
 	if refusal != nil {
 		return *refusal, nil
 	}
-	return s.createSession(wire.CreateSessionRequest{
+	return mg.createSession(wire.CreateSessionRequest{
 		Project:  req.Project,
 		Dir:      req.Dir,
 		Worktree: req.Worktree,

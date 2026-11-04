@@ -206,7 +206,7 @@ func (s *Server) stopFinishedDesign(project, epic string) {
 	if err != nil || live == nil {
 		return
 	}
-	if res, err := s.stopSession(wire.SessionRequest{ID: live.ID}); err != nil || res.Refused {
+	if res, err := s.sessions.stopSession(wire.SessionRequest{ID: live.ID}); err != nil || res.Refused {
 		s.log.Warn("could not stop the finished design session", "map", project+":"+epic, "session", live.ID, "err", err, "refused", res.Message)
 		return
 	}
@@ -338,7 +338,7 @@ func (s *Server) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionR
 		if web && req.State != SessionStateToken(*live) {
 			return sessionRefusal(wire.ReasonStale, "the session changed; review its current state"), nil
 		}
-		if res, err := s.stopSession(wire.SessionRequest{ID: live.ID}); err != nil || (res.Refused && res.Reason != wire.ReasonSessionNotLive) {
+		if res, err := s.sessions.stopSession(wire.SessionRequest{ID: live.ID}); err != nil || (res.Refused && res.Reason != wire.ReasonSessionNotLive) {
 			return res, err
 		}
 	}
@@ -355,7 +355,7 @@ func (s *Server) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionR
 		target += "/" + ticket
 	}
 	prompt := harness.SkillCommand(s.projects.LaunchHarness(project), "gx-design", target)
-	return s.createSession(wire.CreateSessionRequest{
+	return s.sessions.createSession(wire.CreateSessionRequest{
 		Project:      project,
 		Dir:          d.Path,
 		MadeWorktree: !d.Past,
@@ -484,7 +484,7 @@ func createMap(conversationsDir, dir, slug, idea string) error {
 // created with the reason in StartError.
 func (s *Server) startSession(project, slug, worktree, rebaseNote string) wire.SessionResult {
 	addr := project + ":" + slug
-	res, err := s.createSession(wire.CreateSessionRequest{
+	res, err := s.sessions.createSession(wire.CreateSessionRequest{
 		Project:      project,
 		Dir:          worktree,
 		MadeWorktree: true,
@@ -593,7 +593,7 @@ func (s *Server) liveDesignSession(epicAddr string) (*wire.SessionInfo, error) {
 // liveDesignSessionExcept is liveDesignSession leaving out the session
 // excludeID, so a caller never counts itself. Empty excludes none.
 func (s *Server) liveDesignSessionExcept(epicAddr, excludeID string) (*wire.SessionInfo, error) {
-	list, err := s.ListSessions()
+	list, err := s.sessions.ListSessions()
 	if err != nil {
 		return nil, err
 	}

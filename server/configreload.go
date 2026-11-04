@@ -34,7 +34,7 @@ func (s *Server) reloadAppliers() settings.Appliers {
 			s.settings.ApplyWatchConfig,
 			func(old, next Settings) func() {
 				if next.LogRetention != old.LogRetention {
-					s.pruneAgentLogs(time.Now())
+					s.sessions.pruneAgentLogs(time.Now())
 				}
 				return nil
 			},

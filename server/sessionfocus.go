@@ -133,7 +133,7 @@ func (s *Server) reportFocus(req wire.FocusReport) (wire.SessionResult, error) {
 		return sessionRefusal(wire.ReasonSessionBadRequest, "a focus report needs a client"), nil
 	}
 	if req.Session != "" {
-		if _, _, res, err := s.SessionDir(req.Session); res.Refused || err != nil {
+		if _, _, res, err := s.sessions.SessionDir(req.Session); res.Refused || err != nil {
 			return res, err
 		}
 	}
@@ -150,7 +150,7 @@ func (s *Server) reportFocus(req wire.FocusReport) (wire.SessionResult, error) {
 // TUI connected it does nothing: the banner click has already brought the
 // terminal forward.
 func (s *Server) focusSession(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := s.SessionDir(req.ID)
+	_, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -164,12 +164,12 @@ func (s *Server) focusSession(req wire.SessionRequest) (wire.SessionResult, erro
 
 // markSessionRead clears the session's Unread.
 func (s *Server) markSessionRead(req wire.SessionRequest) (wire.SessionResult, error) {
-	dir, _, res, err := s.SessionDir(req.ID)
+	dir, _, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	var info wire.SessionInfo
-	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := s.sessions.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		changed := m.Unread != wire.SessionUnread{}
 		m.Unread = wire.SessionUnread{}
 		info = m.info()

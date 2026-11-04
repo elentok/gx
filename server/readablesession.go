@@ -13,7 +13,7 @@ import (
 // live Queue agent. Only the chat and screen reads use it; the write routes
 // call sessionDir and so refuse a Queue agent id as an unknown session.
 func (s *Server) readableSession(id string) (string, sessionMeta, wire.SessionResult, error) {
-	dir, meta, res, err := s.SessionDir(id)
+	dir, meta, res, err := s.sessions.SessionDir(id)
 	if !res.Refused || res.Reason != wire.ReasonSessionUnknown || !strings.HasPrefix(id, queue.AgentIDPrefix) {
 		return dir, meta, res, err
 	}

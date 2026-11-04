@@ -152,18 +152,20 @@ type Server struct {
 	deadlocks    deadlocks
 	gatesRaised  map[gateHold]bool // touched only by the gate watchdog
 
-	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
-	registry       *runs.Registry
-	savedRuns      []runs.TrackedRun // handles the previous server left; consumed by reclaimRuns
-	guards         *runs.Guards
-	mergeTargets   mergeTargetCache
-	projectRepos   projectRepoCache
-	mergeInto      func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
-	mergedProbe    func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
-	verdicts       verdictLog
-	nudges         nudgeLimiter
-	trunkMissing   missingTrunks
-	sessionWatches *sessionWatches
+	chat         *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
+	registry     *runs.Registry
+	savedRuns    []runs.TrackedRun // handles the previous server left; consumed by reclaimRuns
+	guards       *runs.Guards
+	mergeTargets mergeTargetCache
+	projectRepos projectRepoCache
+	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
+	mergedProbe  func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
+	verdicts     verdictLog
+	nudges       nudgeLimiter
+	trunkMissing missingTrunks
+	// sessions creates, stops and watches the sessions; resumer brings them back.
+	sessions       *Manager
+	resumer        *Resumer
 	designOpens    sync.Map // epic address -> *sync.Mutex, serializing designs open
 	focus          *focusReports
 	sessionBanners sessionBanners
@@ -332,9 +334,10 @@ func New(cfg Config) (*Server, error) {
 		events:      events,
 		guards:      runs.NewGuards(),
 
-		sessionWatches: newSessionWatches(),
-		focus:          newFocusReports(),
+		focus: newFocusReports(),
 	}
+	s.sessions = newManager(s)
+	s.resumer = &Resumer{srv: s}
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
@@ -368,7 +371,7 @@ func New(cfg Config) (*Server, error) {
 	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: host, TicketStore: cfg.TicketStore})
 	s.harness.GiveLog(cfg.Runner)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
-		h.Finished = s.SessionFinished
+		h.Finished = s.sessions.SessionFinished
 	}
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
@@ -504,8 +507,8 @@ var routeTable = []struct {
 	// Interactive sessions; /v1/agents/* is the loop agents'.
 	{"GET /v1/sessions", (*Server).sessionsRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
-	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},
-	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},
+	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.sessions.stopSession)(w, r) }},
+	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.sessions.removeSession)(w, r) }},
 	{"POST /v1/sessions/mark-read", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.markSessionRead)(w, r) }},
 	{"POST /v1/sessions/focus", (*Server).sessionFocusWrite},
 	{"POST /v1/sessions/show", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.focusSession)(w, r) }},
@@ -513,10 +516,12 @@ var routeTable = []struct {
 	{"POST /v1/sessions/link", (*Server).sessionLinkWrite},
 	{"POST /v1/sessions/step", (*Server).sessionStepWrite},
 	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.runSessionAction)(w, r) }},
-	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.resumeSession)(w, r) }},
+	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.resumer.resumeSession)(w, r) }},
 	{"POST /v1/sessions/prompt", (*Server).sessionPromptWrite},
 	{"POST /v1/sessions/keys", (*Server).sessionKeysWrite},
-	{"POST /v1/sessions/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.interruptSession)(w, r) }},
+	{"POST /v1/sessions/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) {
+		sessionWrite(s.sessions.interruptSession)(w, r)
+	}},
 	{"POST /v1/sessions/auto-advance", (*Server).sessionAutoAdvanceWrite},
 	{"POST /v1/sessions/auto-advance/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.cancelAutoAdvanceRoute)(w, r) }},
 	{"POST /v1/designs/open", (*Server).designOpenWrite},
@@ -704,7 +709,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.settings.StartConfigWatch(freshCtx)
 	// Before the socket serves, so a session created at startup is never
 	// taken for one whose holder died while the server was down.
-	s.restoreSessions()
+	s.resumer.restoreSessions()
 	errc := make(chan error, 3)
 	lns := []net.Listener{s.ln}
 	go func() { errc <- s.http.Serve(s.ln) }()
@@ -747,7 +752,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	claimDone := make(chan struct{})
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
 	pruneDone := make(chan struct{})
-	go func() { defer close(pruneDone); s.keepPruned(freshCtx) }()
+	go func() { defer close(pruneDone); s.sessions.keepPruned(freshCtx) }()
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.budget.KeepPolled(freshCtx) }()
 	tokensDone := make(chan struct{})
@@ -765,7 +770,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	usageDone := make(chan struct{})
 	go func() { defer close(usageDone); s.limits.Run(freshCtx) }()
 	sweepDone := make(chan struct{})
-	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
+	go func() { defer close(sweepDone); s.sessions.sweepDesignCounts() }()
 	s.health.FileStartIncident(time.Now())
 	var err error
 	select {
@@ -790,7 +795,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	recordShutdown("budget-events-stop")
 	s.budget.StopEvents()
 	recordShutdown("session-watches-close")
-	s.sessionWatches.close()
+	s.sessions.watches.close()
 	for _, w := range []struct {
 		name string
 		done chan struct{}

@@ -100,7 +100,7 @@ func (s *Server) removeUnlessKept(root queue.RootRef, path string, repo *git.Rep
 // liveWorkIn returns which live session or run works inside the
 // worktree at path, or "".
 func (s *Server) liveWorkIn(root queue.RootRef, path string) string {
-	if sessions, err := s.ListSessions(); err != nil {
+	if sessions, err := s.sessions.ListSessions(); err != nil {
 		return "sessions could not be listed: " + err.Error()
 	} else {
 		for _, in := range sessions {

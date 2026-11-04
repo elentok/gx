@@ -37,7 +37,7 @@ func (s *Server) restartBinary() string {
 // runningAgents counts loop agents and live interactive sessions.
 func (s *Server) runningAgents() int {
 	n := s.registry.Count()
-	sessions, _ := s.ListSessions()
+	sessions, _ := s.sessions.ListSessions()
 	for _, si := range sessions {
 		if si.Status.State != wire.SessionExited {
 			n++

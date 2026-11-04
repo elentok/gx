@@ -79,9 +79,9 @@ func (s *Server) keysSession(req wire.SessionKeysRequest, source string) (wire.S
 // sendSessionKeys checks the request against the session and sends it, under
 // metaMu so the guard and the send see one status.
 func (s *Server) sendSessionKeys(req wire.SessionKeysRequest, source, seq string, n int, refusal *wire.SessionResult) (string, wire.SessionResult, error) {
-	s.sessionWatches.metaMu.Lock()
-	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.SessionDir(req.ID)
+	s.sessions.watches.metaMu.Lock()
+	defer s.sessions.watches.metaMu.Unlock()
+	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return dir, res, err
 	}
@@ -134,25 +134,25 @@ func (s *Server) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 // answerSessionPermission answers the permission dialog of a Blocked session.
 // It is guarded, so it leaves a Design session's countdown alone.
 func (s *Server) answerSessionPermission(req wire.SessionKeysRequest, source string) (wire.SessionResult, error) {
-	s.sessionWatches.metaMu.Lock()
-	dir, meta, res, err := s.SessionDir(req.ID)
+	s.sessions.watches.metaMu.Lock()
+	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
-		s.sessionWatches.metaMu.Unlock()
+		s.sessions.watches.metaMu.Unlock()
 		return res, err
 	}
 	st := meta.info().Status
 	switch {
 	case !chat.AcceptsKeys(st.State):
-		s.sessionWatches.metaMu.Unlock()
+		s.sessions.watches.metaMu.Unlock()
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
 	case st.State != wire.SessionBlocked || st.Kind != "permission":
-		s.sessionWatches.metaMu.Unlock()
+		s.sessions.watches.metaMu.Unlock()
 		return sessionRefusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", req.ID)), nil
 	}
 	c, err := nativerunner.DialHolder(dir)
 	// The answer waits for the agent to move on; the status update that ends the
 	// wait needs the lock.
-	s.sessionWatches.metaMu.Unlock()
+	s.sessions.watches.metaMu.Unlock()
 	if err != nil {
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID)), nil
 	}
@@ -196,9 +196,9 @@ func (s *Server) waitLeftBlocked(id, dir string) (wire.SessionResult, error) {
 	grace := cmp.Or(s.cfg.PromptGrace, claudeui.DefaultNudgeCaps.Grace)
 	deadline := time.Now().Add(grace)
 	for {
-		s.sessionWatches.metaMu.Lock()
+		s.sessions.watches.metaMu.Lock()
 		meta, err := readSessionMeta(dir)
-		s.sessionWatches.metaMu.Unlock()
+		s.sessions.watches.metaMu.Unlock()
 		if err != nil {
 			return wire.SessionResult{}, err
 		}

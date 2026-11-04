@@ -57,13 +57,13 @@ func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
 	}
 	b.pending[id] = &bannerTrigger{sound: snd, reason: reason}
 	// Waits as a session watch, so close drops the banner and doesn't wait out the delay.
-	s.sessionWatches.start(func() {
+	s.sessions.watches.start(func() {
 		delay := time.NewTimer(s.cfg.SessionBannerDelay)
 		defer delay.Stop()
 		select {
 		case <-delay.C:
 			s.fireBanner(id)
-		case <-s.sessionWatches.stop:
+		case <-s.sessions.watches.stop:
 		}
 	})
 }
@@ -73,7 +73,7 @@ func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
 // stalled come from the transcript, not the status, so they carry their label
 // as the reason; a status failure already has its banner text.
 func (s *Server) noteFailure(id string) {
-	_, m, res, err := s.SessionDir(id)
+	_, m, res, err := s.sessions.SessionDir(id)
 	if res.Refused || err != nil {
 		return
 	}
@@ -154,10 +154,10 @@ func (s *Server) fireBanner(id string) {
 	delete(b.pending, id)
 	b.mu.Unlock()
 	afk, onScreen := s.afk.IsOn(), s.focus.onScreen(id)
-	if s.sessionWatches.isStopped() || s.focus.webOnScreen(id) || (onScreen && !afk) {
+	if s.sessions.watches.isStopped() || s.focus.webOnScreen(id) || (onScreen && !afk) {
 		return
 	}
-	_, m, res, err := s.SessionDir(id)
+	_, m, res, err := s.sessions.SessionDir(id)
 	if res.Refused || err != nil {
 		return
 	}
@@ -186,7 +186,7 @@ func (s *Server) fireBanner(id string) {
 		s.sendSessionBanner(info, title, body, link)
 	}
 	if set.AgentsSounds.Enabled {
-		s.sessionWatches.start(func() { s.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
+		s.sessions.watches.start(func() { s.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
 	}
 }
 

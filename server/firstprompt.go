@@ -105,7 +105,7 @@ func (f *firstPrompt) stop() { f.clock.stop() }
 // Starting at the deadline.
 func (f *firstPrompt) startTimedOut() {
 	var prompt string
-	f.s.updateSessionMetaOrWarn(f.dir, f.id, func(m *sessionMeta) bool {
+	f.s.sessions.updateSessionMetaOrWarn(f.dir, f.id, func(m *sessionMeta) bool {
 		starting := m.Status.State == "" || m.Status.State == wire.SessionStarting
 		if m.Run != f.run || m.FirstPrompt == "" || !starting {
 			return false
@@ -226,7 +226,7 @@ func (f *firstPrompt) markTyped() {
 // person's input.
 func (f *firstPrompt) start(signal, prompt string) {
 	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", promptHead(prompt))
-	f.s.sessionWatches.start(func() {
+	f.s.sessions.watches.start(func() {
 		err := f.deliver(prompt)
 		switch {
 		case errors.Is(err, errNudgeCancelled):
@@ -271,7 +271,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 		f.log.Debug("first prompt nudge", "decision", string(d))
 	}
 	err = claudeui.PromptWithNudge(p, prompt, caps, time.Time{}, time.Now, report)
-	if f.s.sessionWatches.isStopped() && err != nil {
+	if f.s.sessions.watches.isStopped() && err != nil {
 		return nil
 	}
 	return err
@@ -352,7 +352,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 			select {
 			case <-f.cancel:
 				return errNudgeCancelled
-			case <-f.s.sessionWatches.stop:
+			case <-f.s.sessions.watches.stop:
 				return errServerStopping
 			default:
 			}
@@ -367,7 +367,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	go func() {
 		select {
 		case <-f.cancel:
-		case <-f.s.sessionWatches.stop:
+		case <-f.s.sessions.watches.stop:
 		case <-ctx.Done():
 		}
 		stop()
@@ -478,7 +478,7 @@ func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {
 			return true, nil
 		case <-p.f.cancel:
 			return false, errNudgeCancelled
-		case <-p.f.s.sessionWatches.stop:
+		case <-p.f.s.sessions.watches.stop:
 			return false, errors.New("server stopping")
 		case <-deadline:
 			return false, nil

@@ -17,13 +17,13 @@ func SessionStateToken(s wire.SessionInfo) string {
 // sessionWriteDesignWeb is sessionWrite for the web mux: only a design session,
 // and only with the state token of the session the page saw.
 func (s *Server) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return sessionWriteAs(s.checkDesignWrite, do)
+	return sessionWriteAs(s.sessions.checkDesignWrite, do)
 }
 
 // checkDesignWrite returns the refusal for a web write on a session that is not
 // a design session or whose state moved since the page saw it.
-func (s *Server) checkDesignWrite(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := s.SessionDir(req.ID)
+func (mg *Manager) checkDesignWrite(req wire.SessionRequest) (wire.SessionResult, error) {
+	_, meta, res, err := mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -40,13 +40,13 @@ func (s *Server) checkDesignWrite(req wire.SessionRequest) (wire.SessionResult, 
 // except a Queue agent, which ralph-loop drives, and only with the state token
 // of the session the page saw.
 func (s *Server) sessionWriteAgentWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return sessionWriteAs(s.checkAgentWrite, do)
+	return sessionWriteAs(s.sessions.checkAgentWrite, do)
 }
 
 // checkAgentWrite returns the refusal for a web write on a Queue session or on
 // a session whose state moved since the page saw it.
-func (s *Server) checkAgentWrite(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := s.SessionDir(req.ID)
+func (mg *Manager) checkAgentWrite(req wire.SessionRequest) (wire.SessionResult, error) {
+	_, meta, res, err := mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}

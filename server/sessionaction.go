@@ -24,9 +24,9 @@ func (s *Server) runSessionAction(req wire.SessionRequest) (wire.SessionResult, 
 // itself, which the runaway guard counts. Any other send is the person's input
 // and resets that count.
 func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
-	s.sessionWatches.metaMu.Lock()
-	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.SessionDir(req.ID)
+	s.sessions.watches.metaMu.Lock()
+	defer s.sessions.watches.metaMu.Unlock()
+	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -37,7 +37,7 @@ func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 	if len(action) == 0 {
 		return sessionRefusal(wire.ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
 	}
-	if res, refused := s.handoffRefusal(meta, action); refused {
+	if res, refused := s.resumer.handoffRefusal(meta, action); refused {
 		return res, nil
 	}
 	meta.Actionable = wire.SessionActionable{}
@@ -51,7 +51,7 @@ func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 		return wire.SessionResult{}, err
 	}
 	s.events.Publish(wire.EventSessionChanged, req.ID)
-	s.startContinue(dir, meta, "Action", action)
+	s.resumer.startContinue(dir, meta, "Action", action)
 	info := meta.info()
 	return wire.SessionResult{Session: &info}, nil
 }
@@ -255,7 +255,7 @@ func (r *actionRun) waitForStep(slash bool) (string, error) {
 // rather than wait on a person who may never come.
 func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal string, err error) {
 	select {
-	case <-r.s.sessionWatches.stop:
+	case <-r.s.sessions.watches.stop:
 		return false, "", errServerStopping
 	case <-r.cancel:
 		return false, signalPersonInput, nil

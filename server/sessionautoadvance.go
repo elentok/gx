@@ -16,7 +16,7 @@ func (s *Server) sessionAutoAdvanceWrite(w http.ResponseWriter, r *http.Request)
 // the state token of the session the page saw.
 func (s *Server) sessionAutoAdvanceWeb() http.HandlerFunc {
 	return s.sessionAutoAdvanceHandler(func(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
-		return s.checkDesignWrite(wire.SessionRequest{ID: req.ID, State: req.State})
+		return s.sessions.checkDesignWrite(wire.SessionRequest{ID: req.ID, State: req.State})
 	})
 }
 
@@ -63,7 +63,7 @@ func (m sessionMeta) canAutoAdvance() bool {
 // setAutoAdvance flips a Design session's auto-advance switch. Turning it off
 // stops a running countdown.
 func (s *Server) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult, error) {
-	dir, meta, res, err := s.SessionDir(req.ID)
+	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -72,7 +72,7 @@ func (s *Server) setAutoAdvance(req wire.AutoAdvanceRequest) (wire.SessionResult
 	}
 	var info wire.SessionInfo
 	start := false
-	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := s.sessions.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.AutoAdvanceOff = req.Off
 		m.AutoSends = 0
 		start = m.canAutoAdvance() && s.autoAdvances.deadline(req.ID).IsZero()

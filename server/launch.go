@@ -103,7 +103,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	}
 	// A server stop ends the launch prompt's wait, which Serve would otherwise
 	// sit out before it can finish.
-	ctx, release := s.sessionWatches.context()
+	ctx, release := s.sessions.watches.context()
 	defer release()
 	start := func() (agentrunner.Session, error) {
 		return ralphloop.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{

@@ -68,9 +68,9 @@ func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 // sessions only: it types /clear and /gx-design. It skips the draft guard:
 // gx.follow-ups/07 tracks that.
 func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wire.SessionResult, error) {
-	s.sessionWatches.metaMu.Lock()
-	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.SessionDir(req.ID)
+	s.sessions.watches.metaMu.Lock()
+	defer s.sessions.watches.metaMu.Unlock()
+	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -109,7 +109,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 		// The server builds the slash commands, so the prefix rule stays closed
 		// to the page.
 		action := chat.DesignContinueAction(meta.Ticket, meta.Harness)
-		if res, refused := s.handoffRefusal(meta, action); refused {
+		if res, refused := s.resumer.handoffRefusal(meta, action); refused {
 			return res, nil
 		}
 		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
@@ -119,13 +119,13 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 			return wire.SessionResult{}, err
 		}
 		s.events.Publish(wire.EventSessionChanged, req.ID)
-		s.startContinue(dir, meta, "Continue", action)
+		s.resumer.startContinue(dir, meta, "Continue", action)
 		ev.Action = "continue"
 		for _, a := range action {
 			ev.Bytes += len(a)
 		}
 	} else {
-		s.sessionWatches.start(func() { s.sendPrompt(dir, text) })
+		s.sessions.watches.start(func() { s.sendPrompt(dir, text) })
 		if name, ok := renameCommandArg(text); ok && name != meta.Name {
 			// The harness renames itself, but a typed name never follows the
 			// terminal title, so the Agents tab would keep the old one.

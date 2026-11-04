@@ -25,25 +25,25 @@ const resumeCrashWindow = 10 * time.Second
 // resumeSession runs the harness's Resume of an Exited session's newest
 // conversation in a new holder, in the same dir. The gx session carries on:
 // id, name, Unread, Actionable and Session ticket are kept.
-func (s *Server) resumeSession(req wire.SessionRequest) (wire.SessionResult, error) {
-	s.sessionWatches.metaMu.Lock()
-	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.SessionDir(req.ID)
+func (rs *Resumer) resumeSession(req wire.SessionRequest) (wire.SessionResult, error) {
+	rs.srv.sessions.watches.metaMu.Lock()
+	defer rs.srv.sessions.watches.metaMu.Unlock()
+	dir, meta, res, err := rs.srv.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	if meta.Status.State != wire.SessionExited {
 		return sessionRefusal(wire.ReasonSessionLive, fmt.Sprintf("session %s is live", req.ID)), nil
 	}
-	if res := s.resumeRefusal(meta); res.Refused {
+	if res := rs.resumeRefusal(meta); res.Refused {
 		return res, nil
 	}
 	meta.RestoredAt = time.Now()
 	if meta.HandoffTier && meta.Exit == wire.SessionExitCrashed {
-		s.applyTier(&meta, meta.Tier)
+		rs.srv.sessions.applyTier(&meta, meta.Tier)
 	}
-	if err := s.startResumedHolder(dir, &meta, time.Time{}); err != nil {
-		s.endFailedStart(dir, &meta)
+	if err := rs.startResumedHolder(dir, &meta, time.Time{}); err != nil {
+		rs.srv.sessions.endFailedStart(dir, &meta)
 		return wire.SessionResult{}, err
 	}
 	info := meta.info()
@@ -51,7 +51,7 @@ func (s *Server) resumeSession(req wire.SessionRequest) (wire.SessionResult, err
 }
 
 // resumeRefusal is why meta's session cannot be resumed, if it cannot.
-func (s *Server) resumeRefusal(meta sessionMeta) wire.SessionResult {
+func (rs *Resumer) resumeRefusal(meta sessionMeta) wire.SessionResult {
 	if fi, err := os.Stat(meta.Dir); err != nil || !fi.IsDir() {
 		return sessionRefusal(wire.ReasonSessionDirGone, "dir is gone")
 	}
@@ -62,10 +62,10 @@ func (s *Server) resumeRefusal(meta sessionMeta) wire.SessionResult {
 	if _, ok := h.Resume(meta.ConversationID, harness.LaunchOptions{}); !ok {
 		return sessionRefusal(wire.ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness))
 	}
-	if agentrunner.Kind(meta.Harness) == harness.Codex && !s.codexRolloutExists(meta.Dir, meta.ConversationID) {
+	if agentrunner.Kind(meta.Harness) == harness.Codex && !rs.srv.sessions.rollouts.codexRolloutExists(meta.Dir, meta.ConversationID) {
 		return sessionRefusal(wire.ReasonSessionNoResume, fmt.Sprintf("no Codex rollout for conversation %q in %s", meta.ConversationID, meta.Dir))
 	}
-	if msg := s.harness.InteractiveMissingReason(meta.Harness, "the session's harness"); msg != "" {
+	if msg := rs.srv.harness.InteractiveMissingReason(meta.Harness, "the session's harness"); msg != "" {
 		return sessionRefusal(wire.ReasonSessionHarnessMissing, msg)
 	}
 	return wire.SessionResult{}
@@ -74,19 +74,19 @@ func (s *Server) resumeRefusal(meta sessionMeta) wire.SessionResult {
 // startResumedHolder starts the session's next run on its saved
 // conversation and watches it; an exit before crashUntil is crashed. The
 // caller holds metaMu.
-func (s *Server) startResumedHolder(dir string, meta *sessionMeta, crashUntil time.Time) error {
+func (rs *Resumer) startResumedHolder(dir string, meta *sessionMeta, crashUntil time.Time) error {
 	if err := clearOldHolder(dir); err != nil {
 		return err
 	}
 	meta.Run++
 	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = wire.SessionStatus{}, time.Now(), "", false
 	meta.RestoreCrashed = false
-	if err := s.startSessionHolder(dir, meta, 0, 0, true); err != nil {
+	if err := rs.srv.sessions.startSessionHolder(dir, meta, 0, 0, true); err != nil {
 		return err
 	}
 	id, run := meta.ID, meta.Run
-	s.sessionWatches.start(func() { s.watchSession(dir, id, run, crashUntil, false) })
-	s.events.Publish(wire.EventSessionChanged, id)
+	rs.srv.sessions.watches.start(func() { rs.srv.sessions.watchSession(dir, id, run, crashUntil, false) })
+	rs.srv.events.Publish(wire.EventSessionChanged, id)
 	return nil
 }
 
@@ -118,10 +118,10 @@ func clearOldHolder(dir string) error {
 // raises any Unread missed while the server was down. A holder that left an
 // exit, or of a session the person stopped, ended its session. Any other dead
 // holder is auto-resumed once.
-func (s *Server) restoreSessions() {
-	list, err := s.ListSessions()
+func (rs *Resumer) restoreSessions() {
+	list, err := rs.srv.sessions.ListSessions()
 	if err != nil {
-		s.log.Warn("restore sessions", "err", err)
+		rs.srv.log.Warn("restore sessions", "err", err)
 		return
 	}
 	var dead []string
@@ -129,37 +129,37 @@ func (s *Server) restoreSessions() {
 		if info.Status.State == wire.SessionExited {
 			continue
 		}
-		dir := filepath.Join(s.cfg.SessionsDir, info.ID)
+		dir := filepath.Join(rs.srv.cfg.SessionsDir, info.ID)
 		if _, err := nativerunner.DialHolder(dir); err == nil {
 			meta, err := readSessionMeta(dir)
 			if err != nil {
-				s.log.Warn("read session meta", "session", info.ID, "err", err)
+				rs.srv.log.Warn("read session meta", "session", info.ID, "err", err)
 				continue
 			}
 			// The probe's memory of the launch override died with the old server.
 			if meta.Harness == string(harness.Claude) {
-				harness.NoteEditorOverride(meta.ConversationID, harness.LaunchEnv(os.Environ(), s.cfg.Env))
+				harness.NoteEditorOverride(meta.ConversationID, harness.LaunchEnv(os.Environ(), rs.srv.cfg.Env))
 			}
-			s.sessionWatches.start(func() { s.watchSession(dir, info.ID, meta.Run, time.Time{}, true) })
+			rs.srv.sessions.watches.start(func() { rs.srv.sessions.watchSession(dir, info.ID, meta.Run, time.Time{}, true) })
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err == nil || info.Stopped {
 			exit := savedSessionExit(dir)
-			s.updateSessionMetaOrWarn(dir, info.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) })
+			rs.srv.sessions.updateSessionMetaOrWarn(dir, info.ID, func(m *sessionMeta) bool { return rs.srv.sessions.recordSessionExit(m, exit) })
 			continue
 		}
 		dead = append(dead, info.ID)
 	}
-	s.sessionWatches.start(func() {
+	rs.srv.sessions.watches.start(func() {
 		for i, id := range dead {
 			if i > 0 {
 				select {
-				case <-s.sessionWatches.stop:
+				case <-rs.srv.sessions.watches.stop:
 					return
 				case <-time.After(resumeSpacing):
 				}
 			}
-			s.autoResumeSession(id)
+			rs.autoResumeSession(id)
 		}
 	})
 }
@@ -167,34 +167,34 @@ func (s *Server) restoreSessions() {
 // autoResumeSession resumes a session whose holder died while it was live,
 // or ends it Exited crashed when auto-resume is off or cannot run. A session
 // that was Working comes back with a "resumed" Unread; gx types nothing.
-func (s *Server) autoResumeSession(id string) {
-	s.sessionWatches.metaMu.Lock()
-	defer s.sessionWatches.metaMu.Unlock()
-	dir, meta, res, err := s.SessionDir(id)
+func (rs *Resumer) autoResumeSession(id string) {
+	rs.srv.sessions.watches.metaMu.Lock()
+	defer rs.srv.sessions.watches.metaMu.Unlock()
+	dir, meta, res, err := rs.srv.sessions.SessionDir(id)
 	if res.Refused || err != nil {
-		s.log.Warn("auto-resume session", "session", id, "err", err, "refusal", res.Message)
+		rs.srv.log.Warn("auto-resume session", "session", id, "err", err, "refusal", res.Message)
 		return
 	}
 	if meta.Status.State == wire.SessionExited || meta.Stopped {
 		return
 	}
 	reason := "auto-resume is off"
-	if s.settings.Load().AgentsResumeOnStart {
-		reason = s.resumeRefusal(meta).Message
+	if rs.srv.settings.Load().AgentsResumeOnStart {
+		reason = rs.resumeRefusal(meta).Message
 	}
 	if reason == "" {
 		ended := meta
 		meta.RestoredAt = time.Time{}
 		if meta.Status.State == wire.SessionWorking {
-			s.raiseUnread(&meta)
+			rs.srv.sessions.raiseUnread(&meta)
 			meta.Unread.Resumed = meta.Unread.Unread
 		}
-		err := s.startResumedHolder(dir, &meta, time.Now().Add(resumeCrashWindow))
+		err := rs.startResumedHolder(dir, &meta, time.Now().Add(resumeCrashWindow))
 		if err == nil {
 			return
 		}
 		meta, reason = ended, err.Error()
 	}
-	s.log.Info("session not auto-resumed", "session", id, "reason", reason)
-	s.endFailedStart(dir, &meta)
+	rs.srv.log.Info("session not auto-resumed", "session", id, "reason", reason)
+	rs.srv.sessions.endFailedStart(dir, &meta)
 }

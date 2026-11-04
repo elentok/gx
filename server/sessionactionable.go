@@ -36,7 +36,7 @@ func (s *Server) markSessionActionable(req wire.MarkActionableRequest) (wire.Ses
 	if req.Reason == "" {
 		return sessionRefusal(wire.ReasonSessionBadRequest, "an actionable needs a reason"), nil
 	}
-	dir, meta, res, err := s.SessionDir(req.ID)
+	dir, meta, res, err := s.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -44,7 +44,7 @@ func (s *Server) markSessionActionable(req wire.MarkActionableRequest) (wire.Ses
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
 	var info wire.SessionInfo
-	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := s.sessions.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.Actionable = wire.SessionActionable{Reason: req.Reason, Action: req.Action}
 		info = m.info()
 		return true
@@ -138,7 +138,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	s.fileBadRoundBlocks(id, design, text)
 	a, matched := designActionable(text, design.Ticket, meta.Harness, s.designFinal(design.Ticket))
 	outcome := actionableNone
-	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+	s.sessions.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
 		var next wire.SessionActionable
 		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: maxAutoSends})
 		if outcome == actionableNone {
@@ -218,7 +218,7 @@ func decideActionable(cur sessionMeta, a wire.SessionActionable, matched bool, p
 func (s *Server) raiseGxActionable(dir, reason string, action []string) {
 	id := filepath.Base(dir)
 	raised := false
-	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+	s.sessions.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
 		if m.Status.State == wire.SessionExited {
 			return false
 		}

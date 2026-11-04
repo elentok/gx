@@ -43,7 +43,7 @@ func (s *Server) fixAgentHandler(web bool) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		res, err := s.startFixAgent(req, web)
+		res, err := s.resumer.startFixAgent(req, web)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -85,9 +85,9 @@ func fixProjectPrompt(agent string, f wire.MigrationFailure) string {
 }
 
 // startFixProjectAgent starts the agent fixing a project's saved failed migration.
-func (s *Server) startFixProjectAgent(project string) (wire.FixAgentResult, error) {
+func (rs *Resumer) startFixProjectAgent(project string) (wire.FixAgentResult, error) {
 	var failure *wire.MigrationFailure
-	for _, f := range s.MigrationFailures() {
+	for _, f := range rs.srv.MigrationFailures() {
 		if f.Project == project {
 			failure = &f
 			break
@@ -96,7 +96,7 @@ func (s *Server) startFixProjectAgent(project string) (wire.FixAgentResult, erro
 	if failure == nil {
 		return fixAgentRefusal(wire.ReasonFixNoFailure, fmt.Sprintf("project %s has no saved migration failure", project)), nil
 	}
-	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, project)
+	checkout := tickets.TrunkCheckout(rs.srv.cfg.TicketStore, project)
 	if checkout == "" {
 		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", project)), nil
 	}
@@ -105,10 +105,10 @@ func (s *Server) startFixProjectAgent(project string) (wire.FixAgentResult, erro
 		Dir:        checkout,
 		Name:       FixAgentName(project),
 		UniqueName: true,
-		Prompt:     fixProjectPrompt(s.projects.LaunchHarness(project), *failure),
+		Prompt:     fixProjectPrompt(rs.srv.projects.LaunchHarness(project), *failure),
 		Tier:       ralphloop.TierStrongest,
 	}
-	res, err := s.createSession(cs, sessionCtx{})
+	res, err := rs.srv.sessions.createSession(cs, sessionCtx{})
 	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
 		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+project), nil
 	}
@@ -118,14 +118,14 @@ func (s *Server) startFixProjectAgent(project string) (wire.FixAgentResult, erro
 // startFixAgent starts a /gx-investigate session in the project's trunk
 // checkout for a ticket paused for an answer or repair, or in error (web: repair only),
 // or for a project's failed migration.
-func (s *Server) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAgentResult, error) {
+func (rs *Resumer) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAgentResult, error) {
 	if req.Project != "" {
-		return s.startFixProjectAgent(req.Project)
+		return rs.startFixProjectAgent(req.Project)
 	}
 	if web && req.State == "" {
 		return fixAgentRefusal(wire.ReasonStale, "a state token is required; review the current pause"), nil
 	}
-	ref, ok, err := s.findTicket(req.Address)
+	ref, ok, err := rs.srv.findTicket(req.Address)
 	if err != nil {
 		return fixAgentRefusal(wire.ReasonSessionBadRequest, err.Error()), nil
 	}
@@ -153,25 +153,25 @@ func (s *Server) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAgen
 	if web && req.State != repairState(readLogLenient(t), t.PausedClass()) {
 		return fixAgentRefusal(wire.ReasonStale, "the pause changed; review the current one"), nil
 	}
-	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, ref.addr.Project)
+	checkout := tickets.TrunkCheckout(rs.srv.cfg.TicketStore, ref.addr.Project)
 	if checkout == "" {
 		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.addr.Project)), nil
 	}
-	settings := s.settings.Load()
+	settings := rs.srv.settings.Load()
 	cs := wire.CreateSessionRequest{
 		Project:    ref.addr.Project,
 		Dir:        checkout,
 		Name:       FixAgentName(addr),
 		UniqueName: true,
-		Prompt:     fixAgentPrompt(s.projects.LaunchHarness(ref.addr.Project), addr, t),
+		Prompt:     fixAgentPrompt(rs.srv.projects.LaunchHarness(ref.addr.Project), addr, t),
 		Tier:       ralphloop.TierStrongest,
 	}
-	remote := settings.AgentsFixAgentRemoteControl && s.projects.LaunchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
+	remote := settings.AgentsFixAgentRemoteControl && rs.srv.projects.LaunchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
 	var sc sessionCtx
 	if remote {
 		sc.remoteControl = addr
 	}
-	res, err := s.createSession(cs, sc)
+	res, err := rs.srv.sessions.createSession(cs, sc)
 	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
 		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+addr), nil
 	}
