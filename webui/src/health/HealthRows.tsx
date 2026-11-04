@@ -1,5 +1,9 @@
-import { Box, Link, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { Box, Link, Spinner, Text } from "@chakra-ui/react";
+import { useContext, type ReactNode } from "react";
+import { ConnectionContext, useConnectionState, type Connection } from "../connection";
+import { postCleanDisk } from "../page/DiskStrips";
+import { Button } from "../ui/button/Button";
+import { refusalText, useWrite } from "../useWrite";
 import type { CauseList as CauseListData, CauseMarker, CauseRow, DisksReport, HealthDisk, HealthReason, HealthState } from "../generated/server";
 import { ticketHref } from "../hrefs";
 import { STATE_COLOR } from "../ui/tray/stateColor";
@@ -177,6 +181,7 @@ function DiskEntry({ disk, serverTime, showProjects }: { disk: HealthDisk; serve
   const ageSeconds = Math.floor((Date.parse(serverTime) - Date.parse(disk.read_at)) / 1000);
   const projects = disk.projects.join(", ");
   const usedPercent = disk.total_bytes > 0 ? (1 - disk.free_bytes / disk.total_bytes) * 100 : 0;
+  const conn = useContext(ConnectionContext);
   return (
     <Box data-part="disk-entry" data-state={disk.state}>
       <Box display="flex" justifyContent="space-between" gap="2" fontSize="13px">
@@ -195,12 +200,36 @@ function DiskEntry({ disk, serverTime, showProjects }: { disk: HealthDisk; serve
       )}
       {disk.held && (
         <Text fontSize="xs" lineHeight="1.45" color={color}>
-          {`Dispatch held for ${projects}. Clean now is in the banner.`}
+          {`Dispatch held for ${projects}. Use Clean below or the banner.`}
         </Text>
       )}
       {ageSeconds > STALE_SECONDS && (
         <Text fontSize="xs" color="text.faint">
           {`read ${ageSeconds}s ago`}
+        </Text>
+      )}
+      {conn && <CleanDisk conn={conn} id={disk.id} />}
+    </Box>
+  );
+}
+
+// The banner's Clean now, on every disk. The snapshot lists a disk only while it is warned or held.
+function CleanDisk({ conn, id }: { conn: Connection; id: string }) {
+  const { snapshot } = useConnectionState(conn);
+  const { run, pending, refusal } = useWrite();
+  const status = snapshot?.disks?.find((d) => d.id === id);
+  const busy = !!status?.cleaning || pending;
+  const failed = status?.last_clean.startsWith("failed") ? status.last_clean : undefined;
+  const problem = refusal ? refusalText(refusal) : failed;
+  return (
+    <Box mt="1" display="flex" flexDirection="column" alignItems="flex-start" gap="1">
+      <Button size="sm" emphasis="secondary" disabled={busy} onClick={() => run(() => postCleanDisk(id), { onDone: () => conn.refresh() })}>
+        {busy && <Spinner size="sm" />}
+        Clean
+      </Button>
+      {problem && (
+        <Text role="alert" fontSize="xs" color="text.dim">
+          {problem}
         </Text>
       )}
     </Box>

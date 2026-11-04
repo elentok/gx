@@ -294,7 +294,7 @@ describe("Tray popover", () => {
       withDisks([disk({ held: true, state: "critical" })]);
       const { getByText, queryByRole, container } = await openTray();
       expect(container.ownerDocument.querySelector("[data-part='disk-entry']")!.getAttribute("data-state")).toBe("critical");
-      expect(getByText("Dispatch held for gx, dotfiles. Clean now is in the banner.")).toBeTruthy();
+      expect(getByText("Dispatch held for gx, dotfiles. Use Clean below or the banner.")).toBeTruthy();
       expect(queryByRole("button", { name: /clean/i })).toBeNull();
     });
 
