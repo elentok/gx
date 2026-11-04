@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/elentok/gx/server/webtls"
 )
 
 const browserRefusalLogEvery = time.Minute
@@ -36,7 +38,7 @@ func browserReason(r *http.Request) string {
 	if r.Header.Get("Sec-Fetch-Site") != "" {
 		return "sec-fetch-site header"
 	}
-	host := normalizeHost(r.Host)
+	host := webtls.NormalizeHost(r.Host)
 	if host != "localhost" && net.ParseIP(host) == nil {
 		return "non-loopback host"
 	}

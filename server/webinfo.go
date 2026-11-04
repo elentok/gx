@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -19,7 +20,7 @@ func (s *Server) webNewRoot(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, webOffInfo())
 		return
 	}
-	if err := s.webCerts.newRoot(); err != nil {
+	if err := s.webCerts.NewRoot(); err != nil {
 		s.log.Error("new root failed", "err", err)
 		writeJSON(w, wire.WebInfo{Refused: true, Reason: wire.ReasonWebNewRootFailed, Message: "could not make a new root: " + err.Error()})
 		return
@@ -159,7 +160,7 @@ func (s *Server) webInfoNow() wire.WebInfo {
 	skipped := s.webCerts.Skipped()
 	info := wire.WebInfo{
 		BaseURL:      s.WebURL(),
-		Fingerprint:  webRootFingerprint(s.webCerts.Root().Raw),
+		Fingerprint:  webtls.RootFingerprint(s.webCerts.Root().Raw),
 		LeftOutHosts: skipped.Hosts,
 	}
 	pending, code, expires, err := s.webAuth.SetupStateWithExpiry()

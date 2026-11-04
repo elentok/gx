@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
@@ -79,7 +80,7 @@ func (u *usageSamples) offer(rec nativerunner.UsageRecord) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if err := writeFileAtomic(u.path, data); err != nil {
+	if err := fsutil.WriteFilePrivateAtomic(u.path, data); err != nil {
 		return false, err
 	}
 	u.sample = &rec
@@ -185,7 +186,7 @@ func (u *usageSamples) lift(now time.Time) ([]string, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	if err := writeFileAtomic(u.liftPath, data); err != nil {
+	if err := fsutil.WriteFilePrivateAtomic(u.liftPath, data); err != nil {
 		return nil, time.Time{}, err
 	}
 	u.lifted = next

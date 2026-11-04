@@ -31,6 +31,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
@@ -276,9 +277,9 @@ type Server struct {
 	web         net.Listener // nil unless Config.WebAddr is set and bound
 	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
 	webHTTP     *http.Server
-	webErr      string    // why the web bind failed
-	webListenIP net.IP    // nil when the listener binds every interface
-	webCerts    *webCerts // nil unless the web listener is bound
+	webErr      string        // why the web bind failed
+	webListenIP net.IP        // nil when the listener binds every interface
+	webCerts    *webtls.Certs // nil unless the web listener is bound
 	clientErrs  ipLimiter
 	// webAuth is the web login store; nil unless the web listener is bound.
 	webAuth        *WebAuth

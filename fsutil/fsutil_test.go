@@ -40,6 +40,30 @@ func TestWriteFileAtomic_ReplacesContentAndLeavesNoTempFile(t *testing.T) {
 	}
 }
 
+func TestWriteFilePrivateAtomic_WritesOwnerOnlyAndLeavesNoTempFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "k.key")
+	for _, content := range []string{"first", "second"} {
+		if err := WriteFilePrivateAtomic(path, []byte(content)); err != nil {
+			t.Fatal(err)
+		}
+		got, err := os.ReadFile(path)
+		if err != nil || string(got) != content {
+			t.Fatalf("read = %q, %v; want %q", got, err, content)
+		}
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o600 {
+		t.Errorf("mode = %o, want 600", mode)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
+		t.Errorf("dir has %d entries, want 1", len(entries))
+	}
+}
+
 func TestWriteFileAtomic_MissingDirFails(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing", "f.md")
 	if err := WriteFileAtomic(path, []byte("x")); err == nil {

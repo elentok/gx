@@ -1,4 +1,4 @@
-package server
+package webtls
 
 import (
 	"net"
@@ -31,7 +31,7 @@ func TestWebBaseURL(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := webBaseURL(tc.allowed, root.Cert, net.ParseIP(tc.listen), "8443", tc.ifaces)
+			got := BaseURL(tc.allowed, root.Cert, net.ParseIP(tc.listen), "8443", tc.ifaces)
 			if got != tc.want {
 				t.Fatalf("got %s, want %s", got, tc.want)
 			}

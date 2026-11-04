@@ -1,19 +1,32 @@
-package server
+package webtls
 
 import (
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"html"
 	"net/http"
 	"strings"
 	"text/template"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 const (
-	webRootProfilePath = "/gx-root.mobileconfig"
-	webRootCerPath     = "/gx-root.cer"
+	RootProfilePath = "/gx-root.mobileconfig"
+	RootCerPath     = "/gx-root.cer"
 )
+
+// Routes are the two public downloads of the root certificate, served on the
+// web listener only. root is read per request because the certs exist only
+// once the web listener is bound.
+func Routes(root func() *x509.Certificate) []wire.Route {
+	return []wire.Route{
+		{Pattern: "GET " + RootProfilePath, Web: wire.WebPublic, WebHandler: rootProfileRead(root)},
+		{Pattern: "GET " + RootCerPath, Web: wire.WebPublic, WebHandler: rootCerRead(root)},
+	}
+}
 
 // webRootProfileTmpl is an unsigned configuration profile with one root
 // payload. Every interpolated value is XML-escaped by the xml func.
@@ -49,8 +62,8 @@ func webRootProfile(der []byte) ([]byte, error) {
 	var b strings.Builder
 	data := struct{ Cert, Identifier, Fingerprint, UUID, CertUUID string }{
 		Cert:        base64.StdEncoding.EncodeToString(der),
-		Identifier:  "com.elentok.gx.root." + strings.ReplaceAll(webRootFingerprint(der), " ", "")[:8],
-		Fingerprint: webRootFingerprint(der),
+		Identifier:  "com.elentok.gx.root." + strings.ReplaceAll(RootFingerprint(der), " ", "")[:8],
+		Fingerprint: RootFingerprint(der),
 		UUID:        randomUUID(),
 		CertUUID:    randomUUID(),
 	}
@@ -68,22 +81,26 @@ func randomUUID() string {
 	return fmt.Sprintf("%X-%X-%X-%X-%X", u[0:4], u[4:6], u[6:8], u[8:10], u[10:])
 }
 
-// webRootProfileRead serves the root as an iOS/macOS profile. No HSTS header:
+// rootProfileRead serves the root as an iOS/macOS profile. No HSTS header:
 // it would block the browser's "visit anyway" step.
-func (s *Server) webRootProfileRead(w http.ResponseWriter, _ *http.Request) {
-	body, err := webRootProfile(s.webCerts.Root().Raw)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+func rootProfileRead(root func() *x509.Certificate) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		body, err := webRootProfile(root().Raw)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-apple-aspen-config")
+		w.Header().Set("Content-Disposition", `attachment; filename="gx-root.mobileconfig"`)
+		_, _ = w.Write(body)
 	}
-	w.Header().Set("Content-Type", "application/x-apple-aspen-config")
-	w.Header().Set("Content-Disposition", `attachment; filename="gx-root.mobileconfig"`)
-	_, _ = w.Write(body)
 }
 
-// webRootCerRead serves the root as DER.
-func (s *Server) webRootCerRead(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/pkix-cert")
-	w.Header().Set("Content-Disposition", `attachment; filename="gx-root.cer"`)
-	_, _ = w.Write(s.webCerts.Root().Raw)
+// rootCerRead serves the root as DER.
+func rootCerRead(root func() *x509.Certificate) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/pkix-cert")
+		w.Header().Set("Content-Disposition", `attachment; filename="gx-root.cer"`)
+		_, _ = w.Write(root().Raw)
+	}
 }

@@ -1,4 +1,4 @@
-package server
+package webtls
 
 import (
 	"crypto/x509"
@@ -234,11 +234,11 @@ func TestWebTLSReissueDecision(t *testing.T) {
 }
 
 func TestWebTLSFingerprintFormat(t *testing.T) {
-	fp := webRootFingerprint([]byte("root der"))
+	fp := RootFingerprint([]byte("root der"))
 	if !regexp.MustCompile(`^([0-9a-f]{8} ){7}[0-9a-f]{8}$`).MatchString(fp) {
 		t.Fatalf("fingerprint = %q", fp)
 	}
-	if fp != webRootFingerprint([]byte("root der")) || fp == webRootFingerprint([]byte("other")) {
+	if fp != RootFingerprint([]byte("root der")) || fp == RootFingerprint([]byte("other")) {
 		t.Fatal("fingerprint not a stable function of the DER")
 	}
 }

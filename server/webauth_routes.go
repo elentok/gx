@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -182,9 +183,9 @@ func (s *Server) webAuthStateRead(w http.ResponseWriter, r *http.Request) {
 	state := webAuthState{
 		TOTPOn:            totp,
 		SetupCodeRequired: totp && s.webAuth.AuthenticatorResetPending(),
-		Fingerprint:       webRootFingerprint(s.webCerts.Root().Raw),
-		ProfilePath:       webRootProfilePath,
-		CerPath:           webRootCerPath,
+		Fingerprint:       webtls.RootFingerprint(s.webCerts.Root().Raw),
+		ProfilePath:       webtls.RootProfilePath,
+		CerPath:           webtls.RootCerPath,
 	}
 	if login, _, ok := s.webLoginFor(r); ok {
 		state.State, state.LoginID = webAuthStateSignedIn, login.ID

@@ -1,4 +1,4 @@
-package server
+package webtls
 
 import (
 	"log/slog"
@@ -77,7 +77,7 @@ type sourceIPListener struct {
 	gate *logGate
 }
 
-func newSourceIPListener(ln net.Listener, log *slog.Logger, now func() time.Time) *sourceIPListener {
+func NewSourceIPListener(ln net.Listener, log *slog.Logger, now func() time.Time) *sourceIPListener {
 	return &sourceIPListener{Listener: ln, log: log, gate: newLogGate(webRefuseLogEvery, now)}
 }
 

@@ -1,4 +1,4 @@
-package server
+package webtls
 
 import (
 	"bytes"
@@ -17,18 +17,18 @@ type fakeLocalConn struct {
 
 func (c fakeLocalConn) LocalAddr() net.Addr { return c.local }
 
-func newTestWebCerts(t *testing.T, dir string, now time.Time, hosts []string, log *slog.Logger) *webCerts {
+func newTestWebCerts(t *testing.T, dir string, now time.Time, hosts []string, log *slog.Logger) *Certs {
 	t.Helper()
 	if log == nil {
 		log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	c, err := newWebCerts(&webCerts{
-		stateDir: dir,
-		listenIP: net.ParseIP("127.0.0.1"),
-		now:      func() time.Time { return now },
-		hosts:    func() []string { return hosts },
-		ifaceIPs: func() []net.IP { return []net.IP{net.ParseIP("127.0.0.1")} },
-		log:      log,
+	c, err := NewCerts(&Certs{
+		StateDir: dir,
+		ListenIP: net.ParseIP("127.0.0.1"),
+		Now:      func() time.Time { return now },
+		Hosts:    func() []string { return hosts },
+		IfaceIPs: func() []net.IP { return []net.IP{net.ParseIP("127.0.0.1")} },
+		Log:      log,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestWebLeaf_ConnectionOnNewLocalIPGetsALeafWithIt(t *testing.T) {
 		t.Fatal("leaf already has 127.0.0.2")
 	}
 	rootDER := c.root.DER
-	cert, err := c.getCertificate(hello("127.0.0.2"))
+	cert, err := c.GetCertificate(hello("127.0.0.2"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestWebLeaf_ConnectionOnNewLocalIPGetsALeafWithIt(t *testing.T) {
 	}
 
 	before := c.leaf.Cert.SerialNumber
-	if _, err := c.getCertificate(hello("8.8.8.8")); err != nil {
+	if _, err := c.GetCertificate(hello("8.8.8.8")); err != nil {
 		t.Fatal(err)
 	}
 	if c.leaf.Cert.SerialNumber.Cmp(before) != 0 {
@@ -100,13 +100,13 @@ func TestWebLeaf_ClockNear29DaysReissuesOnNextHandshake(t *testing.T) {
 	t.Parallel()
 	now := webTLSNow
 	c := newTestWebCerts(t, t.TempDir(), now, nil, nil)
-	c.now = func() time.Time { return now }
+	c.Now = func() time.Time { return now }
 	before := c.leaf.Cert.SerialNumber
-	if _, err := c.getCertificate(&tls.ClientHelloInfo{}); err != nil || c.leaf.Cert.SerialNumber.Cmp(before) != 0 {
+	if _, err := c.GetCertificate(&tls.ClientHelloInfo{}); err != nil || c.leaf.Cert.SerialNumber.Cmp(before) != 0 {
 		t.Fatalf("early handshake re-issued (err %v)", err)
 	}
 	now = c.leaf.Cert.NotAfter.Add(-29 * 24 * time.Hour)
-	if _, err := c.getCertificate(&tls.ClientHelloInfo{}); err != nil {
+	if _, err := c.GetCertificate(&tls.ClientHelloInfo{}); err != nil {
 		t.Fatal(err)
 	}
 	if c.leaf.Cert.SerialNumber.Cmp(before) == 0 {

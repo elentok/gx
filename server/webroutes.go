@@ -21,8 +21,6 @@ type WebOnlyRoute struct {
 // key of webWrites; a test checks the two against routeTable.
 var webOnlyRoutes = []WebOnlyRoute{
 	{Pattern: "POST /v1/client-errors", Public: true},
-	{Pattern: "GET " + webRootProfilePath, Public: true},
-	{Pattern: "GET " + webRootCerPath, Public: true},
 	{Pattern: "GET " + webAuthPathState, Public: true},
 	{Pattern: "POST " + webAuthPathSetupStart, Public: true},
 	{Pattern: "POST " + webAuthPathSetupPassword, Public: true},
@@ -40,9 +38,7 @@ var webOnlyRoutes = []WebOnlyRoute{
 
 // webPublicGets names the GET routes in webOnlyRoutes and their handlers.
 var webPublicGets = map[string]func(*Server) http.HandlerFunc{
-	"GET " + webRootProfilePath: func(s *Server) http.HandlerFunc { return s.webRootProfileRead },
-	"GET " + webRootCerPath:     func(s *Server) http.HandlerFunc { return s.webRootCerRead },
-	"GET " + webAuthPathState:   func(s *Server) http.HandlerFunc { return s.webAuthStateRead },
+	"GET " + webAuthPathState: func(s *Server) http.HandlerFunc { return s.webAuthStateRead },
 }
 
 // WebPublicGetPatterns names every web-only "GET /path" the web mux serves.

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -86,7 +87,7 @@ func (s *limitsStore) apply(report wire.LimitsReport, now int64) (wire.LimitsApp
 	if err != nil {
 		return res, err
 	}
-	if err := writeFileAtomic(s.path, data); err != nil {
+	if err := fsutil.WriteFilePrivateAtomic(s.path, data); err != nil {
 		return res, err
 	}
 	s.state = next

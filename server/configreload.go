@@ -78,7 +78,7 @@ func (s *Server) reloadLocked() (wire.ReloadResult, func()) {
 	}
 	s.settings.Store(&next)
 	if s.webCerts != nil && !reflect.DeepEqual(old.WebAllowedHosts, next.WebAllowedHosts) {
-		if err := s.webCerts.reissue(); err != nil {
+		if err := s.webCerts.Reissue(); err != nil {
 			s.log.Error("web certificate re-issue failed", "err", err)
 		}
 	}

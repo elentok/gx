@@ -35,3 +35,25 @@ func WriteFileAtomic(path string, data []byte) error {
 	}
 	return nil
 }
+
+// WriteFilePrivateAtomic is WriteFileAtomic for files only the owner may read:
+// the temp file is created 0600 and keeps that mode.
+func WriteFilePrivateAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
+}

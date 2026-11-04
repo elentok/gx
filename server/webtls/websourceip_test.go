@@ -1,4 +1,4 @@
-package server
+package webtls
 
 import (
 	"io"
@@ -74,7 +74,7 @@ func TestWebSourceIP_ListenerClosesPublicPeers(t *testing.T) {
 	var logs lockedBuf
 	now := time.Unix(1000, 0)
 	fl := &fakeListener{conns: make(chan net.Conn, 8)}
-	ln := newSourceIPListener(fl, slog.New(slog.NewTextHandler(&logs, nil)), func() time.Time { return now })
+	ln := NewSourceIPListener(fl, slog.New(slog.NewTextHandler(&logs, nil)), func() time.Time { return now })
 
 	pub := func(ip string) *fakeConn {
 		return &fakeConn{remote: &net.TCPAddr{IP: net.ParseIP(ip), Port: 5000}}

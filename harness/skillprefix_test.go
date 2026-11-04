@@ -37,7 +37,7 @@ func TestSkillCommand(t *testing.T) {
 // the repo root).
 var literalExemptions = map[string][]string{
 	// A URL path of the root certificate download.
-	"server/webroot.go": {"/gx-root.mobileconfig", "/gx-root.cer"},
+	"server/webtls/webroot.go": {"/gx-root.mobileconfig", "/gx-root.cer"},
 	// The prefix gx looks for when it reads a command out of a Codex transcript.
 	"codexsession/chat.go": {"$gx-"},
 }

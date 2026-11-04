@@ -1,10 +1,12 @@
 package server
 
 import (
+	"crypto/x509"
 	"net/http"
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -13,7 +15,9 @@ import (
 // from routeTable, webWrites and the web read switch. It is also called with
 // a nil Server to list patterns, so the handlers must not need one yet.
 // A var so the assembly test can swap in a fake list.
-var subsystemRoutes = func(*Server) []wire.Route { return nil }
+var subsystemRoutes = func(s *Server) []wire.Route {
+	return webtls.Routes(func() *x509.Certificate { return s.webCerts.Root() })
+}
 
 // registerRoutes puts each route that has a socket handler on mux.
 func registerRoutes(mux *http.ServeMux, routes []wire.Route) {

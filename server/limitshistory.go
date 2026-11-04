@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -108,7 +109,7 @@ func (h *limitHistory) record(id string, w wire.LimitWindow, now int64) (saved b
 	if err != nil {
 		return false, err
 	}
-	if err := writeFileAtomic(h.path, data); err != nil {
+	if err := fsutil.WriteFilePrivateAtomic(h.path, data); err != nil {
 		return false, err
 	}
 	h.state = next

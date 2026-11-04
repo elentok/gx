@@ -1,4 +1,4 @@
-package server
+package webtls
 
 import (
 	"crypto/ecdsa"
@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/fsutil"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -63,8 +64,8 @@ type webTLSKey struct {
 	Key  *ecdsa.PrivateKey
 }
 
-// webLeafSkipped lists what a leaf left out because the root does not permit it.
-type webLeafSkipped struct {
+// LeafSkipped lists what a leaf left out because the root does not permit it.
+type LeafSkipped struct {
 	Hosts []string
 	IPs   []net.IP
 }
@@ -73,7 +74,7 @@ type webLeafSkipped struct {
 // parent domain, or the host itself when it has a single label or its parent
 // is a public suffix (a constraint on "com" would permit every .com name).
 func webConstraintDomain(host string) string {
-	host = normalizeHost(host)
+	host = NormalizeHost(host)
 	_, parent, ok := strings.Cut(host, ".")
 	if !ok || parent == "" {
 		return host
@@ -88,7 +89,7 @@ func webConstraintDomains(hosts []string) []string {
 	domains := []string{"localhost"}
 	seen := map[string]bool{"localhost": true}
 	for _, h := range hosts {
-		h = normalizeHost(h)
+		h = NormalizeHost(h)
 		if h == "" || net.ParseIP(h) != nil {
 			continue
 		}
@@ -163,12 +164,12 @@ func newWebRoot(hosts []string, now time.Time) (*webTLSKey, error) {
 // root permits, and the interface and listen IPs inside the root's ranges.
 // Unspecified addresses are never included. Whatever it leaves out comes back
 // in the second result.
-func newWebLeaf(root *webTLSKey, hosts []string, ifaceIPs []net.IP, listenIP net.IP, now time.Time) (*webTLSKey, webLeafSkipped, error) {
-	var skipped webLeafSkipped
+func newWebLeaf(root *webTLSKey, hosts []string, ifaceIPs []net.IP, listenIP net.IP, now time.Time) (*webTLSKey, LeafSkipped, error) {
+	var skipped LeafSkipped
 	names := []string{"localhost"}
 	seenName := map[string]bool{"localhost": true}
 	for _, h := range hosts {
-		h = normalizeHost(h)
+		h = NormalizeHost(h)
 		if h == "" || seenName[h] || net.ParseIP(h) != nil {
 			continue
 		}
@@ -243,7 +244,7 @@ func webLeafNeedsReissue(leaf, root *x509.Certificate, hosts []string, localIP n
 		}
 	}
 	for _, h := range hosts {
-		h = normalizeHost(h)
+		h = NormalizeHost(h)
 		if h == "" || net.ParseIP(h) != nil || !webHostPermitted(root, h) {
 			continue
 		}
@@ -261,8 +262,8 @@ func webLeafNeedsReissue(leaf, root *x509.Certificate, hosts []string, localIP n
 	return false
 }
 
-// webRootFingerprint is the SHA-256 of the root's DER as hex in 8 groups of 8.
-func webRootFingerprint(der []byte) string {
+// RootFingerprint is the SHA-256 of the root's DER as hex in 8 groups of 8.
+func RootFingerprint(der []byte) string {
 	sum := sha256.Sum256(der)
 	h := hex.EncodeToString(sum[:])
 	groups := make([]string, 0, 8)
@@ -312,30 +313,10 @@ func writeWebTLSKey(dir, name string, k *webTLSKey) error {
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: k.DER})
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 	// The key goes first so a crash never leaves a certificate without its key.
-	if err := writeFileAtomic(filepath.Join(dir, name+".key"), keyPEM); err != nil {
+	if err := fsutil.WriteFilePrivateAtomic(filepath.Join(dir, name+".key"), keyPEM); err != nil {
 		return err
 	}
-	return writeFileAtomic(filepath.Join(dir, name+".pem"), certPEM)
-}
-
-func writeFileAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return fsutil.WriteFilePrivateAtomic(filepath.Join(dir, name+".pem"), certPEM)
 }
 
 func readWebTLSKey(dir, name string) (*webTLSKey, error) {

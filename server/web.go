@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/webui"
 )
@@ -56,13 +57,13 @@ func (s *Server) bindWeb() {
 	if a, ok := rawLn.Addr().(*net.TCPAddr); ok && !a.IP.IsUnspecified() {
 		listenIP = a.IP
 	}
-	certs, err := newWebCerts(&webCerts{
-		stateDir: s.cfg.StateDir,
-		listenIP: listenIP,
-		now:      s.webNow,
-		hosts:    func() []string { return s.settings.Load().WebAllowedHosts },
-		ifaceIPs: s.interfaceIPs,
-		log:      s.log,
+	certs, err := webtls.NewCerts(&webtls.Certs{
+		StateDir: s.cfg.StateDir,
+		ListenIP: listenIP,
+		Now:      s.webNow,
+		Hosts:    func() []string { return s.settings.Load().WebAllowedHosts },
+		IfaceIPs: s.interfaceIPs,
+		Log:      s.log,
 	})
 	if err != nil {
 		rawLn.Close()
@@ -70,13 +71,13 @@ func (s *Server) bindWeb() {
 		s.log.Error("web tls unavailable", "err", err)
 		return
 	}
-	ln := newSniffListener(newSourceIPListener(rawLn, s.log, time.Now), &tls.Config{GetCertificate: certs.getCertificate, MinVersion: tls.VersionTLS12})
+	ln := webtls.NewSniffListener(webtls.NewSourceIPListener(rawLn, s.log, time.Now), &tls.Config{GetCertificate: certs.GetCertificate, MinVersion: tls.VersionTLS12})
 	s.web, s.webListenIP, s.webCerts = ln, listenIP, certs
 	s.webAuth, s.webLoginCookie = auth, loginCookieName(ln)
 	mux := s.webHandler()
 	protected := s.requireWebLogin(mux, s.denyWeb(mux))
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
-	s.webHTTP = &http.Server{Handler: requireHost(allowed, redirectPlainHTTP(s.servePublicFirst(mux, protected)))}
+	s.webHTTP = &http.Server{Handler: webtls.RequireHost(allowed, webtls.RedirectPlainHTTP(s.servePublicFirst(mux, protected)))}
 }
 
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.
@@ -85,7 +86,7 @@ func (s *Server) WebURL() string {
 		return ""
 	}
 	_, port, _ := net.SplitHostPort(s.web.Addr().String())
-	return webBaseURL(s.settings.Load().WebAllowedHosts, s.webCerts.Root(), s.webListenIP, port, s.interfaceIPs())
+	return webtls.BaseURL(s.settings.Load().WebAllowedHosts, s.webCerts.Root(), s.webListenIP, port, s.interfaceIPs())
 }
 
 // interfaceIPs is the one place the machine's interfaces are read.
@@ -93,7 +94,7 @@ func (s *Server) interfaceIPs() []net.IP {
 	if s.cfg.WebInterfaceIPs != nil {
 		return s.cfg.WebInterfaceIPs()
 	}
-	return interfaceIPs()
+	return webtls.InterfaceIPs()
 }
 
 // webHandler is the web mux: the snapshot, the event stream and the embedded
