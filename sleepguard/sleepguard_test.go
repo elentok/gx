@@ -117,7 +117,7 @@ var allowed = map[string]int{
 	"server/sessions_firstprompt_test.go":           3,
 	"server/sessions_test.go":                       1,
 	"server/slackhook_test.go":                      1,
-	"server/tokenpoll_test.go":                      2, // poll loop with a deadline; negative wait: no poll while a migration is held
+	"server/limits/tokenpoll_test.go":               2, // poll loop with a deadline; negative wait: no poll while a migration is held
 	"server/trunkconflict_claim_test.go":            1,
 	"server/servertest/ptyrunner_test.go":           3, // negative waits: a wrong reap or kill would come within a few polls
 	"server/trunklock_test.go":                      1,

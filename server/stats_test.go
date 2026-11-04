@@ -286,7 +286,7 @@ func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 	add := func(project, group, harness string, tokens int64, dollars float64) {
 		t.Helper()
-		err := h.Server.AddLedgerTokens(tokenledger.Delta{
+		err := h.Server.Limits().AddLedgerTokens(tokenledger.Delta{
 			Key:    tokenledger.Key{Day: today, Project: project, Group: group, Harness: harness},
 			Tokens: tokens, Dollars: dollars,
 		})

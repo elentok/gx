@@ -1,4 +1,4 @@
-package server
+package limits
 
 import (
 	"context"
@@ -14,11 +14,41 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server/limits"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
 	"github.com/elentok/gx/transcript"
 )
+
+// DefaultPoll is the poll interval of the budget and the token ledger when
+// their config leaves it unset.
+const DefaultPoll = 30 * time.Second
+
+// TokenHost is what the token poll reads from the root.
+type TokenHost interface {
+	// Snapshot is the ticket index's snapshot.
+	Snapshot() wire.Snapshot
+	// Sessions lists the interactive sessions.
+	Sessions() ([]InteractiveSession, error)
+	// OnMapEpic reports whether address is on a map epic.
+	OnMapEpic(address string) bool
+	// BudgetIteration is the live iteration of address as its runner sees it.
+	BudgetIteration(address string) (wire.IterationInfo, bool)
+	// MigrationsDone closes once the migrations end, passed or failed.
+	MigrationsDone() <-chan struct{}
+}
+
+// InteractiveSession is the part of a session's meta the token poll reads.
+type InteractiveSession struct {
+	ID             string
+	Harness        string
+	Project        string
+	Dir            string
+	Ticket         string
+	ConversationID string
+	Stopped        bool
+	Exit           string
+}
 
 // TokenReader reads a session's cumulative tokens and dollars.
 type TokenReader func(ref ralphloop.SessionRef) (tokens int64, cost float64, err error)
@@ -50,19 +80,19 @@ type tokenSession struct {
 	path    string // transcript or rollout whose change means new usage
 }
 
-func (s *Server) readTokens(ref ralphloop.SessionRef) (int64, float64, error) {
-	if f := s.tokenPoll.read; f != nil {
+func (l *Limits) readTokens(ref ralphloop.SessionRef) (int64, float64, error) {
+	if f := l.tokenPoll.read; f != nil {
 		return f(ref)
 	}
 	var homes ralphloop.SessionHomes
-	homes.Claude, _ = s.projects.EnvHome()
-	homes.Codex, _ = s.projects.CodexHome()
+	homes.Claude, _ = l.projects.EnvHome()
+	homes.Codex, _ = l.projects.CodexHome()
 	return ralphloop.SessionsTotals(homes, []ralphloop.SessionRef{ref})
 }
 
 // tokenSessionOf resolves address's live iteration session, false when it has
 // none yet.
-func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
+func (l *Limits) tokenSessionOf(address string) (tokenSession, bool) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return tokenSession{}, false
@@ -71,29 +101,29 @@ func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
 	if a.Epic == tickets.OneOffsEpic {
 		group = tokenledger.GroupOneOff
 	}
-	label, _, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.projects.WorktreeDir(a.Project))
-	agentDir := filepath.Join(nativerunner.AgentsRoot(s.cfg.StateDir, a.Project), label)
-	run, _ := s.registry.RunOf(address)
-	codex := limits.IsCodexRun(run)
+	label, _, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, l.projects.WorktreeDir(a.Project))
+	agentDir := filepath.Join(nativerunner.AgentsRoot(l.cfg.StateDir, a.Project), label)
+	run, _ := l.registry.RunOf(address)
+	codex := IsCodexRun(run)
 	if d, err := nativerunner.OpenDir(agentDir); err == nil && agentrunner.Kind(d.Meta.Harness) == harness.Codex {
 		codex = true
 	}
 	ts := tokenSession{project: a.Project, group: group}
 	if codex {
 		id := harness.ReadCodexSessionID(agentDir)
-		home, err := s.projects.CodexHome()
+		home, err := l.projects.CodexHome()
 		if id == "" || err != nil {
 			return tokenSession{}, false
 		}
-		path, ok := s.rolloutPath(home, id)
+		path, ok := l.rolloutPath(home, id)
 		if !ok {
 			return tokenSession{}, false
 		}
 		ts.harness, ts.path = string(harness.Codex), path
 		ts.ref = ralphloop.SessionRef{Agent: ralphloop.AgentCodex, Cwd: worktree, SessionID: id}
 	} else {
-		it, ok := s.budgetIteration(address)
-		home, err := s.projects.EnvHome()
+		it, ok := l.tokenHost.BudgetIteration(address)
+		home, err := l.projects.EnvHome()
 		if !ok || it.Session == "" || err != nil {
 			return tokenSession{}, false
 		}
@@ -105,8 +135,8 @@ func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
 }
 
 // rolloutPath finds a Codex rollout once; the lookup walks the sessions tree.
-func (s *Server) rolloutPath(home, id string) (string, bool) {
-	p := &s.tokenPoll
+func (l *Limits) rolloutPath(home, id string) (string, bool) {
+	p := &l.tokenPoll
 	p.mu.Lock()
 	path, ok := p.rollout[id]
 	p.mu.Unlock()
@@ -145,35 +175,35 @@ func (p *tokenPoller) changed(ts tokenSession) bool {
 	return true
 }
 
-// pollTokens adds every live iteration's token and dollar change since its last
-// poll to today's bucket of the token ledger. A session seen for the first time
-// only stores its total.
-func (s *Server) pollTokens(now time.Time) {
+// PollTokensAt adds every live iteration's token and dollar change since its
+// last poll to the day of now in the token ledger. A session seen for the first
+// time only stores its total.
+func (l *Limits) PollTokensAt(now time.Time) {
 	day := now.Format(tokenledger.DayLayout)
-	for _, t := range s.idx.Snapshot().Tickets {
-		if t.Status != "claimed" && !s.registry.Has(t.Address) {
+	for _, t := range l.tokenHost.Snapshot().Tickets {
+		if t.Status != "claimed" && !l.registry.Has(t.Address) {
 			continue
 		}
-		if ts, ok := s.tokenSessionOf(t.Address); ok {
-			s.pollSession(ts, day)
+		if ts, ok := l.tokenSessionOf(t.Address); ok {
+			l.pollSession(ts, day)
 		}
 	}
-	s.pollInteractiveTokens(day)
+	l.pollInteractiveTokens(day)
 }
 
 // pollSession adds one session's change since its last poll to the ledger.
-func (s *Server) pollSession(ts tokenSession, day string) {
-	if !s.tokenPoll.changed(ts) {
+func (l *Limits) pollSession(ts tokenSession, day string) {
+	if !l.tokenPoll.changed(ts) {
 		return
 	}
-	tokens, cost, err := s.readTokens(ts.ref)
+	tokens, cost, err := l.readTokens(ts.ref)
 	if err != nil {
 		return
 	}
 	cur := tokenledger.Seen{Tokens: tokens, Dollars: cost}
-	prev, seen, err := s.tokens.Seen(ts.key)
+	prev, seen, err := l.tokens.Seen(ts.key)
 	if err != nil {
-		s.log.Error("read token ledger", "err", err)
+		l.log.Error("read token ledger", "err", err)
 		return
 	}
 	// A first-seen session adds nothing; it only sets its seen total.
@@ -181,31 +211,31 @@ func (s *Server) pollSession(ts tokenSession, day string) {
 	if seen {
 		d.Tokens, d.Dollars = max(tokens-prev.Tokens, 0), max(cost-prev.Dollars, 0)
 	}
-	if err := s.tokens.Record(d, ts.key, cur); err != nil {
-		s.log.Error("save token ledger", "err", err)
+	if err := l.tokens.Record(d, ts.key, cur); err != nil {
+		l.log.Error("save token ledger", "err", err)
 	}
 }
 
 // pollInteractiveTokens meters every live interactive session. Its group is
 // fixed at first sight: Design when its Session ticket is on a map, else Other.
-func (s *Server) pollInteractiveTokens(day string) {
-	infos, err := s.listSessionMetas()
+func (l *Limits) pollInteractiveTokens(day string) {
+	infos, err := l.tokenHost.Sessions()
 	if err != nil {
-		s.log.Error("list sessions for token poll", "err", err)
+		l.log.Error("list sessions for token poll", "err", err)
 		return
 	}
 	for _, m := range infos {
 		if m.Stopped || m.Exit != "" || m.ConversationID == "" {
 			continue
 		}
-		ts, ok := s.interactiveTokenSession(m)
+		ts, ok := l.interactiveTokenSession(m)
 		if ok {
-			s.pollSession(ts, day)
+			l.pollSession(ts, day)
 		}
 	}
 }
 
-func (s *Server) interactiveTokenSession(m sessionMeta) (tokenSession, bool) {
+func (l *Limits) interactiveTokenSession(m InteractiveSession) (tokenSession, bool) {
 	ts := tokenSession{
 		key:     "session/" + m.ID + "@" + m.ConversationID,
 		project: m.Project,
@@ -213,24 +243,24 @@ func (s *Server) interactiveTokenSession(m sessionMeta) (tokenSession, bool) {
 		ref:     ralphloop.SessionRef{Agent: ralphloop.AgentFor(m.Harness), Cwd: m.Dir, SessionID: m.ConversationID},
 	}
 	if agentrunner.Kind(m.Harness) == harness.Codex {
-		home, err := s.projects.CodexHome()
+		home, err := l.projects.CodexHome()
 		if err != nil {
 			return tokenSession{}, false
 		}
-		path, ok := s.rolloutPath(home, m.ConversationID)
+		path, ok := l.rolloutPath(home, m.ConversationID)
 		if !ok {
 			return tokenSession{}, false
 		}
 		ts.path = path
 	} else {
-		home, err := s.projects.EnvHome()
+		home, err := l.projects.EnvHome()
 		if err != nil {
 			return tokenSession{}, false
 		}
 		ts.path = transcript.PathIn(home, m.Dir, m.ConversationID)
 	}
-	ts.group = s.tokenPoll.groupOf(ts.key, func() string {
-		if m.Ticket != "" && s.onMapEpic(m.Ticket) {
+	ts.group = l.tokenPoll.groupOf(ts.key, func() string {
+		if m.Ticket != "" && l.tokenHost.OnMapEpic(m.Ticket) {
 			return tokenledger.GroupDesign
 		}
 		return tokenledger.GroupOther
@@ -256,18 +286,18 @@ func (p *tokenPoller) groupOf(key string, compute func() string) string {
 	return g
 }
 
-// keepTokensPolled polls once the migrations end, passed or failed: the ledger
+// KeepTokensPolled polls once the migrations end, passed or failed: the ledger
 // backfill is a migration step, and a poll before it would stamp a first live
 // day that makes the step skip days.
-func (s *Server) keepTokensPolled(ctx context.Context) {
+func (l *Limits) KeepTokensPolled(ctx context.Context) {
 	select {
-	case <-s.migrator.Done():
+	case <-l.tokenHost.MigrationsDone():
 	case <-ctx.Done():
 		return
 	}
-	interval := s.cfg.TokenPollInterval
+	interval := l.cfg.TokenPollInterval
 	if interval <= 0 {
-		interval = defaultBudgetPoll
+		interval = DefaultPoll
 	}
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
@@ -276,9 +306,22 @@ func (s *Server) keepTokensPolled(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			s.pollTokens(time.Now())
+			l.PollTokensAt(time.Now())
 		}
 	}
+}
+
+// SetTokensOf swaps how a session's cumulative tokens and cost are read.
+func (l *Limits) SetTokensOf(f TokenReader) { l.tokenPoll.read = f }
+
+// AddLedgerTokens writes a live delta straight into the token ledger.
+func (l *Limits) AddLedgerTokens(d tokenledger.Delta) error { return l.tokens.Add(d) }
+
+// TokenTranscriptPath is the file whose change makes the token poll read
+// address's session; false when the ticket has no live session.
+func (l *Limits) TokenTranscriptPath(address string) (string, bool) {
+	ts, ok := l.tokenSessionOf(address)
+	return ts.path, ok
 }
 
 // signatureOf stats the transcript and its subagent transcripts. ok is false

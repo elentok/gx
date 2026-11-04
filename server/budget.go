@@ -25,7 +25,6 @@ import (
 const (
 	defaultBudgetKillGrace = 15 * time.Second
 	ledgerFileName         = "budget-ledger.json"
-	defaultBudgetPoll      = 30 * time.Second
 	ledgerSeenRetention    = 48 * time.Hour
 	budgetDayLayout        = limits.DayLayout
 )
@@ -567,7 +566,7 @@ func (s *Server) pauseBudgetKilled(t runs.TrackedRun) error {
 func (s *Server) keepBudgetPolled(ctx context.Context) {
 	interval := s.cfg.BudgetPollInterval
 	if interval <= 0 {
-		interval = defaultBudgetPoll
+		interval = limits.DefaultPoll
 	}
 	tick := time.NewTicker(interval)
 	defer tick.Stop()

@@ -1,4 +1,4 @@
-package server_test
+package limits_test
 
 import (
 	"context"
@@ -60,7 +60,7 @@ func newTokenFixture(t *testing.T, epic string, opts ...func(*server.Config)) *t
 // nudged pane of a paused ticket.
 func (f *tokenFixture) live(t *testing.T) {
 	t.Helper()
-	f.h.Server.SetTokensOf(func(ralphloop.SessionRef) (int64, float64, error) {
+	f.h.Server.Limits().SetTokensOf(func(ralphloop.SessionRef) (int64, float64, error) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.reads++
@@ -88,7 +88,7 @@ func (f *tokenFixture) grow(t *testing.T, tokens int64, cost float64) {
 	f.mu.Lock()
 	f.tokens, f.cost = tokens, cost
 	f.mu.Unlock()
-	path, ok := f.h.Server.TokenTranscriptPath(f.address)
+	path, ok := f.h.Server.Limits().TokenTranscriptPath(f.address)
 	if !ok {
 		t.Fatal("no live session")
 	}
@@ -144,12 +144,12 @@ func TestTokenPoll_FirstSeenAddsNothingThenDelta(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	if rows := f.day(t, pollDay1); len(rows) != 0 {
 		t.Fatalf("first poll wrote %+v", rows)
 	}
 	f.grow(t, 160, 1.5)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 60, 0.5)
 }
 
@@ -157,12 +157,12 @@ func TestTokenPoll_DeltaGoesToTheDayOfThePoll(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, 130, 1.25)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	day2 := pollDay1.AddDate(0, 0, 1)
 	f.grow(t, 200, 2)
-	f.h.Server.PollTokensAt(day2)
+	f.h.Server.Limits().PollTokensAt(day2)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 30, 0.25)
 	wantRow(t, f.day(t, day2), tokenledger.GroupQueue, "claude", 70, 0.75)
 }
@@ -171,9 +171,9 @@ func TestTokenPoll_OneOffGroup(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "one-offs")
 	f.grow(t, 10, 0)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, 25, 0.5)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupOneOff, "claude", 15, 0.5)
 }
 
@@ -181,16 +181,16 @@ func TestTokenPoll_RestartDoesNotDoubleCount(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, 150, 2)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 
 	f.h.Restart(t)
 	f.live(t)
-	f.h.Server.PollTokensAt(pollDay1) // the same total again
+	f.h.Server.Limits().PollTokensAt(pollDay1) // the same total again
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 50, 1)
 	f.grow(t, 170, 2)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 70, 1)
 }
 
@@ -198,16 +198,16 @@ func TestTokenPoll_StoppedTicketKeepsItsTokens(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, 180, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 
 	label, _, _ := ralphloop.IterationIdentity(f.epic, "01", "")
 	sess, _, _ := f.fake.Find(label)
 	if err := f.fake.Stop(sess); err != nil {
 		t.Fatal(err)
 	}
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 80, 0)
 }
 
@@ -215,12 +215,12 @@ func TestTokenPoll_CancelledTicketKeepsItsTokens(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, 180, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 
 	servertest.WriteTicketWith(t, f.store, "proj", f.epic, "01", "first", servertest.TicketOpts{Status: "cancelled", CancelledAt: "2026-10-06T13:00:00Z"})
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 80, 0)
 }
 
@@ -228,13 +228,13 @@ func TestTokenPoll_StartedOverTicketKeepsItsTokens(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, 180, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 
 	// A start-over resets the ticket to open and drops its session.
 	servertest.WriteTicketWith(t, f.store, "proj", f.epic, "01", "first", servertest.TicketOpts{})
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 80, 0)
 }
 
@@ -261,9 +261,9 @@ func TestTokenPoll_LedgerLivesInStateDirNotTicketStore(t *testing.T) {
 	f := newTokenFixture(t, "epic-a")
 	before := storeFiles(t, f.store)
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, 160, 1.5)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "claude", 60, 0.5)
 	if after := storeFiles(t, f.store); !slices.Equal(before, after) {
 		t.Errorf("ticket store files = %v, want %v", after, before)
@@ -274,19 +274,19 @@ func TestTokenPoll_IdlePollReadsNothing(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
 	f.grow(t, 100, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	reads := f.readCount()
 	if reads == 0 {
 		t.Fatal("the first poll did not read")
 	}
 	for range 3 {
-		f.h.Server.PollTokensAt(pollDay1)
+		f.h.Server.Limits().PollTokensAt(pollDay1)
 	}
 	if got := f.readCount(); got != reads {
 		t.Fatalf("idle polls read %d times", got-reads)
 	}
 	f.grow(t, 120, 1)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	if f.readCount() == reads {
 		t.Fatal("a grown transcript was not read")
 	}
@@ -311,18 +311,18 @@ func TestTokenPoll_CodexAddsTokensWithoutDollars(t *testing.T) {
 	f.mu.Lock()
 	f.tokens = 500
 	f.mu.Unlock()
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	if f.readCount() != 0 {
 		t.Fatal("polled a Codex session without a rollout")
 	}
 	rollout := filepath.Join(f.h.Env("HOME"), ".codex", "sessions", "2026", "10", "06", "rollout-2026-10-06T00-00-00-"+id+".jsonl")
 	appendLine(t, rollout)
-	f.h.Server.PollTokensAt(pollDay1) // first seen
+	f.h.Server.Limits().PollTokensAt(pollDay1) // first seen
 	f.mu.Lock()
 	f.tokens = 800
 	f.mu.Unlock()
 	appendLine(t, rollout)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	wantRow(t, f.day(t, pollDay1), tokenledger.GroupQueue, "codex", 300, 0)
 }
 
@@ -350,7 +350,7 @@ func newSessionFixture(t *testing.T) *sessionFixture {
 		t.Fatal(err)
 	}
 	f := &sessionFixture{h: h, totals: map[string]int64{}}
-	h.Server.SetTokensOf(func(ref ralphloop.SessionRef) (int64, float64, error) {
+	h.Server.Limits().SetTokensOf(func(ref ralphloop.SessionRef) (int64, float64, error) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		return f.totals[ref.SessionID], 0, nil
@@ -428,9 +428,9 @@ func (f *sessionFixture) rows(t *testing.T) map[string]tokenledger.Row {
 func (f *sessionFixture) poll(t *testing.T, id, harnessName string, first, second int64) {
 	t.Helper()
 	f.grow(t, id, harnessName, first)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	f.grow(t, id, harnessName, second)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 }
 
 func TestTokenPoll_InteractiveSessionGroups(t *testing.T) {
@@ -446,12 +446,12 @@ func TestTokenPoll_InteractiveSessionGroups(t *testing.T) {
 		f.grow(t, id, "claude", 100)
 	}
 	f.grow(t, "cx", "codex", 100)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	for _, id := range []string{"d", "dt", "o", "n", "np"} {
 		f.grow(t, id, "claude", 130)
 	}
 	f.grow(t, "cx", "codex", 150)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 
 	rows := f.rows(t)
 	want := map[string]int64{
@@ -478,7 +478,7 @@ func TestTokenPoll_InteractiveGroupIsFixedAtFirstSight(t *testing.T) {
 	// The person links the session to a map ticket later.
 	f.add(t, "s", "claude", "proj", "proj:design/01", map[string]any{"conversation_id": "conv-s"})
 	f.grow(t, "s", "claude", 200)
-	f.h.Server.PollTokensAt(pollDay1)
+	f.h.Server.Limits().PollTokensAt(pollDay1)
 	rows := f.rows(t)
 	if r := rows["proj/Other/claude"]; r.Tokens != 100 || len(rows) != 1 {
 		t.Fatalf("rows = %+v, want 100 Other tokens only", rows)
@@ -517,7 +517,7 @@ func TestTokenPoll_WaitsForMigrations(t *testing.T) {
 		return nil, nil
 	}})
 	f.h.Restart(t)
-	f.h.Server.SetTokensOf(func(ralphloop.SessionRef) (int64, float64, error) {
+	f.h.Server.Limits().SetTokensOf(func(ralphloop.SessionRef) (int64, float64, error) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.reads++

@@ -149,7 +149,6 @@ type Server struct {
 	oneOffs      *queue.OneOffs
 	ledger       *budgetLedger
 	tokens       *tokenledger.Ledger
-	tokenPoll    tokenPoller
 	limits       *limits.Limits
 	budgetEvents *budgetEvents
 	budgetNotes  budgetNotes
@@ -415,8 +414,10 @@ func New(cfg Config) (*Server, error) {
 		Config: limits.Config{
 			StateDir: cfg.StateDir, TicketStore: cfg.TicketStore,
 			UsagePollInterval: cfg.UsagePollInterval, LimitsEventInterval: cfg.LimitsEventInterval,
+			TokenPollInterval: cfg.TokenPollInterval,
 		},
 		Settings: &s.settings, Projects: s.projects, Events: events, Guards: s.guards, Log: log,
+		Registry: s.registry, Tokens: s.tokens, TokenHost: tokenHost{s},
 		SpendDays: s.ledger.daysCopy,
 	})
 	mux := http.NewServeMux()
@@ -747,7 +748,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
 	tokensDone := make(chan struct{})
-	go func() { defer close(tokensDone); s.keepTokensPolled(freshCtx) }()
+	go func() { defer close(tokensDone); s.limits.KeepTokensPolled(freshCtx) }()
 	gatesDone := make(chan struct{})
 	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
 	cpuDone := make(chan struct{})

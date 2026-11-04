@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tokenledger"
 )
 
 // DayLayout is the local-day key format of the budget ledger, the stats days
@@ -27,16 +28,22 @@ type Config struct {
 	UsagePollInterval time.Duration
 	// LimitsEventInterval spaces limits-changed events; see broker.LimitsInterval.
 	LimitsEventInterval time.Duration
+	// TokenPollInterval is how often live sessions' tokens are metered; zero means DefaultPoll.
+	TokenPollInterval time.Duration
 }
 
 // Deps is what the limits need from the root. SpendDays returns a copy of the
 // budget ledger's per-day totals; the ledger stays in the root until budget moves.
+// Tokens is the token ledger, shared with the stats, which only read it.
 type Deps struct {
 	Config    Config
 	Settings  *settings.Holder
 	Projects  *projects.Registry
 	Events    *broker.Broker
 	Guards    *runs.Guards
+	Registry  *runs.Registry
+	Tokens    *tokenledger.Ledger
+	TokenHost TokenHost
 	Log       *slog.Logger
 	SpendDays func() map[string]float64
 }
@@ -51,6 +58,11 @@ type Limits struct {
 	log       *slog.Logger
 	spendDays func() map[string]float64
 
+	registry  *runs.Registry
+	tokens    *tokenledger.Ledger
+	tokenHost TokenHost
+	tokenPoll tokenPoller
+
 	store      *limitsStore
 	history    *limitHistory
 	usage      *usageSamples // Claude's
@@ -62,7 +74,8 @@ type Limits struct {
 func New(d Deps) *Limits {
 	return &Limits{
 		cfg: d.Config, settings: d.Settings, projects: d.Projects, events: d.Events, guards: d.Guards, log: d.Log,
-		spendDays:  d.SpendDays,
+		spendDays: d.SpendDays,
+		registry:  d.Registry, tokens: d.Tokens, tokenHost: d.TokenHost,
 		store:      openLimitsStore(d.Config.StateDir),
 		history:    openLimitHistory(d.Config.StateDir),
 		usage:      openUsageSamples(d.Config.StateDir),

@@ -16,7 +16,6 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tokenledger"
 )
 
 var (
@@ -97,22 +96,6 @@ func (s *Server) StartOverAsWeb(req wire.RepairRequest) (wire.RepairResult, erro
 // ResumeAs is the resume a client of the given origin sends over the socket.
 func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairResult, error) {
 	return s.repairResume(req, repairCtx{origin: origin})
-}
-
-// SetTokensOf swaps how a session's cumulative tokens and cost are read.
-func (s *Server) SetTokensOf(f TokenReader) { s.tokenPoll.read = f }
-
-// AddLedgerTokens writes a live delta straight into the token ledger.
-func (s *Server) AddLedgerTokens(d tokenledger.Delta) error { return s.tokens.Add(d) }
-
-// PollTokensAt runs one token poll as of now.
-func (s *Server) PollTokensAt(now time.Time) { s.pollTokens(now) }
-
-// TokenTranscriptPath is the file whose change makes the token poll read
-// address's session; false when the ticket has no live session.
-func (s *Server) TokenTranscriptPath(address string) (string, bool) {
-	ts, ok := s.tokenSessionOf(address)
-	return ts.path, ok
 }
 
 // PollBudget runs one budget poll now.

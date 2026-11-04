@@ -2,6 +2,7 @@ package server
 
 import (
 	harnesschoice "github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/webauth"
 )
 
@@ -15,6 +16,10 @@ type queueHost struct {
 // Harness is the server's harness choice. Tests outside the package read it
 // through here.
 func (s *Server) Harness() *harnesschoice.Harness { return s.harness }
+
+// Limits is the usage limits and token poll. Tests outside the package read
+// their seams through here.
+func (s *Server) Limits() *limits.Limits { return s.limits }
 
 // WebAuth is the web login gate, nil unless the web listener is bound. Tests
 // outside the package read its seams through here.
