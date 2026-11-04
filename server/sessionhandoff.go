@@ -28,7 +28,7 @@ func (s *Server) startContinue(dir string, meta sessionMeta, label string, actio
 // charting. Only a harness with a chat reader restarts, as only it has a design Continue.
 func (s *Server) chartingHandoffDue(meta sessionMeta, action []string) bool {
 	return meta.LaunchDesign && meta.Design &&
-		s.settings.Load().hasChatReader(meta.Harness) &&
+		s.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == ralphloop.TierStrongest &&
 		slices.Equal(action, designContinueAction(meta.Ticket, meta.Harness)) &&
 		s.designLaunchTier(meta.Ticket) == ralphloop.TierWorker

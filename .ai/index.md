@@ -53,6 +53,10 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   background and polls.
 - Never run `go clean -cache` directly, use `gx brief go-clean-cache`.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
+- Run every `go test` with `-exec "$PWD/scripts/proc-cap"` (the Makefile does). It caps your user's
+  process count at the current count + 200, so a test binary that forks itself (a `TestMain` missing
+  `servertest.RunSessionProcesses()` or `herdrfake.RunHelperProcess()`) fails fast instead of
+  crashing the laptop. A package using `servertest` needs both calls.
 - Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
   background either.
 - `server/` is the slowest package. Run it only when you touched `server/` or
@@ -121,7 +125,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
-  root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads
+  root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
+  `server/settings/` holds the settings holder, config reload, config status and config file watch
+  (imports `wire` only; the root registers its appliers)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

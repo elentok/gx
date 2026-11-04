@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
@@ -39,11 +38,6 @@ func (s *Server) WebRenewedCount() int {
 	return n
 }
 
-// LiveDiskSpace is the disk-space settings the server currently runs on.
-func (s *Server) LiveDiskSpace() config.DiskSpaceConfig {
-	return s.settings.Load().DiskSpace
-}
-
 // LiveDesignSessionID is the ID of epicAddr's newest live design session
 // leaving out excludeID, or "".
 func (s *Server) LiveDesignSessionID(epicAddr, excludeID string) string {
@@ -63,13 +57,6 @@ func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string 
 // stop skips.
 func (s *Server) LaunchingRuns() int {
 	return len(s.registry.list()) - len(s.killableRuns())
-}
-
-// LockReload holds the reload lock until the returned func runs, so a test can
-// keep a reload in flight.
-func (s *Server) LockReload() (unlock func()) {
-	s.reloadMu.Lock()
-	return s.reloadMu.Unlock
 }
 
 // HardGraceRunning reports whether a hard-limit countdown is running.
@@ -169,9 +156,6 @@ func (s *Server) PollBudget() { s.pollBudget(time.Now()) }
 
 // BudgetStatusAt is the budget status as of now.
 func (s *Server) BudgetStatusAt(now time.Time) wire.BudgetStatus { return s.budgetStatus(now) }
-
-// HardStopAt is the config status's grace countdown deadline.
-func (s *Server) HardStopAt() time.Time { return s.configStatus().HardStopAt }
 
 // RecordProjectSpend adds spend attributed to a project to today's ledger.
 func (s *Server) RecordProjectSpend(project, key string, cost float64) {

@@ -88,12 +88,12 @@ func (s *Server) stopHardGrace() bool {
 // keeps a lowering reload from starting a new countdown between the generation
 // check and the latch; it is let go before the stop, which sleeps.
 func (s *Server) endHardGrace(gen int) {
-	s.reloadMu.Lock()
+	s.settings.Lock()
 	g := &s.hardGrace
 	g.mu.Lock()
 	if g.timer == nil || g.gen != gen {
 		g.mu.Unlock()
-		s.reloadMu.Unlock()
+		s.settings.Unlock()
 		return
 	}
 	g.timer, g.until = nil, time.Time{}
@@ -115,7 +115,7 @@ func (s *Server) endHardGrace(gen int) {
 	} else {
 		s.rearmBudgetNotes(s.budgetStatus(now))
 	}
-	s.reloadMu.Unlock()
+	s.settings.Unlock()
 	s.events.Publish(wire.EventQueueChanged, "")
 	if !hard {
 		s.kickRunner()

@@ -1,4 +1,4 @@
-package server_test
+package settings_test
 
 import (
 	"path/filepath"
@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/settings"
 )
 
 func TestSettingsFromConfig_CarriesDiskSpace(t *testing.T) {
@@ -15,7 +15,7 @@ func TestSettingsFromConfig_CarriesDiskSpace(t *testing.T) {
 	cfg := config.Default()
 	cfg.DiskSpace = config.DiskSpaceConfig{WarnBelow: 30e9, CleanBelow: 5e9, CleanupCommand: []string{"make", "clean"}}
 
-	s := server.SettingsFromConfig(cfg)
+	s := settings.FromConfig(cfg)
 	if s.DiskSpace.WarnBelow != 30e9 || s.DiskSpace.CleanBelow != 5e9 || !slices.Equal(s.DiskSpace.CleanupCommand, []string{"make", "clean"}) {
 		t.Errorf("settings = %+v, want the config's disk-space section", s.DiskSpace)
 	}
@@ -43,7 +43,7 @@ func TestConfigReload_DiskSpaceKeysApply(t *testing.T) {
 			t.Errorf("reload = %+v, want %s changed", res, key)
 		}
 	}
-	got := h.Server.LiveDiskSpace()
+	got := h.Server.Settings().LiveDiskSpace()
 	if got.WarnBelow != 50e9 || got.CleanBelow != 5e9 || !slices.Equal(got.CleanupCommand, []string{"make", "clean"}) {
 		t.Errorf("live = %+v, want 50G, 5G, make clean", got)
 	}

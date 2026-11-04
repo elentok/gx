@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 )
@@ -16,7 +17,10 @@ import (
 // a nil Server to list patterns, so the handlers must not need one yet.
 // A var so the assembly test can swap in a fake list.
 var subsystemRoutes = func(s *Server) []wire.Route {
-	return webtls.Routes(func() *x509.Certificate { return s.webCerts.Root() })
+	return slices.Concat(
+		webtls.Routes(func() *x509.Certificate { return s.webCerts.Root() }),
+		settings.Routes(func() *settings.Holder { return s.Settings() }),
+	)
 }
 
 // registerRoutes puts each route that has a socket handler on mux.

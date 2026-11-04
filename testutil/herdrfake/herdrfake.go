@@ -112,6 +112,12 @@ func (c *Coordinator) elapseTimedOutWaits(h Handler) Handler {
 // trackAgents), so a handler only has to model the states it cares about.
 func StartEnv(t *testing.T, handler Handler) (*Coordinator, []string) {
 	t.Helper()
+	if !helperProcessRan.Load() {
+		// The fake herdr is a symlink to this test binary. Without the
+		// helper hook in TestMain every `herdr` call re-runs the whole suite,
+		// and each rerun starts servers that call herdr again: a fork storm.
+		panic("herdrfake: this package's TestMain must call herdrfake.RunHelperProcess() first")
+	}
 
 	var env []string
 	// The runners under test read claude's vim mode from its config; the host's
@@ -202,6 +208,9 @@ func countCall(argv []string) {
 	_, _ = f.WriteString(line)
 }
 
+// helperProcessRan is set by RunHelperProcess; StartEnv refuses to run without it.
+var helperProcessRan atomic.Bool
+
 // RunHelperProcess must be the first thing called in a package's TestMain,
 // before m.Run. If the process was launched as the fake herdr helper (i.e.
 // GX_HERDR_FAKE_HELPER_SOCKET is set), it forwards its complete argv to the
@@ -214,6 +223,7 @@ func countCall(argv []string) {
 //		os.Exit(m.Run())
 //	}
 func RunHelperProcess() {
+	helperProcessRan.Store(true)
 	sockPath := os.Getenv(helperSocketEnv)
 	if sockPath == "" {
 		return

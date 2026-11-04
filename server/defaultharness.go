@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/settings"
 	"io/fs"
 	"net/http"
 	"os"
@@ -111,7 +112,7 @@ func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetD
 		return wire.SetDefaultHarnessResult{}, err
 	}
 	if req.Scope == wire.DefaultHarnessGlobal {
-		if rr := s.reloadConfig(reloadTriggerCommand); rr.Refused {
+		if rr := s.settings.Reload(settings.TriggerCommand); rr.Refused {
 			return refuseDefaultHarness(rr.Reason, rr.Message)
 		}
 	}

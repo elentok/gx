@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -29,7 +30,10 @@ const TestPidEnv = "GX_SERVERTEST_PID"
 // TestMain must call RunSessionProcesses. Pair it with the fake harness
 // (agentfake.HarnessKind) so no session runs claude.
 func WithTestHolder() func(*server.Config) {
-	return func(c *server.Config) { c.Holder = []string{os.Args[0], holderArg} }
+	return func(c *server.Config) {
+		requireSessionProcesses()
+		c.Holder = []string{os.Args[0], holderArg}
+	}
 }
 
 // WithEnv adds KEY=VALUE entries to the server's env, which its session holders
@@ -72,10 +76,24 @@ func WithAutoAdvanceDelay(d time.Duration) func(*server.Config) {
 	return func(c *server.Config) { c.AutoAdvanceDelay = d }
 }
 
+// sessionProcessesRan is set by RunSessionProcesses. A test binary that spawns
+// itself as a holder without it runs its whole suite again in every child, and
+// each child spawns more: a fork storm that took a laptop down.
+var sessionProcessesRan atomic.Bool
+
+// requireSessionProcesses panics, before anything is spawned, when the test
+// binary's TestMain never called RunSessionProcesses.
+func requireSessionProcesses() {
+	if !sessionProcessesRan.Load() {
+		panic("servertest: this package's TestMain must call servertest.RunSessionProcesses(); without it the test binary re-runs itself as every holder and forks without end")
+	}
+}
+
 // RunSessionProcesses registers the fake harness and, when the test binary
 // was started as a session's holder or as the fake harness's program, runs
 // that and exits. Call it first in TestMain.
 func RunSessionProcesses() {
+	sessionProcessesRan.Store(true)
 	agentfake.RegisterHarness()
 	if len(os.Args) > 1 && os.Args[1] == holderArg {
 		if pid, err := strconv.Atoi(os.Getenv(TestPidEnv)); err == nil {

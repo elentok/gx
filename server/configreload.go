@@ -1,121 +1,19 @@
 package server
 
 import (
-	"context"
-	"errors"
-	"io/fs"
-	"net/http"
-	"os"
 	"reflect"
-	"strings"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 )
-
-// Reload triggers, as logged.
-const (
-	reloadTriggerCommand = "command"
-	reloadTriggerWatch   = "watch"
-)
-
-func (s *Server) configReloadWrite(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, s.reloadConfig(reloadTriggerCommand))
-}
-
-// reloadConfig is the one reload path: read → parse → build → diff → apply →
-// swap → kick → log. Live settings are untouched on any refusal.
-func (s *Server) reloadConfig(trigger string) wire.ReloadResult {
-	s.reloadMu.Lock()
-	res, closeRetired := s.reloadLocked()
-	s.reportReload(trigger, res)
-	s.reloadMu.Unlock()
-	if closeRetired != nil {
-		go closeRetired()
-	}
-	return res
-}
-
-// reloadLocked returns, besides the result, a func that closes what the
-// reload retired; it waits on the network, so it runs after the unlock.
-func (s *Server) reloadLocked() (wire.ReloadResult, func()) {
-	if s.cfg.ConfigPath == "" {
-		return refuseReload(wire.ReasonReloadUnavailable, "this server has no config file to reload"), nil
-	}
-	data, err := os.ReadFile(s.cfg.ConfigPath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return refuseReload(wire.ReasonConfigMissing, "config file "+s.cfg.ConfigPath+" does not exist; settings unchanged"), nil
-	}
-	if err != nil {
-		return refuseReload(wire.ReasonInvalidConfig, err.Error()), nil
-	}
-	cfg, err := config.Parse(data)
-	if err == nil {
-		err = agentrunner.ValidateSetting(cfg.AgentRunner)
-	}
-	if err != nil {
-		return refuseReload(wire.ReasonInvalidConfig, err.Error()), nil
-	}
-
-	old := s.settings.Load()
-	next := reloadableSettings(*old, SettingsFromConfig(cfg))
-	pending := s.startupOnlyChanges(cfg)
-	s.reloads.addPending(pending)
-	res := wire.ReloadResult{Changed: changedKeys(*old, next)}
-	for _, key := range pending {
-		res.Warnings = append(res.Warnings, "restart needed for "+key)
-	}
-	closers := s.appliers.run(*old, next, func() { s.settings.Store(&next) })
-	return res, joinClosers(closers)
-}
-
-// Applier applies one part of a reload. It runs with reloadMu held and may
-// return a func that closes what it retired; that runs after the unlock.
-type Applier func(old, next Settings) (closeRetired func())
-
-// Appliers are the reload's apply steps. Before runs ahead of the settings
-// swap, in registration order; After runs behind it.
-type Appliers struct {
-	Before, After []Applier
-}
-
-// run applies one reload: Before, then swap, then After. It returns the
-// retired-resource closers in the order they were produced.
-func (a Appliers) run(old, next Settings, swap func()) []func() {
-	var closers []func()
-	apply := func(list []Applier) {
-		for _, fn := range list {
-			if c := fn(old, next); c != nil {
-				closers = append(closers, c)
-			}
-		}
-	}
-	apply(a.Before)
-	swap()
-	apply(a.After)
-	return closers
-}
-
-func joinClosers(closers []func()) func() {
-	if len(closers) == 0 {
-		return nil
-	}
-	return func() {
-		for _, c := range closers {
-			c()
-		}
-	}
-}
 
 // reloadAppliers is the root's registration. The order is the apply order:
 // budget, chat, store commits, swap, then certs, config watch, log prune and
 // the runner kick.
-func (s *Server) reloadAppliers() Appliers {
-	return Appliers{
-		Before: []Applier{
+func (s *Server) reloadAppliers() settings.Appliers {
+	return settings.Appliers{
+		Before: []settings.Applier{
 			func(old, next Settings) func() { s.applyBudgetLimits(old, next); return nil },
 			func(old, next Settings) func() {
 				if next.Chat == old.Chat {
@@ -123,14 +21,9 @@ func (s *Server) reloadAppliers() Appliers {
 				}
 				return s.chat.SetGlobal(next.Chat)
 			},
-			func(old, next Settings) func() {
-				if s.storeCommits != nil && (next.StoreCommitDebounce != old.StoreCommitDebounce || next.StorePushRemote != old.StorePushRemote) {
-					s.storeCommits.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
-				}
-				return nil
-			},
+			s.settings.ApplyStoreCommits,
 		},
-		After: []Applier{
+		After: []settings.Applier{
 			func(old, next Settings) func() {
 				if s.webCerts != nil && !reflect.DeepEqual(old.WebAllowedHosts, next.WebAllowedHosts) {
 					if err := s.webCerts.Reissue(); err != nil {
@@ -139,12 +32,7 @@ func (s *Server) reloadAppliers() Appliers {
 				}
 				return nil
 			},
-			func(old, next Settings) func() {
-				if next.WatchConfig != old.WatchConfig {
-					s.setConfigWatchLocked(next.WatchConfig)
-				}
-				return nil
-			},
+			s.settings.ApplyWatchConfig,
 			func(old, next Settings) func() {
 				if next.LogRetention != old.LogRetention {
 					s.pruneAgentLogs(time.Now())
@@ -155,6 +43,9 @@ func (s *Server) reloadAppliers() Appliers {
 		},
 	}
 }
+
+// banner shows one config-style OS banner and streams it as an event.
+func (s *Server) banner(level, title, body string) { s.settings.Banner(level, title, body) }
 
 // applyBudgetLimits applies each budget limit whose file value changed since
 // the last load to the ledger's live limit, then re-evaluates the latches as
@@ -188,157 +79,4 @@ func (s *Server) applyBudgetLimits(old, next Settings) {
 	s.cancelHardGrace()
 	s.rearmBudgetNotes(s.budgetStatus(now))
 	s.events.Publish(wire.EventQueueChanged, "")
-}
-
-// reloadableSettings is next with the chat test seams, which are not config
-// keys, carried over from the live settings.
-func reloadableSettings(old, next Settings) Settings {
-	next.ChatHarness, next.RemoteControlHarness = old.ChatHarness, old.RemoteControlHarness
-	// Config only holds claude or codex, so any other default is a test's fake
-	// harness and survives a reload like the other seams.
-	if old.AgentsDefaultHarness != "" && string(defaultOrClaude(old.AgentsDefaultHarness)) != old.AgentsDefaultHarness {
-		next.AgentsDefaultHarness = old.AgentsDefaultHarness
-	}
-	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval
-	return next
-}
-
-// changedKeys names the applied config keys whose value differs.
-func changedKeys(old, next Settings) []string {
-	fields := []struct {
-		key       string
-		old, next any
-	}{
-		{"execution-queue.max-agents", old.MaxAgents, next.MaxAgents},
-		{"execution-queue.max-agents-per-epic", old.MaxAgentsPerRoot, next.MaxAgentsPerRoot},
-		{"execution-queue.max-one-off-agents", old.MaxOneOffAgents, next.MaxOneOffAgents},
-		{"execution-queue.waiting-slot-grace", old.WaitingSlotGrace, next.WaitingSlotGrace},
-		{"execution-queue.max-released-agents", old.MaxReleasedAgents, next.MaxReleasedAgents},
-		{"execution-queue.stalled-nudge-delay", old.StalledNudgeDelay, next.StalledNudgeDelay},
-		{"budget.soft-limit", old.BudgetSoftLimit, next.BudgetSoftLimit},
-		{"budget.hard-limit", old.BudgetHardLimit, next.BudgetHardLimit},
-		{"disk-space.warn-below", old.DiskSpace.WarnBelow, next.DiskSpace.WarnBelow},
-		{"disk-space.clean-below", old.DiskSpace.CleanBelow, next.DiskSpace.CleanBelow},
-		{"disk-space.cleanup-command", old.DiskSpace.CleanupCommand, next.DiskSpace.CleanupCommand},
-		{"server.tab-env", old.TabEnv, next.TabEnv},
-		{"server.log-retention", old.LogRetention, next.LogRetention},
-		{"server.watch-config", old.WatchConfig, next.WatchConfig},
-		{"server.recently-finished", old.RecentlyFinished, next.RecentlyFinished},
-		{"server.web.allowed-hosts", old.WebAllowedHosts, next.WebAllowedHosts},
-		{"server.web.totp", old.WebTOTPOff, next.WebTOTPOff},
-		{"evolve", old.Evolve, next.Evolve},
-		{"recovery.enabled", old.RecoverySettings.Enabled, next.RecoverySettings.Enabled},
-		{"recovery.disabled", old.RecoverySettings.Disabled, next.RecoverySettings.Disabled},
-		{"recovery.follow-ups", old.RecoverySettings.FollowUps, next.RecoverySettings.FollowUps},
-		{"recovery.notify-hold", old.RecoverySettings.NotifyHold, next.RecoverySettings.NotifyHold},
-		{"subscription.suppress-extra-usage-warning", old.SuppressExtraUsageWarning, next.SuppressExtraUsageWarning},
-		{"notifications.telegram.bot-token", old.Chat.TelegramBotToken, next.Chat.TelegramBotToken},
-		{"notifications.telegram.chat-id", old.Chat.TelegramChatID, next.Chat.TelegramChatID},
-		{"notifications.slack.webhook-url", old.Chat.SlackWebhookURL, next.Chat.SlackWebhookURL},
-		{"ticket-store.commit-debounce", old.StoreCommitDebounce, next.StoreCommitDebounce},
-		{"ticket-store.push-remote", old.StorePushRemote, next.StorePushRemote},
-		{"agents.restore-sessions-on-start", old.AgentsResumeOnStart, next.AgentsResumeOnStart},
-		{"agents.banners.enabled", old.AgentsBanners, next.AgentsBanners},
-		{"agents.sounds", old.AgentsSounds, next.AgentsSounds},
-		{"agents.claude-args", old.AgentsClaudeArgs, next.AgentsClaudeArgs},
-		{"agents.fix-agent-remote-control", old.AgentsFixAgentRemoteControl, next.AgentsFixAgentRemoteControl},
-		{"agents.claude", old.AgentsClaude, next.AgentsClaude},
-		{"agents.codex", old.AgentsCodex, next.AgentsCodex},
-		{"agents.default-harness", old.AgentsDefaultHarness, next.AgentsDefaultHarness},
-	}
-	var keys []string
-	for _, f := range fields {
-		if !reflect.DeepEqual(f.old, f.next) {
-			keys = append(keys, f.key)
-		}
-	}
-	return keys
-}
-
-// startupOnlyChanges compares the startup-only keys with the values the
-// server started with, so a warning repeats on every reload until restart.
-func (s *Server) startupOnlyChanges(cfg config.Config) []string {
-	var keys []string
-	if cfg.TicketStore.Path != s.cfg.TicketStore {
-		keys = append(keys, "ticket-store.path")
-	}
-	if cfg.Server.TCPListen != (s.cfg.TCPAddr != "") {
-		keys = append(keys, "server.tcp-listen")
-	}
-	if cfg.Server.Web.Listen != s.cfg.WebAddr {
-		keys = append(keys, "server.web.listen")
-	}
-	if cfg.Server.Web.DevFrontendURL() != s.cfg.WebDevURL {
-		keys = append(keys, "server.web.dev-frontend")
-	}
-	if runnerChoice(cfg.AgentRunner) != runnerChoice(s.cfg.AgentRunner) {
-		keys = append(keys, "agent-runner")
-	}
-	return keys
-}
-
-// runnerChoice treats an unset agent-runner as auto, its documented default.
-func runnerChoice(setting string) agentrunner.Choice {
-	if setting == "" {
-		return agentrunner.ChoiceAuto
-	}
-	return agentrunner.Choice(setting)
-}
-
-func refuseReload(reason, message string) wire.ReloadResult {
-	return wire.ReloadResult{Refused: true, Reason: reason, Message: message}
-}
-
-// reportReload sends one result to the log, an OS banner and the event
-// stream. Never to chat: a reload is something the person just did at the
-// machine, not news worth a phone notification.
-func (s *Server) reportReload(trigger string, res wire.ReloadResult) {
-	if res.Refused {
-		s.log.Warn("config reload refused", "trigger", trigger, "reason", res.Reason, "message", res.Message)
-	} else {
-		s.log.Info("config reloaded", "trigger", trigger, "changed", res.Changed, "warnings", res.Warnings)
-	}
-	level, title, body := reloadBanner(res)
-	s.reloads.setLast(wire.ReloadRecord{At: time.Now(), Trigger: trigger, Outcome: level, Message: joinBanner(title, body)})
-	s.banner(level, title, body)
-}
-
-// configBannerGroup makes each config banner replace the previous one.
-const configBannerGroup = "gx-config"
-
-// banner shows one OS banner and streams it as a config-reloaded event, for
-// the TUI to toast at its level.
-func (s *Server) banner(level, title, body string) {
-	go func() {
-		if err := s.cfg.Notifier.Notify(context.Background(), osnotify.Notification{Title: title, Body: body, Group: configBannerGroup}); err != nil {
-			s.log.Warn("OS banner failed", "title", title, "error", err)
-		}
-	}()
-	s.events.PublishEvent(wire.Event{Type: wire.EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
-}
-
-func joinBanner(title, body string) string {
-	if body == "" {
-		return title
-	}
-	return title + ": " + body
-}
-
-// maxBannerBody keeps a long parse error from overflowing the banner.
-const maxBannerBody = 200
-
-func reloadBanner(res wire.ReloadResult) (level, title, body string) {
-	switch {
-	case res.Refused:
-		body = res.Message
-		if r := []rune(body); len(r) > maxBannerBody {
-			body = string(r[:maxBannerBody-1]) + "…"
-		}
-		return wire.EventLevelError, "gx config reload failed", body
-	case len(res.Warnings) > 0:
-		return wire.EventLevelWarning, "gx config reloaded with warnings", strings.Join(res.Warnings, "; ")
-	case len(res.Changed) > 0:
-		return wire.EventLevelSuccess, "gx config reloaded successfully", "changed: " + strings.Join(res.Changed, ", ")
-	}
-	return wire.EventLevelSuccess, "gx config reloaded successfully", "no changes"
 }

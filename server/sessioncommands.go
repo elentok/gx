@@ -65,7 +65,7 @@ func (s *Server) commandHarness(name string) (string, bool) {
 	switch {
 	case name == string(harness.Codex):
 		return string(harness.Codex), true
-	case s.settings.Load().hasChatReader(name):
+	case s.settings.Load().HasChatReader(name):
 		return string(harness.Claude), true
 	}
 	return "", false

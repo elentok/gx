@@ -29,13 +29,12 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
-	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -51,157 +50,9 @@ const (
 func SocketPath(stateDir string) string { return filepath.Join(stateDir, socketFileName) }
 
 // Settings are the Config fields a config reload may change. The server reads
-// them through an atomic snapshot (Server.settings), never from Config.
-type Settings struct {
-	TabEnv []string // KEY=VALUE entries set on each iteration tab
-	// Evolve is the global evolve mode (config.Evolve*); empty means off.
-	Evolve string
-
-	// LogRetention is how long a headless agent's logs are kept after its last
-	// activity; zero means nativerunner.DefaultLogRetention.
-	LogRetention time.Duration
-
-	// BudgetSoftLimit and BudgetHardLimit are config.Budget's daily limits in
-	// dollars, reported in the budget status; zero means off.
-	BudgetSoftLimit float64
-	BudgetHardLimit float64
-
-	// LongTicketTurns is config.Budget's long-ticket alert threshold in
-	// assistant turns; zero means off.
-	LongTicketTurns int
-
-	// Recovery is the catalog with the user's kill switch and disables applied.
-	// The zero value is off.
-	Recovery recovery.Catalog
-	// RecoverySettings is the loaded config recovery block, defaults applied.
-	// An empty FollowUps means DefaultFollowUps; a zero NotifyHold sends a
-	// pause's chat message without waiting for recovery.
-	RecoverySettings config.RecoveryConfig
-
-	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
-	// A zero debounce means 60s.
-	StoreCommitDebounce time.Duration
-	StorePushRemote     string
-
-	// MaxAgents caps live agents across all projects (config
-	// execution-queue.max-agents); zero means the config default.
-	MaxAgents int
-	// MaxAgentsPerRoot caps live agents of one root (config
-	// execution-queue.max-agents-per-epic). Zero means the default.
-	MaxAgentsPerRoot int
-	// MaxOneOffAgents caps live agents across one project's one-offs (config
-	// execution-queue.max-one-off-agents).
-	MaxOneOffAgents int
-	// WaitingSlotGrace and MaxReleasedAgents are config
-	// execution-queue.waiting-slot-grace and .max-released-agents; zero grace
-	// means the config default.
-	WaitingSlotGrace  time.Duration
-	MaxReleasedAgents int
-	// StalledNudgeDelay is config execution-queue.stalled-nudge-delay; zero
-	// means the config default.
-	StalledNudgeDelay time.Duration
-
-	// Chat names the chat destinations the server notifies; empty means none.
-	Chat ralphloop.ServerChatConfig
-
-	// SuppressExtraUsageWarning is config subscription.suppress-extra-usage-warning.
-	SuppressExtraUsageWarning bool
-
-	// WatchConfig reloads Config.ConfigPath whenever it is saved.
-	WatchConfig bool
-
-	// The interactive-session keys of config agents.*.
-	AgentsResumeOnStart bool
-	AgentsBanners       bool
-	AgentsSounds        config.AgentsSoundsConfig
-	AgentsClaudeArgs    []string
-	// AgentsFixAgentRemoteControl is read at each fix-agent start.
-	AgentsFixAgentRemoteControl bool
-
-	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
-	CPUWatchdog config.CPUWatchdogConfig
-
-	// DiskSpace is config disk-space: the free-space thresholds and cleanup
-	// command. Zero thresholds mean off, so hand-built Settings stay off.
-	DiskSpace config.DiskSpaceConfig
-
-	// RecentlyFinished is config server.recently-finished: how many completed
-	// epics the snapshot lists. Zero lists none; the config layer supplies
-	// config.DefaultRecentlyFinished when the key is unset.
-	RecentlyFinished int
-
-	// AgentsClaude and AgentsCodex are the global model and effort of config
-	// agents.*, before a project's overrides.
-	AgentsClaude config.AgentConfig
-	AgentsCodex  config.AgentConfig
-	// AgentsDefaultHarness is config agents.default-harness; empty means claude.
-	AgentsDefaultHarness string
-
-	// WebAllowedHosts is config server.web.allowed-hosts: names, besides IP
-	// literals and localhost, that the web listener accepts in Host.
-	WebAllowedHosts []string
-
-	// WebTOTPOff is config server.web.totp turned off. Inverted so a zero
-	// Settings keeps TOTP on.
-	WebTOTPOff bool
-
-	// WebInterfaceIPs lists the local interface IPs the web URL may fall back
-	// to; nil reads the machine's interfaces. Tests inject it.
-	WebInterfaceIPs func() []net.IP
-
-	// ChatHarness names the harness whose transcripts the session chat reads;
-	// empty means claude. Not a config key: servertest points it at the fake
-	// harness.
-	ChatHarness string
-
-	// RemoteControlHarness names the harness a fix-agent session may start
-	// with --remote-control; empty means claude. Not a config key: servertest
-	// points it at the fake harness, whose launch args stay unflagged.
-	RemoteControlHarness string
-}
-
-// SettingsFromConfig maps the user config to the server's reloadable
-// settings. Startup and reload both use it, so the two never disagree.
-func SettingsFromConfig(cfg config.Config) Settings {
-	return Settings{
-		TabEnv:              cfg.Server.TabEnv,
-		Evolve:              cfg.Evolve,
-		LogRetention:        cfg.Server.LogRetention,
-		BudgetSoftLimit:     cfg.Budget.SoftLimit,
-		BudgetHardLimit:     cfg.Budget.HardLimit,
-		LongTicketTurns:     cfg.Budget.LongTicketTurns,
-		Recovery:            recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
-		RecoverySettings:    cfg.Recovery,
-		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second,
-		StorePushRemote:     cfg.TicketStore.PushRemote,
-		MaxAgents:           cfg.ExecutionQueue.MaxAgents,
-		MaxAgentsPerRoot:    cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
-		MaxOneOffAgents:     cfg.ExecutionQueue.MaxOneOffAgents,
-		WaitingSlotGrace:    cfg.ExecutionQueue.WaitingSlotGrace,
-		MaxReleasedAgents:   cfg.ExecutionQueue.MaxReleasedAgents,
-		StalledNudgeDelay:   cfg.ExecutionQueue.StalledNudgeDelay,
-		Chat: ralphloop.ServerChatConfig{
-			TelegramBotToken: cfg.Notifications.Telegram.BotToken,
-			TelegramChatID:   cfg.Notifications.Telegram.ChatID,
-			SlackWebhookURL:  cfg.Notifications.Slack.WebhookURL,
-		},
-		SuppressExtraUsageWarning:   cfg.Subscription.SuppressExtraUsageWarning,
-		WatchConfig:                 cfg.Server.WatchConfig,
-		AgentsResumeOnStart:         cfg.Agents.ResumeOnStart,
-		AgentsBanners:               cfg.Agents.Banners.Enabled,
-		AgentsSounds:                cfg.Agents.Sounds,
-		AgentsClaudeArgs:            cfg.Agents.ClaudeArgs,
-		AgentsFixAgentRemoteControl: cfg.Agents.FixAgentRemoteControl,
-		CPUWatchdog:                 cfg.CPUWatchdog,
-		DiskSpace:                   cfg.DiskSpace,
-		RecentlyFinished:            cfg.Server.RecentlyFinished,
-		AgentsClaude:                cfg.Agents.Claude,
-		AgentsCodex:                 cfg.Agents.Codex,
-		AgentsDefaultHarness:        cfg.Agents.DefaultHarness,
-		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
-		WebTOTPOff:                  !cfg.Server.Web.TOTP,
-	}
-}
+// them through an atomic snapshot (Server.settings.Load), never from Config.
+// It is an alias so the many readers and hand-built test values keep the name.
+type Settings = settings.Settings
 
 // Defaults for the session-prompting timings in Config. A zero Config field
 // means the default; PromptGrace defaults to claudeui.DefaultNudgeCaps.
@@ -230,15 +81,13 @@ type Server struct {
 	routes []wire.Route
 	// instanceID is new on every start: a restart is done when it changes.
 	instanceID string
-	// settings is the live copy of cfg.Settings. A reader loads it once per
-	// decision; a reload swaps in a new value and never mutates the old one.
-	settings atomic.Pointer[Settings]
-	reloadMu sync.Mutex // serializes config reloads
-	appliers Appliers   // what a reload applies, filled by the root
+	// settings is the live copy of cfg.Settings, its reload, status, config
+	// watcher and store commit loop. A reader loads it once per decision; a
+	// reload swaps in a new value and never mutates the old one.
+	settings settings.Holder
 	// restarting is set once a restart is under way and never cleared on
 	// success: the new server replaces this one.
 	restarting atomic.Bool
-	reloads    reloadHistory
 	// recorded caches sessionRecorded, which globs every Claude project dir.
 	recorded recordedCache
 	// cpuSpikes holds the CPU ticket cooldown.
@@ -264,12 +113,6 @@ type Server struct {
 	// filedRounds holds the round markers already in the follow-ups epic, so an
 	// Idle detection never rescans its tickets.
 	filedRounds sync.Map
-	// storeCommits is nil until the store commit loop starts; guarded by
-	// reloadMu so a reload racing the start is never lost.
-	storeCommits *storecommit.Loop
-	// configWatch runs the config watcher; guarded by reloadMu, so a reload
-	// toggling server.watch-config only ever cancels a context.
-	configWatch configWatch
 	lock        *serverLock
 	ln          net.Listener
 	tcp         net.Listener // nil unless Config.TCPAddr is set
@@ -554,8 +397,29 @@ func New(cfg Config) (*Server, error) {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
 	s.pauseFold.onCap = s.flushPauseFold
+	s.settings.Init(settings.Options{
+		ConfigPath: cfg.ConfigPath,
+		Startup: settings.Startup{
+			TicketStore: cfg.TicketStore,
+			TCPListen:   cfg.TCPAddr != "",
+			WebAddr:     cfg.WebAddr,
+			WebDevURL:   cfg.WebDevURL,
+			AgentRunner: cfg.AgentRunner,
+		},
+		WatchDebounce: cfg.ConfigWatchDebounce,
+		Notifier:      cfg.Notifier,
+		Log:           log,
+		Events:        events,
+		Env:           cfg.Env,
+		HardStopAt: func() time.Time {
+			if s.ledger.held() {
+				return s.hardGrace.deadline()
+			}
+			return time.Time{}
+		},
+	})
 	s.settings.Store(&cfg.Settings)
-	s.appliers = s.reloadAppliers()
+	s.settings.SetAppliers(s.reloadAppliers())
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
@@ -597,8 +461,6 @@ var routeTable = []struct {
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
 	{"POST /v1/usage/report", (*Server).limitsReportWrite},
-	{"POST /v1/config/reload", (*Server).configReloadWrite},
-	{"GET /v1/config/status", (*Server).configStatusRead},
 	{"GET /v1/disk/status", (*Server).diskStatusRead},
 	{"GET /v1/health", (*Server).healthRead},
 	{"GET /v1/usage/summary", (*Server).usageSummaryRead},
@@ -859,7 +721,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.startExtraUsageCheck(time.Now())
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	// Armed before the socket serves, so no save after startup goes unseen.
-	s.startConfigWatch(freshCtx)
+	s.settings.StartConfigWatch(freshCtx)
 	// Before the socket serves, so a session created at startup is never
 	// taken for one whose holder died while the server was down.
 	s.restoreSessions()
@@ -884,7 +746,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	// recoverMerges, reclaimRuns, the log prune and the first scan run in
 	// keepFresh once the migrations end.
 	stopCommits := func() {}
-	if stop, err := s.startStoreCommits(); err != nil {
+	if stop, err := s.settings.StartStoreCommits(); err != nil {
 		s.log.Error("store commit loop failed to start", "err", err)
 	} else {
 		stopCommits = stop
@@ -965,7 +827,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	recordShutdown("config-watch-wait")
-	s.configWatch.running.Wait()
+	s.settings.WaitConfigWatch()
 	recordShutdown("stop-hard-grace")
 	s.stopHardGrace()
 	timeout := s.cfg.MergeStopTimeout
@@ -1001,34 +863,6 @@ func recordShutdown(step string) {
 	}
 }
 
-func (s Settings) storeCommitDebounce() time.Duration {
-	if s.StoreCommitDebounce <= 0 {
-		return time.Duration(config.DefaultCommitDebounceSeconds) * time.Second
-	}
-	return s.StoreCommitDebounce
-}
-
-// startStoreCommits makes the server the store's committer and commits edits
-// made while it was down.
-func (s *Server) startStoreCommits() (stop func(), err error) {
-	if s.cfg.TicketStore == "" {
-		return func() {}, nil
-	}
-	s.reloadMu.Lock()
-	set := s.settings.Load()
-	loop, err := storecommit.StartWith(s.cfg.TicketStore, storecommit.Options{
-		Debounce:   set.storeCommitDebounce(),
-		PushRemote: set.StorePushRemote,
-		OnError:    func(err error) { s.log.Warn("store push failed", "err", err) },
-		Env:        s.cfg.Env,
-	})
-	s.storeCommits = loop
-	s.reloadMu.Unlock()
-	if err != nil {
-		return nil, err
-	}
-	if err := loop.Flush(); err != nil {
-		s.log.Warn("committing down-time store edits failed", "err", err)
-	}
-	return loop.Stop, nil
-}
+// Settings is the settings subsystem, for tests that reach its seams from
+// outside the package.
+func (s *Server) Settings() *settings.Holder { return &s.settings }

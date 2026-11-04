@@ -37,7 +37,7 @@ func (m turnMark) turnEnded() (bool, error) {
 // whose harness has no chat, or no transcript yet, is not marked.
 func (s *Server) markTurn(dir, id string) (turnMark, bool) {
 	meta, err := readSessionMeta(dir)
-	if err != nil || !s.settings.Load().hasChatReader(meta.Harness) {
+	if err != nil || !s.settings.Load().HasChatReader(meta.Harness) {
 		return turnMark{}, false
 	}
 	path, kind, ok := s.chatTranscript(id, meta)

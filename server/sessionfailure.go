@@ -122,7 +122,7 @@ func (s *Server) sessionInfo(m sessionMeta) wire.SessionInfo {
 // stalls are read elsewhere.
 func (s *Server) transcriptFailure(m sessionMeta) *wire.SessionFailure {
 	state := m.Status.State
-	if state != wire.SessionIdle && state != wire.SessionWorking || m.Harness == string(harness.Codex) || !s.settings.Load().hasChatReader(m.Harness) {
+	if state != wire.SessionIdle && state != wire.SessionWorking || m.Harness == string(harness.Codex) || !s.settings.Load().HasChatReader(m.Harness) {
 		return nil
 	}
 	path, ok := s.claudeTranscript(m.ID, m)

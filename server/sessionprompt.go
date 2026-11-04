@@ -76,7 +76,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if req.Continue && !meta.Design {
 		return sessionRefusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
-	if !s.settings.Load().hasChatReader(meta.Harness) {
+	if !s.settings.Load().HasChatReader(meta.Harness) {
 		return sessionRefusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
 	text, refusal := validatePromptText(req.Text, "text")

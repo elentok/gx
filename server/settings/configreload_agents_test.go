@@ -1,4 +1,4 @@
-package server_test
+package settings_test
 
 import (
 	"path/filepath"
@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/settings"
 )
 
 func TestSettingsFromConfig_CarriesAgentsSessionKeys(t *testing.T) {
@@ -18,7 +18,7 @@ func TestSettingsFromConfig_CarriesAgentsSessionKeys(t *testing.T) {
 	cfg.Agents.Sounds = config.AgentsSoundsConfig{Enabled: false, Done: "done.aiff", Attention: "attention.aiff"}
 	cfg.Agents.ClaudeArgs = []string{"--verbose"}
 
-	s := server.SettingsFromConfig(cfg)
+	s := settings.FromConfig(cfg)
 	if s.AgentsResumeOnStart || s.AgentsBanners || s.AgentsSounds != cfg.Agents.Sounds || !slices.Equal(s.AgentsClaudeArgs, cfg.Agents.ClaudeArgs) {
 		t.Errorf("settings = resume %v, banners %v, sounds %+v, args %v; want the config's agents keys",
 			s.AgentsResumeOnStart, s.AgentsBanners, s.AgentsSounds, s.AgentsClaudeArgs)

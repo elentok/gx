@@ -103,6 +103,7 @@ func (r *ptyRunner) prompt(s agentrunner.Session, text string, onNudge func(stri
 // test binary as holder and as the TUI fake. serve calls it on every start, so
 // a Restart gets fresh runners that reattach to the live holders.
 func (h *Harness) buildPty() {
+	requireSessionProcesses()
 	exe := os.Args[0]
 	// The fake gives the ready signal and the launch record by default; a test's
 	// own TUIReadyDelayEnv in cfg.Env still wins.

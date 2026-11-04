@@ -1,7 +1,6 @@
 package server
 
 import (
-	"cmp"
 	"net/http"
 	"os"
 	"sync"
@@ -189,17 +188,6 @@ func (c chatSnapshot) background(now time.Time) []wire.SessionBackgroundTask {
 	return out
 }
 
-// chatHarness is the harness whose transcripts the chat reads.
-func (s Settings) chatHarness() string {
-	return cmp.Or(s.ChatHarness, string(harness.Claude))
-}
-
-// hasChatReader says whether sessions of harnessName have a chat reader: Codex,
-// and the chat harness, which reads the Claude format.
-func (s Settings) hasChatReader(harnessName string) bool {
-	return harnessName == string(harness.Codex) || harnessName == s.chatHarness()
-}
-
 // chatTranscript finds the conversation file of a session with a chat reader,
 // and the format kind to read it with.
 func (s *Server) chatTranscript(id string, meta sessionMeta) (string, agentrunner.Kind, bool) {
@@ -248,7 +236,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := wire.SessionChatResponse{ConversationID: meta.ConversationID, Messages: []wire.SessionChatMessage{}, Background: []wire.SessionBackgroundTask{}, Failure: s.sessionInfo(meta).Failure}
-	if !s.settings.Load().hasChatReader(meta.Harness) {
+	if !s.settings.Load().HasChatReader(meta.Harness) {
 		out.Unsupported = true
 		writeJSON(w, out)
 		return

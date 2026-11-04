@@ -45,10 +45,10 @@ test:
 # e2e runs the herdr e2e suite against a real, already-running herdr daemon
 # (herdr must be on PATH). Tests skip themselves if either isn't available.
 e2e:
-	GX_E2E=1 HERDR_ENV=1 go test ./e2e/... -timeout=2m
+	GX_E2E=1 HERDR_ENV=1 go test -exec "$(CURDIR)/scripts/proc-cap" ./e2e/... -timeout=2m
 
 coverage:
-	go test ./... -coverprofile=coverage.out
+	go test -exec "$(CURDIR)/scripts/proc-cap" ./... -coverprofile=coverage.out
 	go tool cover -func=coverage.out
 
 test-docker-ubuntu:

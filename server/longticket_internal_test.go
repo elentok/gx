@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -21,6 +22,7 @@ func TestAlertLongTicket_ASecondLongTicketAddsSeenAgainNotANewDraft(t *testing.T
 	s, store, _, path := mergedInvestigation(t, investigateReport(proposalHumanOnly), "proj:follow-ups")
 	s.cfg.Notifier = noopNotifier{}
 	s.events = broker.New(0)
+	s.settings.Init(settings.Options{Notifier: noopNotifier{}, Log: s.log, Events: s.events})
 	s.chat = ralphloop.NewServerChat(ralphloop.ServerChatConfig{})
 
 	s.alertLongTicket(tickets.Address{Project: "proj", Epic: "epic-a", ID: "01"}, path, 3)

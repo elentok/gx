@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Run a command with a hard cap on this user's process count: current count
+# plus ${GX_PROC_HEADROOM:-200}. macOS counts every process of the uid, so a
+# fixed number would be below the baseline. A fork storm then fails with
+# "Resource temporarily unavailable" instead of taking the laptop down.
+# Use it as `go test -exec "$PWD/scripts/proc-cap"`: a test binary that re-runs
+# itself (a missing TestMain hook) once crashed the machine with 4,658 processes.
+set -euo pipefail
+base=$(ps -u "$(id -u)" -o pid= | wc -l)
+cap=$((base + ${GX_PROC_HEADROOM:-200}))
+ulimit -u "$cap"
+exec "$@"

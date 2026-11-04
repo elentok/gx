@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -112,7 +113,7 @@ func TestConfigReloadChat_ChangedDestinationTakesLaterMessages(t *testing.T) {
 	defer s.chat.Close()
 
 	writeChatConfig(t, s, path, newHook.URL, 3)
-	if res := s.reloadConfig(reloadTriggerCommand); !slices.Contains(res.Changed, "notifications.slack.webhook-url") {
+	if res := s.settings.Reload(settings.TriggerCommand); !slices.Contains(res.Changed, "notifications.slack.webhook-url") {
 		t.Fatalf("reload = %+v, want webhook-url changed", res)
 	}
 	notice(s, "after-reload")
@@ -129,7 +130,7 @@ func TestConfigReloadChat_RemovedCredentialsStopMessages(t *testing.T) {
 	defer s.chat.Close()
 
 	writeChatConfig(t, s, path, "", 3)
-	s.reloadConfig(reloadTriggerCommand)
+	s.settings.Reload(settings.TriggerCommand)
 	notice(s, "after-reload")
 	time.Sleep(200 * time.Millisecond) // negative wait: a send would come within a few 50ms chat polls
 	if got := hook.sent(); len(got) != 0 || s.chat.Enabled() {
@@ -146,7 +147,7 @@ func TestConfigReloadChat_UnchangedChatKeepsTheBatch(t *testing.T) {
 
 	notice(s, "before-reload")
 	writeChatConfig(t, s, path, hook.URL, 4)
-	if res := s.reloadConfig(reloadTriggerCommand); slices.Contains(res.Changed, "notifications.slack.webhook-url") {
+	if res := s.settings.Reload(settings.TriggerCommand); slices.Contains(res.Changed, "notifications.slack.webhook-url") {
 		t.Fatalf("reload = %+v, want chat unchanged", res)
 	}
 	notice(s, "after-reload")
@@ -164,7 +165,7 @@ func TestConfigReloadChat_ProjectSinkKeepsItsBatch(t *testing.T) {
 
 	s.chat.Pause("proj", override, "epic", "/t/01.md", "01", "paused", "zero-commit", "before-reload", ralphloop.EpicCounts{})
 	writeChatConfig(t, s, path, newHook.URL, 3)
-	s.reloadConfig(reloadTriggerCommand)
+	s.settings.Reload(settings.TriggerCommand)
 	s.chat.Pause("proj", override, "epic", "/t/02.md", "02", "paused", "zero-commit", "after-reload", ralphloop.EpicCounts{})
 	s.chat.Close()
 	if got := projectHook.sent(); len(got) != 1 || !strings.Contains(got[0], "before-reload") || !strings.Contains(got[0], "after-reload") {
@@ -183,7 +184,7 @@ func TestConfigReloadChat_ReturnsBeforeOldSinkCloses(t *testing.T) {
 	writeChatConfig(t, s, path, newHook.URL, 3)
 	done := make(chan struct{})
 	go func() {
-		s.reloadConfig(reloadTriggerCommand)
+		s.settings.Reload(settings.TriggerCommand)
 		close(done)
 	}()
 	select {
