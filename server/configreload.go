@@ -68,28 +68,92 @@ func (s *Server) reloadLocked() (wire.ReloadResult, func()) {
 	for _, key := range pending {
 		res.Warnings = append(res.Warnings, "restart needed for "+key)
 	}
-	s.applyBudgetLimits(*old, next)
-	var closeRetired func()
-	if next.Chat != old.Chat {
-		closeRetired = s.chat.SetGlobal(next.Chat)
-	}
-	if s.storeCommits != nil && (next.StoreCommitDebounce != old.StoreCommitDebounce || next.StorePushRemote != old.StorePushRemote) {
-		s.storeCommits.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
-	}
-	s.settings.Store(&next)
-	if s.webCerts != nil && !reflect.DeepEqual(old.WebAllowedHosts, next.WebAllowedHosts) {
-		if err := s.webCerts.Reissue(); err != nil {
-			s.log.Error("web certificate re-issue failed", "err", err)
+	closers := s.appliers.run(*old, next, func() { s.settings.Store(&next) })
+	return res, joinClosers(closers)
+}
+
+// Applier applies one part of a reload. It runs with reloadMu held and may
+// return a func that closes what it retired; that runs after the unlock.
+type Applier func(old, next Settings) (closeRetired func())
+
+// Appliers are the reload's apply steps. Before runs ahead of the settings
+// swap, in registration order; After runs behind it.
+type Appliers struct {
+	Before, After []Applier
+}
+
+// run applies one reload: Before, then swap, then After. It returns the
+// retired-resource closers in the order they were produced.
+func (a Appliers) run(old, next Settings, swap func()) []func() {
+	var closers []func()
+	apply := func(list []Applier) {
+		for _, fn := range list {
+			if c := fn(old, next); c != nil {
+				closers = append(closers, c)
+			}
 		}
 	}
-	if next.WatchConfig != old.WatchConfig {
-		s.setConfigWatchLocked(next.WatchConfig)
+	apply(a.Before)
+	swap()
+	apply(a.After)
+	return closers
+}
+
+func joinClosers(closers []func()) func() {
+	if len(closers) == 0 {
+		return nil
 	}
-	if next.LogRetention != old.LogRetention {
-		s.pruneAgentLogs(time.Now())
+	return func() {
+		for _, c := range closers {
+			c()
+		}
 	}
-	s.kickRunner()
-	return res, closeRetired
+}
+
+// reloadAppliers is the root's registration. The order is the apply order:
+// budget, chat, store commits, swap, then certs, config watch, log prune and
+// the runner kick.
+func (s *Server) reloadAppliers() Appliers {
+	return Appliers{
+		Before: []Applier{
+			func(old, next Settings) func() { s.applyBudgetLimits(old, next); return nil },
+			func(old, next Settings) func() {
+				if next.Chat == old.Chat {
+					return nil
+				}
+				return s.chat.SetGlobal(next.Chat)
+			},
+			func(old, next Settings) func() {
+				if s.storeCommits != nil && (next.StoreCommitDebounce != old.StoreCommitDebounce || next.StorePushRemote != old.StorePushRemote) {
+					s.storeCommits.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
+				}
+				return nil
+			},
+		},
+		After: []Applier{
+			func(old, next Settings) func() {
+				if s.webCerts != nil && !reflect.DeepEqual(old.WebAllowedHosts, next.WebAllowedHosts) {
+					if err := s.webCerts.Reissue(); err != nil {
+						s.log.Error("web certificate re-issue failed", "err", err)
+					}
+				}
+				return nil
+			},
+			func(old, next Settings) func() {
+				if next.WatchConfig != old.WatchConfig {
+					s.setConfigWatchLocked(next.WatchConfig)
+				}
+				return nil
+			},
+			func(old, next Settings) func() {
+				if next.LogRetention != old.LogRetention {
+					s.pruneAgentLogs(time.Now())
+				}
+				return nil
+			},
+			func(Settings, Settings) func() { s.kickRunner(); return nil },
+		},
+	}
 }
 
 // applyBudgetLimits applies each budget limit whose file value changed since

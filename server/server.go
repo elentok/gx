@@ -234,6 +234,7 @@ type Server struct {
 	// decision; a reload swaps in a new value and never mutates the old one.
 	settings atomic.Pointer[Settings]
 	reloadMu sync.Mutex // serializes config reloads
+	appliers Appliers   // what a reload applies, filled by the root
 	// restarting is set once a restart is under way and never cleared on
 	// success: the new server replaces this one.
 	restarting atomic.Bool
@@ -554,6 +555,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.pauseFold.onCap = s.flushPauseFold
 	s.settings.Store(&cfg.Settings)
+	s.appliers = s.reloadAppliers()
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
