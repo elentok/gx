@@ -111,25 +111,21 @@ test.describe("74. Question sheet layout", () => {
       await expect(body).toBeVisible();
 
       // The header and Prev/Next stay put while the body scrolls.
-      const where = async () => ({
-        dot: await dot.boundingBox(),
-        count: await count.boundingBox(),
-        prev: await prev.boundingBox(),
-        next: await next.boundingBox(),
-        top: (await questions.boundingBox())!.y,
-      });
+      // The sheet is bottom-anchored under a live "Working: ..." status line that comes and goes, so its top
+      // moves by that line's height. Read every box in one evaluate (so no reflow falls between reads) and
+      // measure the header from the sheet's top and Prev/Next from its bottom.
+      const where = async () => {
+        const handles = await Promise.all([questions, dot, count, prev, next].map((l) => l.elementHandle()));
+        return page.evaluate(([sheet, ...els]) => {
+          const s = (sheet as Element).getBoundingClientRect();
+          const [dot, count, prev, next] = els.map((e) => (e as Element).getBoundingClientRect());
+          const fromTop = (r: DOMRect) => ({ x: r.x, y: r.y - s.y, w: r.width, h: r.height });
+          const fromBottom = (r: DOMRect) => ({ x: r.x, y: s.bottom - r.y, w: r.width, h: r.height });
+          return { dot: fromTop(dot), count: fromTop(count), prev: fromBottom(prev), next: fromBottom(next) };
+        }, handles);
+      };
       await body.evaluate((el) => (el.scrollTop = 0));
-      // Under load the sheet is still reflowing (fonts, the opened note) when it first shows: wait until
-      // two reads agree before taking the baseline.
-      let before = await where();
-      await expect
-        .poll(async () => {
-          const now = await where();
-          const settled = JSON.stringify(now) === JSON.stringify(before);
-          before = now;
-          return settled;
-        })
-        .toBe(true);
+      const before = await where();
       await toEnd();
       expect(await where()).toEqual(before);
       for (const el of [dot, count, prev, next]) await expect(el).toBeInViewport();
