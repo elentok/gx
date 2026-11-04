@@ -11,7 +11,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestServerEventsKinds_TextListsEveryKind(t *testing.T) {
@@ -90,7 +90,7 @@ func TestStatusWarnings(t *testing.T) {
 	if got := statusWarnings(apiclient.Negotiation{}, remote); len(got) != 0 {
 		t.Fatalf("clean warnings = %q", got)
 	}
-	n := apiclient.Negotiation{Handshake: server.Handshake{TCPAddr: "127.0.0.1:1"}, Hint: "server is an older build"}
+	n := apiclient.Negotiation{Handshake: wire.Handshake{TCPAddr: "127.0.0.1:1"}, Hint: "server is an older build"}
 	all := strings.Join(statusWarnings(n, remote), "\n")
 	for _, want := range []string{"TCP listener is on", "older build"} {
 		if !strings.Contains(all, want) {

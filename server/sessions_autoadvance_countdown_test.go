@@ -10,7 +10,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -31,7 +30,7 @@ func endTurn(t *testing.T, f *grillingFixture) {
 type grillingFixture struct {
 	h    *servertest.Harness
 	ctx  context.Context
-	evs  <-chan server.Event
+	evs  <-chan wire.Event
 	id   string
 	conv string
 	path string

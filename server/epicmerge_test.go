@@ -112,7 +112,7 @@ func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
 
 // completedUnmerged runs the epic to its completion with auto-ff-merge off,
 // returning the event stream.
-func completedUnmerged(ctx context.Context, t *testing.T, f *schedFixture) <-chan server.Event {
+func completedUnmerged(ctx context.Context, t *testing.T, f *schedFixture) <-chan wire.Event {
 	t.Helper()
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
 	evs := f.queueEpic(ctx, t, "01")

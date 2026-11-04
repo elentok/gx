@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func startWebServer(t *testing.T) *servertest.Harness {
@@ -145,7 +146,7 @@ func TestWebReset_YesClearsEverythingAndPrintsANewCode(t *testing.T) {
 	if err := execute([]string{"server", "web-reset", "--yes", "--json"}, webResetDeps(t, h, "", false, &out)); err != nil {
 		t.Fatal(err)
 	}
-	var got server.WebInfo
+	var got wire.WebInfo
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
@@ -170,7 +171,7 @@ func TestWebReset_YesClearsEverythingAndPrintsANewCode(t *testing.T) {
 	}
 }
 
-func mustWebInfo(t *testing.T, h *servertest.Harness) server.WebInfo {
+func mustWebInfo(t *testing.T, h *servertest.Harness) wire.WebInfo {
 	t.Helper()
 	info, err := h.Client.WebInfo(context.Background())
 	if err != nil {
@@ -421,7 +422,7 @@ func TestWebNewRoot_SwapsRootAndLeafLive(t *testing.T) {
 	if err := runWebNewRoot(context.Background(), h.Client, true, &out); err != nil {
 		t.Fatal(err)
 	}
-	var got server.WebInfo
+	var got wire.WebInfo
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}

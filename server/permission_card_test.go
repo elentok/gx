@@ -173,7 +173,7 @@ func TestPermissionCard_StaysOnABlockedPanePause(t *testing.T) {
 }
 
 // awaitTicketChanged waits for a ticket-changed event naming addr.
-func awaitTicketChanged(t *testing.T, ctx context.Context, evs <-chan server.Event, addr, why string) {
+func awaitTicketChanged(t *testing.T, ctx context.Context, evs <-chan wire.Event, addr, why string) {
 	t.Helper()
 	for {
 		select {

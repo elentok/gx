@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestScratchProject_AutoCreatedAndUnremovable(t *testing.T) {
@@ -33,7 +34,7 @@ func TestScratchProject_AutoCreatedAndUnremovable(t *testing.T) {
 		t.Errorf("workspace not created: %v", err)
 	}
 
-	res, err := h.Client.RemoveProject(ctx, server.ProjectRequest{Name: server.ScratchProject})
+	res, err := h.Client.RemoveProject(ctx, wire.ProjectRequest{Name: server.ScratchProject})
 	if err == nil && !res.Refused {
 		t.Fatalf("remove scratch = %+v, want refusal", res)
 	}

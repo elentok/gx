@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +39,7 @@ func runReloadConfig(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 	res, err := cl.ReloadConfig(ctx)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.ReloadResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "server not running; start it with `gx server start`"}
+		res = wire.ReloadResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "server not running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

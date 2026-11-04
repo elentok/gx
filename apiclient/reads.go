@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -25,23 +24,23 @@ func (c *Client) ProjectWorktrees(ctx context.Context) ([]wire.ProjectWorktrees,
 
 // AddProject registers a project. A refusal is a result (Refused set), not an
 // error.
-func (c *Client) AddProject(ctx context.Context, req server.AddProjectRequest) (server.AddProjectResult, error) {
-	var res server.AddProjectResult
+func (c *Client) AddProject(ctx context.Context, req wire.AddProjectRequest) (wire.AddProjectResult, error) {
+	var res wire.AddProjectResult
 	err := c.post(ctx, "/v1/projects/add", req, &res)
 	return res, err
 }
 
 // RemoveProject unregisters a project, keeping its tickets. A refusal is a
 // result (Refused set), not an error.
-func (c *Client) RemoveProject(ctx context.Context, req server.ProjectRequest) (server.ProjectResult, error) {
-	var res server.ProjectResult
+func (c *Client) RemoveProject(ctx context.Context, req wire.ProjectRequest) (wire.ProjectResult, error) {
+	var res wire.ProjectResult
 	err := c.post(ctx, "/v1/projects/remove", req, &res)
 	return res, err
 }
 
 // SetProjectPath points a project at another repo. A refusal is a result.
-func (c *Client) SetProjectPath(ctx context.Context, req server.ProjectRequest) (server.ProjectResult, error) {
-	var res server.ProjectResult
+func (c *Client) SetProjectPath(ctx context.Context, req wire.ProjectRequest) (wire.ProjectResult, error) {
+	var res wire.ProjectResult
 	err := c.post(ctx, "/v1/projects/set-path", req, &res)
 	return res, err
 }

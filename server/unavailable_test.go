@@ -77,7 +77,7 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 	}
 
 	fresh := testutil.TempRepo(t)
-	if res, err := h.Client.SetProjectPath(ctx, server.ProjectRequest{Name: "proj", Path: fresh}); err != nil || res.Refused {
+	if res, err := h.Client.SetProjectPath(ctx, wire.ProjectRequest{Name: "proj", Path: fresh}); err != nil || res.Refused {
 		t.Fatalf("set-path: %+v, %v", res, err)
 	}
 	ex, err := h.Client.Explain(ctx, "proj:epic-a/01")

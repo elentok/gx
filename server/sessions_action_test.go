@@ -20,7 +20,7 @@ const actionWatchSettle = 200 * time.Millisecond
 
 // idleWithAction brings the session Idle and raises an Actionable carrying
 // action.
-func idleWithAction(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv string, action ...string) {
+func idleWithAction(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, conv string, action ...string) {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
@@ -104,7 +104,7 @@ func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
 
 // startInputSession is startFakeSessionWith on a fake program with an input
 // box, so a slash step has a real input to check.
-func startInputSession(t *testing.T, settle time.Duration) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startInputSession(t *testing.T, settle time.Duration) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
 	return startFakeSessionWith(t, wire.CreateSessionRequest{}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1"), func(c *server.Config) {
 		c.ActionStepStartTimeout = time.Minute

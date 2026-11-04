@@ -23,7 +23,7 @@ import (
 type designsFixture struct {
 	h    *servertest.Harness
 	ctx  context.Context
-	evs  <-chan server.Event
+	evs  <-chan wire.Event
 	repo string
 	base string
 	ck   *http.Cookie

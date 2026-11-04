@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -52,7 +52,7 @@ func runConfigStatus(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 
 // writeConfigBlock renders the Config block that both `gx server
 // config-status` and `gx server status` print.
-func writeConfigBlock(w io.Writer, st server.ConfigStatus, now time.Time) error {
+func writeConfigBlock(w io.Writer, st wire.ConfigStatus, now time.Time) error {
 	lines := []string{"config:"}
 	if r := st.LastReload; r != nil {
 		lines = append(lines, fmt.Sprintf("last reload: %s (%s, %s ago): %s", r.Outcome, r.Trigger, now.Sub(r.At).Round(time.Second), r.Message))

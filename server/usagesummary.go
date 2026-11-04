@@ -18,7 +18,7 @@ func (s *Server) usageLimitWindow(w wire.LimitWindow, id string, weekly bool, no
 	row.Chip = limitBurnChip(samples, now)
 	latest, ok := s.limitHistory.Latest(id)
 	if !ok {
-		latest = LimitSample{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: w.ReceivedAt}
+		latest = wire.LimitSample{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: w.ReceivedAt}
 	}
 	f := limitForecast(samples, latest, now)
 	row.Forecast = &f

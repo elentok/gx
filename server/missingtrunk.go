@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -94,7 +95,7 @@ func (s *Server) checkTrunks() {
 		if !missing {
 			if s.trunkMissing.clear(addr.Project) {
 				s.log.Info("trunk found", "project", addr.Project)
-				s.events.publishEvent(Event{Type: EventTrunkFound, Address: addr.Project, Level: EventLevelSuccess, Message: "trunk found, claiming resumes"})
+				s.events.publishEvent(wire.Event{Type: EventTrunkFound, Address: addr.Project, Level: EventLevelSuccess, Message: "trunk found, claiming resumes"})
 				s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkFound, Emoji: "🌳", Title: "project " + addr.Project + ": trunk found",
 					Detail: "trunk found, claiming resumes"})
 			}
@@ -110,7 +111,7 @@ func (s *Server) enterTrunkMissing(project, reason string) {
 		return
 	}
 	s.log.Warn("trunk missing", "project", project, "reason", reason)
-	s.events.publishEvent(Event{Type: EventTrunkMissing, Address: project, Level: EventLevelWarning, Message: reason})
+	s.events.publishEvent(wire.Event{Type: EventTrunkMissing, Address: project, Level: EventLevelWarning, Message: reason})
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
 		Detail: reason + "; its tickets will not be claimed until it is fixed"})
 }

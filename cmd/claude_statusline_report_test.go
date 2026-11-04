@@ -14,7 +14,6 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -64,7 +63,7 @@ func startReportServer(t *testing.T, out *syncBuilder, handle func(w http.Respon
 		rs.lineSeen = append(rs.lineSeen, out.String() != "")
 		rs.mu.Unlock()
 		if handle == nil {
-			_ = json.NewEncoder(w).Encode(server.LimitsReportResult{})
+			_ = json.NewEncoder(w).Encode(wire.LimitsReportResult{})
 			return
 		}
 		handle(w, r, rs)

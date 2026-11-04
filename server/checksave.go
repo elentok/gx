@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -31,35 +32,12 @@ const (
 	ReasonCommitFailed  = "commit-failed"
 )
 
-// SaveChecksRequest saves one project's check config. Checks has the shape of
-// .gx/checks.json.
-type SaveChecksRequest struct {
-	Project string          `json:"project"`
-	Target  string          `json:"target"`
-	Checks  json.RawMessage `json:"checks"`
-}
-
-// SaveChecksResult says what a save did. A refusal saved nothing.
-type SaveChecksResult struct {
-	Project string `json:"project,omitempty"`
-	Target  string `json:"target,omitempty"`
-	// Trunk and Commit are set for a repo save. Commit is empty when the file
-	// already held this config.
-	Trunk  string `json:"trunk,omitempty"`
-	Commit string `json:"commit,omitempty"`
-	// Path is the file written for a project.json save.
-	Path    string `json:"path,omitempty"`
-	Refused bool   `json:"refused,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
-func refuseSave(reason, msg string) (SaveChecksResult, error) {
-	return SaveChecksResult{Refused: true, Reason: reason, Message: msg}, nil
+func refuseSave(reason, msg string) (wire.SaveChecksResult, error) {
+	return wire.SaveChecksResult{Refused: true, Reason: reason, Message: msg}, nil
 }
 
 func (s *Server) checksSaveWrite(w http.ResponseWriter, r *http.Request) {
-	var req SaveChecksRequest
+	var req wire.SaveChecksRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -72,7 +50,7 @@ func (s *Server) checksSaveWrite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
-func (s *Server) saveChecks(req SaveChecksRequest) (SaveChecksResult, error) {
+func (s *Server) saveChecks(req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
 	dir, err := s.projectDir(req.Project)
 	if err != nil {
 		return refuseSave(ReasonUnknownProject, "no project named "+req.Project)
@@ -85,7 +63,7 @@ func (s *Server) saveChecks(req SaveChecksRequest) (SaveChecksResult, error) {
 	}
 	pf, err := config.ReadProjectFile(dir)
 	if err != nil {
-		return SaveChecksResult{}, err
+		return wire.SaveChecksResult{}, err
 	}
 	switch req.Target {
 	case SaveTargetProjectJSON:
@@ -99,15 +77,15 @@ func (s *Server) saveChecks(req SaveChecksRequest) (SaveChecksResult, error) {
 	return refuseSave(ReasonBadTarget, "target must be "+SaveTargetRepo+" or "+SaveTargetProjectJSON)
 }
 
-func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req SaveChecksRequest) (SaveChecksResult, error) {
+func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
 	pf.Checks = req.Checks
 	if err := tickets.WriteProjectFile(dir, pf); err != nil {
-		return SaveChecksResult{}, err
+		return wire.SaveChecksResult{}, err
 	}
-	return SaveChecksResult{Project: req.Project, Target: req.Target, Path: filepath.Join(dir, config.ProjectFileName)}, nil
+	return wire.SaveChecksResult{Project: req.Project, Target: req.Target, Path: filepath.Join(dir, config.ProjectFileName)}, nil
 }
 
-func (s *Server) saveChecksToRepo(dir string, req SaveChecksRequest) (SaveChecksResult, error) {
+func (s *Server) saveChecksToRepo(dir string, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
 	root := tickets.TrunkCheckout(s.cfg.TicketStore, req.Project)
 	repo := tickets.ProjectRepoRoot(s.cfg.TicketStore, req.Project)
 	if root == "" || repo == "" {
@@ -145,9 +123,9 @@ func (s *Server) saveChecksToRepo(dir string, req SaveChecksRequest) (SaveChecks
 	case errors.As(err, &ce):
 		return refuseSave(ReasonCommitFailed, ce.Error())
 	case err != nil:
-		return SaveChecksResult{}, err
+		return wire.SaveChecksResult{}, err
 	}
-	return SaveChecksResult{Project: req.Project, Target: req.Target, Trunk: trunk, Commit: sha}, nil
+	return wire.SaveChecksResult{Project: req.Project, Target: req.Target, Trunk: trunk, Commit: sha}, nil
 }
 
 // commitError is a git failure while committing the checks file, which the

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -81,7 +80,7 @@ func (e *lifecycleEnv) gx(args ...string) string {
 	return string(out)
 }
 
-func (e *lifecycleEnv) running() (server.Handshake, bool) {
+func (e *lifecycleEnv) running() (wire.Handshake, bool) {
 	e.t.Helper()
 	var st struct {
 		Running bool `json:"running"`
@@ -90,7 +89,7 @@ func (e *lifecycleEnv) running() (server.Handshake, bool) {
 	if err := json.Unmarshal([]byte(e.gx("server", "status", "--json")), &st); err != nil {
 		e.t.Fatal(err)
 	}
-	return server.Handshake{Pid: st.Pid}, st.Running
+	return wire.Handshake{Pid: st.Pid}, st.Running
 }
 
 func (e *lifecycleEnv) ticketStatus(address string) string {
@@ -307,7 +306,7 @@ func newAgentWorld(t *testing.T) *agentWorld {
 
 // waitRestarted waits for a server whose pid is not old, which is how a
 // finished restart looks from outside.
-func (e *lifecycleEnv) waitRestarted(old int, timeout time.Duration) server.Handshake {
+func (e *lifecycleEnv) waitRestarted(old int, timeout time.Duration) wire.Handshake {
 	e.t.Helper()
 	for deadline := time.Now().Add(timeout); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
 		if h, up := e.running(); up && h.Pid != old {
@@ -315,7 +314,7 @@ func (e *lifecycleEnv) waitRestarted(old int, timeout time.Duration) server.Hand
 		}
 	}
 	e.t.Fatalf("no new server after the restart (old pid %d)", old)
-	return server.Handshake{}
+	return wire.Handshake{}
 }
 
 // TestServerLifecycle_WebRestartReclaimsRunningIteration restarts through the

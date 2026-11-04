@@ -280,7 +280,7 @@ func (s *Server) actOnMerge(root rootRef, one ralphloop.OneIteration, dir string
 func (s *Server) pauseRoot(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) {
 	project := root.Project
 	reason, kind := d.result.Message, d.result.PauseKind
-	s.events.publishEvent(Event{Type: EventRootPaused, Address: root.String(), Kind: kind, Level: EventLevelWarning, Message: reason})
+	s.events.publishEvent(wire.Event{Type: EventRootPaused, Address: root.String(), Kind: kind, Level: EventLevelWarning, Message: reason})
 	s.log.Warn("root paused", "root", root, "kind", kind, "reason", reason)
 	if !d.sendNotice() {
 		return

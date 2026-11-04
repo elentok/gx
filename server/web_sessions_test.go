@@ -17,7 +17,7 @@ import (
 )
 
 // startWebDesign starts a web mux with one design session and one plain one.
-func startWebDesign(t *testing.T) (h *servertest.Harness, base string, cookie *http.Cookie, ctx context.Context, evs <-chan server.Event, design, plain string) {
+func startWebDesign(t *testing.T) (h *servertest.Harness, base string, cookie *http.Cookie, ctx context.Context, evs <-chan wire.Event, design, plain string) {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")

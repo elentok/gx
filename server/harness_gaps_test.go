@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -68,7 +67,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		run  func(t *testing.T, f refusalFixture) wire.SessionResult
 	}{
 		{"project override", "the project default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			setHarness(t, f.h, server.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			setHarness(t, f.h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{})
 		}},
@@ -185,7 +184,7 @@ func TestHarnessMissing_ChartingHandoffRefusesBeforeStoppingTheOldAgent(t *testi
 type keptSession struct {
 	h          *servertest.Harness
 	ctx        context.Context
-	evs        <-chan server.Event
+	evs        <-chan wire.Event
 	id, conv   string
 	transcript string
 	store, cfg string

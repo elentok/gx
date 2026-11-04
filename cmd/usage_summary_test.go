@@ -38,14 +38,14 @@ func TestUsageSummary_JSONVerb(t *testing.T) {
 func TestUsageSummary_JSONVerbCarriesForecastAndCodex(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	resets := time.Now().Add(72 * time.Hour).Unix()
-	var samples []server.LimitSample
+	var samples []wire.LimitSample
 	for d := 5; d >= 1; d-- {
 		day := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()-d, 1, 0, 0, 0, time.Local)
-		samples = append(samples, server.LimitSample{LimitID: server.LimitIDCodexWeekly, UsedPercentage: float64(10 * (6 - d)), ResetsAt: resets, ReceivedAt: day.Unix()})
+		samples = append(samples, wire.LimitSample{LimitID: server.LimitIDCodexWeekly, UsedPercentage: float64(10 * (6 - d)), ResetsAt: resets, ReceivedAt: day.Unix()})
 	}
 	data, err := json.Marshal(map[string]any{
 		"samples": map[string]any{server.LimitIDCodexWeekly: samples},
-		"latest":  map[string]any{server.LimitIDCodexWeekly: server.LimitSample{LimitID: server.LimitIDCodexWeekly, UsedPercentage: 50, ResetsAt: resets, ReceivedAt: time.Now().Unix()}},
+		"latest":  map[string]any{server.LimitIDCodexWeekly: wire.LimitSample{LimitID: server.LimitIDCodexWeekly, UsedPercentage: 50, ResetsAt: resets, ReceivedAt: time.Now().Unix()}},
 	})
 	if err != nil {
 		t.Fatal(err)

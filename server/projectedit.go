@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -18,23 +19,8 @@ const (
 	ReasonPathTaken      = "path-taken"
 )
 
-// ProjectRequest names a project; Path is what set-path points it at.
-type ProjectRequest struct {
-	Name string `json:"name"`
-	Path string `json:"path,omitempty"`
-}
-
-// ProjectResult is the outcome of a project remove or set-path.
-type ProjectResult struct {
-	Name    string `json:"name,omitempty"`
-	Repo    string `json:"repo,omitempty"`
-	Refused bool   `json:"refused,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
-func refuseProject(reason, msg string) (ProjectResult, error) {
-	return ProjectResult{Refused: true, Reason: reason, Message: msg}, nil
+func refuseProject(reason, msg string) (wire.ProjectResult, error) {
+	return wire.ProjectResult{Refused: true, Reason: reason, Message: msg}, nil
 }
 
 // projectBusy reports a queued or running ticket of project.
@@ -58,7 +44,7 @@ func (s *Server) projectBusy(project string) (address string, busy bool) {
 
 // removeProject unregisters a project by deleting its project.json. Its
 // tickets stay in the store, so adding the path again picks them back up.
-func (s *Server) removeProject(req ProjectRequest) (ProjectResult, error) {
+func (s *Server) removeProject(req wire.ProjectRequest) (wire.ProjectResult, error) {
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
 	if req.Name == ScratchProject {
@@ -72,13 +58,13 @@ func (s *Server) removeProject(req ProjectRequest) (ProjectResult, error) {
 		return refuseProject(ReasonProjectBusy, addr+" is queued or running; remove it from the queue first")
 	}
 	if err := os.Remove(filepath.Join(dir, config.ProjectFileName)); err != nil {
-		return ProjectResult{}, err
+		return wire.ProjectResult{}, err
 	}
-	return ProjectResult{Name: req.Name}, nil
+	return wire.ProjectResult{Name: req.Name}, nil
 }
 
 // setProjectPath points an existing project at another repo.
-func (s *Server) setProjectPath(req ProjectRequest) (ProjectResult, error) {
+func (s *Server) setProjectPath(req wire.ProjectRequest) (wire.ProjectResult, error) {
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
 	dir, err := s.projectDir(req.Name)
@@ -87,7 +73,7 @@ func (s *Server) setProjectPath(req ProjectRequest) (ProjectResult, error) {
 	}
 	pf, err := config.ReadProjectFile(dir)
 	if err != nil {
-		return ProjectResult{}, err
+		return wire.ProjectResult{}, err
 	}
 	repo := canonicalDir(req.Path)
 	info, gitErr := git.FindRepo(req.Path)
@@ -100,7 +86,7 @@ func (s *Server) setProjectPath(req ProjectRequest) (ProjectResult, error) {
 	}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
-		return ProjectResult{}, err
+		return wire.ProjectResult{}, err
 	}
 	for _, d := range dirs {
 		other, err := config.ReadProjectFile(d)
@@ -110,14 +96,14 @@ func (s *Server) setProjectPath(req ProjectRequest) (ProjectResult, error) {
 	}
 	pf.Repo = &repo
 	if err := tickets.WriteProjectFile(dir, pf); err != nil {
-		return ProjectResult{}, err
+		return wire.ProjectResult{}, err
 	}
-	return ProjectResult{Name: req.Name, Repo: repo}, nil
+	return wire.ProjectResult{Name: req.Name, Repo: repo}, nil
 }
 
-func (s *Server) projectWrite(do func(ProjectRequest) (ProjectResult, error)) http.HandlerFunc {
+func (s *Server) projectWrite(do func(wire.ProjectRequest) (wire.ProjectResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req ProjectRequest
+		var req wire.ProjectRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

@@ -9,12 +9,13 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
 func newServerChecksSaveCmd(d deps) *cobra.Command {
 	var jsonOut bool
-	var req server.SaveChecksRequest
+	var req wire.SaveChecksRequest
 	var checks string
 	c := &cobra.Command{
 		Use:   "checks-save",
@@ -42,7 +43,7 @@ func newServerChecksSaveCmd(d deps) *cobra.Command {
 	return c
 }
 
-func runServerChecksSave(ctx context.Context, cl *apiclient.Client, w io.Writer, req server.SaveChecksRequest, jsonOut bool) error {
+func runServerChecksSave(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.SaveChecksRequest, jsonOut bool) error {
 	res, err := cl.SaveChecks(ctx, req)
 	if err != nil {
 		return fmt.Errorf("server save failed: %w", err)

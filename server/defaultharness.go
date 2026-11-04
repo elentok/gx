@@ -34,48 +34,8 @@ const (
 
 const defaultHarnessKey = "default-harness"
 
-// ProjectDefaultHarness is one project's override; Harness is empty when the
-// project follows the global default.
-type ProjectDefaultHarness struct {
-	Project string `json:"project"`
-	Harness string `json:"harness"`
-}
-
-// DefaultHarnessStatus is the Default harness the Settings page shows.
-type DefaultHarnessStatus struct {
-	Default  string                  `json:"default"`
-	Runner   string                  `json:"runner"`
-	Projects []ProjectDefaultHarness `json:"projects"`
-}
-
-// SetDefaultHarnessRequest writes the Default harness. An empty Harness with
-// scope project removes the override.
-type SetDefaultHarnessRequest struct {
-	Scope   string `json:"scope"`
-	Project string `json:"project,omitempty"`
-	Harness string `json:"harness"`
-}
-
-// SetDefaultHarnessResult says what a write did. A refusal wrote nothing.
-type SetDefaultHarnessResult struct {
-	Scope   string `json:"scope,omitempty"`
-	Project string `json:"project,omitempty"`
-	// Harness is the Default harness in effect for the scope after the write.
-	Harness string `json:"harness,omitempty"`
-	Changed bool   `json:"changed"`
-	// Waiting and Running are the notice's counts; Notice is its text, empty
-	// when nothing changed.
-	Waiting int    `json:"waiting"`
-	Running int    `json:"running"`
-	Notice  string `json:"notice,omitempty"`
-	Path    string `json:"path,omitempty"`
-	Refused bool   `json:"refused,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
-func refuseDefaultHarness(reason, msg string) (SetDefaultHarnessResult, error) {
-	return SetDefaultHarnessResult{Refused: true, Reason: reason, Message: msg}, nil
+func refuseDefaultHarness(reason, msg string) (wire.SetDefaultHarnessResult, error) {
+	return wire.SetDefaultHarnessResult{Refused: true, Reason: reason, Message: msg}, nil
 }
 
 func (s *Server) defaultHarnessRead(w http.ResponseWriter, _ *http.Request) {
@@ -87,18 +47,18 @@ func (s *Server) defaultHarnessRead(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, st)
 }
 
-func (s *Server) defaultHarnessStatus() (DefaultHarnessStatus, error) {
+func (s *Server) defaultHarnessStatus() (wire.DefaultHarnessStatus, error) {
 	projects, err := s.listProjects()
 	if err != nil {
-		return DefaultHarnessStatus{}, err
+		return wire.DefaultHarnessStatus{}, err
 	}
-	st := DefaultHarnessStatus{
+	st := wire.DefaultHarnessStatus{
 		Default:  string(defaultOrClaude(s.settings.Load().AgentsDefaultHarness)),
 		Runner:   s.cfg.AgentRunner,
-		Projects: []ProjectDefaultHarness{},
+		Projects: []wire.ProjectDefaultHarness{},
 	}
 	for _, p := range projects {
-		st.Projects = append(st.Projects, ProjectDefaultHarness{Project: p.Name, Harness: s.projectOverride(p.Name)})
+		st.Projects = append(st.Projects, wire.ProjectDefaultHarness{Project: p.Name, Harness: s.projectOverride(p.Name)})
 	}
 	return st, nil
 }
@@ -118,7 +78,7 @@ func (s *Server) projectOverride(project string) string {
 }
 
 func (s *Server) defaultHarnessWrite(w http.ResponseWriter, r *http.Request) {
-	var req SetDefaultHarnessRequest
+	var req wire.SetDefaultHarnessRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -131,7 +91,7 @@ func (s *Server) defaultHarnessWrite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
-func (s *Server) setDefaultHarness(req SetDefaultHarnessRequest) (SetDefaultHarnessResult, error) {
+func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
 	if req.Harness != "" && req.Harness != config.HarnessClaude && req.Harness != config.HarnessCodex {
 		return refuseDefaultHarness(ReasonBadHarness, "harness must be "+config.HarnessClaude+" or "+config.HarnessCodex)
 	}
@@ -162,7 +122,7 @@ func (s *Server) setDefaultHarness(req SetDefaultHarnessRequest) (SetDefaultHarn
 
 	before := s.effectiveDefault(project)
 	if err := setAgentsKey(path, defaultHarnessKey, req.Harness); err != nil {
-		return SetDefaultHarnessResult{}, err
+		return wire.SetDefaultHarnessResult{}, err
 	}
 	if req.Scope == DefaultHarnessGlobal {
 		if rr := s.reloadConfig(reloadTriggerCommand); rr.Refused {
@@ -171,7 +131,7 @@ func (s *Server) setDefaultHarness(req SetDefaultHarnessRequest) (SetDefaultHarn
 	}
 	after := s.effectiveDefault(project)
 
-	res := SetDefaultHarnessResult{Scope: req.Scope, Project: project, Harness: string(after), Path: path}
+	res := wire.SetDefaultHarnessResult{Scope: req.Scope, Project: project, Harness: string(after), Path: path}
 	if before == after {
 		return res, nil
 	}

@@ -15,7 +15,7 @@ func limitsHarness(t *testing.T) *servertest.Harness {
 	return servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 }
 
-func sendLimits(t *testing.T, h *servertest.Harness, r wire.LimitsReport) server.LimitsReportResult {
+func sendLimits(t *testing.T, h *servertest.Harness, r wire.LimitsReport) wire.LimitsReportResult {
 	t.Helper()
 	res, err := h.Client.ReportLimits(context.Background(), r)
 	if err != nil {
@@ -52,7 +52,7 @@ func TestLimitsReport_OutOfOrderLeavesWindowUnchanged(t *testing.T) {
 	first := sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(50, 4_000_000_000)})
 	lower := sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
 	earlier := sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(60, 3_999_999_000)})
-	for name, got := range map[string]server.LimitsReportResult{"lower percentage": lower, "earlier reset": earlier} {
+	for name, got := range map[string]wire.LimitsReportResult{"lower percentage": lower, "earlier reset": earlier} {
 		if *got.FiveHour != *first.FiveHour {
 			t.Errorf("%s: stored %+v, want unchanged %+v", name, *got.FiveHour, *first.FiveHour)
 		}

@@ -16,6 +16,8 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 const (
@@ -75,18 +77,8 @@ func (e *WebAuthWaitError) Error() string {
 	return fmt.Sprintf("too many attempts, wait %d seconds", e.Seconds)
 }
 
-// WebLogin is one signed-in browser, as shown in the device list.
-type WebLogin struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	UserAgent string    `json:"user_agent"`
-	Created   time.Time `json:"created"`
-	LastUsed  time.Time `json:"last_used"`
-	LastIP    string    `json:"last_ip"`
-}
-
 type webLoginRecord struct {
-	WebLogin
+	wire.WebLogin
 	CookieHash string `json:"cookie_hash"`
 	// savedAt is the last used time on disk, to write at most once a minute.
 	savedAt time.Time
@@ -647,7 +639,7 @@ func signOutExcept(f webAuthFile, keep func(*webLoginRecord) bool) (webAuthFile,
 
 // Lookup finds the web login for a cookie and renews its last used time. A web
 // login idle for 90 days is refused and dropped.
-func (w *WebAuth) Lookup(cookie, ip string) (WebLogin, bool) {
+func (w *WebAuth) Lookup(cookie, ip string) (wire.WebLogin, bool) {
 	sum := sha256.Sum256([]byte(cookie))
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -659,12 +651,12 @@ func (w *WebAuth) Lookup(cookie, ip string) (WebLogin, bool) {
 		}
 	}
 	if found == nil {
-		return WebLogin{}, false
+		return wire.WebLogin{}, false
 	}
 	now := w.now()
 	if now.Sub(found.LastUsed) >= webLoginIdleLimit {
 		w.dropLoginLocked(found.ID)
-		return WebLogin{}, false
+		return wire.WebLogin{}, false
 	}
 	found.LastUsed, found.LastIP = now, ip
 	if now.Sub(found.savedAt) >= webLoginWriteInterval {
@@ -678,10 +670,10 @@ func (w *WebAuth) Lookup(cookie, ip string) (WebLogin, bool) {
 }
 
 // List returns the web logins, oldest first.
-func (w *WebAuth) List() []WebLogin {
+func (w *WebAuth) List() []wire.WebLogin {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	out := make([]WebLogin, 0, len(w.file.Logins))
+	out := make([]wire.WebLogin, 0, len(w.file.Logins))
 	for _, rec := range w.file.Logins {
 		out = append(out, rec.WebLogin)
 	}
@@ -779,7 +771,7 @@ func newWebLoginRecord(userAgent, ip string, at time.Time) (string, *webLoginRec
 	cookie := base64.RawURLEncoding.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(cookie))
 	return cookie, &webLoginRecord{
-		WebLogin: WebLogin{
+		WebLogin: wire.WebLogin{
 			ID:        hex.EncodeToString(id),
 			Name:      deviceName(userAgent),
 			UserAgent: userAgent,

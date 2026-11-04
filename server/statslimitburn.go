@@ -17,7 +17,7 @@ func newStatsLimitBurns(n int) wire.StatsLimitBurns {
 	}
 }
 
-func buildLimitBurn(samples []LimitSample, latest LimitSample, hasLatest, weekly bool, n int, now time.Time) wire.StatsLimitBurn {
+func buildLimitBurn(samples []wire.LimitSample, latest wire.LimitSample, hasLatest, weekly bool, n int, now time.Time) wire.StatsLimitBurn {
 	out := wire.StatsLimitBurn{Days: limitBurnDays(samples, n, now)}
 	withData := 0
 	for _, d := range out.Days {

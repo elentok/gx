@@ -12,12 +12,13 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
 // pauseRoot runs the epic to its root pause, failing on an iteration-failed on
 // the way, and returns the pause event.
-func (f *schedFixture) pauseRoot(t *testing.T) server.Event {
+func (f *schedFixture) pauseRoot(t *testing.T) wire.Event {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

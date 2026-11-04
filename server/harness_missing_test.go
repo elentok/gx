@@ -85,7 +85,7 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 		wantFrom string
 	}{
 		{"project override", func(t *testing.T, h *servertest.Harness, _, _ string) {
-			setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 		}, "the project default"},
 		{"reload", func(t *testing.T, h *servertest.Harness, path, store string) {
 			switchDefaultHarness(t, h, path, store, "codex")

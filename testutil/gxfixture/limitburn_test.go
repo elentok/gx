@@ -18,8 +18,8 @@ import (
 )
 
 type seededHistory struct {
-	Samples map[string][]server.LimitSample `json:"samples"`
-	Latest  map[string]server.LimitSample   `json:"latest"`
+	Samples map[string][]wire.LimitSample `json:"samples"`
+	Latest  map[string]wire.LimitSample   `json:"latest"`
 }
 
 func readSeededHistory(t *testing.T, stateDir string) seededHistory {
@@ -37,7 +37,7 @@ func readSeededHistory(t *testing.T, stateDir string) seededHistory {
 
 // dayGain is how much a limit rose within one local day (daysAgo 0 is today):
 // the last sample of the day minus the last one before it.
-func dayGain(samples []server.LimitSample, now time.Time, daysAgo int) float64 {
+func dayGain(samples []wire.LimitSample, now time.Time, daysAgo int) float64 {
 	m := localMidnight(now).AddDate(0, 0, -daysAgo)
 	var before, last float64
 	for _, s := range samples {
@@ -52,7 +52,7 @@ func dayGain(samples []server.LimitSample, now time.Time, daysAgo int) float64 {
 	return last - before
 }
 
-func daysCovered(samples []server.LimitSample, now time.Time) int {
+func daysCovered(samples []wire.LimitSample, now time.Time) int {
 	if len(samples) == 0 {
 		return 0
 	}

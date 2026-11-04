@@ -8,7 +8,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
@@ -20,7 +19,7 @@ import (
 // ServerAPI is the slice of apiclient.Client the tab uses in server mode.
 type ServerAPI interface {
 	Snapshot(ctx context.Context) (wire.Snapshot, error)
-	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
+	Events(ctx context.Context, since uint64) (<-chan wire.Event, error)
 	QueueItems(ctx context.Context) ([]wire.QueueItem, error)
 	QueueAdd(ctx context.Context, address, agent string) (wire.QueueResult, error)
 	QueueReplace(ctx context.Context, project string, items []wire.QueueItem) (wire.QueueResult, error)
@@ -42,8 +41,8 @@ type ServerAPI interface {
 	Iterations(ctx context.Context) ([]wire.IterationInfo, error)
 	TicketChanged(ctx context.Context, address string) error
 	FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error)
-	DefaultHarness(ctx context.Context) (server.DefaultHarnessStatus, error)
-	SetDefaultHarness(ctx context.Context, req server.SetDefaultHarnessRequest) (server.SetDefaultHarnessResult, error)
+	DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error)
+	SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error)
 }
 
 // showQueueIfAdded follows an add-to-queue toast with a switch to the Queue

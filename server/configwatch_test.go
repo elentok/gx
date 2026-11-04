@@ -10,11 +10,12 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 // watchHarness starts a server watching dir/config.json with a short
 // debounce, and streams its events from now on.
-func watchHarness(t *testing.T, ctx context.Context) (h *servertest.Harness, path, store string, evs <-chan server.Event) {
+func watchHarness(t *testing.T, ctx context.Context) (h *servertest.Harness, path, store string, evs <-chan wire.Event) {
 	t.Helper()
 	store = t.TempDir()
 	path = filepath.Join(t.TempDir(), "config.json")
@@ -53,7 +54,7 @@ func saveByRename(t *testing.T, path, store string, n int) {
 }
 
 // noReloadEvent fails if a config-reloaded event arrives within a few debounces.
-func noReloadEvent(t *testing.T, evs <-chan server.Event, why string) {
+func noReloadEvent(t *testing.T, evs <-chan wire.Event, why string) {
 	t.Helper()
 	timeout := time.After(300 * time.Millisecond)
 	for {

@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -61,7 +61,7 @@ func (e *onboardEnv) deps(t *testing.T, tty bool, answers string, saves ...strin
 
 func (e *onboardEnv) add(t *testing.T, d deps, jsonOut bool) error {
 	t.Helper()
-	return runProjectAdd(context.Background(), e.h.Client, d, &e.out, jsonOut, server.AddProjectRequest{Path: e.repo})
+	return runProjectAdd(context.Background(), e.h.Client, d, &e.out, jsonOut, wire.AddProjectRequest{Path: e.repo})
 }
 
 func (e *onboardEnv) projectChecks(t *testing.T) string {
@@ -192,7 +192,7 @@ func TestProjectOnboard_KeepDefaultsSavesEmptyConfig(t *testing.T) {
 
 func TestProjectAdd_VCSNoneSavesToProjectJSONWithoutTargetPrompt(t *testing.T) {
 	e := newOnboardEnv(t)
-	req := server.AddProjectRequest{Path: t.TempDir(), Name: "loose", VCS: "none"}
+	req := wire.AddProjectRequest{Path: t.TempDir(), Name: "loose", VCS: "none"}
 	d := e.deps(t, true, "1\n")
 	if err := runProjectAdd(context.Background(), e.h.Client, d, &e.out, false, req); err != nil {
 		t.Fatal(err)

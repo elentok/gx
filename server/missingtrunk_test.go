@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestMissingTrunk_UnknownBranchStopsClaimsUntilCreated(t *testing.T) {
@@ -101,7 +102,7 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 }
 
 // countUntil reads evs, counting each type, until one of type want arrives.
-func countUntil(ctx context.Context, t *testing.T, evs <-chan server.Event, counts map[string]int, want string) {
+func countUntil(ctx context.Context, t *testing.T, evs <-chan wire.Event, counts map[string]int, want string) {
 	t.Helper()
 	for {
 		select {

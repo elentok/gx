@@ -57,17 +57,17 @@ func seedLimitHistory(t *testing.T, h *servertest.Harness, ids []string, latestA
 	now := time.Now()
 	resets = now.Add(72 * time.Hour).Unix()
 	state := struct {
-		Samples map[string][]server.LimitSample `json:"samples"`
-		Latest  map[string]server.LimitSample   `json:"latest"`
-	}{map[string][]server.LimitSample{}, map[string]server.LimitSample{}}
+		Samples map[string][]wire.LimitSample `json:"samples"`
+		Latest  map[string]wire.LimitSample   `json:"latest"`
+	}{map[string][]wire.LimitSample{}, map[string]wire.LimitSample{}}
 	for _, id := range ids {
 		for d := 5; d >= 1; d-- {
 			day := time.Date(now.Year(), now.Month(), now.Day()-d, 1, 0, 0, 0, time.Local)
-			state.Samples[id] = append(state.Samples[id], server.LimitSample{
+			state.Samples[id] = append(state.Samples[id], wire.LimitSample{
 				LimitID: id, UsedPercentage: float64(10 * (6 - d)), ResetsAt: resets, ReceivedAt: day.Unix(),
 			})
 		}
-		state.Latest[id] = server.LimitSample{LimitID: id, UsedPercentage: 50, ResetsAt: resets, ReceivedAt: now.Add(-latestAge).Unix()}
+		state.Latest[id] = wire.LimitSample{LimitID: id, UsedPercentage: 50, ResetsAt: resets, ReceivedAt: now.Add(-latestAge).Unix()}
 	}
 	data, err := json.Marshal(state)
 	if err != nil {

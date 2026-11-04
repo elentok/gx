@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // WaitFor polls cond every few milliseconds until it holds, failing the test
@@ -29,7 +29,7 @@ func Poll(timeout time.Duration, cond func() bool) bool {
 
 // WaitForEvent returns the first streamed event of typ for address (any
 // address when empty), failing the test if the stream ends or ctx expires first.
-func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan server.Event, typ, address string) server.Event {
+func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan wire.Event, typ, address string) wire.Event {
 	t.Helper()
 	for {
 		select {

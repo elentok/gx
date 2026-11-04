@@ -571,13 +571,13 @@ func waitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
 
 // startFakeSession creates a fake-harness session and waits for its first
 // report, returning its id and conversation id.
-func startFakeSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startFakeSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
 	return startFakeSessionWith(t, wire.CreateSessionRequest{}, opts...)
 }
 
 // startFakeSessionWith is startFakeSession for req in project proj.
-func startFakeSessionWith(t *testing.T, req wire.CreateSessionRequest, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startFakeSessionWith(t *testing.T, req wire.CreateSessionRequest, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
 	h := servertest.StartWithStore(t, t.TempDir(), append([]func(*server.Config){servertest.WithTestHolder()}, opts...)...)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -599,7 +599,7 @@ func startFakeSessionWith(t *testing.T, req wire.CreateSessionRequest, opts ...f
 // waitForSession waits until the snapshot's session id satisfies ok. It reads
 // the snapshot before each wait: a change that landed together with the one
 // the caller just waited for sends no further event.
-func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id string, ok func(wire.SessionInfo) bool) wire.SessionInfo {
+func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id string, ok func(wire.SessionInfo) bool) wire.SessionInfo {
 	t.Helper()
 	for {
 		snap, err := h.Client.Snapshot(ctx)

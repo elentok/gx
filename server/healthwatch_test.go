@@ -56,7 +56,7 @@ func waitReads(t *testing.T, fake *servertest.FakeSystem, n int) {
 }
 
 // healthEvents counts the health-changed events on stream until it is quiet.
-func healthEvents(ch <-chan server.Event) int {
+func healthEvents(ch <-chan wire.Event) int {
 	n := 0
 	for {
 		select {

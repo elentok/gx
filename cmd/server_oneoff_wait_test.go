@@ -62,14 +62,14 @@ func (f *fakeSource) Snapshot(context.Context) (wire.Snapshot, error) {
 }
 
 // Events delivers one event for the ticket, then ends like a dropped stream.
-func (f *fakeSource) Events(ctx context.Context, _ uint64) (<-chan server.Event, error) {
-	ch := make(chan server.Event, 1)
+func (f *fakeSource) Events(ctx context.Context, _ uint64) (<-chan wire.Event, error) {
+	ch := make(chan wire.Event, 1)
 	if !f.investigation {
-		ch <- server.Event{Address: "gx:p/1"}
+		ch <- wire.Event{Address: "gx:p/1"}
 		close(ch)
 		return ch, nil
 	}
-	ch <- server.Event{Address: investigationAddr}
+	ch <- wire.Event{Address: investigationAddr}
 	go func() {
 		<-ctx.Done()
 		close(ch)

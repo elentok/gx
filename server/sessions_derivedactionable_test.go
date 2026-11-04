@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -21,14 +20,14 @@ const (
 
 // designPromptSession is startPromptSession spread into the arguments the
 // helpers here take.
-func designPromptSession(t *testing.T) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
+func designPromptSession(t *testing.T) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
 	t.Helper()
 	f := startPromptSession(t)
 	return f.h, f.ctx, f.evs, f.id, f.conv, f.transcript
 }
 
 // idleWith ends a turn with text: working, then idle.
-func idleWith(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv, path, text string) {
+func idleWith(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, conv, path, text string) {
 	t.Helper()
 	writeAssistantMessage(t, path, text)
 	report(t, conv, agentfake.Control{State: "working"})
@@ -39,7 +38,7 @@ func idleWith(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-ch
 
 // settled returns the Actionable after the detection of the last idle ran: a
 // later status change orders the read after it.
-func settled(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv string) wire.SessionActionable {
+func settled(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, conv string) wire.SessionActionable {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "working"})
 	return waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking }).Actionable

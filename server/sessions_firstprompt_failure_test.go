@@ -32,7 +32,7 @@ func startFailingFirstPrompt(t *testing.T, prompt string, extraEnv ...string) fi
 type firstPromptFixture struct {
 	h    *servertest.Harness
 	ctx  context.Context
-	evs  <-chan server.Event
+	evs  <-chan wire.Event
 	id   string
 	conv string
 }

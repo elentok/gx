@@ -41,7 +41,7 @@ func waitSessionState(ctx context.Context, t *testing.T, h *servertest.Harness, 
 
 // chatEventWithin reports whether a session-chat-changed event for id arrives
 // within d, appending to the transcript on every poll when grow is set.
-func chatEventWithin(evs <-chan server.Event, t *testing.T, path, id string, d time.Duration, grow bool) bool {
+func chatEventWithin(evs <-chan wire.Event, t *testing.T, path, id string, d time.Duration, grow bool) bool {
 	t.Helper()
 	deadline := time.After(d)
 	tick := time.NewTicker(chatPollTestInterval)

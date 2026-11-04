@@ -23,14 +23,14 @@ func withAlerts(banners, sounds bool) func(*server.Config) {
 	}
 }
 
-func startBannerSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startBannerSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Name: "fix-build"}, append([]func(*server.Config){withAlerts(true, true)}, opts...)...)
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, wire.SessionWorking)
 	return h, ctx, evs, id, conv
 }
 
-func reach(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv string, c agentfake.Control, state string) {
+func reach(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, conv string, c agentfake.Control, state string) {
 	t.Helper()
 	report(t, conv, c)
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == state })

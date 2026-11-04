@@ -17,11 +17,11 @@ func TestServerChecksSave_JSONPrintsTheRouteResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	req := server.SaveChecksRequest{Project: "demo", Target: server.SaveTargetProjectJSON, Checks: json.RawMessage(`{"test":false}`)}
+	req := wire.SaveChecksRequest{Project: "demo", Target: server.SaveTargetProjectJSON, Checks: json.RawMessage(`{"test":false}`)}
 	if err := runServerChecksSave(context.Background(), h.Client, &out, req, true); err != nil {
 		t.Fatal(err)
 	}
-	var got server.SaveChecksResult
+	var got wire.SaveChecksResult
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}

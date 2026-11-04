@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/conversations"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/transcript"
@@ -20,7 +19,7 @@ import (
 
 // clearFakeSession makes the fake report a new conversation, as /clear does,
 // and waits until the session's meta holds it.
-func clearFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, oldConv, newConv string) {
+func clearFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, oldConv, newConv string) {
 	t.Helper()
 	if err := agentfake.SendProgramControl(oldConv, agentfake.Control{Action: agentfake.ActionConversation, ConversationID: newConv}); err != nil {
 		t.Fatal(err)

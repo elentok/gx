@@ -30,7 +30,7 @@ func TestSessionChatChanged_CodexRolloutGrowthPublishes(t *testing.T) {
 	}
 }
 
-func codexEventWithin(evs <-chan server.Event, t *testing.T, path, id string, d time.Duration) bool {
+func codexEventWithin(evs <-chan wire.Event, t *testing.T, path, id string, d time.Duration) bool {
 	t.Helper()
 	deadline := time.After(d)
 	tick := time.NewTicker(chatPollTestInterval)

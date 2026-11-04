@@ -342,7 +342,7 @@ type StatusInfo struct {
 	// Budget is today's spend and limits; nil when the server did not answer.
 	Budget *wire.BudgetStatus `json:"budget,omitempty"`
 	// Config is the reload status; nil when there is nothing to show.
-	Config *server.ConfigStatus `json:"config,omitempty"`
+	Config *wire.ConfigStatus `json:"config,omitempty"`
 	// ConfigError is why config.json does not load; status then uses defaults.
 	ConfigError string `json:"config_error,omitempty"`
 }
@@ -776,7 +776,7 @@ func runServerTicketsFollow(ctx context.Context, c *apiclient.Client, addr strin
 		}
 		_, werr = fmt.Fprintln(w, text)
 	}
-	err := c.Follow(ctx, func(s *wire.Snapshot, ev *server.Event) {
+	err := c.Follow(ctx, func(s *wire.Snapshot, ev *wire.Event) {
 		if ev != nil {
 			if ev.Address == addr {
 				print(fmt.Sprintf("%d\t%s\t%s", ev.Seq, ev.Type, ev.Address), ev)

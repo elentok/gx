@@ -9,7 +9,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -18,7 +17,7 @@ const badRoundText = "❓ **Q1** Which store?\n\n```gx-question\noptions: [unclo
 
 // goIdle takes a working session idle and back to working, so the idle
 // handling has run when it returns.
-func goIdle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan server.Event, id, conv string) {
+func goIdle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan wire.Event, id, conv string) {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
@@ -27,7 +26,7 @@ func goIdle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan
 
 // settle moves the session to working; that change orders the caller after the
 // previous idle handling.
-func settle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan server.Event, id, conv string) {
+func settle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan wire.Event, id, conv string) {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })

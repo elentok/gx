@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/migrations"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -26,25 +27,6 @@ const (
 	ReasonBadVCS       = "bad-vcs"
 )
 
-// AddProjectRequest registers the project at Path. Name defaults to the repo
-// directory's name; VCS is "" (git) or config.VCSNone.
-type AddProjectRequest struct {
-	Path string `json:"path"`
-	Name string `json:"name,omitempty"`
-	VCS  string `json:"vcs,omitempty"`
-}
-
-// AddProjectResult is the outcome of a project add. Existing is true when the
-// path was already registered, in which case Name is the existing project's.
-type AddProjectResult struct {
-	Name     string `json:"name,omitempty"`
-	Repo     string `json:"repo,omitempty"`
-	Existing bool   `json:"existing,omitempty"`
-	Refused  bool   `json:"refused,omitempty"`
-	Reason   string `json:"reason,omitempty"`
-	Message  string `json:"message,omitempty"`
-}
-
 // projectNameRe is what an address's first segment can hold (no ':', '/' or
 // whitespace), minus a leading dot or dash.
 var projectNameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
@@ -52,11 +34,11 @@ var projectNameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
 // projectAddMu serializes adds, so two racing adds cannot claim one name.
 var projectAddMu sync.Mutex
 
-func refuseAdd(reason, msg string) (AddProjectResult, error) {
-	return AddProjectResult{Refused: true, Reason: reason, Message: msg}, nil
+func refuseAdd(reason, msg string) (wire.AddProjectResult, error) {
+	return wire.AddProjectResult{Refused: true, Reason: reason, Message: msg}, nil
 }
 
-func (s *Server) addProject(req AddProjectRequest) (AddProjectResult, error) {
+func (s *Server) addProject(req wire.AddProjectRequest) (wire.AddProjectResult, error) {
 	if req.VCS != "" && req.VCS != config.VCSNone {
 		return refuseAdd(ReasonBadVCS, "--vcs only accepts \""+config.VCSNone+"\"")
 	}
@@ -89,12 +71,12 @@ func (s *Server) addProject(req AddProjectRequest) (AddProjectResult, error) {
 	defer projectAddMu.Unlock()
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
-		return AddProjectResult{}, err
+		return wire.AddProjectResult{}, err
 	}
 	for _, dir := range dirs {
 		pf, err := config.ReadProjectFile(dir)
 		if err == nil && pf.Repo != nil && canonicalDir(*pf.Repo) == repo {
-			return AddProjectResult{Name: tickets.ProjectName(dir), Repo: repo, Existing: true}, nil
+			return wire.AddProjectResult{Name: tickets.ProjectName(dir), Repo: repo, Existing: true}, nil
 		}
 	}
 	for _, dir := range dirs {
@@ -112,12 +94,12 @@ func (s *Server) addProject(req AddProjectRequest) (AddProjectResult, error) {
 	}
 	projectDir := filepath.Join(s.cfg.TicketStore, name)
 	if err := tickets.WriteProjectFile(projectDir, pf); err != nil {
-		return AddProjectResult{}, err
+		return wire.AddProjectResult{}, err
 	}
 	if err := migrations.WriteFullApplied(projectDir); err != nil {
-		return AddProjectResult{}, err
+		return wire.AddProjectResult{}, err
 	}
-	return AddProjectResult{Name: name, Repo: repo}, nil
+	return wire.AddProjectResult{Name: name, Repo: repo}, nil
 }
 
 // canonicalDir resolves symlinks so one directory has one identity; a path
@@ -133,7 +115,7 @@ func canonicalDir(p string) string {
 }
 
 func (s *Server) projectAdd(w http.ResponseWriter, r *http.Request) {
-	var req AddProjectRequest
+	var req wire.AddProjectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

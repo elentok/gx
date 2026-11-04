@@ -32,7 +32,7 @@ func limitsReportFromPayload(payload []byte) (report wire.LimitsReport, ok bool,
 // reportLimits sends the payload's windows to the server. A payload without a
 // usable window sends nothing (sent is false). A missing server is the
 // server-not-running refusal result, as for `gx usage override`.
-func reportLimits(ctx context.Context, dial func() (*apiclient.Client, error), payload []byte) (res server.LimitsReportResult, sent bool, err error) {
+func reportLimits(ctx context.Context, dial func() (*apiclient.Client, error), payload []byte) (res wire.LimitsReportResult, sent bool, err error) {
 	report, ok, err := limitsReportFromPayload(payload)
 	if err != nil || !ok {
 		return res, false, err
@@ -44,7 +44,7 @@ func reportLimits(ctx context.Context, dial func() (*apiclient.Client, error), p
 	res, err = cl.ReportLimits(ctx, report)
 	switch {
 	case apiclient.IsNotRunning(err):
-		return server.LimitsReportResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, true, nil
+		return wire.LimitsReportResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, true, nil
 	case err != nil:
 		return res, true, fmt.Errorf("server write failed: %w", err)
 	}

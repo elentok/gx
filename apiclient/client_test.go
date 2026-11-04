@@ -17,7 +17,7 @@ import (
 )
 
 // fakeServer answers /v1/handshake with h on a temp unix socket.
-func fakeServer(t *testing.T, h server.Handshake) *apiclient.Client {
+func fakeServer(t *testing.T, h wire.Handshake) *apiclient.Client {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "gxc")
 	if err != nil {
@@ -40,7 +40,7 @@ func fakeServer(t *testing.T, h server.Handshake) *apiclient.Client {
 }
 
 func TestNegotiate_MatchingBuildHasNoHintAndAllowsWrites(t *testing.T) {
-	c := fakeServer(t, server.Handshake{APIVersion: server.APIVersion, Build: "b1"})
+	c := fakeServer(t, wire.Handshake{APIVersion: server.APIVersion, Build: "b1"})
 
 	n, err := c.Negotiate(context.Background(), "b1")
 	if err != nil {
@@ -55,7 +55,7 @@ func TestNegotiate_MatchingBuildHasNoHintAndAllowsWrites(t *testing.T) {
 }
 
 func TestNegotiate_BuildMismatchOnlyHints(t *testing.T) {
-	c := fakeServer(t, server.Handshake{APIVersion: server.APIVersion, Build: "old"})
+	c := fakeServer(t, wire.Handshake{APIVersion: server.APIVersion, Build: "old"})
 
 	n, err := c.Negotiate(context.Background(), "new")
 	if err != nil {
@@ -72,7 +72,7 @@ func TestNegotiate_BuildMismatchOnlyHints(t *testing.T) {
 func TestNegotiate_APIVersionMismatchGoesReadOnly(t *testing.T) {
 	// The older version is the server a build before the pause terminology runs.
 	for _, version := range []int{server.APIVersion + 1, server.APIVersion - 1} {
-		c := fakeServer(t, server.Handshake{APIVersion: version, Build: "x"})
+		c := fakeServer(t, wire.Handshake{APIVersion: version, Build: "x"})
 
 		n, err := c.Negotiate(context.Background(), "x")
 		if err != nil {
@@ -119,7 +119,7 @@ func TestTicketUnmute_PostsTheAddressAndReturnsTheResult(t *testing.T) {
 
 // followServer serves /v1/snapshot with an incrementing seq and replays
 // scripted event streams, one per /v1/events call.
-func followServer(t *testing.T, streams [][]server.Event) (*apiclient.Client, *int) {
+func followServer(t *testing.T, streams [][]wire.Event) (*apiclient.Client, *int) {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "gxc")
 	if err != nil {
@@ -156,14 +156,14 @@ func followServer(t *testing.T, streams [][]server.Event) (*apiclient.Client, *i
 }
 
 func TestFollow_ResnapshotsOnStreamEndAndOnSeqGap(t *testing.T) {
-	c, snaps := followServer(t, [][]server.Event{
+	c, snaps := followServer(t, [][]wire.Event{
 		{{Seq: 11, Type: "ticket-changed", Address: "a"}}, // then the stream drops
 		{{Seq: 25, Type: "ticket-changed", Address: "b"}}, // gap: snapshot was at 20
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var got []string
-	err := c.Follow(ctx, func(s *wire.Snapshot, ev *server.Event) {
+	err := c.Follow(ctx, func(s *wire.Snapshot, ev *wire.Event) {
 		if s != nil {
 			got = append(got, "snap")
 		} else {

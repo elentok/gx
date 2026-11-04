@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -20,7 +21,7 @@ func TestProjectRemove_RefusesWhileQueuedKeepsTickets(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 	remove := func() error {
-		return runProjectEdit(ctx, &bytes.Buffer{}, false, "removed", h.Client.RemoveProject, server.ProjectRequest{Name: "proj"})
+		return runProjectEdit(ctx, &bytes.Buffer{}, false, "removed", h.Client.RemoveProject, wire.ProjectRequest{Name: "proj"})
 	}
 
 	if q, err := h.Client.QueueAdd(ctx, "proj:epic/01", ""); err != nil || q.Refused {
@@ -47,12 +48,12 @@ func TestProjectSetPath_ClearsVCSNoneOnlyForGitRepo(t *testing.T) {
 	h := servertest.Start(t)
 	ctx := context.Background()
 	outbox, repo := t.TempDir(), testutil.TempRepo(t)
-	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, server.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"}); err != nil {
+	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"}); err != nil {
 		t.Fatal(err)
 	}
 	setPath := func(path string) {
 		t.Helper()
-		if err := runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.SetProjectPath, server.ProjectRequest{Name: "ob", Path: path}); err != nil {
+		if err := runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.SetProjectPath, wire.ProjectRequest{Name: "ob", Path: path}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -75,7 +76,7 @@ func TestProjectSetPath_ClearsVCSNoneOnlyForGitRepo(t *testing.T) {
 	}
 
 	// The clash hint only applies to a ticket-only project.
-	err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, server.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"})
+	err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"})
 	if err == nil || strings.Contains(err.Error(), "gx project set-path") {
 		t.Errorf("clash with a git project: err = %v, want no set-path hint", err)
 	}
@@ -84,10 +85,10 @@ func TestProjectSetPath_ClearsVCSNoneOnlyForGitRepo(t *testing.T) {
 func TestProjectAdd_ClashWithVCSNoneProjectHintsSetPath(t *testing.T) {
 	h := servertest.Start(t)
 	ctx := context.Background()
-	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, server.AddProjectRequest{Path: t.TempDir(), Name: "ob", VCS: "none"}); err != nil {
+	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: t.TempDir(), Name: "ob", VCS: "none"}); err != nil {
 		t.Fatal(err)
 	}
-	err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, server.AddProjectRequest{Path: testutil.TempRepo(t), Name: "ob"})
+	err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: testutil.TempRepo(t), Name: "ob"})
 	if err == nil || !strings.Contains(err.Error(), "gx project set-path ob <clone>") {
 		t.Errorf("err = %v, want set-path hint", err)
 	}
@@ -98,17 +99,17 @@ func TestProjectSetPath_ChangesResolvedPath(t *testing.T) {
 	ctx := context.Background()
 	a, b := testutil.TempRepo(t), testutil.TempRepo(t)
 	name := filepath.Base(a)
-	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, server.AddProjectRequest{Path: a}); err != nil {
+	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: a}); err != nil {
 		t.Fatal(err)
 	}
-	if err := runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.SetProjectPath, server.ProjectRequest{Name: name, Path: b}); err != nil {
+	if err := runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.SetProjectPath, wire.ProjectRequest{Name: name, Path: b}); err != nil {
 		t.Fatal(err)
 	}
 	pf, err := config.ReadProjectFile(filepath.Join(h.TicketStore, name))
 	if err != nil || pf.Repo == nil || *pf.Repo == "" || filepath.Base(*pf.Repo) != filepath.Base(b) {
 		t.Errorf("project.json = %+v, %v; want repo %s", pf, err, b)
 	}
-	err = runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.SetProjectPath, server.ProjectRequest{Name: "nope", Path: b})
+	err = runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.SetProjectPath, wire.ProjectRequest{Name: "nope", Path: b})
 	if err == nil || !strings.Contains(err.Error(), server.ReasonUnknownProject) {
 		t.Errorf("unknown project: err = %v", err)
 	}

@@ -19,7 +19,7 @@ const firstPromptGrace = 300 * time.Millisecond
 
 // startFirstPromptSession starts a session with an input box and a first
 // prompt, still waiting for its ready report.
-func startFirstPromptSession(t *testing.T, prompt string, extraEnv ...string) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startFirstPromptSession(t *testing.T, prompt string, extraEnv ...string) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
 	return startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace

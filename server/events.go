@@ -3,6 +3,8 @@ package server
 import (
 	"errors"
 	"sync"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 // EventTicketChanged is emitted once per ticket whose indexed state changed
@@ -16,21 +18,6 @@ const (
 	// events are ephemeral and a restart starts over.
 	replayWindow = 256
 )
-
-// Event is one streamed event. Seq is server-wide and contiguous.
-type Event struct {
-	Seq     uint64 `json:"seq"`
-	Type    string `json:"type"`
-	Address string `json:"address,omitempty"`
-	// Level (EventLevel*) and Message are set only by events that report an
-	// outcome, such as config-reloaded.
-	Level   string `json:"level,omitempty"`
-	Message string `json:"message,omitempty"`
-	// Kind (an events.Kind) tells root-paused causes apart.
-	Kind string `json:"kind,omitempty"`
-	// Client names the TUI an event is for, by its event-stream client id.
-	Client string `json:"client,omitempty"`
-}
 
 const (
 	EventLevelSuccess = "success"
@@ -47,8 +34,8 @@ var errSeqGone = errors.New("seq outside replay window")
 type broker struct {
 	mu     sync.Mutex
 	seq    uint64
-	recent []Event
-	subs   map[chan Event]struct{}
+	recent []wire.Event
+	subs   map[chan wire.Event]struct{}
 	buffer int
 	closed bool
 }
@@ -57,7 +44,7 @@ func newBroker(buffer int) *broker {
 	if buffer <= 0 {
 		buffer = defaultSubscriberBuffer
 	}
-	return &broker{subs: map[chan Event]struct{}{}, buffer: buffer}
+	return &broker{subs: map[chan wire.Event]struct{}{}, buffer: buffer}
 }
 
 func (b *broker) currentSeq() uint64 {
@@ -67,11 +54,11 @@ func (b *broker) currentSeq() uint64 {
 }
 
 func (b *broker) publish(typ, address string) {
-	b.publishEvent(Event{Type: typ, Address: address})
+	b.publishEvent(wire.Event{Type: typ, Address: address})
 }
 
 // publishEvent numbers ev (its Seq is overwritten) and fans it out.
-func (b *broker) publishEvent(ev Event) {
+func (b *broker) publishEvent(ev wire.Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.seq++
@@ -92,19 +79,19 @@ func (b *broker) publishEvent(ev Event) {
 
 // subscribe returns a channel carrying every event with seq > since. The
 // channel is closed when the subscriber is dropped or the broker closes.
-func (b *broker) subscribe(since uint64) (<-chan Event, func(), error) {
+func (b *broker) subscribe(since uint64) (<-chan wire.Event, func(), error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if since > b.seq || (since < b.seq && (len(b.recent) == 0 || b.recent[0].Seq > since+1)) {
 		return nil, nil, errSeqGone
 	}
-	var replay []Event
+	var replay []wire.Event
 	for _, ev := range b.recent {
 		if ev.Seq > since {
 			replay = append(replay, ev)
 		}
 	}
-	ch := make(chan Event, len(replay)+b.buffer)
+	ch := make(chan wire.Event, len(replay)+b.buffer)
 	for _, ev := range replay {
 		ch <- ev
 	}

@@ -65,13 +65,13 @@ func (f *budgetEventFixture) spend(total float64) {
 	f.h.Server.PollBudget()
 }
 
-func (f *budgetEventFixture) stream(t *testing.T) <-chan server.Event {
+func (f *budgetEventFixture) stream(t *testing.T) <-chan wire.Event {
 	t.Helper()
 	return limitsEventStream(t, f.h)
 }
 
 // budgetEvents counts the budget-changed events on ch until it is quiet.
-func budgetEvents(ch <-chan server.Event) int {
+func budgetEvents(ch <-chan wire.Event) int {
 	n := 0
 	for {
 		select {
@@ -85,7 +85,7 @@ func budgetEvents(ch <-chan server.Event) int {
 	}
 }
 
-func wantBudgetEvents(t *testing.T, ch <-chan server.Event, want int) {
+func wantBudgetEvents(t *testing.T, ch <-chan wire.Event, want int) {
 	t.Helper()
 	if got := budgetEvents(ch); got != want {
 		t.Fatalf("budget-changed events = %d, want %d", got, want)

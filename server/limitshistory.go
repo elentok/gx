@@ -26,20 +26,11 @@ const (
 // confirming sample.
 const limitConfirmEverySeconds = 3600
 
-// LimitSample is one saved reading; times are epoch seconds. UsedPercentage is
-// the raw number, not rounded.
-type LimitSample struct {
-	LimitID        string  `json:"limit_id"`
-	UsedPercentage float64 `json:"used_percentage"`
-	ResetsAt       int64   `json:"resets_at"`
-	ReceivedAt     int64   `json:"received_at"`
-}
-
 // limitHistoryState is the history file. Latest holds the newest reading seen
 // per limit, which may be newer than its last sample.
 type limitHistoryState struct {
-	Samples map[string][]LimitSample `json:"samples"`
-	Latest  map[string]LimitSample   `json:"latest"`
+	Samples map[string][]wire.LimitSample `json:"samples"`
+	Latest  map[string]wire.LimitSample   `json:"latest"`
 }
 
 // limitHistory holds every limit sample and persists them in the state dir.
@@ -62,19 +53,19 @@ func openLimitHistory(stateDir string) *limitHistory {
 		}
 	}
 	if h.state.Samples == nil {
-		h.state.Samples = map[string][]LimitSample{}
+		h.state.Samples = map[string][]wire.LimitSample{}
 	}
 	if h.state.Latest == nil {
-		h.state.Latest = map[string]LimitSample{}
+		h.state.Latest = map[string]wire.LimitSample{}
 	}
 	return h
 }
 
 // Samples returns a copy of one limit's samples, oldest first.
-func (h *limitHistory) Samples(id string) []LimitSample {
+func (h *limitHistory) Samples(id string) []wire.LimitSample {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return append([]LimitSample(nil), h.state.Samples[id]...)
+	return append([]wire.LimitSample(nil), h.state.Samples[id]...)
 }
 
 // FirstSampleAt is the receive time of a limit's oldest sample.
@@ -88,7 +79,7 @@ func (h *limitHistory) FirstSampleAt(id string) (int64, bool) {
 }
 
 // Latest is the newest reading seen for a limit.
-func (h *limitHistory) Latest(id string) (LimitSample, bool) {
+func (h *limitHistory) Latest(id string) (wire.LimitSample, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	l, ok := h.state.Latest[id]
@@ -102,7 +93,7 @@ func (h *limitHistory) Latest(id string) (LimitSample, bool) {
 func (h *limitHistory) record(id string, w wire.LimitWindow, now int64) (saved bool, err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	sample := LimitSample{LimitID: id, UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: now}
+	sample := wire.LimitSample{LimitID: id, UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: now}
 	samples := h.state.Samples[id]
 	if n := len(samples); n > 0 {
 		last := samples[n-1]
@@ -112,7 +103,7 @@ func (h *limitHistory) record(id string, w wire.LimitWindow, now int64) (saved b
 			return false, nil
 		}
 	}
-	next := limitHistoryState{Samples: map[string][]LimitSample{}, Latest: map[string]LimitSample{}}
+	next := limitHistoryState{Samples: map[string][]wire.LimitSample{}, Latest: map[string]wire.LimitSample{}}
 	for k, v := range h.state.Samples {
 		next.Samples[k] = v
 	}

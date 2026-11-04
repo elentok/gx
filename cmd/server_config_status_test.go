@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
@@ -40,7 +41,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	if err := runConfigStatus(ctx, h.Client, &out, true); err != nil {
 		t.Fatal(err)
 	}
-	var st server.ConfigStatus
+	var st wire.ConfigStatus
 	if err := json.Unmarshal(out.Bytes(), &st); err != nil {
 		t.Fatal(err)
 	}

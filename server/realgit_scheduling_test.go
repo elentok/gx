@@ -75,7 +75,7 @@ func (f *schedFixture) turns() []string {
 }
 
 // subscribe returns the event stream from now on.
-func (f *schedFixture) subscribe(ctx context.Context, t *testing.T) <-chan server.Event {
+func (f *schedFixture) subscribe(ctx context.Context, t *testing.T) <-chan wire.Event {
 	t.Helper()
 	snap, err := f.h.Client.Snapshot(ctx)
 	if err != nil {
@@ -89,7 +89,7 @@ func (f *schedFixture) subscribe(ctx context.Context, t *testing.T) <-chan serve
 }
 
 // queueEpic queues the epic and returns the event stream from before the add.
-func (f *schedFixture) queueEpic(ctx context.Context, t *testing.T, firstID string) <-chan server.Event {
+func (f *schedFixture) queueEpic(ctx context.Context, t *testing.T, firstID string) <-chan wire.Event {
 	t.Helper()
 	evs := f.subscribe(ctx, t)
 	if res, err := f.h.Client.QueueAdd(ctx, "proj:"+schedEpic+"/"+firstID, "claude"); err != nil || res.Refused {

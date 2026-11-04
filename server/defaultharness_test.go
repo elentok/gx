@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func readJSONFile(t *testing.T, path string) map[string]any {
@@ -26,7 +27,7 @@ func readJSONFile(t *testing.T, path string) map[string]any {
 	return m
 }
 
-func setHarness(t *testing.T, h *servertest.Harness, req server.SetDefaultHarnessRequest) server.SetDefaultHarnessResult {
+func setHarness(t *testing.T, h *servertest.Harness, req wire.SetDefaultHarnessRequest) wire.SetDefaultHarnessResult {
 	t.Helper()
 	res, err := h.Client.SetDefaultHarness(context.Background(), req)
 	if err != nil {
@@ -51,7 +52,7 @@ func TestDefaultHarness_GlobalWriteKeepsKeysAndSymlink(t *testing.T) {
 	}
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(link))
 
-	res := setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"})
+	res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"})
 	if res.Refused || !res.Changed || res.Harness != "codex" {
 		t.Fatalf("result = %+v", res)
 	}
@@ -80,13 +81,13 @@ func TestDefaultHarness_GlobalCreatesMissingFileAndRefusesEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
 
-	if res := setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "global"}); !res.Refused || res.Reason != server.ReasonNoGlobalHarnessSet {
+	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "global"}); !res.Refused || res.Reason != server.ReasonNoGlobalHarnessSet {
 		t.Errorf("empty global = %+v, want refusal", res)
 	}
 	if _, err := os.Stat(path); err == nil {
 		t.Fatal("a refused write created the file")
 	}
-	if res := setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}); res.Path != path {
+	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}); res.Path != path {
 		t.Fatalf("result = %+v", res)
 	}
 	if got := agentsKey(readJSONFile(t, path)); got != "codex" {
@@ -104,7 +105,7 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 	}
 	h := servertest.StartWithStore(t, store)
 
-	res := setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+	res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 	if res.Refused || !res.Changed || res.Harness != "codex" {
 		t.Fatalf("set = %+v", res)
 	}
@@ -113,11 +114,11 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 		t.Errorf("project.json = %v", got)
 	}
 	st, _ := h.Client.DefaultHarness(context.Background())
-	if !slices.Contains(st.Projects, server.ProjectDefaultHarness{Project: "proj", Harness: "codex"}) {
+	if !slices.Contains(st.Projects, wire.ProjectDefaultHarness{Project: "proj", Harness: "codex"}) {
 		t.Errorf("status = %+v", st)
 	}
 
-	res = setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "project", Project: "proj"})
+	res = setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj"})
 	if res.Refused || !res.Changed || res.Harness != "claude" {
 		t.Fatalf("remove = %+v", res)
 	}
@@ -125,7 +126,7 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 	if _, ok := got["agents"]; ok || got["vcs"] != "git" || got["checks"] == nil {
 		t.Errorf("project.json after remove = %v", got)
 	}
-	if res := setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "project", Project: "nope", Harness: "codex"}); !res.Refused || res.Reason != server.ReasonUnknownProject {
+	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "nope", Harness: "codex"}); !res.Refused || res.Reason != server.ReasonUnknownProject {
 		t.Errorf("unknown project = %+v", res)
 	}
 }
@@ -145,7 +146,7 @@ func TestDefaultHarness_RefusesHarnessNotOnPath(t *testing.T) {
 	cfgBefore, _ := os.ReadFile(path)
 	pjBefore, _ := os.ReadFile(pj)
 
-	for _, req := range []server.SetDefaultHarnessRequest{
+	for _, req := range []wire.SetDefaultHarnessRequest{
 		{Scope: "global", Harness: "codex"},
 		{Scope: "project", Project: "proj", Harness: "codex"},
 	} {
@@ -185,18 +186,18 @@ func TestDefaultHarness_NoticeCounts(t *testing.T) {
 		}
 	}
 
-	res := setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"})
+	res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"})
 	if want := "Default is now Codex. 1 waiting ticket and the next design step will use it."; res.Notice != want || res.Waiting != 1 {
 		t.Errorf("global = %+v, want notice %q", res, want)
 	}
-	if res := setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}); res.Changed || res.Notice != "" {
+	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}); res.Changed || res.Notice != "" {
 		t.Errorf("no change = %+v", res)
 	}
-	res = setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "project", Project: "override", Harness: "codex"})
+	res = setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "override", Harness: "codex"})
 	if want := "Default for override is now Codex. 1 waiting ticket and the next design step will use it."; res.Notice != want {
 		t.Errorf("project = %+v, want notice %q", res, want)
 	}
-	res = setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "project", Project: "idle", Harness: "claude"})
+	res = setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "idle", Harness: "claude"})
 	if want := "Default for idle is now Claude. The next design step will use it."; res.Notice != want || res.Waiting != 0 {
 		t.Errorf("zero waiting = %+v, want notice %q", res, want)
 	}

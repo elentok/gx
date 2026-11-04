@@ -19,10 +19,11 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
-func reload(t *testing.T, h *servertest.Harness) server.ReloadResult {
+func reload(t *testing.T, h *servertest.Harness) wire.ReloadResult {
 	t.Helper()
 	res, err := h.Client.ReloadConfig(context.Background())
 	if err != nil {

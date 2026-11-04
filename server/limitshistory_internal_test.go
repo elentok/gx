@@ -63,7 +63,7 @@ func TestLimitHistory_ChangeSavesSampleWithAllFields(t *testing.T) {
 	r := newHistoryRig(t, t.TempDir())
 	r.report(five(12.5, 5000), 1000)
 	got := r.h.Samples(LimitIDClaude5h)
-	want := LimitSample{LimitID: LimitIDClaude5h, UsedPercentage: 12.5, ResetsAt: 5000, ReceivedAt: 1000}
+	want := wire.LimitSample{LimitID: LimitIDClaude5h, UsedPercentage: 12.5, ResetsAt: 5000, ReceivedAt: 1000}
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("samples = %+v, want [%+v]", got, want)
 	}

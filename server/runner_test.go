@@ -843,7 +843,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	var streams []<-chan server.Event
+	var streams []<-chan wire.Event
 	for range 2 { // two connected clients
 		evs, err := h.Client.Events(ctx, snap.Seq)
 		if err != nil {

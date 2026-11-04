@@ -8,14 +8,13 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // startDraftSession starts a fake session whose input box already holds a
 // draft.
-func startDraftSession(t *testing.T, req wire.CreateSessionRequest, draft string) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startDraftSession(t *testing.T, req wire.CreateSessionRequest, draft string) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
 	return startFakeSessionWith(t, req, withAlerts(true, true), servertest.WithEnv(agentfake.ProgramDraftEnv+"="+draft, agentfake.ProgramInputEnv+"=1"))
 }

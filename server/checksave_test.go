@@ -11,14 +11,15 @@ import (
 
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
 func saveChecks(t *testing.T, h interface {
-	SaveChecks(context.Context, server.SaveChecksRequest) (server.SaveChecksResult, error)
-}, target, cfg string) server.SaveChecksResult {
+	SaveChecks(context.Context, wire.SaveChecksRequest) (wire.SaveChecksResult, error)
+}, target, cfg string) wire.SaveChecksResult {
 	t.Helper()
-	res, err := h.SaveChecks(context.Background(), server.SaveChecksRequest{Project: "demo", Target: target, Checks: json.RawMessage(cfg)})
+	res, err := h.SaveChecks(context.Background(), wire.SaveChecksRequest{Project: "demo", Target: target, Checks: json.RawMessage(cfg)})
 	if err != nil {
 		t.Fatal(err)
 	}

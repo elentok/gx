@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
@@ -32,11 +32,11 @@ func harnessQueue(t *testing.T, api fakeServerAPI, project string) QueueModel {
 }
 
 func TestDefaultHarness_GlobalPickerSendsGlobalRequest(t *testing.T) {
-	sets := &[]server.SetDefaultHarnessRequest{}
+	sets := &[]wire.SetDefaultHarnessRequest{}
 	m := harnessQueue(t, fakeServerAPI{
-		harness:     server.DefaultHarnessStatus{Default: "claude"},
+		harness:     wire.DefaultHarnessStatus{Default: "claude"},
 		harnessSets: sets,
-		harnessRes:  server.SetDefaultHarnessResult{Notice: "switched"},
+		harnessRes:  wire.SetDefaultHarnessResult{Notice: "switched"},
 	}, "")
 
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
@@ -52,7 +52,7 @@ func TestDefaultHarness_GlobalPickerSendsGlobalRequest(t *testing.T) {
 	if m.harnessPicker.open {
 		t.Fatal("picker still open after enter")
 	}
-	want := server.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}
+	want := wire.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}
 	if len(*sets) != 1 || (*sets)[0] != want {
 		t.Fatalf("requests = %+v, want %+v", *sets, want)
 	}
@@ -62,11 +62,11 @@ func TestDefaultHarness_GlobalPickerSendsGlobalRequest(t *testing.T) {
 }
 
 func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T) {
-	sets := &[]server.SetDefaultHarnessRequest{}
+	sets := &[]wire.SetDefaultHarnessRequest{}
 	m := harnessQueue(t, fakeServerAPI{
-		harness: server.DefaultHarnessStatus{
+		harness: wire.DefaultHarnessStatus{
 			Default:  "claude",
-			Projects: []server.ProjectDefaultHarness{{Project: "gx", Harness: "codex"}},
+			Projects: []wire.ProjectDefaultHarness{{Project: "gx", Harness: "codex"}},
 		},
 		harnessSets: sets,
 	}, "gx")
@@ -85,7 +85,7 @@ func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T)
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyUp})
 	runKey(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	want := server.SetDefaultHarnessRequest{Scope: "project", Project: "gx", Harness: ""}
+	want := wire.SetDefaultHarnessRequest{Scope: "project", Project: "gx", Harness: ""}
 	if len(*sets) != 1 || (*sets)[0] != want {
 		t.Fatalf("requests = %+v, want %+v", *sets, want)
 	}
@@ -93,9 +93,9 @@ func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T)
 
 func TestDefaultHarness_RefusalShowsMessage(t *testing.T) {
 	m := harnessQueue(t, fakeServerAPI{
-		harness:     server.DefaultHarnessStatus{Default: "claude"},
-		harnessSets: &[]server.SetDefaultHarnessRequest{},
-		harnessRes:  server.SetDefaultHarnessResult{Refused: true, Message: "codex is not on PATH"},
+		harness:     wire.DefaultHarnessStatus{Default: "claude"},
+		harnessSets: &[]wire.SetDefaultHarnessRequest{},
+		harnessRes:  wire.SetDefaultHarnessResult{Refused: true, Message: "codex is not on PATH"},
 	}, "")
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyDown})

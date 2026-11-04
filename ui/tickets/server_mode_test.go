@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -47,16 +46,16 @@ type fakeServerAPI struct {
 	queue []wire.QueueItem
 	// harness is what DefaultHarness returns; harnessSets records the
 	// SetDefaultHarness requests and harnessRes is what it returns.
-	harness     server.DefaultHarnessStatus
-	harnessSets *[]server.SetDefaultHarnessRequest
-	harnessRes  server.SetDefaultHarnessResult
+	harness     wire.DefaultHarnessStatus
+	harnessSets *[]wire.SetDefaultHarnessRequest
+	harnessRes  wire.SetDefaultHarnessResult
 }
 
-func (f fakeServerAPI) DefaultHarness(context.Context) (server.DefaultHarnessStatus, error) {
+func (f fakeServerAPI) DefaultHarness(context.Context) (wire.DefaultHarnessStatus, error) {
 	return f.harness, nil
 }
 
-func (f fakeServerAPI) SetDefaultHarness(_ context.Context, req server.SetDefaultHarnessRequest) (server.SetDefaultHarnessResult, error) {
+func (f fakeServerAPI) SetDefaultHarness(_ context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
 	if f.harnessSets != nil {
 		*f.harnessSets = append(*f.harnessSets, req)
 	}
@@ -171,8 +170,8 @@ func (f fakeServerAPI) record(call string) {
 func (f fakeServerAPI) Snapshot(context.Context) (wire.Snapshot, error) {
 	return f.snap, nil
 }
-func (fakeServerAPI) Events(context.Context, uint64) (<-chan server.Event, error) { return nil, nil }
-func (f fakeServerAPI) QueueItems(context.Context) ([]wire.QueueItem, error)      { return f.queue, nil }
+func (fakeServerAPI) Events(context.Context, uint64) (<-chan wire.Event, error) { return nil, nil }
+func (f fakeServerAPI) QueueItems(context.Context) ([]wire.QueueItem, error)    { return f.queue, nil }
 
 // withRenderedStatus makes snap look like one from a current server, which
 // always sends rendered_status: a ticket without one gets its raw status word.

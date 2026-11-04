@@ -153,7 +153,7 @@ func (s State) PendingRowFor(address string) (wire.PendingRow, bool) {
 // ToastFor is the toast a live event warrants. Only the caller's event path
 // may use it: a snapshot or a reconnect re-snapshot describes state, not
 // something that just happened, so it must never produce a toast.
-func ToastFor(ev server.Event) (Toast, bool) {
+func ToastFor(ev wire.Event) (Toast, bool) {
 	switch ev.Type {
 	case server.EventIterationPaused, server.EventTicketPaused:
 		return Toast{Level: server.EventLevelWarning, Text: ev.Address + " paused"}, true
@@ -208,7 +208,7 @@ func (s State) SetQueue(items []wire.QueueItem) State {
 
 // Reduce applies one stream event. An event that is not exactly Seq+1 is not
 // applied: a duplicate is dropped, a gap asks for a re-snapshot.
-func (s State) Reduce(ev server.Event) (State, Effect) {
+func (s State) Reduce(ev wire.Event) (State, Effect) {
 	switch {
 	case ev.Seq <= s.Seq:
 		return s, EffectNone

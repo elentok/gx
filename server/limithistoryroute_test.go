@@ -23,7 +23,7 @@ func TestLimitHistory_ReportSurvivesRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	var f struct {
-		Samples map[string][]server.LimitSample `json:"samples"`
+		Samples map[string][]wire.LimitSample `json:"samples"`
 	}
 	if err := json.Unmarshal(data, &f); err != nil {
 		t.Fatal(err)

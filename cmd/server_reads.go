@@ -96,7 +96,7 @@ func newProjectCmd(d deps) *cobra.Command {
 				return err
 			}
 			return runProjectAdd(c.Context(), cl, d, c.OutOrStdout(), addJSON,
-				server.AddProjectRequest{Path: abs, Name: name, VCS: vcs})
+				wire.AddProjectRequest{Path: abs, Name: name, VCS: vcs})
 		},
 	}
 	add.Flags().StringVar(&name, "name", "", "project name (default: the repo directory's name)")
@@ -116,7 +116,7 @@ func newProjectCmd(d deps) *cobra.Command {
 				return err
 			}
 			return runProjectEdit(c.Context(), c.OutOrStdout(), rmJSON, "removed", cl.RemoveProject,
-				server.ProjectRequest{Name: args[0]})
+				wire.ProjectRequest{Name: args[0]})
 		},
 	}
 	remove.Flags().BoolVar(&rmJSON, "json", false, "emit structured JSON instead of human-readable text")
@@ -141,7 +141,7 @@ func newProjectCmd(d deps) *cobra.Command {
 				return err
 			}
 			return runProjectEdit(c.Context(), c.OutOrStdout(), setJSON, "updated", cl.SetProjectPath,
-				server.ProjectRequest{Name: args[0], Path: abs})
+				wire.ProjectRequest{Name: args[0], Path: abs})
 		},
 	}
 	setPath.Flags().BoolVar(&setJSON, "json", false, "emit structured JSON instead of human-readable text")
@@ -149,16 +149,16 @@ func newProjectCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-type projectEditCall func(context.Context, server.ProjectRequest) (server.ProjectResult, error)
+type projectEditCall func(context.Context, wire.ProjectRequest) (wire.ProjectResult, error)
 
-func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string, call projectEditCall, req server.ProjectRequest) error {
+func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string, call projectEditCall, req wire.ProjectRequest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	res, err := call(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.ProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.ProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -175,19 +175,19 @@ func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string,
 // addProjectJSON is the `project add --json` object: the add result, plus the
 // unset check kinds and the command that sets them up when config is missing.
 type addProjectJSON struct {
-	server.AddProjectResult
+	wire.AddProjectResult
 	ChecksMissing  []string `json:"checks_missing,omitempty"`
 	OnboardCommand string   `json:"onboard_command,omitempty"`
 }
 
-func runProjectAdd(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, jsonOut bool, req server.AddProjectRequest) error {
+func runProjectAdd(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, jsonOut bool, req wire.AddProjectRequest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	res, err := cl.AddProject(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.AddProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.AddProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

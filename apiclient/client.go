@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 type Client struct {
@@ -61,7 +62,7 @@ var ErrReadOnly = errors.New("server API version differs from this client; run `
 
 // Negotiation is the outcome of comparing client and server versions.
 type Negotiation struct {
-	server.Handshake
+	wire.Handshake
 	ReadOnly bool
 	// Hint is a user-facing remedy; empty when versions agree.
 	Hint string
@@ -110,8 +111,8 @@ func New(socketPath string) *Client {
 }
 
 // Handshake returns the server's API version and build id.
-func (c *Client) Handshake(ctx context.Context) (server.Handshake, error) {
-	var h server.Handshake
+func (c *Client) Handshake(ctx context.Context) (wire.Handshake, error) {
+	var h wire.Handshake
 	err := c.get(ctx, "/v1/handshake", &h)
 	return h, err
 }

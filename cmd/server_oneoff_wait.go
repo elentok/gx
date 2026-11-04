@@ -48,7 +48,7 @@ var waitRetry = time.Second
 // eventSource is the slice of apiclient.Client a wait needs.
 type eventSource interface {
 	Snapshot(ctx context.Context) (wire.Snapshot, error)
-	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
+	Events(ctx context.Context, since uint64) (<-chan wire.Event, error)
 }
 
 // waitForTicket blocks until address is done, paused or cancelled; a pause

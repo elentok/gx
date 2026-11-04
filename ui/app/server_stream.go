@@ -53,7 +53,7 @@ type serverStream struct {
 	// non-nil value means "a stream is live or being opened".
 	streamCtx    context.Context
 	streamStop   context.CancelFunc
-	streamEvents <-chan server.Event
+	streamEvents <-chan wire.Event
 }
 
 // setVM replaces the shared state and its queue status.
@@ -70,18 +70,18 @@ type streamSnapshotMsg struct {
 
 type streamSubscribedMsg struct {
 	ctx    context.Context
-	events <-chan server.Event
+	events <-chan wire.Event
 	err    error
 }
 
 type streamEventMsg struct {
-	ev     server.Event
-	events <-chan server.Event
+	ev     wire.Event
+	events <-chan wire.Event
 }
 
 // streamEndedMsg: the stream closed. Whatever was missed is unknowable.
 type streamEndedMsg struct {
-	events <-chan server.Event
+	events <-chan wire.Event
 }
 
 type streamQueueMsg struct {
@@ -178,7 +178,7 @@ func (m Model) subscribe(since uint64) (Model, tea.Cmd) {
 	}
 }
 
-func cmdStreamNext(events <-chan server.Event) tea.Cmd {
+func cmdStreamNext(events <-chan wire.Event) tea.Cmd {
 	return func() tea.Msg {
 		ev, ok := <-events
 		if !ok {

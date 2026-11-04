@@ -24,7 +24,7 @@ import (
 // the limit history, whose file shape comes from server.limitHistoryState.
 type limitBurnSeed struct {
 	report  wire.LimitsReport
-	samples map[string][]server.LimitSample
+	samples map[string][]wire.LimitSample
 	// ledger is the token ledger and the stamped tickets behind it; nil leaves
 	// both empty.
 	ledger *ledgerSeed
@@ -58,7 +58,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		first := localMidnight(now).Add(now.Sub(localMidnight(now)) / 2)
 		return limitBurnSeed{
 			report: wire.LimitsReport{SevenDay: limitWindow(now, 22, reset.Sub(now), 0)},
-			samples: map[string][]server.LimitSample{server.LimitIDClaudeWeekly: {
+			samples: map[string][]wire.LimitSample{server.LimitIDClaudeWeekly: {
 				limitSample(server.LimitIDClaudeWeekly, 15, reset, first),
 				limitSample(server.LimitIDClaudeWeekly, 22, reset, now),
 			}},
@@ -72,7 +72,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		const age = 30 * time.Minute
 		return limitBurnSeed{
 			report: wire.LimitsReport{SevenDay: limitWindow(now, 52, claudeReset.Sub(now), age)},
-			samples: map[string][]server.LimitSample{
+			samples: map[string][]wire.LimitSample{
 				server.LimitIDClaudeWeekly: weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, age,
 					[]float64{8, 16, 24, 33, 40}, 52, []float64{50, 70}),
 				server.LimitIDCodexWeekly: weeklyHistory(server.LimitIDCodexWeekly, now, codexReset, age,
@@ -85,7 +85,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		reset := now.Add(-2 * time.Hour)
 		return limitBurnSeed{
 			report: wire.LimitsReport{SevenDay: limitWindow(now, 75, -2*time.Hour, 6*time.Hour)},
-			samples: map[string][]server.LimitSample{server.LimitIDClaudeWeekly: {
+			samples: map[string][]wire.LimitSample{server.LimitIDClaudeWeekly: {
 				limitSample(server.LimitIDClaudeWeekly, 30, reset, now.Add(-72*time.Hour)),
 				limitSample(server.LimitIDClaudeWeekly, 60, reset, now.Add(-30*time.Hour)),
 				limitSample(server.LimitIDClaudeWeekly, 75, reset, now.Add(-6*time.Hour)),
@@ -102,7 +102,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		weekly := []int{17, 10, 3}
 		fiveHour := []int{14, 6, 0}
 		s := limitBurnSeed{
-			samples: map[string][]server.LimitSample{
+			samples: map[string][]wire.LimitSample{
 				server.LimitIDClaudeWeekly: burnHistory(server.LimitIDClaudeWeekly, now, historyDays, 7*24*time.Hour, weekly, 3),
 				server.LimitIDCodexWeekly:  burnHistory(server.LimitIDCodexWeekly, now, historyDays, 7*24*time.Hour, weekly, 5),
 				server.LimitIDClaude5h:     burnHistory(server.LimitIDClaude5h, now, historyDays, 5*time.Hour, fiveHour, 2),
@@ -110,7 +110,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 			},
 			ledger: statsLedger(now),
 		}
-		last := func(id string) server.LimitSample { v := s.samples[id]; return v[len(v)-1] }
+		last := func(id string) wire.LimitSample { v := s.samples[id]; return v[len(v)-1] }
 		window := func(id string) *wire.LimitWindow {
 			l := last(id)
 			return &wire.LimitWindow{UsedPercentage: l.UsedPercentage, ResetsAt: l.ResetsAt, ReceivedAt: l.ReceivedAt}
@@ -129,7 +129,7 @@ func menuSeed(now time.Time) limitBurnSeed {
 			FiveHour: limitWindow(now, 34, 2*time.Hour+10*time.Minute, 0),
 			SevenDay: limitWindow(now, 81, claudeReset.Sub(now), 0),
 		},
-		samples: map[string][]server.LimitSample{},
+		samples: map[string][]wire.LimitSample{},
 	}
 	s.samples[server.LimitIDClaudeWeekly] = weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, 0,
 		[]float64{20, 36, 52, 69, 74}, 81, []float64{20, 99})
@@ -228,8 +228,8 @@ const (
 // quiet days, and starts a new window on each reset day: the reset time moves
 // forward and the percentage starts again. period is the window length; the last
 // window ends after now. step shifts the daily rise per limit.
-func burnHistory(id string, now time.Time, daysAgo int, period time.Duration, resetDays []int, step int) []server.LimitSample {
-	var out []server.LimitSample
+func burnHistory(id string, now time.Time, daysAgo int, period time.Duration, resetDays []int, step int) []wire.LimitSample {
+	var out []wire.LimitSample
 	used := float64(step * 3)
 	var resetsAt time.Time
 	for ago := daysAgo; ago >= 0; ago-- {
@@ -326,8 +326,8 @@ func localMidnight(t time.Time) time.Time {
 	return time.Date(y, mo, d, 0, 0, 0, 0, t.Location())
 }
 
-func limitSample(id string, pct float64, resetsAt, receivedAt time.Time) server.LimitSample {
-	return server.LimitSample{LimitID: id, UsedPercentage: pct, ResetsAt: resetsAt.Unix(), ReceivedAt: receivedAt.Unix()}
+func limitSample(id string, pct float64, resetsAt, receivedAt time.Time) wire.LimitSample {
+	return wire.LimitSample{LimitID: id, UsedPercentage: pct, ResetsAt: resetsAt.Unix(), ReceivedAt: receivedAt.Unix()}
 }
 
 // weeklyHistory is the history of one weekly window that resets at reset. The
@@ -336,9 +336,9 @@ func limitSample(id string, pct float64, resetsAt, receivedAt time.Time) server.
 // has a sample just after midnight carrying the day before and one at the end
 // of the day. prev is the end-of-day percentages of the window before it, which
 // give the 7th day of history. The newest sample was received newestAgo ago.
-func weeklyHistory(id string, now, reset time.Time, newestAgo time.Duration, dayEnds []float64, current float64, prev []float64) []server.LimitSample {
+func weeklyHistory(id string, now, reset time.Time, newestAgo time.Duration, dayEnds []float64, current float64, prev []float64) []wire.LimitSample {
 	start := reset.AddDate(0, 0, -7)
-	var out []server.LimitSample
+	var out []wire.LimitSample
 	for i, pct := range prev {
 		day := start.AddDate(0, 0, i-len(prev))
 		out = append(out, limitSample(id, pct, start, day.Add(30*time.Minute)))
@@ -360,9 +360,9 @@ func weeklyHistory(id string, now, reset time.Time, newestAgo time.Duration, day
 }
 
 // fiveHourHistory is two samples of a 5-hour window that resets in resetsIn.
-func fiveHourHistory(id string, now time.Time, resetsIn time.Duration, before, current float64) []server.LimitSample {
+func fiveHourHistory(id string, now time.Time, resetsIn time.Duration, before, current float64) []wire.LimitSample {
 	reset := now.Add(resetsIn)
-	return []server.LimitSample{
+	return []wire.LimitSample{
 		limitSample(id, before, reset, now.Add(-time.Hour)),
 		limitSample(id, current, reset, now),
 	}
@@ -373,7 +373,7 @@ func fiveHourHistory(id string, now time.Time, resetsIn time.Duration, before, c
 // every sample per limit, and the newest one as latest.
 func (f *fixture) seedLimitBurn(shape string) error {
 	seed := limitBurnShapes[shape](time.Now())
-	latest := map[string]server.LimitSample{}
+	latest := map[string]wire.LimitSample{}
 	for id, s := range seed.samples {
 		latest[id] = s[len(s)-1]
 	}

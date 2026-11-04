@@ -131,7 +131,7 @@ func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, p
 			target = server.SaveTargetRepo
 		}
 	}
-	res, err := cl.SaveChecks(ctx, server.SaveChecksRequest{Project: project, Target: target, Checks: proposal})
+	res, err := cl.SaveChecks(ctx, wire.SaveChecksRequest{Project: project, Target: target, Checks: proposal})
 	if err != nil {
 		return fmt.Errorf("server write failed: %w", err)
 	}

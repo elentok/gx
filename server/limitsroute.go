@@ -16,17 +16,6 @@ import (
 // out-of-range value.
 const ReasonInvalidReport = "invalid-report"
 
-// LimitsReportResult is the outcome of a limits report: the windows stored
-// after the merge, or a refusal. A report with no windows changes nothing and
-// reads the stored windows back.
-type LimitsReportResult struct {
-	FiveHour *wire.LimitWindow `json:"five_hour,omitempty"`
-	SevenDay *wire.LimitWindow `json:"seven_day,omitempty"`
-	Refused  bool              `json:"refused,omitempty"`
-	Reason   string            `json:"reason,omitempty"`
-	Message  string            `json:"message,omitempty"`
-}
-
 func validLimitWindow(name string, w *wire.LimitWindow) error {
 	if w == nil {
 		return nil
@@ -51,7 +40,7 @@ func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
 		win  *wire.LimitWindow
 	}{{"five_hour", req.FiveHour}, {"seven_day", req.SevenDay}} {
 		if err := validLimitWindow(c.name, c.win); err != nil {
-			writeJSON(w, LimitsReportResult{Refused: true, Reason: ReasonInvalidReport, Message: err.Error()})
+			writeJSON(w, wire.LimitsReportResult{Refused: true, Reason: ReasonInvalidReport, Message: err.Error()})
 			return
 		}
 	}
@@ -69,5 +58,5 @@ func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
 		s.limitsEvents.trigger()
 	}
 	stored := s.limits.read()
-	writeJSON(w, LimitsReportResult{FiveHour: stored.FiveHour, SevenDay: stored.SevenDay})
+	writeJSON(w, wire.LimitsReportResult{FiveHour: stored.FiveHour, SevenDay: stored.SevenDay})
 }

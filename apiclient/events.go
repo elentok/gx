@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -24,13 +23,13 @@ func (c *Client) Snapshot(ctx context.Context) (wire.Snapshot, error) {
 // Events subscribes to the event stream from seq since (use Snapshot's Seq).
 // The channel closes when the stream ends: the server dropped this client for
 // lagging, stopped, or ctx was cancelled. Re-snapshot and resubscribe then.
-func (c *Client) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
+func (c *Client) Events(ctx context.Context, since uint64) (<-chan wire.Event, error) {
 	return c.EventsAs(ctx, since, "")
 }
 
 // EventsAs is Events for a client that reports focus: its reports count
 // while this stream is open.
-func (c *Client) EventsAs(ctx context.Context, since uint64, client string) (<-chan server.Event, error) {
+func (c *Client) EventsAs(ctx context.Context, since uint64, client string) (<-chan wire.Event, error) {
 	path := fmt.Sprintf("/v1/events?since=%d", since)
 	if client != "" {
 		path += "&client=" + url.QueryEscape(client)
@@ -47,7 +46,7 @@ func (c *Client) EventsAs(ctx context.Context, since uint64, client string) (<-c
 		resp.Body.Close()
 		return nil, fmt.Errorf("server returned %s for %s", resp.Status, path)
 	}
-	out := make(chan server.Event)
+	out := make(chan wire.Event)
 	go func() {
 		defer close(out)
 		defer resp.Body.Close()
@@ -57,7 +56,7 @@ func (c *Client) EventsAs(ctx context.Context, since uint64, client string) (<-c
 			if !ok {
 				continue
 			}
-			var ev server.Event
+			var ev wire.Event
 			if json.Unmarshal([]byte(data), &ev) != nil {
 				return
 			}
@@ -76,7 +75,7 @@ func (c *Client) EventsAs(ctx context.Context, since uint64, client string) (<-c
 // reconnecting) triggers a fresh snapshot, so the consumer never has to
 // reason about missed events. Exactly one of the callback's arguments is
 // non-nil. It returns only when ctx is done.
-func (c *Client) Follow(ctx context.Context, fn func(*wire.Snapshot, *server.Event)) error {
+func (c *Client) Follow(ctx context.Context, fn func(*wire.Snapshot, *wire.Event)) error {
 	for {
 		if err := c.followOnce(ctx, fn); err != nil && ctx.Err() == nil {
 			select {
@@ -93,7 +92,7 @@ func (c *Client) Follow(ctx context.Context, fn func(*wire.Snapshot, *server.Eve
 const followRetry = time.Second
 
 // followOnce runs one snapshot+stream round and returns when it must restart.
-func (c *Client) followOnce(ctx context.Context, fn func(*wire.Snapshot, *server.Event)) error {
+func (c *Client) followOnce(ctx context.Context, fn func(*wire.Snapshot, *wire.Event)) error {
 	snap, err := c.Snapshot(ctx)
 	if err != nil {
 		return err

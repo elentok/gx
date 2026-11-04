@@ -13,18 +13,8 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/server/wire"
 )
-
-// ReloadResult is the outcome of one config reload. A refusal is a result
-// (Refused set), not an error (ADR 0028).
-type ReloadResult struct {
-	// Changed lists the config keys whose value changed, in config-key spelling.
-	Changed  []string `json:"changed,omitempty"`
-	Warnings []string `json:"warnings,omitempty"`
-	Refused  bool     `json:"refused,omitempty"`
-	Reason   string   `json:"reason,omitempty"`
-	Message  string   `json:"message,omitempty"`
-}
 
 const (
 	ReasonInvalidConfig     = "invalid-config"
@@ -47,7 +37,7 @@ func (s *Server) configReloadWrite(w http.ResponseWriter, _ *http.Request) {
 
 // reloadConfig is the one reload path: read → parse → build → diff → apply →
 // swap → kick → log. Live settings are untouched on any refusal.
-func (s *Server) reloadConfig(trigger string) ReloadResult {
+func (s *Server) reloadConfig(trigger string) wire.ReloadResult {
 	s.reloadMu.Lock()
 	res, closeRetired := s.reloadLocked()
 	s.reportReload(trigger, res)
@@ -60,7 +50,7 @@ func (s *Server) reloadConfig(trigger string) ReloadResult {
 
 // reloadLocked returns, besides the result, a func that closes what the
 // reload retired; it waits on the network, so it runs after the unlock.
-func (s *Server) reloadLocked() (ReloadResult, func()) {
+func (s *Server) reloadLocked() (wire.ReloadResult, func()) {
 	if s.cfg.ConfigPath == "" {
 		return refuseReload(ReasonReloadUnavailable, "this server has no config file to reload"), nil
 	}
@@ -83,7 +73,7 @@ func (s *Server) reloadLocked() (ReloadResult, func()) {
 	next := reloadableSettings(*old, SettingsFromConfig(cfg))
 	pending := s.startupOnlyChanges(cfg)
 	s.reloads.addPending(pending)
-	res := ReloadResult{Changed: changedKeys(*old, next)}
+	res := wire.ReloadResult{Changed: changedKeys(*old, next)}
 	for _, key := range pending {
 		res.Warnings = append(res.Warnings, "restart needed for "+key)
 	}
@@ -240,21 +230,21 @@ func runnerChoice(setting string) agentrunner.Choice {
 	return agentrunner.Choice(setting)
 }
 
-func refuseReload(reason, message string) ReloadResult {
-	return ReloadResult{Refused: true, Reason: reason, Message: message}
+func refuseReload(reason, message string) wire.ReloadResult {
+	return wire.ReloadResult{Refused: true, Reason: reason, Message: message}
 }
 
 // reportReload sends one result to the log, an OS banner and the event
 // stream. Never to chat: a reload is something the person just did at the
 // machine, not news worth a phone notification.
-func (s *Server) reportReload(trigger string, res ReloadResult) {
+func (s *Server) reportReload(trigger string, res wire.ReloadResult) {
 	if res.Refused {
 		s.log.Warn("config reload refused", "trigger", trigger, "reason", res.Reason, "message", res.Message)
 	} else {
 		s.log.Info("config reloaded", "trigger", trigger, "changed", res.Changed, "warnings", res.Warnings)
 	}
 	level, title, body := reloadBanner(res)
-	s.reloads.setLast(ReloadRecord{At: time.Now(), Trigger: trigger, Outcome: level, Message: joinBanner(title, body)})
+	s.reloads.setLast(wire.ReloadRecord{At: time.Now(), Trigger: trigger, Outcome: level, Message: joinBanner(title, body)})
 	s.banner(level, title, body)
 }
 
@@ -269,7 +259,7 @@ func (s *Server) banner(level, title, body string) {
 			s.log.Warn("OS banner failed", "title", title, "error", err)
 		}
 	}()
-	s.events.publishEvent(Event{Type: EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
+	s.events.publishEvent(wire.Event{Type: EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
 }
 
 func joinBanner(title, body string) string {
@@ -282,7 +272,7 @@ func joinBanner(title, body string) string {
 // maxBannerBody keeps a long parse error from overflowing the banner.
 const maxBannerBody = 200
 
-func reloadBanner(res ReloadResult) (level, title, body string) {
+func reloadBanner(res wire.ReloadResult) (level, title, body string) {
 	switch {
 	case res.Refused:
 		body = res.Message

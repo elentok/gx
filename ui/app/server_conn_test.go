@@ -16,7 +16,6 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	agentsui "github.com/elentok/gx/ui/agents"
@@ -35,7 +34,7 @@ type fakeServerClient struct {
 	slow     bool
 }
 
-func (f *fakeServerClient) EventsAs(ctx context.Context, since uint64, _ string) (<-chan server.Event, error) {
+func (f *fakeServerClient) EventsAs(ctx context.Context, since uint64, _ string) (<-chan wire.Event, error) {
 	return f.Events(ctx, since)
 }
 
@@ -60,7 +59,7 @@ func (f *fakeServerClient) Negotiate(context.Context, string) (apiclient.Negotia
 	if f.down {
 		return apiclient.Negotiation{}, fmt.Errorf("dial: %w", syscall.ECONNREFUSED)
 	}
-	return apiclient.Negotiation{Handshake: server.Handshake{Pid: 4242, HerdrUnavailable: f.herdr}, ReadOnly: f.readOnly}, nil
+	return apiclient.Negotiation{Handshake: wire.Handshake{Pid: 4242, HerdrUnavailable: f.herdr}, ReadOnly: f.readOnly}, nil
 }
 
 func newServerShell(t *testing.T, client ServerClient) Model {

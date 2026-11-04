@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -42,24 +41,24 @@ func (c *Client) UsageOverride(ctx context.Context, harness string) (wire.UsageO
 // ReportLimits sends Claude rate-limit windows and returns the windows the
 // server stores after the merge. A report with no windows reads them back. A
 // refusal is a result (Refused set), not an error.
-func (c *Client) ReportLimits(ctx context.Context, report wire.LimitsReport) (server.LimitsReportResult, error) {
-	var res server.LimitsReportResult
+func (c *Client) ReportLimits(ctx context.Context, report wire.LimitsReport) (wire.LimitsReportResult, error) {
+	var res wire.LimitsReportResult
 	err := c.post(ctx, "/v1/usage/report", report, &res)
 	return res, err
 }
 
 // ReloadConfig reloads the global config file into the server. A refusal is
 // a result (Refused set), not an error.
-func (c *Client) ReloadConfig(ctx context.Context) (server.ReloadResult, error) {
-	var res server.ReloadResult
+func (c *Client) ReloadConfig(ctx context.Context) (wire.ReloadResult, error) {
+	var res wire.ReloadResult
 	err := c.post(ctx, "/v1/config/reload", struct{}{}, &res)
 	return res, err
 }
 
 // ConfigStatus is the last reload result, the startup-only keys waiting for a
 // restart and the hard-limit grace countdown.
-func (c *Client) ConfigStatus(ctx context.Context) (server.ConfigStatus, error) {
-	var st server.ConfigStatus
+func (c *Client) ConfigStatus(ctx context.Context) (wire.ConfigStatus, error) {
+	var st wire.ConfigStatus
 	err := c.get(ctx, "/v1/config/status", &st)
 	return st, err
 }
@@ -96,24 +95,24 @@ func (c *Client) DiskStatus(ctx context.Context) (wire.DiskReport, error) {
 
 // SaveChecks saves one project's check config to the repo or project.json. A
 // refusal is a result (Refused set), not an error.
-func (c *Client) SaveChecks(ctx context.Context, req server.SaveChecksRequest) (server.SaveChecksResult, error) {
-	var res server.SaveChecksResult
+func (c *Client) SaveChecks(ctx context.Context, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
+	var res wire.SaveChecksResult
 	err := c.post(ctx, "/v1/checks/save", req, &res)
 	return res, err
 }
 
 // DefaultHarness is the global Default harness, the agent runner and each
 // project's override.
-func (c *Client) DefaultHarness(ctx context.Context) (server.DefaultHarnessStatus, error) {
-	var st server.DefaultHarnessStatus
+func (c *Client) DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error) {
+	var st wire.DefaultHarnessStatus
 	err := c.get(ctx, "/v1/settings/agents", &st)
 	return st, err
 }
 
 // SetDefaultHarness writes the Default harness. A refusal is a result (Refused
 // set), not an error.
-func (c *Client) SetDefaultHarness(ctx context.Context, req server.SetDefaultHarnessRequest) (server.SetDefaultHarnessResult, error) {
-	var res server.SetDefaultHarnessResult
+func (c *Client) SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
+	var res wire.SetDefaultHarnessResult
 	err := c.post(ctx, "/v1/settings/agents", req, &res)
 	return res, err
 }

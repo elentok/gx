@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	agentsui "github.com/elentok/gx/ui/agents"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 )
@@ -28,7 +28,7 @@ type ServerClient interface {
 	Negotiate(ctx context.Context, build string) (apiclient.Negotiation, error)
 	// EventsAs subscribes under the Agents tab's focus client name, so its
 	// focus reports count while the stream is open.
-	EventsAs(ctx context.Context, since uint64, client string) (<-chan server.Event, error)
+	EventsAs(ctx context.Context, since uint64, client string) (<-chan wire.Event, error)
 }
 
 // ServerDeps is how the shell reaches the server. A nil Settings.Server (no

@@ -6,7 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
@@ -22,13 +22,13 @@ type harnessPicker struct {
 
 // defaultHarnessReadMsg carries the server's current Default harness.
 type defaultHarnessReadMsg struct {
-	status server.DefaultHarnessStatus
+	status wire.DefaultHarnessStatus
 	err    error
 }
 
 // defaultHarnessWroteMsg carries the server's answer to a write.
 type defaultHarnessWroteMsg struct {
-	res server.SetDefaultHarnessResult
+	res wire.SetDefaultHarnessResult
 	err error
 }
 
@@ -45,7 +45,7 @@ func (m QueueModel) handleDefaultHarnessKey() (tea.Model, tea.Cmd) {
 
 // openHarnessPicker builds the picker for the project filter, with the cursor
 // on the value in effect for that scope.
-func (m QueueModel) openHarnessPicker(st server.DefaultHarnessStatus) QueueModel {
+func (m QueueModel) openHarnessPicker(st wire.DefaultHarnessStatus) QueueModel {
 	items := []components.MenuItem{
 		{Label: "Claude", Value: "claude"},
 		{Label: "Codex", Value: "codex"},
@@ -88,9 +88,9 @@ func (m QueueModel) updateHarnessPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.
 	if !accepted || !ok {
 		return m, nil
 	}
-	req := server.SetDefaultHarnessRequest{Scope: "global", Harness: item.Value}
+	req := wire.SetDefaultHarnessRequest{Scope: "global", Harness: item.Value}
 	if m.harnessPicker.project != "" {
-		req = server.SetDefaultHarnessRequest{Scope: "project", Project: m.harnessPicker.project, Harness: item.Value}
+		req = wire.SetDefaultHarnessRequest{Scope: "project", Project: m.harnessPicker.project, Harness: item.Value}
 	}
 	api := m.serverAPI
 	return m, func() tea.Msg {

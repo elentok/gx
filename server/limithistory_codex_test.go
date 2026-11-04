@@ -44,7 +44,7 @@ func limitsEventsSince(t *testing.T, s *Server, seq uint64) int {
 	}
 }
 
-func codexSamples(s *Server, id string) []LimitSample { return s.limitHistory.Samples(id) }
+func codexSamples(s *Server, id string) []wire.LimitSample { return s.limitHistory.Samples(id) }
 
 func TestLimitHistoryCodex_LaterResetWinsThenHighestPercentage(t *testing.T) {
 	t.Parallel()

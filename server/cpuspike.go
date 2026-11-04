@@ -28,14 +28,6 @@ func CPUWatchConfig(c config.CPUWatchdogConfig) cpuwatch.Config {
 	return cpuwatch.Config{Threshold: c.ThresholdPercent, Sustain: c.Sustain, Cooldown: c.Cooldown}
 }
 
-// CPUSpikeResult is what became of a reported spike.
-type CPUSpikeResult struct {
-	// Address is the investigate ticket filed for it; empty when none was.
-	Address string `json:"address,omitempty"`
-	// Message says why no ticket was filed.
-	Message string `json:"message,omitempty"`
-}
-
 // cpuSpikes holds when the last CPU ticket was filed, for the cooldown. It
 // lives in memory: a restart lets one more through.
 type cpuSpikes struct {
@@ -58,22 +50,22 @@ func (s *Server) keepCPUWatched(ctx context.Context) {
 // cpuSpike logs a spike and, in evolve maintainer mode, files a diagnose ticket
 // in the gx project: gx-investigate finds the cause. The cooldown and the one-off's
 // dedupe key keep a busy gx from filing more than one at a time.
-func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) CPUSpikeResult {
+func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult {
 	s.log.Warn("cpu spike", "source", sp.Source, "pid", sp.PID, "avg_percent", avgCPU(sp.Samples), "evidence", sp.Dir)
 	set := s.settings.Load()
 	if !set.CPUWatchdog.Enabled {
-		return CPUSpikeResult{Message: "cpu-watchdog is off"}
+		return wire.CPUSpikeResult{Message: "cpu-watchdog is off"}
 	}
 	if set.Evolve != config.EvolveMaintainer {
-		return CPUSpikeResult{Message: "filing a ticket needs evolve maintainer mode"}
+		return wire.CPUSpikeResult{Message: "filing a ticket needs evolve maintainer mode"}
 	}
 	if _, err := s.projectDir(OutboxProject); err != nil {
-		return CPUSpikeResult{Message: "filing a ticket needs a gx project: " + err.Error()}
+		return wire.CPUSpikeResult{Message: "filing a ticket needs a gx project: " + err.Error()}
 	}
 	s.cpuSpikes.mu.Lock()
 	defer s.cpuSpikes.mu.Unlock()
 	if last := s.cpuSpikes.lastFiled; !last.IsZero() && now.Sub(last) < set.CPUWatchdog.Cooldown {
-		return CPUSpikeResult{Message: fmt.Sprintf("cooling down: last ticket filed %s ago", now.Sub(last).Round(time.Second))}
+		return wire.CPUSpikeResult{Message: fmt.Sprintf("cooling down: last ticket filed %s ago", now.Sub(last).Round(time.Second))}
 	}
 	res, err := s.oneOff(wire.OneOffRequest{
 		Prompt:  cpuSpikePrompt(sp, set.CPUWatchdog),
@@ -87,14 +79,14 @@ func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) CPUSpikeResult {
 	switch {
 	case err != nil:
 		s.log.Warn("cpu spike: file ticket", "err", err)
-		return CPUSpikeResult{Message: err.Error()}
+		return wire.CPUSpikeResult{Message: err.Error()}
 	case res.Refused:
 		s.log.Info("cpu spike: ticket refused", "reason", res.Reason, "message", res.Message)
-		return CPUSpikeResult{Message: res.Message}
+		return wire.CPUSpikeResult{Message: res.Message}
 	}
 	s.cpuSpikes.lastFiled = now
 	s.log.Info("cpu spike: ticket filed", "address", res.Address)
-	return CPUSpikeResult{Address: res.Address}
+	return wire.CPUSpikeResult{Address: res.Address}
 }
 
 func cpuSpikePrompt(sp cpuwatch.Spike, c config.CPUWatchdogConfig) string {

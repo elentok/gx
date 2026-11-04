@@ -22,7 +22,7 @@ func limitsEventHarness(t *testing.T) *servertest.Harness {
 }
 
 // limitsEventStream opens the stream from the current snapshot.
-func limitsEventStream(t *testing.T, h *servertest.Harness) <-chan server.Event {
+func limitsEventStream(t *testing.T, h *servertest.Harness) <-chan wire.Event {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -38,7 +38,7 @@ func limitsEventStream(t *testing.T, h *servertest.Harness) <-chan server.Event 
 }
 
 // limitsEvents counts the limits-changed events on ch until it is quiet.
-func limitsEvents(ch <-chan server.Event) int {
+func limitsEvents(ch <-chan wire.Event) int {
 	n := 0
 	for {
 		select {
@@ -52,7 +52,7 @@ func limitsEvents(ch <-chan server.Event) int {
 	}
 }
 
-func wantLimitsEvents(t *testing.T, ch <-chan server.Event, want int) {
+func wantLimitsEvents(t *testing.T, ch <-chan wire.Event, want int) {
 	t.Helper()
 	if got := limitsEvents(ch); got != want {
 		t.Fatalf("limits-changed events = %d, want %d", got, want)

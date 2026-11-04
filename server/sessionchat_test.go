@@ -13,14 +13,13 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // startChatSession starts a fake session whose harness counts as the chat
 // harness and returns its id, conversation and transcript path.
-func startChatSession(t *testing.T, kind string) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
+func startChatSession(t *testing.T, kind string) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
 	t.Helper()
 	cfg := t.TempDir()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), servertest.WithChatPollInterval(chatPollTestInterval), servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg))

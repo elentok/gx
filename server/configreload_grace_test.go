@@ -26,7 +26,7 @@ type graceFixture struct {
 	h          *servertest.Harness
 	path       string
 	store      string
-	evs        <-chan server.Event
+	evs        <-chan wire.Event
 	ctx        context.Context
 	startTitle string
 }

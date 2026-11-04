@@ -18,7 +18,7 @@ import (
 )
 
 // stopFakeSession stops a session and waits for it to exit.
-func stopFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id string) {
+func stopFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id string) {
 	t.Helper()
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {

@@ -21,7 +21,7 @@ const (
 
 // startFailureSession starts a fake session; chat makes its harness the chat
 // harness, whose transcripts auth and stalled read.
-func startFailureSession(t *testing.T, chat bool, stall time.Duration) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
+func startFailureSession(t *testing.T, chat bool, stall time.Duration) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
 	t.Helper()
 	cfg := t.TempDir()
 	opts := []func(*server.Config){servertest.WithStallThreshold(stall), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}

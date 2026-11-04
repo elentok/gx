@@ -115,7 +115,7 @@ func TestEvents_SnapshotThenSubscribeSeesTicketEditAsOneEventWithNextSeq(t *test
 
 	select {
 	case ev := <-events:
-		want := server.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/02"}
+		want := wire.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/02"}
 		if ev != want {
 			t.Errorf("event = %+v, want %+v", ev, want)
 		}
@@ -163,7 +163,7 @@ func TestEvents_TicketChangedPingPublishesAtOnce(t *testing.T) {
 
 	select {
 	case ev := <-events:
-		want := server.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/01"}
+		want := wire.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/01"}
 		if ev != want {
 			t.Errorf("event = %+v, want %+v", ev, want)
 		}
@@ -399,7 +399,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	next := func() server.Event {
+	next := func() wire.Event {
 		for {
 			select {
 			case ev := <-events:
@@ -408,7 +408,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 				}
 			case <-ctx.Done():
 				t.Fatal("event missing")
-				return server.Event{}
+				return wire.Event{}
 			}
 		}
 	}

@@ -315,7 +315,7 @@ func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testi
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
-	st, _ = st.Reduce(server.Event{Seq: 2, Type: server.EventTicketDone, Address: "gx:alpha/01"})
+	st, _ = st.Reduce(wire.Event{Seq: 2, Type: server.EventTicketDone, Address: "gx:alpha/01"})
 
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 	view := next.(QueueModel).View().Content
