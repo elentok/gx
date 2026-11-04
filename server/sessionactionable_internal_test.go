@@ -98,7 +98,13 @@ func modelTestServer(t *testing.T, cwd string, lines ...string) *Server {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}})
+	return withChat(withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}))
+}
+
+// withChat gives a bare test Server the session chat that New builds.
+func withChat(s *Server) *Server {
+	s.sessionChat = chat.New(chat.Deps{Config: chat.Config{Env: s.cfg.Env}, Source: chatSource{s}, Log: s.log})
+	return s
 }
 
 func replyWithModel(model string) string {
@@ -144,7 +150,7 @@ func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 	if got := s.sessionInfo(meta).Model; got != "claude-opus-5-5" {
 		t.Fatalf("model = %q, want claude-opus-5-5", got)
 	}
-	path, ok := s.claudeTranscript("s1", meta)
+	path, ok := s.sessionChat.ClaudeTranscript("s1", chatMeta(meta))
 	if !ok {
 		t.Fatal("no transcript")
 	}
@@ -185,7 +191,7 @@ func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "rollout-conv.jsonl"), []byte(rollout), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
+	s := withChat(withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}))
 	info := s.sessionInfo(sessionMeta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
 	if info.Model != "gpt-6.1-terra" || info.Effort != "high" || !info.ModelSwitched {
 		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-6.1-terra/high/true", info.Model, info.Effort, info.ModelSwitched)

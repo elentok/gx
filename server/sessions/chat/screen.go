@@ -1,4 +1,4 @@
-package server
+package chat
 
 import (
 	"net/http"
@@ -6,44 +6,33 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
-// sessionScreenRead serves a design session's screen (session=) or a loop
-// ticket agent's (ticket=).
-func (s *Server) sessionScreenRead(w http.ResponseWriter, r *http.Request) {
+// screenRead serves a design session's screen (session=) or a loop ticket
+// agent's (ticket=).
+func (c *Chat) screenRead(w http.ResponseWriter, r *http.Request) {
 	if address := r.URL.Query().Get("ticket"); address != "" {
-		s.ticketScreenRead(w, address)
+		c.ticketScreenRead(w, address)
 		return
 	}
-	id := r.URL.Query().Get("session")
-	dir, meta, res, err := s.readableSession(id)
-	if res.Refused {
-		status := http.StatusBadRequest
-		if res.Reason == wire.ReasonSessionUnknown {
-			status = http.StatusNotFound
-		}
-		http.Error(w, res.Message, status)
-		return
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	dir, meta, ok := c.readable(w, r.URL.Query().Get("session"))
+	if !ok {
 		return
 	}
 	writeScreen(w, dir, meta.Status.State == wire.SessionExited)
 }
 
-func (s *Server) ticketScreenRead(w http.ResponseWriter, address string) {
+func (c *Chat) ticketScreenRead(w http.ResponseWriter, address string) {
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		http.Error(w, "no ticket "+address, http.StatusNotFound)
 		return
 	}
-	dir, ok := s.ticketPtyDir(addr)
+	dir, ok := c.TicketPtyDir(addr)
 	if !ok {
 		http.Error(w, "no screen for "+address, http.StatusNotFound)
 		return
@@ -58,11 +47,11 @@ func (s *Server) ticketScreenRead(w http.ResponseWriter, address string) {
 	writeRows(w, rows, err)
 }
 
-// ticketPtyDir is the agent directory of addr's latest run, when that agent
+// TicketPtyDir is the agent directory of addr's latest run, when that agent
 // ran in a pty. Other runners have no screen.
-func (s *Server) ticketPtyDir(addr tickets.Address) (string, bool) {
+func (c *Chat) TicketPtyDir(addr tickets.Address) (string, bool) {
 	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
-	dir := filepath.Join(nativerunner.AgentsRoot(s.cfg.StateDir, addr.Project), label)
+	dir := filepath.Join(nativerunner.AgentsRoot(c.cfg.StateDir, addr.Project), label)
 	d, err := nativerunner.OpenDir(dir)
 	if err != nil || !d.PTY() {
 		return "", false
@@ -109,5 +98,5 @@ func writeRows(w http.ResponseWriter, rows []string, err error) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, wire.SessionScreenResponse{Rows: rows})
+	wire.WriteJSON(w, wire.SessionScreenResponse{Rows: rows})
 }

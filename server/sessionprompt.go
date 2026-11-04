@@ -170,12 +170,11 @@ func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error
 // lastChatMessageID is the id of the newest visible message of the session's
 // chat, or "" with none.
 func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) {
-	path, kind, ok := s.chatTranscript(id, meta)
+	path, kind, ok := s.sessionChat.Transcript(id, chatMeta(meta))
 	if !ok {
 		return "", nil
 	}
-	final := s.designFinal(meta.Ticket)
-	snap, err := s.chats.Read(path, kind, final, chat.Loader(kind, meta.Ticket, final))
+	snap, err := s.sessionChat.ReadSnapshot(path, kind, meta.Ticket)
 	if os.IsNotExist(err) || len(snap.Msgs) == 0 {
 		return "", nil
 	}

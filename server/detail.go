@@ -68,7 +68,7 @@ func (s *Server) ticketDetail(ref ticketRef) (wire.TicketDetail, error) {
 	}
 	if !ref.epic.IsMap {
 		d.Stats = s.detailStats(ref)
-		_, d.HasScreen = s.ticketPtyDir(ref.addr)
+		_, d.HasScreen = s.sessionChat.TicketPtyDir(ref.addr)
 		var writtenAt time.Time
 		if t.Status == schema.StatusCancelled {
 			writtenAt = ticketWrittenAt(ref.ticket.Path)

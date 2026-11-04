@@ -40,7 +40,7 @@ func (s *Server) markTurn(dir, id string) (turnMark, bool) {
 	if err != nil || !s.settings.Load().HasChatReader(meta.Harness) {
 		return turnMark{}, false
 	}
-	path, kind, ok := s.chatTranscript(id, meta)
+	path, kind, ok := s.sessionChat.Transcript(id, chatMeta(meta))
 	if !ok {
 		return turnMark{}, false
 	}

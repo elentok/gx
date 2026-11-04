@@ -1,4 +1,4 @@
-package server
+package chat
 
 import (
 	"context"
@@ -6,17 +6,16 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/server/wire"
 )
 
-// sessionCommandsRead serves the command menu of a session (session=) or of a
+// commandsRead serves the command menu of a session (session=) or of a
 // First prompt in a project dir (project= and dir=), for kind "/" (default)
 // or "$". The read starts the harness in the dir, which runs the person's
 // hooks, so a project dir is checked like a new session's.
-func (s *Server) sessionCommandsRead(w http.ResponseWriter, r *http.Request) {
+func (c *Chat) commandsRead(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	kind := q.Get("kind")
 	if kind == "" {
@@ -26,26 +25,26 @@ func (s *Server) sessionCommandsRead(w http.ResponseWriter, r *http.Request) {
 	bySession := id != "" && project == "" && dir == ""
 	byProject := id == "" && project != "" && dir != ""
 	if (kind != "/" && kind != "$") || bySession == byProject {
-		writeCommandsRefusal(w, sessionRefusal(wire.ReasonSessionBadRequest, "want kind / or $, and either session or project with dir"))
+		writeRefusal(w, refuse(wire.ReasonSessionBadRequest, "want kind / or $, and either session or project with dir"))
 		return
 	}
 
 	// A First prompt has no harness field: it starts Claude.
 	name := string(harness.Claude)
 	if bySession {
-		_, meta, res, err := s.SessionDir(id)
+		_, meta, res, err := c.src.SessionDir(id)
 		if res.Refused || err != nil {
 			writeCommandsFailure(w, res, err)
 			return
 		}
 		var ok bool
-		if name, ok = s.commandHarness(meta.Harness); !ok {
-			writeCommandsRefusal(w, sessionRefusal(wire.ReasonPromptHarnessNotSupported, "this harness has no command list"))
+		if name, ok = c.commandHarness(meta.Harness); !ok {
+			writeRefusal(w, refuse(wire.ReasonPromptHarnessNotSupported, "this harness has no command list"))
 			return
 		}
 		dir = meta.Dir
 	} else {
-		refusal, err := s.checkProjectDir(project, dir)
+		refusal, err := c.src.CheckProjectDir(project, dir)
 		if refusal != nil {
 			writeCommandsFailure(w, *refusal, nil)
 			return
@@ -56,16 +55,16 @@ func (s *Server) sessionCommandsRead(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, s.commandList(r.Context(), name, kind, dir))
+	wire.WriteJSON(w, c.commandList(r.Context(), name, kind, dir))
 }
 
 // commandHarness maps a session's harness to the command-list harness: Codex,
 // or Claude for the chat harness, which speaks the Claude format.
-func (s *Server) commandHarness(name string) (string, bool) {
+func (c *Chat) commandHarness(name string) (string, bool) {
 	switch {
 	case name == string(harness.Codex):
 		return string(harness.Codex), true
-	case s.settings.Load().HasChatReader(name):
+	case c.src.HasChatReader(name):
 		return string(harness.Claude), true
 	}
 	return "", false
@@ -73,18 +72,18 @@ func (s *Server) commandHarness(name string) (string, bool) {
 
 // commandList is the menu for harnessName in dir. Claude has only "/", and
 // Codex's "/" is its built-ins, so neither starts a probe for the other kind.
-func (s *Server) commandList(ctx context.Context, harnessName, kind, dir string) wire.SessionCommandsResponse {
+func (c *Chat) commandList(ctx context.Context, harnessName, kind, dir string) wire.SessionCommandsResponse {
 	var res commandlist.Result
 	switch {
 	case harnessName == string(harness.Claude) && kind == "/":
-		res = s.commandLists.Get(ctx, commandlist.Key{Harness: harnessName, Dir: dir, Kind: kind},
+		res = c.commandLists.Get(ctx, commandlist.Key{Harness: harnessName, Dir: dir, Kind: kind},
 			func(ctx context.Context, dir string) ([]commandlist.Entry, error) {
-				return commandlist.ProbeClaude(ctx, dir, s.cfg.Env)
+				return commandlist.ProbeClaude(ctx, dir, c.cfg.Env)
 			})
 	case harnessName == string(harness.Codex) && kind == "$":
-		res = s.commandLists.Get(ctx, commandlist.Key{Harness: harnessName, Dir: dir, Kind: kind},
+		res = c.commandLists.Get(ctx, commandlist.Key{Harness: harnessName, Dir: dir, Kind: kind},
 			func(ctx context.Context, dir string) ([]commandlist.Entry, error) {
-				return commandlist.ProbeCodexSkills(ctx, dir, s.cfg.Env)
+				return commandlist.ProbeCodexSkills(ctx, dir, c.cfg.Env)
 			})
 	case harnessName == string(harness.Codex):
 		res.Entries = commandlist.BuiltinsFor(harnessName, runtime.GOOS).Entries
@@ -105,12 +104,12 @@ func writeCommandsFailure(w http.ResponseWriter, res wire.SessionResult, err err
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeCommandsRefusal(w, res)
+	writeRefusal(w, res)
 }
 
-// writeCommandsRefusal answers with the refusal as JSON under a 4xx status, so
-// a caller can read its reason.
-func writeCommandsRefusal(w http.ResponseWriter, res wire.SessionResult) {
+// writeRefusal answers with the refusal as JSON under a 4xx status, so a
+// caller can read its reason.
+func writeRefusal(w http.ResponseWriter, res wire.SessionResult) {
 	status := http.StatusBadRequest
 	if res.Reason == wire.ReasonSessionUnknown {
 		status = http.StatusNotFound

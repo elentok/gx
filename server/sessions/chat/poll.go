@@ -1,19 +1,18 @@
-package server
+package chat
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 )
 
-const defaultChatPollInterval = 2 * time.Second
-
-// chatPoll publishes EventSessionChatChanged when the session's transcript
-// size changes. It ticks only between setActive(true) and setActive(false), so
+// Poll publishes EventSessionChatChanged when the session's transcript
+// size changes. It ticks only between SetActive(true) and SetActive(false), so
 // an Idle or Exited session costs nothing.
-type chatPoll struct {
-	s    *Server
+type Poll struct {
+	c    *Chat
 	dir  string
 	id   string
 	mu   sync.Mutex
@@ -21,11 +20,12 @@ type chatPoll struct {
 	done chan struct{}
 }
 
-func (s *Server) newChatPoll(dir, id string) *chatPoll {
-	return &chatPoll{s: s, dir: dir, id: id}
+// NewPoll makes the poll of the session id whose state dir is dir.
+func (c *Chat) NewPoll(dir, id string) *Poll {
+	return &Poll{c: c, dir: dir, id: id}
 }
 
-func (p *chatPoll) setActive(active bool) {
+func (p *Poll) SetActive(active bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	switch {
@@ -37,7 +37,7 @@ func (p *chatPoll) setActive(active bool) {
 	}
 }
 
-func (p *chatPoll) close() {
+func (p *Poll) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.stop != nil {
@@ -46,15 +46,15 @@ func (p *chatPoll) close() {
 }
 
 // halt stops the ticking goroutine and waits for it. The caller holds p.mu.
-func (p *chatPoll) halt() {
+func (p *Poll) halt() {
 	close(p.stop)
 	<-p.done
 	p.stop, p.done = nil, nil
 }
 
-func (p *chatPoll) run(stop <-chan struct{}, done chan<- struct{}) {
+func (p *Poll) run(stop <-chan struct{}, done chan<- struct{}) {
 	defer close(done)
-	ticker := time.NewTicker(p.s.cfg.ChatPollInterval)
+	ticker := time.NewTicker(p.c.cfg.ChatPollInterval)
 	defer ticker.Stop()
 	var path string
 	size := int64(-1)
@@ -62,12 +62,12 @@ func (p *chatPoll) run(stop <-chan struct{}, done chan<- struct{}) {
 		select {
 		case <-stop:
 			return
-		case <-p.s.sessionWatches.stop:
+		case <-p.c.src.Stopped():
 			return
 		case <-ticker.C:
 		}
 		// A stall is only time passing, so no status change reports it.
-		p.s.noteFailure(p.id)
+		p.c.src.NoteFailure(p.id)
 		if path == "" {
 			path = p.transcript()
 		}
@@ -83,16 +83,16 @@ func (p *chatPoll) run(stop <-chan struct{}, done chan<- struct{}) {
 		// The first reading is the baseline: growth that predates the poll
 		// is already in the chat the page loads.
 		if prev >= 0 && size != prev {
-			p.s.events.Publish(wire.EventSessionChatChanged, p.id)
+			p.c.src.Publish(wire.EventSessionChatChanged, p.id)
 		}
 	}
 }
 
-func (p *chatPoll) transcript() string {
-	meta, err := readSessionMeta(p.dir)
-	if err != nil || !p.s.settings.Load().HasChatReader(meta.Harness) {
+func (p *Poll) transcript() string {
+	meta, err := p.c.src.ReadMeta(p.dir)
+	if err != nil || !p.c.src.HasChatReader(meta.Harness) {
 		return ""
 	}
-	path, _, _ := p.s.chatTranscript(p.id, meta)
+	path, _, _ := p.c.Transcript(p.id, meta)
 	return path
 }

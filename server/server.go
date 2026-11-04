@@ -25,8 +25,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/brief"
-	"github.com/elentok/gx/codexsession"
-	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
@@ -106,20 +104,10 @@ type Server struct {
 	restarting atomic.Bool
 	disks      *disk.Disk
 	health     *health.Health
-	// chats caches parsed session chats by transcript file.
-	chats chat.Cache
-	// transcripts caches where each conversation's transcript is.
-	transcripts chat.TranscriptPaths
-	// commandLists caches the harnesses' command lists.
-	commandLists *commandlist.Cache
+	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
+	sessionChat *chat.Chat
 	// autoAdvances holds the running auto-advance countdowns.
 	autoAdvances autoAdvances
-	// authFailures caches whether each transcript ends in an auth error.
-	authFailures chat.AuthFailures
-	// reportedModels caches the model ID on each transcript's newest reply.
-	reportedModels chat.FileCache[string]
-	// codexTurns caches the model and effort on each rollout's newest turn.
-	codexTurns chat.FileCache[codexsession.TurnModel]
 	// filedRounds holds the round markers already in the follow-ups epic, so an
 	// Idle detection never rescans its tickets.
 	filedRounds sync.Map
@@ -204,13 +192,13 @@ func New(cfg Config) (*Server, error) {
 		cfg.SessionBannerDelay = defaultSessionBannerDelay
 	}
 	if cfg.ChatPollInterval == 0 {
-		cfg.ChatPollInterval = defaultChatPollInterval
+		cfg.ChatPollInterval = chat.DefaultPollInterval
 	}
 	if cfg.Chat.GateStatePath == "" {
 		cfg.Chat.GateStatePath = ralphloop.NotificationStatePath(cfg.StateDir)
 	}
 	if cfg.StallThreshold == 0 {
-		cfg.StallThreshold = defaultStallThreshold
+		cfg.StallThreshold = chat.DefaultStallThreshold
 	}
 	if cfg.TurnSettleTimeout == 0 {
 		cfg.TurnSettleTimeout = defaultTurnSettleTimeout
@@ -321,14 +309,13 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("load runs: %w", err)
 	}
 	s := &Server{
-		cfg:          cfg,
-		commandLists: commandlist.NewCache(cfg.CommandListAge, nil),
-		lock:         lock,
-		ln:           ln,
-		tcp:          tcp,
-		logf:         logf,
-		log:          log,
-		idx:          idx,
+		cfg:  cfg,
+		lock: lock,
+		ln:   ln,
+		tcp:  tcp,
+		logf: logf,
+		log:  log,
+		idx:  idx,
 
 		chat:      ralphloop.NewServerChat(cfg.Chat),
 		registry:  registry,
@@ -440,6 +427,14 @@ func New(cfg Config) (*Server, error) {
 		TicketStore: cfg.TicketStore, ConversationsDir: cfg.ConversationsDir,
 		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s},
 	})
+	s.sessionChat = chat.New(chat.Deps{
+		Config: chat.Config{
+			TranscriptMissTTL: cfg.TranscriptMissTTL, ChatPollInterval: cfg.ChatPollInterval,
+			StallThreshold: cfg.StallThreshold, CommandListAge: cfg.CommandListAge,
+			Env: cfg.Env, StateDir: cfg.StateDir,
+		},
+		Source: chatSource{s}, Log: log,
+	})
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
@@ -508,11 +503,6 @@ var routeTable = []struct {
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},
 	// Interactive sessions; /v1/agents/* is the loop agents'.
 	{"GET /v1/sessions", (*Server).sessionsRead},
-	{"GET /v1/sessions/chat", (*Server).sessionChatRead},
-	{"GET /v1/sessions/chat/archive", (*Server).sessionChatArchiveRead},
-	{"GET /v1/sessions/screen", (*Server).sessionScreenRead},
-	{"GET /v1/sessions/commands", (*Server).sessionCommandsRead},
-	{"GET /v1/sessions/permission", (*Server).sessionPermissionRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
 	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},
 	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/health"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
@@ -626,8 +627,8 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 	}()
 	first := s.newFirstPrompt(dir, id, run)
 	defer first.stop()
-	chat := s.newChatPoll(dir, id)
-	defer chat.close()
+	poll := s.sessionChat.NewPoll(dir, id)
+	defer poll.Close()
 	// settle is closed to end the wait of the last idle edge's settleTurn.
 	var settle chan struct{}
 	endSettle := func() {
@@ -708,7 +709,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 			})
 			first.noteState(st.State)
 			s.noteFailure(id)
-			chat.setActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
+			poll.SetActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			// Marked before the Design check reads the transcript.
 			mark, marked := turnMark{}, false
 			if idleEdge {
@@ -841,7 +842,7 @@ func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
 	}
 	s.saveConversationTotals(*m, m.ConversationID)
 	m.Status, m.StatusChangedAt, m.Exit = wire.SessionStatus{State: wire.SessionExited}, time.Now(), exit
-	m.RestoreCrashed = exit == wire.SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < restoreCrashWindow
+	m.RestoreCrashed = exit == wire.SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < chat.RestoreCrashWindow
 	m.FirstPrompt = ""
 	m.Actionable = wire.SessionActionable{}
 	return true

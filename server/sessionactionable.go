@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
@@ -102,41 +100,6 @@ type designRef struct {
 	Live                 bool
 }
 
-// claudeTranscript finds the claude transcript of a session's conversation. A
-// missing transcript (a codex session, or one not written yet) stays silent;
-// real errors and an ambiguous id are logged.
-func (s *Server) claudeTranscript(id string, meta sessionMeta) (string, bool) {
-	conversationID := meta.ConversationID
-	if conversationID == "" {
-		return "", false
-	}
-	return s.transcripts.Resolve(conversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
-		projects, err := harness.ClaudeProjectsDirIn(s.cfg.Env)
-		if err != nil {
-			s.log.Warn("claude projects dir", "session", id, "err", err)
-			return "", false
-		}
-		// One stat of the expected slug dir; the glob over every project dir
-		// is only for a session launched from a different cwd.
-		expected := filepath.Join(projects, transcript.Slugify(meta.Dir), conversationID+".jsonl")
-		if _, err := os.Stat(expected); err == nil {
-			return expected, true
-		}
-		paths, err := transcript.FindByIDIn(projects, conversationID)
-		if err != nil {
-			s.log.Warn("find transcript", "session", id, "err", err)
-			return "", false
-		}
-		if len(paths) > 1 {
-			s.log.Warn("several transcripts", "session", id, "conversation", conversationID, "count", len(paths))
-		}
-		if len(paths) != 1 {
-			return "", false
-		}
-		return paths[0], true
-	})
-}
-
 // lastAssistantText reads the session's last assistant message from its claude
 // transcript, or from its codex rollout.
 func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
@@ -147,7 +110,7 @@ func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
 		}
 		return text, ok && err == nil
 	}
-	path, ok := s.claudeTranscript(id, meta)
+	path, ok := s.sessionChat.ClaudeTranscript(id, chatMeta(meta))
 	if !ok {
 		return "", false
 	}
