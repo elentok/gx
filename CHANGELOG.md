@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.45.1 - 2026-11-04
+
+- Fixed `gx server` using about 500% CPU on machines with many Claude project directories. Each web snapshot searched every project directory for every ticket session. The server now caches that lookup: found sessions for good, missing ones for 15 seconds.
+
 ## v0.45.0 - 2026-11-04
 
 - Added Codex support. Codex runs as a second agent harness beside Claude, on the PTY runner, and needs Codex 0.166.0 or newer. A Default harness setting (Settings > Agents, or `agents.default-harness`) picks claude or codex for new agents; `H` in the Queue tab also picks it. `gx codex doctor` checks the Codex features gx relies on, and `gx codex setup` installs the hooks and approvals. Codex approvals show as a card in the web UI.
