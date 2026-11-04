@@ -66,27 +66,18 @@ func sessionRefusal(reason, msg string) wire.SessionResult {
 	return wire.SessionResult{Refused: true, Reason: reason, Message: msg}
 }
 
-func (s *Server) sessionCreateWrite(w http.ResponseWriter, r *http.Request) {
+func (mg *Manager) sessionCreateWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.CreateSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.sessions.createSession(req, sessionCtx{})
+	res, err := mg.createSession(req, sessionCtx{})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, res)
-}
-
-func (s *Server) sessionsRead(w http.ResponseWriter, _ *http.Request) {
-	list, err := s.queue.ListSessionsWithQueue()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, list)
 }
 
 // createSession makes the session's state dir, writes its meta and starts its
@@ -105,13 +96,13 @@ func (mg *Manager) createSession(req wire.CreateSessionRequest, sc sessionCtx) (
 	}
 	from := "the request"
 	if req.Harness == "" {
-		req.Harness = mg.srv.projects.LaunchHarness(req.Project)
-		from = mg.srv.harness.DefaultHarnessSource(req.Project)
+		req.Harness = mg.projects.LaunchHarness(req.Project)
+		from = mg.harness.DefaultHarnessSource(req.Project)
 	}
 	if _, err := harness.Lookup(agentrunner.Kind(req.Harness)); err != nil {
 		return sessionRefusal(wire.ReasonSessionUnknownHarness, err.Error()), nil
 	}
-	if msg := mg.srv.harness.InteractiveMissingReason(req.Harness, from); msg != "" {
+	if msg := mg.harness.InteractiveMissingReason(req.Harness, from); msg != "" {
 		return sessionRefusal(wire.ReasonSessionHarnessMissing, msg), nil
 	}
 	conv, err := nativerunner.NewUUID()
@@ -130,7 +121,7 @@ func (mg *Manager) createSession(req wire.CreateSessionRequest, sc sessionCtx) (
 	}
 	tier := cmp.Or(req.Tier, ralphloop.TierWorker)
 	if sc.launchDesign {
-		tier = mg.srv.designLaunchTier(req.Ticket)
+		tier = mg.designLaunchTier(req.Ticket)
 	}
 	meta := sessionMeta{
 		Harness:        req.Harness,
@@ -140,7 +131,7 @@ func (mg *Manager) createSession(req wire.CreateSessionRequest, sc sessionCtx) (
 		Name:           req.Name,
 		Ticket:         req.Ticket,
 		LaunchDesign:   sc.launchDesign,
-		Design:         sc.design || (req.Ticket != "" && mg.srv.onMapEpic(req.Ticket)),
+		Design:         sc.design || (req.Ticket != "" && mg.onMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
 		RemoteControl:  sc.remoteControl,
 		RebaseNote:     req.RebaseNote,
@@ -157,8 +148,8 @@ func (mg *Manager) createSession(req wire.CreateSessionRequest, sc sessionCtx) (
 	}
 	if meta.Design && meta.Ticket != "" {
 		// Cosmetic: a failed stamp must not fail the session.
-		if err := mg.srv.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
-			mg.srv.log.Warn("stamp design start", "session", meta.ID, "ticket", meta.Ticket, "err", err)
+		if err := mg.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
+			mg.log.Warn("stamp design start", "session", meta.ID, "ticket", meta.Ticket, "err", err)
 		}
 	}
 	id := meta.ID
@@ -173,7 +164,7 @@ func (mg *Manager) createSession(req wire.CreateSessionRequest, sc sessionCtx) (
 		return wire.SessionResult{}, err
 	}
 	mg.watches.start(func() { mg.watchSession(dir, id, 0, time.Time{}, false) })
-	mg.srv.events.Publish(wire.EventSessionChanged, id)
+	mg.events.Publish(wire.EventSessionChanged, id)
 	info := meta.info()
 	return wire.SessionResult{Session: &info}, nil
 }
@@ -182,7 +173,7 @@ func (mg *Manager) createSession(req wire.CreateSessionRequest, sc sessionCtx) (
 // the session's harness and project.
 func (mg *Manager) applyTier(meta *sessionMeta, tier ralphloop.Tier) {
 	meta.Tier = tier
-	meta.Model, meta.Effort = ralphloop.ResolveTier(mg.srv.projects.AgentsConfig(meta.Project), ralphloop.AgentFor(meta.Harness), tier)
+	meta.Model, meta.Effort = ralphloop.ResolveTier(mg.projects.AgentsConfig(meta.Project), ralphloop.AgentFor(meta.Harness), tier)
 }
 
 // recordConversation keeps the session's current conversation on the record,
@@ -192,11 +183,11 @@ func (mg *Manager) recordConversation(m sessionMeta) {
 	if m.Ticket == "" || m.ConversationID == "" {
 		return
 	}
-	err := conversations.Save(mg.srv.cfg.ConversationsDir, conversations.Record{
+	err := conversations.Save(mg.cfg.ConversationsDir, conversations.Record{
 		ID: m.ConversationID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, Design: m.Design, RecordedAt: time.Now(),
 	})
 	if err != nil {
-		mg.srv.log.Warn("record conversation", "session", m.ID, "err", err)
+		mg.log.Warn("record conversation", "session", m.ID, "err", err)
 	}
 }
 
@@ -208,19 +199,19 @@ func (mg *Manager) saveConversationTotals(m sessionMeta, conversation string) {
 		return
 	}
 	agent := ralphloop.AgentFor(m.Harness)
-	home, err := mg.srv.projects.EnvHome()
+	home, err := mg.projects.EnvHome()
 	if err != nil {
-		mg.srv.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
+		mg.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 		return
 	}
-	codexHome, _ := mg.srv.projects.CodexHome()
+	codexHome, _ := mg.projects.CodexHome()
 	tokens, cost, err := ralphloop.SessionsTotals(ralphloop.SessionHomes{Claude: home, Codex: codexHome}, []ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
 	if err != nil {
-		mg.srv.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
+		mg.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 		return
 	}
-	if err := conversations.SaveTotals(mg.srv.cfg.ConversationsDir, conversation, conversations.Totals{TotalTokens: int(tokens), Cost: cost}); err != nil {
-		mg.srv.log.Warn("save conversation totals", "session", m.ID, "conversation", conversation, "err", err)
+	if err := conversations.SaveTotals(mg.cfg.ConversationsDir, conversation, conversations.Totals{TotalTokens: int(tokens), Cost: cost}); err != nil {
+		mg.log.Warn("save conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 	}
 	if m.Design {
 		mg.saveConversationGrilling(m, conversation)
@@ -234,7 +225,7 @@ func (mg *Manager) addSessionWorktree(project, name string) (string, string) {
 	if !filepath.IsLocal(name) {
 		return "", fmt.Sprintf("bad worktree name %q", name)
 	}
-	projectDir, repoDir, err := mg.srv.projects.Of(project)
+	projectDir, repoDir, err := mg.projects.Of(project)
 	if err != nil {
 		return "", err.Error()
 	}
@@ -297,7 +288,7 @@ func freeSessionName(project string, list []wire.SessionInfo) string {
 // short because holder.sock lives in the dir and unix socket paths are
 // length-limited.
 func (mg *Manager) makeSessionDir() (id, dir string, err error) {
-	if err := os.MkdirAll(mg.srv.cfg.SessionsDir, 0o700); err != nil {
+	if err := os.MkdirAll(mg.cfg.SessionsDir, 0o700); err != nil {
 		return "", "", err
 	}
 	for range 8 {
@@ -306,7 +297,7 @@ func (mg *Manager) makeSessionDir() (id, dir string, err error) {
 			return "", "", err
 		}
 		id = hex.EncodeToString(b[:])
-		dir = filepath.Join(mg.srv.cfg.SessionsDir, id)
+		dir = filepath.Join(mg.cfg.SessionsDir, id)
 		err = os.Mkdir(dir, 0o700)
 		if !errors.Is(err, fs.ErrExist) {
 			return id, dir, err
@@ -334,7 +325,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *sessionMeta, cols, rows 
 	if err != nil {
 		return err
 	}
-	env := mg.srv.cfg.Env
+	env := mg.cfg.Env
 	if meta.Harness == string(harness.Codex) {
 		// The SessionStart hook writes Codex's own session id here; without it
 		// the meta keeps gx's UUID and the chat misses the rollout.
@@ -342,7 +333,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *sessionMeta, cols, rows 
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
-		Args:      launchArgs(meta, mg.srv.settings.Load().AgentsClaudeArgs, mg.codexRoots(meta)),
+		Args:      launchArgs(meta, mg.settings.Load().AgentsClaudeArgs, mg.codexRoots(meta)),
 		Env:       env,
 		Cwd:       meta.Dir,
 	}
@@ -353,7 +344,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *sessionMeta, cols, rows 
 			return fmt.Errorf("harness %s cannot resume", meta.Harness)
 		}
 	}
-	holder := mg.srv.cfg.Holder
+	holder := mg.cfg.Holder
 	if len(holder) == 0 {
 		exe, err := os.Executable()
 		if err != nil {
@@ -419,7 +410,7 @@ func (mg *Manager) codexRoots(meta *sessionMeta) []string {
 		return nil
 	}
 	var extra []string
-	if d, err := mg.srv.projects.Dir(meta.Project); err == nil {
+	if d, err := mg.projects.Dir(meta.Project); err == nil {
 		extra = append(extra, d)
 	}
 	return harness.CodexWritableRoots(meta.Dir, extra...)
@@ -439,10 +430,10 @@ func hasFlag(args []string, flag string) bool {
 func (mg *Manager) endFailedStart(dir string, meta *sessionMeta) {
 	mg.recordSessionExit(meta, wire.SessionExitCrashed)
 	if err := writeSessionMeta(dir, *meta); err != nil {
-		mg.srv.log.Warn("save session meta", "session", meta.ID, "err", err)
+		mg.log.Warn("save session meta", "session", meta.ID, "err", err)
 		return
 	}
-	mg.srv.events.Publish(wire.EventSessionChanged, meta.ID)
+	mg.events.Publish(wire.EventSessionChanged, meta.ID)
 }
 
 // trustFlag has the holder answer the trust dialog, only for a worktree gx
@@ -475,14 +466,14 @@ func (mg *Manager) ListSessions() ([]wire.SessionInfo, error) {
 	}
 	out := make([]wire.SessionInfo, len(metas))
 	for i, m := range metas {
-		out[i] = mg.srv.sessionInfo(m)
+		out[i] = mg.host.sessionInfo(m)
 	}
 	return out, nil
 }
 
 // listSessionMetas is listSessions before the info is built.
 func (mg *Manager) listSessionMetas() ([]sessionMeta, error) {
-	entries, err := os.ReadDir(mg.srv.cfg.SessionsDir)
+	entries, err := os.ReadDir(mg.cfg.SessionsDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -494,12 +485,12 @@ func (mg *Manager) listSessionMetas() ([]sessionMeta, error) {
 		if !e.IsDir() {
 			continue
 		}
-		meta, err := readSessionMeta(filepath.Join(mg.srv.cfg.SessionsDir, e.Name()))
+		meta, err := readSessionMeta(filepath.Join(mg.cfg.SessionsDir, e.Name()))
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			mg.srv.log.Warn("unreadable session meta", "session", e.Name(), "err", err)
+			mg.log.Warn("unreadable session meta", "session", e.Name(), "err", err)
 			continue
 		}
 		metas = append(metas, meta)
@@ -532,7 +523,7 @@ func (mg *Manager) SessionDir(id string) (string, sessionMeta, wire.SessionResul
 	if id == "" || filepath.Base(id) != id || strings.HasPrefix(id, ".") {
 		return "", sessionMeta{}, sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("bad session id %q", id)), nil
 	}
-	dir := filepath.Join(mg.srv.cfg.SessionsDir, id)
+	dir := filepath.Join(mg.cfg.SessionsDir, id)
 	meta, err := readSessionMeta(dir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", sessionMeta{}, sessionRefusal(wire.ReasonSessionUnknown, fmt.Sprintf("no session %s", id)), nil
@@ -615,7 +606,7 @@ func (mg *Manager) removeSession(req wire.SessionRequest) (wire.SessionResult, e
 	if err := os.RemoveAll(dir); err != nil {
 		return wire.SessionResult{}, err
 	}
-	mg.srv.events.Publish(wire.EventSessionChanged, req.ID)
+	mg.events.Publish(wire.EventSessionChanged, req.ID)
 	info := meta.info()
 	return wire.SessionResult{Session: &info}, nil
 }
@@ -628,7 +619,7 @@ func (mg *Manager) updateSessionMeta(dir, id string, change func(*sessionMeta) b
 	meta, exitedDesign, err := mg.saveSessionMetaUpdate(dir, id, change)
 	if exitedDesign {
 		if project, epic, ok := strings.Cut(epicAddress(meta.Ticket), ":"); ok {
-			time.Sleep(mg.srv.cfg.SessionExitCleanupDelay)
+			time.Sleep(mg.cfg.SessionExitCleanupDelay)
 			mg.designs.cleanupDesign(project, epic)
 		}
 	}
@@ -649,7 +640,7 @@ func (mg *Manager) saveSessionMetaUpdate(dir, id string, change func(*sessionMet
 	if err := writeSessionMeta(dir, meta); err != nil {
 		return meta, false, fmt.Errorf("save session %s meta: %w", id, err)
 	}
-	mg.srv.events.Publish(wire.EventSessionChanged, id)
+	mg.events.Publish(wire.EventSessionChanged, id)
 	return meta, meta.Design && !wasExited && meta.Status.State == wire.SessionExited, nil
 }
 
@@ -657,6 +648,6 @@ func (mg *Manager) saveSessionMetaUpdate(dir, id string, change func(*sessionMet
 // have no request to fail.
 func (mg *Manager) updateSessionMetaOrWarn(dir, id string, change func(*sessionMeta) bool) {
 	if err := mg.updateSessionMeta(dir, id, change); err != nil {
-		mg.srv.log.Warn("update session meta", "session", id, "err", err)
+		mg.log.Warn("update session meta", "session", id, "err", err)
 	}
 }

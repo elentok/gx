@@ -1,14 +1,60 @@
 package server
 
-import "github.com/elentok/gx/harness"
+import (
+	"log/slog"
+	"time"
+
+	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/broker"
+	harnesschoice "github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/sound"
+)
+
+// SessionsConfig is the slice of the server Config the Manager reads.
+type SessionsConfig struct {
+	SessionsDir             string
+	ConversationsDir        string
+	TicketStore             string
+	Env                     []string
+	Holder                  []string
+	Notifier                osnotify.Notifier
+	Player                  sound.Player
+	SessionBannerDelay      time.Duration
+	SessionExitCleanupDelay time.Duration
+}
+
+// Host is what the Manager needs from the rest of the root.
+type Host interface {
+	sessionInfo(m sessionMeta) wire.SessionInfo
+	WebURL() string
+}
 
 // Manager creates, stops, removes and watches sessions, and reads and writes
 // their meta. It owns the watch goroutines (watches).
-//
-// srv is the rest of the root; the move into server/sessions replaces it with
-// the small interfaces below and the fields the methods actually use.
 type Manager struct {
-	srv     *Server
+	cfg      SessionsConfig
+	log      *slog.Logger
+	events   *broker.Broker
+	projects *projects.Registry
+	settings *settings.Holder
+	harness  *harnesschoice.Harness
+	idx      *index.Index
+	// chat reads the sessions' transcripts for the watch loop.
+	chat  *chat.Chat
+	focus *focusReports
+	afk   *queue.AFK
+	// alerts sends the AFK chat alert of a banner.
+	alerts  *ralphloop.ServerChat
+	banners sessionBanners
+	host    Host
 	watches *sessionWatches
 	// prompter is the prompt, turn and auto-advance side the watch loop calls.
 	prompter Prompter
@@ -18,9 +64,27 @@ type Manager struct {
 	rollouts codexRollouts
 }
 
+// newManager copies the fields it needs from s at call time, so s must have
+// them set (projects, harness and sessionChat come late in New).
 func newManager(s *Server) *Manager {
 	return &Manager{
-		srv:      s,
+		cfg: SessionsConfig{
+			SessionsDir: s.cfg.SessionsDir, ConversationsDir: s.cfg.ConversationsDir,
+			TicketStore: s.cfg.TicketStore, Env: s.cfg.Env, Holder: s.cfg.Holder,
+			Notifier: s.cfg.Notifier, Player: s.cfg.Player,
+			SessionBannerDelay: s.cfg.SessionBannerDelay, SessionExitCleanupDelay: s.cfg.SessionExitCleanupDelay,
+		},
+		log:      s.log,
+		events:   s.events,
+		projects: s.projects,
+		settings: &s.settings,
+		harness:  s.harness,
+		idx:      s.idx,
+		chat:     s.sessionChat,
+		focus:    s.focus,
+		afk:      s.afk,
+		alerts:   s.chat,
+		host:     s,
 		watches:  newSessionWatches(),
 		prompter: serverPrompter{s},
 		designs:  s,

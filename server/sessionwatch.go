@@ -101,7 +101,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 	stream, err := mg.openSessionWatch(dir)
 	if err != nil {
 		if !mg.watches.isStopped() {
-			mg.srv.log.Warn("session watch", "session", id, "err", err)
+			mg.log.Warn("session watch", "session", id, "err", err)
 			recordExit(savedSessionExit(dir))
 		}
 		return
@@ -117,7 +117,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 	}()
 	first := mg.prompter.newFirstPrompt(dir, id, run)
 	defer first.stop()
-	poll := mg.srv.sessionChat.NewPoll(dir, id)
+	poll := mg.chat.NewPoll(dir, id)
 	defer poll.Close()
 	// settle is closed to end the wait of the last idle edge's settleTurn.
 	var settle chan struct{}
@@ -164,7 +164,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 				if prev := m.info().Status; prev != st {
 					if raisesUnread(prev.State, st.State, msg.Status.Cancelled) {
 						mg.raiseUnread(m)
-						mg.srv.triggerBanner(m.ID, unreadSound(st.State), "")
+						mg.triggerBanner(m.ID, unreadSound(st.State), "")
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
@@ -198,7 +198,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 				return changed
 			})
 			first.noteState(st.State)
-			mg.srv.noteFailure(id)
+			mg.noteFailure(id)
 			poll.SetActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			// Marked before the Design check reads the transcript.
 			mark, marked := turnMark{}, false
@@ -326,8 +326,8 @@ func (mg *Manager) recordSessionExit(m *sessionMeta, exit string) bool {
 	} else {
 		mg.raiseUnread(m)
 		// A Done Design exiting cleanly is expected: no banner.
-		if exit != wire.SessionExitClean || !mg.srv.designDone(*m) {
-			mg.srv.triggerBanner(m.ID, sound.Done, "")
+		if exit != wire.SessionExitClean || !mg.designDone(*m) {
+			mg.triggerBanner(m.ID, sound.Done, "")
 		}
 	}
 	mg.saveConversationTotals(*m, m.ConversationID)
@@ -356,7 +356,7 @@ func raisesUnread(from, to string, cancelled bool) bool {
 
 // raiseUnread sets m's Unread unless a focused TUI has it on screen.
 func (mg *Manager) raiseUnread(m *sessionMeta) {
-	if !mg.srv.focus.onScreen(m.ID) {
+	if !mg.focus.onScreen(m.ID) {
 		m.Unread.Unread = true
 	}
 }

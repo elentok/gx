@@ -16,8 +16,8 @@ func SessionStateToken(s wire.SessionInfo) string {
 
 // sessionWriteDesignWeb is sessionWrite for the web mux: only a design session,
 // and only with the state token of the session the page saw.
-func (s *Server) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return sessionWriteAs(s.sessions.checkDesignWrite, do)
+func (mg *Manager) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+	return sessionWriteAs(mg.checkDesignWrite, do)
 }
 
 // checkDesignWrite returns the refusal for a web write on a session that is not
@@ -39,8 +39,8 @@ func (mg *Manager) checkDesignWrite(req wire.SessionRequest) (wire.SessionResult
 // sessionWriteAgentWeb is sessionWrite for a web stop or remove: any session
 // except a Queue agent, which ralph-loop drives, and only with the state token
 // of the session the page saw.
-func (s *Server) sessionWriteAgentWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return sessionWriteAs(s.sessions.checkAgentWrite, do)
+func (mg *Manager) sessionWriteAgentWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+	return sessionWriteAs(mg.checkAgentWrite, do)
 }
 
 // checkAgentWrite returns the refusal for a web write on a Queue session or on

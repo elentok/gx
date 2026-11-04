@@ -29,7 +29,7 @@ type WebCreateSessionRequest struct {
 
 // sessionCreateWeb is sessionCreateWrite for the web mux. A body with any
 // other field is refused, not dropped.
-func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
+func (mg *Manager) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 	var req WebCreateSessionRequest
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -38,7 +38,7 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 		res = sessionRefusal(wire.ReasonSessionBadRequest, err.Error())
 	} else {
 		var err error
-		if res, err = s.sessions.createWebSession(req); err != nil {
+		if res, err = mg.createWebSession(req); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -49,7 +49,7 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 // checkProjectDir returns a refusal when project is not configured or a
 // non-empty dir is neither its root nor one of its worktrees; nil means ok.
 func (mg *Manager) checkProjectDir(project, dir string) (*wire.SessionResult, error) {
-	list, err := mg.srv.projects.ListWorktrees()
+	list, err := mg.projects.ListWorktrees()
 	if err != nil {
 		return nil, err
 	}

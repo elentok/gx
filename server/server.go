@@ -164,12 +164,11 @@ type Server struct {
 	nudges       nudgeLimiter
 	trunkMissing missingTrunks
 	// sessions creates, stops and watches the sessions; resumer brings them back.
-	sessions       *Manager
-	resumer        *Resumer
-	designOpens    sync.Map // epic address -> *sync.Mutex, serializing designs open
-	focus          *focusReports
-	sessionBanners sessionBanners
-	unblockMu      sync.Mutex // makes leaving a headless block happen once, whoever sees it first
+	sessions    *Manager
+	resumer     *Resumer
+	designOpens sync.Map // epic address -> *sync.Mutex, serializing designs open
+	focus       *focusReports
+	unblockMu   sync.Mutex // makes leaving a headless block happen once, whoever sees it first
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -336,7 +335,6 @@ func New(cfg Config) (*Server, error) {
 
 		focus: newFocusReports(),
 	}
-	s.sessions = newManager(s)
 	s.resumer = &Resumer{srv: s}
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
@@ -370,9 +368,6 @@ func New(cfg Config) (*Server, error) {
 	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: host})
 	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: host, TicketStore: cfg.TicketStore})
 	s.harness.GiveLog(cfg.Runner)
-	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
-		h.Finished = s.sessions.SessionFinished
-	}
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
@@ -438,6 +433,11 @@ func New(cfg Config) (*Server, error) {
 		},
 		Source: chatSource{s}, Log: log,
 	})
+	// The Manager copies projects, harness and sessionChat, so it comes after them.
+	s.sessions = newManager(s)
+	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
+		h.Finished = s.sessions.SessionFinished
+	}
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })

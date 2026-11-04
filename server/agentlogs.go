@@ -25,7 +25,7 @@ type reattacher interface {
 }
 
 func (mg *Manager) logRetention() time.Duration {
-	if d := mg.srv.settings.Load().LogRetention; d > 0 {
+	if d := mg.settings.Load().LogRetention; d > 0 {
 		return d
 	}
 	return nativerunner.DefaultLogRetention
@@ -50,24 +50,24 @@ func (mg *Manager) keepPruned(ctx context.Context) {
 // prunes each directory by the runner its meta.json names. A paused ticket's
 // logs stay: a person may still need them.
 func (mg *Manager) pruneAgentLogs(now time.Time) {
-	dirs, err := tickets.ProjectDirs(mg.srv.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(mg.cfg.TicketStore)
 	if err != nil {
-		mg.srv.log.Warn("prune agent logs", "err", err)
+		mg.log.Warn("prune agent logs", "err", err)
 		return
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
-		p, ok := mg.srv.harness.RunnerNamed(string(agentrunner.ChoiceHeadless), project).(logPruner)
+		p, ok := mg.harness.RunnerNamed(string(agentrunner.ChoiceHeadless), project).(logPruner)
 		if !ok {
 			continue
 		}
 		paused := pausedLabels(dir)
 		pruned, err := p.Prune(mg.logRetention(), now, func(label string) bool { return paused[label] })
 		if err != nil {
-			mg.srv.log.Warn("prune agent logs", "project", project, "err", err)
+			mg.log.Warn("prune agent logs", "project", project, "err", err)
 		}
 		if len(pruned) > 0 {
-			mg.srv.log.Info("pruned agent logs", "project", project, "labels", pruned)
+			mg.log.Info("pruned agent logs", "project", project, "labels", pruned)
 		}
 	}
 }

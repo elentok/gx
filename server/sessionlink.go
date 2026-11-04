@@ -97,8 +97,8 @@ func (rs *Resumer) reportSessionStep(req wire.ReportStepRequest) (wire.SessionRe
 
 // stampDesignStart records the first design session on the map epic behind
 // address. The stamp is write-once, so every later session leaves it.
-func (s *Server) stampDesignStart(address string, now time.Time) error {
-	epicDir, ok, err := s.epicDir(address)
+func (mg *Manager) stampDesignStart(address string, now time.Time) error {
+	epicDir, ok, err := mg.epicDir(address)
 	if err != nil || !ok {
 		return err
 	}
@@ -107,13 +107,13 @@ func (s *Server) stampDesignStart(address string, now time.Time) error {
 
 // epicDir resolves address ("project:epic" or "project:epic/NN") to its epic
 // directory; ok is false when the address names no epic.
-func (s *Server) epicDir(address string) (dir string, ok bool, err error) {
+func (mg *Manager) epicDir(address string) (dir string, ok bool, err error) {
 	project, rest, found := strings.Cut(address, ":")
 	epic, _, _ := strings.Cut(rest, "/")
 	if !found || epic == "" {
 		return "", false, nil
 	}
-	projectDir, err := s.projects.Dir(project)
+	projectDir, err := mg.projects.Dir(project)
 	if err != nil {
 		return "", false, err
 	}
@@ -123,8 +123,8 @@ func (s *Server) epicDir(address string) (dir string, ok bool, err error) {
 // designLaunchTier is the tier of a design-launched session on the map behind
 // address: strongest while charting or while the destination is unconfirmed,
 // worker at every later step. An unreadable map charts.
-func (s *Server) designLaunchTier(address string) ralphloop.Tier {
-	dir, ok, err := s.epicDir(address)
+func (mg *Manager) designLaunchTier(address string) ralphloop.Tier {
+	dir, ok, err := mg.epicDir(address)
 	if err != nil || !ok {
 		return ralphloop.TierStrongest
 	}
@@ -137,7 +137,7 @@ func (s *Server) designLaunchTier(address string) ralphloop.Tier {
 
 // onMapEpic reports whether address ("project:epic" or "project:epic/NN")
 // is on a map epic; an unknown project or epic is not.
-func (s *Server) onMapEpic(address string) bool {
-	dir, ok, err := s.epicDir(address)
+func (mg *Manager) onMapEpic(address string) bool {
+	dir, ok, err := mg.epicDir(address)
 	return err == nil && ok && tickets.IsMapEpic(dir)
 }

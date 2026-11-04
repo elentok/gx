@@ -39,8 +39,8 @@ type bannerTrigger struct {
 
 // triggerBanner schedules the session's banner, or merges into the one
 // already waiting: attention beats done, and a reason replaces none.
-func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
-	b := &s.sessionBanners
+func (mg *Manager) triggerBanner(id string, snd sound.Name, reason string) {
+	b := &mg.banners
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if p := b.pending[id]; p != nil {
@@ -57,13 +57,13 @@ func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
 	}
 	b.pending[id] = &bannerTrigger{sound: snd, reason: reason}
 	// Waits as a session watch, so close drops the banner and doesn't wait out the delay.
-	s.sessions.watches.start(func() {
-		delay := time.NewTimer(s.cfg.SessionBannerDelay)
+	mg.watches.start(func() {
+		delay := time.NewTimer(mg.cfg.SessionBannerDelay)
 		defer delay.Stop()
 		select {
 		case <-delay.C:
-			s.fireBanner(id)
-		case <-s.sessions.watches.stop:
+			mg.fireBanner(id)
+		case <-mg.watches.stop:
 		}
 	})
 }
@@ -72,17 +72,17 @@ func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
 // forgets it once the failure clears so a later one banners again. Auth and
 // stalled come from the transcript, not the status, so they carry their label
 // as the reason; a status failure already has its banner text.
-func (s *Server) noteFailure(id string) {
-	_, m, res, err := s.sessions.SessionDir(id)
+func (mg *Manager) noteFailure(id string) {
+	_, m, res, err := mg.SessionDir(id)
 	if res.Refused || err != nil {
 		return
 	}
-	f := s.sessionInfo(m).Failure
+	f := mg.host.sessionInfo(m).Failure
 	kind := ""
 	if f != nil {
 		kind = f.Kind
 	}
-	b := &s.sessionBanners
+	b := &mg.banners
 	b.mu.Lock()
 	prev := b.failing[id]
 	if kind == "" {
@@ -102,14 +102,15 @@ func (s *Server) noteFailure(id string) {
 		reason = f.Label
 	}
 	// A Done Design exiting cleanly is expected; the Design page hides it too.
-	if kind == wire.FailureKindEnded && s.designDone(m) {
+	if kind == wire.FailureKindEnded && mg.designDone(m) {
 		return
 	}
-	s.triggerBanner(id, sound.Attention, reason)
+	mg.triggerBanner(id, sound.Attention, reason)
 }
 
 // designDone reports whether the session is a Design whose map's Progress is Done.
-func (s *Server) designDone(m sessionMeta) bool {
+// mapProgress stays a root function; it moves with the map code.
+func (mg *Manager) designDone(m sessionMeta) bool {
 	if !m.Design || m.Ticket == "" {
 		return false
 	}
@@ -117,7 +118,7 @@ func (s *Server) designDone(m sessionMeta) bool {
 	if err != nil {
 		return false
 	}
-	epics, err := s.projects.Epics(addr.Project)
+	epics, err := mg.projects.Epics(addr.Project)
 	if err != nil {
 		return false
 	}
@@ -135,8 +136,8 @@ func (s *Server) designDone(m sessionMeta) bool {
 
 // designLink is the Design page of a Design session, without the token; empty
 // when the web listener is off or the session is not a Design.
-func (s *Server) designLink(m sessionMeta) string {
-	base := s.WebURL()
+func (mg *Manager) designLink(m sessionMeta) string {
+	base := mg.host.WebURL()
 	if base == "" || !m.Design || m.Ticket == "" {
 		return ""
 	}
@@ -147,17 +148,17 @@ func (s *Server) designLink(m sessionMeta) string {
 	return base + "/#/d/" + queue.RootOf(addr).String()
 }
 
-func (s *Server) fireBanner(id string) {
-	b := &s.sessionBanners
+func (mg *Manager) fireBanner(id string) {
+	b := &mg.banners
 	b.mu.Lock()
 	t := b.pending[id]
 	delete(b.pending, id)
 	b.mu.Unlock()
-	afk, onScreen := s.afk.IsOn(), s.focus.onScreen(id)
-	if s.sessions.watches.isStopped() || s.focus.webOnScreen(id) || (onScreen && !afk) {
+	afk, onScreen := mg.afk.IsOn(), mg.focus.onScreen(id)
+	if mg.watches.isStopped() || mg.focus.webOnScreen(id) || (onScreen && !afk) {
 		return
 	}
-	_, m, res, err := s.sessions.SessionDir(id)
+	_, m, res, err := mg.SessionDir(id)
 	if res.Refused || err != nil {
 		return
 	}
@@ -169,31 +170,31 @@ func (s *Server) fireBanner(id string) {
 	if body == "" {
 		body = sessionStatusText(info)
 	}
-	link := s.designLink(m)
+	link := mg.designLink(m)
 	// AFK adds chat without the focus check; the banner and sound keep theirs.
 	if afk {
 		chatBody := body
 		if link != "" {
 			chatBody += "\n" + link
 		}
-		s.chat.SessionAlert(info.Project, s.projects.ChatOverride(info.Project), title, chatBody)
+		mg.alerts.SessionAlert(info.Project, mg.projects.ChatOverride(info.Project), title, chatBody)
 	}
 	if onScreen {
 		return
 	}
-	set := s.settings.Load()
+	set := mg.settings.Load()
 	if set.AgentsBanners {
-		s.sendSessionBanner(info, title, body, link)
+		mg.sendSessionBanner(info, title, body, link)
 	}
 	if set.AgentsSounds.Enabled {
-		s.sessions.watches.start(func() { s.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
+		mg.watches.start(func() { mg.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
 	}
 }
 
 func bannerTitle(info wire.SessionInfo) string { return info.Project + " · " + info.Name }
 
-func (s *Server) sendSessionBanner(info wire.SessionInfo, title, body, link string) {
-	term, connected := s.focus.clickTarget()
+func (mg *Manager) sendSessionBanner(info wire.SessionInfo, title, body, link string) {
+	term, connected := mg.focus.clickTarget()
 	note := osnotify.Notification{
 		Title:    title,
 		Body:     body,
@@ -204,8 +205,8 @@ func (s *Server) sendSessionBanner(info wire.SessionInfo, title, body, link stri
 	if connected {
 		note.Execute = "gx agents focus " + info.ID
 	}
-	if err := s.cfg.Notifier.Notify(context.Background(), note); err != nil {
-		s.log.Warn("session banner", "session", info.ID, "err", err)
+	if err := mg.cfg.Notifier.Notify(context.Background(), note); err != nil {
+		mg.log.Warn("session banner", "session", info.ID, "err", err)
 	}
 }
 
