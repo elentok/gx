@@ -127,11 +127,14 @@ var allowed = map[string]int{
 	"testutil/agentfake/tui_test.go":                10, // poll loop with a deadline; negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open; a lone Esc leaves the turn alone; a stall lands before the prompt; the registry delay (1s) must pass before the retry; the launch-record opt-out writes no user record
 	"testutil/agentfake/worker_test.go":             1,
 	"testutil/gxfixture/cachegate_test.go":          5, // two poll loops with a deadline; negative waits: the gate holds the clean
+	"testutil/gxfixture/design_test.go":             5,
 	"testutil/gxfixture/disk_test.go":               2,
+	"testutil/gxfixture/harness_test.go":            1,
 	"testutil/gxfixture/limitburn_test.go":          4, // three poll loops with a deadline; a settle wait so the poll sees the first line
-	"testutil/gxfixture/main_test.go":               8,
 	"testutil/gxfixture/migrate_test.go":            2, // poll loop with a deadline; negative wait: the hold must keep the server migrating
+	"testutil/gxfixture/ready_test.go":              1,
 	"testutil/gxfixture/restart_test.go":            1, // poll loop with a deadline waiting on the running-agent count
+	"testutil/gxfixture/united_test.go":             1,
 	"testutil/herdrfake/state_test.go":              2,
 	"testutil/runnerfake/runnerfake_test.go":        1,
 	"tickets/stamp_lock_test.go":                    1,
