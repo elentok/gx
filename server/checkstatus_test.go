@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/check"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -150,7 +150,7 @@ func TestChecksStatus_MissingState(t *testing.T) {
 	})
 	t.Run("scratch is never missing", func(t *testing.T) {
 		h := servertest.StartWithStore(t, t.TempDir())
-		st, err := h.Client.ChecksStatus(context.Background(), server.ScratchProject)
+		st, err := h.Client.ChecksStatus(context.Background(), projects.ScratchProject)
 		if err != nil || len(st.Projects) != 1 || st.Projects[0].Missing {
 			t.Errorf("scratch = %+v, %v", st, err)
 		}
@@ -203,7 +203,7 @@ func TestChecksStatus_NoProjectListsEveryProject(t *testing.T) {
 	for _, p := range st.Projects {
 		names[p.Project] = true
 	}
-	if !names["demo"] || !names[server.ScratchProject] {
+	if !names["demo"] || !names[projects.ScratchProject] {
 		t.Errorf("projects = %v", names)
 	}
 }

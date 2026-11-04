@@ -1,6 +1,9 @@
 package server
 
-import "github.com/elentok/gx/check"
+import (
+	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/server/projects"
+)
 
 // checkWaitingLabel is the status label of a claimed ticket whose `gx check
 // --full` waits for the check lock, or "". It is a label only: no pause kind,
@@ -16,9 +19,9 @@ func (s *Server) checkWaitingLabel(address string) string {
 	if !ok || t.Cwd == "" {
 		return ""
 	}
-	cwd := canonicalDir(t.Cwd)
+	cwd := projects.CanonicalDir(t.Cwd)
 	for _, w := range check.ReadWaiting(s.cfg.StateDir) {
-		if w.Root == "" || canonicalDir(w.Root) != cwd {
+		if w.Root == "" || projects.CanonicalDir(w.Root) != cwd {
 			continue
 		}
 		if w.HeldBy == "" {

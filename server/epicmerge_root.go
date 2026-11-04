@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -324,7 +325,7 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic) {
 	if mode == config.EvolveOff || mode == "" {
 		return
 	}
-	if err := EnsureOutboxProject(s.cfg.TicketStore, mode); err != nil {
+	if err := projects.EnsureOutboxProject(s.cfg.TicketStore, mode); err != nil {
 		s.log.Warn("retro hook: create outbox project", "root", root, "err", err)
 		return
 	}

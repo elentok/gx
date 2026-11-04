@@ -148,12 +148,8 @@ func (s *Server) webHandler() http.Handler {
 			s.epicList(w, r)
 		case r.URL.Path == "/v1/epics/detail":
 			s.epicDetail(w, r)
-		case r.URL.Path == "/v1/projects/worktrees":
-			s.projectWorktrees(w, r)
 		case r.URL.Path == "/v1/stats":
 			s.stats(w, r)
-		case r.URL.Path == "/v1/checks/status":
-			s.checksStatusRead(w, r)
 		case r.URL.Path == "/v1/settings/agents":
 			s.defaultHarnessRead(w, r)
 		case r.URL.Path == "/v1/health":
@@ -201,19 +197,17 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/sessions/auto-advance/cancel": func(s *Server) http.HandlerFunc {
 		return s.sessionWriteDesignWeb(s.cancelAutoAdvanceRoute)
 	},
-	"POST /v1/designs/open":             func(s *Server) http.HandlerFunc { return s.designOpenWeb() },
-	"POST /v1/designs/delete":           func(s *Server) http.HandlerFunc { return s.designDeleteWrite },
-	"POST /v1/tickets/fix-agent":        func(s *Server) http.HandlerFunc { return s.fixAgentWeb() },
-	"POST /v1/projects/retry-migration": func(s *Server) http.HandlerFunc { return s.retryMigrationWrite },
-	"POST /v1/sessions/focus":           func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
-	"POST /v1/afk":                      func(s *Server) http.HandlerFunc { return s.afkWrite },
-	"POST /v1/vimode":                   func(s *Server) http.HandlerFunc { return s.viModeWrite },
-	"POST /v1/usage/override":           func(s *Server) http.HandlerFunc { return s.usageOverrideWrite },
-	"POST /v1/checks/save":              func(s *Server) http.HandlerFunc { return s.checksSaveWrite },
-	"POST /v1/disk/clean":               func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
-	"POST /v1/restart":                  func(s *Server) http.HandlerFunc { return s.restartWrite },
-	"POST /v1/settings/agents":          func(s *Server) http.HandlerFunc { return s.defaultHarnessWrite },
-	"POST /v1/client-errors":            func(s *Server) http.HandlerFunc { return s.clientErrorReport },
+	"POST /v1/designs/open":      func(s *Server) http.HandlerFunc { return s.designOpenWeb() },
+	"POST /v1/designs/delete":    func(s *Server) http.HandlerFunc { return s.designDeleteWrite },
+	"POST /v1/tickets/fix-agent": func(s *Server) http.HandlerFunc { return s.fixAgentWeb() },
+	"POST /v1/sessions/focus":    func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
+	"POST /v1/afk":               func(s *Server) http.HandlerFunc { return s.afkWrite },
+	"POST /v1/vimode":            func(s *Server) http.HandlerFunc { return s.viModeWrite },
+	"POST /v1/usage/override":    func(s *Server) http.HandlerFunc { return s.usageOverrideWrite },
+	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
+	"POST /v1/restart":           func(s *Server) http.HandlerFunc { return s.restartWrite },
+	"POST /v1/settings/agents":   func(s *Server) http.HandlerFunc { return s.defaultHarnessWrite },
+	"POST /v1/client-errors":     func(s *Server) http.HandlerFunc { return s.clientErrorReport },
 
 	"POST " + webAuthPathSetupStart:    func(s *Server) http.HandlerFunc { return s.webSetupStart },
 	"POST " + webAuthPathSetupPassword: func(s *Server) http.HandlerFunc { return s.webSetupPassword },

@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/migrations"
+	"github.com/elentok/gx/server/projects"
 )
 
 func TestEnsureScratchProject_NewGetsTheFullListAndExistingIsUntouched(t *testing.T) {
 	t.Parallel()
 	store := filepath.Join(t.TempDir(), "store")
-	listPath := filepath.Join(store, ScratchProject, migrations.AppliedFile)
+	listPath := filepath.Join(store, projects.ScratchProject, migrations.AppliedFile)
 	read := func() ([]string, bool) {
 		data, err := os.ReadFile(listPath)
 		if os.IsNotExist(err) {
@@ -25,7 +26,7 @@ func TestEnsureScratchProject_NewGetsTheFullListAndExistingIsUntouched(t *testin
 		return strings.Fields(string(data)), true
 	}
 
-	if err := ensureScratchProject(store); err != nil {
+	if err := projects.EnsureScratchProject(store); err != nil {
 		t.Fatal(err)
 	}
 	if got, ok := read(); !ok || !slices.Equal(got, migrations.Default.Names()) {
@@ -35,7 +36,7 @@ func TestEnsureScratchProject_NewGetsTheFullListAndExistingIsUntouched(t *testin
 	if err := os.WriteFile(listPath, []byte("only-this\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureScratchProject(store); err != nil {
+	if err := projects.EnsureScratchProject(store); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := read(); !slices.Equal(got, []string{"only-this"}) {
@@ -45,7 +46,7 @@ func TestEnsureScratchProject_NewGetsTheFullListAndExistingIsUntouched(t *testin
 	if err := os.Remove(listPath); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureScratchProject(store); err != nil {
+	if err := projects.EnsureScratchProject(store); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := read(); ok {

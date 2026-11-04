@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/tickets"
 )
@@ -35,7 +36,7 @@ func migrateStore(t *testing.T, projects ...string) string {
 func okStep(name string, ran *[]string) migrations.Step {
 	return migrations.Step{Name: name, Run: func(env migrations.Env) ([]tickets.MigrationChange, error) {
 		// The harness store also holds the scratch project; leave it out of the count.
-		if filepath.Base(env.Root) != server.ScratchProject {
+		if filepath.Base(env.Root) != projects.ScratchProject {
 			*ran = append(*ran, name)
 		}
 		return nil, nil

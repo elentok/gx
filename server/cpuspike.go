@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/cpuwatch"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -59,7 +60,7 @@ func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult 
 	if set.Evolve != config.EvolveMaintainer {
 		return wire.CPUSpikeResult{Message: "filing a ticket needs evolve maintainer mode"}
 	}
-	if _, err := s.projects.Dir(OutboxProject); err != nil {
+	if _, err := s.projects.Dir(projects.OutboxProject); err != nil {
 		return wire.CPUSpikeResult{Message: "filing a ticket needs a gx project: " + err.Error()}
 	}
 	s.cpuSpikes.mu.Lock()
@@ -69,7 +70,7 @@ func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult 
 	}
 	res, err := s.oneOff(wire.OneOffRequest{
 		Prompt:  cpuSpikePrompt(sp, set.CPUWatchdog),
-		Project: OutboxProject,
+		Project: projects.OutboxProject,
 		Type:    string(schema.TypeDiagnose),
 		Name:    "cpu-spike-" + sp.Source + "-" + now.Format("20060102-1504"),
 		Unique:  "cpu-spike:" + sp.Source,

@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -44,7 +44,7 @@ func TestProjectAdd_NewProjectGetsTheFullAppliedList(t *testing.T) {
 func TestScratchProject_StartedServerGivesItTheFullList(t *testing.T) {
 	t.Parallel()
 	h := servertest.Start(t)
-	got, ok := appliedLines(t, filepath.Join(h.TicketStore, server.ScratchProject))
+	got, ok := appliedLines(t, filepath.Join(h.TicketStore, projects.ScratchProject))
 	if !ok || !slices.Equal(got, migrations.Default.Names()) {
 		t.Errorf("scratch list = %v (exists %v), want %v", got, ok, migrations.Default.Names())
 	}
@@ -53,10 +53,10 @@ func TestScratchProject_StartedServerGivesItTheFullList(t *testing.T) {
 func TestEnsureOutboxProject_NewGetsTheFullListAndExistingIsUntouched(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	if err := server.EnsureOutboxProject(store, config.EvolveContributor); err != nil {
+	if err := projects.EnsureOutboxProject(store, config.EvolveContributor); err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(store, server.OutboxProject)
+	dir := filepath.Join(store, projects.OutboxProject)
 	got, ok := appliedLines(t, dir)
 	if !ok || !slices.Equal(got, migrations.Default.Names()) {
 		t.Fatalf("new outbox list = %v (exists %v), want %v", got, ok, migrations.Default.Names())
@@ -64,7 +64,7 @@ func TestEnsureOutboxProject_NewGetsTheFullListAndExistingIsUntouched(t *testing
 	if err := os.Remove(filepath.Join(dir, migrations.AppliedFile)); err != nil {
 		t.Fatal(err)
 	}
-	if err := server.EnsureOutboxProject(store, config.EvolveContributor); err != nil {
+	if err := projects.EnsureOutboxProject(store, config.EvolveContributor); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := appliedLines(t, dir); ok {

@@ -1,4 +1,4 @@
-package server
+package projects
 
 import (
 	"encoding/json"
@@ -16,6 +16,10 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/transcript"
 )
+
+// AgentEnv names the agent ("claude" or "codex") a ralph-loop run launched
+// under, so `gx agent model` answers for that agent.
+const AgentEnv = "GX_AGENT"
 
 // envHome is the home dir the server reads: HOME of Config.Env, which New
 // fills from the process env when the caller leaves it nil.

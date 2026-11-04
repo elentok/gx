@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"slices"
@@ -79,7 +80,7 @@ func (s *Server) evolveDirs(ticket tickets.Address) []string {
 // investigate agent, its ticket's address so its CLI calls identify it (see
 // InvestigateEnv).
 func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) []string {
-	env := append(slices.Clone(tabEnv), AgentEnv+"="+string(agent))
+	env := append(slices.Clone(tabEnv), projects.AgentEnv+"="+string(agent))
 	if t.Type == string(schema.TypeInvestigate) {
 		env = append(env, wire.InvestigateEnv+"="+addr.String())
 	}

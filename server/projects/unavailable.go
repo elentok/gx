@@ -1,4 +1,4 @@
-package server
+package projects
 
 import (
 	"os"
@@ -40,9 +40,9 @@ func (u *unavailableNotes) clear(project string) {
 	delete(u.seen, project)
 }
 
-// missingPath returns the registered path of the project in dir when it no
+// MissingPath returns the registered path of the project in dir when it no
 // longer exists. A project with no path (the built-in scratch one) is never missing.
-func missingPath(dir string) (string, bool) {
+func MissingPath(dir string) (string, bool) {
 	pf, err := config.ReadProjectFile(dir)
 	if err != nil || pf.Repo == nil {
 		return "", false
@@ -57,7 +57,7 @@ func (p *Registry) UnavailablePath(project string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return missingPath(dir)
+	return MissingPath(dir)
 }
 
 // checkProjects looks at every registered project's path: at start and on every
@@ -70,7 +70,7 @@ func (p *Registry) Check() {
 	}
 	for _, dir := range dirs {
 		name := tickets.ProjectName(dir)
-		path, missing := missingPath(dir)
+		path, missing := MissingPath(dir)
 		if !missing {
 			p.unavailable.clear(name)
 			continue

@@ -55,6 +55,7 @@ var retryPrompts = map[schema.PauseReason]string{
 func RunRepairDirect(ticketStore, verb string, req wire.RepairRequest) (wire.RepairResult, error) {
 	s := &Server{cfg: Config{TicketStore: ticketStore}}
 	s.settings.Store(&Settings{})
+	s.initProjects()
 	var do func(wire.RepairRequest, repairCtx) (wire.RepairResult, error)
 	switch verb {
 	case "merge":

@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -878,12 +879,12 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
-	var projects []string
+	var asked []string
 	var mu sync.Mutex
 	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(fake, func(_, project string) agentrunner.Runner {
 		mu.Lock()
 		defer mu.Unlock()
-		projects = append(projects, project)
+		asked = append(asked, project)
 		return fake
 	}))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -915,10 +916,10 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	for _, p := range projects {
+	for _, p := range asked {
 		// scratch is asked by the log prune, which visits every project.
 		// The herdr health probe is asked for the fallback project.
-		if p != "proj" && p != server.ScratchProject && p != runnerbuild.FallbackProject {
+		if p != "proj" && p != projects.ScratchProject && p != runnerbuild.FallbackProject {
 			t.Errorf("RunnerFor asked for project %q", p)
 		}
 	}

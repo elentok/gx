@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -95,7 +96,7 @@ func TestInvestigateLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
 
 	p := pauseAndCatchInvestigation(t, store)
 
-	if want := filepath.Join(server.ScratchWorkspace(store), "epic-a"); p.Cwd != want {
+	if want := filepath.Join(projects.ScratchWorkspace(store), "epic-a"); p.Cwd != want {
 		t.Errorf("investigate cwd = %s, want the scratch subdir %s", p.Cwd, want)
 	}
 }
@@ -126,7 +127,7 @@ func TestOneOffLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
 			}
 			select {
 			case p := <-got:
-				if want := filepath.Join(server.ScratchWorkspace(store), "one-offs"); p.Cwd != want {
+				if want := filepath.Join(projects.ScratchWorkspace(store), "one-offs"); p.Cwd != want {
 					t.Errorf("cwd = %s, want the scratch subdir %s", p.Cwd, want)
 				}
 			case <-time.After(20 * time.Second):

@@ -1,7 +1,6 @@
-package server
+package projects
 
 import (
-	"net/http"
 	"path/filepath"
 	"sort"
 
@@ -11,15 +10,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
-
-func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
-	list, err := s.projects.ListWorktrees()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	wire.WriteJSON(w, list)
-}
 
 // tierModels resolves each tier's model for the harness a web-created session
 // launches.

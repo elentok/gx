@@ -260,7 +260,7 @@ func (p *tokenPoller) groupOf(key string, compute func() string) string {
 // day that makes the step skip days.
 func (s *Server) keepTokensPolled(ctx context.Context) {
 	select {
-	case <-s.migrator.done:
+	case <-s.migrator.Done():
 	case <-ctx.Done():
 		return
 	}

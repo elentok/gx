@@ -1,8 +1,6 @@
-package server
+package projects
 
 import (
-	"encoding/json"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -63,10 +61,10 @@ func (p *Registry) SetPath(req wire.ProjectRequest) (wire.ProjectResult, error) 
 	if err != nil {
 		return wire.ProjectResult{}, err
 	}
-	repo := canonicalDir(req.Path)
+	repo := CanonicalDir(req.Path)
 	info, gitErr := git.FindRepo(req.Path)
 	if gitErr == nil {
-		repo = canonicalDir(info.Root)
+		repo = CanonicalDir(info.Root)
 		// The outbox became a real clone, so its tickets can commit.
 		pf.VCS = nil
 	} else if pf.VCS == nil || *pf.VCS != config.VCSNone {
@@ -78,7 +76,7 @@ func (p *Registry) SetPath(req wire.ProjectRequest) (wire.ProjectResult, error) 
 	}
 	for _, d := range dirs {
 		other, err := config.ReadProjectFile(d)
-		if d != dir && err == nil && other.Repo != nil && canonicalDir(*other.Repo) == repo {
+		if d != dir && err == nil && other.Repo != nil && CanonicalDir(*other.Repo) == repo {
 			return refuseProject(wire.ReasonPathTaken, repo+" is already project "+tickets.ProjectName(d))
 		}
 	}
@@ -87,20 +85,4 @@ func (p *Registry) SetPath(req wire.ProjectRequest) (wire.ProjectResult, error) 
 		return wire.ProjectResult{}, err
 	}
 	return wire.ProjectResult{Name: req.Name, Repo: repo}, nil
-}
-
-func (s *Server) projectWrite(do func(wire.ProjectRequest) (wire.ProjectResult, error)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req wire.ProjectRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		res, err := do(req)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		wire.WriteJSON(w, res)
-	}
 }

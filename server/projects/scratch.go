@@ -1,4 +1,4 @@
-package server
+package projects
 
 import (
 	"os"
@@ -15,14 +15,14 @@ func ScratchWorkspace(ticketStore string) string {
 	return filepath.Join(filepath.Dir(filepath.Clean(ticketStore)), ScratchProject)
 }
 
-// scratchSubdir is where one scratch ticket runs.
-func scratchSubdir(ticketStore, epic string) string {
+// ScratchSubdir is where one scratch ticket runs.
+func ScratchSubdir(ticketStore, epic string) string {
 	return filepath.Join(ScratchWorkspace(ticketStore), epic)
 }
 
-// pruneScratchWorkspace deletes the subdirs of tickets that have left the
+// PruneScratchWorkspace deletes the subdirs of tickets that have left the
 // scratch project, which is what archiving one does.
-func pruneScratchWorkspace(ticketStore string) error {
+func PruneScratchWorkspace(ticketStore string) error {
 	workspace := ScratchWorkspace(ticketStore)
 	entries, err := os.ReadDir(workspace)
 	if err != nil {
@@ -42,8 +42,8 @@ func pruneScratchWorkspace(ticketStore string) error {
 	return nil
 }
 
-// ensureScratchProject registers the built-in scratch project (idempotent).
-func ensureScratchProject(ticketStore string) error {
+// EnsureScratchProject registers the built-in scratch project (idempotent).
+func EnsureScratchProject(ticketStore string) error {
 	workspace := ScratchWorkspace(ticketStore)
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		return err

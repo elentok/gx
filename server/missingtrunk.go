@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -133,7 +134,7 @@ func (s *Server) trunkProblem(project string) (string, bool) {
 	if pf.Repo == nil || (pf.VCS != nil && *pf.VCS == config.VCSNone) {
 		return "", false
 	}
-	if _, gone := missingPath(dir); gone {
+	if _, gone := projects.MissingPath(dir); gone {
 		return "", false
 	}
 	if _, err := tickets.Trunk(dir, *pf.Repo); err != nil {

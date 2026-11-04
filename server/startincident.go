@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -38,13 +39,13 @@ func (s *Server) fileStartIncident(now time.Time) {
 		s.log.Info("start incident: not filed, needs evolve maintainer mode", "note", path)
 		return
 	}
-	if _, err := s.projects.Dir(OutboxProject); err != nil {
+	if _, err := s.projects.Dir(projects.OutboxProject); err != nil {
 		s.log.Info("start incident: not filed, needs a gx project", "err", err)
 		return
 	}
 	res, err := s.oneOff(wire.OneOffRequest{
 		Prompt:  startIncidentPrompt(string(note), path),
-		Project: OutboxProject,
+		Project: projects.OutboxProject,
 		Type:    string(schema.TypeDiagnose),
 		Name:    "server-start-" + now.Format("20060102-1504"),
 		Unique:  "server-start-incident",

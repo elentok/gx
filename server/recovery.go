@@ -137,7 +137,7 @@ func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) 
 func (s *Server) recoverAsync(f recovery.Failure) {
 	if s.migrator.Migrating() {
 		s.guards.GoSettle(func() {
-			<-s.migrator.done
+			<-s.migrator.Done()
 			s.recoverAsync(f)
 		})
 		return

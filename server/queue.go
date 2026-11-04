@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-const queueFileName = "queue.json"
+const queueFileName = projects.QueueFileName
 
 func refusal(reason, msg string) wire.QueueResult {
 	return wire.QueueResult{Refused: true, Reason: reason, Message: msg}

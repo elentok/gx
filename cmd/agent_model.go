@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +22,7 @@ func newAgentModelCmd(d deps) *cobra.Command {
 			"alone when its effort is empty.\n\n" +
 			"The agent is found in this order:\n" +
 			"  1. " + nativerunner.AgentSessionEnv + ": the harness of that gx server session\n" +
-			"  2. " + server.AgentEnv + ": set by ralph-loop to the run's agent\n" +
+			"  2. " + projects.AgentEnv + ": set by ralph-loop to the run's agent\n" +
 			"  3. claude\n\n" +
 			"The value comes from the config agents.* section with the current directory's project\n" +
 			"overrides on top, and falls back to the built-in default. It is printed as written,\n" +
@@ -80,7 +80,7 @@ func currentAgent(d deps) ralphloop.AgentKind {
 			return ralphloop.AgentFor(h)
 		}
 	}
-	return ralphloop.AgentFor(d.getenv(server.AgentEnv))
+	return ralphloop.AgentFor(d.getenv(projects.AgentEnv))
 }
 
 func sessionHarness(d deps, id string) (string, bool) {

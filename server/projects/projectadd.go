@@ -1,8 +1,6 @@
-package server
+package projects
 
 import (
-	"encoding/json"
-	"net/http"
 	"path/filepath"
 	"regexp"
 	"sync"
@@ -33,14 +31,14 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 	if req.VCS != "" && req.VCS != config.VCSNone {
 		return refuseAdd(wire.ReasonBadVCS, "--vcs only accepts \""+config.VCSNone+"\"")
 	}
-	repo := canonicalDir(req.Path)
+	repo := CanonicalDir(req.Path)
 	defaultName := filepath.Base(repo)
 	if req.VCS == "" {
 		info, err := git.FindRepo(req.Path)
 		if err != nil {
 			return refuseAdd(wire.ReasonNotRepo, req.Path+" is not a git repo (use --vcs none for a project without one)")
 		}
-		repo = canonicalDir(info.Root)
+		repo = CanonicalDir(info.Root)
 		dir := repo
 		if filepath.Base(dir) == ".bare" {
 			dir = filepath.Dir(dir)
@@ -66,7 +64,7 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 	}
 	for _, dir := range dirs {
 		pf, err := config.ReadProjectFile(dir)
-		if err == nil && pf.Repo != nil && canonicalDir(*pf.Repo) == repo {
+		if err == nil && pf.Repo != nil && CanonicalDir(*pf.Repo) == repo {
 			return wire.AddProjectResult{Name: tickets.ProjectName(dir), Repo: repo, Existing: true}, nil
 		}
 	}
@@ -93,9 +91,9 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 	return wire.AddProjectResult{Name: name, Repo: repo}, nil
 }
 
-// canonicalDir resolves symlinks so one directory has one identity; a path
+// CanonicalDir resolves symlinks so one directory has one identity; a path
 // that cannot be resolved is compared as given.
-func canonicalDir(p string) string {
+func CanonicalDir(p string) string {
 	if abs, err := filepath.Abs(p); err == nil {
 		p = abs
 	}
@@ -103,18 +101,4 @@ func canonicalDir(p string) string {
 		return resolved
 	}
 	return filepath.Clean(p)
-}
-
-func (s *Server) projectAdd(w http.ResponseWriter, r *http.Request) {
-	var req wire.AddProjectRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	res, err := s.projects.Add(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	wire.WriteJSON(w, res)
 }

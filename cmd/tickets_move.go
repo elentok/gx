@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -112,7 +112,7 @@ func activeAddresses(dirs config.Dirs, dial func() (*apiclient.Client, error)) (
 	if err != nil {
 		return nil, err
 	}
-	return server.PersistedActive(stateDir)
+	return projects.PersistedActive(stateDir)
 }
 
 func printMove(w io.Writer, p tickets.MovePlan, jsonOut bool, mode string) error {

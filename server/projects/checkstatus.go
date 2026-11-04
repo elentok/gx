@@ -1,8 +1,7 @@
-package server
+package projects
 
 import (
 	"errors"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -15,23 +14,9 @@ import (
 
 // Checks reads and saves a project's check configuration.
 type Checks struct {
-	cfg      func() projectsEnv
+	cfg      func() Env
 	projects *Registry
 	guards   *runs.Guards
-}
-
-func (s *Server) checksStatusRead(w http.ResponseWriter, r *http.Request) {
-	st, err := s.checks.Status(r.URL.Query().Get("project"))
-	if err != nil {
-		code := http.StatusInternalServerError
-		var ae *tickets.AddressError
-		if errors.As(err, &ae) {
-			code = http.StatusNotFound
-		}
-		http.Error(w, err.Error(), code)
-		return
-	}
-	wire.WriteJSON(w, st)
 }
 
 // checksStatus answers for one project, or for every registered project when

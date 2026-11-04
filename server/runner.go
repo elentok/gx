@@ -42,7 +42,7 @@ func (s *Server) WaitSettled(timeout time.Duration) bool {
 func (s *Server) keepClaiming(ctx context.Context) {
 	// Reclaim sets holds a claim must see, and the index is empty until then.
 	select {
-	case <-s.migrator.startupDone:
+	case <-s.migrator.StartupDone():
 	case <-ctx.Done():
 		return
 	}

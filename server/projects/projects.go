@@ -1,4 +1,6 @@
-package server
+// Package projects holds the project registry, the start-up migrator and the
+// checks reads and saves, with their routes. It does not import server.
+package projects
 
 import (
 	"cmp"
@@ -26,9 +28,8 @@ type RegistryBack interface {
 	BusyAddresses() []string
 }
 
-// projectsEnv is the part of the Server's Config that Registry, Migrator and
-// Checks read.
-type projectsEnv struct {
+// Env is the part of the Server's Config that Registry, Migrator and Checks read.
+type Env struct {
 	TicketStore                  string
 	StateDir                     string
 	Env                          []string
@@ -42,21 +43,13 @@ type projectsEnv struct {
 	Sleep                        func(time.Duration)
 }
 
-// projectsEnvOf is how the three types see the Server's config: they hold this
-// getter and call it on every read, so a later change to the config shows.
-func (s *Server) projectsEnvOf() projectsEnv {
-	c := &s.cfg
-	return projectsEnv{
-		TicketStore: c.TicketStore, StateDir: c.StateDir, Env: c.Env, Migrations: c.Migrations,
-		MigrationFailurePollInterval: c.MigrationFailurePollInterval, Chat: c.Chat, GuardPoll: c.GuardPoll,
-		InstallDeps: c.InstallDeps, RateLimitResetBuffer: c.RateLimitResetBuffer, RunnerWait: c.RunnerWait, Sleep: c.Sleep,
-	}
-}
+// The three types hold a getter for the Server's config and call it on every
+// read, so a later change to the config shows.
 
 // Registry is project lookup and edit: the store's project dirs, their
 // project.json, the env-derived dirs and the typing rules.
 type Registry struct {
-	cfg         func() projectsEnv
+	cfg         func() Env
 	log         *slog.Logger
 	idx         *index.Index
 	settings    *settings.Holder
@@ -65,30 +58,19 @@ type Registry struct {
 	unavailable unavailableNotes
 }
 
-// initProjects builds the projects Registry, Migrator and Checks from the
-// Server's own fields. Tests that build a bare Server call it too.
-func (s *Server) initProjects() {
-	s.projects = &Registry{cfg: s.projectsEnvOf, log: s.log, idx: s.idx, settings: &s.settings, chat: s.chat, back: s}
-	s.migrator = &Migrator{cfg: s.projectsEnvOf, log: s.log, back: s, done: make(chan struct{}), startupDone: make(chan struct{})}
-	s.checks = &Checks{cfg: s.projectsEnvOf, projects: s.projects, guards: s.guards}
+// NewRegistry builds the Registry.
+func NewRegistry(cfg func() Env, log *slog.Logger, idx *index.Index, set *settings.Holder, chat *ralphloop.ServerChat, back RegistryBack) *Registry {
+	return &Registry{cfg: cfg, log: log, idx: idx, settings: set, chat: chat, back: back}
 }
 
-// withProjects is initProjects for a bare Server literal in a test.
-func withProjects(s *Server) *Server {
-	s.initProjects()
-	return s
+// NewMigrator builds the Migrator.
+func NewMigrator(cfg func() Env, log *slog.Logger, back MigratorBack) *Migrator {
+	return &Migrator{cfg: cfg, log: log, back: back, done: make(chan struct{}), startupDone: make(chan struct{})}
 }
 
-// BusyAddresses implements RegistryBack.
-func (s *Server) BusyAddresses() []string {
-	var out []string
-	for _, it := range s.queued.list() {
-		out = append(out, it.Address)
-	}
-	for _, r := range s.registry.List() {
-		out = append(out, r.Address)
-	}
-	return out
+// NewChecks builds Checks over the Registry.
+func NewChecks(cfg func() Env, reg *Registry, guards *runs.Guards) *Checks {
+	return &Checks{cfg: cfg, projects: reg, guards: guards}
 }
 
 // Dir finds the project's directory in the store.

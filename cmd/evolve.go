@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets"
@@ -66,7 +67,7 @@ func evolveGuard(env evolveEnv, projectDir string) (string, error) {
 		return "", err
 	}
 	mode := env.cfg.EvolveMode(pf)
-	if err := server.EnsureOutboxProject(env.storePath, mode); err != nil {
+	if err := projects.EnsureOutboxProject(env.storePath, mode); err != nil {
 		return "", err
 	}
 	if mode != config.EvolveMaintainer {

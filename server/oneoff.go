@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -403,15 +404,15 @@ func (s *Server) oneOffProject(req wire.OneOffRequest) (project, dir string, err
 		}
 		return req.Project, "", nil
 	}
-	cwd := canonicalDir(req.Cwd)
-	best, bestLen := ScratchProject, -1
+	cwd := projects.CanonicalDir(req.Cwd)
+	best, bestLen := projects.ScratchProject, -1
 	for _, d := range dirs {
 		name := tickets.ProjectName(d)
 		pf, err := config.ReadProjectFile(d)
-		if name == ScratchProject || err != nil || pf.Repo == nil {
+		if name == projects.ScratchProject || err != nil || pf.Repo == nil {
 			continue
 		}
-		for _, root := range projectRoots(canonicalDir(*pf.Repo)) {
+		for _, root := range projectRoots(projects.CanonicalDir(*pf.Repo)) {
 			if req.Cwd != "" && within(root, cwd) && len(root) > bestLen {
 				best, bestLen = name, len(root)
 			}

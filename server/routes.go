@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -21,7 +22,8 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 	return slices.Concat(
 		webtls.Routes(func() *x509.Certificate { return s.webCerts.Root() }),
 		settings.Routes(func() *settings.Holder { return s.Settings() }),
-		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrator.done }),
+		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrator.Done() }),
+		projects.Routes(func() *projects.Registry { return s.projects }, func() *projects.Migrator { return s.migrator }, func() *projects.Checks { return s.checks }),
 	)
 }
 

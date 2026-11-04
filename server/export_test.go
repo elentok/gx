@@ -168,9 +168,6 @@ func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason 
 // PruneBackups runs the backup-ref prune as of now.
 func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.pruneBackups(repoRoot, now) }
 
-// StartupDone closes once the startup steps, the first rescan among them, ended.
-func (s *Server) StartupDone() <-chan struct{} { return s.migrator.startupDone }
-
 // SetShutdownRecorder makes Serve report each shutdown step to rec; nil clears it.
 func SetShutdownRecorder(rec func(step string)) {
 	if rec == nil {
@@ -205,9 +202,6 @@ func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
 
 // PauseStuckFinishedClaims runs one finished-claim watchdog pass as of now.
 func (s *Server) PauseStuckFinishedClaims(now time.Time) { s.pauseStuckFinishedClaims(now) }
-
-// WorktreeDir is where the project's iteration worktrees live.
-func (s *Server) WorktreeDir(project string) string { return s.projects.WorktreeDir(project) }
 
 // RecoveredCount is recoveredCount for tests.
 func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }

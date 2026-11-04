@@ -32,6 +32,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -136,9 +137,9 @@ type Server struct {
 	log            *slog.Logger
 	logGiven       sync.Mutex // see giveLog
 	idx            *index.Index
-	projects       *Registry
-	migrator       *Migrator
-	checks         *Checks
+	projects       *projects.Registry
+	migrator       *projects.Migrator
+	checks         *projects.Checks
 
 	queued       *queueStore
 	pause        *pauseState
@@ -252,11 +253,11 @@ func New(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	if cfg.TicketStore != "" {
-		if err := ensureScratchProject(cfg.TicketStore); err != nil {
+		if err := projects.EnsureScratchProject(cfg.TicketStore); err != nil {
 			lock.release()
 			return nil, fmt.Errorf("create scratch project: %w", err)
 		}
-		if err := pruneScratchWorkspace(cfg.TicketStore); err != nil {
+		if err := projects.PruneScratchWorkspace(cfg.TicketStore); err != nil {
 			lock.release()
 			return nil, fmt.Errorf("prune scratch workspace: %w", err)
 		}
@@ -440,10 +441,6 @@ var routeTable = []struct {
 	{"POST /v1/web/set-password", (*Server).webSetPasswordCLI},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
-	{"GET /v1/projects/worktrees", (*Server).projectWorktrees},
-	{"POST /v1/projects/add", (*Server).projectAdd},
-	{"POST /v1/projects/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.projects.Remove)(w, r) }},
-	{"POST /v1/projects/set-path", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.projects.SetPath)(w, r) }},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
@@ -454,7 +451,6 @@ var routeTable = []struct {
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
 	{"POST /v1/restart", (*Server).restartWrite},
 	{"POST /v1/disk/clean", (*Server).diskCleanWrite},
-	{"GET /v1/checks/status", (*Server).checksStatusRead},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/tickets/detail", (*Server).detail},
@@ -522,10 +518,8 @@ var routeTable = []struct {
 	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
 	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
 	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
-	{"POST /v1/projects/retry-migration", (*Server).retryMigrationWrite},
 	{"POST /v1/afk", (*Server).afkWrite},
 	{"POST /v1/vimode", (*Server).viModeWrite},
-	{"POST /v1/checks/save", (*Server).checksSaveWrite},
 	{"GET /v1/settings/agents", (*Server).defaultHarnessRead},
 	{"POST /v1/settings/agents", (*Server).defaultHarnessWrite},
 }

@@ -1,10 +1,8 @@
-package server
+package projects
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
-	"net/http"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,7 +24,7 @@ type MigratorBack interface {
 // Migrator runs the start-up migration of every project and the retries, and
 // reads the failures they leave.
 type Migrator struct {
-	cfg  func() projectsEnv
+	cfg  func() Env
 	log  *slog.Logger
 	back MigratorBack
 	// done closes when the start-up migration run ends.
@@ -40,26 +38,17 @@ type Migrator struct {
 	now map[string]int
 }
 
-// MigrationsDone is closed when the start-up migration of every project has
-// ended, whether each project passed or failed. It is closed even when there is
-// no ticket store.
-func (s *Server) MigrationsDone() <-chan struct{} { return s.migrator.Done() }
-
-// MigrationRunning reports whether a migration run of project is in flight.
-func (s *Server) MigrationRunning(project string) bool { return s.migrator.Running(project) }
-
-// MigrationFailures reads the saved failed migrations of the projects now in
-// the ticket store. The CLI writes the record, so each call reads the file.
-func (s *Server) MigrationFailures() []wire.MigrationFailure { return s.migrator.Failures() }
-
-// FailuresChanged implements MigratorBack.
-func (s *Server) FailuresChanged() {
-	s.events.Publish(wire.EventMigrationFailuresChanged, "")
-	s.guards.Kick() // a clear ends a Migration block: claim now, not at the next tick
-}
-
-// Done is closed when the start-up migration run has ended.
+// Done is closed when the start-up migration of every project has ended,
+// whether each project passed or failed. It is closed even when there is no
+// ticket store.
 func (m *Migrator) Done() <-chan struct{} { return m.done }
+
+// StartupDone is closed when the steps that run after the migrations have
+// ended; claiming waits for it.
+func (m *Migrator) StartupDone() <-chan struct{} { return m.startupDone }
+
+// EndStartup closes StartupDone. Call it once.
+func (m *Migrator) EndStartup() { close(m.startupDone) }
 
 // migrating reports whether the start-up migration run is still going.
 func (m *Migrator) Migrating() bool {
@@ -109,15 +98,6 @@ func (m *Migrator) MigrateAll(ctx context.Context) {
 		m.migrateProject(reg, dir, pass)
 		m.End(name)
 	}
-}
-
-func (s *Server) retryMigrationWrite(w http.ResponseWriter, r *http.Request) {
-	var req wire.RetryMigrationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	wire.WriteJSON(w, s.migrator.Retry(req.Project))
 }
 
 // retryMigration runs the project's pending steps in the background, the same

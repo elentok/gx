@@ -130,7 +130,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds
   the ticket index, the store watch and the poll/watch loop, and the project, lock and history
-  reads (imports `wire` and `broker`; the root registers the `OnRescan` steps and the migration gate)
+  reads (imports `wire` and `broker`; the root registers the `OnRescan` steps and the migration gate);
+  `server/projects/` holds the project `Registry`, the start-up `Migrator` and `Checks`, with their
+  routes, the scratch and outbox projects and `AgentEnv` (imports `index`, `runs`, `settings` and
+  `wire`; `cmd` imports it too)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

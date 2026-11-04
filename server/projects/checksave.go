@@ -1,10 +1,9 @@
-package server
+package projects
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -17,20 +16,6 @@ import (
 
 func refuseSave(reason, msg string) (wire.SaveChecksResult, error) {
 	return wire.SaveChecksResult{Refused: true, Reason: reason, Message: msg}, nil
-}
-
-func (s *Server) checksSaveWrite(w http.ResponseWriter, r *http.Request) {
-	var req wire.SaveChecksRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	res, err := s.checks.Save(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	wire.WriteJSON(w, res)
 }
 
 func (c *Checks) Save(req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {

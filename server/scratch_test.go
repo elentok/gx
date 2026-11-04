@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -19,11 +19,11 @@ func TestScratchProject_AutoCreatedAndUnremovable(t *testing.T) {
 	ctx := context.Background()
 
 	list, err := h.Client.Projects(ctx)
-	if err != nil || len(list) != 1 || list[0].Name != server.ScratchProject || list[0].VCS != config.VCSNone {
+	if err != nil || len(list) != 1 || list[0].Name != projects.ScratchProject || list[0].VCS != config.VCSNone {
 		t.Fatalf("projects = %+v, %v; want just scratch with vcs none", list, err)
 	}
 
-	workspace := server.ScratchWorkspace(h.TicketStore)
+	workspace := projects.ScratchWorkspace(h.TicketStore)
 	if list[0].Repo != workspace {
 		t.Errorf("scratch repo = %q, want %q", list[0].Repo, workspace)
 	}
@@ -34,7 +34,7 @@ func TestScratchProject_AutoCreatedAndUnremovable(t *testing.T) {
 		t.Errorf("workspace not created: %v", err)
 	}
 
-	res, err := h.Client.RemoveProject(ctx, wire.ProjectRequest{Name: server.ScratchProject})
+	res, err := h.Client.RemoveProject(ctx, wire.ProjectRequest{Name: projects.ScratchProject})
 	if err == nil && !res.Refused {
 		t.Fatalf("remove scratch = %+v, want refusal", res)
 	}

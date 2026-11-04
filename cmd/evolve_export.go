@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
@@ -82,7 +82,7 @@ func evolveReminder(env evolveEnv, mode string, w io.Writer) error {
 // unexported. It never posts anything. The reminder is left out: it would
 // always read zero.
 func runEvolveExport(env evolveEnv, w, errW io.Writer, out string, again bool) error {
-	if err := server.EnsureOutboxProject(env.storePath, env.cfg.Evolve); err != nil {
+	if err := projects.EnsureOutboxProject(env.storePath, env.cfg.Evolve); err != nil {
 		return err
 	}
 	dir, err := tickets.ProjectDirByName(env.storePath, evolveGxProject)
