@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -63,8 +63,8 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 		}
 	}
 	res, err = h.Client.TicketNudge(ctx, "proj:epic-a/01", "once more")
-	if err != nil || !res.Refused || res.Reason != server.ReasonRateLimited {
-		t.Errorf("over the limit = %+v, %v; want refusal %s", res, err, server.ReasonRateLimited)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonRateLimited {
+		t.Errorf("over the limit = %+v, %v; want refusal %s", res, err, wire.ReasonRateLimited)
 	}
 	if typed := fake.Prompts(label); len(typed) != 3 {
 		t.Errorf("a refused nudge must not reach the pane, typed = %v", typed)
@@ -87,8 +87,8 @@ func TestNudge_NotReadyRefuses(t *testing.T) {
 
 	fake.SetState(label, agentrunner.StateBlocked, "permission to use Bash")
 	res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "hi")
-	if err != nil || !res.Refused || res.Reason != server.ReasonAgentNotReady {
-		t.Errorf("nudge while blocked = %+v, %v; want refusal %s", res, err, server.ReasonAgentNotReady)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentNotReady {
+		t.Errorf("nudge while blocked = %+v, %v; want refusal %s", res, err, wire.ReasonAgentNotReady)
 	}
 
 	fake.SetState(label, agentrunner.StateIdle, "")
@@ -106,9 +106,9 @@ func TestNudge_Refusals(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 	for _, c := range []struct{ name, addr, text, reason string }{
-		{"no text", "proj:epic-a/01", " ", server.ReasonTextRequired},
-		{"unknown ticket", "proj:epic-a/77", "hi", server.ReasonUnknownTicket},
-		{"no live pane", "proj:epic-a/01", "hi", server.ReasonIterationNotLive},
+		{"no text", "proj:epic-a/01", " ", wire.ReasonTextRequired},
+		{"unknown ticket", "proj:epic-a/77", "hi", wire.ReasonUnknownTicket},
+		{"no live pane", "proj:epic-a/01", "hi", wire.ReasonIterationNotLive},
 	} {
 		res, err := h.Client.TicketNudge(ctx, c.addr, c.text)
 		if err != nil || !res.Refused || res.Reason != c.reason {

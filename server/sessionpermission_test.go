@@ -11,7 +11,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -91,7 +90,7 @@ func TestSessionPermission_Refusals(t *testing.T) {
 	f := startPromptSession(t)
 	seedSession(t, f, "seeded-exited", wire.SessionExited)
 	for name, tc := range map[string]struct{ id, want string }{
-		"not blocked": {f.id, server.ReasonNotBlocked},
+		"not blocked": {f.id, wire.ReasonNotBlocked},
 		"exited":      {"seeded-exited", wire.ReasonSessionNotLive},
 		"unknown":     {"nope", wire.ReasonSessionUnknown},
 	} {

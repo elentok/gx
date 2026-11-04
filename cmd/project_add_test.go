@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -58,10 +57,10 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 		desc, reason string
 		req          wire.AddProjectRequest
 	}{
-		{"scratch reserved", server.ReasonReservedName, wire.AddProjectRequest{Path: notRepo, Name: "scratch", VCS: "none"}},
-		{"duplicate name", server.ReasonNameTaken, wire.AddProjectRequest{Path: notRepo, Name: name, VCS: "none"}},
-		{"non-repo", server.ReasonNotRepo, wire.AddProjectRequest{Path: notRepo}},
-		{"bad name", server.ReasonBadName, wire.AddProjectRequest{Path: notRepo, Name: "a/b", VCS: "none"}},
+		{"scratch reserved", wire.ReasonReservedName, wire.AddProjectRequest{Path: notRepo, Name: "scratch", VCS: "none"}},
+		{"duplicate name", wire.ReasonNameTaken, wire.AddProjectRequest{Path: notRepo, Name: name, VCS: "none"}},
+		{"non-repo", wire.ReasonNotRepo, wire.AddProjectRequest{Path: notRepo}},
+		{"bad name", wire.ReasonBadName, wire.AddProjectRequest{Path: notRepo, Name: "a/b", VCS: "none"}},
 	} {
 		if _, err := add(tc.req); err == nil || !strings.Contains(err.Error(), tc.reason) {
 			t.Errorf("%s: err = %v, want reason %s", tc.desc, err, tc.reason)

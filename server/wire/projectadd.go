@@ -18,3 +18,12 @@ type AddProjectResult struct {
 	Reason   string `json:"reason,omitempty"`
 	Message  string `json:"message,omitempty"`
 }
+
+// Refusal reasons of a project add.
+const (
+	ReasonBadName      = "bad-name"
+	ReasonReservedName = "reserved-name"
+	ReasonNameTaken    = "name-taken"
+	ReasonNotRepo      = "not-a-repo"
+	ReasonBadVCS       = "bad-vcs"
+)

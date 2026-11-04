@@ -20,31 +20,13 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Refusal reasons of the ticket writes (pause, relaunch, unmute).
-const (
-	ReasonReasonRequired   = "reason-required"
-	ReasonAlreadyPaused    = "already-paused"
-	ReasonNotMuted         = "not-muted"
-	ReasonIterationRunning = "iteration-running"
-	ReasonTicketDone       = "ticket-done"
-	ReasonHerdrUnavailable = "herdr-unavailable"
-	// ReasonAgentWorking refuses a retry while the ticket's agent is still
-	// working; the web maps it to "Stop agent and retry".
-	ReasonAgentWorking = "agent-working"
-	// ReasonBudgetLimit refuses a relaunch or nudge past the daily soft
-	// limit (the hard limit implies it), as claims are held back.
-	ReasonBudgetLimit = "budget-limit"
-	// ReasonUsageLimit refuses an automatic relaunch while the usage gate holds.
-	ReasonUsageLimit = "usage-limit"
-)
-
 // budgetRefusal refuses new agent work past the daily soft limit; ok is
 // false when there is nothing to refuse.
 func (s *Server) budgetRefusal() (wire.QueueResult, bool) {
 	if !s.budgetSoftReached(time.Now()) {
 		return wire.QueueResult{}, false
 	}
-	return refusal(ReasonBudgetLimit, "the daily budget limit is reached; raise it with `gx budget override`"), true
+	return refusal(wire.ReasonBudgetLimit, "the daily budget limit is reached; raise it with `gx budget override`"), true
 }
 
 // ticketRef is a ticket found in the store, with where it lives.
@@ -102,7 +84,7 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 func (s *Server) ticketWrite(req wire.QueueRequest, do func(ticketRef) (wire.QueueResult, error)) (wire.QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		if s.registry.has(ref.addr.String()) {
-			return refusal(ReasonIterationRunning, "an iteration is running in "+ref.addr.String()), nil
+			return refusal(wire.ReasonIterationRunning, "an iteration is running in "+ref.addr.String()), nil
 		}
 		return do(ref)
 	})
@@ -120,7 +102,7 @@ func (s *Server) resolvedWrite(req wire.QueueRequest, do func(ticketRef) (wire.Q
 		return wire.QueueResult{}, err
 	}
 	if !ok {
-		return refusal(ReasonUnknownTicket, "no ticket "+addr), nil
+		return refusal(wire.ReasonUnknownTicket, "no ticket "+addr), nil
 	}
 	return do(ref)
 }
@@ -130,18 +112,18 @@ func (s *Server) resolvedWrite(req wire.QueueRequest, do func(ticketRef) (wire.Q
 func (s *Server) ticketPause(req wire.QueueRequest) (wire.QueueResult, error) {
 	reason := strings.TrimSpace(req.PauseReason)
 	if reason == "" {
-		return refusal(ReasonReasonRequired, "a one-line reason is required"), nil
+		return refusal(wire.ReasonReasonRequired, "a one-line reason is required"), nil
 	}
 	return s.ticketWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
-			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
+			return refusal(wire.ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		switch schema.Status(ref.ticket.Status) {
 		case schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
-			return refusal(ReasonAlreadyPaused, ref.addr.String()+" is already paused"), nil
+			return refusal(wire.ReasonAlreadyPaused, ref.addr.String()+" is already paused"), nil
 		}
 		if ref.epic.IsMap {
-			return refusal(ReasonMapEpic, ref.addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
+			return refusal(wire.ReasonMapEpic, ref.addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
 		}
 		run, _ := s.registry.tracked(ref.addr.String())
 		if err := s.pauseTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.Manual, reason, run.Run); err != nil {
@@ -155,7 +137,7 @@ func (s *Server) ticketPause(req wire.QueueRequest) (wire.QueueResult, error) {
 func (s *Server) ticketUnmute(req wire.QueueRequest) (wire.QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		if len(ref.ticket.Mutes) == 0 {
-			return refusal(ReasonNotMuted, ref.addr.String()+" is not muted"), nil
+			return refusal(wire.ReasonNotMuted, ref.addr.String()+" is not muted"), nil
 		}
 		if err := ralphloop.UnmuteTicket(ref.ticket.Path, time.Now()); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("unmute %s: %w", ref.addr, err)
@@ -227,7 +209,7 @@ func (s *Server) promptsOnRetry(address string) bool {
 func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queueCtx) (wire.QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
-			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
+			return refusal(wire.ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		var applied *recovery.Failure
 		if qc.investigator != "" {
@@ -244,7 +226,7 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queueCtx) (wire.QueueR
 				return wire.QueueResult{}, err
 			}
 			if stale {
-				return refusal(ReasonStale, "the pause changed; review the current one"), nil
+				return refusal(wire.ReasonStale, "the pause changed; review the current one"), nil
 			}
 		}
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
@@ -252,20 +234,20 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queueCtx) (wire.QueueR
 		}
 		agent := s.resolveTicket(ref.addr, ref.ticket).Harness
 		if reason, held := s.herdrHolds(s.launchRunner(ref.addr.Project, agent)); held {
-			return refusal(ReasonHerdrUnavailable, reason), nil
+			return refusal(wire.ReasonHerdrUnavailable, reason), nil
 		}
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
 		}
 		if qc.actor != "" {
 			if v, held := s.usageGate(agent, time.Now()); held {
-				return refusal(ReasonUsageLimit, v), nil
+				return refusal(wire.ReasonUsageLimit, v), nil
 			}
 		}
 		if d, held := s.freshHeldDisk(ref.addr.Project); held {
 			return refusal(wire.ReasonDiskLow, diskLowReason(d)), nil
 		}
-		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, ReasonAgentWorking, isWorking); refused || err != nil {
+		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, wire.ReasonAgentWorking, isWorking); refused || err != nil {
 			return res, err
 		}
 		source := req.Source
@@ -309,11 +291,11 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queueCtx) (wire.QueueR
 func (s *Server) ticketCancel(req wire.QueueRequest) (wire.QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
-			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
+			return refusal(wire.ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		// An archived one-off, found by its old address, is already over.
 		if ref.addr.Epic == OneOffsArchivedEpic {
-			return refusal(ReasonTicketDone, ref.addr.String()+" is archived"), nil
+			return refusal(wire.ReasonTicketDone, ref.addr.String()+" is archived"), nil
 		}
 		targets := cancelTargets(ref)
 		addrs := make([]tickets.Address, len(targets))
@@ -323,7 +305,7 @@ func (s *Server) ticketCancel(req wire.QueueRequest) (wire.QueueResult, error) {
 		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
 		// A one-off is archived on cancel, so its run can't be left alive behind it.
 		stop := req.Stop || ref.addr.Epic == OneOffsEpic
-		if res, refused, err := s.settleLive(addrs, stop, ReasonTicketLive, anyLive); refused || err != nil {
+		if res, refused, err := s.settleLive(addrs, stop, wire.ReasonTicketLive, anyLive); refused || err != nil {
 			return res, err
 		}
 		for _, t := range targets {
@@ -378,7 +360,7 @@ func (s *Server) cancelInvestigateChild(ref ticketRef, source string) error {
 		}
 		addr := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}
 		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
-		if _, _, err := s.settleLive([]tickets.Address{addr}, true, ReasonTicketLive, anyLive); err != nil {
+		if _, _, err := s.settleLive([]tickets.Address{addr}, true, wire.ReasonTicketLive, anyLive); err != nil {
 			return err
 		}
 		if err := s.markCancelled(ref, t, source); err != nil {

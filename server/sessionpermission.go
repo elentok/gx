@@ -41,7 +41,7 @@ func (s *Server) readSessionPermission(id string) (wire.SessionResult, wire.Sess
 	case !acceptsKeys(st):
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", id, st)), out, nil
 	case st != wire.SessionBlocked:
-		return sessionRefusal(ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", id, st)), out, nil
+		return sessionRefusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", id, st)), out, nil
 	}
 	c, err := nativerunner.DialHolder(dir)
 	if err != nil {

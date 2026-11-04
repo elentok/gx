@@ -9,7 +9,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -75,8 +74,8 @@ func TestSessionKeys_CodexUnreadableScreenDeniesButNeverApproves(t *testing.T) {
 	f := startCodexPermissionSession(t, true)
 	// A dialog with no command under its title is not one gx answers.
 	f.blockCodex(t, "")
-	if res := f.permission(t, "allow", ""); !res.Refused || res.Reason != server.ReasonNotApprovable {
-		t.Fatalf("allow = %+v, want %s", res, server.ReasonNotApprovable)
+	if res := f.permission(t, "allow", ""); !res.Refused || res.Reason != wire.ReasonNotApprovable {
+		t.Fatalf("allow = %+v, want %s", res, wire.ReasonNotApprovable)
 	}
 	// The refused Allow sent no y: the fake is still blocked, and Esc ends it.
 	if got := sessionSnapshotOf(t, f.designsFixture, f.id).Status.State; got != wire.SessionBlocked {
@@ -96,8 +95,8 @@ func TestSessionKeys_CodexHookRequestIsAnsweredByTheDecisionFile(t *testing.T) {
 	}
 	f.block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
 
-	if res := f.permission(t, "allow", "req-0"); !res.Refused || res.Reason != server.ReasonRequestChanged {
-		t.Fatalf("allow of another request = %+v, want %s", res, server.ReasonRequestChanged)
+	if res := f.permission(t, "allow", "req-0"); !res.Refused || res.Reason != wire.ReasonRequestChanged {
+		t.Fatalf("allow of another request = %+v, want %s", res, wire.ReasonRequestChanged)
 	}
 	if _, ok, err := nativerunner.ReadPermissionDecision(dir); err != nil || ok {
 		t.Fatalf("decision after a mismatch = %v, %v; want none", ok, err)

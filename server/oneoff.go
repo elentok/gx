@@ -21,18 +21,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Refusal reasons of a one-off submit.
-const (
-	ReasonEmptyPrompt   = "empty-prompt"
-	ReasonUnknownProj   = "unknown-project"
-	ReasonOptionRemoved = "option-removed"
-	ReasonBadBlocker    = "invalid-blocker"
-	ReasonBadWindow     = "invalid-context-window"
-	ReasonBadFile       = "invalid-file"
-	ReasonDuplicateLive = "duplicate-live"
-	ReasonBadType       = "invalid-type"
-)
-
 // OneOffStatusQueued is the status a successful submit reports: it is created
 // and already at the queue tail.
 const OneOffStatusQueued = "queued"
@@ -163,17 +151,17 @@ func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.
 		if err := applyOneOffFile(&req); err != nil {
 			var removed removedKeyError
 			if errors.As(err, &removed) {
-				return oneOffRefusal(ReasonOptionRemoved, err.Error()), nil
+				return oneOffRefusal(wire.ReasonOptionRemoved, err.Error()), nil
 			}
-			return oneOffRefusal(ReasonBadFile, err.Error()), nil
+			return oneOffRefusal(wire.ReasonBadFile, err.Error()), nil
 		}
 		if req.Unique == "" && !req.NoUnique {
 			resolved, err := filepath.EvalSymlinks(req.File)
 			if err != nil {
-				return oneOffRefusal(ReasonBadFile, err.Error()), nil
+				return oneOffRefusal(wire.ReasonBadFile, err.Error()), nil
 			}
 			if req.Unique, err = filepath.Abs(resolved); err != nil {
-				return oneOffRefusal(ReasonBadFile, err.Error()), nil
+				return oneOffRefusal(wire.ReasonBadFile, err.Error()), nil
 			}
 		}
 	}
@@ -182,7 +170,7 @@ func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.
 	}
 	prompt := strings.TrimSpace(req.Prompt)
 	if prompt == "" {
-		return oneOffRefusal(ReasonEmptyPrompt, "a one-off needs a prompt"), nil
+		return oneOffRefusal(wire.ReasonEmptyPrompt, "a one-off needs a prompt"), nil
 	}
 	typ := schema.TypePrompt
 	switch schema.TicketType(req.Type) {
@@ -190,14 +178,14 @@ func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.
 	case schema.TypeEvolve, schema.TypeDiagnose:
 		typ = schema.TicketType(req.Type)
 	default:
-		return oneOffRefusal(ReasonBadType, "type "+req.Type+" is not supported by a one-off"), nil
+		return oneOffRefusal(wire.ReasonBadType, "type "+req.Type+" is not supported by a one-off"), nil
 	}
 	project, dir, err := s.oneOffProject(req)
 	if err != nil {
 		return wire.OneOffResult{}, err
 	}
 	if dir == "" {
-		return oneOffRefusal(ReasonUnknownProj, "no project "+project+" in the ticket store"), nil
+		return oneOffRefusal(wire.ReasonUnknownProj, "no project "+project+" in the ticket store"), nil
 	}
 
 	slug := req.Name
@@ -205,7 +193,7 @@ func (s *Server) oneOffValidate(req wire.OneOffRequest, plan *oneOffPlan) (wire.
 		slug = defaultOneOffName(prompt)
 	}
 	if _, err := tickets.ParseAddress(tickets.Address{Project: project, Epic: slug, ID: "01"}.String(), tickets.AddressContext{}); err != nil {
-		return oneOffRefusal(ReasonInvalidAddress, "name "+slug+" is not usable in a ticket address"), nil
+		return oneOffRefusal(wire.ReasonInvalidAddress, "name "+slug+" is not usable in a ticket address"), nil
 	}
 	if dup, err := s.liveDuplicate(dir, req.Unique); err != nil {
 		return wire.OneOffResult{}, err
@@ -352,7 +340,7 @@ func (d *duplicate) refusal(project, projectDir string) (wire.OneOffResult, erro
 	}); err != nil {
 		return wire.OneOffResult{}, err
 	}
-	res := oneOffRefusal(ReasonDuplicateLive, addr+" already has this dedupe key")
+	res := oneOffRefusal(wire.ReasonDuplicateLive, addr+" already has this dedupe key")
 	res.Address = addr
 	return res, nil
 }
@@ -381,24 +369,24 @@ func (s *Server) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *w
 		return &r
 	}
 	if req.ExpectedContextWindow < 0 {
-		return refuse(ReasonBadWindow, "expected context window must be non-negative")
+		return refuse(wire.ReasonBadWindow, "expected context window must be non-negative")
 	}
 	if len(req.BlockedBy) == 0 {
 		return nil
 	}
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
-		r := oneOffRefusal(ReasonBadBlocker, err.Error())
+		r := oneOffRefusal(wire.ReasonBadBlocker, err.Error())
 		return &r
 	}
 	for _, b := range req.BlockedBy {
 		a, err := tickets.ParseAddress(b, tickets.AddressContext{})
 		switch {
 		case err != nil:
-			return refuse(ReasonBadBlocker, err.Error())
+			return refuse(wire.ReasonBadBlocker, err.Error())
 		case a.Project != project:
-			return refuse(ReasonBadBlocker, b+" is in another project (cross-project blocking not supported)")
+			return refuse(wire.ReasonBadBlocker, b+" is in another project (cross-project blocking not supported)")
 		case !s.hasTicket(a.String()):
-			return refuse(ReasonBadBlocker, "no ticket "+b)
+			return refuse(wire.ReasonBadBlocker, "no ticket "+b)
 		}
 	}
 	return nil

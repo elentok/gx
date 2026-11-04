@@ -18,15 +18,6 @@ import (
 // its name.
 const ScratchProject = "scratch"
 
-// Refusal reasons of a project add.
-const (
-	ReasonBadName      = "bad-name"
-	ReasonReservedName = "reserved-name"
-	ReasonNameTaken    = "name-taken"
-	ReasonNotRepo      = "not-a-repo"
-	ReasonBadVCS       = "bad-vcs"
-)
-
 // projectNameRe is what an address's first segment can hold (no ':', '/' or
 // whitespace), minus a leading dot or dash.
 var projectNameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
@@ -40,14 +31,14 @@ func refuseAdd(reason, msg string) (wire.AddProjectResult, error) {
 
 func (s *Server) addProject(req wire.AddProjectRequest) (wire.AddProjectResult, error) {
 	if req.VCS != "" && req.VCS != config.VCSNone {
-		return refuseAdd(ReasonBadVCS, "--vcs only accepts \""+config.VCSNone+"\"")
+		return refuseAdd(wire.ReasonBadVCS, "--vcs only accepts \""+config.VCSNone+"\"")
 	}
 	repo := canonicalDir(req.Path)
 	defaultName := filepath.Base(repo)
 	if req.VCS == "" {
 		info, err := git.FindRepo(req.Path)
 		if err != nil {
-			return refuseAdd(ReasonNotRepo, req.Path+" is not a git repo (use --vcs none for a project without one)")
+			return refuseAdd(wire.ReasonNotRepo, req.Path+" is not a git repo (use --vcs none for a project without one)")
 		}
 		repo = canonicalDir(info.Root)
 		dir := repo
@@ -61,10 +52,10 @@ func (s *Server) addProject(req wire.AddProjectRequest) (wire.AddProjectResult, 
 		name = defaultName
 	}
 	if name == ScratchProject {
-		return refuseAdd(ReasonReservedName, "\""+ScratchProject+"\" is reserved")
+		return refuseAdd(wire.ReasonReservedName, "\""+ScratchProject+"\" is reserved")
 	}
 	if !projectNameRe.MatchString(name) {
-		return refuseAdd(ReasonBadName, "project name "+name+" must be a slug of letters, digits, '.', '_' or '-'")
+		return refuseAdd(wire.ReasonBadName, "project name "+name+" must be a slug of letters, digits, '.', '_' or '-'")
 	}
 
 	projectAddMu.Lock()
@@ -85,7 +76,7 @@ func (s *Server) addProject(req wire.AddProjectRequest) (wire.AddProjectResult, 
 			if pf, err := config.ReadProjectFile(dir); err == nil && pf.VCS != nil && *pf.VCS == config.VCSNone {
 				msg += "; to turn that ticket-only project into this clone, run gx project set-path " + name + " <clone>"
 			}
-			return refuseAdd(ReasonNameTaken, msg)
+			return refuseAdd(wire.ReasonNameTaken, msg)
 		}
 	}
 	pf := config.ProjectFile{Name: &name, Repo: &repo}

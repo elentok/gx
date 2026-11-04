@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -61,24 +62,24 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	}
 
 	for _, c := range []struct{ name, address, reason string }{
-		{"already queued", "proj:epic-a", server.ReasonAlreadyQueued},
-		{"map epic", "proj:map-epic", server.ReasonMapEpic},
-		{"draft epic", "proj:epic-drafting", server.ReasonEpicDraft},
-		{"follow-ups", "proj:follow-ups", server.ReasonFollowUpsEpic},
-		{"follow-ups archived", "proj:follow-ups-archived", server.ReasonFollowUpsEpic},
-		{"cancelled epic", "proj:epic-cancelled", server.ReasonEpicNotOpen},
-		{"done epic", "proj:epic-closed", server.ReasonEpicNotOpen},
-		{"no open tickets", "proj:epic-done", server.ReasonNoOpenTickets},
-		{"draft only", "proj:epic-draft", server.ReasonNoOpenTickets},
-		{"claimed only", "proj:epic-claimed", server.ReasonNoOpenTickets},
-		{"merged", "proj:epic-merged", server.ReasonAlreadyMerged},
+		{"already queued", "proj:epic-a", wire.ReasonAlreadyQueued},
+		{"map epic", "proj:map-epic", wire.ReasonMapEpic},
+		{"draft epic", "proj:epic-drafting", wire.ReasonEpicDraft},
+		{"follow-ups", "proj:follow-ups", wire.ReasonFollowUpsEpic},
+		{"follow-ups archived", "proj:follow-ups-archived", wire.ReasonFollowUpsEpic},
+		{"cancelled epic", "proj:epic-cancelled", wire.ReasonEpicNotOpen},
+		{"done epic", "proj:epic-closed", wire.ReasonEpicNotOpen},
+		{"no open tickets", "proj:epic-done", wire.ReasonNoOpenTickets},
+		{"draft only", "proj:epic-draft", wire.ReasonNoOpenTickets},
+		{"claimed only", "proj:epic-claimed", wire.ReasonNoOpenTickets},
+		{"merged", "proj:epic-merged", wire.ReasonAlreadyMerged},
 	} {
 		if code, body := add(c.address, "1"); code != http.StatusOK || reasonOf(t, body) != c.reason {
 			t.Errorf("%s = %d %s, want refusal %s", c.name, code, body, c.reason)
 		}
 	}
 
-	if code, body := add("proj:epic-a", ""); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+	if code, body := add("proj:epic-a", ""); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("without token = %d %s, want a stale refusal", code, body)
 	}
 	if code, _ := webPostJSON(t, base+"/v1/queue/add", `{"address":"proj:epic-a","state":"1"}`, nil, "", jsonPost(base)); code != http.StatusUnauthorized {

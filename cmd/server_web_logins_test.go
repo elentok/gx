@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"os"
@@ -86,8 +87,8 @@ func TestWebRevoke_UnknownIDIsRefusedWithItsReason(t *testing.T) {
 	h := startWebServer(t)
 	finishWebSetup(t, h)
 	err := runWebRevoke(context.Background(), h.Client, "nope", false, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonLoginNotFound) {
-		t.Errorf("err = %v, want %s", err, server.ReasonLoginNotFound)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonLoginNotFound) {
+		t.Errorf("err = %v, want %s", err, wire.ReasonLoginNotFound)
 	}
 	if list, _ := h.Client.WebLogins(context.Background()); len(list.Logins) != 1 {
 		t.Errorf("logins = %+v, want the one login kept", list.Logins)
@@ -105,8 +106,8 @@ func TestWebLoginsAndRevoke_NoServerIsServerNotRunning(t *testing.T) {
 		"web-logins": func() error { return runWebLogins(context.Background(), c, false, &bytes.Buffer{}) },
 		"web-revoke": func() error { return runWebRevoke(context.Background(), c, "x", false, &bytes.Buffer{}) },
 	} {
-		if err := run(); err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
-			t.Errorf("%s: err = %v, want %s", name, err, server.ReasonServerNotRunning)
+		if err := run(); err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
+			t.Errorf("%s: err = %v, want %s", name, err, wire.ReasonServerNotRunning)
 		}
 	}
 }

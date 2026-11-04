@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,12 +46,12 @@ func TestRetryAndCancel_WorkingLeftoverRefuses(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false)
-	if err != nil || !res.Refused || res.Reason != server.ReasonAgentWorking {
-		t.Errorf("retry = %+v, %v; want %s refusal", res, err, server.ReasonAgentWorking)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentWorking {
+		t.Errorf("retry = %+v, %v; want %s refusal", res, err, wire.ReasonAgentWorking)
 	}
 	res, err = h.Client.TicketCancel(ctx, "proj:epic-a/01", false)
-	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
-		t.Errorf("cancel = %+v, %v; want %s refusal", res, err, server.ReasonTicketLive)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
+		t.Errorf("cancel = %+v, %v; want %s refusal", res, err, wire.ReasonTicketLive)
 	}
 	if _, ok, _ := fake.Find(holderLabel); !ok {
 		t.Error("a refused verb closed the working leftover")

@@ -135,14 +135,14 @@ func TestQueue_Refusals(t *testing.T) {
 		do     func() (wire.QueueResult, error)
 		reason string
 	}{
-		{"duplicate", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/01", "") }, server.ReasonAlreadyQueued},
-		{"unknown ticket", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/99", "") }, server.ReasonUnknownTicket},
-		{"bad address", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "nonsense", "") }, server.ReasonInvalidAddress},
-		{"bad agent", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/02", "gpt") }, server.ReasonInvalidAgent},
-		{"remove unqueued", func() (wire.QueueResult, error) { return h.Client.QueueRemove(ctx, "proj:epic-a/02") }, server.ReasonNotQueued},
-		{"move unqueued", func() (wire.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/02", 1) }, server.ReasonNotQueued},
-		{"map epic", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:map-epic/01", "") }, server.ReasonMapEpic},
-		{"move out of range", func() (wire.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/01", 2) }, server.ReasonBadPosition},
+		{"duplicate", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/01", "") }, wire.ReasonAlreadyQueued},
+		{"unknown ticket", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/99", "") }, wire.ReasonUnknownTicket},
+		{"bad address", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "nonsense", "") }, wire.ReasonInvalidAddress},
+		{"bad agent", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/02", "gpt") }, wire.ReasonInvalidAgent},
+		{"remove unqueued", func() (wire.QueueResult, error) { return h.Client.QueueRemove(ctx, "proj:epic-a/02") }, wire.ReasonNotQueued},
+		{"move unqueued", func() (wire.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/02", 1) }, wire.ReasonNotQueued},
+		{"map epic", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:map-epic/01", "") }, wire.ReasonMapEpic},
+		{"move out of range", func() (wire.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/01", 2) }, wire.ReasonBadPosition},
 	}
 	for _, c := range cases {
 		res, err := c.do()

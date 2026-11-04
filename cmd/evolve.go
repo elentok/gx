@@ -153,7 +153,7 @@ func submitRetro(ctx context.Context, env evolveEnv, w, errW io.Writer, project,
 	res, err := env.submit(ctx, server.RetroSubmit(project, epic, env.now()))
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.OneOffResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.OneOffResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

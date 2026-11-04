@@ -23,32 +23,6 @@ const EventQueueChanged = "queue-changed"
 
 const queueFileName = "queue.json"
 
-// Refusal reasons of the queue writes. Stable: clients switch on them.
-const (
-	// ReasonServerNotRunning is produced by the CLI, never the server.
-	ReasonServerNotRunning = "server-not-running"
-	ReasonUnknownTicket    = "unknown-ticket"
-	ReasonInvestigateStop  = "investigate-stop"
-	ReasonInvalidAddress   = "invalid-address"
-	ReasonInvalidAgent     = "invalid-agent"
-	ReasonAlreadyQueued    = "already-queued"
-	ReasonNotQueued        = "not-queued"
-	ReasonBadPosition      = "bad-position"
-	ReasonTicketLive       = "ticket-live"
-	ReasonMapEpic          = "map-epic"
-	ReasonNoOpenTickets    = "no-open-tickets"
-	ReasonEpicDraft        = "epic-draft"
-	ReasonEpicNotOpen      = "epic-not-open"
-	ReasonFollowUpsEpic    = "follow-ups-epic"
-	ReasonAlreadyMerged    = "already-merged"
-	ReasonMergePending     = "merge-pending"
-	ReasonNotComplete      = "not-complete"
-	ReasonBranchMissing    = "branch-missing"
-	ReasonOneOffsEpic      = "one-offs-epic"
-	ReasonNotDirtyTrunk    = "not-dirty-trunk"
-	ReasonNeedsRebase      = "needs-rebase"
-)
-
 func refusal(reason, msg string) wire.QueueResult {
 	return wire.QueueResult{Refused: true, Reason: reason, Message: msg}
 }
@@ -147,7 +121,7 @@ func (s *Server) mapEpicRefusal(address string) *wire.QueueResult {
 	if !s.inMapEpic(address) {
 		return nil
 	}
-	r := refusal(ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
+	r := refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
 	return &r
 }
 
@@ -177,7 +151,7 @@ func (s *Server) hasTicket(address string) bool {
 func canonical(raw string) (string, *wire.QueueResult) {
 	a, err := tickets.ParseAddress(raw, tickets.AddressContext{})
 	if err != nil {
-		r := refusal(ReasonInvalidAddress, err.Error())
+		r := refusal(wire.ReasonInvalidAddress, err.Error())
 		return "", &r
 	}
 	return a.String(), nil
@@ -213,7 +187,7 @@ func resolveAgent(name string) (ralphloop.AgentKind, *wire.QueueResult) {
 		return "", nil
 	}
 	if err := ralphloop.ValidateAgentKind(agent); err != nil {
-		r := refusal(ReasonInvalidAgent, err.Error())
+		r := refusal(wire.ReasonInvalidAgent, err.Error())
 		return "", &r
 	}
 	return agent, nil
@@ -244,7 +218,7 @@ func parseQueueTarget(raw string) (queueTarget, *wire.QueueResult) {
 func (s *Server) refusal(t queueTarget) *wire.QueueResult {
 	if !t.isEpic() {
 		if !s.hasTicket(t.address) {
-			r := refusal(ReasonUnknownTicket, "no ticket "+t.address)
+			r := refusal(wire.ReasonUnknownTicket, "no ticket "+t.address)
 			return &r
 		}
 		return s.mapEpicRefusal(t.address)
@@ -252,24 +226,24 @@ func (s *Server) refusal(t queueTarget) *wire.QueueResult {
 	epics, err := s.projectEpics(t.project)
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == t.epic })
 	if err != nil || i < 0 {
-		r := refusal(ReasonUnknownTicket, "no epic "+t.address)
+		r := refusal(wire.ReasonUnknownTicket, "no epic "+t.address)
 		return &r
 	}
 	e := epics[i]
 	var r wire.QueueResult
 	switch {
 	case e.IsMap:
-		r = refusal(ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
+		r = refusal(wire.ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
 	case !e.MergedAt.IsZero():
-		r = refusal(ReasonAlreadyMerged, t.address+" is already merged")
+		r = refusal(wire.ReasonAlreadyMerged, t.address+" is already merged")
 	case e.QueueRefusal() == tickets.QueueRefusalFollowUps:
-		r = refusal(ReasonFollowUpsEpic, t.address+" is a follow-ups epic; a follow-up is not schedulable work")
+		r = refusal(wire.ReasonFollowUpsEpic, t.address+" is a follow-ups epic; a follow-up is not schedulable work")
 	case e.Status == string(schema.StatusDraft):
-		r = refusal(ReasonEpicDraft, t.address+" is a draft; its tickets are still being created")
+		r = refusal(wire.ReasonEpicDraft, t.address+" is a draft; its tickets are still being created")
 	case e.QueueRefusal() == tickets.QueueRefusalNotOpen:
-		r = refusal(ReasonEpicNotOpen, t.address+" is "+e.Status+", not open")
+		r = refusal(wire.ReasonEpicNotOpen, t.address+" is "+e.Status+", not open")
 	case !epicQueueable(e, false):
-		r = refusal(ReasonNoOpenTickets, t.address+" has no open ticket")
+		r = refusal(wire.ReasonNoOpenTickets, t.address+" has no open ticket")
 	default:
 		return nil
 	}
@@ -292,7 +266,7 @@ func (s *Server) queueAddItem(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		for _, it := range items {
 			if it.Address == addr {
-				r := refusal(ReasonAlreadyQueued, addr+" is already queued")
+				r := refusal(wire.ReasonAlreadyQueued, addr+" is already queued")
 				return nil, &r
 			}
 		}
@@ -335,12 +309,12 @@ func (s *Server) queueRemove(req wire.QueueRequest) (wire.QueueResult, error) {
 	addr := target.address
 	return s.writeQueue(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		if indexOfAddr(items, addr) < 0 {
-			r := refusal(ReasonNotQueued, addr+" is not queued")
+			r := refusal(wire.ReasonNotQueued, addr+" is not queued")
 			return nil, &r
 		}
 		subtree := s.subtree(addr)
 		if live := s.liveIn(subtree); live != "" {
-			r := refusal(ReasonTicketLive, live+" has a live iteration")
+			r := refusal(wire.ReasonTicketLive, live+" has a live iteration")
 			return nil, &r
 		}
 		return dropAddresses(items, subtree), nil
@@ -371,10 +345,10 @@ func (s *Server) queueReplaceItems(req wire.QueueRequest) (wire.QueueResult, err
 			return *badAgent, nil
 		}
 		if projectOfAddress(addr) != req.Project {
-			return refusal(ReasonInvalidAddress, addr+" is not in project "+req.Project), nil
+			return refusal(wire.ReasonInvalidAddress, addr+" is not in project "+req.Project), nil
 		}
 		if seen[addr] {
-			return refusal(ReasonAlreadyQueued, addr+" is listed twice"), nil
+			return refusal(wire.ReasonAlreadyQueued, addr+" is listed twice"), nil
 		}
 		seen[addr] = true
 		items = append(items, newQueueItem(addr, agent))
@@ -382,7 +356,7 @@ func (s *Server) queueReplaceItems(req wire.QueueRequest) (wire.QueueResult, err
 	return s.writeQueue("", func(cur []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {
 			if !s.hasTicket(it.Address) {
-				r := refusal(ReasonUnknownTicket, "no ticket "+it.Address)
+				r := refusal(wire.ReasonUnknownTicket, "no ticket "+it.Address)
 				return nil, &r
 			}
 			if r := s.mapEpicRefusal(it.Address); r != nil {
@@ -398,7 +372,7 @@ func (s *Server) queueReplaceItems(req wire.QueueRequest) (wire.QueueResult, err
 			// A dropped entry must not have a live run under it.
 			if !seen[it.Address] {
 				if live := s.liveIn(s.subtree(it.Address)); live != "" {
-					r := refusal(ReasonTicketLive, live+" has a live iteration")
+					r := refusal(wire.ReasonTicketLive, live+" has a live iteration")
 					return nil, &r
 				}
 			}
@@ -484,11 +458,11 @@ func (s *Server) queueMove(req wire.QueueRequest) (wire.QueueResult, error) {
 			}
 		}
 		if from < 0 {
-			r := refusal(ReasonNotQueued, addr+" is not queued")
+			r := refusal(wire.ReasonNotQueued, addr+" is not queued")
 			return nil, &r
 		}
 		if req.Position < 1 || req.Position > len(items) {
-			r := refusal(ReasonBadPosition, "position must be between 1 and the queue length")
+			r := refusal(wire.ReasonBadPosition, "position must be between 1 and the queue length")
 			return nil, &r
 		}
 		it := items[from]
@@ -528,7 +502,7 @@ func queueWriteAs(web bool, do func(wire.QueueRequest, queueCtx) (wire.QueueResu
 			return
 		}
 		if web && req.State == "" {
-			writeJSON(w, refusal(ReasonStale, "a state token is required; review the current question"))
+			writeJSON(w, refusal(wire.ReasonStale, "a state token is required; review the current question"))
 			return
 		}
 		req.Source = requestOrigin(r, web)

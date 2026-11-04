@@ -101,8 +101,8 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 			t.Fatal(err)
 		}
 		res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
-		if err != nil || res.Reason != server.ReasonNotAnswerable {
-			t.Errorf("%s: %+v, %v; want %s", name, res, err, server.ReasonNotAnswerable)
+		if err != nil || res.Reason != wire.ReasonNotAnswerable {
+			t.Errorf("%s: %+v, %v; want %s", name, res, err, wire.ReasonNotAnswerable)
 		}
 	}
 	if n := answerCount(t, ticketPath); n != 0 {
@@ -120,8 +120,8 @@ func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	h.Server.RecordSpend("spent", 6)
 	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
-	if err != nil || res.Reason != server.ReasonBudgetLimit {
-		t.Fatalf("answer = %+v, %v; want %s", res, err, server.ReasonBudgetLimit)
+	if err != nil || res.Reason != wire.ReasonBudgetLimit {
+		t.Fatalf("answer = %+v, %v; want %s", res, err, wire.ReasonBudgetLimit)
 	}
 	if n := answerCount(t, ticketPath); n != 0 {
 		t.Errorf("pause.answer lines = %d, want 0", n)
@@ -275,8 +275,8 @@ func TestAnswer_Refusals(t *testing.T) {
 		}
 		return res
 	}
-	if res := ask(wire.QueueRequest{Choice: "a"}); res.Reason != server.ReasonNotPaused {
-		t.Errorf("claimed ticket: %+v, want %s", res, server.ReasonNotPaused)
+	if res := ask(wire.QueueRequest{Choice: "a"}); res.Reason != wire.ReasonNotPaused {
+		t.Errorf("claimed ticket: %+v, want %s", res, wire.ReasonNotPaused)
 	}
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	cases := []struct {
@@ -284,10 +284,10 @@ func TestAnswer_Refusals(t *testing.T) {
 		req    wire.QueueRequest
 		reason string
 	}{
-		{"stale", wire.QueueRequest{State: "99:paused", Choice: "a"}, server.ReasonStale},
-		{"bad choice", wire.QueueRequest{State: state, Choice: "zzz"}, server.ReasonBadChoice},
-		{"empty", wire.QueueRequest{State: state}, server.ReasonEmptyAnswer},
-		{"too long", wire.QueueRequest{State: state, Choice: "a", Note: strings.Repeat("x", 4001)}, server.ReasonTooLong},
+		{"stale", wire.QueueRequest{State: "99:paused", Choice: "a"}, wire.ReasonStale},
+		{"bad choice", wire.QueueRequest{State: state, Choice: "zzz"}, wire.ReasonBadChoice},
+		{"empty", wire.QueueRequest{State: state}, wire.ReasonEmptyAnswer},
+		{"too long", wire.QueueRequest{State: state, Choice: "a", Note: strings.Repeat("x", 4001)}, wire.ReasonTooLong},
 	}
 	for _, c := range cases {
 		if res := ask(c.req); !res.Refused || res.Reason != c.reason {
@@ -298,8 +298,8 @@ func TestAnswer_Refusals(t *testing.T) {
 		t.Errorf("stale carries question %v state %q, want the current one (%q)", res.Question, res.State, state)
 	}
 	fake.SetState("epic-a-iter-01", agentrunner.StateBlocked, "permission")
-	if res := ask(wire.QueueRequest{State: state, Choice: "a"}); res.Reason != server.ReasonAgentNotReady {
-		t.Errorf("blocked agent: %+v, want %s", res, server.ReasonAgentNotReady)
+	if res := ask(wire.QueueRequest{State: state, Choice: "a"}); res.Reason != wire.ReasonAgentNotReady {
+		t.Errorf("blocked agent: %+v, want %s", res, wire.ReasonAgentNotReady)
 	}
 	if n := answerCount(t, ticketPath); n != 0 {
 		t.Errorf("refusals logged %d pause.answer lines, want 0", n)

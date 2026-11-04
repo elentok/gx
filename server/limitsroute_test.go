@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -107,7 +106,7 @@ func TestLimitsReport_InvalidIsRefused(t *testing.T) {
 		"resets_at zero":      {FiveHour: limitWin(10, 0)},
 	} {
 		res := sendLimits(t, h, r)
-		if !res.Refused || res.Reason != server.ReasonInvalidReport {
+		if !res.Refused || res.Reason != wire.ReasonInvalidReport {
 			t.Errorf("%s: res = %+v, want invalid-report refusal", name, res)
 		}
 	}

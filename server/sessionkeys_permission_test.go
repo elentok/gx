@@ -9,7 +9,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -102,8 +101,8 @@ func TestSessionKeys_PermissionAllowNeverPicksAStandingOption(t *testing.T) {
 			t.Parallel()
 			f := startPromptSessionWithGrace(t, 10*time.Second)
 			f.blockOn(t, rows)
-			if res := f.permission(t, "allow", ""); !res.Refused || res.Reason != server.ReasonNotApprovable {
-				t.Fatalf("allow = %+v, want %s", res, server.ReasonNotApprovable)
+			if res := f.permission(t, "allow", ""); !res.Refused || res.Reason != wire.ReasonNotApprovable {
+				t.Fatalf("allow = %+v, want %s", res, wire.ReasonNotApprovable)
 			}
 			f.nothingSent(t)
 		})
@@ -125,8 +124,8 @@ func TestSessionKeys_PermissionRequestChangedSendsNothing(t *testing.T) {
 	f := startPromptSessionWithGrace(t, 10*time.Second)
 	f.blockOn(t, agentfake.BashPermissionDialog("ls"))
 	for _, decision := range []string{"allow", "deny"} {
-		if res := f.permission(t, decision, "not-the-dialog"); !res.Refused || res.Reason != server.ReasonRequestChanged {
-			t.Fatalf("%s = %+v, want %s", decision, res, server.ReasonRequestChanged)
+		if res := f.permission(t, decision, "not-the-dialog"); !res.Refused || res.Reason != wire.ReasonRequestChanged {
+			t.Fatalf("%s = %+v, want %s", decision, res, wire.ReasonRequestChanged)
 		}
 	}
 	f.nothingSent(t)
@@ -165,7 +164,7 @@ func TestSessionKeys_PermissionRefusals(t *testing.T) {
 		req  wire.SessionKeysRequest
 		want string
 	}{
-		"not blocked":     {wire.SessionKeysRequest{Permission: "allow"}, server.ReasonNotBlocked},
+		"not blocked":     {wire.SessionKeysRequest{Permission: "allow"}, wire.ReasonNotBlocked},
 		"bad value":       {wire.SessionKeysRequest{Permission: "maybe"}, wire.ReasonSessionBadRequest},
 		"with a key":      {wire.SessionKeysRequest{Permission: "allow", Key: "Tab"}, wire.ReasonSessionBadRequest},
 		"unknown session": {wire.SessionKeysRequest{ID: "nope", Permission: "allow"}, wire.ReasonSessionUnknown},

@@ -66,7 +66,7 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 	}
 
 	res, err = h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{{Address: "other:epic-b/01"}})
-	if err != nil || !res.Refused || res.Reason != server.ReasonInvalidAddress {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonInvalidAddress {
 		t.Fatalf("replace with a foreign ticket = %+v, %v", res, err)
 	}
 }
@@ -102,11 +102,11 @@ func TestQueue_ReplaceAndRemoveRefuseWhileAnIterationIsLive(t *testing.T) {
 	expectRun(t, h)
 
 	res, err := h.Client.QueueRemove(ctx, "proj:epic-a/01")
-	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
 	res, err = h.Client.QueueReplace(ctx, "proj", nil)
-	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
 		t.Fatalf("replace = %+v, %v", res, err)
 	}
 	if got := addresses(mustItems(t, h)); len(got) != 1 {

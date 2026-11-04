@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"os"
@@ -66,8 +67,8 @@ func TestWebPassword_StdinSignsEveryLoginOutAndTheNewPasswordLogsIn(t *testing.T
 	if got := webLoginsStatus(t, base, old); got != http.StatusUnauthorized {
 		t.Errorf("old cookie after the change = %d, want 401", got)
 	}
-	if got := webLoginReason(t, base, "correct horse battery", secret); got != server.ReasonWrongCredentials {
-		t.Errorf("login with the old password = %q, want %s", got, server.ReasonWrongCredentials)
+	if got := webLoginReason(t, base, "correct horse battery", secret); got != wire.ReasonWrongCredentials {
+		t.Errorf("login with the old password = %q, want %s", got, wire.ReasonWrongCredentials)
 	}
 	if got := webLoginReason(t, base, newWebPassword, secret); got != "" {
 		t.Errorf("login with the new password was refused: %q", got)
@@ -106,10 +107,10 @@ func TestWebPassword_ShortPasswordIsRefusedWithItsReason(t *testing.T) {
 	old := finishWebSetup(t, h)
 	var out bytes.Buffer
 	err := execute([]string{"server", "web-password", "--password-stdin", "--json"}, webResetDeps(t, h, "short\n", false, &out))
-	if err == nil || !strings.Contains(err.Error(), server.ReasonPasswordTooShort) {
-		t.Errorf("err = %v, want %s", err, server.ReasonPasswordTooShort)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonPasswordTooShort) {
+		t.Errorf("err = %v, want %s", err, wire.ReasonPasswordTooShort)
 	}
-	if !strings.Contains(out.String(), server.ReasonPasswordTooShort) {
+	if !strings.Contains(out.String(), wire.ReasonPasswordTooShort) {
 		t.Errorf("--json output has no reason:\n%s", out.String())
 	}
 	if got := webLoginsStatus(t, mustWebInfo(t, h).BaseURL, old); got != http.StatusOK {
@@ -226,8 +227,8 @@ func TestWebPassword_NoServerIsServerNotRunning(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	c := apiclient.New(filepath.Join(dir, "none.sock"))
 	err = runWebPassword(context.Background(), c, newWebPassword, false, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
-		t.Errorf("err = %v, want %s", err, server.ReasonServerNotRunning)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
+		t.Errorf("err = %v, want %s", err, wire.ReasonServerNotRunning)
 	}
 }
 

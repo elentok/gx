@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,8 +39,8 @@ func (l *loginWeb) attemptLogin(t *testing.T, password, totpCode string) (loginR
 func (l *loginWeb) failRound(t *testing.T, n int) {
 	t.Helper()
 	for i := 0; i < n; i++ {
-		if res, _ := l.attemptLogin(t, "not the password", "000000"); res.Reason != server.ReasonWrongCredentials {
-			t.Fatalf("failed login %d: reason %q, want %q", i+1, res.Reason, server.ReasonWrongCredentials)
+		if res, _ := l.attemptLogin(t, "not the password", "000000"); res.Reason != wire.ReasonWrongCredentials {
+			t.Fatalf("failed login %d: reason %q, want %q", i+1, res.Reason, wire.ReasonWrongCredentials)
 		}
 	}
 }
@@ -80,12 +81,12 @@ func TestWebLoginLimits_FiveWrongSetupCodesLockLoginsToo(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
 	for i := 0; i < 5; i++ {
-		if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); reasonOf(t, body) != server.ReasonSetupCodeWrong {
+		if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); reasonOf(t, body) != wire.ReasonSetupCodeWrong {
 			t.Fatalf("wrong Setup code %d: body %q", i+1, body)
 		}
 	}
 	res, _ := l.attemptLogin(t, loginTestPassword, "000000")
-	if res.Reason != server.ReasonRateLimited || res.WaitSeconds < 55 || res.WaitSeconds > 60 {
+	if res.Reason != wire.ReasonRateLimited || res.WaitSeconds < 55 || res.WaitSeconds > 60 {
 		t.Errorf("login after 5 wrong Setup codes: %+v, want rate-limited for about a minute", res)
 	}
 }
@@ -99,7 +100,7 @@ func TestWebLoginLimits_WaitGrowsPerRoundAndStopsAtAnHour(t *testing.T) {
 	for round, wait := range want {
 		l.failRound(t, 5)
 		res, _ := l.attemptLogin(t, "not the password", "000000")
-		if res.Reason != server.ReasonRateLimited || res.WaitSeconds < wait-5 || res.WaitSeconds > wait {
+		if res.Reason != wire.ReasonRateLimited || res.WaitSeconds < wait-5 || res.WaitSeconds > wait {
 			t.Fatalf("round %d: %+v, want rate-limited for about %ds", round+1, res, wait)
 		}
 		l.advance(time.Duration(wait+1) * time.Second)
@@ -222,8 +223,8 @@ func TestWebLoginLog_EachEventWritesOneLineWithIPAndName(t *testing.T) {
 		reason string
 	}{
 		{"web login", 2, ""},
-		{"web login refused", 1, server.ReasonWrongCredentials},
-		{"web setup refused", 1, server.ReasonSetupCodeWrong},
+		{"web login refused", 1, wire.ReasonWrongCredentials},
+		{"web setup refused", 1, wire.ReasonSetupCodeWrong},
 		{"web sign out", 1, ""},
 	} {
 		lines := logLines(t, log, c.msg)

@@ -82,24 +82,24 @@ func TestAgentAnswer_RequestIDRefusalsLogNothing(t *testing.T) {
 		wrap   func(*runnerfake.Runner) agentrunner.Runner
 		reason string
 	}{
-		{"not blocked", func(e answerEnv) {}, nil, server.ReasonNotBlocked},
-		{"request changed", func(e answerEnv) { e.fake.SetPending(answerLabel, bashPending("req-2")) }, nil, server.ReasonRequestChanged},
+		{"not blocked", func(e answerEnv) {}, nil, wire.ReasonNotBlocked},
+		{"request changed", func(e answerEnv) { e.fake.SetPending(answerLabel, bashPending("req-2")) }, nil, wire.ReasonRequestChanged},
 		{"plan approval", func(e answerEnv) {
 			e.fake.SetPending(answerLabel, &agentrunner.Pending{ID: "req-1", Tool: "ExitPlanMode", NotApprovable: true})
-		}, nil, server.ReasonNotApprovable},
+		}, nil, wire.ReasonNotApprovable},
 		{"ask user question", func(e answerEnv) {
 			e.fake.SetPending(answerLabel, &agentrunner.Pending{ID: "req-1", Tool: "AskUserQuestion", NotApprovable: true})
-		}, nil, server.ReasonNotApprovable},
+		}, nil, wire.ReasonNotApprovable},
 		{"herdr hosted", func(e answerEnv) { e.fake.SetPending(answerLabel, bashPending("req-1")) },
-			func(f *runnerfake.Runner) agentrunner.Runner { return herdrFake{f} }, server.ReasonNotApprovable},
+			func(f *runnerfake.Runner) agentrunner.Runner { return herdrFake{f} }, wire.ReasonNotApprovable},
 		{"not delivered", func(e answerEnv) {
 			e.fake.SetPending(answerLabel, bashPending("req-1"))
 			e.fake.SetAnswerErr(answerLabel, agentrunner.ErrNotDelivered)
-		}, nil, server.ReasonNotDelivered},
+		}, nil, wire.ReasonNotDelivered},
 		{"agent gone", func(e answerEnv) {
 			e.fake.SetPending(answerLabel, bashPending("req-1"))
 			e.fake.SetAnswerErr(answerLabel, agentrunner.SessionDied("claude exited"))
-		}, nil, server.ReasonAgentGone},
+		}, nil, wire.ReasonAgentGone},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -123,8 +123,8 @@ func TestAgentAnswer_AgentGoneWhenNoSessionLives(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := e.answer(t, wire.QueueRequest{Decision: "allow", RequestID: "req-1"})
-	if !res.Refused || res.Reason != server.ReasonAgentGone {
-		t.Fatalf("answer = %+v; want refusal %s", res, server.ReasonAgentGone)
+	if !res.Refused || res.Reason != wire.ReasonAgentGone {
+		t.Fatalf("answer = %+v; want refusal %s", res, wire.ReasonAgentGone)
 	}
 }
 

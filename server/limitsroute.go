@@ -12,10 +12,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// ReasonInvalidReport refuses a limits report with a non-finite or
-// out-of-range value.
-const ReasonInvalidReport = "invalid-report"
-
 func validLimitWindow(name string, w *wire.LimitWindow) error {
 	if w == nil {
 		return nil
@@ -40,7 +36,7 @@ func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
 		win  *wire.LimitWindow
 	}{{"five_hour", req.FiveHour}, {"seven_day", req.SevenDay}} {
 		if err := validLimitWindow(c.name, c.win); err != nil {
-			writeJSON(w, wire.LimitsReportResult{Refused: true, Reason: ReasonInvalidReport, Message: err.Error()})
+			writeJSON(w, wire.LimitsReportResult{Refused: true, Reason: wire.ReasonInvalidReport, Message: err.Error()})
 			return
 		}
 	}

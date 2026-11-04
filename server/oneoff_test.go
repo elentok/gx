@@ -212,8 +212,8 @@ func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 	}
 
 	res, err = h.Client.OneOff(ctx, wire.OneOffRequest{File: filepath.Join(t.TempDir(), "missing.md"), Cwd: repo})
-	if err != nil || !res.Refused || res.Reason != server.ReasonBadFile {
-		t.Errorf("missing file: %+v, %v; want %s refusal", res, err, server.ReasonBadFile)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonBadFile {
+		t.Errorf("missing file: %+v, %v; want %s refusal", res, err, wire.ReasonBadFile)
 	}
 }
 
@@ -272,8 +272,8 @@ func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 		req    wire.OneOffRequest
 		reason string
 	}{
-		{"unknown blocker", wire.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"proj:epic-a/09"}}, server.ReasonBadBlocker},
-		{"cross-project blocker", wire.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"scratch:e/01"}}, server.ReasonBadBlocker},
+		{"unknown blocker", wire.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"proj:epic-a/09"}}, wire.ReasonBadBlocker},
+		{"cross-project blocker", wire.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"scratch:e/01"}}, wire.ReasonBadBlocker},
 	}
 	for _, c := range cases {
 		c.req.Name = "refused-job"
@@ -300,8 +300,8 @@ func TestOneOff_InvalidAgentLeavesNoTicketAndRetryIsNotDuplicateLive(t *testing.
 	}
 	req := wire.OneOffRequest{File: file, Cwd: repo, Name: "bad-agent-job", Agent: "gpt"}
 	res, err := h.Client.OneOff(ctx, req)
-	if err != nil || !res.Refused || res.Reason != server.ReasonInvalidAgent {
-		t.Fatalf("got %+v, %v; want refusal %s", res, err, server.ReasonInvalidAgent)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonInvalidAgent {
+		t.Fatalf("got %+v, %v; want refusal %s", res, err, wire.ReasonInvalidAgent)
 	}
 	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "*bad-agent-job*")); len(files) != 0 {
 		t.Errorf("a refused submit left %v behind", files)
@@ -343,7 +343,7 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 
 	again := server.RetroSubmit("proj", "epic-a", at.Add(time.Hour))
 	res, err := h.Client.OneOff(ctx, again)
-	if err != nil || !res.Refused || res.Reason != server.ReasonDuplicateLive || res.Address != first.Address {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonDuplicateLive || res.Address != first.Address {
 		t.Errorf("second retro: %+v, %v; want duplicate-live naming %s", res, err, first.Address)
 	}
 }
@@ -403,7 +403,7 @@ func TestOneOff_RefusesBadTypes(t *testing.T) {
 		"implement":    {Prompt: "x", Cwd: repo, Type: "implement"},
 	} {
 		res, err := h.Client.OneOff(context.Background(), req)
-		if err != nil || !res.Refused || res.Reason != server.ReasonBadType {
+		if err != nil || !res.Refused || res.Reason != wire.ReasonBadType {
 			t.Errorf("%s: %+v, %v; want invalid-type", name, res, err)
 		}
 	}
@@ -428,7 +428,7 @@ func TestOneOff_DuplicateLiveRefusedByFileKey(t *testing.T) {
 	}
 	for name, f := range map[string]string{"same file": file, "symlink": link} {
 		res, err := h.Client.OneOff(ctx, wire.OneOffRequest{File: f, Cwd: repo})
-		if err != nil || !res.Refused || res.Reason != server.ReasonDuplicateLive || res.Address != first.Address {
+		if err != nil || !res.Refused || res.Reason != wire.ReasonDuplicateLive || res.Address != first.Address {
 			t.Errorf("%s: %+v, %v; want duplicate-live naming %s", name, res, err, first.Address)
 		}
 	}

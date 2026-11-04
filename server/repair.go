@@ -32,12 +32,6 @@ type repairCtx struct {
 	investigator string
 }
 
-// ReasonBadBase refuses an resume whose base is not one of the competing blockers.
-const ReasonBadBase = "bad-base"
-
-// ReasonBadTier refuses a resume whose tier is not one of ralphloop.AllTiers.
-const ReasonBadTier = "bad-tier"
-
 // zeroCommitPrompt is what a live agent receives when a person resumes its
 // zero-commit finish.
 const zeroCommitPrompt = "A person reviewed your finish with no commits and wants you to continue. " +
@@ -103,13 +97,13 @@ func (s *Server) epicTarget(req wire.RepairRequest, needID, preferProject bool) 
 	if hasID || needID {
 		a, perr := tickets.ParseAddress(req.Address, tickets.AddressContext{})
 		if perr != nil {
-			return "", "", "", &repair.RefusalError{Reason: ReasonInvalidAddress, Message: perr.Error()}
+			return "", "", "", &repair.RefusalError{Reason: wire.ReasonInvalidAddress, Message: perr.Error()}
 		}
 		raw, id = a.Project+":"+a.Epic, a.ID
 	}
 	project, epic, ok := strings.Cut(raw, ":")
 	if !ok || project == "" || epic == "" {
-		return "", "", "", &repair.RefusalError{Reason: ReasonInvalidAddress, Message: fmt.Sprintf("%q is not an epic address (want project:epic)", raw)}
+		return "", "", "", &repair.RefusalError{Reason: wire.ReasonInvalidAddress, Message: fmt.Sprintf("%q is not an epic address (want project:epic)", raw)}
 	}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
@@ -127,7 +121,7 @@ func (s *Server) epicTarget(req wire.RepairRequest, needID, preferProject bool) 
 		}
 		return filepath.Join(d, epic), id, cwd, nil
 	}
-	return "", "", "", &repair.RefusalError{Reason: ReasonUnknownTicket, Message: "no project " + project + " in the ticket store"}
+	return "", "", "", &repair.RefusalError{Reason: wire.ReasonUnknownTicket, Message: "no project " + project + " in the ticket store"}
 }
 
 func (s *Server) repairMerge(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
@@ -278,7 +272,7 @@ func (s *Server) repairResume(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	}
 	if req.Tier != "" && !ralphloop.Tier(req.Tier).Valid() {
 		msg := fmt.Sprintf("tier %q is not one of light, worker, strongest", req.Tier)
-		return repairRefusal(&repair.RefusalError{Reason: ReasonBadTier, Message: msg}), nil
+		return repairRefusal(&repair.RefusalError{Reason: wire.ReasonBadTier, Message: msg}), nil
 	}
 	dir := filepath.Dir(epicPath)
 	addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}
@@ -307,7 +301,7 @@ func (s *Server) repairResume(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	if req.Base != "" {
 		if blockers := s.ambiguousBlockers(addr); !slices.Contains(blockers, req.Base) {
 			msg := fmt.Sprintf("base %q is not one of the competing blockers (%s)", req.Base, strings.Join(blockers, ", "))
-			return repairRefusal(&repair.RefusalError{Reason: ReasonBadBase, Message: msg}), nil
+			return repairRefusal(&repair.RefusalError{Reason: wire.ReasonBadBase, Message: msg}), nil
 		}
 	}
 	if s.adoptFirst(dir, addr, t.Path) {
@@ -420,7 +414,7 @@ func staleTicket(epicPath, id string, req wire.RepairRequest) (wire.RepairResult
 }
 
 func staleResumeRefusal() wire.RepairResult {
-	return repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "the pause changed; review the current one"})
+	return repairRefusal(&repair.RefusalError{Reason: wire.ReasonStale, Message: "the pause changed; review the current one"})
 }
 
 // resumeRefused carries a refusal out of the lock-held append callback.
@@ -501,7 +495,7 @@ func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) 
 	case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
 		return false, nil
 	case errors.Is(err, agentrunner.ErrNotReady):
-		return false, &repair.RefusalError{Reason: ReasonAgentNotReady, Message: err.Error()}
+		return false, &repair.RefusalError{Reason: wire.ReasonAgentNotReady, Message: err.Error()}
 	case err != nil:
 		return false, fmt.Errorf("prompt %s: %w", addr, err)
 	}
@@ -561,7 +555,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 			// send the retry prompt.
 			interrupted, err := s.retryBlocked(address)
 			if errors.Is(err, agentrunner.ErrNotReady) {
-				return repairRefusal(&repair.RefusalError{Reason: ReasonAgentNotReady, Message: err.Error()}), true, nil
+				return repairRefusal(&repair.RefusalError{Reason: wire.ReasonAgentNotReady, Message: err.Error()}), true, nil
 			}
 			if err != nil || interrupted {
 				return wire.RepairResult{}, false, err
@@ -572,7 +566,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 			if !selfReported {
 				msg = fmt.Sprintf("%s has a live agent blocked on a request; reply with `gx server agents answer`, or `gx server agents interrupt` if there is nothing to answer", address)
 			}
-			return repairRefusal(&repair.RefusalError{Reason: ReasonAgentWaiting, Message: msg}), true, nil
+			return repairRefusal(&repair.RefusalError{Reason: wire.ReasonAgentWaiting, Message: msg}), true, nil
 		}
 		s.registry.delete(address)
 	}
@@ -628,7 +622,7 @@ func repairWriteAs(web bool, do func(wire.RepairRequest, repairCtx) (wire.Repair
 			rc.investigator = r.Header.Get(InvestigateHeader)
 		}
 		if web && req.State == "" {
-			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "a state token is required; review the current pause"}))
+			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: wire.ReasonStale, Message: "a state token is required; review the current pause"}))
 			return
 		}
 		res, err := do(req, rc)

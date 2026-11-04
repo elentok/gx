@@ -91,7 +91,7 @@ func (s *Server) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 	case !acceptsKeys(st.State):
 		return dir, sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
 	case req.OnlyBlocked && st.State != wire.SessionBlocked:
-		return dir, sessionRefusal(ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", req.ID, st.State)), nil
+		return dir, sessionRefusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", req.ID, st.State)), nil
 	}
 	c, err := nativerunner.DialHolder(dir)
 	if err != nil {
@@ -149,7 +149,7 @@ func (s *Server) answerSessionPermission(req wire.SessionKeysRequest, source str
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
 	case st.State != wire.SessionBlocked || st.Kind != "permission":
 		s.sessionWatches.metaMu.Unlock()
-		return sessionRefusal(ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", req.ID)), nil
+		return sessionRefusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", req.ID)), nil
 	}
 	c, err := nativerunner.DialHolder(dir)
 	// The answer waits for the agent to move on; the status update that ends the
@@ -179,13 +179,13 @@ func (s *Server) answerSessionPermission(req wire.SessionKeysRequest, source str
 func sessionAnswerRefusal(id string, err error) (wire.SessionResult, error) {
 	switch {
 	case errors.Is(err, agentrunner.ErrRequestMismatch):
-		return sessionRefusal(ReasonRequestChanged, err.Error()), nil
+		return sessionRefusal(wire.ReasonRequestChanged, err.Error()), nil
 	case errors.Is(err, nativerunner.ErrNotApprovable), errors.Is(err, agentrunner.ErrInvalidDecision):
-		return sessionRefusal(ReasonNotApprovable, err.Error()), nil
+		return sessionRefusal(wire.ReasonNotApprovable, err.Error()), nil
 	case errors.Is(err, agentrunner.ErrNotDelivered):
 		return sessionRefusal(wire.ReasonKeysNotDelivered, err.Error()), nil
 	case errors.Is(err, agentrunner.ErrNotReady):
-		return sessionRefusal(ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", id)), nil
+		return sessionRefusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", id)), nil
 	case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
 		return sessionRefusal(wire.ReasonSessionNotLive, err.Error()), nil
 	}

@@ -226,8 +226,8 @@ func TestWebReset_NoServerIsServerNotRunning(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	err = runWebReset(context.Background(), apiclient.New(filepath.Join(dir, "none.sock")), false, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
-		t.Errorf("err = %v, want %s", err, server.ReasonServerNotRunning)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
+		t.Errorf("err = %v, want %s", err, wire.ReasonServerNotRunning)
 	}
 }
 
@@ -352,8 +352,8 @@ func TestWebURL_NoServerIsServerNotRunning(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	cl := apiclient.New(filepath.Join(dir, "none.sock"))
 	err = runWebURL(context.Background(), cl, false, false, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
-		t.Errorf("err = %v, want %s", err, server.ReasonServerNotRunning)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
+		t.Errorf("err = %v, want %s", err, wire.ReasonServerNotRunning)
 	}
 }
 

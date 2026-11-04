@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/spf13/cobra"
 )
@@ -321,7 +320,7 @@ func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err error) error {
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.SessionResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.SessionResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

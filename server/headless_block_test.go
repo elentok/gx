@@ -213,8 +213,8 @@ func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
 	h, ticketPath, turn := pauseBlocked(t)
 	req := wire.RepairRequest{Address: answerAddr}
 	res, err := h.Server.ResumeAs(req, server.OriginCLI)
-	if err != nil || !res.Refused || res.Reason != server.ReasonAgentWaiting || !strings.Contains(res.Message, "gx server agents answer") {
-		t.Fatalf("resume live = %+v, %v; want %s naming the answer verb", res, err, server.ReasonAgentWaiting)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentWaiting || !strings.Contains(res.Message, "gx server agents answer") {
+		t.Fatalf("resume live = %+v, %v; want %s naming the answer verb", res, err, wire.ReasonAgentWaiting)
 	}
 	sess, ok, err := turn.Find("epic-a-iter-01")
 	if err != nil || !ok {

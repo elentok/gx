@@ -49,3 +49,21 @@ func (r WebLoginsResult) Refusal() (bool, string, string) { return r.Refused, r.
 func (WebLoginsResult) Refuse(reason, message string) WebLoginsResult {
 	return WebLoginsResult{Refused: true, Reason: reason, Message: message}
 }
+
+// ReasonWebRevokeFailed refuses a CLI revoke when the web logins could not be saved.
+const ReasonWebRevokeFailed = "web-revoke-failed"
+
+// ReasonWebPasswordFailed refuses a CLI password change when it could not be saved.
+const ReasonWebPasswordFailed = "web-password-failed"
+
+// ReasonWebOff refuses a web read when the web listener is off or failed to bind.
+const ReasonWebOff = "web-off"
+
+// ReasonWebNewRootFailed refuses a new-root request when the root could not be made or saved.
+const ReasonWebNewRootFailed = "web-new-root-failed"
+
+// ReasonWebResetFailed refuses a web reset when the account could not be cleared or saved.
+const ReasonWebResetFailed = "web-reset-failed"
+
+// ReasonWebAuthenticatorResetFailed refuses a CLI authenticator reset when it could not be saved.
+const ReasonWebAuthenticatorResetFailed = "web-authenticator-reset-failed"

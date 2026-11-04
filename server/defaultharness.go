@@ -24,14 +24,6 @@ const (
 	DefaultHarnessProject = "project"
 )
 
-// Refusal reasons of a Default harness write.
-const (
-	ReasonBadScope           = "bad-scope"
-	ReasonBadHarness         = "bad-harness"
-	ReasonHarnessNotOnPath   = "harness-not-on-path"
-	ReasonNoGlobalHarnessSet = "global-needs-harness"
-)
-
 const defaultHarnessKey = "default-harness"
 
 func refuseDefaultHarness(reason, msg string) (wire.SetDefaultHarnessResult, error) {
@@ -93,30 +85,30 @@ func (s *Server) defaultHarnessWrite(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
 	if req.Harness != "" && req.Harness != config.HarnessClaude && req.Harness != config.HarnessCodex {
-		return refuseDefaultHarness(ReasonBadHarness, "harness must be "+config.HarnessClaude+" or "+config.HarnessCodex)
+		return refuseDefaultHarness(wire.ReasonBadHarness, "harness must be "+config.HarnessClaude+" or "+config.HarnessCodex)
 	}
 	var path, project string
 	switch req.Scope {
 	case DefaultHarnessGlobal:
 		if req.Harness == "" {
-			return refuseDefaultHarness(ReasonNoGlobalHarnessSet, "the global default needs a harness")
+			return refuseDefaultHarness(wire.ReasonNoGlobalHarnessSet, "the global default needs a harness")
 		}
 		if s.cfg.ConfigPath == "" {
-			return refuseDefaultHarness(ReasonReloadUnavailable, "this server has no config file to write")
+			return refuseDefaultHarness(wire.ReasonReloadUnavailable, "this server has no config file to write")
 		}
 		path = s.cfg.ConfigPath
 	case DefaultHarnessProject:
 		dir, err := s.projectDir(req.Project)
 		if err != nil {
-			return refuseDefaultHarness(ReasonUnknownProject, "no project named "+req.Project)
+			return refuseDefaultHarness(wire.ReasonUnknownProject, "no project named "+req.Project)
 		}
 		path, project = filepath.Join(dir, config.ProjectFileName), req.Project
 	default:
-		return refuseDefaultHarness(ReasonBadScope, "scope must be "+DefaultHarnessGlobal+" or "+DefaultHarnessProject)
+		return refuseDefaultHarness(wire.ReasonBadScope, "scope must be "+DefaultHarnessGlobal+" or "+DefaultHarnessProject)
 	}
 	if req.Harness != "" {
 		if program, missing := s.missingProgram(req.Harness); missing {
-			return refuseDefaultHarness(ReasonHarnessNotOnPath, program+" is not on PATH")
+			return refuseDefaultHarness(wire.ReasonHarnessNotOnPath, program+" is not on PATH")
 		}
 	}
 

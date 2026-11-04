@@ -336,7 +336,7 @@ func (s *Server) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionR
 			return sessionRefusal(wire.ReasonDesignBranchClash, msg), nil
 		}
 		if web && req.State != SessionStateToken(*live) {
-			return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil
+			return sessionRefusal(wire.ReasonStale, "the session changed; review its current state"), nil
 		}
 		if res, err := s.stopSession(wire.SessionRequest{ID: live.ID}); err != nil || (res.Refused && res.Reason != wire.ReasonSessionNotLive) {
 			return res, err
@@ -438,7 +438,7 @@ func (s *Server) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult, 
 	idea := strings.TrimSpace(normalizeAnswer(req.Idea))
 	switch {
 	case idea == "":
-		return sessionRefusal(ReasonEmptyPrompt, "an idea is required"), nil
+		return sessionRefusal(wire.ReasonEmptyPrompt, "an idea is required"), nil
 	case len(idea) > maxSessionPromptBytes:
 		return sessionRefusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
 	}

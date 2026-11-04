@@ -8,24 +8,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// ReasonWebRevokeFailed refuses a CLI revoke when the web logins could not be saved.
-const ReasonWebRevokeFailed = "web-revoke-failed"
-
-// ReasonWebPasswordFailed refuses a CLI password change when it could not be saved.
-const ReasonWebPasswordFailed = "web-password-failed"
-
-// ReasonWebOff refuses a web read when the web listener is off or failed to bind.
-const ReasonWebOff = "web-off"
-
-// ReasonWebNewRootFailed refuses a new-root request when the root could not be made or saved.
-const ReasonWebNewRootFailed = "web-new-root-failed"
-
-// ReasonWebResetFailed refuses a web reset when the account could not be cleared or saved.
-const ReasonWebResetFailed = "web-reset-failed"
-
-// ReasonWebAuthenticatorResetFailed refuses a CLI authenticator reset when it could not be saved.
-const ReasonWebAuthenticatorResetFailed = "web-authenticator-reset-failed"
-
 func (s *Server) webInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, s.webInfoNow())
 }
@@ -39,7 +21,7 @@ func (s *Server) webNewRoot(w http.ResponseWriter, _ *http.Request) {
 	}
 	if err := s.webCerts.newRoot(); err != nil {
 		s.log.Error("new root failed", "err", err)
-		writeJSON(w, wire.WebInfo{Refused: true, Reason: ReasonWebNewRootFailed, Message: "could not make a new root: " + err.Error()})
+		writeJSON(w, wire.WebInfo{Refused: true, Reason: wire.ReasonWebNewRootFailed, Message: "could not make a new root: " + err.Error()})
 		return
 	}
 	info := s.webInfoNow()
@@ -57,7 +39,7 @@ func (s *Server) webReset(w http.ResponseWriter, _ *http.Request) {
 	removed, err := s.webAuth.WebReset()
 	if err != nil {
 		s.log.Error("web reset failed", "err", err)
-		writeJSON(w, wire.WebInfo{Refused: true, Reason: ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
+		writeJSON(w, wire.WebInfo{Refused: true, Reason: wire.ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
 		return
 	}
 	s.dropWebLogins(removed...)
@@ -76,7 +58,7 @@ func (s *Server) webResetAuthenticator(w http.ResponseWriter, _ *http.Request) {
 	removed, _, err := s.webAuth.ClearAuthenticator()
 	if err != nil {
 		s.log.Error("web authenticator reset failed", "err", err)
-		writeJSON(w, wire.WebInfo{Refused: true, Reason: ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
+		writeJSON(w, wire.WebInfo{Refused: true, Reason: wire.ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
 		return
 	}
 	s.dropWebLogins(removed...)
@@ -127,11 +109,11 @@ func (s *Server) webLoginRevokeCLI(w http.ResponseWriter, r *http.Request) {
 	}
 	switch err := s.revokeWebLogin(body.ID, "cli"); {
 	case errors.Is(err, ErrWebLoginNotFound):
-		s.logWebAuth("web login revoke refused", "cli", "", ReasonLoginNotFound)
-		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: ReasonLoginNotFound, Message: "no web login has that id"})
+		s.logWebAuth("web login revoke refused", "cli", "", wire.ReasonLoginNotFound)
+		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonLoginNotFound, Message: "no web login has that id"})
 	case err != nil:
 		s.log.Error("web revoke failed", "err", err)
-		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
+		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
 	default:
 		writeJSON(w, wire.WebLoginsResult{})
 	}
@@ -154,11 +136,11 @@ func (s *Server) webSetPasswordCLI(w http.ResponseWriter, r *http.Request) {
 	removed, err := s.webAuth.SetPassword(body.Password)
 	switch {
 	case errors.Is(err, ErrPasswordTooShort):
-		s.logWebAuth("web password change refused", "cli", "", ReasonPasswordTooShort)
-		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
+		s.logWebAuth("web password change refused", "cli", "", wire.ReasonPasswordTooShort)
+		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
 	case err != nil:
 		s.log.Error("web password change failed", "err", err)
-		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
+		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
 	default:
 		s.logWebAuth("web password changed", "cli", "", "")
 		s.dropWebLogins(removed...)
@@ -167,7 +149,7 @@ func (s *Server) webSetPasswordCLI(w http.ResponseWriter, r *http.Request) {
 }
 
 func webOffInfo() wire.WebInfo {
-	return wire.WebInfo{Refused: true, Reason: ReasonWebOff, Message: "the web UI is off: set server.web.listen in the config and restart the server"}
+	return wire.WebInfo{Refused: true, Reason: wire.ReasonWebOff, Message: "the web UI is off: set server.web.listen in the config and restart the server"}
 }
 
 func (s *Server) webInfoNow() wire.WebInfo {

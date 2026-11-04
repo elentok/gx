@@ -10,3 +10,9 @@ type ReloadResult struct {
 	Reason   string   `json:"reason,omitempty"`
 	Message  string   `json:"message,omitempty"`
 }
+
+const (
+	ReasonInvalidConfig     = "invalid-config"
+	ReasonConfigMissing     = "config-missing"
+	ReasonReloadUnavailable = "reload-unavailable"
+)

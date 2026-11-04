@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -23,7 +22,7 @@ func TestServerQueueAdd_RefusesWhenNoServerRunning(t *testing.T) {
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.QueueAdd(ctx, "proj:epic/01", "")
 		})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) || !strings.Contains(err.Error(), "gx server start") {
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) || !strings.Contains(err.Error(), "gx server start") {
 		t.Errorf("err = %v; want server-not-running with the start hint", err)
 	}
 }

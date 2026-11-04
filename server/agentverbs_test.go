@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -44,13 +43,13 @@ func TestAgentVerbs_ReachTheLiveIteration(t *testing.T) {
 
 	// Nothing is blocked yet, so there is nothing to answer.
 	res, err := h.Client.AgentAnswer(ctx, "proj:epic-a/01", "allow", "")
-	if err != nil || !res.Refused || res.Reason != server.ReasonNotBlocked {
-		t.Fatalf("answer while idle = %+v, %v; want refusal %s", res, err, server.ReasonNotBlocked)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotBlocked {
+		t.Fatalf("answer while idle = %+v, %v; want refusal %s", res, err, wire.ReasonNotBlocked)
 	}
 
 	fake.SetState(label, agentrunner.StateBlocked, "permission to use Bash")
-	if res, err := h.Client.AgentPrompt(ctx, "proj:epic-a/01", "more"); err != nil || !res.Refused || res.Reason != server.ReasonAgentNotReady {
-		t.Errorf("prompt while blocked = %+v, %v; want refusal %s", res, err, server.ReasonAgentNotReady)
+	if res, err := h.Client.AgentPrompt(ctx, "proj:epic-a/01", "more"); err != nil || !res.Refused || res.Reason != wire.ReasonAgentNotReady {
+		t.Errorf("prompt while blocked = %+v, %v; want refusal %s", res, err, wire.ReasonAgentNotReady)
 	}
 	if res, err := h.Client.AgentAnswer(ctx, "proj:epic-a/01", "deny", "no"); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
@@ -72,8 +71,8 @@ func TestAgentVerbs_AnswerInvalidDecisionRefuses(t *testing.T) {
 	fake.SetAnswerErr(label, agentrunner.ErrInvalidDecision)
 
 	res, err := h.Client.AgentAnswer(context.Background(), "proj:epic-a/01", "allow", "")
-	if err != nil || !res.Refused || res.Reason != server.ReasonBadDecision {
-		t.Fatalf("answer = %+v, %v; want refusal %s", res, err, server.ReasonBadDecision)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonBadDecision {
+		t.Fatalf("answer = %+v, %v; want refusal %s", res, err, wire.ReasonBadDecision)
 	}
 	if want := "not a permission prompt; deny cancels it"; res.Message != want {
 		t.Errorf("message = %q, want %q", res.Message, want)
@@ -91,8 +90,8 @@ func TestAgentVerbs_AnswerReasonNotDeliveredRefuses(t *testing.T) {
 	fake.SetAnswerErr(label, fmt.Errorf("%w: denied, but the reason was not delivered: %v", agentrunner.ErrNotDelivered, agentrunner.ErrNotReady))
 
 	res, err := h.Client.AgentAnswer(context.Background(), "proj:epic-a/01", "deny", "use rg")
-	if err != nil || !res.Refused || res.Reason != server.ReasonNotDelivered {
-		t.Fatalf("answer = %+v, %v; want refusal %s", res, err, server.ReasonNotDelivered)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotDelivered {
+		t.Fatalf("answer = %+v, %v; want refusal %s", res, err, wire.ReasonNotDelivered)
 	}
 }
 
@@ -107,8 +106,8 @@ func TestAgentVerbs_InterruptNotReadyRefuses(t *testing.T) {
 
 	fake.SetInterruptErr(label, agentrunner.ErrNotReady)
 	res, err := h.Client.AgentInterrupt(ctx, "proj:epic-a/01")
-	if err != nil || !res.Refused || res.Reason != server.ReasonAgentNotReady {
-		t.Errorf("interrupt = %+v, %v; want refusal %s", res, err, server.ReasonAgentNotReady)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentNotReady {
+		t.Errorf("interrupt = %+v, %v; want refusal %s", res, err, wire.ReasonAgentNotReady)
 	}
 
 	fake.SetInterruptErr(label, errors.New("boom"))
@@ -126,12 +125,12 @@ func TestAgentVerbs_Refusals(t *testing.T) {
 		do     func() (wire.QueueResult, error)
 		reason string
 	}{
-		{"prompt without text", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", " ") }, server.ReasonTextRequired},
-		{"prompt unknown ticket", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/77", "hi") }, server.ReasonUnknownTicket},
-		{"prompt not live", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", "hi") }, server.ReasonIterationNotLive},
-		{"interrupt not live", func() (wire.QueueResult, error) { return h.Client.AgentInterrupt(ctx, "proj:epic-a/01") }, server.ReasonIterationNotLive},
-		{"answer not live", func() (wire.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "allow", "") }, server.ReasonIterationNotLive},
-		{"answer bad decision", func() (wire.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "maybe", "") }, server.ReasonBadDecision},
+		{"prompt without text", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", " ") }, wire.ReasonTextRequired},
+		{"prompt unknown ticket", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/77", "hi") }, wire.ReasonUnknownTicket},
+		{"prompt not live", func() (wire.QueueResult, error) { return h.Client.AgentPrompt(ctx, "proj:epic-a/01", "hi") }, wire.ReasonIterationNotLive},
+		{"interrupt not live", func() (wire.QueueResult, error) { return h.Client.AgentInterrupt(ctx, "proj:epic-a/01") }, wire.ReasonIterationNotLive},
+		{"answer not live", func() (wire.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "allow", "") }, wire.ReasonIterationNotLive},
+		{"answer bad decision", func() (wire.QueueResult, error) { return h.Client.AgentAnswer(ctx, "proj:epic-a/01", "maybe", "") }, wire.ReasonBadDecision},
 	} {
 		res, err := c.do()
 		if err != nil || !res.Refused || res.Reason != c.reason {

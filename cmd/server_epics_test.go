@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 )
 
 func TestPrintEpicDetail_ShowsQueueable(t *testing.T) {
@@ -133,8 +132,8 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 			errPart: "paused (needs-rebase): branch is behind trunk"},
 	}
 	for _, code := range []string{
-		server.ReasonInvalidAddress, server.ReasonUnknownTicket, server.ReasonMapEpic, server.ReasonAlreadyMerged,
-		server.ReasonMergePending, server.ReasonNotComplete, server.ReasonBranchMissing,
+		wire.ReasonInvalidAddress, wire.ReasonUnknownTicket, wire.ReasonMapEpic, wire.ReasonAlreadyMerged,
+		wire.ReasonMergePending, wire.ReasonNotComplete, wire.ReasonBranchMissing,
 	} {
 		cases[code] = struct {
 			res     wire.QueueResult
@@ -161,7 +160,7 @@ func TestServerEpicsMerge_RefusesWhenNoServerRunning(t *testing.T) {
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.EpicMerge(ctx, "proj:epic")
 		})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
-		t.Errorf("err = %v; want %s", err, server.ReasonServerNotRunning)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
+		t.Errorf("err = %v; want %s", err, wire.ReasonServerNotRunning)
 	}
 }

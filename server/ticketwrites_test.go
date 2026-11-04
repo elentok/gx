@@ -175,8 +175,8 @@ func TestPause_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "  ")
-	if err != nil || !res.Refused || res.Reason != server.ReasonReasonRequired {
-		t.Fatalf("pause = %+v, %v; want %s refusal", res, err, server.ReasonReasonRequired)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonReasonRequired {
+		t.Fatalf("pause = %+v, %v; want %s refusal", res, err, wire.ReasonReasonRequired)
 	}
 	data, _ := os.ReadFile(path)
 	if strings.Contains(string(data), "status: paused") {
@@ -216,7 +216,7 @@ func TestPause_RefusesUnknownTicket(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.TicketPause(ctx, "proj:epic-a/99", "why")
-	if err != nil || !res.Refused || res.Reason != server.ReasonUnknownTicket {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonUnknownTicket {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
 }
@@ -235,9 +235,9 @@ func TestPause_RefusesARunningDoneAlreadyPausedOrMapEpicTicket(t *testing.T) {
 	defer cancel()
 
 	for _, c := range []struct{ name, address, reason string }{
-		{"running", "proj:epic-a/01", server.ReasonIterationRunning},
-		{"done", "proj:epic-a/02", server.ReasonTicketDone},
-		{"map epic", "proj:map-epic/01", server.ReasonMapEpic},
+		{"running", "proj:epic-a/01", wire.ReasonIterationRunning},
+		{"done", "proj:epic-a/02", wire.ReasonTicketDone},
+		{"map epic", "proj:map-epic/01", wire.ReasonMapEpic},
 	} {
 		res, err := h.Client.TicketPause(ctx, c.address, "why")
 		if err != nil || !res.Refused || res.Reason != c.reason {
@@ -259,8 +259,8 @@ func TestPause_RefusesAnAlreadyPausedTicket(t *testing.T) {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "second")
-	if err != nil || !res.Refused || res.Reason != server.ReasonAlreadyPaused {
-		t.Fatalf("second pause = %+v, %v; want %s refusal", res, err, server.ReasonAlreadyPaused)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonAlreadyPaused {
+		t.Fatalf("second pause = %+v, %v; want %s refusal", res, err, wire.ReasonAlreadyPaused)
 	}
 }
 
@@ -323,8 +323,8 @@ func TestUnmute_RefusesATicketWithNoMutes(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01")
-	if err != nil || !res.Refused || res.Reason != server.ReasonNotMuted {
-		t.Fatalf("unmute = %+v, %v; want %s refusal", res, err, server.ReasonNotMuted)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotMuted {
+		t.Fatalf("unmute = %+v, %v; want %s refusal", res, err, wire.ReasonNotMuted)
 	}
 	if after, _ := os.ReadFile(path); string(after) != string(before) {
 		t.Errorf("refused unmute changed the ticket:\n%s", after)
@@ -338,7 +338,7 @@ func TestUnmute_RefusesUnknownTicket(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/99")
-	if err != nil || !res.Refused || res.Reason != server.ReasonUnknownTicket {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonUnknownTicket {
 		t.Fatalf("unmute = %+v, %v", res, err)
 	}
 }
@@ -379,8 +379,8 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false)
-	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
-		t.Fatalf("cancel = %+v, %v; want %s refusal", res, err, server.ReasonTicketLive)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
+		t.Fatalf("cancel = %+v, %v; want %s refusal", res, err, wire.ReasonTicketLive)
 	}
 	if data, _ := os.ReadFile(path); strings.Contains(string(data), "status: cancelled") || h.Stops() != 0 {
 		t.Fatalf("refused cancel changed things (stops=%d):\n%s", h.Stops(), data)
@@ -415,8 +415,8 @@ func TestCancel_OldOneOffAddressResolvesTheArchivedTicket(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.TicketCancel(ctx, "proj:one-offs/07", false)
-	if err != nil || !res.Refused || res.Reason != server.ReasonTicketDone {
-		t.Fatalf("cancel = %+v, %v; want %s refusal (not unknown-ticket)", res, err, server.ReasonTicketDone)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketDone {
+		t.Fatalf("cancel = %+v, %v; want %s refusal (not unknown-ticket)", res, err, wire.ReasonTicketDone)
 	}
 }
 

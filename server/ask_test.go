@@ -2,12 +2,12 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -75,11 +75,11 @@ func TestAsk_Refusals(t *testing.T) {
 	tests := []struct {
 		name, body, address, reason string
 	}{
-		{"bad yaml", "## Question\n\nQ?\n\n```gx-question\ntype: [\n```\n\n## Handoff\n\nh\n", "proj:epic-a/01", server.ReasonInvalidQuestion},
-		{"no question", "## Handoff\n\nh\n", "proj:epic-a/01", server.ReasonInvalidQuestion},
-		{"missing handoff", "## Question\n\nQ?\n", "proj:epic-a/01", server.ReasonHandoffRequired},
-		{"empty handoff", "## Question\n\nQ?\n\n## Handoff\n\n", "proj:epic-a/01", server.ReasonHandoffRequired},
-		{"unknown ticket", askBody, "proj:epic-a/99", server.ReasonUnknownTicket},
+		{"bad yaml", "## Question\n\nQ?\n\n```gx-question\ntype: [\n```\n\n## Handoff\n\nh\n", "proj:epic-a/01", wire.ReasonInvalidQuestion},
+		{"no question", "## Handoff\n\nh\n", "proj:epic-a/01", wire.ReasonInvalidQuestion},
+		{"missing handoff", "## Question\n\nQ?\n", "proj:epic-a/01", wire.ReasonHandoffRequired},
+		{"empty handoff", "## Question\n\nQ?\n\n## Handoff\n\n", "proj:epic-a/01", wire.ReasonHandoffRequired},
+		{"unknown ticket", askBody, "proj:epic-a/99", wire.ReasonUnknownTicket},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -110,8 +110,8 @@ func TestAsk_SecondAskRefusesWhileQuestionOpen(t *testing.T) {
 		t.Fatalf("first ask = %+v, %v", res, err)
 	}
 	res, err := h.Client.TicketAsk(ctx, "proj:epic-a/01", askBody)
-	if err != nil || !res.Refused || res.Reason != server.ReasonQuestionOpen {
-		t.Fatalf("second ask = %+v, %v; want refusal %s", res, err, server.ReasonQuestionOpen)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonQuestionOpen {
+		t.Fatalf("second ask = %+v, %v; want refusal %s", res, err, wire.ReasonQuestionOpen)
 	}
 	if n := len(askLog(t, path)); n != 1 {
 		t.Errorf("log has %d events, want 1", n)

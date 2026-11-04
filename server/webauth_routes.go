@@ -14,15 +14,6 @@ import (
 
 // Refusal reasons of the web login routes (ADR 0028).
 const (
-	ReasonWrongCredentials   = "wrong-credentials"
-	ReasonSetupCodeWrong     = "setup-code-wrong"
-	ReasonSetupCodeRequired  = "setup-code-required"
-	ReasonSetupNotPending    = "setup-not-pending"
-	ReasonTOTPMismatch       = "totp-mismatch"
-	ReasonPasswordTooShort   = "password-too-short"
-	ReasonTOTPOff            = "totp-off"
-	ReasonLoginNotFound      = "login-not-found"
-	ReasonLoginNameInvalid   = "login-name-invalid"
 	webLoginCookiePrefix     = "__Host-gx_login"
 	webLoginCookieMaxAge     = int(webLoginIdleLimit / time.Second)
 	webAuthBodyMax           = 4 << 10
@@ -258,19 +249,19 @@ func (s *Server) refuseWebAuth(w http.ResponseWriter, r *http.Request, event str
 	reason := ""
 	switch {
 	case errors.As(err, &wait):
-		s.logWebAuth(event, remoteIP(r), "", ReasonRateLimited)
-		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonRateLimited, WaitSeconds: wait.Seconds})
+		s.logWebAuth(event, remoteIP(r), "", wire.ReasonRateLimited)
+		writeJSON(w, webAuthResult{Refused: true, Reason: wire.ReasonRateLimited, WaitSeconds: wait.Seconds})
 		return
 	case errors.Is(err, ErrTOTPMismatch):
-		reason = ReasonTOTPMismatch
+		reason = wire.ReasonTOTPMismatch
 	case errors.Is(err, ErrWebAuthRefused):
 		reason = wrong
 	case errors.Is(err, ErrSetupNotPending):
-		reason = ReasonSetupNotPending
+		reason = wire.ReasonSetupNotPending
 	case errors.Is(err, ErrPasswordTooShort):
-		reason = ReasonPasswordTooShort
+		reason = wire.ReasonPasswordTooShort
 	case errors.Is(err, ErrSetupCodeRequired):
-		reason = ReasonSetupCodeRequired
+		reason = wire.ReasonSetupCodeRequired
 	default:
 		s.log.Error("web auth failed", "event", event, "ip", remoteIP(r), "err", err)
 		http.Error(w, "web auth unavailable", http.StatusInternalServerError)
@@ -287,7 +278,7 @@ func (s *Server) webSetupStart(w http.ResponseWriter, r *http.Request) {
 	}
 	secret, err := s.webAuth.SetupStart(s.webTOTPOn(), body.Code, remoteIP(r))
 	if err != nil {
-		s.refuseWebAuth(w, r, "web setup refused", err, ReasonSetupCodeWrong)
+		s.refuseWebAuth(w, r, "web setup refused", err, wire.ReasonSetupCodeWrong)
 		return
 	}
 	res := webAuthResult{Secret: secret}
@@ -304,7 +295,7 @@ func (s *Server) webSetupPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.webAuth.SetupPassword(body.Code, body.Password, remoteIP(r)); err != nil {
-		s.refuseWebAuth(w, r, "web setup refused", err, ReasonSetupCodeWrong)
+		s.refuseWebAuth(w, r, "web setup refused", err, wire.ReasonSetupCodeWrong)
 		return
 	}
 	writeJSON(w, webAuthResult{})
@@ -317,7 +308,7 @@ func (s *Server) webSetupFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	cookie, err := s.webAuth.SetupFinish(s.webTOTPOn(), body.Code, body.Password, body.TOTPCode, remoteIP(r), r.UserAgent())
 	if err != nil {
-		s.refuseWebAuth(w, r, "web setup refused", err, ReasonSetupCodeWrong)
+		s.refuseWebAuth(w, r, "web setup refused", err, wire.ReasonSetupCodeWrong)
 		return
 	}
 	s.logWebLogin("web login", remoteIP(r), cookie)
@@ -337,7 +328,7 @@ func (s *Server) webLoginWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		s.refuseWebAuth(w, r, "web login refused", err, ReasonWrongCredentials)
+		s.refuseWebAuth(w, r, "web login refused", err, wire.ReasonWrongCredentials)
 		return
 	}
 	s.logWebLogin("web login", remoteIP(r), cookie)
@@ -352,13 +343,13 @@ func (s *Server) webAddAuthenticator(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.webTOTPOn() {
-		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonTOTPOff})
+		writeJSON(w, webAuthResult{Refused: true, Reason: wire.ReasonTOTPOff})
 		return
 	}
 	ip := remoteIP(r)
 	cookie, err := s.webAuth.AddAuthenticator(body.PendingID, body.TOTPCode, ip, r.UserAgent())
 	if err != nil {
-		s.refuseWebAuth(w, r, "web login refused", err, ReasonWrongCredentials)
+		s.refuseWebAuth(w, r, "web login refused", err, wire.ReasonWrongCredentials)
 		return
 	}
 	s.logWebLogin("web login", ip, cookie)
@@ -381,9 +372,9 @@ func (s *Server) refuseWebLogin(w http.ResponseWriter, r *http.Request, event st
 	reason := ""
 	switch {
 	case errors.Is(err, ErrWebLoginNotFound):
-		reason = ReasonLoginNotFound
+		reason = wire.ReasonLoginNotFound
 	case errors.Is(err, ErrWebLoginNameInvalid):
-		reason = ReasonLoginNameInvalid
+		reason = wire.ReasonLoginNameInvalid
 	default:
 		s.log.Error("web auth failed", "event", event, "ip", remoteIP(r), "err", err)
 		http.Error(w, "web auth unavailable", http.StatusInternalServerError)
@@ -442,7 +433,7 @@ func (s *Server) webChangePassword(w http.ResponseWriter, r *http.Request) {
 	name := s.webLoginName(this)
 	removed, err := s.webAuth.ChangePassword(s.webTOTPOn(), body.Password, body.TOTPCode, body.NewPassword, this, remoteIP(r))
 	if err != nil {
-		s.refuseWebAuth(w, r, "web password change refused", err, ReasonWrongCredentials)
+		s.refuseWebAuth(w, r, "web password change refused", err, wire.ReasonWrongCredentials)
 		return
 	}
 	s.logWebAuth("web password changed", remoteIP(r), name, "")
@@ -458,12 +449,12 @@ func (s *Server) webAuthenticatorBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.webTOTPOn() {
-		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonTOTPOff})
+		writeJSON(w, webAuthResult{Refused: true, Reason: wire.ReasonTOTPOff})
 		return
 	}
 	secret, err := s.webAuth.AuthenticatorResetBegin(true, body.Password, body.TOTPCode, remoteIP(r))
 	if err != nil {
-		s.refuseWebAuth(w, r, "web authenticator reset refused", err, ReasonWrongCredentials)
+		s.refuseWebAuth(w, r, "web authenticator reset refused", err, wire.ReasonWrongCredentials)
 		return
 	}
 	writeJSON(w, webAuthResult{Secret: secret, URI: totpURI(secret, totpAccountLabel)})
@@ -477,14 +468,14 @@ func (s *Server) webAuthenticatorFinish(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if !s.webTOTPOn() {
-		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonTOTPOff})
+		writeJSON(w, webAuthResult{Refused: true, Reason: wire.ReasonTOTPOff})
 		return
 	}
 	this := webLoginIDFrom(r.Context())
 	name := s.webLoginName(this)
 	removed, err := s.webAuth.AuthenticatorResetFinish(body.TOTPCode, this, remoteIP(r))
 	if err != nil {
-		s.refuseWebAuth(w, r, "web authenticator reset refused", err, ReasonTOTPMismatch)
+		s.refuseWebAuth(w, r, "web authenticator reset refused", err, wire.ReasonTOTPMismatch)
 		return
 	}
 	s.logWebAuth("web authenticator reset", remoteIP(r), name, "")

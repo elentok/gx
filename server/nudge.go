@@ -16,13 +16,6 @@ import (
 // EventTicketNudged is emitted after text was typed into an iteration's pane.
 const EventTicketNudged = "ticket-nudged"
 
-// Refusal reasons of the nudge verb.
-const (
-	ReasonTextRequired     = "text-required"
-	ReasonIterationNotLive = "iteration-not-live"
-	ReasonRateLimited      = "rate-limited"
-)
-
 const (
 	nudgeLimit  = 3
 	nudgeWindow = time.Minute
@@ -62,13 +55,13 @@ func (l *nudgeLimiter) allow(address string, now time.Time) bool {
 func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
-		return refusal(ReasonTextRequired, "text to type into the pane is required"), nil
+		return refusal(wire.ReasonTextRequired, "text to type into the pane is required"), nil
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		address := ref.addr.String()
 		if r, err := s.iterationRunner(ref.addr); err == nil {
 			if reason, held := s.herdrHolds(r); held {
-				return refusal(ReasonHerdrUnavailable, reason), nil
+				return refusal(wire.ReasonHerdrUnavailable, reason), nil
 			}
 		}
 		if res, refused := s.budgetRefusal(); refused {
@@ -76,15 +69,15 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		it, live := s.liveIteration(address)
 		if !live {
-			return refusal(ReasonIterationNotLive, "no live iteration for "+address), nil
+			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+address), nil
 		}
 		now := time.Now()
 		if !s.nudges.allow(address, now) {
-			return refusal(ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", nudgeLimit, address, nudgeWindow)), nil
+			return refusal(wire.ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", nudgeLimit, address, nudgeWindow)), nil
 		}
 		if err := it.runner.Prompt(it.session, text); err != nil {
 			if errors.Is(err, agentrunner.ErrNotReady) {
-				return refusal(ReasonAgentNotReady, err.Error()), nil
+				return refusal(wire.ReasonAgentNotReady, err.Error()), nil
 			}
 			return wire.QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
 		}

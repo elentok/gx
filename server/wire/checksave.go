@@ -24,3 +24,14 @@ type SaveChecksResult struct {
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+// Refusal reasons of a check save.
+const (
+	ReasonInvalidChecks = "invalid-checks"
+	ReasonBadTarget     = "bad-target"
+	ReasonVCSNone       = "vcs-none"
+	ReasonNoTrunk       = "no-trunk-checkout"
+	ReasonWrongBranch   = "wrong-branch"
+	ReasonDirtyChecks   = "dirty-checks"
+	ReasonCommitFailed  = "commit-failed"
+)

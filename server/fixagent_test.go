@@ -243,7 +243,7 @@ func TestFixAgent_WebNeedsTheStateToken(t *testing.T) {
 		return webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base))
 	}
 	for _, state := range []string{"", "5:repair", "0:answer"} {
-		if code, out := post(state); code != http.StatusOK || reasonOf(t, out) != server.ReasonStale {
+		if code, out := post(state); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
 			t.Errorf("state %q = %d %s, want stale", state, code, out)
 		}
 	}

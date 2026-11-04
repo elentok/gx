@@ -1,13 +1,12 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/elentok/gx/server"
 )
 
 const (
@@ -97,8 +96,8 @@ func TestQueueAdd_DraftImplEpicRefusesEpicDraftAndWritesNothing(t *testing.T) {
 		writeEpicFiles(t, store, "feature-impl", "---\nstatus: draft\n---\n", open)
 	})
 	res, err := h.Client.QueueAdd(t.Context(), "proj:feature-impl", "")
-	if err != nil || !res.Refused || res.Reason != server.ReasonEpicDraft {
-		t.Fatalf("add = %+v, %v; want refusal %s", res, err, server.ReasonEpicDraft)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonEpicDraft {
+		t.Fatalf("add = %+v, %v; want refusal %s", res, err, wire.ReasonEpicDraft)
 	}
 	if got := queuedAtLine(epicTicketMD(t, storeDir, "feature-impl")); got != "" {
 		t.Errorf("refused add stamped %q", got)

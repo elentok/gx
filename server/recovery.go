@@ -270,13 +270,6 @@ func recoveredCount(projectDir, epic string) int {
 	return n
 }
 
-// Refusal reasons of approve.
-const (
-	ReasonNoProposal    = "no-proposal"
-	ReasonProposalStale = "proposal-stale"
-	ReasonRemedyFailed  = "remedy-failed"
-)
-
 const proposedRemedyHeading = "Proposed Remedy"
 
 // propose writes what a high-authority remedy would do as an event and as a
@@ -331,14 +324,14 @@ func (s *Server) ticketApprove(req wire.QueueRequest) (wire.QueueResult, error) 
 			}
 		}
 		if proposal == nil {
-			return refusal(ReasonNoProposal, "no recovery proposal for "+f.Address), nil
+			return refusal(wire.ReasonNoProposal, "no recovery proposal for "+f.Address), nil
 		}
 		fingerprint, err := fileFingerprint(ref.ticket.Path)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
 		if fingerprint != proposal.Fingerprint {
-			return refusal(ReasonProposalStale, f.Address+" changed since the proposal was made"), nil
+			return refusal(wire.ReasonProposalStale, f.Address+" changed since the proposal was made"), nil
 		}
 		calls, err := recovery.ParseCalls(proposal.Text)
 		if err != nil {
@@ -351,7 +344,7 @@ func (s *Server) ticketApprove(req wire.QueueRequest) (wire.QueueResult, error) 
 		}
 		s.recordRecovery(ref, events.RecoveryApplied, f, proposal.Reason, outcome)
 		if outcome != "ok" {
-			return refusal(ReasonRemedyFailed, outcome), nil
+			return refusal(wire.ReasonRemedyFailed, outcome), nil
 		}
 		// Retired into Comments rather than deleted, so the ticket keeps what ran.
 		err = schema.UpdateTicketWithBody(ref.ticket.Path, func(_ *schema.Ticket, b *string) {
@@ -389,17 +382,17 @@ const investigateRetryEntry = "investigate-retry"
 func (s *Server) investigateRetryFailure(qc queueCtx, ref ticketRef) (recovery.Failure, wire.QueueResult, bool) {
 	inv, ok, err := s.findTicket(qc.investigator)
 	if err != nil || !ok || inv.ticket.Type != string(schema.TypeInvestigate) {
-		return recovery.Failure{}, refusal(ReasonInvestigateStop, qc.investigator+" is not an investigate ticket"), false
+		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, qc.investigator+" is not an investigate ticket"), false
 	}
 	t, err := schema.ParseTicket(ref.ticket.Path)
 	if err != nil {
-		return recovery.Failure{}, refusal(ReasonInvestigateStop, "cannot read "+ref.addr.String()+": "+err.Error()), false
+		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, "cannot read "+ref.addr.String()+": "+err.Error()), false
 	}
 	reason := t.EffectiveReason()
 	row, hasRow := reason.Row()
 	if t.PausedClass() == "" || !hasRow || !slices.Contains(row.Verbs, schema.VerbRetry) ||
 		(t.PausedClass() != schema.PauseClassRepair && reason != schema.PauseZeroCommit) {
-		return recovery.Failure{}, refusal(ReasonInvestigateStop, ref.addr.String()+" is "+t.Describe()+"; only a person retries it"), false
+		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, ref.addr.String()+" is "+t.Describe()+"; only a person retries it"), false
 	}
 	f := recovery.Failure{Address: ref.addr.String(), Type: events.Paused, Kind: events.Kind(reason)}
 	// The fork is the investigation itself, not a remedy the agent's one retry
@@ -411,7 +404,7 @@ func (s *Server) investigateRetryFailure(qc queueCtx, ref ticketRef) (recovery.F
 		}
 	}
 	if why := guardRailStop(log, f); why != "" {
-		return recovery.Failure{}, refusal(ReasonInvestigateStop, why), false
+		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, why), false
 	}
 	return f, wire.QueueResult{}, true
 }
@@ -597,7 +590,7 @@ func (s *Server) recoveryWait(req wire.QueueRequest, _ recovery.Call) (wire.Queu
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		it, live := s.liveIteration(ref.addr.String())
 		if !live {
-			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
 		timeout := s.cfg.CompactRewaitTimeout
 		if timeout == 0 {
@@ -609,12 +602,6 @@ func (s *Server) recoveryWait(req wire.QueueRequest, _ recovery.Call) (wire.Queu
 		return wire.QueueResult{}, nil
 	})
 }
-
-// Refusal reasons of release-gate and finish.
-const (
-	ReasonAgentBusy      = "agent-busy"
-	ReasonFinishTimedOut = "finish-timed-out"
-)
 
 // agentState is the run's agent state, read fresh through the run's runner.
 // idle is true for an agent that is not working: idle, or done.
@@ -638,14 +625,14 @@ func (s *Server) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call) (wi
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		run, ok := s.registry.tracked(ref.addr.String())
 		if !ok {
-			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
 		state, idle, err := s.agentState(ref.addr)
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("read agent of %s: %w", ref.addr, err)
 		}
 		if !idle {
-			return refusal(ReasonAgentBusy, ref.addr.String()+" agent is "+string(state)), nil
+			return refusal(wire.ReasonAgentBusy, ref.addr.String()+" agent is "+string(state)), nil
 		}
 		_, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, s.worktreeDir(ref.addr.Project))
 		ahead, err := git.CommitsAhead(worktree, run.Base, "HEAD")
@@ -699,16 +686,10 @@ var finishPoll = time.Second
 // needs it.
 func (s *Server) recoveryFinish(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
 	if !s.registry.waitGone(req.Address, finishWaitTimeout, finishPoll) {
-		return refusal(ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
+		return refusal(wire.ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
 	}
 	return wire.QueueResult{}, nil
 }
-
-// Refusal reasons of set-parent.
-const (
-	ReasonParentChanged = "parent-changed"
-	ReasonInvalidParent = "invalid-parent"
-)
 
 // recoverySetParent re-checks and writes under the epic lock `gx tickets set
 // --parent` takes, so a re-parent between the scan and the write is seen, not
@@ -723,15 +704,15 @@ func (s *Server) recoverySetParent(req wire.QueueRequest, c recovery.Call) (wire
 		defer unlock()
 		i := slices.IndexFunc(epic.Tickets, func(t tickets.Ticket) bool { return t.Identifier == ref.addr.ID })
 		if i < 0 {
-			return refusal(ReasonUnknownTicket, "no ticket "+address), nil
+			return refusal(wire.ReasonUnknownTicket, "no ticket "+address), nil
 		}
 		target := &epic.Tickets[i]
 		if _, defect := recovery.ParentDefect(target.Identifier, target.Parent); !defect {
-			return refusal(ReasonParentChanged, address+" has a parent its ID allows"), nil
+			return refusal(wire.ReasonParentChanged, address+" has a parent its ID allows"), nil
 		}
 		target.Parent = &parent
 		if err := epic.ValidateParentGraph(); err != nil {
-			return refusal(ReasonInvalidParent, err.Error()), nil
+			return refusal(wire.ReasonInvalidParent, err.Error()), nil
 		}
 		err = schema.UpdateTicket(target.Path, func(t *schema.Ticket) {
 			id := schema.TicketID(parent)

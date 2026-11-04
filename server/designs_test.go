@@ -595,7 +595,7 @@ func TestWebDesigns_NewNeedsAFreshToken(t *testing.T) {
 		"no token":  `{"epic":"proj:map","new":true}`,
 		"old token": fmt.Sprintf(`{"epic":"proj:map","new":true,"state":%q}`, live.ID+":starting:1"),
 	} {
-		if code, out := post(body); code != http.StatusOK || reasonOf(t, out) != server.ReasonStale {
+		if code, out := post(body); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
 			t.Errorf("new with %s = %d %s, want stale", name, code, out)
 		}
 	}

@@ -182,8 +182,8 @@ func TestResume_InvalidTierIsRefusedAndChangesNothing(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 
 	res, err := h.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: "proj:epic-a/01", Tier: "huge"})
-	if err != nil || !res.Refused || res.Reason != server.ReasonBadTier {
-		t.Fatalf("resume = %+v, %v; want refusal %s", res, err, server.ReasonBadTier)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonBadTier {
+		t.Fatalf("resume = %+v, %v; want refusal %s", res, err, wire.ReasonBadTier)
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusPaused || tk.TierOverride != "" {
 		t.Errorf("ticket = %+v, %v; want still paused with no override", tk, err)

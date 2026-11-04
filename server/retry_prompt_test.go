@@ -1,13 +1,13 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -78,8 +78,8 @@ func TestRetry_HeadlessBlockedPauseStillRefuses(t *testing.T) {
 	t.Parallel()
 	h, _, turn := pauseBlocked(t)
 	res, err := h.Client.TicketRetry(t.Context(), answerAddr, false)
-	if err != nil || !res.Refused || res.Reason != server.ReasonAgentWaiting {
-		t.Fatalf("retry = %+v, %v; want %s", res, err, server.ReasonAgentWaiting)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentWaiting {
+		t.Fatalf("retry = %+v, %v; want %s", res, err, wire.ReasonAgentWaiting)
 	}
 	if got := turn.Interrupts("epic-a-iter-01"); got != 0 {
 		t.Errorf("interrupts = %d; want 0", got)

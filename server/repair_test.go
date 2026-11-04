@@ -116,8 +116,8 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 		{"start-over without a reason", "start-over", wire.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
 		{"resume an open ticket via alias", "resume", wire.RepairRequest{Address: addr}, repair.ReasonNotPaused},
 		{"resume an open ticket", "resume", wire.RepairRequest{Address: addr}, repair.ReasonNotPaused},
-		{"bad address", "resume", wire.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
-		{"unknown project", "start-over", wire.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
+		{"bad address", "resume", wire.RepairRequest{Address: "nonsense"}, wire.ReasonInvalidAddress},
+		{"unknown project", "start-over", wire.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, wire.ReasonUnknownTicket},
 	}
 	for _, c := range cases {
 		res, err := h.Client.Repair(ctx, c.verb, c.req)

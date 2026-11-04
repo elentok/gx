@@ -42,8 +42,8 @@ func TestRecommend_StoredRecommendationShowsInDetail(t *testing.T) {
 func TestRecommend_VerbOutsideActionsIsRefused(t *testing.T) {
 	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
-	if res := recommendAs(t, h, investigateAddr, "proj:epic-a/01", wire.ActionApprove); !res.Refused || res.Reason != server.ReasonVerbNotOffered {
-		t.Errorf("recommend = %+v, want %s refusal", res, server.ReasonVerbNotOffered)
+	if res := recommendAs(t, h, investigateAddr, "proj:epic-a/01", wire.ActionApprove); !res.Refused || res.Reason != wire.ReasonVerbNotOffered {
+		t.Errorf("recommend = %+v, want %s refusal", res, wire.ReasonVerbNotOffered)
 	}
 	d, err := h.Client.Detail(t.Context(), "proj:epic-a/01")
 	if err != nil {
@@ -80,8 +80,8 @@ func TestRecommend_DeadlockInvestigationWritesNone(t *testing.T) {
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
-	if res := recommendAs(t, h, "proj:epic-a/03", "proj:epic-a/01", wire.ActionRetry); !res.Refused || res.Reason != server.ReasonInvestigateStop {
-		t.Errorf("recommend = %+v, want %s refusal", res, server.ReasonInvestigateStop)
+	if res := recommendAs(t, h, "proj:epic-a/03", "proj:epic-a/01", wire.ActionRetry); !res.Refused || res.Reason != wire.ReasonInvestigateStop {
+		t.Errorf("recommend = %+v, want %s refusal", res, wire.ReasonInvestigateStop)
 	}
 	d, err := h.Client.Detail(t.Context(), "proj:epic-a/01")
 	if err != nil {

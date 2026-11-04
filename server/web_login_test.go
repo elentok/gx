@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"strings"
@@ -200,14 +201,14 @@ func TestWebLogin_WrongPasswordAndWrongCodeGiveTheSameReason(t *testing.T) {
 	l.advance(31 * time.Second)
 	_, wrongPassword := l.post(t, "/v1/web/auth/login", `{"password":"not the password","totp_code":"`+l.totp(t, secret)+`"}`, nil)
 	_, wrongCode := l.post(t, "/v1/web/auth/login", `{"password":"`+loginTestPassword+`","totp_code":"000000"}`, nil)
-	if got := reasonOf(t, wrongPassword); got != server.ReasonWrongCredentials {
-		t.Errorf("wrong password reason %q, want %q", got, server.ReasonWrongCredentials)
+	if got := reasonOf(t, wrongPassword); got != wire.ReasonWrongCredentials {
+		t.Errorf("wrong password reason %q, want %q", got, wire.ReasonWrongCredentials)
 	}
-	if got := reasonOf(t, wrongCode); got != server.ReasonWrongCredentials {
-		t.Errorf("wrong code reason %q, want %q", got, server.ReasonWrongCredentials)
+	if got := reasonOf(t, wrongCode); got != wire.ReasonWrongCredentials {
+		t.Errorf("wrong code reason %q, want %q", got, wire.ReasonWrongCredentials)
 	}
 	resp, body := l.post(t, "/v1/web/auth/login", `{"password":"`+loginTestPassword+`","totp_code":"`+l.totp(t, secret)+`"}`, nil)
-	if reasonOf(t, body) != "" && reasonOf(t, body) != server.ReasonRateLimited {
+	if reasonOf(t, body) != "" && reasonOf(t, body) != wire.ReasonRateLimited {
 		t.Fatalf("good login body %q", body)
 	}
 	if reasonOf(t, body) == "" && len(resp.Cookies()) != 1 {
@@ -219,8 +220,8 @@ func TestWebLogin_SetupRefusalsNameTheirReason(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
 	info, _ := l.h.Client.WebInfo(context.Background())
-	if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); reasonOf(t, body) != server.ReasonSetupCodeWrong {
-		t.Errorf("wrong Setup code: body %q, want %q", body, server.ReasonSetupCodeWrong)
+	if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); reasonOf(t, body) != wire.ReasonSetupCodeWrong {
+		t.Errorf("wrong Setup code: body %q, want %q", body, wire.ReasonSetupCodeWrong)
 	}
 	_, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"`+info.SetupCode+`"}`, nil)
 	var start struct{ Secret string }
@@ -229,11 +230,11 @@ func TestWebLogin_SetupRefusalsNameTheirReason(t *testing.T) {
 		_, b := l.post(t, "/v1/web/auth/setup-finish", `{"code":"`+info.SetupCode+`","password":"`+password+`","totp_code":"`+code+`"}`, nil)
 		return reasonOf(t, b)
 	}
-	if got := finish("short", l.totp(t, start.Secret)); got != server.ReasonPasswordTooShort {
-		t.Errorf("short password reason %q, want %q", got, server.ReasonPasswordTooShort)
+	if got := finish("short", l.totp(t, start.Secret)); got != wire.ReasonPasswordTooShort {
+		t.Errorf("short password reason %q, want %q", got, wire.ReasonPasswordTooShort)
 	}
-	if got := finish(loginTestPassword, "000000"); got != server.ReasonTOTPMismatch {
-		t.Errorf("wrong TOTP code reason %q, want %q", got, server.ReasonTOTPMismatch)
+	if got := finish(loginTestPassword, "000000"); got != wire.ReasonTOTPMismatch {
+		t.Errorf("wrong TOTP code reason %q, want %q", got, wire.ReasonTOTPMismatch)
 	}
 }
 

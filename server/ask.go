@@ -9,13 +9,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Refusal reasons of the ask verb.
-const (
-	ReasonInvalidQuestion = "invalid-question"
-	ReasonHandoffRequired = "handoff-required"
-	ReasonQuestionOpen    = "question-open"
-)
-
 const askAuthorAgent = "agent"
 
 // ticketAsk records an agent's question: it appends one pause.question to the
@@ -25,10 +18,10 @@ const askAuthorAgent = "agent"
 func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 	q, err := tickets.ParseQuestionStrict(req.Text)
 	if err != nil {
-		return refusal(ReasonInvalidQuestion, err.Error()), nil
+		return refusal(wire.ReasonInvalidQuestion, err.Error()), nil
 	}
 	if strings.TrimSpace(q.Handoff) == "" {
-		return refusal(ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
+		return refusal(wire.ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		ev := tickets.LogEvent{
@@ -46,7 +39,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 			return nil
 		})
 		if err == errQuestionOpen {
-			return refusal(ReasonQuestionOpen, ref.addr.String()+" already has an open question"), nil
+			return refusal(wire.ReasonQuestionOpen, ref.addr.String()+" already has an open question"), nil
 		}
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("ask %s: %w", ref.addr, err)

@@ -237,7 +237,7 @@ func TestInvestigateRetry_EarlierClaudeRunChecksClaudeGate(t *testing.T) {
 
 	t.Run("claude gate holds it", func(t *testing.T) {
 		t.Parallel()
-		if res := startRetryEnv(t, "implement", true, withUsageSample(t, claudeGated)); !res.Refused || res.Reason != server.ReasonUsageLimit || !strings.Contains(res.Message, "Claude usage: 98% of the 5-hour limit") {
+		if res := startRetryEnv(t, "implement", true, withUsageSample(t, claudeGated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Claude usage: 98% of the 5-hour limit") {
 			t.Errorf("retry = %+v, want a Claude usage-limit refusal", res)
 		}
 	})
@@ -279,7 +279,7 @@ func TestRelaunch_FollowsCodexDefaultGateAndRunner(t *testing.T) {
 		})
 		t.Run(typ+" gate", func(t *testing.T) {
 			t.Parallel()
-			if res := startRetryEnv(t, typ, false, withCodexUsageSample(t, gated)); !res.Refused || res.Reason != server.ReasonUsageLimit || !strings.Contains(res.Message, "Codex usage: 98% of the weekly limit") {
+			if res := startRetryEnv(t, typ, false, withCodexUsageSample(t, gated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Codex usage: 98% of the weekly limit") {
 				t.Errorf("retry = %+v, want a Codex usage-limit refusal", res)
 			}
 		})

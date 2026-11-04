@@ -2,12 +2,11 @@ package server_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
-
-	"github.com/elentok/gx/server"
 )
 
 // webPostJSON sends a POST with a JSON body. A nil cookie sends none; host, when
@@ -83,11 +82,11 @@ func TestWeb_AnswerAndResumeNeedAStateToken(t *testing.T) {
 	cookie := login(t, h.StateDir, base)
 	for _, path := range []string{"/v1/tickets/answer", "/v1/tickets/resume", "/v1/tickets/unpark"} {
 		code, body := webPostJSON(t, base+path, `{"address":"nope/none/01"}`, cookie, "", jsonPost(base))
-		if code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+		if code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
 			t.Errorf("%s without token = %d %s, want a stale refusal", path, code, body)
 		}
 		code, body = webPostJSON(t, base+path, `{"address":"nope/none/01","state":"1:paused"}`, cookie, "", jsonPost(base))
-		if code != http.StatusOK || reasonOf(t, body) == server.ReasonStale {
+		if code != http.StatusOK || reasonOf(t, body) == wire.ReasonStale {
 			t.Errorf("%s with token = %d %s, want the handler to run", path, code, body)
 		}
 	}

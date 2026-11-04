@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -44,7 +43,7 @@ func reportLimits(ctx context.Context, dial func() (*apiclient.Client, error), p
 	res, err = cl.ReportLimits(ctx, report)
 	switch {
 	case apiclient.IsNotRunning(err):
-		return wire.LimitsReportResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, true, nil
+		return wire.LimitsReportResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, true, nil
 	case err != nil:
 		return res, true, fmt.Errorf("server write failed: %w", err)
 	}

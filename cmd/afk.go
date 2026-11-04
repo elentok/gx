@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -46,7 +45,7 @@ func runAFK(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool
 	res, err := cl.SetAFK(ctx, on)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.AFKResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.AFKResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

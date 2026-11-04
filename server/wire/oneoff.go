@@ -37,3 +37,15 @@ type OneOffResult struct {
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+// Refusal reasons of a one-off submit.
+const (
+	ReasonEmptyPrompt   = "empty-prompt"
+	ReasonUnknownProj   = "unknown-project"
+	ReasonOptionRemoved = "option-removed"
+	ReasonBadBlocker    = "invalid-blocker"
+	ReasonBadWindow     = "invalid-context-window"
+	ReasonBadFile       = "invalid-file"
+	ReasonDuplicateLive = "duplicate-live"
+	ReasonBadType       = "invalid-type"
+)

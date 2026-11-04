@@ -123,7 +123,7 @@ func (s *Server) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAgen
 		return s.startFixProjectAgent(req.Project)
 	}
 	if web && req.State == "" {
-		return fixAgentRefusal(ReasonStale, "a state token is required; review the current pause"), nil
+		return fixAgentRefusal(wire.ReasonStale, "a state token is required; review the current pause"), nil
 	}
 	ref, ok, err := s.findTicket(req.Address)
 	if err != nil {
@@ -151,7 +151,7 @@ func (s *Server) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAgen
 		return fixAgentRefusal(wire.ReasonFixNotRepair, fmt.Sprintf("%s is not paused or in error", addr)), nil
 	}
 	if web && req.State != repairState(readLogLenient(t), t.PausedClass()) {
-		return fixAgentRefusal(ReasonStale, "the pause changed; review the current one"), nil
+		return fixAgentRefusal(wire.ReasonStale, "the pause changed; review the current one"), nil
 	}
 	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, ref.addr.Project)
 	if checkout == "" {

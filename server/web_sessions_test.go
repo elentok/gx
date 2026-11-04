@@ -75,8 +75,8 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 	fresh := sessionToken(ctx, t, h, design)
 
 	for _, tc := range []struct{ name, id, state, want string }{
-		{"no token", design, "", server.ReasonStale},
-		{"old token", design, design + ":starting:1", server.ReasonStale},
+		{"no token", design, "", wire.ReasonStale},
+		{"old token", design, design + ":starting:1", wire.ReasonStale},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "stop", tc.id, tc.state)
 		if code != http.StatusOK || reasonOf(t, body) != tc.want {
@@ -92,7 +92,7 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 	}
 	waitForSession(ctx, t, h, evs, design, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
-	if code, body := webSessionWrite(t, base, cookie, "resume", design, fresh); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+	if code, body := webSessionWrite(t, base, cookie, "resume", design, fresh); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("restore with the pre-stop token = %d %s, want stale", code, body)
 	}
 	if code, body := webSessionWrite(t, base, cookie, "resume", design, sessionToken(ctx, t, h, design)); code != http.StatusOK || reasonOf(t, body) != "" {
@@ -114,7 +114,7 @@ func TestWebSessions_StopThenRemoveAPlainSession(t *testing.T) {
 	}
 	waitForSession(ctx, t, h, evs, plain, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("remove with the pre-stop token = %d %s, want stale", code, body)
 	}
 	if code, body := webSessionWrite(t, base, cookie, "remove", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != "" {

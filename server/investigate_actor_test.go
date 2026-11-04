@@ -67,16 +67,16 @@ func TestInvestigateRetry_LogsRecoveryAppliedNotHumanRelaunch(t *testing.T) {
 func TestInvestigateRetry_BlockedPaneIsRefused(t *testing.T) {
 	t.Parallel()
 	h := startInvestigateEnv(t, events.BlockedPane)
-	if res := retryAs(t, h, investigateAddr); !res.Refused || res.Reason != server.ReasonInvestigateStop {
-		t.Errorf("retry = %+v, want %s refusal", res, server.ReasonInvestigateStop)
+	if res := retryAs(t, h, investigateAddr); !res.Refused || res.Reason != wire.ReasonInvestigateStop {
+		t.Errorf("retry = %+v, want %s refusal", res, wire.ReasonInvestigateStop)
 	}
 }
 
 func TestInvestigateRetry_NotAnInvestigateTicketIsRefused(t *testing.T) {
 	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
-	if res := retryAs(t, h, "proj:epic-a/01"); !res.Refused || res.Reason != server.ReasonInvestigateStop {
-		t.Errorf("retry = %+v, want %s refusal", res, server.ReasonInvestigateStop)
+	if res := retryAs(t, h, "proj:epic-a/01"); !res.Refused || res.Reason != wire.ReasonInvestigateStop {
+		t.Errorf("retry = %+v, want %s refusal", res, wire.ReasonInvestigateStop)
 	}
 }
 
@@ -87,8 +87,8 @@ func TestInvestigateRetry_PastTheGuardRailIsRefused(t *testing.T) {
 	if err := ralphloop.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", prior); err != nil {
 		t.Fatal(err)
 	}
-	if res := retryAs(t, h, investigateAddr); !res.Refused || res.Reason != server.ReasonInvestigateStop {
-		t.Errorf("retry = %+v, want %s refusal", res, server.ReasonInvestigateStop)
+	if res := retryAs(t, h, investigateAddr); !res.Refused || res.Reason != wire.ReasonInvestigateStop {
+		t.Errorf("retry = %+v, want %s refusal", res, wire.ReasonInvestigateStop)
 	}
 	if got := ofType(runLog(t, h), events.RecoveryApplied); len(got) != 1 {
 		t.Errorf("recovery-applied = %+v, want only the earlier one", got)

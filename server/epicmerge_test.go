@@ -60,16 +60,16 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 	before := ticketFiles(t, f.store)
 
 	for addr, want := range map[string]string{
-		"proj:" + schedEpic + "/01":  server.ReasonInvalidAddress,
-		"::":                         server.ReasonInvalidAddress,
-		"proj:nope":                  server.ReasonUnknownTicket,
-		"nope:" + schedEpic:          server.ReasonUnknownTicket,
-		"proj:map-epic":              server.ReasonMapEpic,
-		"proj:" + server.OneOffsEpic: server.ReasonOneOffsEpic,
-		"proj:merged":                server.ReasonAlreadyMerged,
-		"proj:pending":               server.ReasonMergePending,
-		"proj:open":                  server.ReasonNotComplete,
-		"proj:" + schedEpic:          server.ReasonBranchMissing,
+		"proj:" + schedEpic + "/01":  wire.ReasonInvalidAddress,
+		"::":                         wire.ReasonInvalidAddress,
+		"proj:nope":                  wire.ReasonUnknownTicket,
+		"nope:" + schedEpic:          wire.ReasonUnknownTicket,
+		"proj:map-epic":              wire.ReasonMapEpic,
+		"proj:" + server.OneOffsEpic: wire.ReasonOneOffsEpic,
+		"proj:merged":                wire.ReasonAlreadyMerged,
+		"proj:pending":               wire.ReasonMergePending,
+		"proj:open":                  wire.ReasonNotComplete,
+		"proj:" + schedEpic:          wire.ReasonBranchMissing,
 	} {
 		res, err := f.h.Client.EpicMerge(context.Background(), addr)
 		if err != nil || !res.Refused || res.Reason != want {

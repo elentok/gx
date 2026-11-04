@@ -31,7 +31,7 @@ func (s *Server) checkDesignWrite(req wire.SessionRequest) (wire.SessionResult, 
 		return sessionRefusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if req.State != SessionStateToken(meta.info()) {
-		return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil
+		return sessionRefusal(wire.ReasonStale, "the session changed; review its current state"), nil
 	}
 	return wire.SessionResult{}, nil
 }
@@ -54,7 +54,7 @@ func (s *Server) checkAgentWrite(req wire.SessionRequest) (wire.SessionResult, e
 		return sessionRefusal(wire.ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent; ralph-loop drives it", req.ID)), nil
 	}
 	if req.State != SessionStateToken(meta.info()) {
-		return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil
+		return sessionRefusal(wire.ReasonStale, "the session changed; review its current state"), nil
 	}
 	return wire.SessionResult{}, nil
 }

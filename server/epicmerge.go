@@ -84,12 +84,12 @@ func shownEpicState(shown wire.EpicState, e tickets.Epic) wire.EpicState {
 func (s *Server) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 	project, epic, ok := tickets.ParseEpicAddress(req.Address)
 	if !ok {
-		return mergeEpicRef{}, refuseMerge(ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
+		return mergeEpicRef{}, refuseMerge(wire.ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
 	}
 	root := rootRef{Project: project, Epic: epic}
 	dir, repo, err := s.projectOf(project)
 	if err != nil {
-		return mergeEpicRef{}, refuseMerge(ReasonUnknownTicket, "no epic "+root.String())
+		return mergeEpicRef{}, refuseMerge(wire.ReasonUnknownTicket, "no epic "+root.String())
 	}
 	epics, err := tickets.LoadResolved(project, dir)
 	if err != nil {
@@ -97,20 +97,20 @@ func (s *Server) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 	}
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == epic })
 	if i < 0 || len(epics[i].Tickets) == 0 {
-		return mergeEpicRef{}, refuseMerge(ReasonUnknownTicket, "no epic "+root.String())
+		return mergeEpicRef{}, refuseMerge(wire.ReasonUnknownTicket, "no epic "+root.String())
 	}
 	e := epics[i]
 	if e.IsMap {
-		return mergeEpicRef{}, refuseMerge(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand")
+		return mergeEpicRef{}, refuseMerge(wire.ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand")
 	}
 	if !isMergeableEpic(root) {
-		return mergeEpicRef{}, refuseMerge(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
+		return mergeEpicRef{}, refuseMerge(wire.ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
 	}
 	// The web page sends the state it shows; the socket route sends none.
 	if shown := wire.EpicState(req.State); shown != "" {
 		now := epicStateFor(root, e, s.registry.startedAtOf)
 		if shown = shownEpicState(shown, e); shown != now {
-			return mergeEpicRef{}, refuseMerge(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
+			return mergeEpicRef{}, refuseMerge(wire.ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
 		}
 	}
 	return mergeEpicRef{root: root, dir: dir, repo: repo, epics: epics, epic: e}, nil
@@ -288,14 +288,14 @@ func epicMergeRefusal(root rootRef, e tickets.Epic, repo string) *wire.QueueResu
 	var r wire.QueueResult
 	switch {
 	case !tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero():
-		r = refusal(ReasonAlreadyMerged, root.String()+" is already merged")
+		r = refusal(wire.ReasonAlreadyMerged, root.String()+" is already merged")
 	case slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return pendingMerge(e, t) }):
-		r = refusal(ReasonMergePending, root.String()+" already has a merge ticket pending")
+		r = refusal(wire.ReasonMergePending, root.String()+" already has a merge ticket pending")
 	case !ralphloop.AllDone(e):
-		r = refusal(ReasonNotComplete, root.String()+" has tickets that are not done")
+		r = refusal(wire.ReasonNotComplete, root.String()+" has tickets that are not done")
 	// A commitless epic never makes a branch: mergeEpic stamps it merged.
 	case !allCommitless(e) && !git.RefExists(repo, "refs/heads/"+root.Epic):
-		r = refusal(ReasonBranchMissing, "no branch "+root.Epic+" in "+repo)
+		r = refusal(wire.ReasonBranchMissing, "no branch "+root.Epic+" in "+repo)
 	default:
 		return nil
 	}

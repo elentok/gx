@@ -39,3 +39,11 @@ type SetDefaultHarnessResult struct {
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+// Refusal reasons of a Default harness write.
+const (
+	ReasonBadScope           = "bad-scope"
+	ReasonBadHarness         = "bad-harness"
+	ReasonHarnessNotOnPath   = "harness-not-on-path"
+	ReasonNoGlobalHarnessSet = "global-needs-harness"
+)

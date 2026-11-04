@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -83,7 +82,7 @@ func runServerOneOff(ctx context.Context, dirs config.Dirs, cl *apiclient.Client
 	res, err := cl.OneOff(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.OneOffResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.OneOffResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -124,11 +123,11 @@ func decideOneOff(res wire.OneOffResult, wait bool) oneOffDecision {
 	switch {
 	case !res.Refused:
 		return oneOffDecision{follow: wait, printAddress: true}
-	case res.Reason == server.ReasonServerNotRunning:
+	case res.Reason == wire.ReasonServerNotRunning:
 		return oneOffDecision{err: &ExitError{Code: exitServerNotRunning}, notice: refusal}
-	case res.Reason == server.ReasonDuplicateLive && wait:
+	case res.Reason == wire.ReasonDuplicateLive && wait:
 		return oneOffDecision{follow: true, printAddress: true, notice: "duplicate: waiting on " + res.Address}
-	case res.Reason == server.ReasonDuplicateLive:
+	case res.Reason == wire.ReasonDuplicateLive:
 		return oneOffDecision{err: &ExitError{Code: exitDuplicateLive}, notice: refusal, printAddress: true}
 	default:
 		return oneOffDecision{err: errors.New(refusal)}

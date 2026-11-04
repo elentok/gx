@@ -8,9 +8,6 @@ import (
 	"github.com/elentok/gx/nativerunner"
 )
 
-// ReasonSessionNotWorking refuses an interrupt of a session with no turn to end.
-const ReasonSessionNotWorking = "session-not-working"
-
 // interruptSession ends a Working session's current turn and keeps the session,
 // with the Ctrl+C the TUI uses. The holder protocol has no interrupt verb: its
 // keys reach claude as typed.
@@ -22,7 +19,7 @@ func (s *Server) interruptSession(req wire.SessionRequest) (wire.SessionResult, 
 		return res, err
 	}
 	if st := meta.info().Status; st.State != wire.SessionWorking {
-		return sessionRefusal(ReasonSessionNotWorking, fmt.Sprintf("session %s is %s, not working", req.ID, st.State)), nil
+		return sessionRefusal(wire.ReasonSessionNotWorking, fmt.Sprintf("session %s is %s, not working", req.ID, st.State)), nil
 	}
 	c, err := nativerunner.DialHolder(dir)
 	if err == nil {

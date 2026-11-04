@@ -85,7 +85,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 			return *refusal, nil
 		}
 		if text == "" {
-			return sessionRefusal(ReasonEmptyPrompt, "text to type is required"), nil
+			return sessionRefusal(wire.ReasonEmptyPrompt, "text to type is required"), nil
 		}
 	}
 	if source == promptSourceWeb {
@@ -94,7 +94,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 			return wire.SessionResult{}, err
 		}
 		if last != req.LastMessage {
-			return sessionRefusal(ReasonStale, "the conversation moved; review it first"), nil
+			return sessionRefusal(wire.ReasonStale, "the conversation moved; review it first"), nil
 		}
 	}
 	if st := meta.info().Status; !st.Promptable() {

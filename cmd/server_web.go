@@ -15,7 +15,6 @@ import (
 	"rsc.io/qr"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -48,7 +47,7 @@ func runWebCall[T Refusable[T]](ctx context.Context, call func(context.Context) 
 	res, err := call(ctx)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = res.Refuse(server.ReasonServerNotRunning, "no server is running; start it with `gx server start`")
+		res = res.Refuse(wire.ReasonServerNotRunning, "no server is running; start it with `gx server start`")
 	case err != nil:
 		return fmt.Errorf("%s: %w", failure, err)
 	}

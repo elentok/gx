@@ -10,3 +10,7 @@ type LimitsReportResult struct {
 	Reason   string       `json:"reason,omitempty"`
 	Message  string       `json:"message,omitempty"`
 }
+
+// ReasonInvalidReport refuses a limits report with a non-finite or
+// out-of-range value.
+const ReasonInvalidReport = "invalid-report"

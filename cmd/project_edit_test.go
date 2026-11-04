@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -27,7 +26,7 @@ func TestProjectRemove_RefusesWhileQueuedKeepsTickets(t *testing.T) {
 	if q, err := h.Client.QueueAdd(ctx, "proj:epic/01", ""); err != nil || q.Refused {
 		t.Fatalf("queue add: %+v, %v", q, err)
 	}
-	if err := remove(); err == nil || !strings.Contains(err.Error(), server.ReasonProjectBusy) {
+	if err := remove(); err == nil || !strings.Contains(err.Error(), wire.ReasonProjectBusy) {
 		t.Fatalf("remove while queued: err = %v", err)
 	}
 	if _, err := h.Client.QueueRemove(ctx, "proj:epic/01"); err != nil {
@@ -110,7 +109,7 @@ func TestProjectSetPath_ChangesResolvedPath(t *testing.T) {
 		t.Errorf("project.json = %+v, %v; want repo %s", pf, err, b)
 	}
 	err = runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.SetProjectPath, wire.ProjectRequest{Name: "nope", Path: b})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonUnknownProject) {
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonUnknownProject) {
 		t.Errorf("unknown project: err = %v", err)
 	}
 }

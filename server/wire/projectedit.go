@@ -14,3 +14,10 @@ type ProjectResult struct {
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+// Refusal reasons of a project remove or set-path.
+const (
+	ReasonUnknownProject = "unknown-project"
+	ReasonProjectBusy    = "project-busy"
+	ReasonPathTaken      = "path-taken"
+)

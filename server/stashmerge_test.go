@@ -69,7 +69,7 @@ func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
 
 	code, body := f.webStashMerge(t, string(wire.EpicStateRunning))
 
-	if code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+	if code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("stale state = %d %s, want the stale refusal", code, body)
 	}
 	if got := f.git(t, "rev-parse", "main"); got != main {
@@ -201,7 +201,7 @@ func TestStashMerge_RefusesAnEpicThatIsNotPausedOnADirtyTrunk(t *testing.T) {
 
 	res, err := f.h.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
 
-	if err != nil || res.Reason != server.ReasonNotDirtyTrunk {
+	if err != nil || res.Reason != wire.ReasonNotDirtyTrunk {
 		t.Errorf("stash-merge = %+v, %v, want the not-dirty-trunk refusal", res, err)
 	}
 }

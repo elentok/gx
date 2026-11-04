@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -515,7 +516,7 @@ func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Reason != server.ReasonProposalStale {
+	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Reason != wire.ReasonProposalStale {
 		t.Errorf("approve = %+v, %v, want proposal-stale", res, err)
 	}
 	if proposedRemedy(t, path) == "" {
@@ -1107,8 +1108,8 @@ func TestRecovery_R10LeavesABusyAgentsGateAndEscalates(t *testing.T) {
 	for _, runner := range []string{"herdr", "headless"} {
 		t.Run(runner, func(t *testing.T) {
 			got := raiseGateHeld(t, runner, agentrunner.StateWorking, commitInWorktree(t))
-			if got.applied.Reason != "R10" || !strings.Contains(got.applied.Outcome, server.ReasonAgentBusy) {
-				t.Errorf("applied = %+v, want a failed R10 naming %s", got.applied, server.ReasonAgentBusy)
+			if got.applied.Reason != "R10" || !strings.Contains(got.applied.Outcome, wire.ReasonAgentBusy) {
+				t.Errorf("applied = %+v, want a failed R10 naming %s", got.applied, wire.ReasonAgentBusy)
 			}
 			if got.escalated == nil || got.escalated.Reason != "R10" {
 				t.Errorf("escalated = %v, want R10", got.escalated)
@@ -1293,7 +1294,7 @@ func TestRecovery_SetParentRefusesAParentChangedSinceTheScan(t *testing.T) {
 	waitFor(t, func() bool { return len(parentDefectEvents(h)[events.RecoveryApplied]) > 0 })
 	h.Server.Rescan()
 	applied := parentDefectEvents(h)[events.RecoveryApplied]
-	if len(applied) != 1 || !strings.Contains(applied[0].Outcome, server.ReasonParentChanged) {
+	if len(applied) != 1 || !strings.Contains(applied[0].Outcome, wire.ReasonParentChanged) {
 		t.Errorf("recovery-applied = %+v, want one parent-changed refusal", applied)
 	}
 	if got := ticketParent(t, h, "01a2"); got != "01a1" {

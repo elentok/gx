@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -81,7 +80,7 @@ func TestDefaultHarness_GlobalCreatesMissingFileAndRefusesEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
 
-	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "global"}); !res.Refused || res.Reason != server.ReasonNoGlobalHarnessSet {
+	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "global"}); !res.Refused || res.Reason != wire.ReasonNoGlobalHarnessSet {
 		t.Errorf("empty global = %+v, want refusal", res)
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -126,7 +125,7 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 	if _, ok := got["agents"]; ok || got["vcs"] != "git" || got["checks"] == nil {
 		t.Errorf("project.json after remove = %v", got)
 	}
-	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "nope", Harness: "codex"}); !res.Refused || res.Reason != server.ReasonUnknownProject {
+	if res := setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "nope", Harness: "codex"}); !res.Refused || res.Reason != wire.ReasonUnknownProject {
 		t.Errorf("unknown project = %+v", res)
 	}
 }
@@ -151,7 +150,7 @@ func TestDefaultHarness_RefusesHarnessNotOnPath(t *testing.T) {
 		{Scope: "project", Project: "proj", Harness: "codex"},
 	} {
 		res := setHarness(t, h, req)
-		if !res.Refused || res.Reason != server.ReasonHarnessNotOnPath || !strings.Contains(res.Message, "codex is not on PATH") {
+		if !res.Refused || res.Reason != wire.ReasonHarnessNotOnPath || !strings.Contains(res.Message, "codex is not on PATH") {
 			t.Errorf("%+v = %+v", req, res)
 		}
 	}

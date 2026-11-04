@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -108,12 +109,12 @@ func TestWebTOTP_OffTakesThePasswordAlone(t *testing.T) {
 	if a.Refused || a.AuthenticatorNeeded || len(resp.Cookies()) != 1 {
 		t.Errorf("login with a stray code: %+v, %d cookies; want it ignored", a, len(resp.Cookies()))
 	}
-	if _, a := w.login(t, `{"password":"wrong password here"}`); a.Reason != server.ReasonWrongCredentials {
-		t.Errorf("wrong password reason %q, want %q", a.Reason, server.ReasonWrongCredentials)
+	if _, a := w.login(t, `{"password":"wrong password here"}`); a.Reason != wire.ReasonWrongCredentials {
+		t.Errorf("wrong password reason %q, want %q", a.Reason, wire.ReasonWrongCredentials)
 	}
 	resp, body := w.post(t, "/v1/web/auth/add-authenticator", `{"pending_id":"x","totp_code":"000000"}`, nil)
-	if reasonOf(t, body) != server.ReasonTOTPOff || len(resp.Cookies()) != 0 {
-		t.Errorf("add-authenticator with TOTP off: %q, %d cookies; want %q", body, len(resp.Cookies()), server.ReasonTOTPOff)
+	if reasonOf(t, body) != wire.ReasonTOTPOff || len(resp.Cookies()) != 0 {
+		t.Errorf("add-authenticator with TOTP off: %q, %d cookies; want %q", body, len(resp.Cookies()), wire.ReasonTOTPOff)
 	}
 }
 
@@ -187,7 +188,7 @@ func TestWebTOTP_WrongAddAuthenticatorCodesLockTheIP(t *testing.T) {
 	for range 5 {
 		w.post(t, "/v1/web/auth/add-authenticator", `{"pending_id":"`+a.PendingID+`","totp_code":"000000"}`, nil)
 	}
-	if _, got := w.login(t, `{"password":"`+loginTestPassword+`"}`); got.Reason != server.ReasonRateLimited {
-		t.Errorf("login after 5 wrong codes: %+v, want %q", got, server.ReasonRateLimited)
+	if _, got := w.login(t, `{"password":"`+loginTestPassword+`"}`); got.Reason != wire.ReasonRateLimited {
+		t.Errorf("login after 5 wrong codes: %+v, want %q", got, wire.ReasonRateLimited)
 	}
 }

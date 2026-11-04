@@ -9,7 +9,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -192,7 +191,7 @@ func TestDesignsOpenNew_Refusals(t *testing.T) {
 		"path slug":    {"a/b", "idea", wire.ReasonSessionBadRequest},
 		"epic exists":  {"plain", "idea", wire.ReasonDesignEpicExists},
 		"map exists":   {"map", "idea", wire.ReasonDesignEpicExists},
-		"empty idea":   {"fresh-idea", " \n", server.ReasonEmptyPrompt},
+		"empty idea":   {"fresh-idea", " \n", wire.ReasonEmptyPrompt},
 		"idea too big": {"fresh-idea", strings.Repeat("a", 32*1024+1), wire.ReasonPromptTextTooLong},
 	} {
 		if res := f.openNew(t, tc.slug, tc.idea); !res.Refused || res.Reason != tc.want || res.EpicCreated {

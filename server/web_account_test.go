@@ -2,13 +2,12 @@ package server_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/elentok/gx/server"
 )
 
 type accountLogin struct {
@@ -87,8 +86,8 @@ func TestWebAccount_RenameIsStoredAndLogged(t *testing.T) {
 		t.Errorf("rename log lines %v, want one with the IP and the new name", lines)
 	}
 	_, body = a.post(t, "/v1/web/logins/rename", `{"id":"`+id+`","name":""}`, a.first)
-	if got := reasonOf(t, body); got != server.ReasonLoginNameInvalid {
-		t.Errorf("empty name reason %q, want %q", got, server.ReasonLoginNameInvalid)
+	if got := reasonOf(t, body); got != wire.ReasonLoginNameInvalid {
+		t.Errorf("empty name reason %q, want %q", got, wire.ReasonLoginNameInvalid)
 	}
 }
 
@@ -161,8 +160,8 @@ func TestWebAccount_UnknownIDIsRefusedWithItsReason(t *testing.T) {
 	a := startAccountWeb(t)
 	for _, path := range []string{"/v1/web/logins/rename", "/v1/web/logins/revoke"} {
 		_, body := a.post(t, path, `{"id":"nope","name":"x"}`, a.first)
-		if got := reasonOf(t, body); got != server.ReasonLoginNotFound {
-			t.Errorf("%s: reason %q, want %q", path, got, server.ReasonLoginNotFound)
+		if got := reasonOf(t, body); got != wire.ReasonLoginNotFound {
+			t.Errorf("%s: reason %q, want %q", path, got, wire.ReasonLoginNotFound)
 		}
 	}
 	if got := len(a.logins(t, a.first)); got != 2 {
@@ -239,14 +238,14 @@ func TestWebAccount_ChangePasswordRefusesBadChecksAndSignsOutTheOthers(t *testin
 	t.Parallel()
 	a := startAccountWeb(t)
 	secret := a.secret
-	if got := a.changePassword(t, a.first, "not the password", a.codeNow(t, secret), accountNewPassword); got != server.ReasonWrongCredentials {
-		t.Errorf("wrong password reason %q, want %q", got, server.ReasonWrongCredentials)
+	if got := a.changePassword(t, a.first, "not the password", a.codeNow(t, secret), accountNewPassword); got != wire.ReasonWrongCredentials {
+		t.Errorf("wrong password reason %q, want %q", got, wire.ReasonWrongCredentials)
 	}
-	if got := a.changePassword(t, a.first, loginTestPassword, "000000", accountNewPassword); got != server.ReasonWrongCredentials {
-		t.Errorf("wrong code reason %q, want %q", got, server.ReasonWrongCredentials)
+	if got := a.changePassword(t, a.first, loginTestPassword, "000000", accountNewPassword); got != wire.ReasonWrongCredentials {
+		t.Errorf("wrong code reason %q, want %q", got, wire.ReasonWrongCredentials)
 	}
-	if got := a.changePassword(t, a.first, loginTestPassword, a.codeNow(t, secret), "short"); got != server.ReasonPasswordTooShort {
-		t.Errorf("short password reason %q, want %q", got, server.ReasonPasswordTooShort)
+	if got := a.changePassword(t, a.first, loginTestPassword, a.codeNow(t, secret), "short"); got != wire.ReasonPasswordTooShort {
+		t.Errorf("short password reason %q, want %q", got, wire.ReasonPasswordTooShort)
 	}
 	if got := len(a.logins(t, a.first)); got != 2 {
 		t.Fatalf("%d web logins after the refusals, want 2", got)
@@ -277,10 +276,10 @@ func TestWebAccount_FiveWrongPasswordsLockTheIPForLogin(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		a.changePassword(t, a.first, "not the password", "000000", accountNewPassword)
 	}
-	if got := a.changePassword(t, a.first, loginTestPassword, a.codeNow(t, a.secret), accountNewPassword); got != server.ReasonRateLimited {
-		t.Errorf("6th change password reason %q, want %q", got, server.ReasonRateLimited)
+	if got := a.changePassword(t, a.first, loginTestPassword, a.codeNow(t, a.secret), accountNewPassword); got != wire.ReasonRateLimited {
+		t.Errorf("6th change password reason %q, want %q", got, wire.ReasonRateLimited)
 	}
-	if res, _ := a.attemptLogin(t, loginTestPassword, a.totp(t, a.secret)); res.Reason != server.ReasonRateLimited {
+	if res, _ := a.attemptLogin(t, loginTestPassword, a.totp(t, a.secret)); res.Reason != wire.ReasonRateLimited {
 		t.Errorf("login after the lock: %+v, want rate limited", res)
 	}
 }
@@ -300,16 +299,16 @@ func (a *accountWeb) resetFinish(t *testing.T, cookie *http.Cookie, code string)
 func TestWebAccount_AbandonedResetKeepsTheOldSecretAndFinishSwapsIt(t *testing.T) {
 	t.Parallel()
 	a := startAccountWeb(t)
-	if got := a.resetBegin(t, a.first, "not the password", a.codeNow(t, a.secret)); got.Reason != server.ReasonWrongCredentials {
-		t.Errorf("begin with a wrong password reason %q, want %q", got.Reason, server.ReasonWrongCredentials)
+	if got := a.resetBegin(t, a.first, "not the password", a.codeNow(t, a.secret)); got.Reason != wire.ReasonWrongCredentials {
+		t.Errorf("begin with a wrong password reason %q, want %q", got.Reason, wire.ReasonWrongCredentials)
 	}
 	begun := a.resetBegin(t, a.first, loginTestPassword, a.codeNow(t, a.secret))
 	if begun.Reason != "" || begun.Secret == "" || !strings.HasPrefix(begun.URI, "otpauth://") {
 		t.Fatalf("begin = %+v, want a secret and an otpauth URI", begun)
 	}
 	a.goodLogin(t, a.secret) // abandoned: the old secret still works
-	if got := a.resetFinish(t, a.first, "000000"); got.Reason != server.ReasonTOTPMismatch {
-		t.Errorf("finish with a wrong code reason %q, want %q", got.Reason, server.ReasonTOTPMismatch)
+	if got := a.resetFinish(t, a.first, "000000"); got.Reason != wire.ReasonTOTPMismatch {
+		t.Errorf("finish with a wrong code reason %q, want %q", got.Reason, wire.ReasonTOTPMismatch)
 	}
 	ended := a.streamOf(t, a.second)
 	if got := a.resetFinish(t, a.first, a.codeNow(t, begun.Secret)); got.Reason != "" {
@@ -337,8 +336,8 @@ func TestWebAccount_TOTPOffNeedsNoCodeAndRefusesTheResetRoutes(t *testing.T) {
 	}
 	for _, path := range []string{"/v1/web/account/authenticator/begin", "/v1/web/account/authenticator/finish"} {
 		_, body := a.post(t, path, `{"password":"`+accountNewPassword+`"}`, a.first)
-		if got := reasonOf(t, body); got != server.ReasonTOTPOff {
-			t.Errorf("%s reason %q, want %q", path, got, server.ReasonTOTPOff)
+		if got := reasonOf(t, body); got != wire.ReasonTOTPOff {
+			t.Errorf("%s reason %q, want %q", path, got, wire.ReasonTOTPOff)
 		}
 	}
 }

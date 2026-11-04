@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/check"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
@@ -118,7 +117,7 @@ func TestSaveChecks_VCSNoneOnlyProjectJSON(t *testing.T) {
 	t.Parallel()
 	h, _ := checksFixture(t, `,"vcs":"none"`)
 	res := saveChecks(t, h.Client, "repo", `{}`)
-	if !res.Refused || res.Reason != server.ReasonVCSNone || res.Message == "" {
+	if !res.Refused || res.Reason != wire.ReasonVCSNone || res.Message == "" {
 		t.Errorf("repo result = %+v", res)
 	}
 	if res := saveChecks(t, h.Client, "project.json", `{}`); res.Refused {
@@ -133,7 +132,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 		writeNested(t, repo, check.RepoConfigPath, `{"lint":false}`)
 		before := gitIn(t, repo, "rev-parse", "HEAD")
 		res := saveChecks(t, h.Client, "repo", `{"test":false}`)
-		if !res.Refused || res.Reason != server.ReasonDirtyChecks || res.Message == "" {
+		if !res.Refused || res.Reason != wire.ReasonDirtyChecks || res.Message == "" {
 			t.Fatalf("result = %+v", res)
 		}
 		if gitIn(t, repo, "rev-parse", "HEAD") != before {
@@ -149,7 +148,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 		gitIn(t, repo, "checkout", "-q", "-b", "side")
 		before := gitIn(t, repo, "rev-parse", trunk)
 		res := saveChecks(t, h.Client, "repo", `{}`)
-		if !res.Refused || res.Reason != server.ReasonWrongBranch {
+		if !res.Refused || res.Reason != wire.ReasonWrongBranch {
 			t.Fatalf("result = %+v", res)
 		}
 		if gitIn(t, repo, "rev-parse", trunk) != before {
@@ -167,7 +166,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 		}
 		before := gitIn(t, repo, "rev-parse", "HEAD")
 		res := saveChecks(t, h.Client, "repo", `{}`)
-		if !res.Refused || res.Reason != server.ReasonCommitFailed {
+		if !res.Refused || res.Reason != wire.ReasonCommitFailed {
 			t.Fatalf("result = %+v", res)
 		}
 		if gitIn(t, repo, "rev-parse", "HEAD") != before {
@@ -196,7 +195,7 @@ func TestSaveChecks_InvalidConfigIsRefused(t *testing.T) {
 	before := gitIn(t, repo, "rev-parse", "HEAD")
 	for _, target := range []string{"repo", "project.json"} {
 		res := saveChecks(t, h.Client, target, `{"deploy":"x"}`)
-		if !res.Refused || res.Reason != server.ReasonInvalidChecks || !strings.Contains(res.Message, "deploy") {
+		if !res.Refused || res.Reason != wire.ReasonInvalidChecks || !strings.Contains(res.Message, "deploy") {
 			t.Errorf("%s: result = %+v", target, res)
 		}
 	}

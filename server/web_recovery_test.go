@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"os/exec"
@@ -96,10 +97,10 @@ func TestWebRecoveryVerbs_OldTokenIsStaleCurrentRuns(t *testing.T) {
 				}
 				return out
 			}
-			if got := reasonOf(t, post("99:repair")); got != server.ReasonStale {
-				t.Errorf("old token: reason = %q, want %q", got, server.ReasonStale)
+			if got := reasonOf(t, post("99:repair")); got != wire.ReasonStale {
+				t.Errorf("old token: reason = %q, want %q", got, wire.ReasonStale)
 			}
-			if got := reasonOf(t, post(state)); got == server.ReasonStale {
+			if got := reasonOf(t, post(state)); got == wire.ReasonStale {
 				t.Errorf("current token was refused as stale")
 			}
 		})

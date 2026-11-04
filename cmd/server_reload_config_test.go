@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -40,8 +41,8 @@ func TestReloadConfig_PrintsChangesWarningsAndRefusals(t *testing.T) {
 
 	servertest.WriteConfig(t, path, store, map[string]any{"evolve": "sometimes"})
 	err := runReloadConfig(ctx, h.Client, &out, false)
-	if err == nil || !strings.Contains(err.Error(), server.ReasonInvalidConfig) {
-		t.Errorf("invalid = %v, want a %s error", err, server.ReasonInvalidConfig)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonInvalidConfig) {
+		t.Errorf("invalid = %v, want a %s error", err, wire.ReasonInvalidConfig)
 	}
 }
 

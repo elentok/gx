@@ -109,18 +109,18 @@ func TestConfigReload_RefusesInvalidAndMissingFiles(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"execution-queue": {"max-agents": 5}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if res := reload(t, h); res.Reason != server.ReasonInvalidConfig || res.Message == "" {
-		t.Errorf("bad json = %+v, want %s with the parse error", res, server.ReasonInvalidConfig)
+	if res := reload(t, h); res.Reason != wire.ReasonInvalidConfig || res.Message == "" {
+		t.Errorf("bad json = %+v, want %s with the parse error", res, wire.ReasonInvalidConfig)
 	}
 	servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 5}, "agent-runner": "tmux"})
-	if res := reload(t, h); res.Reason != server.ReasonInvalidConfig {
-		t.Errorf("bad agent-runner = %+v, want %s", res, server.ReasonInvalidConfig)
+	if res := reload(t, h); res.Reason != wire.ReasonInvalidConfig {
+		t.Errorf("bad agent-runner = %+v, want %s", res, wire.ReasonInvalidConfig)
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if res := reload(t, h); res.Reason != server.ReasonConfigMissing {
-		t.Errorf("missing = %+v, want %s", res, server.ReasonConfigMissing)
+	if res := reload(t, h); res.Reason != wire.ReasonConfigMissing {
+		t.Errorf("missing = %+v, want %s", res, wire.ReasonConfigMissing)
 	}
 
 	servertest.WriteConfig(t, path, store, maxAgents(3))
@@ -279,7 +279,7 @@ func TestConfigReload_NotifierFailureDoesNotFailReload(t *testing.T) {
 func TestConfigReload_UnavailableWithoutConfigPath(t *testing.T) {
 	t.Parallel()
 	h := servertest.Start(t)
-	if res := reload(t, h); res.Reason != server.ReasonReloadUnavailable {
-		t.Errorf("reload = %+v, want %s", res, server.ReasonReloadUnavailable)
+	if res := reload(t, h); res.Reason != wire.ReasonReloadUnavailable {
+		t.Errorf("reload = %+v, want %s", res, wire.ReasonReloadUnavailable)
 	}
 }

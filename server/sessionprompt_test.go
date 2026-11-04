@@ -87,7 +87,7 @@ func TestSessionPrompt_Refusals(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	for name, tc := range map[string]struct{ text, want string }{
-		"empty":    {"  \n", server.ReasonEmptyPrompt},
+		"empty":    {"  \n", wire.ReasonEmptyPrompt},
 		"bang":     {" !ls", wire.ReasonPromptPrefixNotAllowed},
 		"too long": {strings.Repeat("a", 32*1024+1), wire.ReasonPromptTextTooLong},
 	} {
@@ -261,7 +261,7 @@ func TestWebSessionPrompt_StaleWhenTheTranscriptMoved(t *testing.T) {
 		body := fmt.Sprintf(`{"id":%q,"text":"SQLite","last_message":%q}`, f.id, last)
 		return webPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", jsonPost(f.base))
 	}
-	if code, out := post("a1"); code != http.StatusOK || reasonOf(t, out) != server.ReasonStale {
+	if code, out := post("a1"); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
 		t.Errorf("old message id = %d %s, want stale", code, out)
 	}
 	if code, out := post("a2"); code != http.StatusOK || reasonOf(t, out) != "" {
@@ -316,7 +316,7 @@ func TestWebSessionPrompt_StaleContinueIsRefused(t *testing.T) {
 		body := fmt.Sprintf(`{"id":%q,"continue":true,"last_message":%q}`, f.id, last)
 		return webPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", jsonPost(f.base))
 	}
-	if code, out := post("a1"); code != http.StatusOK || reasonOf(t, out) != server.ReasonStale {
+	if code, out := post("a1"); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
 		t.Errorf("old message id = %d %s, want stale", code, out)
 	}
 	if got := submitted(t, f.conv); got != "" {

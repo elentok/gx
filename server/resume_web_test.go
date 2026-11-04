@@ -92,8 +92,8 @@ func TestWebResume_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
 
 	for name, state := range map[string]string{"missing": "", "stale": "99:paused"} {
 		res := webResume(t, e.h, wire.RepairRequest{State: state})
-		if !res.Refused || res.Reason != server.ReasonStale {
-			t.Fatalf("%s: resume = %+v; want refusal %s", name, res, server.ReasonStale)
+		if !res.Refused || res.Reason != wire.ReasonStale {
+			t.Fatalf("%s: resume = %+v; want refusal %s", name, res, wire.ReasonStale)
 		}
 	}
 	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.PausedClass() != schema.PauseClassAnswer {
@@ -259,8 +259,8 @@ func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	req := wire.RepairRequest{Address: "proj:epic-a/03", State: state, Base: "99"}
 
 	res, err := h.Server.ResumeAsWeb(req)
-	if err != nil || !res.Refused || res.Reason != server.ReasonBadBase {
-		t.Fatalf("resume with a foreign base = %+v, %v; want refusal %s", res, err, server.ReasonBadBase)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonBadBase {
+		t.Fatalf("resume with a foreign base = %+v, %v; want refusal %s", res, err, wire.ReasonBadBase)
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.PausedClass() != schema.PauseClassAnswer || tk.Base != "" {
 		t.Fatalf("ticket = %+v, %v; want untouched", tk, err)

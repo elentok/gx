@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -66,7 +65,7 @@ func TestWebSessions_AutoAdvanceNeedsAFreshTokenOnADesignSession(t *testing.T) {
 	h, base, cookie, ctx, _, design, plain := startWebDesign(t)
 	waitForHolder(t, h.SessionsDir+"/"+design)
 	for _, tc := range []struct{ name, id, state, want string }{
-		{"no token", design, "", server.ReasonStale},
+		{"no token", design, "", wire.ReasonStale},
 		{"plain session", plain, sessionToken(ctx, t, h, plain), wire.ReasonSessionNotDesign},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "auto-advance", tc.id, tc.state)

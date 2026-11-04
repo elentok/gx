@@ -16,12 +16,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-const (
-	ReasonInvalidConfig     = "invalid-config"
-	ReasonConfigMissing     = "config-missing"
-	ReasonReloadUnavailable = "reload-unavailable"
-)
-
 // EventConfigReloaded reports one reload result; its Level and Message are set.
 const EventConfigReloaded = "config-reloaded"
 
@@ -52,21 +46,21 @@ func (s *Server) reloadConfig(trigger string) wire.ReloadResult {
 // reload retired; it waits on the network, so it runs after the unlock.
 func (s *Server) reloadLocked() (wire.ReloadResult, func()) {
 	if s.cfg.ConfigPath == "" {
-		return refuseReload(ReasonReloadUnavailable, "this server has no config file to reload"), nil
+		return refuseReload(wire.ReasonReloadUnavailable, "this server has no config file to reload"), nil
 	}
 	data, err := os.ReadFile(s.cfg.ConfigPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		return refuseReload(ReasonConfigMissing, "config file "+s.cfg.ConfigPath+" does not exist; settings unchanged"), nil
+		return refuseReload(wire.ReasonConfigMissing, "config file "+s.cfg.ConfigPath+" does not exist; settings unchanged"), nil
 	}
 	if err != nil {
-		return refuseReload(ReasonInvalidConfig, err.Error()), nil
+		return refuseReload(wire.ReasonInvalidConfig, err.Error()), nil
 	}
 	cfg, err := config.Parse(data)
 	if err == nil {
 		err = agentrunner.ValidateSetting(cfg.AgentRunner)
 	}
 	if err != nil {
-		return refuseReload(ReasonInvalidConfig, err.Error()), nil
+		return refuseReload(wire.ReasonInvalidConfig, err.Error()), nil
 	}
 
 	old := s.settings.Load()

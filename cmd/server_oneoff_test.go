@@ -29,7 +29,7 @@ func dupServer(t *testing.T, status string) *apiclient.Client {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Refused: true, Reason: server.ReasonDuplicateLive, Address: "gx:p/1", Message: "dup"})
+		_ = json.NewEncoder(w).Encode(wire.OneOffResult{Refused: true, Reason: wire.ReasonDuplicateLive, Address: "gx:p/1", Message: "dup"})
 	})
 	mux.HandleFunc("/v1/snapshot", func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(wire.Snapshot{Tickets: []wire.TicketInfo{{Address: "gx:p/1", Status: status}}})

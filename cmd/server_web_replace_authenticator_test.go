@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"os"
@@ -83,8 +84,8 @@ func TestWebResetAuthenticator_PrintsASetupCodeAndNoSecret(t *testing.T) {
 
 		oldCode, _ := server.TOTPCode(secret, time.Now().Unix()/30)
 		_, body := postLogin(t, base, `{"password":"correct horse battery","totp_code":"`+oldCode+`"}`)
-		if !strings.Contains(body, server.ReasonSetupCodeRequired) {
-			t.Errorf("login without the Setup code = %s, want %s", body, server.ReasonSetupCodeRequired)
+		if !strings.Contains(body, wire.ReasonSetupCodeRequired) {
+			t.Errorf("login without the Setup code = %s, want %s", body, wire.ReasonSetupCodeRequired)
 		}
 		_, body = postLogin(t, base, `{"password":"correct horse battery","setup_code":"`+code+`"}`)
 		if !strings.Contains(body, `"authenticator_needed":true`) {
@@ -100,8 +101,8 @@ func TestWebResetAuthenticator_NoServerIsServerNotRunning(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	err = runWebResetAuthenticator(context.Background(), apiclient.New(filepath.Join(dir, "none.sock")), false, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
-		t.Errorf("err = %v, want %s", err, server.ReasonServerNotRunning)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
+		t.Errorf("err = %v, want %s", err, wire.ReasonServerNotRunning)
 	}
 }
 

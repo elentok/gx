@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -22,8 +21,8 @@ func TestOneOff_RemovedFileKeysAreRefusedAndNothingIsWritten(t *testing.T) {
 				t.Fatal(err)
 			}
 			res, err := h.Client.OneOff(ctx, wire.OneOffRequest{File: file, Cwd: repo, Name: "refused-job"})
-			if err != nil || !res.Refused || res.Reason != server.ReasonOptionRemoved {
-				t.Fatalf("got %+v, %v; want refusal %s", res, err, server.ReasonOptionRemoved)
+			if err != nil || !res.Refused || res.Reason != wire.ReasonOptionRemoved {
+				t.Fatalf("got %+v, %v; want refusal %s", res, err, wire.ReasonOptionRemoved)
 			}
 			if !strings.Contains(res.Message, key) || !strings.Contains(res.Message, "never commits") {
 				t.Errorf("message %q should name %q and say one-offs never commit", res.Message, key)

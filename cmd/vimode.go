@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -46,7 +45,7 @@ func runViMode(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut b
 	res, err := cl.SetViMode(ctx, on)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.ViModeResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.ViModeResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

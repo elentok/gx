@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
@@ -158,7 +157,7 @@ func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string,
 	res, err := call(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.ProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.ProjectResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -187,7 +186,7 @@ func runProjectAdd(ctx context.Context, cl *apiclient.Client, d deps, w io.Write
 	res, err := cl.AddProject(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.AddProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.AddProjectResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -329,7 +328,7 @@ func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, 
 	res, err := cl.UsageOverride(ctx, harness)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.UsageOverrideResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.UsageOverrideResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -394,7 +393,7 @@ func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, js
 	res, err := write(ctx, cl)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.BudgetResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.BudgetResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -619,7 +618,7 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	res, err := do(ctx, cl)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = wire.QueueResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.QueueResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

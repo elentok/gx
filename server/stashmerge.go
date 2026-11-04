@@ -24,7 +24,7 @@ func (s *Server) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error)
 		return mergeVerbError(err)
 	}
 	if m.epic.MergeBlockKind != string(events.DirtyTrunk) {
-		return refusal(ReasonNotDirtyTrunk, m.root.String()+" is not paused on a dirty trunk"), nil
+		return refusal(wire.ReasonNotDirtyTrunk, m.root.String()+" is not paused on a dirty trunk"), nil
 	}
 	first, _, target, err := s.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
@@ -59,12 +59,12 @@ func (s *Server) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, ta
 	if ff, err := git.IsAncestor(m.repo, target, "refs/heads/"+epic); err != nil {
 		return wire.QueueResult{}, nil, err
 	} else if !ff {
-		return refusal(ReasonNeedsRebase, fmt.Sprintf("%s is not a fast-forward of %s; merge again to rebase it", epic, target)), nil, nil
+		return refusal(wire.ReasonNeedsRebase, fmt.Sprintf("%s is not a fast-forward of %s; merge again to rebase it", epic, target)), nil, nil
 	}
 	// Recomputed now: the files may have changed since the pause.
 	clashing := clashingFiles(repo.Root, dir, target, epic)
 	if len(clashing) == 0 {
-		return refusal(ReasonNotDirtyTrunk, "no uncommitted file on "+target+" clashes any more; merge again"), nil, nil
+		return refusal(wire.ReasonNotDirtyTrunk, "no uncommitted file on "+target+" clashes any more; merge again"), nil, nil
 	}
 	snapshot, err := git.SnapshotPaths(dir, clashing)
 	if err != nil {

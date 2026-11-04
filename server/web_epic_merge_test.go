@@ -36,10 +36,10 @@ func TestWeb_EpicMergeChecksTheShownState(t *testing.T) {
 		return !tickets.LoadEpicTicketMD(filepath.Join(store, "proj", "research")).MergedAt.IsZero()
 	}
 
-	if code, body := merge(string(wire.EpicStateRunning), jsonPost(base)); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+	if code, body := merge(string(wire.EpicStateRunning), jsonPost(base)); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("stale state = %d %s, want the stale refusal", code, body)
 	}
-	if code, body := merge("", jsonPost(base)); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
+	if code, body := merge("", jsonPost(base)); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("no state = %d %s, want the stale refusal", code, body)
 	}
 	foreign := map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}

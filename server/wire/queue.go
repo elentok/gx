@@ -77,3 +77,29 @@ type QueueRequest struct {
 	State  string `json:"state,omitempty"`
 	Source string `json:"source,omitempty"`
 }
+
+// Refusal reasons of the queue writes. Stable: clients switch on them.
+const (
+	// ReasonServerNotRunning is produced by the CLI, never the server.
+	ReasonServerNotRunning = "server-not-running"
+	ReasonUnknownTicket    = "unknown-ticket"
+	ReasonInvestigateStop  = "investigate-stop"
+	ReasonInvalidAddress   = "invalid-address"
+	ReasonInvalidAgent     = "invalid-agent"
+	ReasonAlreadyQueued    = "already-queued"
+	ReasonNotQueued        = "not-queued"
+	ReasonBadPosition      = "bad-position"
+	ReasonTicketLive       = "ticket-live"
+	ReasonMapEpic          = "map-epic"
+	ReasonNoOpenTickets    = "no-open-tickets"
+	ReasonEpicDraft        = "epic-draft"
+	ReasonEpicNotOpen      = "epic-not-open"
+	ReasonFollowUpsEpic    = "follow-ups-epic"
+	ReasonAlreadyMerged    = "already-merged"
+	ReasonMergePending     = "merge-pending"
+	ReasonNotComplete      = "not-complete"
+	ReasonBranchMissing    = "branch-missing"
+	ReasonOneOffsEpic      = "one-offs-epic"
+	ReasonNotDirtyTrunk    = "not-dirty-trunk"
+	ReasonNeedsRebase      = "needs-rebase"
+)

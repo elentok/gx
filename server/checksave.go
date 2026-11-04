@@ -21,17 +21,6 @@ const (
 	SaveTargetProjectJSON = "project.json"
 )
 
-// Refusal reasons of a check save.
-const (
-	ReasonInvalidChecks = "invalid-checks"
-	ReasonBadTarget     = "bad-target"
-	ReasonVCSNone       = "vcs-none"
-	ReasonNoTrunk       = "no-trunk-checkout"
-	ReasonWrongBranch   = "wrong-branch"
-	ReasonDirtyChecks   = "dirty-checks"
-	ReasonCommitFailed  = "commit-failed"
-)
-
 func refuseSave(reason, msg string) (wire.SaveChecksResult, error) {
 	return wire.SaveChecksResult{Refused: true, Reason: reason, Message: msg}, nil
 }
@@ -53,13 +42,13 @@ func (s *Server) checksSaveWrite(w http.ResponseWriter, r *http.Request) {
 func (s *Server) saveChecks(req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
 	dir, err := s.projectDir(req.Project)
 	if err != nil {
-		return refuseSave(ReasonUnknownProject, "no project named "+req.Project)
+		return refuseSave(wire.ReasonUnknownProject, "no project named "+req.Project)
 	}
 	if len(req.Checks) == 0 {
-		return refuseSave(ReasonInvalidChecks, "checks is required")
+		return refuseSave(wire.ReasonInvalidChecks, "checks is required")
 	}
 	if _, err := check.ParseConfig(req.Checks); err != nil {
-		return refuseSave(ReasonInvalidChecks, err.Error())
+		return refuseSave(wire.ReasonInvalidChecks, err.Error())
 	}
 	pf, err := config.ReadProjectFile(dir)
 	if err != nil {
@@ -70,11 +59,11 @@ func (s *Server) saveChecks(req wire.SaveChecksRequest) (wire.SaveChecksResult, 
 		return saveChecksToProjectJSON(dir, pf, req)
 	case SaveTargetRepo:
 		if pf.VCS != nil && *pf.VCS == config.VCSNone {
-			return refuseSave(ReasonVCSNone, req.Project+" has no VCS; save to project.json")
+			return refuseSave(wire.ReasonVCSNone, req.Project+" has no VCS; save to project.json")
 		}
 		return s.saveChecksToRepo(dir, req)
 	}
-	return refuseSave(ReasonBadTarget, "target must be "+SaveTargetRepo+" or "+SaveTargetProjectJSON)
+	return refuseSave(wire.ReasonBadTarget, "target must be "+SaveTargetRepo+" or "+SaveTargetProjectJSON)
 }
 
 func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
@@ -89,39 +78,39 @@ func (s *Server) saveChecksToRepo(dir string, req wire.SaveChecksRequest) (wire.
 	root := tickets.TrunkCheckout(s.cfg.TicketStore, req.Project)
 	repo := tickets.ProjectRepoRoot(s.cfg.TicketStore, req.Project)
 	if root == "" || repo == "" {
-		return refuseSave(ReasonNoTrunk, req.Project+" has no trunk checkout")
+		return refuseSave(wire.ReasonNoTrunk, req.Project+" has no trunk checkout")
 	}
 	trunk, err := tickets.Trunk(dir, repo)
 	if err != nil {
-		return refuseSave(ReasonNoTrunk, err.Error())
+		return refuseSave(wire.ReasonNoTrunk, err.Error())
 	}
 	defer s.trunkLocks.lock(repo, trunk)()
 
 	branch, err := git.CurrentBranch(root)
 	if err != nil {
-		return refuseSave(ReasonWrongBranch, "cannot read the branch of "+root+": "+err.Error())
+		return refuseSave(wire.ReasonWrongBranch, "cannot read the branch of "+root+": "+err.Error())
 	}
 	if branch != trunk {
-		return refuseSave(ReasonWrongBranch, root+" is on "+branch+", not "+trunk)
+		return refuseSave(wire.ReasonWrongBranch, root+" is on "+branch+", not "+trunk)
 	}
 	status, _, err := git.Run(root, git.NonInteractiveEnv(), "status", "--porcelain", "--", check.RepoConfigPath)
 	if err != nil {
-		return refuseSave(ReasonCommitFailed, err.Error())
+		return refuseSave(wire.ReasonCommitFailed, err.Error())
 	}
 	if status != "" {
-		return refuseSave(ReasonDirtyChecks, check.RepoConfigPath+" has uncommitted changes in "+root)
+		return refuseSave(wire.ReasonDirtyChecks, check.RepoConfigPath+" has uncommitted changes in "+root)
 	}
 
 	var pretty bytes.Buffer
 	if err := json.Indent(&pretty, req.Checks, "", "  "); err != nil {
-		return refuseSave(ReasonInvalidChecks, err.Error())
+		return refuseSave(wire.ReasonInvalidChecks, err.Error())
 	}
 	pretty.WriteByte('\n')
 	sha, err := commitChecksFile(root, pretty.Bytes())
 	var ce *commitError
 	switch {
 	case errors.As(err, &ce):
-		return refuseSave(ReasonCommitFailed, ce.Error())
+		return refuseSave(wire.ReasonCommitFailed, ce.Error())
 	case err != nil:
 		return wire.SaveChecksResult{}, err
 	}

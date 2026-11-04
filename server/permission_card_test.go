@@ -289,12 +289,12 @@ func TestWeb_AgentAnswerNeedsRequestIDAndOrigin(t *testing.T) {
 		t.Errorf("wrong Origin = %d, want 403", code)
 	}
 	code, reason := post(js, `{"address":"proj:epic-a/01","decision":"allow"}`)
-	if code != http.StatusOK || reason != server.ReasonRequestIDRequired {
-		t.Errorf("no request_id = %d %q, want 200 %q", code, reason, server.ReasonRequestIDRequired)
+	if code != http.StatusOK || reason != wire.ReasonRequestIDRequired {
+		t.Errorf("no request_id = %d %q, want 200 %q", code, reason, wire.ReasonRequestIDRequired)
 	}
 	// With a request ID the call goes through to the verb (and refuses: nothing is live).
 	code, reason = post(js, `{"address":"proj:epic-a/01","decision":"allow","request_id":"r"}`)
-	if code != http.StatusOK || reason == server.ReasonRequestIDRequired || reason == "" {
+	if code != http.StatusOK || reason == wire.ReasonRequestIDRequired || reason == "" {
 		t.Errorf("with request_id = %d %q, want the verb's own refusal", code, reason)
 	}
 }

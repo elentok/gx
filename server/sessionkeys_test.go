@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -81,7 +80,7 @@ func TestSessionKeys_Refusals(t *testing.T) {
 		"DEL in text":        {wire.SessionKeysRequest{Text: "a\x7fb"}, wire.ReasonSessionBadRequest},
 		"bang prefix":        {wire.SessionKeysRequest{Text: "!ls"}, wire.ReasonPromptPrefixNotAllowed},
 		"text too long":      {wire.SessionKeysRequest{Text: strings.Repeat("a", 32*1024+1)}, wire.ReasonPromptTextTooLong},
-		"guard while idle":   {wire.SessionKeysRequest{Key: "Esc", OnlyBlocked: true}, server.ReasonNotBlocked},
+		"guard while idle":   {wire.SessionKeysRequest{Key: "Esc", OnlyBlocked: true}, wire.ReasonNotBlocked},
 		"starting":           {wire.SessionKeysRequest{ID: "seeded-starting", Key: "Esc"}, wire.ReasonSessionNotLive},
 		"exited":             {wire.SessionKeysRequest{ID: "seeded-exited", Key: "Esc"}, wire.ReasonSessionNotLive},
 		"holder not dialled": {wire.SessionKeysRequest{ID: "seeded-nodial", Key: "Esc"}, wire.ReasonSessionNotLive},
@@ -193,8 +192,8 @@ func TestSessionKeys_TextIsTypedWithoutEnter(t *testing.T) {
 func TestSessionKeys_GuardSendsNothingWhenNotBlocked(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	if res := f.keys(t, wire.SessionKeysRequest{Key: "Enter", OnlyBlocked: true}); !res.Refused || res.Reason != server.ReasonNotBlocked {
-		t.Fatalf("guarded = %+v, want %s", res, server.ReasonNotBlocked)
+	if res := f.keys(t, wire.SessionKeysRequest{Key: "Enter", OnlyBlocked: true}); !res.Refused || res.Reason != wire.ReasonNotBlocked {
+		t.Fatalf("guarded = %+v, want %s", res, wire.ReasonNotBlocked)
 	}
 	// A guarded Enter that got through would log an empty entry before this one.
 	if res := f.keys(t, wire.SessionKeysRequest{Key: "Tab"}); res.Refused {
@@ -342,8 +341,8 @@ func TestSessionKeys_GuardedRefusalKeepsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startKeysAdvancing(t)
 	res, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Key: "Tab", OnlyBlocked: true})
-	if err != nil || !res.Refused || res.Reason != server.ReasonNotBlocked {
-		t.Fatalf("keys = %+v, %v; want %s", res, err, server.ReasonNotBlocked)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotBlocked {
+		t.Fatalf("keys = %+v, %v; want %s", res, err, wire.ReasonNotBlocked)
 	}
 	if got := sessionSnapshot(t, f); got.AutoAdvanceAt == nil {
 		t.Errorf("session = %+v, want the countdown running", got)

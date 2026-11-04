@@ -44,3 +44,9 @@ type RepairResult struct {
 	// running; empty when the server served it.
 	Via string `json:"via,omitempty"`
 }
+
+// ReasonBadBase refuses an resume whose base is not one of the competing blockers.
+const ReasonBadBase = "bad-base"
+
+// ReasonBadTier refuses a resume whose tier is not one of ralphloop.AllTiers.
+const ReasonBadTier = "bad-tier"

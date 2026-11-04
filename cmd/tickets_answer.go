@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -33,7 +32,7 @@ func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
 			}
 			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				res, err := cl.TicketAnswer(ctx, req)
-				if err == nil && res.Refused && res.Reason == server.ReasonStale && !jsonOut {
+				if err == nil && res.Refused && res.Reason == wire.ReasonStale && !jsonOut {
 					res.Message = staleMessage(res)
 				}
 				return res, err

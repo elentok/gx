@@ -12,13 +12,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// Refusal reasons of a project remove or set-path.
-const (
-	ReasonUnknownProject = "unknown-project"
-	ReasonProjectBusy    = "project-busy"
-	ReasonPathTaken      = "path-taken"
-)
-
 func refuseProject(reason, msg string) (wire.ProjectResult, error) {
 	return wire.ProjectResult{Refused: true, Reason: reason, Message: msg}, nil
 }
@@ -48,14 +41,14 @@ func (s *Server) removeProject(req wire.ProjectRequest) (wire.ProjectResult, err
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
 	if req.Name == ScratchProject {
-		return refuseProject(ReasonReservedName, "\""+ScratchProject+"\" is built in and cannot be removed")
+		return refuseProject(wire.ReasonReservedName, "\""+ScratchProject+"\" is built in and cannot be removed")
 	}
 	dir, err := s.projectDir(req.Name)
 	if err != nil {
-		return refuseProject(ReasonUnknownProject, "no project named "+req.Name)
+		return refuseProject(wire.ReasonUnknownProject, "no project named "+req.Name)
 	}
 	if addr, busy := s.projectBusy(req.Name); busy {
-		return refuseProject(ReasonProjectBusy, addr+" is queued or running; remove it from the queue first")
+		return refuseProject(wire.ReasonProjectBusy, addr+" is queued or running; remove it from the queue first")
 	}
 	if err := os.Remove(filepath.Join(dir, config.ProjectFileName)); err != nil {
 		return wire.ProjectResult{}, err
@@ -69,7 +62,7 @@ func (s *Server) setProjectPath(req wire.ProjectRequest) (wire.ProjectResult, er
 	defer projectAddMu.Unlock()
 	dir, err := s.projectDir(req.Name)
 	if err != nil {
-		return refuseProject(ReasonUnknownProject, "no project named "+req.Name)
+		return refuseProject(wire.ReasonUnknownProject, "no project named "+req.Name)
 	}
 	pf, err := config.ReadProjectFile(dir)
 	if err != nil {
@@ -82,7 +75,7 @@ func (s *Server) setProjectPath(req wire.ProjectRequest) (wire.ProjectResult, er
 		// The outbox became a real clone, so its tickets can commit.
 		pf.VCS = nil
 	} else if pf.VCS == nil || *pf.VCS != config.VCSNone {
-		return refuseProject(ReasonNotRepo, req.Path+" is not a git repo")
+		return refuseProject(wire.ReasonNotRepo, req.Path+" is not a git repo")
 	}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
@@ -91,7 +84,7 @@ func (s *Server) setProjectPath(req wire.ProjectRequest) (wire.ProjectResult, er
 	for _, d := range dirs {
 		other, err := config.ReadProjectFile(d)
 		if d != dir && err == nil && other.Repo != nil && canonicalDir(*other.Repo) == repo {
-			return refuseProject(ReasonPathTaken, repo+" is already project "+tickets.ProjectName(d))
+			return refuseProject(wire.ReasonPathTaken, repo+" is already project "+tickets.ProjectName(d))
 		}
 	}
 	pf.Repo = &repo

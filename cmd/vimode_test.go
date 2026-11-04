@@ -3,12 +3,12 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -47,7 +47,7 @@ func TestViMode_RefusesWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out bytes.Buffer
 	err := runViMode(context.Background(), cl, &out, false, nil)
-	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
-		t.Errorf("err = %v; want %s", err, server.ReasonServerNotRunning)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
+		t.Errorf("err = %v; want %s", err, wire.ReasonServerNotRunning)
 	}
 }
