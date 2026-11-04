@@ -70,3 +70,16 @@ func (s *Server) designLaunchTier(address string) ralphloop.Tier {
 func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 	s.sessions.sessionCreateWeb(w, r)
 }
+
+// One-line forwarders to the Resumer.
+
+func (s *Server) fixAgentWrite(w http.ResponseWriter, r *http.Request) {
+	s.resumer.fixAgentWrite(w, r)
+}
+func (s *Server) fixAgentWeb() http.HandlerFunc { return s.resumer.fixAgentWeb() }
+func (s *Server) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
+	s.resumer.sessionLinkWrite(w, r)
+}
+func (s *Server) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
+	s.resumer.sessionStepWrite(w, r)
+}

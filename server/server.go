@@ -335,7 +335,6 @@ func New(cfg Config) (*Server, error) {
 
 		focus: newFocusReports(),
 	}
-	s.resumer = &Resumer{srv: s}
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
@@ -435,6 +434,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.sessions = newManager(s)
+	s.resumer = newResumer(s)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished
 	}

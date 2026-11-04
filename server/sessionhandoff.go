@@ -18,10 +18,10 @@ import (
 // caller holds metaMu; the work runs after it lets go.
 func (rs *Resumer) startContinue(dir string, meta sessionMeta, label string, action []string) {
 	if rs.chartingHandoffDue(meta, action) {
-		rs.srv.sessions.watches.start(func() { rs.chartingHandoff(dir, meta.ID) })
+		rs.mg.watches.start(func() { rs.chartingHandoff(dir, meta.ID) })
 		return
 	}
-	rs.srv.sessions.watches.start(func() { rs.srv.sessions.prompter.sendAction(dir, label, action) })
+	rs.mg.watches.start(func() { rs.mg.prompter.sendAction(dir, label, action) })
 }
 
 // chartingHandoffDue reports whether action is the design Continue of a
@@ -29,10 +29,10 @@ func (rs *Resumer) startContinue(dir string, meta sessionMeta, label string, act
 // charting. Only a harness with a chat reader restarts, as only it has a design Continue.
 func (rs *Resumer) chartingHandoffDue(meta sessionMeta, action []string) bool {
 	return meta.LaunchDesign && meta.Design &&
-		rs.srv.settings.Load().HasChatReader(meta.Harness) &&
+		rs.mg.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == ralphloop.TierStrongest &&
 		slices.Equal(action, chat.DesignContinueAction(meta.Ticket, meta.Harness)) &&
-		rs.srv.designLaunchTier(meta.Ticket) == ralphloop.TierWorker
+		rs.mg.designLaunchTier(meta.Ticket) == ralphloop.TierWorker
 }
 
 // handoffRefusal is why a Continue of action must not start: it is a charting
@@ -42,7 +42,7 @@ func (rs *Resumer) handoffRefusal(meta sessionMeta, action []string) (wire.Sessi
 	if !rs.chartingHandoffDue(meta, action) {
 		return wire.SessionResult{}, false
 	}
-	msg := rs.srv.harness.InteractiveMissingReason(meta.Harness, "the session's harness")
+	msg := rs.mg.harness.InteractiveMissingReason(meta.Harness, "the session's harness")
 	if msg == "" {
 		return wire.SessionResult{}, false
 	}
@@ -62,36 +62,36 @@ func (rs *Resumer) chartingHandoff(dir, id string) {
 	// No lock held: the stop waits for the holder to save its exit.
 	if c, err := nativerunner.DialHolder(dir); err == nil {
 		if err := c.Stop(); err != nil {
-			rs.srv.log.Warn("handoff: stop agent", "session", id, "err", err)
+			rs.mg.log.Warn("handoff: stop agent", "session", id, "err", err)
 		} else {
 			waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
 		}
 	}
-	rs.srv.sessions.watches.metaMu.Lock()
-	defer rs.srv.sessions.watches.metaMu.Unlock()
+	rs.mg.watches.metaMu.Lock()
+	defer rs.mg.watches.metaMu.Unlock()
 	meta, err := readSessionMeta(dir)
 	if err != nil {
-		rs.srv.log.Warn("handoff: read meta", "session", id, "err", err)
+		rs.mg.log.Warn("handoff: read meta", "session", id, "err", err)
 		return
 	}
 	if err := rs.restartOnWorker(dir, &meta, old); err != nil {
-		rs.srv.log.Warn("handoff: restart", "session", id, "err", err)
-		rs.srv.sessions.endFailedStart(dir, &meta)
+		rs.mg.log.Warn("handoff: restart", "session", id, "err", err)
+		rs.mg.endFailedStart(dir, &meta)
 	}
 }
 
 // beginHandoff bumps the run and returns the conversation being ended. It
 // reports false when the session ended in the meantime.
 func (rs *Resumer) beginHandoff(dir, id string) (string, bool) {
-	rs.srv.sessions.watches.metaMu.Lock()
-	defer rs.srv.sessions.watches.metaMu.Unlock()
+	rs.mg.watches.metaMu.Lock()
+	defer rs.mg.watches.metaMu.Unlock()
 	meta, err := readSessionMeta(dir)
 	if err != nil || meta.Status.State == wire.SessionExited {
 		return "", false
 	}
 	meta.Run++
 	if err := writeSessionMeta(dir, meta); err != nil {
-		rs.srv.log.Warn("handoff: save meta", "session", id, "err", err)
+		rs.mg.log.Warn("handoff: save meta", "session", id, "err", err)
 		return "", false
 	}
 	return meta.ConversationID, true
@@ -100,27 +100,27 @@ func (rs *Resumer) beginHandoff(dir, id string) (string, bool) {
 // restartOnWorker ends the old conversation like an agent exit, records a new
 // one and launches it under the worker tier. The caller holds metaMu.
 func (rs *Resumer) restartOnWorker(dir string, meta *sessionMeta, old string) error {
-	rs.srv.sessions.saveConversationTotals(*meta, old)
+	rs.mg.saveConversationTotals(*meta, old)
 	conv, err := nativerunner.NewUUID()
 	if err != nil {
 		return err
 	}
 	meta.ConversationID = conv
-	rs.srv.sessions.applyTier(meta, ralphloop.TierWorker)
+	rs.mg.applyTier(meta, ralphloop.TierWorker)
 	meta.HandoffTier = true
 	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
 	meta.Actionable = wire.SessionActionable{}
-	rs.srv.sessions.recordConversation(*meta)
+	rs.mg.recordConversation(*meta)
 	if err := clearOldHolder(dir); err != nil {
 		return err
 	}
 	meta.Run++
 	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = wire.SessionStatus{}, time.Now(), "", false
-	if err := rs.srv.sessions.startSessionHolder(dir, meta, 0, 0, false); err != nil {
+	if err := rs.mg.startSessionHolder(dir, meta, 0, 0, false); err != nil {
 		return err
 	}
 	id, run := meta.ID, meta.Run
-	rs.srv.sessions.watches.start(func() { rs.srv.sessions.watchSession(dir, id, run, time.Time{}, false) })
-	rs.srv.events.Publish(wire.EventSessionChanged, id)
+	rs.mg.watches.start(func() { rs.mg.watchSession(dir, id, run, time.Time{}, false) })
+	rs.mg.events.Publish(wire.EventSessionChanged, id)
 	return nil
 }

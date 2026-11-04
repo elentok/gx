@@ -31,10 +31,12 @@ type SessionsConfig struct {
 	SessionExitCleanupDelay time.Duration
 }
 
-// Host is what the Manager needs from the rest of the root.
+// Host is what the Manager and the Resumer need from the rest of the root.
 type Host interface {
 	sessionInfo(m sessionMeta) wire.SessionInfo
 	WebURL() string
+	findTicket(address string) (ticketRef, bool, error)
+	MigrationFailures() []wire.MigrationFailure
 }
 
 // Manager creates, stops, removes and watches sessions, and reads and writes
@@ -95,7 +97,13 @@ func newManager(s *Server) *Manager {
 // Resumer brings sessions back: resume, restore, auto-resume, handoff, link,
 // step and the fix agent.
 type Resumer struct {
-	srv *Server
+	mg   *Manager
+	host Host
+}
+
+// newResumer needs s.sessions set.
+func newResumer(s *Server) *Resumer {
+	return &Resumer{mg: s.sessions, host: s}
 }
 
 // Prompter is what the session watch loop needs from the prompt, turn and

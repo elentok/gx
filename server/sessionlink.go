@@ -14,13 +14,13 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func (s *Server) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
+func (rs *Resumer) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.LinkSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.resumer.linkSession(req)
+	res, err := rs.linkSession(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -36,7 +36,7 @@ func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult,
 	if req.Ticket == "" {
 		return sessionRefusal(wire.ReasonSessionBadRequest, "a link needs a ticket address"), nil
 	}
-	dir, meta, res, err := rs.srv.sessions.SessionDir(req.ID)
+	dir, meta, res, err := rs.mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -44,11 +44,11 @@ func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult,
 	if !strings.Contains(ticket, ":") {
 		ticket = meta.Project + ":" + ticket
 	}
-	design := rs.srv.onMapEpic(ticket)
+	design := rs.mg.onMapEpic(ticket)
 	var info wire.SessionInfo
-	if err := rs.srv.sessions.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := rs.mg.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.Ticket, m.Design = ticket, m.Design || design
-		rs.srv.sessions.recordConversation(*m)
+		rs.mg.recordConversation(*m)
 		info = m.info()
 		return true
 	}); err != nil {
@@ -57,13 +57,13 @@ func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult,
 	return wire.SessionResult{Session: &info}, nil
 }
 
-func (s *Server) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
+func (rs *Resumer) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.ReportStepRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.resumer.reportSessionStep(req)
+	res, err := rs.reportSessionStep(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -77,7 +77,7 @@ func (rs *Resumer) reportSessionStep(req wire.ReportStepRequest) (wire.SessionRe
 	if req.Step == "" {
 		return sessionRefusal(wire.ReasonSessionBadRequest, "a step report needs a step"), nil
 	}
-	dir, meta, res, err := rs.srv.sessions.SessionDir(req.ID)
+	dir, meta, res, err := rs.mg.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -85,7 +85,7 @@ func (rs *Resumer) reportSessionStep(req wire.ReportStepRequest) (wire.SessionRe
 		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
 	var info wire.SessionInfo
-	if err := rs.srv.sessions.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := rs.mg.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.ReportedStep, m.ReportedTitle = req.Step, req.Title
 		info = m.info()
 		return true

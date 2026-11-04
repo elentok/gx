@@ -30,7 +30,7 @@ func TestStartContinue_SendsTheActionThroughThePrompter(t *testing.T) {
 	t.Cleanup(s.sessions.watches.close)
 
 	action := []string{"/continue"}
-	(&Resumer{srv: s}).startContinue(t.TempDir(), sessionMeta{ID: "abcdef"}, "Continue", action)
+	newResumer(s).startContinue(t.TempDir(), sessionMeta{ID: "abcdef"}, "Continue", action)
 
 	select {
 	case got := <-fake.sent:
