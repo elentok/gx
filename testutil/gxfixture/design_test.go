@@ -14,7 +14,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/transcript"
@@ -74,14 +73,14 @@ func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
 
 const designAddr = "demo:design-epic"
 
-func (r *running) currentStep(t *testing.T) server.ProgressStep {
+func (r *running) currentStep(t *testing.T) wire.ProgressStep {
 	t.Helper()
-	var d server.EpicDetail
+	var d wire.EpicDetail
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "epics", "detail", designAddr, "--json")), &d); err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range d.Steps {
-		if s.State == server.MapStepCurrent {
+		if s.State == wire.MapStepCurrent {
 			return s.Step
 		}
 	}
@@ -109,7 +108,7 @@ func (r *running) waitChat(t *testing.T, id string, ok func(wire.SessionChatResp
 }
 
 // waitStep polls until the epic detail shows step as current.
-func (r *running) waitStep(t *testing.T, step server.ProgressStep) {
+func (r *running) waitStep(t *testing.T, step wire.ProgressStep) {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
 	for r.currentStep(t) != step {
@@ -153,12 +152,12 @@ func roundLabels(chat wire.SessionChatResponse) []string {
 func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	t.Parallel()
 	r := start(t, "design")
-	if step := r.currentStep(t); step != server.ProgressResolveTickets {
+	if step := r.currentStep(t); step != wire.ProgressResolveTickets {
 		t.Errorf("current step = %q, want resolve-tickets", step)
 	}
 	// The verb moves the step the page shows.
 	r.gx(t, "tickets", "set", designAddr, "--design-step", "spec")
-	r.waitStep(t, server.ProgressSpec)
+	r.waitStep(t, wire.ProgressSpec)
 	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
 	tracked, err := exec.Command("git", "-C", repo, "ls-files").Output()
 	if err != nil || strings.TrimSpace(string(tracked)) != agentfake.WorkerConfigFile {

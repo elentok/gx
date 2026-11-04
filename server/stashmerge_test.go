@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -66,7 +67,7 @@ func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
 	f := stashMergeFixture(t)
 	main := f.git(t, "rev-parse", "main")
 
-	code, body := f.webStashMerge(t, string(server.EpicStateRunning))
+	code, body := f.webStashMerge(t, string(wire.EpicStateRunning))
 
 	if code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
 		t.Errorf("stale state = %d %s, want the stale refusal", code, body)
@@ -88,7 +89,7 @@ func TestStashMerge_AcceptsTheCardsMergeBlockedState(t *testing.T) {
 	t.Parallel()
 	f := stashMergeFixture(t)
 
-	code, body := f.webStashMerge(t, string(server.EpicListMergeBlocked))
+	code, body := f.webStashMerge(t, string(wire.EpicListMergeBlocked))
 
 	if code != http.StatusOK || reasonOf(t, body) != "" {
 		t.Errorf("stash-merge from a card = %d %s, want it accepted", code, body)
@@ -101,7 +102,7 @@ func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTim
 	// Dirty only now: the pause did not list it.
 	testutil.WriteFile(t, f.repo, "late.txt", "local late")
 
-	code, body := f.webStashMerge(t, string(server.EpicStatePaused))
+	code, body := f.webStashMerge(t, string(wire.EpicStatePaused))
 
 	if code != http.StatusOK || reasonOf(t, body) != "" {
 		t.Fatalf("stash-merge = %d %s", code, body)

@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -118,11 +119,11 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := server.PermissionCard{RequestID: "req-1", Tool: "Bash", Input: `{"command":"ls"}`, Description: "List files"}
+	want := wire.PermissionCard{RequestID: "req-1", Tool: "Bash", Input: `{"command":"ls"}`, Description: "List files"}
 	if d.Permission == nil || *d.Permission != want {
 		t.Fatalf("permission = %+v, want %+v", d.Permission, want)
 	}
-	if !slices.Contains(d.Actions, server.ActionApprove) {
+	if !slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("actions = %v, want approve", d.Actions)
 	}
 	if !activeNeedsApproval(t, h) {
@@ -133,7 +134,7 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	d, err = h.Client.Detail(ctx, answerAddr)
-	if err != nil || d.Permission != nil || slices.Contains(d.Actions, server.ActionApprove) {
+	if err != nil || d.Permission != nil || slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("after answer: permission %+v, actions %v, err %v", d.Permission, d.Actions, err)
 	}
 	if activeNeedsApproval(t, h) {
@@ -166,7 +167,7 @@ func TestPermissionCard_StaysOnABlockedPanePause(t *testing.T) {
 	if d.Permission == nil || d.Permission.RequestID != "req-1" {
 		t.Errorf("permission = %+v, want the pending request", d.Permission)
 	}
-	if !slices.Contains(d.Actions, server.ActionApprove) {
+	if !slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("actions = %v, want approve", d.Actions)
 	}
 }
@@ -221,7 +222,7 @@ func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 	if d.Permission == nil || d.Permission.Hint != "Approve it in the TUI" || d.Permission.RequestID != "" || d.Permission.Tool != "ExitPlanMode" {
 		t.Errorf("permission = %+v", d.Permission)
 	}
-	if slices.Contains(d.Actions, server.ActionApprove) {
+	if slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("actions = %v, want no approve", d.Actions)
 	}
 	if !activeNeedsApproval(t, h) {
@@ -232,7 +233,7 @@ func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
 	t.Parallel()
 	h, _ := startBlockedClaimed(t, true, &agentrunner.Pending{ID: "req-3", Tool: "Bash"})
-	var d server.TicketDetail
+	var d wire.TicketDetail
 	waitFor(t, func() bool {
 		var err error
 		if d, err = h.Client.Detail(context.Background(), answerAddr); err != nil {
@@ -243,7 +244,7 @@ func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
 	if d.Permission.Hint != "Approve it in the TUI" || d.Permission.RequestID != "" {
 		t.Errorf("permission = %+v", d.Permission)
 	}
-	if slices.Contains(d.Actions, server.ActionApprove) {
+	if slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("actions = %v, want no approve", d.Actions)
 	}
 }
@@ -319,8 +320,8 @@ func TestPermissionCard_CodexHookRequestAllowAndDeny(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := server.PermissionCard{RequestID: "codex-req-1", Tool: "Bash", Input: `{"command":"rg foo"}`, Description: "rg foo"}
-			if d.Permission == nil || *d.Permission != want || !slices.Contains(d.Actions, server.ActionApprove) {
+			want := wire.PermissionCard{RequestID: "codex-req-1", Tool: "Bash", Input: `{"command":"rg foo"}`, Description: "rg foo"}
+			if d.Permission == nil || *d.Permission != want || !slices.Contains(d.Actions, wire.ActionApprove) {
 				t.Fatalf("permission = %+v, actions %v, want %+v with approve", d.Permission, d.Actions, want)
 			}
 			if res, err := h.Client.AgentAnswer(ctx, answerAddr, tc.decision, tc.text); err != nil || res.Refused {

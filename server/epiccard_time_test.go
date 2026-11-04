@@ -1,12 +1,11 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/elentok/gx/server"
 )
 
 func TestEpicList_CardTimePair(t *testing.T) {
@@ -40,7 +39,7 @@ func TestEpicList_CardTimePair(t *testing.T) {
 		}
 	}
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		got[r.Address] = r
 	}
@@ -53,17 +52,17 @@ func TestEpicList_CardTimePair(t *testing.T) {
 	}
 
 	fixed := map[string]struct {
-		kind  server.CardTimeKind
+		kind  wire.CardTimeKind
 		start time.Time
 	}{
-		"proj:ready":       {server.CardTimeCreated, at("2026-01-01T10:00:00Z")},
-		"proj:draft":       {server.CardTimeCreated, at("2026-01-03T10:00:00Z")},
-		"proj:noopen":      {server.CardTimeCreated, at("2026-01-01T10:00:00Z")},
-		"proj:merging":     {server.CardTimeElapsed, at("2026-01-02T09:00:00Z")},
-		"proj:merged":      {server.CardTimeFinished, at("2026-01-02T11:00:00Z")},
-		"proj:one-offs/02": {server.CardTimeElapsed, at("2026-01-04T08:00:00Z")},
+		"proj:ready":       {wire.CardTimeCreated, at("2026-01-01T10:00:00Z")},
+		"proj:draft":       {wire.CardTimeCreated, at("2026-01-03T10:00:00Z")},
+		"proj:noopen":      {wire.CardTimeCreated, at("2026-01-01T10:00:00Z")},
+		"proj:merging":     {wire.CardTimeElapsed, at("2026-01-02T09:00:00Z")},
+		"proj:merged":      {wire.CardTimeFinished, at("2026-01-02T11:00:00Z")},
+		"proj:one-offs/02": {wire.CardTimeElapsed, at("2026-01-04T08:00:00Z")},
 		"proj:follow-ups":  {"", time.Time{}},
-		"proj:paused":      {server.CardTimeWaiting, at("2026-01-05T08:00:00Z")},
+		"proj:paused":      {wire.CardTimeWaiting, at("2026-01-05T08:00:00Z")},
 	}
 	for addr, w := range fixed {
 		r, ok := got[addr]
@@ -78,7 +77,7 @@ func TestEpicList_CardTimePair(t *testing.T) {
 	// Queued cards count from their own enqueue, taken now.
 	for _, addr := range []string{"proj:queued", "proj:one-offs/01"} {
 		r := got[addr]
-		if r.TimeKind != server.CardTimeElapsed || r.TimeStart.Before(before) {
+		if r.TimeKind != wire.CardTimeElapsed || r.TimeStart.Before(before) {
 			t.Errorf("%s time = %q %v, want elapsed from the enqueue", addr, r.TimeKind, r.TimeStart)
 		}
 	}

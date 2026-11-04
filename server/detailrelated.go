@@ -1,48 +1,16 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/elentok/gx/tickets"
 )
 
-// Relations a related ticket has to the one on the page.
-const (
-	RelationBlocker = "blocker"
-	RelationParent  = "parent"
-	RelationFork    = "fork"
-)
-
-// RelatedTicket is one ticket line of the detail page's Related section.
-type RelatedTicket struct {
-	Relation string `json:"relation"`
-	// Address is canonical for a ticket of the same project. A blocker that
-	// names no ticket keeps the token as written.
-	Address string `json:"address"`
-	// Linkable is false for a blocker that names no ticket, which has nothing to link to.
-	Linkable bool   `json:"linkable"`
-	Title    string `json:"title"`
-	// Status is the rendered-status word the epic rows use.
-	Status string `json:"status"`
-}
-
-// DetailStats is the stat line of a loop ticket. Cost and ContextWindow come
-// from the merge stamps and stay empty until the ticket merges. A map ticket
-// has no stats.
-type DetailStats struct {
-	// Elapsed is in seconds; a claimed ticket ticks on the client from ClaimedAt.
-	Elapsed       int       `json:"elapsed,omitempty"`
-	ClaimedAt     time.Time `json:"claimed_at,omitzero"`
-	Cost          float64   `json:"cost,omitempty"`
-	HadCodex      bool      `json:"had_codex,omitempty"`
-	ContextWindow int       `json:"context_window,omitempty"`
-}
-
-func (s *Server) detailStats(ref ticketRef) *DetailStats {
+func (s *Server) detailStats(ref ticketRef) *wire.DetailStats {
 	t := ref.ticket
-	st := &DetailStats{Elapsed: t.ElapsedTime, Cost: t.ActualCost, HadCodex: t.HadCodex, ContextWindow: t.ActualContextWindow}
+	st := &wire.DetailStats{Elapsed: t.ElapsedTime, Cost: t.ActualCost, HadCodex: t.HadCodex, ContextWindow: t.ActualContextWindow}
 	if at, ok := s.registry.startedAtOf(ref.addr.String()); ok && ref.epic.RenderedStatus(t) == tickets.StatusClaimed {
 		st.ClaimedAt = at
 	}
@@ -51,23 +19,23 @@ func (s *Server) detailStats(ref ticketRef) *DetailStats {
 
 // relatedTickets lists one entry per blocked_by token, then the parent, then
 // each fork child.
-func relatedTickets(ref ticketRef, epics []tickets.Epic) []RelatedTicket {
-	own := func(t tickets.Ticket, relation string) RelatedTicket {
+func relatedTickets(ref ticketRef, epics []tickets.Epic) []wire.RelatedTicket {
+	own := func(t tickets.Ticket, relation string) wire.RelatedTicket {
 		addr := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.DisplayNumber()}
-		return RelatedTicket{Relation: relation, Address: addr.String(), Linkable: true, Title: t.Title, Status: ref.epic.RenderedStatus(t).Word()}
+		return wire.RelatedTicket{Relation: relation, Address: addr.String(), Linkable: true, Title: t.Title, Status: ref.epic.RenderedStatus(t).Word()}
 	}
-	related := []RelatedTicket{}
+	related := []wire.RelatedTicket{}
 	for _, token := range ref.ticket.BlockedBy {
 		related = append(related, blockerEntry(ref, epics, token))
 	}
 	if ref.ticket.Parent != nil {
 		if p, ok := findInEpic(ref.epic, *ref.ticket.Parent); ok {
-			related = append(related, own(p, RelationParent))
+			related = append(related, own(p, wire.RelationParent))
 		}
 	}
 	for _, t := range ref.epic.Tickets {
 		if t.Parent != nil && sameTicketID(*t.Parent, ref.ticket.DisplayNumber()) {
-			related = append(related, own(t, RelationFork))
+			related = append(related, own(t, wire.RelationFork))
 		}
 	}
 	return related
@@ -76,8 +44,8 @@ func relatedTickets(ref ticketRef, epics []tickets.Epic) []RelatedTicket {
 // blockerEntry resolves one blocked_by token: bare ("04", "04a"), qualified
 // ("epic/06") or a whole epic ("epic"). A whole epic reads done once it has
 // merged and open before.
-func blockerEntry(ref ticketRef, epics []tickets.Epic, token string) RelatedTicket {
-	entry := RelatedTicket{Relation: RelationBlocker, Address: token, Status: tickets.StatusError.Word()}
+func blockerEntry(ref ticketRef, epics []tickets.Epic, token string) wire.RelatedTicket {
+	entry := wire.RelatedTicket{Relation: wire.RelationBlocker, Address: token, Status: tickets.StatusError.Word()}
 	epic, id := ref.epic, token
 	if tickets.IsWholeEpicRef(token) {
 		name := epicNameOf(token)

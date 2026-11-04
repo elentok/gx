@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"testing"
 	"time"
 )
@@ -8,9 +9,9 @@ import (
 func TestCardTimeFor_QueuedFallsBackToQueuedAt(t *testing.T) {
 	t.Parallel()
 	queuedAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	row := EpicListRow{Section: SectionImplementing, State: EpicListQueued, QueuedAt: queuedAt}
+	row := wire.EpicListRow{Section: wire.SectionImplementing, State: wire.EpicListQueued, QueuedAt: queuedAt}
 	kind, start := cardTimeFor(row, cardTimeSources{})
-	if kind != CardTimeElapsed || !start.Equal(queuedAt) {
+	if kind != wire.CardTimeElapsed || !start.Equal(queuedAt) {
 		t.Errorf("time = %q %v, want elapsed from queued_at", kind, start)
 	}
 	enq := queuedAt.Add(time.Hour)
@@ -25,17 +26,17 @@ func TestCardTimeFor_SectionMapsToKind(t *testing.T) {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	for _, tc := range []struct {
 		name string
-		row  EpicListRow
+		row  wire.EpicListRow
 		src  cardTimeSources
-		kind CardTimeKind
+		kind wire.CardTimeKind
 	}{
-		{"needs you", EpicListRow{Section: SectionNeedsYou, WaitingSince: at}, cardTimeSources{}, CardTimeWaiting},
-		{"running", EpicListRow{Section: SectionImplementing, State: EpicListRunning}, cardTimeSources{startedAt: at}, CardTimeElapsed},
-		{"ready to queue", EpicListRow{Section: SectionReadyToQueue, CreatedAt: at}, cardTimeSources{}, CardTimeCreated},
-		{"ready to design", EpicListRow{Section: SectionReadyToDesign, CreatedAt: at}, cardTimeSources{}, CardTimeCreated},
-		{"finished", EpicListRow{Section: SectionFinished, CompletedAt: at}, cardTimeSources{}, CardTimeFinished},
-		{"no start", EpicListRow{Section: SectionNeedsYou}, cardTimeSources{}, ""},
-		{"no section", EpicListRow{CreatedAt: at}, cardTimeSources{}, ""},
+		{"needs you", wire.EpicListRow{Section: wire.SectionNeedsYou, WaitingSince: at}, cardTimeSources{}, wire.CardTimeWaiting},
+		{"running", wire.EpicListRow{Section: wire.SectionImplementing, State: wire.EpicListRunning}, cardTimeSources{startedAt: at}, wire.CardTimeElapsed},
+		{"ready to queue", wire.EpicListRow{Section: wire.SectionReadyToQueue, CreatedAt: at}, cardTimeSources{}, wire.CardTimeCreated},
+		{"ready to design", wire.EpicListRow{Section: wire.SectionReadyToDesign, CreatedAt: at}, cardTimeSources{}, wire.CardTimeCreated},
+		{"finished", wire.EpicListRow{Section: wire.SectionFinished, CompletedAt: at}, cardTimeSources{}, wire.CardTimeFinished},
+		{"no start", wire.EpicListRow{Section: wire.SectionNeedsYou}, cardTimeSources{}, ""},
+		{"no section", wire.EpicListRow{CreatedAt: at}, cardTimeSources{}, ""},
 	} {
 		kind, start := cardTimeFor(tc.row, tc.src)
 		if kind != tc.kind || (kind != "" && !start.Equal(at)) {

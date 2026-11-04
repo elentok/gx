@@ -82,22 +82,22 @@ func (c *Client) Explain(ctx context.Context, address string) (server.Explanatio
 }
 
 // Detail returns one ticket's pause detail, by its full address.
-func (c *Client) Detail(ctx context.Context, address string) (server.TicketDetail, error) {
-	var d server.TicketDetail
+func (c *Client) Detail(ctx context.Context, address string) (wire.TicketDetail, error) {
+	var d wire.TicketDetail
 	err := c.get(ctx, "/v1/tickets/detail?address="+url.QueryEscape(address), &d)
 	return d, err
 }
 
 // Epics returns every epic the Epics page lists.
-func (c *Client) Epics(ctx context.Context) (server.EpicList, error) {
-	var l server.EpicList
+func (c *Client) Epics(ctx context.Context) (wire.EpicList, error) {
+	var l wire.EpicList
 	err := c.get(ctx, "/v1/epics", &l)
 	return l, err
 }
 
 // EpicDetail returns an epic's state, progress and ticket rows.
-func (c *Client) EpicDetail(ctx context.Context, address string) (server.EpicDetail, error) {
-	var d server.EpicDetail
+func (c *Client) EpicDetail(ctx context.Context, address string) (wire.EpicDetail, error) {
+	var d wire.EpicDetail
 	err := c.get(ctx, "/v1/epics/detail?address="+url.QueryEscape(address), &d)
 	return d, err
 }

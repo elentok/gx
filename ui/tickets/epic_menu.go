@@ -3,13 +3,13 @@ package tickets
 import (
 	"context"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -102,11 +102,11 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 	for _, word := range in.actions {
 		v, ok := schema.VerbOfWord(word)
 		switch word {
-		case server.ActionStashMerge:
+		case wire.ActionStashMerge:
 			it := pick(v.Label(), "", actionStashMerge, contextmenu.Suggested, blockedWhy)
 			it.Help = v.Tooltip()
 			items = append(items, it)
-		case server.ActionMerge:
+		case wire.ActionMerge:
 			if ok {
 				mergeItem.Label = v.Label()
 				mergeItem.Help = v.Tooltip()
@@ -154,7 +154,7 @@ func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
 
 // epicSummaryActions is the Actions of the summary for address, nil when the
 // server sent none.
-func epicSummaryActions(sums []server.EpicSummary, address string) []string {
+func epicSummaryActions(sums []wire.EpicSummary, address string) []string {
 	for _, s := range sums {
 		if s.Address == address {
 			return s.Actions

@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -24,14 +24,14 @@ func runEv(typ events.Type, min int, mod func(*ralphloop.Event)) ralphloop.Event
 	return ev
 }
 
-func runsOf(t *testing.T, status string, evs ...ralphloop.Event) []server.DetailRun {
+func runsOf(t *testing.T, status string, evs ...ralphloop.Event) []wire.DetailRun {
 	t.Helper()
 	return runsWith(t, status, "", nil, nil, evs...)
 }
 
 // runsWith is runsOf for a ticket with extra frontmatter, pause answers in its
 // log at the given minutes, and a hook on the ticket file once it is written.
-func runsWith(t *testing.T, status, extra string, answerMins []int, prep func(ticketPath string), evs ...ralphloop.Event) []server.DetailRun {
+func runsWith(t *testing.T, status, extra string, answerMins []int, prep func(ticketPath string), evs ...ralphloop.Event) []wire.DetailRun {
 	t.Helper()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
@@ -72,11 +72,11 @@ func TestTicketDetail_RunsWithNoNormalEnd(t *testing.T) {
 		runEv(events.Reclaimed, 22, nil),
 		runEv(events.CherryPicked, 30, nil),
 	)
-	want := []server.DetailRun{
-		{Start: runsAt(0), Duration: 120, Outcome: server.RunAgentGoneAfterRestart, StartKind: server.StartNewSession},
-		{Start: runsAt(10), Duration: 300, Outcome: server.RunAgentLost, StartKind: server.StartNewSession},
-		{Start: runsAt(15), Duration: 180, Outcome: server.RunRelaunched, StartKind: server.StartNewSession},
-		{Start: runsAt(20), Duration: 600, Outcome: server.RunMerged, StartKind: server.StartNewSession},
+	want := []wire.DetailRun{
+		{Start: runsAt(0), Duration: 120, Outcome: wire.RunAgentGoneAfterRestart, StartKind: wire.StartNewSession},
+		{Start: runsAt(10), Duration: 300, Outcome: wire.RunAgentLost, StartKind: wire.StartNewSession},
+		{Start: runsAt(15), Duration: 180, Outcome: wire.RunRelaunched, StartKind: wire.StartNewSession},
+		{Start: runsAt(20), Duration: 600, Outcome: wire.RunMerged, StartKind: wire.StartNewSession},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("runs = %+v\nwant %+v", got, want)
@@ -91,7 +91,7 @@ func TestTicketDetail_CancelledRunEndsAtStatusWrite(t *testing.T) {
 		}
 	}
 	got := runsWith(t, "cancelled", "", nil, prep, runEv(events.IterationStarted, 40, nil))
-	want := []server.DetailRun{{Start: runsAt(40), Duration: 600, Outcome: server.RunCancelled, StartKind: server.StartNewSession}}
+	want := []wire.DetailRun{{Start: runsAt(40), Duration: 600, Outcome: wire.RunCancelled, StartKind: wire.StartNewSession}}
 	if !slices.Equal(got, want) {
 		t.Fatalf("runs = %+v\nwant %+v", got, want)
 	}
@@ -106,9 +106,9 @@ func TestTicketDetail_AnswerToLiveAgentStartsSameSessionRun(t *testing.T) {
 		runEv(events.Paused, 3, paused),
 		runEv(events.CherryPicked, 12, nil),
 	)
-	want := []server.DetailRun{
-		{Start: runsAt(0), Duration: 180, Outcome: server.RunPaused, PauseLabel: "Merge conflict", StartKind: server.StartNewSession},
-		{Start: runsAt(5), Duration: 420, Outcome: server.RunMerged, StartKind: server.StartSameSession},
+	want := []wire.DetailRun{
+		{Start: runsAt(0), Duration: 180, Outcome: wire.RunPaused, PauseLabel: "Merge conflict", StartKind: wire.StartNewSession},
+		{Start: runsAt(5), Duration: 420, Outcome: wire.RunMerged, StartKind: wire.StartSameSession},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("runs = %+v\nwant %+v", got, want)
@@ -124,7 +124,7 @@ func TestTicketDetail_AnswerThenFreshStartAddsNoExtraRun(t *testing.T) {
 		runEv(events.IterationStarted, 8, nil),
 		runEv(events.CherryPicked, 12, nil),
 	)
-	if len(got) != 2 || got[1].Start != runsAt(8) || got[1].Outcome != server.RunMerged {
+	if len(got) != 2 || got[1].Start != runsAt(8) || got[1].Outcome != wire.RunMerged {
 		t.Fatalf("runs = %+v", got)
 	}
 }
@@ -137,7 +137,7 @@ func TestTicketDetail_AnswerToLiveAgentStillRunning(t *testing.T) {
 		runEv(events.IterationStarted, 0, nil),
 		runEv(events.Paused, 3, paused),
 	)
-	if len(got) != 2 || got[1].Start != runsAt(5) || got[1].Outcome != server.RunRunning || got[1].StartKind != server.StartSameSession {
+	if len(got) != 2 || got[1].Start != runsAt(5) || got[1].Outcome != wire.RunRunning || got[1].StartKind != wire.StartSameSession {
 		t.Fatalf("runs = %+v", got)
 	}
 }
@@ -151,9 +151,9 @@ func TestTicketDetail_LateFinishAdoptionStartsRunUntilMerge(t *testing.T) {
 		runEv(events.LateFinishAdopted, 20, nil),
 		runEv(events.CherryPicked, 21, nil),
 	)
-	want := []server.DetailRun{
-		{Start: runsAt(0), Duration: 180, Outcome: server.RunPaused, PauseLabel: "Merge conflict", StartKind: server.StartNewSession},
-		{Start: runsAt(20), Duration: 60, Outcome: server.RunMerged, StartKind: server.StartSameSession},
+	want := []wire.DetailRun{
+		{Start: runsAt(0), Duration: 180, Outcome: wire.RunPaused, PauseLabel: "Merge conflict", StartKind: wire.StartNewSession},
+		{Start: runsAt(20), Duration: 60, Outcome: wire.RunMerged, StartKind: wire.StartSameSession},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("runs = %+v\nwant %+v", got, want)
@@ -179,11 +179,11 @@ func TestTicketDetail_RunsWithNormalEnds(t *testing.T) {
 		runEv(events.TicketStartedOver, 41, nil),
 	)
 	at := func(min int) time.Time { return runsT0.Add(time.Duration(min) * time.Minute) }
-	want := []server.DetailRun{
-		{Start: at(0), Duration: 600, Outcome: server.RunMerged, StartKind: server.StartNewSession},
-		{Start: at(20), Duration: 300, Outcome: server.RunMergedNoCommits, StartKind: server.StartSameSession},
-		{Start: at(30), Duration: 180, Outcome: server.RunPaused, PauseLabel: "Merge conflict", StartKind: server.StartSameSession},
-		{Start: at(40), Duration: 60, Outcome: server.RunStartedOver, StartKind: server.StartNewSession},
+	want := []wire.DetailRun{
+		{Start: at(0), Duration: 600, Outcome: wire.RunMerged, StartKind: wire.StartNewSession},
+		{Start: at(20), Duration: 300, Outcome: wire.RunMergedNoCommits, StartKind: wire.StartSameSession},
+		{Start: at(30), Duration: 180, Outcome: wire.RunPaused, PauseLabel: "Merge conflict", StartKind: wire.StartSameSession},
+		{Start: at(40), Duration: 60, Outcome: wire.RunStartedOver, StartKind: wire.StartNewSession},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("runs = %+v\nwant %+v", got, want)
@@ -193,7 +193,7 @@ func TestTicketDetail_RunsWithNormalEnds(t *testing.T) {
 func TestTicketDetail_OpenLastRun(t *testing.T) {
 	t.Parallel()
 	start := runEv(events.IterationStarted, 0, nil)
-	for status, want := range map[string]string{"claimed": server.RunRunning, "open": server.RunAgentLost} {
+	for status, want := range map[string]string{"claimed": wire.RunRunning, "open": wire.RunAgentLost} {
 		got := runsOf(t, status, start)
 		if len(got) != 1 || got[0].Outcome != want || got[0].Duration != 0 {
 			t.Fatalf("status %s: runs = %+v, want one %s run with no duration", status, got, want)

@@ -9,7 +9,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -38,7 +37,7 @@ type QueueModel struct {
 	// summaries and herdrDown come from the delivered state: the server's
 	// summary of each queued epic by epic name, and whether the server can
 	// launch agents.
-	summaries map[string]server.EpicSummary
+	summaries map[string]wire.EpicSummary
 	// harnessLabels is the snapshot's row label by ticket address.
 	harnessLabels map[string]string
 	// waitingLabels is the Queue agent rows' check-lock label by ticket address.
@@ -52,7 +51,7 @@ type QueueModel struct {
 	// finished is the snapshot's Recently finished list. finishedGen numbers the
 	// refresh tick chain: each page activation starts a new chain and the older
 	// chain's pending tick is ignored.
-	finished    []server.FinishedEpic
+	finished    []wire.FinishedEpic
 	finishedGen int
 	// serverBudget is the last snapshot's budget: the header's spend and the
 	// root rows' cost in server mode.

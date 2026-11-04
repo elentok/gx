@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,7 +15,7 @@ import (
 
 func TestPrintEpicDetail_ShowsQueueable(t *testing.T) {
 	var out bytes.Buffer
-	d := server.EpicDetail{Address: "proj:epic", Kind: server.EpicKindLoop, Done: 1, Total: 2, Queueable: true}
+	d := wire.EpicDetail{Address: "proj:epic", Kind: wire.EpicKindLoop, Done: 1, Total: 2, Queueable: true}
 	if err := printEpicDetail(&out, d); err != nil {
 		t.Fatal(err)
 	}
@@ -25,9 +26,9 @@ func TestPrintEpicDetail_ShowsQueueable(t *testing.T) {
 
 func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 	var out bytes.Buffer
-	l := server.EpicList{Epics: []server.EpicListRow{
-		{Address: "proj:a", Kind: server.EpicKindLoop, State: server.EpicListReady, Done: 1, Total: 2, Queueable: true, Section: server.SectionReadyToQueue},
-		{Address: "proj:b", Kind: server.EpicKindMap, State: server.EpicListDesigning},
+	l := wire.EpicList{Epics: []wire.EpicListRow{
+		{Address: "proj:a", Kind: wire.EpicKindLoop, State: wire.EpicListReady, Done: 1, Total: 2, Queueable: true, Section: wire.SectionReadyToQueue},
+		{Address: "proj:b", Kind: wire.EpicKindMap, State: wire.EpicListDesigning},
 	}}
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
@@ -39,8 +40,8 @@ func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 
 func TestPrintEpicList_JoinedCardPrintsTheActivePartsAddress(t *testing.T) {
 	var out bytes.Buffer
-	l := server.EpicList{Epics: []server.EpicListRow{
-		{Address: "proj:m", Addresses: []string{"proj:m-impl", "proj:m"}, Kind: server.EpicKindMap, State: server.EpicListRunning, Section: server.SectionImplementing},
+	l := wire.EpicList{Epics: []wire.EpicListRow{
+		{Address: "proj:m", Addresses: []string{"proj:m-impl", "proj:m"}, Kind: wire.EpicKindMap, State: wire.EpicListRunning, Section: wire.SectionImplementing},
 	}}
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
@@ -52,9 +53,9 @@ func TestPrintEpicList_JoinedCardPrintsTheActivePartsAddress(t *testing.T) {
 
 func TestPrintEpicList_NeedsYouRowsKeepTheServersOldestWaitOrder(t *testing.T) {
 	var out bytes.Buffer
-	l := server.EpicList{Epics: []server.EpicListRow{
-		{Address: "proj:old", Kind: server.EpicKindLoop, State: server.EpicListPaused, Section: server.SectionNeedsYou, WaitingSince: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{Address: "proj:new", Kind: server.EpicKindLoop, State: server.EpicListMergeBlocked, Section: server.SectionNeedsYou, WaitingSince: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)},
+	l := wire.EpicList{Epics: []wire.EpicListRow{
+		{Address: "proj:old", Kind: wire.EpicKindLoop, State: wire.EpicListPaused, Section: wire.SectionNeedsYou, WaitingSince: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{Address: "proj:new", Kind: wire.EpicKindLoop, State: wire.EpicListMergeBlocked, Section: wire.SectionNeedsYou, WaitingSince: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)},
 	}}
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
@@ -67,8 +68,8 @@ func TestPrintEpicList_NeedsYouRowsKeepTheServersOldestWaitOrder(t *testing.T) {
 
 func TestPrintEpicList_OneOffPrintsTicketAddressAndCardKind(t *testing.T) {
 	var out bytes.Buffer
-	l := server.EpicList{Epics: []server.EpicListRow{
-		{Address: "proj:one-offs/01", Addresses: []string{"proj:one-offs/01"}, Kind: server.EpicKindLoop, CardKind: server.CardKindOneOff, State: server.EpicListQueued, Section: server.SectionImplementing},
+	l := wire.EpicList{Epics: []wire.EpicListRow{
+		{Address: "proj:one-offs/01", Addresses: []string{"proj:one-offs/01"}, Kind: wire.EpicKindLoop, CardKind: wire.CardKindOneOff, State: wire.EpicListQueued, Section: wire.SectionImplementing},
 	}}
 	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
@@ -79,10 +80,10 @@ func TestPrintEpicList_OneOffPrintsTicketAddressAndCardKind(t *testing.T) {
 }
 
 func TestPrintEpicList_FinishedIsCappedUnlessAllFinished(t *testing.T) {
-	l := server.EpicList{RecentlyFinished: 2, Epics: []server.EpicListRow{
-		{Address: "proj:a", Kind: server.EpicKindLoop, State: server.EpicListFinished, Section: server.SectionFinished},
-		{Address: "proj:b", Kind: server.EpicKindLoop, State: server.EpicListFinished, Section: server.SectionFinished},
-		{Address: "proj:c", Kind: server.EpicKindLoop, State: server.EpicListFinished, Section: server.SectionFinished},
+	l := wire.EpicList{RecentlyFinished: 2, Epics: []wire.EpicListRow{
+		{Address: "proj:a", Kind: wire.EpicKindLoop, State: wire.EpicListFinished, Section: wire.SectionFinished},
+		{Address: "proj:b", Kind: wire.EpicKindLoop, State: wire.EpicListFinished, Section: wire.SectionFinished},
+		{Address: "proj:c", Kind: wire.EpicKindLoop, State: wire.EpicListFinished, Section: wire.SectionFinished},
 	}}
 	for _, tc := range []struct {
 		all  bool

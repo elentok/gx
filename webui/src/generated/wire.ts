@@ -107,6 +107,309 @@ export interface KindCheck {
 }
 
 //////////
+// source: detail.go
+
+export const ActionAnswer = "answer";
+export const ActionApprove = "approve";
+export const ActionResume = "resume";
+export const ActionRetry = "retry";
+export const ActionStartOver = "start-over";
+export const ActionMerge = "merge";
+export const ActionChooseBase = "choose-base";
+export const ActionReopenAndRetry = "reopen-and-retry";
+export const ActionStashMerge = "stash-merge";
+/**
+ * ActionResumeOnWorker ends a model-mismatch pause; the web posts a resume with tier=worker.
+ */
+export const ActionResumeOnWorker = "resume-on-worker";
+/**
+ * Actions the detail route offers. The server decides them; the UI renders them.
+ */
+export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume | typeof ActionRetry | typeof ActionStartOver | typeof ActionMerge | typeof ActionChooseBase | typeof ActionReopenAndRetry | typeof ActionStashMerge | typeof ActionResumeOnWorker;
+export const RoundOpen = "open";
+export const RoundAnswered = "answered";
+export const RoundClosed = "closed";
+/**
+ * Outcomes of a pause round.
+ */
+export type Round = typeof RoundOpen | typeof RoundAnswered | typeof RoundClosed;
+/**
+ * ActionInfo is the text of one action's button.
+ */
+export interface ActionInfo {
+  label: string;
+  tooltip: string;
+}
+/**
+ * DetailOption is one choice of an options question.
+ */
+export interface DetailOption {
+  id: string;
+  label: string;
+  consequence?: string;
+}
+/**
+ * DetailRound is one pause round. The earlier rounds fill only Seq, By, Summary
+ * and Outcome; the latest fills the rest.
+ */
+export interface DetailRound {
+  seq: number /* int */;
+  by: string;
+  summary: string;
+  outcome: string;
+  kind?: string;
+  text?: string;
+  block?: string;
+  handoff?: string;
+  options?: DetailOption[];
+  recommended?: string;
+  yes?: string;
+  no?: string;
+  /**
+   * Answer is the pause.answer that ended the round.
+   */
+  answer?: DetailAnswer;
+  /**
+   * ClosedReason is the pause.closed reason of a round no answer ended.
+   */
+  closed_reason?: string;
+  /**
+   * PromptedAt is when a person last prompted the running agent of this open
+   * round, and Prompt is the line the web shows for it.
+   */
+  prompted_at?: string;
+  prompt?: string;
+}
+/**
+ * DetailAnswer is a person's reply to a round.
+ */
+export interface DetailAnswer {
+  source?: string;
+  choice?: string;
+  text?: string;
+  note?: string;
+}
+/**
+ * DetailRecommendation is what an investigate agent left on a paused ticket: its
+ * diagnosis and the one verb of Actions it recommends.
+ */
+export interface DetailRecommendation {
+  verb: string;
+  diagnosis: string;
+}
+/**
+ * PermissionCard is the pending permission prompt of a blocked agent.
+ */
+export interface PermissionCard {
+  request_id: string;
+  tool?: string;
+  input?: string;
+  description?: string;
+  /**
+   * Hint is set when the prompt cannot be approved from here; the card carries
+   * no approve action then.
+   */
+  hint?: string;
+}
+/**
+ * ChatMessage is one message of the latest round's exchange.
+ */
+export interface ChatMessage {
+  from: string; // "agent", "gx", or the answer's source
+  text: string;
+}
+/**
+ * TicketDetail is the /v1/tickets/detail payload.
+ */
+export interface TicketDetail {
+  address: string;
+  title: string;
+  status: string;
+  /**
+   * PauseReason picks the action the page labels: Answer, Choose base, Retry or Resume.
+   */
+  pause_reason?: string;
+  /**
+   * PauseLabel is PauseReason in the plain words the summaries and Queue show.
+   */
+  pause_label?: string;
+  /**
+   * WaitingLabel is set while the claimed ticket's check run waits for the
+   * check lock. A label only: Status and the pause fields do not change.
+   */
+  waiting_label?: string;
+  /**
+   * ModelRan and ModelExpected are the two models a model-mismatch pause shows.
+   */
+  model_ran?: string;
+  model_expected?: string;
+  /**
+   * LongTicketTurns and LongTicketThreshold feed the Long-running badge: the turn
+   * count stored by the alert, and budget.long-ticket-turns. Both are 0 when unmarked.
+   */
+  long_ticket_turns?: number /* int */;
+  long_ticket_threshold?: number /* int */;
+  /**
+   * PauseText is the body's "## Paused" section; the body keeps it too, so the
+   * client leaves it out of the description.
+   */
+  pause_text?: string;
+  type?: string;
+  epic: string;
+  /**
+   * MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
+   */
+  map_epic: boolean;
+  /**
+   * Body is the whole body markdown, comments included.
+   */
+  body?: string;
+  related: RelatedTicket[];
+  stats?: DetailStats;
+  /**
+   * Answered is derived, never stored: the ticket is open again and its
+   * latest question has an answer.
+   */
+  answered: boolean;
+  /**
+   * Rounds holds every round before the latest, oldest first.
+   */
+  rounds: DetailRound[];
+  latest?: DetailRound;
+  /**
+   * Permission is empty until a headless or pty agent reports a pending prompt.
+   */
+  permission?: PermissionCard;
+  chat: ChatMessage[];
+  /**
+   * Runs is one line per run, oldest first; a map ticket has none.
+   */
+  runs: DetailRun[];
+  /**
+   * HasScreen is set when the latest run's agent ran in a pty, so
+   * /v1/sessions/screen?ticket= has a screen to show.
+   */
+  has_screen?: boolean;
+  /**
+   * State is the token an answer or resume sends back; empty without a round.
+   */
+  state?: string;
+  /**
+   * Bases are the competing blockers an ambiguous-base pause chooses between;
+   * the resume sends the chosen one back as its base.
+   */
+  bases?: string[];
+  actions: string[];
+  /**
+   * Recommendation is set while the open pause round carries one.
+   */
+  recommendation?: DetailRecommendation;
+  /**
+   * ActionInfo gives each entry of Actions its button label and tooltip, from
+   * the pause-to-verb table, so the page holds no verb text of its own.
+   */
+  action_info?: { [key: string]: ActionInfo};
+  /**
+   * ErrorReason, ParseError and Path are set for an Error ticket. ParseError is
+   * set only when the file fails to parse, and then the payload carries no body
+   * or stats.
+   */
+  error_reason?: string;
+  parse_error?: string;
+  path?: string;
+}
+
+//////////
+// source: detailrelated.go
+
+export const RelationBlocker = "blocker";
+export const RelationParent = "parent";
+export const RelationFork = "fork";
+/**
+ * Relations a related ticket has to the one on the page.
+ */
+export type Relation = typeof RelationBlocker | typeof RelationParent | typeof RelationFork;
+/**
+ * RelatedTicket is one ticket line of the detail page's Related section.
+ */
+export interface RelatedTicket {
+  relation: string;
+  /**
+   * Address is canonical for a ticket of the same project. A blocker that
+   * names no ticket keeps the token as written.
+   */
+  address: string;
+  /**
+   * Linkable is false for a blocker that names no ticket, which has nothing to link to.
+   */
+  linkable: boolean;
+  title: string;
+  /**
+   * Status is the rendered-status word the epic rows use.
+   */
+  status: string;
+}
+/**
+ * DetailStats is the stat line of a loop ticket. Cost and ContextWindow come
+ * from the merge stamps and stay empty until the ticket merges. A map ticket
+ * has no stats.
+ */
+export interface DetailStats {
+  /**
+   * Elapsed is in seconds; a claimed ticket ticks on the client from ClaimedAt.
+   */
+  elapsed?: number /* int */;
+  claimed_at?: string;
+  cost?: number /* float64 */;
+  had_codex?: boolean;
+  context_window?: number /* int */;
+}
+
+//////////
+// source: detailruns.go
+
+export const RunMerged = "merged";
+export const RunMergedNoCommits = "merged-no-commits";
+export const RunPaused = "paused";
+export const RunStartedOver = "started-over";
+export const RunRunning = "running";
+export const RunAgentLost = "agent-lost";
+/**
+ * RunAgentGoneAfterRestart is a run a restarted server found dead with no
+ * work to keep, and put back in the queue.
+ */
+export const RunAgentGoneAfterRestart = "agent-gone-after-restart";
+export const RunRelaunched = "relaunched";
+export const RunCancelled = "cancelled";
+/**
+ * Outcomes of a run line.
+ */
+export type Run = typeof RunMerged | typeof RunMergedNoCommits | typeof RunPaused | typeof RunStartedOver | typeof RunRunning | typeof RunAgentLost | typeof RunAgentGoneAfterRestart | typeof RunRelaunched | typeof RunCancelled;
+export const StartNewSession = "new-session";
+export const StartSameSession = "same-session";
+/**
+ * How a run began. The run log keeps cold-start and resumed; the page labels
+ * them "new session" and "same session".
+ */
+export type Start = typeof StartNewSession | typeof StartSameSession;
+/**
+ * DetailRun is one run line of the Runs section.
+ */
+export interface DetailRun {
+  start: string;
+  /**
+   * Duration is in seconds; a running or lost run has none.
+   */
+  duration?: number /* int */;
+  outcome: string;
+  /**
+   * PauseLabel is the reason label of a run that ended in a pause.
+   */
+  pause_label?: string;
+  start_kind: string;
+}
+
+//////////
 // source: diskcleannow.go
 
 /**
@@ -201,6 +504,577 @@ export interface DiskReport {
   warn_below: string;
   clean_below: string;
   disks: DiskStatus[];
+}
+
+//////////
+// source: epiccard.go
+
+/**
+ * CardSection is the Epics page section a card belongs to. The server decides it;
+ * the web client does not derive sections.
+ */
+export type CardSection = string;
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionNeedsYou: CardSection = "needs-you";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionImplementing: CardSection = "implementing";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionDesigning: CardSection = "designing";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionReadyToQueue: CardSection = "ready-to-queue";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionReadyToDesign: CardSection = "ready-to-design";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionFinished: CardSection = "finished";
+/**
+ * CardKind is the kind of an Epics page card.
+ */
+export const CardKindImplementation = "implementation";
+export const CardKindDesign = "design";
+export const CardKindOneOff = "one-off";
+export const CardKindFollowUps = "follow-ups";
+export type CardKind = typeof CardKindImplementation | typeof CardKindDesign | typeof CardKindOneOff | typeof CardKindFollowUps;
+/**
+ * CardActionKind names what a card button does.
+ */
+export type CardActionKind = string;
+export const CardActionQueue: CardActionKind = "queue";
+export const CardActionAnswer: CardActionKind = "answer";
+export const CardActionOpenTicket: CardActionKind = "open-ticket";
+export const CardActionOpenEpic: CardActionKind = "open-epic";
+export const CardActionMerge: CardActionKind = "merge";
+/**
+ * StashMerge targets the epic like Merge; its route is a later ticket's.
+ */
+export const CardActionStashMerge: CardActionKind = "stash-merge";
+/**
+ * The Design actions target the Design's epic address. Design and Continue
+ * start a session first (POST open-design); Answer and Open only navigate.
+ */
+export const CardActionDesign: CardActionKind = "design";
+export const CardActionContinue: CardActionKind = "continue";
+export const CardActionOpen: CardActionKind = "open";
+/**
+ * Triage targets the project whose follow-ups the card counts.
+ */
+export const CardActionTriage: CardActionKind = "triage";
+/**
+ * CardAction is one button of a card. Target is the address the button opens (a
+ * ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).
+ */
+export interface CardAction {
+  kind: CardActionKind;
+  label: string;
+  target?: string;
+  /**
+   * Link is the hash route the button opens, when the server decides it. Answer
+   * sets it for a Design question; the client falls back to the ticket page.
+   */
+  link?: string;
+}
+/**
+ * CardTimeKind says what the card's start time measures; the client words it.
+ */
+export type CardTimeKind = string;
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeElapsed: CardTimeKind = "elapsed";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeWaiting: CardTimeKind = "waiting";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeCreated: CardTimeKind = "created";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeFinished: CardTimeKind = "finished";
+
+//////////
+// source: epicdetail.go
+
+export const EpicKindLoop = "loop";
+export const EpicKindMap = "map";
+/**
+ * Epic kinds of an EpicDetail.
+ */
+export type EpicKind = typeof EpicKindLoop | typeof EpicKindMap;
+/**
+ * EpicDetailRow is one ticket of an EpicDetail. A map epic's rows leave Parent,
+ * Cost, Asking, Question and Reason empty.
+ */
+export interface EpicDetailRow extends HarnessLabel {
+  address: string;
+  title: string;
+  rendered_status: string;
+  type?: string;
+  parent?: string;
+  /**
+   * LongTicketTurns and LongTicketThreshold feed the Long-running badge; both are 0 when unmarked.
+   */
+  long_ticket_turns?: number /* int */;
+  long_ticket_threshold?: number /* int */;
+  /**
+   * Elapsed is in seconds and set once the ticket merges; a running row ticks
+   * on the client from ClaimedAt. On a map row it is the done time minus the
+   * claim time, absent when either is unset.
+   */
+  elapsed?: number /* int */;
+  cost?: number /* float64 */;
+  /**
+   * HadCodex marks a ticket with a Codex session; its Cost covers only the Claude part.
+   */
+  had_codex?: boolean;
+  claimed_at?: string;
+  /**
+   * ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
+   */
+  closed_at?: string;
+  /**
+   * Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
+   */
+  blockers?: string[];
+  /**
+   * Asking is set on a paused ticket with an open question; Question is its summary line.
+   */
+  needs_answer?: boolean;
+  question?: string;
+  /**
+   * Reason is the plain-words pause reason of a paused loop-epic ticket.
+   */
+  reason?: string;
+  /**
+   * State is the token the fix-agent route needs; set on a row paused for repair.
+   */
+  state?: string;
+  /**
+   * FixPrompt is the prompt the fix agent starts from; set on a row paused for repair.
+   */
+  fix_prompt?: string;
+  /**
+   * Current and Blocked are set on a map epic's rows: Current is the claimed
+   * ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
+   */
+  current?: boolean;
+  blocked?: boolean;
+}
+/**
+ * MapStepState is where a Progress step stands.
+ */
+export type MapStepState = string;
+export const MapStepDone: MapStepState = "done";
+export const MapStepCurrent: MapStepState = "current";
+export const MapStepTodo: MapStepState = "todo";
+/**
+ * MapStep is one of the eight Progress steps of a map epic.
+ */
+export interface MapStep {
+  step: ProgressStep;
+  label: string;
+  state: MapStepState;
+}
+/**
+ * EpicStats is an epic page's Stats section. Every field is absent when it is
+ * not stamped, never zero by default.
+ */
+export interface EpicStats {
+  lines_added?: number /* int */;
+  lines_removed?: number /* int */;
+  total_tokens?: number /* int64 */;
+  /**
+   * Cost is absent when any ticket had a Codex session.
+   */
+  cost?: number /* float64 */;
+  /**
+   * LeadTime is in seconds, from created_at to the merge (loop) or completion
+   * (map); LeadTimeSoFar is set while that end is unset and LeadTime runs to now.
+   */
+  lead_time?: number /* int */;
+  lead_time_so_far?: boolean;
+  /**
+   * Friction is a loop epic's summed friction values.
+   */
+  friction?: EpicFriction;
+}
+/**
+ * EpicFriction is the Friction part of EpicStats.
+ */
+export interface EpicFriction {
+  /**
+   * PausesByReason counts pauses by reason, so the client can show the top ones.
+   */
+  pauses_by_reason?: { [key: string]: number /* int */};
+  run_events?: { [key: string]: number /* int */};
+  paused_secs: number /* int */;
+  /**
+   * WebShare is the fraction of pause endings made on the web; absent with no endings.
+   */
+  web_share?: number /* float64 */;
+}
+/**
+ * EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
+ * the payload carries no token counts outside Stats.
+ */
+export interface EpicDetail {
+  address: string;
+  kind: string;
+  /**
+   * State is empty for a map epic.
+   */
+  state?: EpicState;
+  summary: string;
+  /**
+   * Done counts cancelled tickets too.
+   */
+  done: number /* int */;
+  total: number /* int */;
+  /**
+   * WallClock runs from the epic's started_at to completed_at, or to now while
+   * it runs; it is absent before the first claim. AgentTime and CostTotal add up
+   * merged tickets only and are always sent, so a zero total still shows.
+   */
+  wall_clock?: number /* int */;
+  agent_time: number /* int */;
+  cost_total: number /* float64 */;
+  rows: EpicDetailRow[];
+  /**
+   * Queueable is set when the Queue action applies; see epicQueueable.
+   */
+  queueable: boolean;
+  /**
+   * Queued is set when the epic holds a queue item. A Waiting epic that is not
+   * queued is not waiting for a slot.
+   */
+  queued: boolean;
+  /**
+   * MergeBlockKind and MergeBlockReason describe why a Merge blocked epic's last
+   * merge paused.
+   */
+  land_block_kind?: string;
+  land_block_reason?: string;
+  /**
+   * MergeBlockFiles is every file a dirty-trunk pause names; the reason caps its list.
+   */
+  land_block_files?: string[];
+  /**
+   * Actions are the verbs of a Merge blocked epic's pause, from the pause-to-verb
+   * table, in display order.
+   */
+  actions?: string[];
+  /**
+   * ActionInfo gives each entry of Actions its button label and tooltip.
+   */
+  action_info?: { [key: string]: ActionInfo};
+  /**
+   * Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
+   */
+  steps?: MapStep[];
+  impl_address?: string;
+  /**
+   * RingProgress is a map epic's Design progress in percent, as on the Design card.
+   */
+  ring_progress?: number /* int */;
+  /**
+   * DesignSection is a map epic's own Design card section, which the page's tone
+   * reads even when a joined card shows the -impl epic instead.
+   */
+  design_section?: CardSection;
+  /**
+   * Draft is set on a loop epic that is still being published into.
+   */
+  draft?: boolean;
+  /**
+   * Deletable is set on an uncharted design, the rule the designs delete route guards.
+   */
+  deletable?: boolean;
+  stats: EpicStats;
+}
+
+//////////
+// source: epiclist.go
+
+/**
+ * EpicListState is EpicListRow.State. It is a superset of EpicState: it also
+ * names the epics the Epics page lists that no queue item holds.
+ */
+export type EpicListState = string;
+/**
+ * Spelled as literals, not EpicListState(EpicState...): tygo emits a conversion as `any`,
+ * which throws when the web app imports the generated file.
+ */
+export const EpicListFinished: EpicListState = "finished";
+export const EpicListRunning: EpicListState = "running";
+export const EpicListAwaitingMerge: EpicListState = "awaiting-merge";
+export const EpicListMerging: EpicListState = "merging";
+export const EpicListPaused: EpicListState = "paused";
+export const EpicListReady: EpicListState = "ready";
+export const EpicListDesigning: EpicListState = "designing";
+export const EpicListWaitingToDesign: EpicListState = "waiting-to-design";
+export const EpicListQueued: EpicListState = "queued";
+export const EpicListMergeBlocked: EpicListState = "merge-blocked";
+export const EpicListDraft: EpicListState = "draft";
+/**
+ * EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
+ * nothing to queue, yet not finished.
+ */
+export const EpicListNoOpenTickets: EpicListState = "no-open-tickets";
+/**
+ * EpicListFollowUps is a project's follow-ups card; see followUpsCard.
+ */
+export const EpicListFollowUps: EpicListState = "follow-ups";
+/**
+ * ProgressStep is the step a map's design has reached; see mapProgress. The
+ * tickets package owns the list of steps. The constants below are literals,
+ * not tickets.Step*, because tygo cannot resolve another package's constant;
+ * TestProgressStepsMatchTickets keeps them in sync.
+ */
+export type ProgressStep = string;
+export const ProgressChart: ProgressStep = "chart";
+export const ProgressResolveTickets: ProgressStep = "resolve-tickets";
+export const ProgressSpec: ProgressStep = "spec";
+export const ProgressReview: ProgressStep = "review";
+export const ProgressGrillFindings: ProgressStep = "grill-findings";
+export const ProgressCreateTickets: ProgressStep = "create-tickets";
+export const ProgressBranch: ProgressStep = "branch";
+export const ProgressDone: ProgressStep = "done";
+/**
+ * EpicListRow is one epic of the /v1/epics payload.
+ */
+export interface EpicListRow {
+  address: string;
+  project: string;
+  name: string;
+  kind: string;
+  state: EpicListState;
+  done: number /* int */;
+  total: number /* int */;
+  completed_at?: string;
+  merged_at?: string;
+  created_at?: string;
+  /**
+   * QueuedAt is the epic's first enqueue, else started_at, else merged_at.
+   */
+  queued_at?: string;
+  /**
+   * Queued is set while a queue item holds the epic.
+   */
+  queued: boolean;
+  /**
+   * Queueable is set when the Queue action applies; see epicQueueable.
+   */
+  queueable: boolean;
+  /**
+   * BlockedByEpics are the addresses of the epics named in blocked_by that
+   * have not merged yet.
+   */
+  blocked_by_epics: string[];
+  /**
+   * LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
+   */
+  last_activity_at?: string;
+  /**
+   * MergeBlockKind and MergeBlockReason are set only on a Merge blocked row;
+   * see EpicDetail.
+   */
+  land_block_kind?: string;
+  land_block_reason?: string;
+  /**
+   * ProgressStep is set only on a map row.
+   */
+  progress_step?: ProgressStep;
+  /**
+   * QueueSlot is the 1-based slot of the row's loop epic in the queue, 0 when it
+   * is not queued. A joined card carries its -impl epic's slot.
+   */
+  queue_slot?: number /* int */;
+  /**
+   * The card fields below are set on loop epic rows. A joined card carries both
+   * of its epics' addresses in Addresses, the active part first.
+   */
+  addresses?: string[];
+  card_kind?: CardKind;
+  /**
+   * Section is where the Epics page puts the card.
+   */
+  section?: CardSection;
+  status_words?: string;
+  /**
+   * RingProgress is the ring fill in percent, 0 to 100.
+   */
+  ring_progress?: number /* int */;
+  /**
+   * Reason is the line under the status words when there is something to say.
+   */
+  reason?: string;
+  actions?: CardAction[];
+  /**
+   * StatePill and WaitingSince are set on a Needs-you card: the pill word and the
+   * start of the wait the section sorts by.
+   */
+  state_pill?: string;
+  waiting_since?: string;
+  /**
+   * CountdownEndsAt is the deadline of a Design's auto-advance countdown; the client
+   * builds "Next run starts in Ns" from it.
+   */
+  countdown_ends_at?: string;
+  /**
+   * TimeKind and TimeStart are the card's time label: what it measures and when it
+   * starts. Both are empty when the start is unknown.
+   */
+  time_kind?: CardTimeKind;
+  time_start?: string;
+}
+/**
+ * FollowUpCount is the number of draft and open tickets in one project's
+ * follow-ups epic.
+ */
+export interface FollowUpCount {
+  project: string;
+  open: number /* int */;
+}
+/**
+ * EpicList is the /v1/epics payload.
+ */
+export interface EpicList {
+  epics: EpicListRow[];
+  /**
+   * Projects is every project, including those with no epics: the project
+   * pickers list them all.
+   */
+  projects?: string[];
+  /**
+   * FollowUps lists only the projects with at least one open follow-up.
+   */
+  follow_ups: FollowUpCount[];
+  /**
+   * RecentlyFinished is config server.recently-finished: how many Finished cards
+   * the page shows before a filter.
+   */
+  recently_finished?: number /* int */;
+}
+
+//////////
+// source: epicsummary.go
+
+/**
+ * EpicState is EpicSummary.State.
+ */
+export const EpicStateAwaitingMerge = "awaiting-merge";
+export const EpicStateFinished = "finished";
+export const EpicStateRunning = "running";
+/**
+ * EpicStateMerging is an epic whose only unfinished tickets are merge tickets
+ * that are open or claimed.
+ */
+export const EpicStateMerging = "merging";
+export const EpicStateWaiting = "waiting";
+/**
+ * EpicStatePaused is an epic with nothing runnable: a paused ticket, a
+ * dependency deadlock, or a blocked merge. EpicSummary.Reason says which.
+ */
+export const EpicStatePaused = "paused";
+export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStatePaused;
+export const EpicReasonDeadlock = "Dependency deadlock";
+export const EpicReasonMergeBlocked = "Merge blocked";
+/**
+ * The reasons a Paused epic gives for itself, when no ticket is paused.
+ */
+export type EpicReason = typeof EpicReasonDeadlock | typeof EpicReasonMergeBlocked;
+/**
+ * SummaryTicket is one ticket in an EpicSummary: an active one carries
+ * ClaimedAt, a Paused one carries Recovery and its unclipped Pause reason.
+ */
+export interface SummaryTicket {
+  address: string;
+  title: string;
+  status: string;
+  claimed_at?: string;
+  recovery?: string;
+  reason?: string;
+  /**
+   * ReasonLabel is the plain-words label of the ticket's pause reason.
+   */
+  reason_label?: string;
+  /**
+   * Summary is the open question's summary line, or the pause reason without one.
+   */
+  summary?: string;
+  /**
+   * Answerable is set when a person's reply can go to the open question.
+   */
+  answerable: boolean;
+  /**
+   * Answered is set on an open ticket whose latest question has an answer.
+   */
+  answered: boolean;
+  /**
+   * NeedsApproval is set on an active ticket whose agent waits on a permission prompt.
+   */
+  needs_approval: boolean;
+}
+/**
+ * EpicSummary is one epic holding a queue item, as the web page's cards show it.
+ */
+export interface EpicSummary {
+  address: string;
+  name: string;
+  project: string;
+  state: EpicState;
+  done: number /* int */;
+  total: number /* int */;
+  /**
+   * Active is the running tickets, listed only while the epic is Running.
+   */
+  active: SummaryTicket[];
+  parked: SummaryTicket[];
+  /**
+   * HasRepair is set when a paused ticket is broken (stuck or error), so
+   * both clients show a fault in the alarm color instead of a question.
+   */
+  has_repair: boolean;
+  /**
+   * Reason is why a Paused epic is paused: the reason of its first paused
+   * ticket, else "Dependency deadlock" or "Merge blocked". It is empty for a
+   * Paused epic that holds only drafts.
+   */
+  reason?: string;
+  /**
+   * More is the number of paused tickets beyond the first, whose reason Reason shows.
+   */
+  more?: number /* int */;
+  /**
+   * Detail is the cycle that deadlocks the epic, or why its merge is blocked.
+   */
+  detail?: string;
+  /**
+   * MergeBlocked is set on a Paused epic whose last merge failed, so clients
+   * keep offering the merge action.
+   */
+  merge_blocked?: boolean;
+  /**
+   * MergeBlockKind is the pause reason of a blocked merge.
+   */
+  merge_block_kind?: string;
+  /**
+   * Actions are the verbs of a blocked merge's pause, from the pause-to-verb table.
+   */
+  actions?: string[];
 }
 
 //////////
@@ -557,6 +1431,25 @@ export interface ProjectWorktrees {
   root: string;
   worktrees: string[];
   tiers: { [key: string]: string};
+}
+
+//////////
+// source: recentlyfinished.go
+
+/**
+ * FinishedEpic is one entry of the snapshot's Recently finished list.
+ */
+export interface FinishedEpic {
+  address: string;
+  name: string;
+  project: string;
+  done: number /* int */;
+  total: number /* int */;
+  completed_at: string;
+  /**
+   * OneOff marks a ticket entry: Address is the ticket's, Done and Total are 0.
+   */
+  one_off: boolean;
 }
 
 //////////

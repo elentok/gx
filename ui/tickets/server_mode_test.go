@@ -33,7 +33,7 @@ type fakeServerAPI struct {
 	removeRes  server.QueueResult
 	mergeRes   server.QueueResult
 	// detail and detailErr are what Detail returns for any address.
-	detail     server.TicketDetail
+	detail     wire.TicketDetail
 	detailErr  error
 	budget     wire.BudgetStatus
 	iterations []server.IterationInfo
@@ -143,7 +143,7 @@ func (f fakeServerAPI) EpicStashMerge(_ context.Context, address string) (server
 	return server.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) Detail(context.Context, string) (server.TicketDetail, error) {
+func (f fakeServerAPI) Detail(context.Context, string) (wire.TicketDetail, error) {
 	return f.detail, f.detailErr
 }
 
@@ -361,7 +361,7 @@ func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing
 // Seam D: "enter" on a paused row issues the detail's first verb (resume here).
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(server.ActionResume)})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		// The wire carries no pause reason, so only the retired repair status
 		// tells the client this pause is a repair.
@@ -445,7 +445,7 @@ func (f fakeServerAPI) TicketChanged(_ context.Context, address string) error {
 func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
 	if len(api.detail.Actions) == 0 {
-		api.detail = detailWith(server.ActionAnswer, server.ActionResume)
+		api.detail = detailWith(wire.ActionAnswer, wire.ActionResume)
 	}
 	m := newServerModel(t).WithServer(api)
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{

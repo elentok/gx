@@ -56,9 +56,9 @@ type State struct {
 	Tickets []server.TicketInfo
 	// Epics is the server's summary of each epic holding a queue item, in queue
 	// order, as the last snapshot delivered it.
-	Epics []server.EpicSummary
+	Epics []wire.EpicSummary
 	// RecentlyFinished is the last snapshot's completed epics, newest first.
-	RecentlyFinished []server.FinishedEpic
+	RecentlyFinished []wire.FinishedEpic
 	// Queue is the queued ticket addresses in launch order.
 	Queue []string
 	// Iterations holds live state by ticket address; absent means no live

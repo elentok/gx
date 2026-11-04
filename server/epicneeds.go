@@ -3,6 +3,7 @@ package server
 import (
 	"cmp"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"time"
 
@@ -26,9 +27,9 @@ type needsYou struct {
 	Pill   string
 	Reason string
 	Since  time.Time
-	Action CardAction
+	Action wire.CardAction
 	// More are the buttons after Action.
-	More []CardAction
+	More []wire.CardAction
 }
 
 // ticketWait is one paused or asking ticket of an epic.
@@ -41,7 +42,7 @@ type ticketWait struct {
 // waiting ticket comes first, oldest wait first, since it can hold a running epic
 // too. An epic without one waits on its deadlock, its blocked merge, or an
 // unmerged finish in a project with auto-merge off.
-func (s *Server) loopNeedsYou(root rootRef, e tickets.Epic, state EpicListState) (needsYou, bool) {
+func (s *Server) loopNeedsYou(root rootRef, e tickets.Epic, state wire.EpicListState) (needsYou, bool) {
 	if e.IsMap || !e.MergedAt.IsZero() {
 		return needsYou{}, false
 	}
@@ -50,26 +51,26 @@ func (s *Server) loopNeedsYou(root rootRef, e tickets.Epic, state EpicListState)
 		return n, true
 	}
 	switch {
-	case state == EpicListMergeBlocked:
+	case state == wire.EpicListMergeBlocked:
 		n := needsYou{
 			Pill: PillMergeBlocked, Reason: e.MergeBlockReason, Since: fallback,
-			Action: CardAction{Kind: CardActionMerge, Label: "Merge", Target: root.String()},
+			Action: wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: root.String()},
 		}
 		if e.MergeBlockKind == string(schema.PauseDirtyTrunk) {
 			n.Reason = schema.PauseDirtyTrunk.Label()
-			n.Action = CardAction{Kind: CardActionStashMerge, Label: schema.VerbStashMerge.Label(), Target: root.String()}
-			n.More = []CardAction{{Kind: CardActionMerge, Label: schema.VerbMergeAgain.Label(), Target: root.String()}}
+			n.Action = wire.CardAction{Kind: wire.CardActionStashMerge, Label: schema.VerbStashMerge.Label(), Target: root.String()}
+			n.More = []wire.CardAction{{Kind: wire.CardActionMerge, Label: schema.VerbMergeAgain.Label(), Target: root.String()}}
 		}
 		return n, true
-	case state == EpicListPaused && epicStateOf(e) == epicCycle:
+	case state == wire.EpicListPaused && epicStateOf(e) == epicCycle:
 		return needsYou{
 			Pill: PillDeadlocked, Reason: cycleReason(root, e), Since: fallback,
-			Action: CardAction{Kind: CardActionOpenEpic, Label: "Open epic", Target: root.String()},
+			Action: wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: root.String()},
 		}, true
-	case state == EpicListAwaitingMerge && !s.autoFFMerge(root.Project):
+	case state == wire.EpicListAwaitingMerge && !s.autoFFMerge(root.Project):
 		return needsYou{
 			Pill: PillAwaitingMerge, Reason: "Auto-merge is off for " + root.Project, Since: fallback,
-			Action: CardAction{Kind: CardActionMerge, Label: "Merge", Target: root.String()},
+			Action: wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: root.String()},
 		}, true
 	}
 	return needsYou{}, false
@@ -111,14 +112,14 @@ func (s *Server) ticketWaitOf(root rootRef, e tickets.Epic, t tickets.Ticket) (n
 		evs := readLogLenient(t)
 		n := needsYou{
 			Pill: PillPaused, Reason: label + ": " + tickets.PauseDetail(e, t),
-			Action: CardAction{Kind: CardActionOpenTicket, Label: "Open ticket", Target: addr.String()},
+			Action: wire.CardAction{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: addr.String()},
 		}
 		if rounds := tickets.AllRounds(evs); len(rounds) > 0 {
 			n.Since = rounds[len(rounds)-1].Question.TS
 		}
 		if open := tickets.OpenQuestion(evs); status == tickets.StatusPausedAnswer && open != nil {
 			n.Pill, n.Reason = PillQuestion, label+": "+open.Summary
-			n.Action = CardAction{Kind: CardActionAnswer, Label: "Answer", Target: addr.String()}
+			n.Action = wire.CardAction{Kind: wire.CardActionAnswer, Label: "Answer", Target: addr.String()}
 		}
 		return n, true
 	case status == tickets.StatusClaimed:
@@ -129,7 +130,7 @@ func (s *Server) ticketWaitOf(root rootRef, e tickets.Epic, t tickets.Ticket) (n
 		return needsYou{
 			Pill: PillPermission, Reason: label + " wants to run: " + cmp.Or(card.Description, card.Tool),
 			Since:  permissionSince(readLogLenient(t)),
-			Action: CardAction{Kind: CardActionAnswer, Label: "Answer", Target: addr.String()},
+			Action: wire.CardAction{Kind: wire.CardActionAnswer, Label: "Answer", Target: addr.String()},
 		}, true
 	}
 	return needsYou{}, false

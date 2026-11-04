@@ -9,14 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
 
 // cardsOf is `gx server epics --json`.
-func (r *running) cardsOf(t *testing.T) []server.EpicListRow {
+func (r *running) cardsOf(t *testing.T) []wire.EpicListRow {
 	t.Helper()
-	var list server.EpicList
+	var list wire.EpicList
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "epics", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}

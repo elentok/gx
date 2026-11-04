@@ -36,7 +36,7 @@ type ServerAPI interface {
 	TicketApprove(ctx context.Context, address string) (server.QueueResult, error)
 	EpicMerge(ctx context.Context, address string) (server.QueueResult, error)
 	EpicStashMerge(ctx context.Context, address string) (server.QueueResult, error)
-	Detail(ctx context.Context, address string) (server.TicketDetail, error)
+	Detail(ctx context.Context, address string) (wire.TicketDetail, error)
 	Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error)
 	DesignWorktree(ctx context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error)
 	Iterations(ctx context.Context) ([]server.IterationInfo, error)

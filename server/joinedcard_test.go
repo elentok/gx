@@ -44,7 +44,7 @@ func TestEpicList_JoinedCardPhases(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}
@@ -58,16 +58,16 @@ func TestEpicList_JoinedCardPhases(t *testing.T) {
 	cases := []struct {
 		name      string
 		addresses []string
-		kind      server.CardKind
+		kind      wire.CardKind
 		words     string
 		ring      int
 	}{
-		{"designing", []string{"proj:designing"}, server.CardKindDesign, "Designing", 37},
-		{"creating", []string{"proj:creating", "proj:creating-impl"}, server.CardKindDesign, "Creating tickets (3 so far)...", 0},
-		{"building", []string{"proj:building-impl", "proj:building"}, server.CardKindImplementation, "Not started", 33},
-		{"queued-done", []string{"proj:queued-done-impl", "proj:queued-done"}, server.CardKindImplementation, "Not started", 33},
-		{"orphan-impl", []string{"proj:orphan-impl"}, server.CardKindImplementation, "Not started", 33},
-		{"solo", []string{"proj:solo"}, server.CardKindDesign, "Designing", 37},
+		{"designing", []string{"proj:designing"}, wire.CardKindDesign, "Designing", 37},
+		{"creating", []string{"proj:creating", "proj:creating-impl"}, wire.CardKindDesign, "Creating tickets (3 so far)...", 0},
+		{"building", []string{"proj:building-impl", "proj:building"}, wire.CardKindImplementation, "Not started", 33},
+		{"queued-done", []string{"proj:queued-done-impl", "proj:queued-done"}, wire.CardKindImplementation, "Not started", 33},
+		{"orphan-impl", []string{"proj:orphan-impl"}, wire.CardKindImplementation, "Not started", 33},
+		{"solo", []string{"proj:solo"}, wire.CardKindDesign, "Designing", 37},
 	}
 	for _, c := range cases {
 		r, ok := got[c.name]
@@ -80,7 +80,7 @@ func TestEpicList_JoinedCardPhases(t *testing.T) {
 				c.name, r.Addresses, r.CardKind, r.StatusWords, r.RingProgress, c.addresses, c.kind, c.words, c.ring)
 		}
 	}
-	if s := got["queued-done"].Section; s != server.SectionReadyToQueue {
+	if s := got["queued-done"].Section; s != wire.SectionReadyToQueue {
 		t.Errorf("queued-done section = %q, want ready-to-queue", s)
 	}
 }
@@ -105,7 +105,7 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	row := func() server.EpicListRow {
+	row := func() wire.EpicListRow {
 		code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
 		for _, r := range getEpicList(t, code, body).Epics {
 			if r.Name == "m" {
@@ -113,17 +113,17 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 			}
 		}
 		t.Fatal("no row for m")
-		return server.EpicListRow{}
+		return wire.EpicListRow{}
 	}
 
-	if r := row(); r.Section != server.SectionReadyToQueue {
+	if r := row(); r.Section != wire.SectionReadyToQueue {
 		t.Fatalf("before the question, section = %q, want ready-to-queue", r.Section)
 	}
-	designSection := func() server.CardSection {
+	designSection := func() wire.CardSection {
 		_, d, _ := getEpicDetail(t, h, hs.WebURL, "proj:m")
 		return d.DesignSection
 	}
-	if got := designSection(); got != server.SectionFinished {
+	if got := designSection(); got != wire.SectionFinished {
 		t.Fatalf("before the question, design_section = %q, want finished", got)
 	}
 
@@ -149,22 +149,22 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	waitForSession(ctx, t, h, evs, res.Session.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 
 	r := row()
-	if r.Section != server.SectionNeedsYou || r.StatePill != server.PillQuestion {
+	if r.Section != wire.SectionNeedsYou || r.StatePill != server.PillQuestion {
 		t.Errorf("section %q pill %q, want needs-you Question", r.Section, r.StatePill)
 	}
 	if want := []string{"proj:m", "proj:m-impl"}; !slices.Equal(r.Addresses, want) {
 		t.Errorf("addresses = %v, want %v", r.Addresses, want)
 	}
-	if r.CardKind != server.CardKindImplementation {
+	if r.CardKind != wire.CardKindImplementation {
 		t.Errorf("card kind = %q, want implementation", r.CardKind)
 	}
-	if r.TimeKind != server.CardTimeWaiting || !r.TimeStart.Equal(r.WaitingSince) {
+	if r.TimeKind != wire.CardTimeWaiting || !r.TimeStart.Equal(r.WaitingSince) {
 		t.Errorf("time = %q %v, want waiting since %v", r.TimeKind, r.TimeStart, r.WaitingSince)
 	}
-	if got := designSection(); got != server.SectionNeedsYou {
+	if got := designSection(); got != wire.SectionNeedsYou {
 		t.Errorf("design_section = %q, want needs-you", got)
 	}
-	want := []server.CardAction{{Kind: server.CardActionAnswer, Label: "Answer", Target: "proj:m", Link: "#/d/proj:m"}}
+	want := []wire.CardAction{{Kind: wire.CardActionAnswer, Label: "Answer", Target: "proj:m", Link: "#/d/proj:m"}}
 	if !slices.Equal(r.Actions, want) {
 		t.Errorf("actions = %+v, want %+v", r.Actions, want)
 	}
@@ -181,7 +181,7 @@ func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	var row *server.EpicListRow
+	var row *wire.EpicListRow
 	for _, r := range getEpicList(t, code, body).Epics {
 		if r.Name == "m" {
 			row = &r
@@ -190,7 +190,7 @@ func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
 	if row == nil {
 		t.Fatal("no row for the joined card")
 	}
-	if row.Section != server.SectionImplementing || row.QueueSlot != 1 {
+	if row.Section != wire.SectionImplementing || row.QueueSlot != 1 {
 		t.Errorf("section = %q, slot = %d, want implementing and slot 1", row.Section, row.QueueSlot)
 	}
 }
@@ -211,7 +211,7 @@ func TestEpicList_JoinedCardCarriesImplQueueSlot(t *testing.T) {
 		}
 	}
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}

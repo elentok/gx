@@ -2,13 +2,13 @@ package tickets
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tree"
@@ -47,25 +47,25 @@ var (
 )
 
 // epicStateLabels must match LABELS in webui/src/view.ts.
-var epicStateLabels = map[server.EpicState]string{
-	server.EpicStatePaused:        "Paused",
-	server.EpicStateRunning:       "Running",
-	server.EpicStateWaiting:       "Waiting for a slot",
-	server.EpicStateAwaitingMerge: "Awaiting merge",
-	server.EpicStateMerging:       "Merging",
-	server.EpicStateFinished:      "Merged",
+var epicStateLabels = map[wire.EpicState]string{
+	wire.EpicStatePaused:        "Paused",
+	wire.EpicStateRunning:       "Running",
+	wire.EpicStateWaiting:       "Waiting for a slot",
+	wire.EpicStateAwaitingMerge: "Awaiting merge",
+	wire.EpicStateMerging:       "Merging",
+	wire.EpicStateFinished:      "Merged",
 }
 
 // epicStatusLine picks an epic header's status-line icon, text, and color from
 // the server's summary. The text is the state's label, plus the reason for a
 // deadlocked epic.
-func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
+func epicStatusLine(icons ui.IconSet, sum wire.EpicSummary, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
 	switch sum.State {
-	case server.EpicStateAwaitingMerge, server.EpicStateFinished:
+	case wire.EpicStateAwaitingMerge, wire.EpicStateFinished:
 		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
-	case server.EpicStateRunning, server.EpicStateMerging:
+	case wire.EpicStateRunning, wire.EpicStateMerging:
 		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()
-	case server.EpicStatePaused:
+	case wire.EpicStatePaused:
 		text = epicStateLabels[sum.State]
 		if sum.Reason != "" {
 			text += ": " + sum.Reason
@@ -77,12 +77,12 @@ func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph strin
 		case sum.MergeBlocked:
 			return icons.Warning, text, epicStatusProblemStyle
 		// Red once a paused ticket is broken, since a fault outranks a question.
-		case sum.HasRepair || sum.Reason == server.EpicReasonDeadlock:
+		case sum.HasRepair || sum.Reason == wire.EpicReasonDeadlock:
 			return icons.Warning, text, epicStatusPausedRepairStyle
 		}
 		return icons.Warning, text, epicStatusPausedAnswerStyle
 	default:
-		return icons.EpicQueued, epicStateLabels[server.EpicStateWaiting], lipgloss.NewStyle()
+		return icons.EpicQueued, epicStateLabels[wire.EpicStateWaiting], lipgloss.NewStyle()
 	}
 }
 
@@ -149,7 +149,7 @@ func (m QueueModel) queueLabelWidth() int {
 	return tree.LabelWidth(m.queueBodyWidth())
 }
 
-func epicCounter(sum server.EpicSummary) string {
+func epicCounter(sum wire.EpicSummary) string {
 	return fmt.Sprintf("(%d/%d)", sum.Done, sum.Total)
 }
 
@@ -179,7 +179,7 @@ func (m QueueModel) epicHeaderLayoutFor(epics []tickets.Epic, labelW int) epicHe
 
 // epicBar renders the epic's fixed-width progress bar, filled in the epic's
 // state colour (fill).
-func epicBar(sum server.EpicSummary, fill lipgloss.Style) string {
+func epicBar(sum wire.EpicSummary, fill lipgloss.Style) string {
 	fraction := 0.0
 	if sum.Total > 0 {
 		fraction = float64(sum.Done) / float64(sum.Total)
@@ -190,7 +190,7 @@ func epicBar(sum server.EpicSummary, fill lipgloss.Style) string {
 // epicNameLine renders the selectable name row. In the wide layout the
 // counter and bar are right-aligned to labelW; otherwise the name is alone,
 // cut with an ellipsis if it overflows.
-func epicNameLine(name string, sum server.EpicSummary, fill lipgloss.Style, layout epicHeaderLayout, labelW int) string {
+func epicNameLine(name string, sum wire.EpicSummary, fill lipgloss.Style, layout epicHeaderLayout, labelW int) string {
 	if labelW > 0 && layout != epicLayoutWide {
 		name = ansi.Truncate(name, labelW-1, "…")
 	}
@@ -204,7 +204,7 @@ func epicNameLine(name string, sum server.EpicSummary, fill lipgloss.Style, layo
 }
 
 // epicBarLine renders the narrow layouts' second line.
-func epicBarLine(sum server.EpicSummary, fill lipgloss.Style, layout epicHeaderLayout) string {
+func epicBarLine(sum wire.EpicSummary, fill lipgloss.Style, layout epicHeaderLayout) string {
 	if layout == epicLayoutNarrowCount {
 		return " " + epicCounter(sum)
 	}
@@ -346,7 +346,7 @@ func (m QueueModel) queueRunStateTitle() string {
 // reports running.
 func (m QueueModel) runningProgress() (done, total int) {
 	for _, sum := range m.summaries {
-		if sum.State == server.EpicStateRunning {
+		if sum.State == wire.EpicStateRunning {
 			done += sum.Done
 			total += sum.Total
 		}

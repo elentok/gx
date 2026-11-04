@@ -1,13 +1,13 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -15,9 +15,9 @@ import (
 
 func TestProgressStepsMatchTickets(t *testing.T) {
 	t.Parallel()
-	got := []server.ProgressStep{
-		server.ProgressChart, server.ProgressResolveTickets, server.ProgressSpec, server.ProgressReview,
-		server.ProgressGrillFindings, server.ProgressCreateTickets, server.ProgressBranch, server.ProgressDone,
+	got := []wire.ProgressStep{
+		wire.ProgressChart, wire.ProgressResolveTickets, wire.ProgressSpec, wire.ProgressReview,
+		wire.ProgressGrillFindings, wire.ProgressCreateTickets, wire.ProgressBranch, wire.ProgressDone,
 	}
 	if !slices.Equal(got, tickets.DesignSteps) {
 		t.Fatalf("server.Progress* = %v, want tickets.DesignSteps = %v", got, tickets.DesignSteps)
@@ -32,9 +32,9 @@ func TestEpicList_MapProgress(t *testing.T) {
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 
-	steps := []server.ProgressStep{
-		server.ProgressChart, server.ProgressResolveTickets, server.ProgressSpec, server.ProgressReview,
-		server.ProgressGrillFindings, server.ProgressCreateTickets, server.ProgressBranch, server.ProgressDone,
+	steps := []wire.ProgressStep{
+		wire.ProgressChart, wire.ProgressResolveTickets, wire.ProgressSpec, wire.ProgressReview,
+		wire.ProgressGrillFindings, wire.ProgressCreateTickets, wire.ProgressBranch, wire.ProgressDone,
 	}
 
 	h, base := startEpicDetail(t, func(store string) {
@@ -59,16 +59,16 @@ func TestEpicList_MapProgress(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}
 
-	want := map[string]server.ProgressStep{
-		"m-no-field":    server.ProgressChart,
-		"m-bad-step":    server.ProgressChart,
-		"m-status-done": server.ProgressDone,
-		"m-ignored":     server.ProgressResolveTickets,
+	want := map[string]wire.ProgressStep{
+		"m-no-field":    wire.ProgressChart,
+		"m-bad-step":    wire.ProgressChart,
+		"m-status-done": wire.ProgressDone,
+		"m-ignored":     wire.ProgressResolveTickets,
 		"loop":          "",
 	}
 	for _, s := range steps {

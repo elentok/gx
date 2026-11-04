@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func TestEpicList_DesignAndJoinedCardsCarryTheTimePair(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}
@@ -57,16 +58,16 @@ func TestEpicList_DesignAndJoinedCardsCarryTheTimePair(t *testing.T) {
 	}
 	for _, c := range []struct {
 		name  string
-		kind  server.CardTimeKind
+		kind  wire.CardTimeKind
 		start time.Time
 	}{
-		{"notstarted", server.CardTimeCreated, at("2026-01-01T10:00:00Z")},
-		{"stopped", server.CardTimeElapsed, at("2026-01-02T10:00:00Z")},
+		{"notstarted", wire.CardTimeCreated, at("2026-01-01T10:00:00Z")},
+		{"stopped", wire.CardTimeElapsed, at("2026-01-02T10:00:00Z")},
 		{"stopped-nostamp", "", time.Time{}},
-		{"finished", server.CardTimeFinished, at("2026-01-03T10:00:00Z")},
-		{"creating", server.CardTimeElapsed, at("2026-01-02T10:00:00Z")},
-		{"branch", server.CardTimeCreated, at("2026-01-04T10:00:00Z")},
-		{"merged", server.CardTimeFinished, at("2026-01-06T10:00:00Z")},
+		{"finished", wire.CardTimeFinished, at("2026-01-03T10:00:00Z")},
+		{"creating", wire.CardTimeElapsed, at("2026-01-02T10:00:00Z")},
+		{"branch", wire.CardTimeCreated, at("2026-01-04T10:00:00Z")},
+		{"merged", wire.CardTimeFinished, at("2026-01-06T10:00:00Z")},
 	} {
 		r, ok := got[c.name]
 		if !ok {

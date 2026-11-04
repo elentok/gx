@@ -1,10 +1,10 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -41,7 +41,7 @@ func TestEpicDetail_MapProgress(t *testing.T) {
 		})
 		servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	})
-	detail := func(epic string) server.EpicDetail {
+	detail := func(epic string) wire.EpicDetail {
 		t.Helper()
 		code, d, body := getEpicDetail(t, h, base, "proj:"+epic)
 		if code != http.StatusOK {
@@ -49,12 +49,12 @@ func TestEpicDetail_MapProgress(t *testing.T) {
 		}
 		return d
 	}
-	current := func(d server.EpicDetail) (done int, label string) {
+	current := func(d wire.EpicDetail) (done int, label string) {
 		for _, s := range d.Steps {
 			switch s.State {
-			case server.MapStepDone:
+			case wire.MapStepDone:
 				done++
-			case server.MapStepCurrent:
+			case wire.MapStepCurrent:
 				label = s.Label
 			}
 		}
@@ -85,7 +85,7 @@ func TestEpicDetail_MapProgress(t *testing.T) {
 	}
 
 	back := detail("m-back")
-	if spec := back.Steps[2]; spec.Step != server.ProgressSpec || spec.State != server.MapStepTodo {
+	if spec := back.Steps[2]; spec.Step != wire.ProgressSpec || spec.State != wire.MapStepTodo {
 		t.Errorf("sent-back Spec step = %+v, want todo", spec)
 	}
 

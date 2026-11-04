@@ -3,6 +3,7 @@ package server
 import (
 	"cmp"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -13,15 +14,15 @@ import (
 
 // oneOffCards lists the cards of e's one-off tickets, none when e holds none. A
 // done or archived one-off gets a Finished card; capFinishedOneOffs trims those.
-func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) []EpicListRow {
+func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) []wire.EpicListRow {
 	if !IsOneOffEpic(e) {
 		return nil
 	}
-	var rows []EpicListRow
+	var rows []wire.EpicListRow
 	for _, f := range finishedOneOffs(project, e) {
 		row := oneOffRow(f.Address, f.Name, project)
-		row.State, row.Section, row.CompletedAt = EpicListFinished, SectionFinished, f.CompletedAt
-		row.setCardTime(cardTimeSources{})
+		row.State, row.Section, row.CompletedAt = wire.EpicListFinished, wire.SectionFinished, f.CompletedAt
+		setCardTime(&row, cardTimeSources{})
 		rows = append(rows, row)
 	}
 	if filepath.Base(e.Path) == OneOffsArchivedEpic {
@@ -32,48 +33,48 @@ func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) [
 		addr := tickets.Address{Project: project, Epic: e.Name, ID: t.DisplayNumber()}
 		row := oneOffRow(addr.String(), t.Title, project)
 		if n, ok := s.ticketWaitOf(root, e, t); ok {
-			row.State, row.Section = EpicListPaused, SectionNeedsYou
-			row.StatePill, row.Reason, row.Actions = n.Pill, n.Reason, []CardAction{n.Action}
+			row.State, row.Section = wire.EpicListPaused, wire.SectionNeedsYou
+			row.StatePill, row.Reason, row.Actions = n.Pill, n.Reason, []wire.CardAction{n.Action}
 			row.WaitingSince = cmp.Or(n.Since, t.ClaimedAt, lastActivity(e))
 		} else if e.RenderedStatus(t) == tickets.StatusClaimed {
-			row.State, row.Section = EpicListRunning, SectionImplementing
+			row.State, row.Section = wire.EpicListRunning, wire.SectionImplementing
 		} else if slot := queue.slot(addr.String()); slot > 0 {
-			row.State, row.Section = EpicListQueued, SectionImplementing
+			row.State, row.Section = wire.EpicListQueued, wire.SectionImplementing
 			row.QueueSlot, row.StatusWords = slot, fmt.Sprintf("Queued #%d", slot)
 		} else {
 			continue
 		}
-		row.setCardTime(cardTimeSources{startedAt: t.ClaimedAt, enqueuedAt: queue.enqueuedAt(addr.String())})
+		setCardTime(&row, cardTimeSources{startedAt: t.ClaimedAt, enqueuedAt: queue.enqueuedAt(addr.String())})
 		rows = append(rows, row)
 	}
 	return rows
 }
 
-func oneOffRow(address, title, project string) EpicListRow {
-	return EpicListRow{
-		Address: address, Project: project, Name: title, Kind: EpicKindLoop,
-		Addresses: []string{address}, CardKind: CardKindOneOff,
-		StatusWords: "One-off", Actions: []CardAction{},
+func oneOffRow(address, title, project string) wire.EpicListRow {
+	return wire.EpicListRow{
+		Address: address, Project: project, Name: title, Kind: wire.EpicKindLoop,
+		Addresses: []string{address}, CardKind: wire.CardKindOneOff,
+		StatusWords: "One-off", Actions: []wire.CardAction{},
 	}
 }
 
 // capFinishedOneOffs drops the Finished one-off cards that are not among the
 // newest limit Finished cards. Done epics always stay.
-func capFinishedOneOffs(rows []EpicListRow, limit int) []EpicListRow {
-	var finished []EpicListRow
+func capFinishedOneOffs(rows []wire.EpicListRow, limit int) []wire.EpicListRow {
+	var finished []wire.EpicListRow
 	for _, r := range rows {
-		if r.Section == SectionFinished {
+		if r.Section == wire.SectionFinished {
 			finished = append(finished, r)
 		}
 	}
-	slices.SortStableFunc(finished, func(a, b EpicListRow) int { return finishedAt(b).Compare(finishedAt(a)) })
+	slices.SortStableFunc(finished, func(a, b wire.EpicListRow) int { return finishedAt(b).Compare(finishedAt(a)) })
 	if len(finished) > limit {
 		cut := map[string]bool{}
 		for _, r := range finished[limit:] {
 			cut[r.Address] = true
 		}
-		return slices.DeleteFunc(rows, func(r EpicListRow) bool {
-			return r.CardKind == CardKindOneOff && r.Section == SectionFinished && cut[r.Address]
+		return slices.DeleteFunc(rows, func(r wire.EpicListRow) bool {
+			return r.CardKind == wire.CardKindOneOff && r.Section == wire.SectionFinished && cut[r.Address]
 		})
 	}
 	return rows
@@ -81,7 +82,7 @@ func capFinishedOneOffs(rows []EpicListRow, limit int) []EpicListRow {
 
 // followUpsCard is the one card of a project's follow-ups epic, absent when it
 // has no open follow-up. The epic itself never gets a plain card.
-func followUpsCard(project string, e tickets.Epic) (EpicListRow, bool) {
+func followUpsCard(project string, e tickets.Epic) (wire.EpicListRow, bool) {
 	var bugs, ideas, other int
 	for _, t := range e.Tickets {
 		if t.Status != string(schema.StatusDraft) && t.Status != string(schema.StatusOpen) {
@@ -97,14 +98,14 @@ func followUpsCard(project string, e tickets.Epic) (EpicListRow, bool) {
 		}
 	}
 	if bugs+ideas+other == 0 {
-		return EpicListRow{}, false
+		return wire.EpicListRow{}, false
 	}
 	address := rootRef{Project: project, Epic: followUpsEpicName}.String()
-	return EpicListRow{
-		Address: address, Project: project, Name: followUpsEpicName, Kind: EpicKindLoop,
-		State: EpicListFollowUps, Addresses: []string{address}, CardKind: CardKindFollowUps,
-		Section: SectionReadyToDesign, StatusWords: followUpWords(bugs, ideas, other),
-		Actions: []CardAction{{Kind: CardActionTriage, Label: "Triage", Target: project}},
+	return wire.EpicListRow{
+		Address: address, Project: project, Name: followUpsEpicName, Kind: wire.EpicKindLoop,
+		State: wire.EpicListFollowUps, Addresses: []string{address}, CardKind: wire.CardKindFollowUps,
+		Section: wire.SectionReadyToDesign, StatusWords: followUpWords(bugs, ideas, other),
+		Actions: []wire.CardAction{{Kind: wire.CardActionTriage, Label: "Triage", Target: project}},
 	}, true
 }
 

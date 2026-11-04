@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -215,7 +216,7 @@ func TestEpicMenu_MergeBlockVerbsComeFromActions(t *testing.T) {
 func TestEpicMenu_StashMergeRunsOnTheEpic(t *testing.T) {
 	var calls []string
 	m, _ := epicMenuModel(t, fakeServerAPI{calls: &calls})
-	m.vm.Epics = []server.EpicSummary{{Address: "gx:alpha", Actions: []string{"stash-merge", "merge"}}}
+	m.vm.Epics = []wire.EpicSummary{{Address: "gx:alpha", Actions: []string{"stash-merge", "merge"}}}
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Stash, merge and restore")
 	if cmd == nil {
 		t.Fatal("Stash, merge and restore issued nothing")

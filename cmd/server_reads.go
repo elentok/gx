@@ -723,7 +723,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.TicketDetail, error) {
+				func(ctx context.Context, cl *apiclient.Client) (wire.TicketDetail, error) {
 					return cl.Detail(ctx, args[0])
 				},
 				printDetail)
@@ -913,7 +913,7 @@ func printExplanation(w io.Writer, e server.Explanation) error {
 	return err
 }
 
-func printDetail(w io.Writer, d server.TicketDetail) error {
+func printDetail(w io.Writer, d wire.TicketDetail) error {
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", d.Address, d.Status, d.Title); err != nil {
 		return err
 	}

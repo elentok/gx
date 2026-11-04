@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -203,12 +204,12 @@ func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("detail = %d %s", code, body)
 	}
-	var d server.TicketDetail
+	var d wire.TicketDetail
 	if err := json.Unmarshal([]byte(body), &d); err != nil {
 		t.Fatal(err)
 	}
 	want := "Prompt sent to the running agent at " + prompts[0].TS.Local().Format("15:04")
-	if d.Latest == nil || d.Latest.Outcome != server.RoundOpen || d.Latest.Prompt != want {
+	if d.Latest == nil || d.Latest.Outcome != wire.RoundOpen || d.Latest.Prompt != want {
 		t.Errorf("latest = %+v; want an open round with prompt %q", d.Latest, want)
 	}
 

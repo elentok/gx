@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -31,15 +31,15 @@ func TestEpicList_DirtyTrunkCardHasBothActions(t *testing.T) {
 		writeEpicFiles(t, store, "dirty", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: dirty-trunk\nland_block_reason: uncommitted changes on main clash with a.txt\n---\n", done)
 	})
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	var row server.EpicListRow
+	var row wire.EpicListRow
 	for _, r := range getEpicList(t, code, body).Epics {
 		if r.Address == "proj:dirty" {
 			row = r
 		}
 	}
-	want := []server.CardAction{
-		{Kind: server.CardActionStashMerge, Label: "Stash, merge and restore", Target: "proj:dirty"},
-		{Kind: server.CardActionMerge, Label: "Merge again", Target: "proj:dirty"},
+	want := []wire.CardAction{
+		{Kind: wire.CardActionStashMerge, Label: "Stash, merge and restore", Target: "proj:dirty"},
+		{Kind: wire.CardActionMerge, Label: "Merge again", Target: "proj:dirty"},
 	}
 	if row.Reason != "Trunk has local changes" || !slices.Equal(row.Actions, want) {
 		t.Errorf("dirty row = reason %q actions %v, want both actions (%s)", row.Reason, row.Actions, body)
@@ -70,29 +70,29 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 		}
 	})
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		got[r.Address] = r
 	}
 
 	want := map[string]struct {
-		section server.CardSection
+		section wire.CardSection
 		pill    string
 		reason  string
-		action  server.CardAction
+		action  wire.CardAction
 	}{
-		"proj:asking": {server.SectionNeedsYou, "Question", "01 A: Which store?",
-			server.CardAction{Kind: server.CardActionAnswer, Label: "Answer", Target: "proj:asking/01"}},
-		"proj:repair": {server.SectionNeedsYou, "Paused", "01 A: ",
-			server.CardAction{Kind: server.CardActionOpenTicket, Label: "Open ticket", Target: "proj:repair/01"}},
-		"proj:cycle": {server.SectionNeedsYou, "Deadlocked", "proj:cycle/02 waits on proj:cycle/01",
-			server.CardAction{Kind: server.CardActionOpenEpic, Label: "Open epic", Target: "proj:cycle"}},
-		"proj:blocked": {server.SectionNeedsYou, "Merge blocked", "conflict",
-			server.CardAction{Kind: server.CardActionMerge, Label: "Merge", Target: "proj:blocked"}},
-		"proj:awaiting": {server.SectionNeedsYou, "Awaiting merge", "Auto-merge is off for proj",
-			server.CardAction{Kind: server.CardActionMerge, Label: "Merge", Target: "proj:awaiting"}},
-		"auto:awaiting": {server.SectionImplementing, "", "", server.CardAction{}},
-		"proj:ready":    {server.SectionReadyToQueue, "", "", server.CardAction{}},
+		"proj:asking": {wire.SectionNeedsYou, "Question", "01 A: Which store?",
+			wire.CardAction{Kind: wire.CardActionAnswer, Label: "Answer", Target: "proj:asking/01"}},
+		"proj:repair": {wire.SectionNeedsYou, "Paused", "01 A: ",
+			wire.CardAction{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: "proj:repair/01"}},
+		"proj:cycle": {wire.SectionNeedsYou, "Deadlocked", "proj:cycle/02 waits on proj:cycle/01",
+			wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: "proj:cycle"}},
+		"proj:blocked": {wire.SectionNeedsYou, "Merge blocked", "conflict",
+			wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: "proj:blocked"}},
+		"proj:awaiting": {wire.SectionNeedsYou, "Awaiting merge", "Auto-merge is off for proj",
+			wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: "proj:awaiting"}},
+		"auto:awaiting": {wire.SectionImplementing, "", "", wire.CardAction{}},
+		"proj:ready":    {wire.SectionReadyToQueue, "", "", wire.CardAction{}},
 	}
 	for addr, w := range want {
 		r, ok := got[addr]
@@ -103,7 +103,7 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 		if r.Section != w.section || r.StatePill != w.pill || !strings.Contains(r.Reason, w.reason) || (w.pill != "" && r.Reason == "") {
 			t.Errorf("%s = section %q pill %q reason %q, want %q %q containing %q", addr, r.Section, r.StatePill, r.Reason, w.section, w.pill, w.reason)
 		}
-		if w.pill != "" && !slices.Equal(r.Actions, []server.CardAction{w.action}) {
+		if w.pill != "" && !slices.Equal(r.Actions, []wire.CardAction{w.action}) {
 			t.Errorf("%s actions = %v, want [%v]", addr, r.Actions, w.action)
 		}
 	}
@@ -130,7 +130,7 @@ func TestEpicList_NeedsYouSortsOldestWaitFirst(t *testing.T) {
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
 	var names []string
 	for _, r := range getEpicList(t, code, body).Epics {
-		if r.Section == server.SectionNeedsYou {
+		if r.Section == wire.SectionNeedsYou {
 			names = append(names, r.Name)
 		}
 	}
@@ -172,10 +172,10 @@ func TestEpicList_PermissionWaitingIsNeedsYou(t *testing.T) {
 	}
 	// The server learns of the pending request on its own poll, so the row
 	// reads "implementing" until then.
-	var r server.EpicListRow
+	var r wire.EpicListRow
 	waitFor(t, func() bool {
 		code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
-		r = server.EpicListRow{}
+		r = wire.EpicListRow{}
 		for _, row := range getEpicList(t, code, body).Epics {
 			if row.Address == "proj:epic-a" {
 				r = row
@@ -183,8 +183,8 @@ func TestEpicList_PermissionWaitingIsNeedsYou(t *testing.T) {
 		}
 		return r.StatePill == "Permission"
 	})
-	want := server.CardAction{Kind: server.CardActionAnswer, Label: "Answer", Target: answerAddr}
-	if r.Section != server.SectionNeedsYou || r.StatePill != "Permission" || !strings.Contains(r.Reason, "List files") || !slices.Equal(r.Actions, []server.CardAction{want}) {
+	want := wire.CardAction{Kind: wire.CardActionAnswer, Label: "Answer", Target: answerAddr}
+	if r.Section != wire.SectionNeedsYou || r.StatePill != "Permission" || !strings.Contains(r.Reason, "List files") || !slices.Equal(r.Actions, []wire.CardAction{want}) {
 		t.Errorf("row = section %q pill %q reason %q actions %v", r.Section, r.StatePill, r.Reason, r.Actions)
 	}
 }

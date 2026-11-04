@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ import (
 
 func TestEpicNameLine_NoTotalShowsNoCounterOrBar(t *testing.T) {
 	t.Parallel()
-	sum := server.EpicSummary{Name: "one-offs", State: server.EpicStateWaiting}
+	sum := wire.EpicSummary{Name: "one-offs", State: wire.EpicStateWaiting}
 	got := ansi.Strip(epicNameLine("one-offs", sum, lipgloss.NewStyle(), epicLayoutWide, 40))
 	if strings.TrimSpace(got) != "one-offs" {
 		t.Errorf("name line = %q, want the name alone", got)
@@ -30,19 +31,19 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
 	tests := []struct {
-		state    server.EpicState
+		state    wire.EpicState
 		wantIcon string
 		wantText string
 	}{
-		{server.EpicStateAwaitingMerge, icons.TicketDone, "Awaiting merge"},
-		{server.EpicStateRunning, "S", "Running"},
-		{server.EpicStateWaiting, icons.EpicQueued, "Waiting for a slot"},
-		{server.EpicStatePaused, icons.Warning, "Paused"},
-		{server.EpicStateMerging, "S", "Merging"},
-		{server.EpicStateFinished, icons.TicketDone, "Merged"},
+		{wire.EpicStateAwaitingMerge, icons.TicketDone, "Awaiting merge"},
+		{wire.EpicStateRunning, "S", "Running"},
+		{wire.EpicStateWaiting, icons.EpicQueued, "Waiting for a slot"},
+		{wire.EpicStatePaused, icons.Warning, "Paused"},
+		{wire.EpicStateMerging, "S", "Merging"},
+		{wire.EpicStateFinished, icons.TicketDone, "Merged"},
 	}
 	for _, tt := range tests {
-		icon, text, _ := epicStatusLine(icons, server.EpicSummary{State: tt.state}, "S")
+		icon, text, _ := epicStatusLine(icons, wire.EpicSummary{State: tt.state}, "S")
 		if icon != tt.wantIcon || text != tt.wantText {
 			t.Errorf("state %q: got icon=%q text=%q, want icon=%q text=%q", tt.state, icon, text, tt.wantIcon, tt.wantText)
 		}
@@ -51,7 +52,7 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 
 func TestEpicStatusLine_PausedShowsReasonAndMore(t *testing.T) {
 	t.Parallel()
-	sum := server.EpicSummary{State: server.EpicStatePaused, Reason: "Waiting for your answer", More: 2}
+	sum := wire.EpicSummary{State: wire.EpicStatePaused, Reason: "Waiting for your answer", More: 2}
 	_, text, _ := epicStatusLine(ui.Icons(false), sum, "")
 	if text != "Paused: Waiting for your answer +2 more" {
 		t.Errorf("text = %q, want the label, the reason and the count of the others", text)
@@ -60,7 +61,7 @@ func TestEpicStatusLine_PausedShowsReasonAndMore(t *testing.T) {
 
 func TestEpicStatusLine_MergeBlockedShowsReason(t *testing.T) {
 	t.Parallel()
-	_, text, style := epicStatusLine(ui.Icons(false), server.EpicSummary{State: server.EpicStatePaused, Reason: server.EpicReasonMergeBlocked, MergeBlocked: true}, "")
+	_, text, style := epicStatusLine(ui.Icons(false), wire.EpicSummary{State: wire.EpicStatePaused, Reason: wire.EpicReasonMergeBlocked, MergeBlocked: true}, "")
 	if text != "Paused: Merge blocked" {
 		t.Errorf("text = %q, want the label followed by the reason", text)
 	}
@@ -72,19 +73,19 @@ func TestEpicStatusLine_MergeBlockedShowsReason(t *testing.T) {
 func TestEpicStatusLine_Colors(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
-	repair := server.EpicSummary{State: server.EpicStatePaused, HasRepair: true, Paused: []server.SummaryTicket{
+	repair := wire.EpicSummary{State: wire.EpicStatePaused, HasRepair: true, Paused: []wire.SummaryTicket{
 		{Status: "paused"}, {Status: "paused"},
 	}}
-	answer := server.EpicSummary{State: server.EpicStatePaused, Paused: []server.SummaryTicket{{Status: "paused"}}}
+	answer := wire.EpicSummary{State: wire.EpicStatePaused, Paused: []wire.SummaryTicket{{Status: "paused"}}}
 	for _, tt := range []struct {
 		name string
-		sum  server.EpicSummary
+		sum  wire.EpicSummary
 		want string
 	}{
-		{"awaiting-merge", server.EpicSummary{State: server.EpicStateAwaitingMerge}, epicStatusDoneStyle.Render(icons.TicketDone)},
+		{"awaiting-merge", wire.EpicSummary{State: wire.EpicStateAwaitingMerge}, epicStatusDoneStyle.Render(icons.TicketDone)},
 		{"paused (repair)", repair, epicStatusPausedRepairStyle.Render(icons.Warning)},
 		{"paused (answer)", answer, epicStatusPausedAnswerStyle.Render(icons.Warning)},
-		{"deadlocked", server.EpicSummary{State: server.EpicStatePaused, Reason: server.EpicReasonDeadlock}, epicStatusPausedRepairStyle.Render(icons.Warning)},
+		{"deadlocked", wire.EpicSummary{State: wire.EpicStatePaused, Reason: wire.EpicReasonDeadlock}, epicStatusPausedRepairStyle.Render(icons.Warning)},
 	} {
 		icon, _, style := epicStatusLine(icons, tt.sum, "")
 		if got := style.Render(icon); got != tt.want {
@@ -96,15 +97,15 @@ func TestEpicStatusLine_Colors(t *testing.T) {
 // fixtureSummaries stands in for the server's epic summaries in fixtures that
 // only build tickets: it counts done tickets, lists the claimed ones that have
 // a claim time as active, and the paused (answer) and paused (repair) ones as paused.
-func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []server.EpicSummary {
-	var out []server.EpicSummary
+func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []wire.EpicSummary {
+	var out []wire.EpicSummary
 	for _, epic := range epics {
-		sum := server.EpicSummary{
-			Address: epic.Name, Name: epic.Name, State: server.EpicStateWaiting, Total: len(epic.Tickets),
-			Active: []server.SummaryTicket{}, Paused: []server.SummaryTicket{},
+		sum := wire.EpicSummary{
+			Address: epic.Name, Name: epic.Name, State: wire.EpicStateWaiting, Total: len(epic.Tickets),
+			Active: []wire.SummaryTicket{}, Paused: []wire.SummaryTicket{},
 		}
 		for _, t := range epic.Tickets {
-			info := server.SummaryTicket{Address: t.Path, Title: t.Title}
+			info := wire.SummaryTicket{Address: t.Path, Title: t.Title}
 			switch status := epic.RenderedStatus(t); status {
 			case gxtickets.StatusDone:
 				sum.Done++
@@ -112,7 +113,7 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 				if at, ok := claimedAt[t.Path]; ok {
 					info.ClaimedAt = at
 					sum.Active = append(sum.Active, info)
-					sum.State = server.EpicStateRunning
+					sum.State = wire.EpicStateRunning
 				}
 			case gxtickets.StatusPausedAnswer, gxtickets.StatusPausedRepair:
 				info.Status, info.Reason = status.Word(), gxtickets.PauseDetail(epic, t)
@@ -120,7 +121,7 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 			}
 		}
 		if sum.Total > 0 && sum.Done == sum.Total {
-			sum.State = server.EpicStateAwaitingMerge
+			sum.State = wire.EpicStateAwaitingMerge
 		}
 		out = append(out, sum)
 	}
@@ -128,19 +129,19 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 }
 
 // summaryQueue delivers one epic with the given ticket rows and server summary.
-func summaryQueue(t *testing.T, sum server.EpicSummary, infos ...server.TicketInfo) QueueModel {
+func summaryQueue(t *testing.T, sum wire.EpicSummary, infos ...server.TicketInfo) QueueModel {
 	t.Helper()
 	items := make([]server.QueueItem, len(infos))
 	for i, info := range infos {
 		items[i] = server.QueueItem{Address: info.Address}
 	}
-	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: infos, Epics: []server.EpicSummary{sum}}, items)
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: infos, Epics: []wire.EpicSummary{sum}}, items)
 	return m
 }
 
 func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
 	m := summaryQueue(t,
-		server.EpicSummary{Address: "gx:alpha", Name: "alpha", State: server.EpicStateWaiting, Done: 3, Total: 7},
+		wire.EpicSummary{Address: "gx:alpha", Name: "alpha", State: wire.EpicStateWaiting, Done: 3, Total: 7},
 		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	)
 
@@ -155,9 +156,9 @@ func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
 
 func TestQueueServerMode_ShowsPauseReasonFromSummary(t *testing.T) {
 	m := summaryQueue(t,
-		server.EpicSummary{
-			Address: "gx:alpha", Name: "alpha", State: server.EpicStatePaused, Done: 0, Total: 1,
-			Paused: []server.SummaryTicket{{
+		wire.EpicSummary{
+			Address: "gx:alpha", Name: "alpha", State: wire.EpicStatePaused, Done: 0, Total: 1,
+			Paused: []wire.SummaryTicket{{
 				Address: "gx:alpha/01", Title: "First", Status: "paused", Reason: "Which approach, A or B?",
 			}},
 		},
@@ -175,7 +176,7 @@ func TestQueueServerMode_ShowsPauseReasonFromSummary(t *testing.T) {
 
 func TestQueueServerMode_DeadlockedWord(t *testing.T) {
 	m := summaryQueue(t,
-		server.EpicSummary{Address: "gx:alpha", Name: "alpha", State: server.EpicStatePaused, Total: 1, Reason: server.EpicReasonDeadlock, Detail: "01 waits on itself"},
+		wire.EpicSummary{Address: "gx:alpha", Name: "alpha", State: wire.EpicStatePaused, Total: 1, Reason: wire.EpicReasonDeadlock, Detail: "01 waits on itself"},
 		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	)
 

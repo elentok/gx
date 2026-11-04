@@ -4,16 +4,8 @@ packages:
     output_path: "webui/src/generated/server.ts"
     include_files:
       - designs.go
-      - detail.go
-      - detailrelated.go
-      - detailruns.go
-      - epiccard.go
-      - epicdetail.go
-      - epiclist.go
-      - epicsummary.go
       - index.go
       - pause.go
-      - recentlyfinished.go
       - migrate.go
       - verdicts.go
     # Moved types stay importable from generated/server. A wire type the
@@ -21,12 +13,14 @@ packages:
     # below (tygo loads syntax only, so it cannot resolve wire.X itself).
     frontmatter: |
       export * from './wire';
-      import type { BudgetStatus, DiskStatus, Health, HarnessLabel, SessionInfo, SessionResult } from './wire';
+      import type { BudgetStatus, DiskStatus, EpicSummary, FinishedEpic, Health, HarnessLabel, SessionInfo, SessionResult } from './wire';
     type_mappings:
       time.Time: "string"
       tickets.DesignStep: "string"
       wire.BudgetStatus: "BudgetStatus"
       wire.DiskStatus: "DiskStatus"
+      wire.EpicSummary: "EpicSummary"
+      wire.FinishedEpic: "FinishedEpic"
       wire.Health: "Health"
       wire.HarnessLabel: "HarnessLabel"
       wire.SessionInfo: "SessionInfo"
@@ -39,8 +33,15 @@ packages:
     include_files:
       - budget.go
       - checkstatus.go
+      - detail.go
+      - detailrelated.go
+      - detailruns.go
       - diskcleannow.go
       - diskwatch.go
+      - epiccard.go
+      - epicdetail.go
+      - epiclist.go
+      - epicsummary.go
       - fixagent.go
       - harnesslabel.go
       - healthreport.go
@@ -49,6 +50,7 @@ packages:
       - limitsevents.go
       - limitsstore.go
       - projectworktrees.go
+      - recentlyfinished.go
       - restart.go
       - restartcheck.go
       - sessionautoadvance.go

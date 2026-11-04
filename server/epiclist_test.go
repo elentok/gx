@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"maps"
 	"net/http"
 	"os"
@@ -14,9 +15,9 @@ import (
 	"github.com/elentok/gx/server/servertest"
 )
 
-func getEpicList(t *testing.T, code int, body string) server.EpicList {
+func getEpicList(t *testing.T, code int, body string) wire.EpicList {
 	t.Helper()
-	var l server.EpicList
+	var l wire.EpicList
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
@@ -63,26 +64,26 @@ func TestEpicList_SectionRules(t *testing.T) {
 	list := getEpicList(t, code, body)
 
 	want := map[string]struct {
-		state server.EpicListState
+		state wire.EpicListState
 		kind  string
 	}{
-		"proj:ready":            {server.EpicListReady, server.EpicKindLoop},
-		"proj:draft":            {server.EpicListDraft, server.EpicKindLoop},
-		"proj:queued":           {server.EpicListQueued, server.EpicKindLoop},
-		"proj:awaiting":         {server.EpicListAwaitingMerge, server.EpicKindLoop},
-		"proj:paused":           {server.EpicListPaused, server.EpicKindLoop},
-		"proj:blocked":          {server.EpicListMergeBlocked, server.EpicKindLoop},
-		"proj:merging":          {server.EpicListMerging, server.EpicKindLoop},
-		"proj:unqueued-claimed": {server.EpicListNoOpenTickets, server.EpicKindLoop},
-		"proj:merged":           {server.EpicListFinished, server.EpicKindLoop},
-		"proj:noopen":           {server.EpicListAwaitingMerge, server.EpicKindLoop},
-		"proj:designing":        {server.EpicListDesigning, server.EpicKindMap},
-		"proj:designing-done":   {server.EpicListDesigning, server.EpicKindMap},
-		"proj:waiting":          {server.EpicListWaitingToDesign, server.EpicKindMap},
-		"proj:mapdone":          {server.EpicListFinished, server.EpicKindMap},
-		"proj:follow-ups":       {server.EpicListFollowUps, server.EpicKindLoop},
+		"proj:ready":            {wire.EpicListReady, wire.EpicKindLoop},
+		"proj:draft":            {wire.EpicListDraft, wire.EpicKindLoop},
+		"proj:queued":           {wire.EpicListQueued, wire.EpicKindLoop},
+		"proj:awaiting":         {wire.EpicListAwaitingMerge, wire.EpicKindLoop},
+		"proj:paused":           {wire.EpicListPaused, wire.EpicKindLoop},
+		"proj:blocked":          {wire.EpicListMergeBlocked, wire.EpicKindLoop},
+		"proj:merging":          {wire.EpicListMerging, wire.EpicKindLoop},
+		"proj:unqueued-claimed": {wire.EpicListNoOpenTickets, wire.EpicKindLoop},
+		"proj:merged":           {wire.EpicListFinished, wire.EpicKindLoop},
+		"proj:noopen":           {wire.EpicListAwaitingMerge, wire.EpicKindLoop},
+		"proj:designing":        {wire.EpicListDesigning, wire.EpicKindMap},
+		"proj:designing-done":   {wire.EpicListDesigning, wire.EpicKindMap},
+		"proj:waiting":          {wire.EpicListWaitingToDesign, wire.EpicKindMap},
+		"proj:mapdone":          {wire.EpicListFinished, wire.EpicKindMap},
+		"proj:follow-ups":       {wire.EpicListFollowUps, wire.EpicKindLoop},
 	}
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range list.Epics {
 		got[r.Address] = r
 	}
@@ -121,7 +122,7 @@ func TestEpicList_RowFields(t *testing.T) {
 			map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
 	})
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	var byName = map[string]server.EpicListRow{}
+	var byName = map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		byName[r.Name] = r
 	}
@@ -146,7 +147,7 @@ func TestEpicList_BlockedByEpicsIgnoresMerged(t *testing.T) {
 		writeEpicFiles(t, store, "free", "---\nstatus: open\nblocked_by: [landed]\n---\n", open)
 	})
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	byName := map[string]server.EpicListRow{}
+	byName := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		byName[r.Name] = r
 	}
@@ -168,7 +169,7 @@ func TestEpicList_LastActivityIsTheNewestStamp(t *testing.T) {
 		writeEpicFiles(t, store, "idle", "---\nstatus: open\nkind: map\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
 	})
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	byName := map[string]server.EpicListRow{}
+	byName := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		byName[r.Name] = r
 	}
@@ -227,12 +228,12 @@ func TestEpicList_FollowUpsCardCountsByCategoryAndComesFirst(t *testing.T) {
 		writeProjectEpic(t, store, "empty", "follow-ups", loop, map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
 	})
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	var cards, design []server.EpicListRow
+	var cards, design []wire.EpicListRow
 	for _, r := range getEpicList(t, code, body).Epics {
 		if r.Name == "follow-ups" {
 			cards = append(cards, r)
 		}
-		if r.Section == server.SectionReadyToDesign {
+		if r.Section == wire.SectionReadyToDesign {
 			design = append(design, r)
 		}
 	}
@@ -240,10 +241,10 @@ func TestEpicList_FollowUpsCardCountsByCategoryAndComesFirst(t *testing.T) {
 		t.Fatalf("follow-ups cards = %+v, want one (none for the project with nothing open): %s", cards, body)
 	}
 	c := cards[0]
-	if c.Address != "proj:follow-ups" || c.CardKind != server.CardKindFollowUps || c.StatusWords != "2 bugs, 1 idea" {
+	if c.Address != "proj:follow-ups" || c.CardKind != wire.CardKindFollowUps || c.StatusWords != "2 bugs, 1 idea" {
 		t.Errorf("card = %+v", c)
 	}
-	if len(c.Actions) != 1 || c.Actions[0].Kind != server.CardActionTriage || c.Actions[0].Target != "proj" {
+	if len(c.Actions) != 1 || c.Actions[0].Kind != wire.CardActionTriage || c.Actions[0].Target != "proj" {
 		t.Errorf("actions = %+v, want Triage on proj", c.Actions)
 	}
 	if len(design) != 2 || design[0].Address != "proj:follow-ups" {
@@ -282,19 +283,19 @@ func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
 	}
 	code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
 	var addrs []string
-	bySection := map[server.CardSection][]server.EpicListRow{}
+	bySection := map[wire.CardSection][]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		addrs = append(addrs, r.Address)
 		bySection[r.Section] = append(bySection[r.Section], r)
 	}
-	if q := bySection[server.SectionImplementing]; len(q) != 1 || q[0].Address != "proj:one-offs/01" || q[0].CardKind != server.CardKindOneOff || q[0].State != server.EpicListQueued {
+	if q := bySection[wire.SectionImplementing]; len(q) != 1 || q[0].Address != "proj:one-offs/01" || q[0].CardKind != wire.CardKindOneOff || q[0].State != wire.EpicListQueued {
 		t.Errorf("Implementing = %+v, want the queued one-off", q)
 	}
-	if n := bySection[server.SectionNeedsYou]; len(n) != 1 || n[0].Address != "proj:one-offs/02" || n[0].StatePill != server.PillPaused || len(n[0].Actions) != 1 || n[0].Actions[0].Kind != server.CardActionOpenTicket {
+	if n := bySection[wire.SectionNeedsYou]; len(n) != 1 || n[0].Address != "proj:one-offs/02" || n[0].StatePill != server.PillPaused || len(n[0].Actions) != 1 || n[0].Actions[0].Kind != wire.CardActionOpenTicket {
 		t.Errorf("Needs you = %+v, want the paused one-off with its pill and action", n)
 	}
 	var got []string
-	for _, r := range bySection[server.SectionFinished] {
+	for _, r := range bySection[wire.SectionFinished] {
 		got = append(got, r.Address)
 	}
 	// Every done epic stays; only the two newest Finished cards may be one-offs.

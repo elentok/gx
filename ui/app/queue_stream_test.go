@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
@@ -27,10 +28,10 @@ func queuedTicket(status string, claimedAt time.Time) []server.TicketInfo {
 }
 
 // runningEpic is the server's summary of gx:alpha once 01 is claimed.
-func runningEpic() []server.EpicSummary {
-	return []server.EpicSummary{{
-		Address: "gx:alpha", Name: "alpha", State: server.EpicStateRunning, Total: 1,
-		Active: []server.SummaryTicket{{Address: "gx:alpha/01", Title: "Zeta ticket", ClaimedAt: time.Now()}},
+func runningEpic() []wire.EpicSummary {
+	return []wire.EpicSummary{{
+		Address: "gx:alpha", Name: "alpha", State: wire.EpicStateRunning, Total: 1,
+		Active: []wire.SummaryTicket{{Address: "gx:alpha/01", Title: "Zeta ticket", ClaimedAt: time.Now()}},
 	}}
 }
 

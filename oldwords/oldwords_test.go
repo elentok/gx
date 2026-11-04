@@ -86,8 +86,8 @@ var allowed = map[string]allowance{
 	// Wire and persisted names kept for compatibility with running servers,
 	// stored logs and on-disk state.
 	"server/queue.go":                     allow("JSON wire fields parked, park_kind, park_reason", "park"),
-	"server/epicsummary.go":               allow("JSON wire field parked", "park"),
-	"server/epicdetail.go":                allow("JSON wire field needs_answer", "needsanswer"),
+	"server/wire/epicsummary.go":          allow("JSON wire field parked", "park"),
+	"server/wire/epicdetail.go":           allow("JSON wire field needs_answer", "needsanswer"),
 	"server/reads.go":                     allow("persisted lock kind \"land\"", "land"),
 	"server/mergerecover.go":              allow("persisted event kind land-rolled-back", "land"),
 	"server/repair.go":                    allow("hidden unpark verb and the persisted unpark answer choice", "park"),
@@ -95,7 +95,7 @@ var allowed = map[string]allowance{
 	"ralphloop/mergelock.go":              allow("on-disk land-locks state dir; renaming would orphan live locks", "land"),
 	"ralphloop/notification_text.go":      allow("chat headlines \"needs answer\" and \"needs repair\"", "needsanswer", "needsrepair"),
 	"ralphloop/waitforfinish_recovery.go": allow("comment names the legacy Needs Answer heading", "needsanswer"),
-	"webui/src/generated/server.ts":       allow("generated from the wire fields above", "park", "needsanswer"), "webui/src/epic/rows.ts": allow("maps the legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
+	"webui/src/generated/wire.ts":         allow("generated from the wire fields above", "park", "needsanswer"), "webui/src/epic/rows.ts": allow("maps the legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
 	// Tests of the read shim, the hidden aliases and the kept wire names.
 	"cmd/server_parity_test.go":                allow("lists the hidden drain, park and unpark routes", "drain", "park"),
 	"cmd/tickets_alias_test.go":                allow("tests the retired land, reset, unpark and drain aliases", "park", "land", "reset", "drain"),

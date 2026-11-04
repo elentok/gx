@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"time"
 
@@ -35,7 +36,7 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link ServerLink) (tea.M
 // applyServerState rebuilds rows, queue order, claim times, budget, herdr state
 // and queue mode from st.
 func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) {
-	m.summaries = make(map[string]server.EpicSummary, len(st.Epics))
+	m.summaries = make(map[string]wire.EpicSummary, len(st.Epics))
 	for _, sum := range st.Epics {
 		m.summaries[sum.Address] = sum
 	}
@@ -120,7 +121,7 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 	running := map[string]bool{}
 	for _, epic := range m.epics {
 		sum := m.summaries[epic.Name]
-		if sum.State != server.EpicStateRunning {
+		if sum.State != wire.EpicStateRunning {
 			continue
 		}
 		active := make(map[string]time.Time, len(sum.Active))

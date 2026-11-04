@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"time"
 
@@ -8,84 +9,10 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// EpicState is EpicSummary.State.
-type EpicState string
-
-const (
-	EpicStateAwaitingMerge EpicState = "awaiting-merge"
-	EpicStateFinished      EpicState = "finished"
-	EpicStateRunning       EpicState = "running"
-	// EpicStateMerging is an epic whose only unfinished tickets are merge tickets
-	// that are open or claimed.
-	EpicStateMerging EpicState = "merging"
-	EpicStateWaiting EpicState = "waiting"
-	// EpicStatePaused is an epic with nothing runnable: a paused ticket, a
-	// dependency deadlock, or a blocked merge. EpicSummary.Reason says which.
-	EpicStatePaused EpicState = "paused"
-)
-
-// The reasons a Paused epic gives for itself, when no ticket is paused.
-const (
-	EpicReasonDeadlock     = "Dependency deadlock"
-	EpicReasonMergeBlocked = "Merge blocked"
-)
-
-// SummaryTicket is one ticket in an EpicSummary: an active one carries
-// ClaimedAt, a Paused one carries Recovery and its unclipped Pause reason.
-type SummaryTicket struct {
-	Address   string    `json:"address"`
-	Title     string    `json:"title"`
-	Status    string    `json:"status"`
-	ClaimedAt time.Time `json:"claimed_at,omitzero"`
-	Recovery  string    `json:"recovery,omitempty"`
-	Reason    string    `json:"reason,omitempty"`
-	// ReasonLabel is the plain-words label of the ticket's pause reason.
-	ReasonLabel string `json:"reason_label,omitempty"`
-	// Summary is the open question's summary line, or the pause reason without one.
-	Summary string `json:"summary,omitempty"`
-	// Answerable is set when a person's reply can go to the open question.
-	Answerable bool `json:"answerable"`
-	// Answered is set on an open ticket whose latest question has an answer.
-	Answered bool `json:"answered"`
-	// NeedsApproval is set on an active ticket whose agent waits on a permission prompt.
-	NeedsApproval bool `json:"needs_approval"`
-}
-
-// EpicSummary is one epic holding a queue item, as the web page's cards show it.
-type EpicSummary struct {
-	Address string    `json:"address"`
-	Name    string    `json:"name"`
-	Project string    `json:"project"`
-	State   EpicState `json:"state"`
-	Done    int       `json:"done"`
-	Total   int       `json:"total"`
-	// Active is the running tickets, listed only while the epic is Running.
-	Active []SummaryTicket `json:"active"`
-	Paused []SummaryTicket `json:"parked"`
-	// HasRepair is set when a paused ticket is broken (stuck or error), so
-	// both clients show a fault in the alarm color instead of a question.
-	HasRepair bool `json:"has_repair"`
-	// Reason is why a Paused epic is paused: the reason of its first paused
-	// ticket, else "Dependency deadlock" or "Merge blocked". It is empty for a
-	// Paused epic that holds only drafts.
-	Reason string `json:"reason,omitempty"`
-	// More is the number of paused tickets beyond the first, whose reason Reason shows.
-	More int `json:"more,omitempty"`
-	// Detail is the cycle that deadlocks the epic, or why its merge is blocked.
-	Detail string `json:"detail,omitempty"`
-	// MergeBlocked is set on a Paused epic whose last merge failed, so clients
-	// keep offering the merge action.
-	MergeBlocked bool `json:"merge_blocked,omitempty"`
-	// MergeBlockKind is the pause reason of a blocked merge.
-	MergeBlockKind string `json:"merge_block_kind,omitempty"`
-	// Actions are the verbs of a blocked merge's pause, from the pause-to-verb table.
-	Actions []string `json:"actions,omitempty"`
-}
-
 // epicSummaries summarizes every epic with a queue item, in queue order. A
 // Merged epic and a map epic have no card.
-func (s *Server) epicSummaries(all []TicketInfo) []EpicSummary {
-	out := []EpicSummary{}
+func (s *Server) epicSummaries(all []TicketInfo) []wire.EpicSummary {
+	out := []wire.EpicSummary{}
 	seen := map[rootRef]bool{}
 	recoveryOf := func(addr string) string { return recoveryState(s.pauseHold.state(addr), addr, all) }
 	for _, item := range s.queued.list() {
@@ -146,15 +73,15 @@ func answeredLatest(evs []tickets.LogEvent) bool {
 
 // summarizeEpic applies the state rules, first match wins. A claimed ticket
 // counts as runnable, but only one with a server claim time counts as running.
-func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) EpicSummary {
-	sum := EpicSummary{
+func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) wire.EpicSummary {
+	sum := wire.EpicSummary{
 		Address: root.String(), Name: e.Name, Project: root.Project, Done: e.DoneCount(), Total: e.TotalCount(),
-		Active: []SummaryTicket{}, Paused: []SummaryTicket{},
+		Active: []wire.SummaryTicket{}, Paused: []wire.SummaryTicket{},
 	}
 	for _, t := range e.Tickets {
 		status := e.RenderedStatus(t)
 		addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
-		info := SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
+		info := wire.SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
 		switch {
 		case isPaused(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.PauseDetail(e, t)
@@ -185,26 +112,26 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		sum.Done, sum.Total = 0, 0
 	}
 	sum.State = epicStateFor(root, e, claimedAt)
-	if sum.State == EpicStatePaused {
+	if sum.State == wire.EpicStatePaused {
 		sum.Reason, sum.More = pausedEpicReason(e)
 		switch {
 		case isMergeableEpic(root) && epicMergeBlocked(e):
-			sum.Reason, sum.Detail = EpicReasonMergeBlocked, e.MergeBlockReason
+			sum.Reason, sum.Detail = wire.EpicReasonMergeBlocked, e.MergeBlockReason
 			sum.MergeBlocked, sum.MergeBlockKind = true, e.MergeBlockKind
 			sum.Actions = mergeBlockActions(e.MergeBlockKind)
 		case epicStateOf(e) == epicCycle:
-			sum.Reason, sum.Detail = EpicReasonDeadlock, cycleReason(root, e)
+			sum.Reason, sum.Detail = wire.EpicReasonDeadlock, cycleReason(root, e)
 		}
 	}
 	if !showsActive(sum.State) {
-		sum.Active = []SummaryTicket{}
+		sum.Active = []wire.SummaryTicket{}
 	}
 	return sum
 }
 
 // showsActive reports whether an epic in state lists its claimed tickets.
-func showsActive(state EpicState) bool {
-	return state == EpicStateRunning || state == EpicStateMerging
+func showsActive(state wire.EpicState) bool {
+	return state == wire.EpicStateRunning || state == wire.EpicStateMerging
 }
 
 // isMergeableEpic reports whether root can ever merge; the one-offs inbox never does.
@@ -256,22 +183,22 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 
 // epicStateFor is the one place that decides an epic's state. Running needs a
 // claimed, non-paused ticket that has a server claim time.
-func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) EpicState {
+func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) wire.EpicState {
 	switch epicStateOf(e) {
 	case epicDone:
 		if !isMergeableEpic(root) {
-			return EpicStateWaiting
+			return wire.EpicStateWaiting
 		}
 		if e.MergedAt.IsZero() {
 			if epicMergeBlocked(e) {
-				return EpicStatePaused
+				return wire.EpicStatePaused
 			}
-			return EpicStateAwaitingMerge
+			return wire.EpicStateAwaitingMerge
 		}
-		return EpicStateFinished
+		return wire.EpicStateFinished
 	case epicRunnable:
 		if isMergeableEpic(root) && onlyMergeTicketsRemain(e) {
-			return EpicStateMerging
+			return wire.EpicStateMerging
 		}
 		for _, t := range e.Tickets {
 			if isPaused(e, t) || e.RenderedStatus(t) != tickets.StatusClaimed {
@@ -279,11 +206,11 @@ func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Tim
 			}
 			addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
 			if _, ok := claimedAt(addr); ok {
-				return EpicStateRunning
+				return wire.EpicStateRunning
 			}
 		}
-		return EpicStateWaiting
+		return wire.EpicStateWaiting
 	default:
-		return EpicStatePaused
+		return wire.EpicStatePaused
 	}
 }

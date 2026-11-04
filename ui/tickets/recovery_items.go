@@ -2,9 +2,8 @@ package tickets
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"strings"
-
-	"github.com/elentok/gx/server"
 )
 
 // recoverPrefix marks a menu pick that runs one of detail.actions; the rest of
@@ -21,7 +20,7 @@ type recoveryAction struct {
 
 // recoveryActions reads the server's verbs with the label and tooltip the
 // server sent for each. A nil detail offers none.
-func recoveryActions(d *server.TicketDetail) []recoveryAction {
+func recoveryActions(d *wire.TicketDetail) []recoveryAction {
 	if d == nil {
 		return nil
 	}
@@ -42,7 +41,7 @@ func recoveryActions(d *server.TicketDetail) []recoveryAction {
 // ticketDetail reads address's detail. With no server it returns nil and no
 // error; a failed read returns the error, and the menu opens without recovery
 // items.
-func ticketDetail(api ServerAPI, address string) (*server.TicketDetail, error) {
+func ticketDetail(api ServerAPI, address string) (*wire.TicketDetail, error) {
 	if api == nil {
 		return nil, nil
 	}

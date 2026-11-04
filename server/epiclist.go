@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"slices"
 	"strings"
@@ -11,129 +12,8 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// EpicListState is EpicListRow.State. It is a superset of EpicState: it also
-// names the epics the Epics page lists that no queue item holds.
-type EpicListState string
-
-const (
-	// Spelled as literals, not EpicListState(EpicState...): tygo emits a conversion as `any`,
-	// which throws when the web app imports the generated file.
-	EpicListFinished      EpicListState = "finished"
-	EpicListRunning       EpicListState = "running"
-	EpicListAwaitingMerge EpicListState = "awaiting-merge"
-	EpicListMerging       EpicListState = "merging"
-	EpicListPaused        EpicListState = "paused"
-
-	EpicListReady           EpicListState = "ready"
-	EpicListDesigning       EpicListState = "designing"
-	EpicListWaitingToDesign EpicListState = "waiting-to-design"
-	EpicListQueued          EpicListState = "queued"
-	EpicListMergeBlocked    EpicListState = "merge-blocked"
-	EpicListDraft           EpicListState = "draft"
-	// EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
-	// nothing to queue, yet not finished.
-	EpicListNoOpenTickets EpicListState = "no-open-tickets"
-	// EpicListFollowUps is a project's follow-ups card; see followUpsCard.
-	EpicListFollowUps EpicListState = "follow-ups"
-)
-
-// ProgressStep is the step a map's design has reached; see mapProgress. The
-// tickets package owns the list of steps. The constants below are literals,
-// not tickets.Step*, because tygo cannot resolve another package's constant;
-// TestProgressStepsMatchTickets keeps them in sync.
-type ProgressStep = tickets.DesignStep
-
-const (
-	ProgressChart          ProgressStep = "chart"
-	ProgressResolveTickets ProgressStep = "resolve-tickets"
-	ProgressSpec           ProgressStep = "spec"
-	ProgressReview         ProgressStep = "review"
-	ProgressGrillFindings  ProgressStep = "grill-findings"
-	ProgressCreateTickets  ProgressStep = "create-tickets"
-	ProgressBranch         ProgressStep = "branch"
-	ProgressDone           ProgressStep = "done"
-)
-
 // followUpsEpicName is every project's contributor outbox epic.
 const followUpsEpicName = "follow-ups"
-
-// EpicListRow is one epic of the /v1/epics payload.
-type EpicListRow struct {
-	Address     string        `json:"address"`
-	Project     string        `json:"project"`
-	Name        string        `json:"name"`
-	Kind        string        `json:"kind"`
-	State       EpicListState `json:"state"`
-	Done        int           `json:"done"`
-	Total       int           `json:"total"`
-	CompletedAt time.Time     `json:"completed_at,omitzero"`
-	MergedAt    time.Time     `json:"merged_at,omitzero"`
-	CreatedAt   time.Time     `json:"created_at,omitzero"`
-	// QueuedAt is the epic's first enqueue, else started_at, else merged_at.
-	QueuedAt time.Time `json:"queued_at,omitzero"`
-	// Queued is set while a queue item holds the epic.
-	Queued bool `json:"queued"`
-	// Queueable is set when the Queue action applies; see epicQueueable.
-	Queueable bool `json:"queueable"`
-	// BlockedByEpics are the addresses of the epics named in blocked_by that
-	// have not merged yet.
-	BlockedByEpics []string `json:"blocked_by_epics"`
-	// LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
-	LastActivityAt time.Time `json:"last_activity_at,omitzero"`
-	// MergeBlockKind and MergeBlockReason are set only on a Merge blocked row;
-	// see EpicDetail.
-	MergeBlockKind   string `json:"land_block_kind,omitempty"`
-	MergeBlockReason string `json:"land_block_reason,omitempty"`
-	// ProgressStep is set only on a map row.
-	ProgressStep ProgressStep `json:"progress_step,omitempty"`
-	// QueueSlot is the 1-based slot of the row's loop epic in the queue, 0 when it
-	// is not queued. A joined card carries its -impl epic's slot.
-	QueueSlot int `json:"queue_slot,omitempty"`
-
-	// The card fields below are set on loop epic rows. A joined card carries both
-	// of its epics' addresses in Addresses, the active part first.
-	Addresses []string `json:"addresses,omitempty"`
-	CardKind  CardKind `json:"card_kind,omitempty"`
-	// Section is where the Epics page puts the card.
-	Section     CardSection `json:"section,omitempty"`
-	StatusWords string      `json:"status_words,omitempty"`
-	// RingProgress is the ring fill in percent, 0 to 100.
-	RingProgress int `json:"ring_progress,omitempty"`
-	// Reason is the line under the status words when there is something to say.
-	Reason  string       `json:"reason,omitempty"`
-	Actions []CardAction `json:"actions,omitempty"`
-	// StatePill and WaitingSince are set on a Needs-you card: the pill word and the
-	// start of the wait the section sorts by.
-	StatePill    string    `json:"state_pill,omitempty"`
-	WaitingSince time.Time `json:"waiting_since,omitzero"`
-	// CountdownEndsAt is the deadline of a Design's auto-advance countdown; the client
-	// builds "Next run starts in Ns" from it.
-	CountdownEndsAt time.Time `json:"countdown_ends_at,omitzero"`
-	// TimeKind and TimeStart are the card's time label: what it measures and when it
-	// starts. Both are empty when the start is unknown.
-	TimeKind  CardTimeKind `json:"time_kind,omitempty"`
-	TimeStart time.Time    `json:"time_start,omitzero"`
-}
-
-// FollowUpCount is the number of draft and open tickets in one project's
-// follow-ups epic.
-type FollowUpCount struct {
-	Project string `json:"project"`
-	Open    int    `json:"open"`
-}
-
-// EpicList is the /v1/epics payload.
-type EpicList struct {
-	Epics []EpicListRow `json:"epics"`
-	// Projects is every project, including those with no epics: the project
-	// pickers list them all.
-	Projects []string `json:"projects,omitempty"`
-	// FollowUps lists only the projects with at least one open follow-up.
-	FollowUps []FollowUpCount `json:"follow_ups"`
-	// RecentlyFinished is config server.recently-finished: how many Finished cards
-	// the page shows before a filter.
-	RecentlyFinished int `json:"recently_finished,omitempty"`
-}
 
 // epicListed reports whether the Epics page can show e: one-offs, follow-ups
 // and archived epics are never listed.
@@ -144,38 +24,38 @@ func epicListed(e tickets.Epic) bool {
 // epicListState is the one rule for a listed epic's state. A map has no
 // queue state, and a loop epic is draft, finished or whatever the queue and
 // its tickets say.
-func epicListState(e tickets.Epic, queued, queueable bool, loopState EpicState) EpicListState {
+func epicListState(e tickets.Epic, queued, queueable bool, loopState wire.EpicState) wire.EpicListState {
 	switch {
 	case e.IsMap:
 		return mapListState(e)
 	case !e.MergedAt.IsZero():
-		return EpicListFinished
+		return wire.EpicListFinished
 	case e.Status == string(schema.StatusDraft):
-		return EpicListDraft
-	case loopState == EpicStatePaused && epicMergeBlocked(e):
-		return EpicListMergeBlocked
-	case loopState != EpicStateWaiting && loopState != EpicStateFinished:
-		return EpicListState(loopState)
+		return wire.EpicListDraft
+	case loopState == wire.EpicStatePaused && epicMergeBlocked(e):
+		return wire.EpicListMergeBlocked
+	case loopState != wire.EpicStateWaiting && loopState != wire.EpicStateFinished:
+		return wire.EpicListState(loopState)
 	case queued:
-		return EpicListQueued
+		return wire.EpicListQueued
 	case queueable:
-		return EpicListReady
+		return wire.EpicListReady
 	}
-	return EpicListNoOpenTickets
+	return wire.EpicListNoOpenTickets
 }
 
 // mapListState: a map with a completed_at is finished. Otherwise it is
 // designing once a ticket is claimed or done, and waiting to design before.
-func mapListState(e tickets.Epic) EpicListState {
+func mapListState(e tickets.Epic) wire.EpicListState {
 	switch {
 	case !e.CompletedAt.IsZero():
-		return EpicListFinished
+		return wire.EpicListFinished
 	case slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool {
 		return t.Status == string(schema.StatusClaimed) || t.Status == string(schema.StatusDone)
 	}):
-		return EpicListDesigning
+		return wire.EpicListDesigning
 	}
-	return EpicListWaitingToDesign
+	return wire.EpicListWaitingToDesign
 }
 
 func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
@@ -184,7 +64,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	list := EpicList{Epics: []EpicListRow{}, FollowUps: []FollowUpCount{}}
+	list := wire.EpicList{Epics: []wire.EpicListRow{}, FollowUps: []wire.FollowUpCount{}}
 	designs := s.designActivities()
 	queue := s.newQueueIndex()
 	for _, dir := range dirs {
@@ -197,7 +77,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		for _, e := range epics {
 			if e.Name == followUpsEpicName {
 				if open := openFollowUps(e); open > 0 {
-					list.FollowUps = append(list.FollowUps, FollowUpCount{Project: project, Open: open})
+					list.FollowUps = append(list.FollowUps, wire.FollowUpCount{Project: project, Open: open})
 				}
 			}
 		}
@@ -205,14 +85,14 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	}
 	list.RecentlyFinished = s.settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
-	sortCards(list.Epics, func(r EpicListRow) int { return r.QueueSlot })
+	sortCards(list.Epics, func(r wire.EpicListRow) int { return r.QueueSlot })
 	writeJSON(w, list)
 }
 
 // projectCards builds one project's cards: follow-ups, one-offs, loop and map
 // epics, then pending Design cards. A listed map's card shows its -impl epic,
 // so that epic gets no row of its own.
-func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, queue queueIndex) []EpicListRow {
+func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, queue queueIndex) []wire.EpicListRow {
 	merged := map[string]bool{}
 	byName := map[string]tickets.Epic{}
 	for _, e := range epics {
@@ -232,7 +112,7 @@ func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[
 		return ok && has
 	}
 
-	var rows []EpicListRow
+	var rows []wire.EpicListRow
 	if fu, ok := byName[followUpsEpicName]; ok {
 		if row, ok := followUpsCard(project, fu); ok {
 			rows = append(rows, row)
@@ -249,7 +129,7 @@ func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[
 		row.BlockedByEpics = unmergedBlockers(project, e, merged)
 		if e.IsMap {
 			row.ProgressStep = mapProgress(e)
-			var impl *EpicListRow
+			var impl *wire.EpicListRow
 			if implEpic, ok := joined[e.Name]; ok {
 				r := s.epicListRow(project, implEpic, queue)
 				impl = &r
@@ -301,12 +181,12 @@ func lastActivity(e tickets.Epic) time.Time {
 	return newest
 }
 
-func (s *Server) epicListRow(project string, e tickets.Epic, queue queueIndex) EpicListRow {
+func (s *Server) epicListRow(project string, e tickets.Epic, queue queueIndex) wire.EpicListRow {
 	root := rootRef{Project: project, Epic: e.Name}
 	queued := s.rootQueued(root)
 	queueable := epicQueueable(e, queued)
-	row := EpicListRow{
-		Address: root.String(), Project: project, Name: e.Name, Kind: EpicKindLoop,
+	row := wire.EpicListRow{
+		Address: root.String(), Project: project, Name: e.Name, Kind: wire.EpicKindLoop,
 		Done: e.DoneCount(), Total: e.TotalCount(),
 		CompletedAt: e.CompletedAt, MergedAt: e.MergedAt, CreatedAt: e.CreatedAt,
 		QueuedAt: cmp.Or(e.QueuedAt, e.StartedAt, e.MergedAt),
@@ -314,20 +194,20 @@ func (s *Server) epicListRow(project string, e tickets.Epic, queue queueIndex) E
 		LastActivityAt: lastActivity(e),
 	}
 	if e.IsMap {
-		row.Kind = EpicKindMap
+		row.Kind = wire.EpicKindMap
 	}
 	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.registry.startedAtOf))
-	if row.State == EpicListMergeBlocked {
+	if row.State == wire.EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}
 	if !e.IsMap {
 		row.QueueSlot = queue.slot(root.String())
 		decorateLoopCard(&row, row.QueueSlot)
 		if n, ok := s.loopNeedsYou(root, e, row.State); ok {
-			row.Section, row.StatePill, row.Reason, row.WaitingSince = SectionNeedsYou, n.Pill, n.Reason, n.Since
-			row.Actions = append([]CardAction{n.Action}, n.More...)
+			row.Section, row.StatePill, row.Reason, row.WaitingSince = wire.SectionNeedsYou, n.Pill, n.Reason, n.Since
+			row.Actions = append([]wire.CardAction{n.Action}, n.More...)
 		}
-		row.setCardTime(cardTimeSources{startedAt: e.StartedAt, enqueuedAt: queue.enqueuedAt(root.String())})
+		setCardTime(&row, cardTimeSources{startedAt: e.StartedAt, enqueuedAt: queue.enqueuedAt(root.String())})
 	}
 	return row
 }

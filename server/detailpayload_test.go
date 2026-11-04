@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,17 +10,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
-func fetchDetail(t *testing.T, h *servertest.Harness, base, address string) server.TicketDetail {
+func fetchDetail(t *testing.T, h *servertest.Harness, base, address string) wire.TicketDetail {
 	t.Helper()
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address="+address)
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	var d server.TicketDetail
+	var d wire.TicketDetail
 	if err := json.Unmarshal([]byte(body), &d); err != nil {
 		t.Fatalf("body %q: %v", body, err)
 	}
@@ -62,11 +62,11 @@ func TestTicketDetail_LoopTicketPayload(t *testing.T) {
 			t.Fatalf("body lacks %q: %q", want, d.Body)
 		}
 	}
-	want := []server.RelatedTicket{
-		{Relation: server.RelationBlocker, Address: "proj:work/01", Linkable: true, Title: "Own blocker", Status: "done"},
-		{Relation: server.RelationBlocker, Address: "proj:other/06", Linkable: true, Title: "Cross blocker", Status: "claimed"},
-		{Relation: server.RelationParent, Address: "proj:work/02", Linkable: true, Title: "The parent", Status: "waiting-for-children"},
-		{Relation: server.RelationFork, Address: "proj:work/04", Linkable: true, Title: "A fork", Status: "blocked"},
+	want := []wire.RelatedTicket{
+		{Relation: wire.RelationBlocker, Address: "proj:work/01", Linkable: true, Title: "Own blocker", Status: "done"},
+		{Relation: wire.RelationBlocker, Address: "proj:other/06", Linkable: true, Title: "Cross blocker", Status: "claimed"},
+		{Relation: wire.RelationParent, Address: "proj:work/02", Linkable: true, Title: "The parent", Status: "waiting-for-children"},
+		{Relation: wire.RelationFork, Address: "proj:work/04", Linkable: true, Title: "A fork", Status: "blocked"},
 	}
 	if !slices.Equal(d.Related, want) {
 		t.Fatalf("related = %+v, want %+v", d.Related, want)

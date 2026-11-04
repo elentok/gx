@@ -2,10 +2,10 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -25,10 +25,10 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	if d.State != state {
 		t.Errorf("state = %q, want %q", d.State, state)
 	}
-	if d.Latest == nil || d.Latest.Kind != tickets.QuestionOptions || len(d.Latest.Options) != 2 || d.Latest.Handoff != "h" || d.Latest.Outcome != server.RoundOpen {
+	if d.Latest == nil || d.Latest.Kind != tickets.QuestionOptions || len(d.Latest.Options) != 2 || d.Latest.Handoff != "h" || d.Latest.Outcome != wire.RoundOpen {
 		t.Errorf("latest = %+v", d.Latest)
 	}
-	if want := []string{server.ActionAnswer}; !slices.Equal(d.Actions, want) {
+	if want := []string{wire.ActionAnswer}; !slices.Equal(d.Actions, want) {
 		t.Errorf("live agent actions = %v, want %v", d.Actions, want)
 	}
 	sess, ok, err := fake.Find("epic-a-iter-01")
@@ -39,7 +39,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err = h.Client.Detail(context.Background(), answerAddr)
-	if want := []string{server.ActionAnswer, server.ActionResume}; err != nil || !slices.Equal(d.Actions, want) {
+	if want := []string{wire.ActionAnswer, wire.ActionResume}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("gone agent actions = %v, %v; want %v", d.Actions, err, want)
 	}
 }
@@ -57,10 +57,10 @@ func TestDetail_ZeroCommitOffersRetryOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Detail(context.Background(), answerAddr)
-	if want := []string{server.ActionRetry}; err != nil || !slices.Equal(d.Actions, want) {
+	if want := []string{wire.ActionRetry}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("actions = %v, %v; want %v", d.Actions, err, want)
 	}
-	if got, want := d.ActionInfo[server.ActionRetry], (server.ActionInfo{Label: schema.VerbRetry.Label(), Tooltip: schema.VerbRetry.Tooltip()}); got != want {
+	if got, want := d.ActionInfo[wire.ActionRetry], (wire.ActionInfo{Label: schema.VerbRetry.Label(), Tooltip: schema.VerbRetry.Tooltip()}); got != want {
 		t.Errorf("retry info = %+v, want %+v", got, want)
 	}
 }
@@ -76,12 +76,12 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 		reason schema.PauseReason
 		want   []string
 	}{
-		{schema.PauseIterationError, []string{server.ActionRetry, server.ActionStartOver}},
-		{schema.PauseMergeConflict, []string{server.ActionMerge, server.ActionStartOver}},
-		{schema.PauseStrandedCommits, []string{server.ActionReopenAndRetry}},
-		{schema.PauseAmbiguousBase, []string{server.ActionChooseBase}},
-		{schema.PauseBlockedPane, []string{server.ActionRetry}},
-		{schema.PauseManual, []string{server.ActionResume, server.ActionStartOver}},
+		{schema.PauseIterationError, []string{wire.ActionRetry, wire.ActionStartOver}},
+		{schema.PauseMergeConflict, []string{wire.ActionMerge, wire.ActionStartOver}},
+		{schema.PauseStrandedCommits, []string{wire.ActionReopenAndRetry}},
+		{schema.PauseAmbiguousBase, []string{wire.ActionChooseBase}},
+		{schema.PauseBlockedPane, []string{wire.ActionRetry}},
+		{schema.PauseManual, []string{wire.ActionResume, wire.ActionStartOver}},
 	}
 	for _, c := range cases {
 		if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
@@ -93,8 +93,8 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 		if err != nil || !slices.Equal(d.Actions, c.want) {
 			t.Errorf("%s: actions = %v, %v; want %v", c.reason, d.Actions, err, c.want)
 		}
-		if c.reason == schema.PauseStrandedCommits && d.ActionInfo[server.ActionReopenAndRetry].Label != "Reopen and retry" {
-			t.Errorf("stranded-commits label = %q", d.ActionInfo[server.ActionReopenAndRetry].Label)
+		if c.reason == schema.PauseStrandedCommits && d.ActionInfo[wire.ActionReopenAndRetry].Label != "Reopen and retry" {
+			t.Errorf("stranded-commits label = %q", d.ActionInfo[wire.ActionReopenAndRetry].Label)
 		}
 	}
 }
@@ -110,7 +110,7 @@ func TestDetail_FinishedCommitlessOffersMergeOnly(t *testing.T) {
 		commitless bool
 		want       []string
 	}{
-		{"finished commitless", schema.StatusClaimed, schema.IterationStatusFinished, true, []string{server.ActionMerge}},
+		{"finished commitless", schema.StatusClaimed, schema.IterationStatusFinished, true, []string{wire.ActionMerge}},
 		{"finished with commits", schema.StatusClaimed, schema.IterationStatusFinished, false, []string{}},
 		{"unfinished commitless", schema.StatusClaimed, schema.IterationStatusWorking, true, []string{}},
 		{"done commitless", schema.StatusDone, schema.IterationStatusFinished, true, []string{}},
@@ -159,10 +159,10 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err = h.Client.Detail(context.Background(), answerAddr)
-	if err != nil || len(d.Rounds) != 1 || d.Rounds[0].Outcome != server.RoundAnswered || d.Rounds[0].Options != nil {
+	if err != nil || len(d.Rounds) != 1 || d.Rounds[0].Outcome != wire.RoundAnswered || d.Rounds[0].Options != nil {
 		t.Fatalf("earlier rounds = %+v, %v", d.Rounds, err)
 	}
-	if d.Latest.Outcome != server.RoundClosed || d.Latest.ClosedReason != "resumed" || slices.Contains(d.Actions, server.ActionAnswer) {
+	if d.Latest.Outcome != wire.RoundClosed || d.Latest.ClosedReason != "resumed" || slices.Contains(d.Actions, wire.ActionAnswer) {
 		t.Errorf("closed round = %+v, actions = %v", d.Latest, d.Actions)
 	}
 }
@@ -176,7 +176,7 @@ func TestDetail_StuckHasNoAnswerAction(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Detail(context.Background(), answerAddr)
-	if err != nil || slices.Contains(d.Actions, server.ActionAnswer) {
+	if err != nil || slices.Contains(d.Actions, wire.ActionAnswer) {
 		t.Errorf("stuck actions = %v, %v", d.Actions, err)
 	}
 }

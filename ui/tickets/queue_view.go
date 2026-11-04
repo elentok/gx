@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"strings"
 
@@ -8,7 +9,6 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
@@ -274,7 +274,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
 	status := ticketStatus(epic, t)
-	i := slices.IndexFunc(m.summaries[epic.Name].Paused, func(p server.SummaryTicket) bool { return p.Address == t.Path })
+	i := slices.IndexFunc(m.summaries[epic.Name].Paused, func(p wire.SummaryTicket) bool { return p.Address == t.Path })
 	if i < 0 || m.summaries[epic.Name].Paused[i].Reason == "" {
 		return "", false
 	}

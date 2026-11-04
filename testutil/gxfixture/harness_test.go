@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -263,9 +264,9 @@ func (w *web) try(t *testing.T, path string, body any) (data string, ok bool) {
 	return fmt.Sprintf("%d: %s", resp.StatusCode, raw), err == nil && resp.StatusCode == http.StatusOK && !out.Refused
 }
 
-func (r *running) detail(t *testing.T, address string) server.TicketDetail {
+func (r *running) detail(t *testing.T, address string) wire.TicketDetail {
 	t.Helper()
-	var d server.TicketDetail
+	var d wire.TicketDetail
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "tickets", "detail", address, "--json")), &d); err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +274,7 @@ func (r *running) detail(t *testing.T, address string) server.TicketDetail {
 }
 
 // waitPermission waits for the approve ticket's agent to block on a prompt the web can approve.
-func (r *running) waitPermission(t *testing.T, address string) server.TicketDetail {
+func (r *running) waitPermission(t *testing.T, address string) wire.TicketDetail {
 	t.Helper()
 	deadline := time.Now().Add(60 * time.Second)
 	for {

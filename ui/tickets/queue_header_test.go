@@ -9,7 +9,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -18,7 +17,7 @@ import (
 
 func TestEpicBarFillFollowsStateColour(t *testing.T) {
 	t.Parallel()
-	sum := server.EpicSummary{Done: 1, Total: 2}
+	sum := wire.EpicSummary{Done: 1, Total: 2}
 	if got, want := epicBar(sum, epicStatusProblemStyle), epicBar(sum, lipgloss.NewStyle()); got == want {
 		t.Fatalf("bar fill ignored the state colour: %q", got)
 	}
@@ -32,15 +31,15 @@ func TestQueueHeaderPausedLineFollowsRunningCount(t *testing.T) {
 	m := NewQueueModel("", ui.Settings{}, keys.Manager{})
 	m.paused = true
 	cases := []struct {
-		active []server.SummaryTicket
+		active []wire.SummaryTicket
 		want   string
 	}{
 		{nil, "Paused. No tickets running."},
-		{[]server.SummaryTicket{{Address: "p:e/01"}}, "Paused. 1 ticket still running."},
-		{[]server.SummaryTicket{{Address: "p:e/01"}, {Address: "p:e/02"}, {Address: "p:e/03"}}, "Paused. 3 tickets still running."},
+		{[]wire.SummaryTicket{{Address: "p:e/01"}}, "Paused. 1 ticket still running."},
+		{[]wire.SummaryTicket{{Address: "p:e/01"}, {Address: "p:e/02"}, {Address: "p:e/03"}}, "Paused. 3 tickets still running."},
 	}
 	for _, tc := range cases {
-		m.summaries = map[string]server.EpicSummary{"p:e": {Active: tc.active}}
+		m.summaries = map[string]wire.EpicSummary{"p:e": {Active: tc.active}}
 		lines := m.queueHeaderBodyLines()
 		if got := ansi.Strip(lines[0]); got != tc.want {
 			t.Errorf("header = %q, want %q", got, tc.want)

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"io"
 
 	"github.com/elentok/gx/apiclient"
@@ -22,10 +23,10 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), listJSON, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.EpicList, error) {
+				func(ctx context.Context, cl *apiclient.Client) (wire.EpicList, error) {
 					return cl.Epics(ctx)
 				},
-				func(w io.Writer, l server.EpicList) error { return printEpicList(w, l, allFinished) })
+				func(w io.Writer, l wire.EpicList) error { return printEpicList(w, l, allFinished) })
 		},
 	}
 	cmd.Flags().BoolVar(&listJSON, "json", false, "emit structured JSON instead of human-readable text")
@@ -70,7 +71,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.EpicDetail, error) {
+				func(ctx context.Context, cl *apiclient.Client) (wire.EpicDetail, error) {
 					return cl.EpicDetail(ctx, args[0])
 				},
 				printEpicDetail)
@@ -93,10 +94,10 @@ func printEpicRow(w io.Writer, address, kind, state string, done, total int, que
 
 // printEpicList writes one line per card. Finished cards come newest first, and
 // only the first l.RecentlyFinished print unless allFinished is set.
-func printEpicList(w io.Writer, l server.EpicList, allFinished bool) error {
+func printEpicList(w io.Writer, l wire.EpicList, allFinished bool) error {
 	finished := 0
 	for _, e := range l.Epics {
-		if e.Section == server.SectionFinished {
+		if e.Section == wire.SectionFinished {
 			finished++
 			if !allFinished && finished > l.RecentlyFinished {
 				continue
@@ -107,14 +108,14 @@ func printEpicList(w io.Writer, l server.EpicList, allFinished bool) error {
 		if len(e.Addresses) > 0 {
 			address = e.Addresses[0]
 		}
-		if err := printEpicRow(w, address, string(cmp.Or(e.CardKind, server.CardKind(e.Kind))), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section)); err != nil {
+		if err := printEpicRow(w, address, string(cmp.Or(e.CardKind, wire.CardKind(e.Kind))), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printEpicDetail(w io.Writer, d server.EpicDetail) error {
+func printEpicDetail(w io.Writer, d wire.EpicDetail) error {
 	if err := printEpicRow(w, d.Address, string(d.Kind), string(d.State), d.Done, d.Total, d.Queueable); err != nil {
 		return err
 	}

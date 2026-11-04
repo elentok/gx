@@ -62,8 +62,8 @@ func (s *Server) designActivities() map[string]designActivity {
 
 // mapNotStarted: the Destination is unconfirmed and none of the map's tickets
 // is resolved.
-func mapNotStarted(m tickets.Epic, step ProgressStep) bool {
-	if step != ProgressChart {
+func mapNotStarted(m tickets.Epic, step wire.ProgressStep) bool {
+	if step != wire.ProgressChart {
 		return false
 	}
 	for _, t := range m.Tickets {

@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"slices"
 	"strings"
@@ -87,7 +88,7 @@ func withMutes(info server.TicketInfo, mutes []schema.MuteRecord) server.TicketI
 
 func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(server.ActionAnswer, server.ActionResume)})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
@@ -262,7 +263,7 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 		t.Errorf("set draft on a draft = %q", got)
 	}
 
-	resumeDetail := detailWith(server.ActionResume)
+	resumeDetail := detailWith(wire.ActionResume)
 	done := ticketMenuInput{rendered: tickets.StatusDone, ticket: tickets.Ticket{Status: "done"}, isMap: true, detail: &resumeDetail}
 	for _, label := range []string{"Pause", "Cancel", resumeLabel, "Unmute & Reopen"} {
 		if got := disabled(done, label); got != ticketFinished {
@@ -419,7 +420,7 @@ func TestTicketMenuItems_ResumeEnterHintOnlyWhenEnterResumes(t *testing.T) {
 		{"paused (answer)", "", tickets.StatusPausedAnswer, ""},
 		{"paused (repair)", schema.PauseManual, tickets.StatusPausedRepair, "enter"},
 	} {
-		d := detailWith(server.ActionResume)
+		d := detailWith(wire.ActionResume)
 		items := ticketMenuItems(ticketMenuInput{
 			rendered: tt.rendered,
 			ticket:   tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: tt.reason},

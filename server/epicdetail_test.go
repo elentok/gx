@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -52,10 +53,10 @@ func startEpicDetail(t *testing.T, setup func(store string)) (*servertest.Harnes
 	return h, hs.WebURL
 }
 
-func getEpicDetail(t *testing.T, h *servertest.Harness, base, address string) (int, server.EpicDetail, string) {
+func getEpicDetail(t *testing.T, h *servertest.Harness, base, address string) (int, wire.EpicDetail, string) {
 	t.Helper()
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics/detail?address="+address)
-	var d server.EpicDetail
+	var d wire.EpicDetail
 	if code == http.StatusOK {
 		if err := json.Unmarshal([]byte(body), &d); err != nil {
 			t.Fatalf("body %q: %v", body, err)
@@ -64,7 +65,7 @@ func getEpicDetail(t *testing.T, h *servertest.Harness, base, address string) (i
 	return code, d, body
 }
 
-func rowOf(t *testing.T, d server.EpicDetail, address string) server.EpicDetailRow {
+func rowOf(t *testing.T, d wire.EpicDetail, address string) wire.EpicDetailRow {
 	t.Helper()
 	for _, r := range d.Rows {
 		if r.Address == address {
@@ -72,7 +73,7 @@ func rowOf(t *testing.T, d server.EpicDetail, address string) server.EpicDetailR
 		}
 	}
 	t.Fatalf("no row %s in %+v", address, d.Rows)
-	return server.EpicDetailRow{}
+	return wire.EpicDetailRow{}
 }
 
 func TestEpicDetail_LoopEpic(t *testing.T) {
@@ -107,7 +108,7 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	if d.Address != "proj:work" || d.Kind != server.EpicKindLoop || d.State != server.EpicStatePaused || d.Summary != "Does the thing." {
+	if d.Address != "proj:work" || d.Kind != wire.EpicKindLoop || d.State != wire.EpicStatePaused || d.Summary != "Does the thing." {
 		t.Errorf("header = %+v", d)
 	}
 	if d.Done != 3 || d.Total != 6 {
@@ -148,7 +149,7 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 	}
 }
 
-func rowAddresses(d server.EpicDetail) []string {
+func rowAddresses(d wire.EpicDetail) []string {
 	out := make([]string, len(d.Rows))
 	for i, r := range d.Rows {
 		out[i] = r.Address
@@ -163,7 +164,7 @@ func TestEpicDetail_FinishedVersusAwaitingMerge(t *testing.T) {
 		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
 		writeEpicFiles(t, store, "merged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
 	})
-	for epic, want := range map[string]server.EpicState{"unmerged": server.EpicStateAwaitingMerge, "merged": server.EpicStateFinished} {
+	for epic, want := range map[string]wire.EpicState{"unmerged": wire.EpicStateAwaitingMerge, "merged": wire.EpicStateFinished} {
 		code, d, body := getEpicDetail(t, h, base, "proj:"+epic)
 		if code != http.StatusOK || d.State != want {
 			t.Errorf("%s = %d, state %q, want %q (%s)", epic, code, d.State, want, body)
@@ -179,7 +180,7 @@ func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
 	})
 	code, d, body := getEpicDetail(t, h, base, "proj:blocked")
-	if code != http.StatusOK || d.State != server.EpicStatePaused ||
+	if code != http.StatusOK || d.State != wire.EpicStatePaused ||
 		d.MergeBlockKind != "self-reported" || d.MergeBlockReason != "conflict in main.go" {
 		t.Errorf("blocked = %d, %+v (%s)", code, d, body)
 	}
@@ -286,7 +287,7 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	if d.Kind != server.EpicKindMap || d.Summary != "Reach the sea." || d.State != "" {
+	if d.Kind != wire.EpicKindMap || d.Summary != "Reach the sea." || d.State != "" {
 		t.Errorf("header = %+v", d)
 	}
 	if d.WallClock != 0 || d.AgentTime != 0 || d.CostTotal != 0 {

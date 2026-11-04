@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -204,7 +205,7 @@ func TestPty_TurnBlockShowsAPendingPermissionWithTheReason(t *testing.T) {
 	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
 	queueWithTurn(t, h, func(turn *Turn) { turn.Block("rg needle") })
 
-	var card *server.PermissionCard
+	var card *wire.PermissionCard
 	WaitFor(t, 30*time.Second, "a pending permission", func() bool {
 		d, err := h.Client.Detail(context.Background(), "proj:epic-a/01")
 		card = d.Permission

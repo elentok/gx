@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ func writeFinishedEpic(t *testing.T, store, epic string, at time.Time) {
 	}
 }
 
-func finishedNames(t *testing.T, h *servertest.Harness) []server.FinishedEpic {
+func finishedNames(t *testing.T, h *servertest.Harness) []wire.FinishedEpic {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

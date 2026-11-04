@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"strings"
 
 	"github.com/elentok/gx/tickets"
@@ -11,62 +12,62 @@ import (
 // mapProgress is a map's current Progress step. It comes from the epic's
 // design_step alone: status done always shows Done, and a missing or unknown
 // field shows Chart. It never looks at files or branch refs.
-func mapProgress(m tickets.Epic) ProgressStep {
+func mapProgress(m tickets.Epic) wire.ProgressStep {
 	if m.Status == string(schema.StatusDone) {
-		return ProgressDone
+		return wire.ProgressDone
 	}
 	if step, ok := tickets.ParseDesignStep(m.DesignStep); ok {
 		return step
 	}
-	return ProgressChart
+	return wire.ProgressChart
 }
 
 // progressLabels is the label of each Progress step.
-var progressLabels = map[ProgressStep]string{
-	ProgressChart:          "Chart",
-	ProgressResolveTickets: "Resolve tickets",
-	ProgressSpec:           "Spec",
-	ProgressReview:         "Review",
-	ProgressGrillFindings:  "Grill findings",
-	ProgressCreateTickets:  "Create tickets",
-	ProgressBranch:         "Branch",
-	ProgressDone:           "Done",
+var progressLabels = map[wire.ProgressStep]string{
+	wire.ProgressChart:          "Chart",
+	wire.ProgressResolveTickets: "Resolve tickets",
+	wire.ProgressSpec:           "Spec",
+	wire.ProgressReview:         "Review",
+	wire.ProgressGrillFindings:  "Grill findings",
+	wire.ProgressCreateTickets:  "Create tickets",
+	wire.ProgressBranch:         "Branch",
+	wire.ProgressDone:           "Done",
 }
 
 // mapSteps lists all Progress steps with their state. The steps before the
 // current one are done, and all of them are once the map is Done.
-func mapSteps(m tickets.Epic, byName map[string]tickets.Epic) []MapStep {
+func mapSteps(m tickets.Epic, byName map[string]tickets.Epic) []wire.MapStep {
 	current := mapProgress(m)
-	steps := make([]MapStep, 0, len(tickets.DesignSteps))
-	state := MapStepDone
+	steps := make([]wire.MapStep, 0, len(tickets.DesignSteps))
+	state := wire.MapStepDone
 	for _, step := range tickets.DesignSteps {
 		label := progressLabels[step]
 		switch {
-		case step == current && current == ProgressDone:
+		case step == current && current == wire.ProgressDone:
 		case step == current:
-			state = MapStepCurrent
+			state = wire.MapStepCurrent
 			label += currentStepNote(m, byName, current)
-		case state == MapStepCurrent:
-			state = MapStepTodo
+		case state == wire.MapStepCurrent:
+			state = wire.MapStepTodo
 		}
-		steps = append(steps, MapStep{Step: step, Label: label, State: state})
+		steps = append(steps, wire.MapStep{Step: step, Label: label, State: state})
 	}
 	return steps
 }
 
 // currentStepNote is the suffix of the current step's label.
-func currentStepNote(m tickets.Epic, byName map[string]tickets.Epic, step ProgressStep) string {
+func currentStepNote(m tickets.Epic, byName map[string]tickets.Epic, step wire.ProgressStep) string {
 	switch step {
-	case ProgressChart:
+	case wire.ProgressChart:
 		return " · confirm destination"
-	case ProgressResolveTickets:
+	case wire.ProgressResolveTickets:
 		if !tickets.HasOpenTicket(m) && schema.Section(m.Body, "Not yet specified") != "" {
 			return " · fog left"
 		}
-	case ProgressGrillFindings:
+	case wire.ProgressGrillFindings:
 		checked, total := findingCounts(schema.Section(m.Body, "Review findings"))
 		return fmt.Sprintf(" · %d of %d", checked, total)
-	case ProgressCreateTickets:
+	case wire.ProgressCreateTickets:
 		if impl, ok := byName[m.Name+tickets.ImplEpicSuffix]; ok && impl.Status == string(schema.StatusDraft) {
 			n := len(impl.Tickets)
 			if n == 1 {

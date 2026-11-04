@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
@@ -10,7 +11,7 @@ import (
 
 func finishedQueue(t *testing.T, now time.Time) QueueModel {
 	t.Helper()
-	snap := server.Snapshot{Seq: 1, RecentlyFinished: []server.FinishedEpic{
+	snap := server.Snapshot{Seq: 1, RecentlyFinished: []wire.FinishedEpic{
 		{Name: "widgets", Project: "gx", Done: 4, Total: 5, CompletedAt: now.Add(-2 * time.Hour)},
 	}}
 	m, _ := deliverQueue(t, snap, nil)
@@ -29,7 +30,7 @@ func TestQueueFinished_RendersDimLine(t *testing.T) {
 
 func TestQueueFinished_OneOffShowsMarkerNotProgress(t *testing.T) {
 	now := time.Now()
-	snap := server.Snapshot{Seq: 1, RecentlyFinished: []server.FinishedEpic{
+	snap := server.Snapshot{Seq: 1, RecentlyFinished: []wire.FinishedEpic{
 		{Name: "fix-flaky-test", Project: "gx", OneOff: true, CompletedAt: now.Add(-time.Hour)},
 	}}
 	m, _ := deliverQueue(t, snap, nil)

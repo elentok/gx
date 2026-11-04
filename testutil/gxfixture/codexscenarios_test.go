@@ -12,11 +12,10 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 )
 
-func (r *running) epicRow(t *testing.T, epic, ticket string) server.EpicDetailRow {
+func (r *running) epicRow(t *testing.T, epic, ticket string) wire.EpicDetailRow {
 	t.Helper()
 	d, err := apiclient.New(r.Socket).EpicDetail(context.Background(), "demo:"+epic)
 	if err != nil {
@@ -28,7 +27,7 @@ func (r *running) epicRow(t *testing.T, epic, ticket string) server.EpicDetailRo
 		}
 	}
 	t.Fatalf("epic %s has no row %s: %+v", epic, ticket, d.Rows)
-	return server.EpicDetailRow{}
+	return wire.EpicDetailRow{}
 }
 
 func TestCodexQueueScenario_TwoRunningThreeWaitingWithTheirNotes(t *testing.T) {

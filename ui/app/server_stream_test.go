@@ -30,7 +30,7 @@ type streamFake struct {
 	mu        sync.Mutex
 	seq       uint64
 	tickets   []server.TicketInfo
-	epics     []server.EpicSummary
+	epics     []wire.EpicSummary
 	snapErr   error
 	snapshots int
 	streams   []*fakeStream

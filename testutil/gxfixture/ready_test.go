@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -146,10 +145,10 @@ func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
 	cases := []struct {
 		id, reason, action string
 	}{
-		{"03", "self-reported", server.ActionAnswer},
-		{"04", "ambiguous-base", server.ActionChooseBase},
-		{"05", "merge-conflict", server.ActionMerge},
-		{"06", "zero-commit", server.ActionRetry},
+		{"03", "self-reported", wire.ActionAnswer},
+		{"04", "ambiguous-base", wire.ActionChooseBase},
+		{"05", "merge-conflict", wire.ActionMerge},
+		{"06", "zero-commit", wire.ActionRetry},
 	}
 	for _, c := range cases {
 		d := r.detail(t, pausedEpic+c.id)
@@ -170,7 +169,7 @@ func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
 	}
 
 	d := r.waitPermission(t, approveAddr)
-	if d.Permission.Tool != "Bash command" || d.Permission.Description != agentfake.PermissionCommand || !slices.Contains(d.Actions, server.ActionApprove) {
+	if d.Permission.Tool != "Bash command" || d.Permission.Description != agentfake.PermissionCommand || !slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("approve ticket: permission %+v actions %v, want the Bash prompt and approve", d.Permission, d.Actions)
 	}
 	r.stop(t)
@@ -212,7 +211,7 @@ func TestPausedScenario_EachPauseHasTheRoundOfItsKind(t *testing.T) {
 			t.Errorf("%s rounds = %v, want [%s]", id, got, want)
 		}
 	}
-	if d := r.detail(t, pausedEpic+"09"); d.Recommendation == nil || d.Recommendation.Verb != server.ActionRetry {
+	if d := r.detail(t, pausedEpic+"09"); d.Recommendation == nil || d.Recommendation.Verb != wire.ActionRetry {
 		t.Errorf("09 recommendation = %+v, want retry", d.Recommendation)
 	}
 	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
@@ -234,7 +233,7 @@ func TestDirtyTrunkScenario_RootPausedOnADirtyCheckout(t *testing.T) {
 	for _, c := range r.cardsOf(t) {
 		if c.Name == "dirty-epic" {
 			found = true
-			if c.MergeBlockKind != "dirty-trunk" || c.Section != server.SectionNeedsYou {
+			if c.MergeBlockKind != "dirty-trunk" || c.Section != wire.SectionNeedsYou {
 				t.Errorf("dirty-epic card = %+v, want a needs-you card blocked on dirty-trunk", c)
 			}
 		}
@@ -252,11 +251,11 @@ func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 
 	// The route each verb's button posts to, as webui/src/ticket/recover.ts has it.
 	routes := map[string]string{
-		server.ActionAnswer:     "/v1/tickets/answer",
-		server.ActionResume:     "/v1/tickets/resume",
-		server.ActionChooseBase: "/v1/tickets/resume",
-		server.ActionRetry:      "/v1/tickets/retry",
-		server.ActionMerge:      "/v1/tickets/merge",
+		wire.ActionAnswer:     "/v1/tickets/answer",
+		wire.ActionResume:     "/v1/tickets/resume",
+		wire.ActionChooseBase: "/v1/tickets/resume",
+		wire.ActionRetry:      "/v1/tickets/retry",
+		wire.ActionMerge:      "/v1/tickets/merge",
 	}
 	ids := []string{"03", "04", "05", "06", "07", "08", "09"}
 	for _, id := range ids {
@@ -267,9 +266,9 @@ func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 		verb := d.Actions[0]
 		body := map[string]any{"address": d.Address, "state": d.State}
 		switch verb {
-		case server.ActionAnswer:
+		case wire.ActionAnswer:
 			body["text"] = "go ahead"
-		case server.ActionChooseBase:
+		case wire.ActionChooseBase:
 			body["base"] = "01"
 		}
 		w.post(t, routes[verb], body)

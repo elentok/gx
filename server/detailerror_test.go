@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -35,7 +35,7 @@ func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	var d server.TicketDetail
+	var d wire.TicketDetail
 	if err := json.Unmarshal([]byte(body), &d); err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestDetailWeb_GraphErrorKeepsFullPayload(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	var d server.TicketDetail
+	var d wire.TicketDetail
 	if err := json.Unmarshal([]byte(body), &d); err != nil {
 		t.Fatal(err)
 	}

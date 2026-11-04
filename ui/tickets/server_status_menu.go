@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"slices"
 
 	tea "charm.land/bubbletea/v2"
@@ -48,7 +49,7 @@ func isRepairPause(t tickets.Ticket) bool {
 // menu still lists them; picking one points the person to the web.
 func isWebOnlyVerb(verb string) bool {
 	switch verb {
-	case server.ActionAnswer, server.ActionChooseBase, server.ActionReopenAndRetry:
+	case wire.ActionAnswer, wire.ActionChooseBase, wire.ActionReopenAndRetry:
 		return true
 	}
 	return false
@@ -87,18 +88,18 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 			res, err = api.TicketCancel(ctx, address, true)
 		case serverVerbUnmute:
 			res, err = api.TicketUnmute(ctx, address)
-		case server.ActionRetry:
+		case wire.ActionRetry:
 			res, err = api.TicketRelaunch(ctx, address, false)
-		case server.ActionApprove:
+		case wire.ActionApprove:
 			res, err = api.TicketApprove(ctx, address)
-		case server.ActionStashMerge:
+		case wire.ActionStashMerge:
 			epic, _, _ := tickets.SplitTrailerValue(address)
 			res, err = api.EpicStashMerge(ctx, epic)
-		case server.ActionMerge:
+		case wire.ActionMerge:
 			repair(verb, server.RepairRequest{Address: address})
-		case server.ActionStartOver:
+		case wire.ActionStartOver:
 			repair(verb, server.RepairRequest{Address: address, Reason: serverStartOverReason})
-		case server.ActionResume:
+		case wire.ActionResume:
 			repair(serverVerbResume, server.RepairRequest{Address: address})
 		default:
 			return notify.Warning("unknown action " + verb)()

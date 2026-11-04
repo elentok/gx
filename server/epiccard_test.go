@@ -1,12 +1,11 @@
 package server_test
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/elentok/gx/server"
 )
 
 func TestEpicList_LoopCardFields(t *testing.T) {
@@ -38,32 +37,32 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	got := map[string]server.EpicListRow{}
+	got := map[string]wire.EpicListRow{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		got[r.Address] = r
 	}
 
-	queue := []server.CardAction{{Kind: server.CardActionQueue, Label: "Queue"}}
-	merge := func(target string) []server.CardAction {
-		return []server.CardAction{{Kind: server.CardActionMerge, Label: "Merge", Target: target}}
+	queue := []wire.CardAction{{Kind: wire.CardActionQueue, Label: "Queue"}}
+	merge := func(target string) []wire.CardAction {
+		return []wire.CardAction{{Kind: wire.CardActionMerge, Label: "Merge", Target: target}}
 	}
 	want := map[string]struct {
-		section server.CardSection
+		section wire.CardSection
 		words   string
 		ring    int
-		actions []server.CardAction
+		actions []wire.CardAction
 	}{
-		"proj:ready":    {server.SectionReadyToQueue, "Not started", 50, queue},
-		"proj:queued":   {server.SectionImplementing, "Queued #1", 0, nil},
-		"proj:awaiting": {server.SectionNeedsYou, "Implemented", 100, merge("proj:awaiting")},
-		"proj:paused":   {server.SectionNeedsYou, "Implementing...", 0, []server.CardAction{{Kind: server.CardActionOpenTicket, Label: "Open ticket", Target: "proj:paused/01"}}},
-		"proj:blocked":  {server.SectionNeedsYou, "Implemented", 100, merge("proj:blocked")},
-		"proj:merging":  {server.SectionImplementing, "Merging...", 50, nil},
-		"proj:draft":    {server.SectionReadyToDesign, "Draft", 0, nil},
-		"proj:noopen":   {server.SectionReadyToDesign, "No open tickets", 0, nil},
-		"proj:merged":   {server.SectionFinished, "Merged", 100, nil},
+		"proj:ready":    {wire.SectionReadyToQueue, "Not started", 50, queue},
+		"proj:queued":   {wire.SectionImplementing, "Queued #1", 0, nil},
+		"proj:awaiting": {wire.SectionNeedsYou, "Implemented", 100, merge("proj:awaiting")},
+		"proj:paused":   {wire.SectionNeedsYou, "Implementing...", 0, []wire.CardAction{{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: "proj:paused/01"}}},
+		"proj:blocked":  {wire.SectionNeedsYou, "Implemented", 100, merge("proj:blocked")},
+		"proj:merging":  {wire.SectionImplementing, "Merging...", 50, nil},
+		"proj:draft":    {wire.SectionReadyToDesign, "Draft", 0, nil},
+		"proj:noopen":   {wire.SectionReadyToDesign, "No open tickets", 0, nil},
+		"proj:merged":   {wire.SectionFinished, "Merged", 100, nil},
 		// An empty epic counts as implemented (nothing is left to run).
-		"proj:empty": {server.SectionNeedsYou, "Implemented", 0, merge("proj:empty")},
+		"proj:empty": {wire.SectionNeedsYou, "Implemented", 0, merge("proj:empty")},
 	}
 	for addr, w := range want {
 		r, ok := got[addr]
@@ -71,7 +70,7 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 			t.Errorf("%s is missing from %s", addr, body)
 			continue
 		}
-		if r.CardKind != server.CardKindImplementation || r.Section != w.section || r.StatusWords != w.words || r.RingProgress != w.ring || !slices.Equal(r.Actions, w.actions) || !slices.Equal(r.Addresses, []string{addr}) {
+		if r.CardKind != wire.CardKindImplementation || r.Section != w.section || r.StatusWords != w.words || r.RingProgress != w.ring || !slices.Equal(r.Actions, w.actions) || !slices.Equal(r.Addresses, []string{addr}) {
 			t.Errorf("%s = kind %q section %q words %q ring %d actions %v addresses %v, want section %q words %q ring %d actions %v",
 				addr, r.CardKind, r.Section, r.StatusWords, r.RingProgress, r.Actions, r.Addresses, w.section, w.words, w.ring, w.actions)
 		}
@@ -98,7 +97,7 @@ func TestEpicList_QueuedOneOffSortsBySlotAndReadsQueuedN(t *testing.T) {
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
 	var names, words []string
 	for _, r := range getEpicList(t, code, body).Epics {
-		if r.Section == server.SectionImplementing {
+		if r.Section == wire.SectionImplementing {
 			names, words = append(names, r.Name), append(words, r.StatusWords)
 		}
 	}
@@ -130,14 +129,14 @@ func TestEpicList_SectionSortOrders(t *testing.T) {
 		}
 	}
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	bySection := map[server.CardSection][]string{}
+	bySection := map[wire.CardSection][]string{}
 	for _, r := range getEpicList(t, code, body).Epics {
 		bySection[r.Section] = append(bySection[r.Section], r.Name)
 	}
-	for section, want := range map[server.CardSection][]string{
-		server.SectionImplementing:  {"q-first", "q-second"},
-		server.SectionReadyToQueue:  {"new", "old"},
-		server.SectionReadyToDesign: {"alpha", "zeta"},
+	for section, want := range map[wire.CardSection][]string{
+		wire.SectionImplementing:  {"q-first", "q-second"},
+		wire.SectionReadyToQueue:  {"new", "old"},
+		wire.SectionReadyToDesign: {"alpha", "zeta"},
 	} {
 		if !slices.Equal(bySection[section], want) {
 			t.Errorf("%s = %v, want %v", section, bySection[section], want)

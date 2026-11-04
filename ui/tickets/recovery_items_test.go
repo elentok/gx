@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"errors"
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"testing"
 
@@ -19,21 +20,21 @@ var resumeLabel = schema.VerbResume.Label()
 
 // detailWith is a detail whose actions carry the table's label and tooltip, as
 // the server sends them.
-func detailWith(actions ...string) server.TicketDetail {
-	d := server.TicketDetail{Actions: actions, ActionInfo: map[string]server.ActionInfo{}}
+func detailWith(actions ...string) wire.TicketDetail {
+	d := wire.TicketDetail{Actions: actions, ActionInfo: map[string]wire.ActionInfo{}}
 	for _, a := range actions {
 		v, ok := schema.VerbOfWord(a)
 		if !ok {
 			continue
 		}
-		d.ActionInfo[a] = server.ActionInfo{Label: v.Label(), Tooltip: v.Tooltip()}
+		d.ActionInfo[a] = wire.ActionInfo{Label: v.Label(), Tooltip: v.Tooltip()}
 	}
 	return d
 }
 
-var answerDetail = detailWith(server.ActionAnswer, server.ActionResume)
+var answerDetail = detailWith(wire.ActionAnswer, wire.ActionResume)
 
-func recoveryMenu(t *testing.T, status schema.Status, reason schema.PauseReason, d server.TicketDetail) []contextmenu.Item[ticketTarget] {
+func recoveryMenu(t *testing.T, status schema.Status, reason schema.PauseReason, d wire.TicketDetail) []contextmenu.Item[ticketTarget] {
 	t.Helper()
 	ticket := tickets.Ticket{Status: string(status), PauseReason: reason}
 	return ticketMenuItems(ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket, detail: &d})
@@ -46,8 +47,8 @@ func TestRecoveryItems_MatchDetailActions(t *testing.T) {
 		reason  schema.PauseReason
 		actions []string
 	}{
-		{"repair pause", schema.StatusPaused, schema.PauseIterationError, []string{server.ActionRetry, server.ActionStartOver}},
-		{"answer pause", schema.StatusPaused, schema.PauseSelfReported, []string{server.ActionAnswer, server.ActionResume}},
+		{"repair pause", schema.StatusPaused, schema.PauseIterationError, []string{wire.ActionRetry, wire.ActionStartOver}},
+		{"answer pause", schema.StatusPaused, schema.PauseSelfReported, []string{wire.ActionAnswer, wire.ActionResume}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -79,7 +80,7 @@ func TestRecoveryItems_MatchDetailActions(t *testing.T) {
 // The TUI has no input for a reply or a base, and the server has no repair verb
 // for reopen-and-retry, so these verbs must never reach the server as a resume.
 func TestServerWrite_WebOnlyVerbsNeverResume(t *testing.T) {
-	for _, verb := range []string{server.ActionAnswer, server.ActionChooseBase, server.ActionReopenAndRetry, "no-such-verb"} {
+	for _, verb := range []string{wire.ActionAnswer, wire.ActionChooseBase, wire.ActionReopenAndRetry, "no-such-verb"} {
 		t.Run(verb, func(t *testing.T) {
 			var calls []string
 			cmd := cmdServerWrite(fakeServerAPI{calls: &calls}, verb, "gx:alpha/02")
@@ -96,7 +97,7 @@ func TestServerWrite_WebOnlyVerbsNeverResume(t *testing.T) {
 
 func TestServerWrite_ResumeStillResumes(t *testing.T) {
 	var calls []string
-	cmdServerWrite(fakeServerAPI{calls: &calls}, server.ActionResume, "gx:alpha/02")()
+	cmdServerWrite(fakeServerAPI{calls: &calls}, wire.ActionResume, "gx:alpha/02")()
 	if want := []string{"resume gx:alpha/02"}; !slices.Equal(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
 	}
@@ -108,8 +109,8 @@ func TestServerMode_EnterSkipsWebOnlyActions(t *testing.T) {
 		actions []string
 		want    []string
 	}{
-		{"only web verbs", []string{server.ActionAnswer, server.ActionChooseBase}, nil},
-		{"web verb first", []string{server.ActionAnswer, server.ActionResume}, []string{"resume gx:alpha/02"}},
+		{"only web verbs", []string{wire.ActionAnswer, wire.ActionChooseBase}, nil},
+		{"web verb first", []string{wire.ActionAnswer, wire.ActionResume}, []string{"resume gx:alpha/02"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
@@ -160,14 +161,14 @@ func TestCmdTicketMenu_ReportsAFailedDetailRead(t *testing.T) {
 
 // The TUI trusts the server's ActionInfo; a word without one shows as itself.
 func TestRecoveryActions_NoActionInfoFallsBackToTheWord(t *testing.T) {
-	got := recoveryActions(&server.TicketDetail{Actions: []string{server.ActionRetry}})
-	if len(got) != 1 || got[0].label != server.ActionRetry || got[0].help != "" {
+	got := recoveryActions(&wire.TicketDetail{Actions: []string{wire.ActionRetry}})
+	if len(got) != 1 || got[0].label != wire.ActionRetry || got[0].help != "" {
 		t.Fatalf("got %+v, want the bare word as label and no help", got)
 	}
 }
 
 func TestRecoveryItems_ShowTheTooltipAsHelp(t *testing.T) {
-	d := detailWith(server.ActionRetry)
+	d := detailWith(wire.ActionRetry)
 	it := itemByLabel(t, recoveryMenu(t, schema.StatusPaused, schema.PauseIterationError, d), schema.VerbRetry.Label())
 	if it.Help == "" || it.Help != schema.VerbRetry.Tooltip() {
 		t.Errorf("help = %q, want %q", it.Help, schema.VerbRetry.Tooltip())
@@ -175,8 +176,8 @@ func TestRecoveryItems_ShowTheTooltipAsHelp(t *testing.T) {
 }
 
 func TestRecoveryItems_MarkTheRecommendedVerb(t *testing.T) {
-	d := detailWith(server.ActionRetry, server.ActionStartOver)
-	d.Recommendation = &server.DetailRecommendation{Verb: server.ActionStartOver, Diagnosis: "bad branch"}
+	d := detailWith(wire.ActionRetry, wire.ActionStartOver)
+	d.Recommendation = &wire.DetailRecommendation{Verb: wire.ActionStartOver, Diagnosis: "bad branch"}
 	items := recoveryMenu(t, schema.StatusPaused, schema.PauseIterationError, d)
 
 	rec := itemByLabel(t, items, schema.VerbStartOver.Label()+recommendedMark)
@@ -189,7 +190,7 @@ func TestRecoveryItems_MarkTheRecommendedVerb(t *testing.T) {
 // Seam D: "enter" on a repair pause runs the first verb of detail.actions.
 func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 	var calls []string
-	api := fakeServerAPI{calls: &calls, detail: detailWith(server.ActionRetry, server.ActionStartOver)}
+	api := fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionRetry, wire.ActionStartOver)}
 	m := newServerModel(t).WithServer(api)
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -70,9 +71,9 @@ func mergeVerbError(err error) (QueueResult, error) {
 // shownEpicState is the state a merge request's token names, in the Epic
 // page's vocabulary. An Epics card shows the list state, which calls a
 // merge-blocked epic "merge-blocked" where the Epic page says paused.
-func shownEpicState(shown EpicState, e tickets.Epic) EpicState {
-	if shown == EpicState(EpicListMergeBlocked) && epicMergeBlocked(e) {
-		return EpicStatePaused
+func shownEpicState(shown wire.EpicState, e tickets.Epic) wire.EpicState {
+	if shown == wire.EpicState(wire.EpicListMergeBlocked) && epicMergeBlocked(e) {
+		return wire.EpicStatePaused
 	}
 	return shown
 }
@@ -106,7 +107,7 @@ func (s *Server) loadMergeEpic(req QueueRequest) (mergeEpicRef, error) {
 		return mergeEpicRef{}, refuseMerge(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
 	}
 	// The web page sends the state it shows; the socket route sends none.
-	if shown := EpicState(req.State); shown != "" {
+	if shown := wire.EpicState(req.State); shown != "" {
 		now := epicStateFor(root, e, s.registry.startedAtOf)
 		if shown = shownEpicState(shown, e); shown != now {
 			return mergeEpicRef{}, refuseMerge(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))

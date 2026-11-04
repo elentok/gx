@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -11,15 +12,15 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// epicStateValues parses epicsummary.go for every EpicState constant, so a new
-// state cannot slip past the guard below.
-func epicStateValues(t *testing.T) []EpicState {
+// epicStateValues parses wire/epicsummary.go for every EpicState constant, so a
+// new state cannot slip past the guard below.
+func epicStateValues(t *testing.T) []wire.EpicState {
 	t.Helper()
-	f, err := parser.ParseFile(token.NewFileSet(), "epicsummary.go", nil, 0)
+	f, err := parser.ParseFile(token.NewFileSet(), "wire/epicsummary.go", nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out []EpicState
+	var out []wire.EpicState
 	for _, d := range f.Decls {
 		gd, ok := d.(*ast.GenDecl)
 		if !ok || gd.Tok != token.CONST {
@@ -35,7 +36,7 @@ func epicStateValues(t *testing.T) []EpicState {
 				if err != nil {
 					t.Fatal(err)
 				}
-				out = append(out, EpicState(s))
+				out = append(out, wire.EpicState(s))
 			}
 		}
 	}
@@ -50,12 +51,12 @@ func TestEpicListState_EveryEpicStateHasItsOwn(t *testing.T) {
 	}
 	for _, s := range states {
 		e := tickets.Epic{Name: "epic"}
-		want := EpicListState(s)
+		want := wire.EpicListState(s)
 		switch s {
-		case EpicStateFinished:
+		case wire.EpicStateFinished:
 			// Finished is decided by merged_at, not by the queue state.
 			e.MergedAt = time.Unix(100, 0)
-		case EpicStateWaiting:
+		case wire.EpicStateWaiting:
 			// A waiting epic is queued, ready or has no open ticket, depending
 			// on the queue and its tickets; it has no list state of its own.
 			continue

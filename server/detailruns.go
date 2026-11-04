@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"time"
 
@@ -9,39 +10,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// Outcomes of a run line.
-const (
-	RunMerged          = "merged"
-	RunMergedNoCommits = "merged-no-commits"
-	RunPaused          = "paused"
-	RunStartedOver     = "started-over"
-	RunRunning         = "running"
-	RunAgentLost       = "agent-lost"
-	// RunAgentGoneAfterRestart is a run a restarted server found dead with no
-	// work to keep, and put back in the queue.
-	RunAgentGoneAfterRestart = "agent-gone-after-restart"
-	RunRelaunched            = "relaunched"
-	RunCancelled             = "cancelled"
-)
-
-// How a run began. The run log keeps cold-start and resumed; the page labels
-// them "new session" and "same session".
-const (
-	StartNewSession  = "new-session"
-	StartSameSession = "same-session"
-)
-
-// DetailRun is one run line of the Runs section.
-type DetailRun struct {
-	Start time.Time `json:"start"`
-	// Duration is in seconds; a running or lost run has none.
-	Duration int    `json:"duration,omitempty"`
-	Outcome  string `json:"outcome"`
-	// PauseLabel is the reason label of a run that ended in a pause.
-	PauseLabel string `json:"pause_label,omitempty"`
-	StartKind  string `json:"start_kind"`
-}
 
 // runSources is everything the run lines of one ticket are built from.
 type runSources struct {
@@ -64,8 +32,8 @@ type runSources struct {
 // iteration-started: a late-finish-adopted event, and a pause answer that
 // claimed the ticket again for the live agent. A reclaim writes no run-log
 // line, so it never splits a run.
-func detailRuns(src runSources) []DetailRun {
-	b := runBuilder{runs: []DetailRun{}}
+func detailRuns(src runSources) []wire.DetailRun {
+	b := runBuilder{runs: []wire.DetailRun{}}
 	answers := src.answers
 	for _, ev := range src.events {
 		// An answer at the same instant as an event comes first.
@@ -84,14 +52,14 @@ func detailRuns(src runSources) []DetailRun {
 
 // runBuilder folds events and pause answers, oldest first, into run lines.
 type runBuilder struct {
-	runs []DetailRun
+	runs []wire.DetailRun
 	open bool
 	// answeredAt is when the last pause was answered, until a run takes it up.
 	answeredAt time.Time
 }
 
 func (b *runBuilder) begin(at time.Time, kind string) {
-	b.runs = append(b.runs, DetailRun{Start: at, StartKind: kind})
+	b.runs = append(b.runs, wire.DetailRun{Start: at, StartKind: kind})
 	b.open = true
 	b.answeredAt = time.Time{}
 }
@@ -114,7 +82,7 @@ func (b *runBuilder) reopen(at time.Time, outcome string) {
 
 // answer notes a pause answer; only the first one after a pause counts.
 func (b *runBuilder) answer(at time.Time) {
-	if !b.open && len(b.runs) > 0 && b.runs[len(b.runs)-1].Outcome == RunPaused && b.answeredAt.IsZero() {
+	if !b.open && len(b.runs) > 0 && b.runs[len(b.runs)-1].Outcome == wire.RunPaused && b.answeredAt.IsZero() {
 		b.answeredAt = at
 	}
 }
@@ -123,20 +91,20 @@ func (b *runBuilder) event(ev ralphloop.Event) {
 	switch events.Type(ev.Type) {
 	case events.IterationStarted:
 		if b.open {
-			b.end(ev.Time, RunAgentLost)
+			b.end(ev.Time, wire.RunAgentLost)
 		}
-		kind := StartNewSession
+		kind := wire.StartNewSession
 		if ev.Path == "resumed" {
-			kind = StartSameSession
+			kind = wire.StartSameSession
 		}
 		b.begin(ev.Time, kind)
 	case events.ClaimReopened:
-		b.reopen(ev.Time, RunAgentGoneAfterRestart)
+		b.reopen(ev.Time, wire.RunAgentGoneAfterRestart)
 	case events.HumanRelaunch:
-		b.reopen(ev.Time, RunRelaunched)
+		b.reopen(ev.Time, wire.RunRelaunched)
 	case events.LateFinishAdopted:
 		if !b.open {
-			b.begin(ev.Time, StartSameSession)
+			b.begin(ev.Time, wire.StartSameSession)
 		}
 	default:
 		outcome := runEnd(ev)
@@ -144,13 +112,13 @@ func (b *runBuilder) event(ev ralphloop.Event) {
 			return
 		}
 		if !b.open && !b.answeredAt.IsZero() {
-			b.begin(b.answeredAt, StartSameSession)
+			b.begin(b.answeredAt, wire.StartSameSession)
 		}
 		if !b.open {
 			return
 		}
 		b.end(ev.Time, outcome)
-		if outcome == RunPaused {
+		if outcome == wire.RunPaused {
 			b.runs[len(b.runs)-1].PauseLabel = schema.PauseReason(ev.Kind).Label()
 		}
 	}
@@ -162,7 +130,7 @@ func (b *runBuilder) event(ev ralphloop.Event) {
 func (b *runBuilder) finish(t schema.Ticket, cancelledAt time.Time) {
 	if !b.open && !b.answeredAt.IsZero() && !t.ClaimedAt.Before(b.answeredAt) &&
 		(t.Status == schema.StatusClaimed || t.Status == schema.StatusCancelled) {
-		b.begin(b.answeredAt, StartSameSession)
+		b.begin(b.answeredAt, wire.StartSameSession)
 	}
 	if !b.open {
 		return
@@ -170,11 +138,11 @@ func (b *runBuilder) finish(t schema.Ticket, cancelledAt time.Time) {
 	last := &b.runs[len(b.runs)-1]
 	switch t.Status {
 	case schema.StatusCancelled:
-		b.end(cancelledAt, RunCancelled)
+		b.end(cancelledAt, wire.RunCancelled)
 	case schema.StatusClaimed:
-		last.Outcome = RunRunning
+		last.Outcome = wire.RunRunning
 	default:
-		last.Outcome = RunAgentLost
+		last.Outcome = wire.RunAgentLost
 	}
 }
 
@@ -182,19 +150,19 @@ func (b *runBuilder) finish(t schema.Ticket, cancelledAt time.Time) {
 func runEnd(ev ralphloop.Event) string {
 	switch events.Type(ev.Type) {
 	case events.CherryPicked, events.ManualMerge:
-		return RunMerged
+		return wire.RunMerged
 	case events.Commitless:
-		return RunMergedNoCommits
+		return wire.RunMergedNoCommits
 	case events.Paused:
-		return RunPaused
+		return wire.RunPaused
 	case events.TicketStartedOver:
-		return RunStartedOver
+		return wire.RunStartedOver
 	}
 	return ""
 }
 
 // ticketRuns reads the ticket's run lines from its epic's run log.
-func (s *Server) ticketRuns(ref ticketRef, t schema.Ticket, log []tickets.LogEvent, statusWrittenAt time.Time) ([]DetailRun, error) {
+func (s *Server) ticketRuns(ref ticketRef, t schema.Ticket, log []tickets.LogEvent, statusWrittenAt time.Time) ([]wire.DetailRun, error) {
 	evs, err := s.readHistory(ref.addr)
 	if err != nil {
 		return nil, err

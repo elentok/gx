@@ -1,37 +1,25 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// FinishedEpic is one entry of the snapshot's Recently finished list.
-type FinishedEpic struct {
-	Address     string    `json:"address"`
-	Name        string    `json:"name"`
-	Project     string    `json:"project"`
-	Done        int       `json:"done"`
-	Total       int       `json:"total"`
-	CompletedAt time.Time `json:"completed_at"`
-	// OneOff marks a ticket entry: Address is the ticket's, Done and Total are 0.
-	OneOff bool `json:"one_off"`
-}
-
 // finishedOneOffs lists the done one-offs of e: archived ones by their
 // completed_at stamp, and done ones the sweep has not moved yet by file mod
 // time. A cancelled one-off carries no stamp and never counts.
-func finishedOneOffs(project string, e tickets.Epic) []FinishedEpic {
+func finishedOneOffs(project string, e tickets.Epic) []wire.FinishedEpic {
 	epic := filepath.Base(e.Path)
 	if !isOneOffsEpicName(epic) {
 		return nil
 	}
-	var out []FinishedEpic
+	var out []wire.FinishedEpic
 	for _, t := range e.Tickets {
 		at := t.CompletedAt
 		if at.IsZero() {
@@ -44,7 +32,7 @@ func finishedOneOffs(project string, e tickets.Epic) []FinishedEpic {
 			}
 			at = info.ModTime()
 		}
-		out = append(out, FinishedEpic{
+		out = append(out, wire.FinishedEpic{
 			Address: tickets.Address{Project: project, Epic: epic, ID: t.Identifier}.String(),
 			Name:    t.Title, Project: project, OneOff: true, CompletedAt: at,
 		})
@@ -55,17 +43,17 @@ func finishedOneOffs(project string, e tickets.Epic) []FinishedEpic {
 // recentlyFinished lists the last limit completed loop epics, newest first. It
 // reads the completed_at stamps of the last scan, so it needs no storage of its
 // own and a restart rebuilds the same list. A map epic never counts.
-func (i *index) recentlyFinished(limit int) []FinishedEpic {
+func (i *index) recentlyFinished(limit int) []wire.FinishedEpic {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	out := []FinishedEpic{}
+	out := []wire.FinishedEpic{}
 	for dir, epics := range i.loaded {
 		project := tickets.ProjectName(dir)
 		for _, e := range epics {
 			if e.IsMap || e.CompletedAt.IsZero() || isOneOffsEpicName(filepath.Base(e.Path)) {
 				continue
 			}
-			f := FinishedEpic{
+			f := wire.FinishedEpic{
 				Address: rootRef{Project: project, Epic: e.Name}.String(),
 				Name:    e.Name, Project: project, Done: e.DoneCount(), Total: e.TotalCount(), CompletedAt: e.CompletedAt,
 			}
@@ -75,7 +63,7 @@ func (i *index) recentlyFinished(limit int) []FinishedEpic {
 			out = append(out, finishedOneOffs(project, e)...)
 		}
 	}
-	slices.SortFunc(out, func(a, b FinishedEpic) int {
+	slices.SortFunc(out, func(a, b wire.FinishedEpic) int {
 		if c := b.CompletedAt.Compare(a.CompletedAt); c != 0 {
 			return c
 		}

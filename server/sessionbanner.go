@@ -129,7 +129,7 @@ func (s *Server) designDone(m sessionMeta) bool {
 		return false
 	}
 	step := mapProgress(e)
-	return step == ProgressDone
+	return step == wire.ProgressDone
 }
 
 // designLink is the Design page of a Design session, without the token; empty

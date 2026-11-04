@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -26,7 +27,7 @@ func TestBlockedPause_AgentErrorPausesWithItsTextAndOffersRetry(t *testing.T) {
 			waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 
 			d, err := h.Client.Detail(context.Background(), answerAddr)
-			if err != nil || !slices.Contains(d.Actions, server.ActionRetry) {
+			if err != nil || !slices.Contains(d.Actions, wire.ActionRetry) {
 				t.Errorf("actions = %v, %v; want Retry offered", d.Actions, err)
 			}
 			var reason string

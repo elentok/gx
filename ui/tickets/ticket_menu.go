@@ -2,12 +2,12 @@ package tickets
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -51,7 +51,7 @@ type ticketMenuInput struct {
 	session string
 	// detail is the ticket's server detail, read off the Update goroutine; nil
 	// (no server, or the read failed) offers no recovery items.
-	detail *server.TicketDetail
+	detail *wire.TicketDetail
 }
 
 const (

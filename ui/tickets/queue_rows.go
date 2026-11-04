@@ -1,12 +1,12 @@
 package tickets
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -72,7 +72,7 @@ type queueNode struct {
 // cache.
 type queueEntriesCache struct {
 	epics        []tickets.Epic
-	summaries    map[string]server.EpicSummary
+	summaries    map[string]wire.EpicSummary
 	checked      map[string]bool
 	hideComplete bool
 	project      string

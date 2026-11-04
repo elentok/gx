@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -74,7 +75,7 @@ func groupsOf(items []contextmenu.Item[ticketTarget]) []contextmenu.Group {
 
 func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) {
 	var calls []string
-	d := detailWith(server.ActionResume, server.ActionStartOver)
+	d := detailWith(wire.ActionResume, wire.ActionStartOver)
 	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls, detail: d}), schema.PauseManual, nil)
 	m, ready := requestQueueMenu(t, m)
 

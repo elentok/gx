@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"time"
 
@@ -9,176 +10,18 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Actions the detail route offers. The server decides them; the UI renders them.
-const (
-	ActionAnswer         = "answer"
-	ActionApprove        = "approve"
-	ActionResume         = "resume"
-	ActionRetry          = "retry"
-	ActionStartOver      = "start-over"
-	ActionMerge          = "merge"
-	ActionChooseBase     = "choose-base"
-	ActionReopenAndRetry = "reopen-and-retry"
-	ActionStashMerge     = "stash-merge"
-	// ActionResumeOnWorker ends a model-mismatch pause; the web posts a resume with tier=worker.
-	ActionResumeOnWorker = "resume-on-worker"
-)
-
-// Outcomes of a pause round.
-const (
-	RoundOpen     = "open"
-	RoundAnswered = "answered"
-	RoundClosed   = "closed"
-)
-
-// ActionInfo is the text of one action's button.
-type ActionInfo struct {
-	Label   string `json:"label"`
-	Tooltip string `json:"tooltip"`
-}
-
 // actionInfo looks up each action's label and tooltip.
-func actionInfo(actions []string) map[string]ActionInfo {
-	out := make(map[string]ActionInfo, len(actions))
+func actionInfo(actions []string) map[string]wire.ActionInfo {
+	out := make(map[string]wire.ActionInfo, len(actions))
 	for _, a := range actions {
 		if v, ok := schema.VerbOfWord(a); ok {
-			out[a] = ActionInfo{Label: v.Label(), Tooltip: v.Tooltip()}
+			out[a] = wire.ActionInfo{Label: v.Label(), Tooltip: v.Tooltip()}
 		}
 	}
 	return out
 }
 
-// DetailOption is one choice of an options question.
-type DetailOption struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Consequence string `json:"consequence,omitempty"`
-}
-
-// DetailRound is one pause round. The earlier rounds fill only Seq, By, Summary
-// and Outcome; the latest fills the rest.
-type DetailRound struct {
-	Seq     int    `json:"seq"`
-	By      string `json:"by"`
-	Summary string `json:"summary"`
-	Outcome string `json:"outcome"`
-
-	Kind        string         `json:"kind,omitempty"`
-	Text        string         `json:"text,omitempty"`
-	Block       string         `json:"block,omitempty"`
-	Handoff     string         `json:"handoff,omitempty"`
-	Options     []DetailOption `json:"options,omitempty"`
-	Recommended string         `json:"recommended,omitempty"`
-	Yes         string         `json:"yes,omitempty"`
-	No          string         `json:"no,omitempty"`
-
-	// Answer is the pause.answer that ended the round.
-	Answer *DetailAnswer `json:"answer,omitempty"`
-	// ClosedReason is the pause.closed reason of a round no answer ended.
-	ClosedReason string `json:"closed_reason,omitempty"`
-
-	// PromptedAt is when a person last prompted the running agent of this open
-	// round, and Prompt is the line the web shows for it.
-	PromptedAt *time.Time `json:"prompted_at,omitempty"`
-	Prompt     string     `json:"prompt,omitempty"`
-}
-
-// DetailAnswer is a person's reply to a round.
-type DetailAnswer struct {
-	Source string `json:"source,omitempty"`
-	Choice string `json:"choice,omitempty"`
-	Text   string `json:"text,omitempty"`
-	Note   string `json:"note,omitempty"`
-}
-
-// DetailRecommendation is what an investigate agent left on a paused ticket: its
-// diagnosis and the one verb of Actions it recommends.
-type DetailRecommendation struct {
-	Verb      string `json:"verb"`
-	Diagnosis string `json:"diagnosis"`
-}
-
-// PermissionCard is the pending permission prompt of a blocked agent.
-type PermissionCard struct {
-	RequestID   string `json:"request_id"`
-	Tool        string `json:"tool,omitempty"`
-	Input       string `json:"input,omitempty"`
-	Description string `json:"description,omitempty"`
-	// Hint is set when the prompt cannot be approved from here; the card carries
-	// no approve action then.
-	Hint string `json:"hint,omitempty"`
-}
-
 const permissionHint = "Approve it in the TUI"
-
-// ChatMessage is one message of the latest round's exchange.
-type ChatMessage struct {
-	From string `json:"from"` // "agent", "gx", or the answer's source
-	Text string `json:"text"`
-}
-
-// TicketDetail is the /v1/tickets/detail payload.
-type TicketDetail struct {
-	Address string `json:"address"`
-	Title   string `json:"title"`
-	Status  string `json:"status"`
-	// PauseReason picks the action the page labels: Answer, Choose base, Retry or Resume.
-	PauseReason string `json:"pause_reason,omitempty"`
-	// PauseLabel is PauseReason in the plain words the summaries and Queue show.
-	PauseLabel string `json:"pause_label,omitempty"`
-	// WaitingLabel is set while the claimed ticket's check run waits for the
-	// check lock. A label only: Status and the pause fields do not change.
-	WaitingLabel string `json:"waiting_label,omitempty"`
-	// ModelRan and ModelExpected are the two models a model-mismatch pause shows.
-	ModelRan      string `json:"model_ran,omitempty"`
-	ModelExpected string `json:"model_expected,omitempty"`
-	// LongTicketTurns and LongTicketThreshold feed the Long-running badge: the turn
-	// count stored by the alert, and budget.long-ticket-turns. Both are 0 when unmarked.
-	LongTicketTurns     int `json:"long_ticket_turns,omitempty"`
-	LongTicketThreshold int `json:"long_ticket_threshold,omitempty"`
-	// PauseText is the body's "## Paused" section; the body keeps it too, so the
-	// client leaves it out of the description.
-	PauseText string `json:"pause_text,omitempty"`
-	Type      string `json:"type,omitempty"`
-	Epic      string `json:"epic"`
-	// MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
-	MapEpic bool `json:"map_epic"`
-	// Body is the whole body markdown, comments included.
-	Body    string          `json:"body,omitempty"`
-	Related []RelatedTicket `json:"related"`
-	Stats   *DetailStats    `json:"stats,omitempty"`
-	// Answered is derived, never stored: the ticket is open again and its
-	// latest question has an answer.
-	Answered bool `json:"answered"`
-	// Rounds holds every round before the latest, oldest first.
-	Rounds []DetailRound `json:"rounds"`
-	Latest *DetailRound  `json:"latest,omitempty"`
-	// Permission is empty until a headless or pty agent reports a pending prompt.
-	Permission *PermissionCard `json:"permission,omitempty"`
-	Chat       []ChatMessage   `json:"chat"`
-	// Runs is one line per run, oldest first; a map ticket has none.
-	Runs []DetailRun `json:"runs"`
-	// HasScreen is set when the latest run's agent ran in a pty, so
-	// /v1/sessions/screen?ticket= has a screen to show.
-	HasScreen bool `json:"has_screen,omitempty"`
-	// State is the token an answer or resume sends back; empty without a round.
-	State string `json:"state,omitempty"`
-	// Bases are the competing blockers an ambiguous-base pause chooses between;
-	// the resume sends the chosen one back as its base.
-	Bases   []string `json:"bases,omitempty"`
-	Actions []string `json:"actions"`
-	// Recommendation is set while the open pause round carries one.
-	Recommendation *DetailRecommendation `json:"recommendation,omitempty"`
-	// ActionInfo gives each entry of Actions its button label and tooltip, from
-	// the pause-to-verb table, so the page holds no verb text of its own.
-	ActionInfo map[string]ActionInfo `json:"action_info,omitempty"`
-	// ErrorReason, ParseError and Path are set for an Error ticket. ParseError is
-	// set only when the file fails to parse, and then the payload carries no body
-	// or stats.
-	ErrorReason string `json:"error_reason,omitempty"`
-	ParseError  string `json:"parse_error,omitempty"`
-	Path        string `json:"path,omitempty"`
-}
 
 func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
@@ -204,14 +47,14 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, d)
 }
 
-func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
+func (s *Server) ticketDetail(ref ticketRef) (wire.TicketDetail, error) {
 	t, err := schema.ParseTicket(ref.ticket.Path)
 	if err != nil {
 		return brokenDetail(ref, err), nil
 	}
 	evs, err := tickets.ReadLog(ref.ticket.Path)
 	if err != nil {
-		return TicketDetail{}, err
+		return wire.TicketDetail{}, err
 	}
 	d := newTicketDetail(ref)
 	fillHeader(&d, ref, t)
@@ -229,27 +72,27 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 			writtenAt = ticketWrittenAt(ref.ticket.Path)
 		}
 		if d.Runs, err = s.ticketRuns(ref, t, evs, writtenAt); err != nil {
-			return TicketDetail{}, err
+			return wire.TicketDetail{}, err
 		}
 	}
 	epics, err := s.projectEpics(ref.addr.Project)
 	if err != nil {
-		return TicketDetail{}, err
+		return wire.TicketDetail{}, err
 	}
 	d.Related = relatedTickets(ref, epics)
 	// A blocked-pane pause keeps its agent's prompt, and Approve ends that pause.
 	if t.Status == schema.StatusClaimed || t.PauseReason == schema.PauseBlockedPane {
 		if d.Permission, err = s.permissionCard(ref.addr); err != nil {
-			return TicketDetail{}, err
+			return wire.TicketDetail{}, err
 		}
 	}
 	d.State = detailState(evs, t)
 	if rec := tickets.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
-		d.Recommendation = &DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
+		d.Recommendation = &wire.DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
 	}
 	rounds := tickets.Rounds(evs)
 	if d.Actions, err = s.detailFor(ref.addr.String(), t, rounds, d.Permission); err != nil {
-		return TicketDetail{}, err
+		return wire.TicketDetail{}, err
 	}
 	d.ActionInfo = actionInfo(d.Actions)
 	if len(rounds) == 0 {
@@ -265,7 +108,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		latest.Prompt = "Prompt sent to the running agent at " + at.Local().Format("15:04")
 	}
 	d.Latest = &latest
-	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == RoundAnswered
+	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == wire.RoundAnswered
 	d.Chat = roundChat(latest)
 	if t.PausedClass() == schema.PauseClassAnswer && t.PauseReason == schema.PauseAmbiguousBase {
 		d.Bases = s.ambiguousBlockers(ref.addr)
@@ -275,7 +118,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 
 // detailFor is what a person may do with a parsed ticket now, given its pause
 // rounds. The ticket detail and ticketRecommend both read their actions from here.
-func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseRound, card *PermissionCard) ([]string, error) {
+func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseRound, card *wire.PermissionCard) ([]string, error) {
 	var last *tickets.PauseRound
 	if len(rounds) > 0 {
 		last = &rounds[len(rounds)-1]
@@ -292,7 +135,7 @@ func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseR
 
 // brokenDetail is the small payload of a file that fails to parse: nothing the
 // body or the log could add.
-func brokenDetail(ref ticketRef, parseErr error) TicketDetail {
+func brokenDetail(ref ticketRef, parseErr error) wire.TicketDetail {
 	d := newTicketDetail(ref)
 	d.Status = tickets.StatusError.Word()
 	d.ErrorReason = "ticket file format is invalid"
@@ -303,16 +146,16 @@ func brokenDetail(ref ticketRef, parseErr error) TicketDetail {
 
 // newTicketDetail is the payload every ticket starts from: what the address
 // alone gives, with every list empty rather than null.
-func newTicketDetail(ref ticketRef) TicketDetail {
-	return TicketDetail{
+func newTicketDetail(ref ticketRef) wire.TicketDetail {
+	return wire.TicketDetail{
 		Address: ref.addr.String(), Title: ref.ticket.Title, Epic: rootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
-		Related: []RelatedTicket{}, Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{}, Runs: []DetailRun{},
+		Related: []wire.RelatedTicket{}, Rounds: []wire.DetailRound{}, Chat: []wire.ChatMessage{}, Actions: []string{}, Runs: []wire.DetailRun{},
 	}
 }
 
 // fillHeader sets the fields of a ticket that parsed: its status, pause, body
 // and, for an Error ticket, the reason.
-func fillHeader(d *TicketDetail, ref ticketRef, t schema.Ticket) {
+func fillHeader(d *wire.TicketDetail, ref ticketRef, t schema.Ticket) {
 	d.Status = string(storedStatus(t))
 	d.PauseReason = string(t.PauseReason)
 	d.PauseLabel = t.PauseReason.Label()
@@ -335,7 +178,7 @@ func fillHeader(d *TicketDetail, ref ticketRef, t schema.Ticket) {
 // the runner's status, so it runs only when a detail or a snapshot is built.
 // A prompt the web cannot approve (a herdr-hosted agent, an unnamed dialog, a
 // tool that needs a real answer) gets a card with a hint and no request ID.
-func (s *Server) permissionCard(addr tickets.Address) (*PermissionCard, error) {
+func (s *Server) permissionCard(addr tickets.Address) (*wire.PermissionCard, error) {
 	runner, sess, ok, err := s.liveSession(addr)
 	if err != nil || !ok {
 		return nil, err
@@ -346,9 +189,9 @@ func (s *Server) permissionCard(addr tickets.Address) (*PermissionCard, error) {
 	}
 	p := st.Pending
 	if p == nil {
-		return &PermissionCard{Description: st.BlockedReason, Hint: permissionHint}, nil
+		return &wire.PermissionCard{Description: st.BlockedReason, Hint: permissionHint}, nil
 	}
-	card := &PermissionCard{RequestID: p.ID, Tool: p.Tool, Input: string(p.Input), Description: p.Description}
+	card := &wire.PermissionCard{RequestID: p.ID, Tool: p.Tool, Input: string(p.Input), Description: p.Description}
 	if p.NotApprovable || runner.Name() == string(agentrunner.ChoiceHerdr) {
 		card.RequestID, card.Hint = "", permissionHint
 	}
@@ -357,13 +200,13 @@ func (s *Server) permissionCard(addr tickets.Address) (*PermissionCard, error) {
 
 // detailActions is what a person may do with the ticket right now. Approve
 // joins when the permission card can be approved from here.
-func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, card *PermissionCard) []string {
+func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, card *wire.PermissionCard) []string {
 	actions := []string{}
 	if card != nil && card.RequestID != "" {
-		actions = append(actions, ActionApprove)
+		actions = append(actions, wire.ActionApprove)
 	}
 	if t.FinishedCommitless() {
-		actions = append(actions, ActionMerge)
+		actions = append(actions, wire.ActionMerge)
 	}
 	if t.PausedClass() == "" {
 		return actions
@@ -388,12 +231,12 @@ func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, 
 }
 
 // detailRound reads a round's question leniently: a bad block is free text.
-func detailRound(r tickets.PauseRound, full bool) DetailRound {
-	out := DetailRound{Seq: r.Question.Seq, By: r.Question.By, Summary: r.Question.Summary, Outcome: RoundOpen}
+func detailRound(r tickets.PauseRound, full bool) wire.DetailRound {
+	out := wire.DetailRound{Seq: r.Question.Seq, By: r.Question.By, Summary: r.Question.Summary, Outcome: wire.RoundOpen}
 	if r.End != nil {
-		out.Outcome = RoundClosed
+		out.Outcome = wire.RoundClosed
 		if r.End.Type == tickets.EventPauseAnswer {
-			out.Outcome = RoundAnswered
+			out.Outcome = wire.RoundAnswered
 		}
 	}
 	if !full {
@@ -403,13 +246,13 @@ func detailRound(r tickets.PauseRound, full bool) DetailRound {
 	out.Kind, out.Text, out.Block, out.Handoff = q.Kind, q.Detail, r.Question.Block, q.Handoff
 	out.Recommended, out.Yes, out.No = q.Recommended, q.Yes, q.No
 	for _, o := range q.Options {
-		out.Options = append(out.Options, DetailOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
+		out.Options = append(out.Options, wire.DetailOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
 	}
 	if r.End == nil {
 		return out
 	}
 	if r.End.Type == tickets.EventPauseAnswer {
-		out.Answer = &DetailAnswer{Source: r.End.Source, Choice: r.End.Choice, Text: r.End.Text, Note: r.End.Note}
+		out.Answer = &wire.DetailAnswer{Source: r.End.Source, Choice: r.End.Choice, Text: r.End.Text, Note: r.End.Note}
 	} else {
 		out.ClosedReason = r.End.Reason
 	}
@@ -417,14 +260,14 @@ func detailRound(r tickets.PauseRound, full bool) DetailRound {
 }
 
 // roundChat is the round as a conversation: the question, then the reply.
-func roundChat(r DetailRound) []ChatMessage {
-	msgs := []ChatMessage{{From: r.By, Text: r.Summary}}
+func roundChat(r wire.DetailRound) []wire.ChatMessage {
+	msgs := []wire.ChatMessage{{From: r.By, Text: r.Summary}}
 	if r.Answer != nil {
 		reply := r.Answer.Choice
 		if reply == "" {
 			reply = r.Answer.Text
 		}
-		msgs = append(msgs, ChatMessage{From: r.Answer.Source, Text: reply})
+		msgs = append(msgs, wire.ChatMessage{From: r.Answer.Source, Text: reply})
 	}
 	return msgs
 }

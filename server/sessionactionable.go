@@ -94,7 +94,7 @@ func (s *Server) designFinal(ticket string) bool {
 	for _, e := range epics {
 		if e.Name == name {
 			step := mapProgress(e)
-			return step == ProgressBranch || step == ProgressDone
+			return step == wire.ProgressBranch || step == wire.ProgressDone
 		}
 	}
 	return false

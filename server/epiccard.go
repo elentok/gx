@@ -3,121 +3,67 @@ package server
 import (
 	"cmp"
 	"fmt"
+	"github.com/elentok/gx/server/wire"
 	"slices"
 	"time"
 
 	"github.com/elentok/gx/tickets"
 )
 
-// CardSection is the Epics page section a card belongs to. The server decides it;
-// the web client does not derive sections.
-type CardSection string
-
-// Spelled as literals for tygo; see the comment on EpicListState.
-const (
-	SectionNeedsYou      CardSection = "needs-you"
-	SectionImplementing  CardSection = "implementing"
-	SectionDesigning     CardSection = "designing"
-	SectionReadyToQueue  CardSection = "ready-to-queue"
-	SectionReadyToDesign CardSection = "ready-to-design"
-	SectionFinished      CardSection = "finished"
-)
-
 // cardSectionOrder is the order the page lists the sections in.
-var cardSectionOrder = []CardSection{
-	SectionNeedsYou, SectionImplementing, SectionReadyToQueue, SectionDesigning, SectionReadyToDesign, SectionFinished,
-}
-
-// CardKind is the kind of an Epics page card.
-type CardKind string
-
-const (
-	CardKindImplementation CardKind = "implementation"
-	CardKindDesign         CardKind = "design"
-	CardKindOneOff         CardKind = "one-off"
-	CardKindFollowUps      CardKind = "follow-ups"
-)
-
-// CardActionKind names what a card button does.
-type CardActionKind string
-
-const (
-	CardActionQueue      CardActionKind = "queue"
-	CardActionAnswer     CardActionKind = "answer"
-	CardActionOpenTicket CardActionKind = "open-ticket"
-	CardActionOpenEpic   CardActionKind = "open-epic"
-	CardActionMerge      CardActionKind = "merge"
-	// StashMerge targets the epic like Merge; its route is a later ticket's.
-	CardActionStashMerge CardActionKind = "stash-merge"
-	// The Design actions target the Design's epic address. Design and Continue
-	// start a session first (POST open-design); Answer and Open only navigate.
-	CardActionDesign   CardActionKind = "design"
-	CardActionContinue CardActionKind = "continue"
-	CardActionOpen     CardActionKind = "open"
-	// Triage targets the project whose follow-ups the card counts.
-	CardActionTriage CardActionKind = "triage"
-)
-
-// CardAction is one button of a card. Target is the address the button opens (a
-// ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).
-type CardAction struct {
-	Kind   CardActionKind `json:"kind"`
-	Label  string         `json:"label"`
-	Target string         `json:"target,omitempty"`
-	// Link is the hash route the button opens, when the server decides it. Answer
-	// sets it for a Design question; the client falls back to the ticket page.
-	Link string `json:"link,omitempty"`
+var cardSectionOrder = []wire.CardSection{
+	wire.SectionNeedsYou, wire.SectionImplementing, wire.SectionReadyToQueue, wire.SectionDesigning, wire.SectionReadyToDesign, wire.SectionFinished,
 }
 
 // loopCardSection is the section of a loop epic row.
-func loopCardSection(state EpicListState) CardSection {
+func loopCardSection(state wire.EpicListState) wire.CardSection {
 	switch state {
-	case EpicListPaused, EpicListMergeBlocked:
-		return SectionNeedsYou
-	case EpicListRunning, EpicListQueued, EpicListMerging, EpicListAwaitingMerge:
-		return SectionImplementing
-	case EpicListReady:
-		return SectionReadyToQueue
-	case EpicListFinished:
-		return SectionFinished
+	case wire.EpicListPaused, wire.EpicListMergeBlocked:
+		return wire.SectionNeedsYou
+	case wire.EpicListRunning, wire.EpicListQueued, wire.EpicListMerging, wire.EpicListAwaitingMerge:
+		return wire.SectionImplementing
+	case wire.EpicListReady:
+		return wire.SectionReadyToQueue
+	case wire.EpicListFinished:
+		return wire.SectionFinished
 	}
-	return SectionReadyToDesign
+	return wire.SectionReadyToDesign
 }
 
 // loopStatusWords is the status line of a loop epic row; position is the
 // 1-based queue slot of a queued epic.
-func loopStatusWords(state EpicListState, position int) string {
+func loopStatusWords(state wire.EpicListState, position int) string {
 	switch state {
-	case EpicListRunning, EpicListPaused:
+	case wire.EpicListRunning, wire.EpicListPaused:
 		return "Implementing..."
-	case EpicListMerging:
+	case wire.EpicListMerging:
 		return "Merging..."
-	case EpicListAwaitingMerge, EpicListMergeBlocked:
+	case wire.EpicListAwaitingMerge, wire.EpicListMergeBlocked:
 		return "Implemented"
-	case EpicListQueued:
+	case wire.EpicListQueued:
 		return fmt.Sprintf("Queued #%d", position)
-	case EpicListFinished:
+	case wire.EpicListFinished:
 		return "Merged"
-	case EpicListDraft:
+	case wire.EpicListDraft:
 		return "Draft"
-	case EpicListNoOpenTickets:
+	case wire.EpicListNoOpenTickets:
 		return "No open tickets"
 	}
 	return "Not started"
 }
 
 // decorateLoopCard fills the card fields of a loop epic row.
-func decorateLoopCard(row *EpicListRow, position int) {
+func decorateLoopCard(row *wire.EpicListRow, position int) {
 	row.Addresses = []string{row.Address}
-	row.CardKind = CardKindImplementation
+	row.CardKind = wire.CardKindImplementation
 	row.Section = loopCardSection(row.State)
 	row.StatusWords = loopStatusWords(row.State, position)
 	if row.Total > 0 {
 		row.RingProgress = row.Done * 100 / row.Total
 	}
-	row.Actions = []CardAction{}
-	if row.State == EpicListReady {
-		row.Actions = append(row.Actions, CardAction{Kind: CardActionQueue, Label: "Queue"})
+	row.Actions = []wire.CardAction{}
+	if row.State == wire.EpicListReady {
+		row.Actions = append(row.Actions, wire.CardAction{Kind: wire.CardActionQueue, Label: "Queue"})
 	}
 }
 
@@ -164,17 +110,6 @@ func (q queueIndex) slot(key string) int { return q.slots[key] }
 // enqueuedAt is the earliest enqueue time among key's items; zero when none has one.
 func (q queueIndex) enqueuedAt(key string) time.Time { return q.enqueued[key] }
 
-// CardTimeKind says what the card's start time measures; the client words it.
-type CardTimeKind string
-
-// Spelled as literals for tygo; see the comment on EpicListState.
-const (
-	CardTimeElapsed  CardTimeKind = "elapsed"
-	CardTimeWaiting  CardTimeKind = "waiting"
-	CardTimeCreated  CardTimeKind = "created"
-	CardTimeFinished CardTimeKind = "finished"
-)
-
 // cardTimeSources are the times a card's time pair draws on beyond the row itself.
 type cardTimeSources struct {
 	// startedAt is when the card's work began: the epic's started_at, a Design's
@@ -186,21 +121,21 @@ type cardTimeSources struct {
 
 // cardTimeFor maps the row's section to the card's time pair; a section without
 // one, or a zero start, gives none. Call it once, after the row's section is final.
-func cardTimeFor(row EpicListRow, src cardTimeSources) (CardTimeKind, time.Time) {
-	var kind CardTimeKind
+func cardTimeFor(row wire.EpicListRow, src cardTimeSources) (wire.CardTimeKind, time.Time) {
+	var kind wire.CardTimeKind
 	var start time.Time
 	switch row.Section {
-	case SectionNeedsYou:
-		kind, start = CardTimeWaiting, row.WaitingSince
-	case SectionImplementing, SectionDesigning:
-		kind, start = CardTimeElapsed, src.startedAt
-		if row.State == EpicListQueued {
+	case wire.SectionNeedsYou:
+		kind, start = wire.CardTimeWaiting, row.WaitingSince
+	case wire.SectionImplementing, wire.SectionDesigning:
+		kind, start = wire.CardTimeElapsed, src.startedAt
+		if row.State == wire.EpicListQueued {
 			start = cmp.Or(src.enqueuedAt, row.QueuedAt)
 		}
-	case SectionReadyToQueue, SectionReadyToDesign:
-		kind, start = CardTimeCreated, row.CreatedAt
-	case SectionFinished:
-		kind, start = CardTimeFinished, finishedAt(row)
+	case wire.SectionReadyToQueue, wire.SectionReadyToDesign:
+		kind, start = wire.CardTimeCreated, row.CreatedAt
+	case wire.SectionFinished:
+		kind, start = wire.CardTimeFinished, finishedAt(row)
 	}
 	if start.IsZero() {
 		return "", time.Time{}
@@ -209,82 +144,82 @@ func cardTimeFor(row EpicListRow, src cardTimeSources) (CardTimeKind, time.Time)
 }
 
 // setCardTime sets the row's time pair from cardTimeFor.
-func (r *EpicListRow) setCardTime(src cardTimeSources) {
+func setCardTime(r *wire.EpicListRow, src cardTimeSources) {
 	r.TimeKind, r.TimeStart = cardTimeFor(*r, src)
 }
 
 // implementingRank orders Implementing: running, then queued, then the rest.
-func implementingRank(r EpicListRow) int {
+func implementingRank(r wire.EpicListRow) int {
 	switch r.State {
-	case EpicListRunning:
+	case wire.EpicListRunning:
 		return 0
-	case EpicListQueued:
+	case wire.EpicListQueued:
 		return 1
 	}
 	return 2
 }
 
 // designingRank orders Designing: live Designs first, then stopped ones.
-func designingRank(r EpicListRow) int {
+func designingRank(r wire.EpicListRow) int {
 	if slices.ContainsFunc(r.Actions, isContinue) {
 		return 1
 	}
 	return 0
 }
 
-func isContinue(a CardAction) bool { return a.Kind == CardActionContinue }
+func isContinue(a wire.CardAction) bool { return a.Kind == wire.CardActionContinue }
 
-func followUpsRank(r EpicListRow) int {
-	if r.CardKind == CardKindFollowUps {
+func followUpsRank(r wire.EpicListRow) int {
+	if r.CardKind == wire.CardKindFollowUps {
 		return 0
 	}
 	return 1
 }
 
 // finishedAt is when a Finished card landed: its merge, else its completion.
-func finishedAt(r EpicListRow) time.Time { return cmp.Or(r.MergedAt, r.CompletedAt) }
+func finishedAt(r wire.EpicListRow) time.Time { return cmp.Or(r.MergedAt, r.CompletedAt) }
 
 // sortCards orders rows by section, then by the section's rule. Rows without a
 // section keep their place after the sectioned ones.
-func sortCards(rows []EpicListRow, queuePosition func(EpicListRow) int) {
-	rank := func(r EpicListRow) int {
+func sortCards(rows []wire.EpicListRow, queuePosition func(wire.EpicListRow) int) {
+	rank := func(r wire.EpicListRow) int {
 		i := slices.Index(cardSectionOrder, r.Section)
 		if i < 0 {
 			return len(cardSectionOrder)
 		}
 		return i
 	}
-	slices.SortStableFunc(rows, func(a, b EpicListRow) int {
+	slices.SortStableFunc(rows, func(a, b wire.EpicListRow) int {
 		if c := cmp.Compare(rank(a), rank(b)); c != 0 {
 			return c
 		}
 		switch a.Section {
-		case SectionNeedsYou:
+		case wire.SectionNeedsYou:
 			return a.WaitingSince.Compare(b.WaitingSince)
-		case SectionImplementing:
+		case wire.SectionImplementing:
 			if c := cmp.Compare(implementingRank(a), implementingRank(b)); c != 0 {
 				return c
 			}
-			if a.State == EpicListQueued {
+			if a.State == wire.EpicListQueued {
 				return cmp.Compare(queuePosition(a), queuePosition(b))
 			}
 			if implementingRank(a) >= 2 {
 				return b.LastActivityAt.Compare(a.LastActivityAt)
 			}
-		case SectionDesigning:
+		case wire.SectionDesigning:
 			if c := cmp.Compare(designingRank(a), designingRank(b)); c != 0 {
 				return c
 			}
 			return b.LastActivityAt.Compare(a.LastActivityAt)
-		case SectionReadyToQueue:
+		case wire.SectionReadyToQueue:
 			return b.CreatedAt.Compare(a.CreatedAt)
-		case SectionReadyToDesign:
+		case wire.SectionReadyToDesign:
 			// Follow-ups cards come first, then the rest by name.
 			if c := cmp.Compare(followUpsRank(a), followUpsRank(b)); c != 0 {
 				return c
 			}
 			return cmp.Compare(a.Name, b.Name)
-		case SectionFinished:
+		case wire.SectionFinished:
 			return finishedAt(b).Compare(finishedAt(a))
 		}
 		return 0
