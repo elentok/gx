@@ -14,25 +14,26 @@ import (
 
 type session struct {
 	agentrunner.Session
-	epic           string
-	cwd            string
-	args           []string
-	kind           agentrunner.Kind
-	resumeID       string
-	status         agentrunner.Status
-	promptErr      error
-	answerErr      error
-	interruptErr   error
-	interruptDelay time.Duration
-	stopErr        error
-	limited        bool
-	resetAt        time.Time
-	limitErr       error
-	diedErr        error
-	bgTask         bool
-	prompts        []string
-	interrupts     int
-	answers        []agentrunner.Answer
+	epic            string
+	cwd             string
+	args            []string
+	kind            agentrunner.Kind
+	resumeID        string
+	status          agentrunner.Status
+	promptErr       error
+	answerErr       error
+	interruptErr    error
+	interruptDelay  time.Duration
+	interruptStarts []time.Time
+	stopErr         error
+	limited         bool
+	resetAt         time.Time
+	limitErr        error
+	diedErr         error
+	bgTask          bool
+	prompts         []string
+	interrupts      int
+	answers         []agentrunner.Answer
 }
 
 // view is the status callers see: a running background task keeps an idle
@@ -268,6 +269,7 @@ func (r *Runner) Interrupt(s agentrunner.Session) error {
 		return err
 	}
 	delay, failure := ss.interruptDelay, ss.interruptErr
+	ss.interruptStarts = append(ss.interruptStarts, time.Now())
 	r.mu.Unlock()
 	// The delay runs unlocked so other calls on the runner proceed meanwhile.
 	time.Sleep(delay)
@@ -433,6 +435,17 @@ func (r *Runner) SetInterruptDelay(label string, d time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.byLabel(label).interruptDelay = d
+}
+
+// InterruptStarts returns when each Interrupt of label began, before its delay.
+func (r *Runner) InterruptStarts(label string) []time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ss := r.history[label]
+	if ss == nil {
+		return nil
+	}
+	return append([]time.Time(nil), ss.interruptStarts...)
 }
 
 // FailNextPrompts makes the next n Prompts to label fail with err, across

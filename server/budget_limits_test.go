@@ -411,17 +411,34 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 func TestBudget_HardLimitInterruptsRunInParallelInsideGrace(t *testing.T) {
 	t.Parallel()
 	h, fake, over, labels := startBudgetRuns(t, 3, 600*time.Millisecond)
+	const delay = 500 * time.Millisecond
 	for _, l := range labels {
-		fake.SetInterruptDelay(l, 500*time.Millisecond)
+		fake.SetInterruptDelay(l, delay)
 	}
 	over.Store(true)
 	start := time.Now()
 	h.Server.PollBudget()
 	elapsed := time.Since(start)
-	// The upper bound sits well below the serial total so a loaded machine
-	// does not look like serial Interrupts.
-	if elapsed < 600*time.Millisecond || elapsed >= 1200*time.Millisecond {
-		t.Errorf("stop took %v, want about the 600ms grace (serial Interrupts would take 1500ms)", elapsed)
+	// Wall time has no upper bound: load stretches it. Overlap shows in when the
+	// Interrupts began: serial ones begin a full delay apart.
+	if elapsed < 600*time.Millisecond {
+		t.Errorf("stop took %v, want at least the 600ms grace", elapsed)
+	}
+	var first, last time.Time
+	for _, l := range labels {
+		starts := fake.InterruptStarts(l)
+		if len(starts) != 1 {
+			t.Fatalf("%s interrupts = %d, want 1", l, len(starts))
+		}
+		if first.IsZero() || starts[0].Before(first) {
+			first = starts[0]
+		}
+		if starts[0].After(last) {
+			last = starts[0]
+		}
+	}
+	if spread := last.Sub(first); spread >= delay {
+		t.Errorf("interrupts began %v apart, want under %v (serial ones begin a full delay apart)", spread, delay)
 	}
 	assertNoLiveSessions(t, fake)
 }
