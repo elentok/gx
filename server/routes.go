@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/disk"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -30,6 +31,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		projects.Routes(func() *projects.Registry { return s.projects }, func() *projects.Migrator { return s.migrator }, func() *projects.Checks { return s.checks }),
 		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }, func() *queue.ViMode { return s.viMode }),
 		harnesschoice.Routes(func() *harnesschoice.Harness { return s.harness }),
+		disk.Routes(func() *disk.Disk { return s.disks }),
 	)
 }
 

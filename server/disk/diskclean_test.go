@@ -1,4 +1,4 @@
-package server_test
+package disk_test
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -116,7 +117,7 @@ func startCleanRig(t *testing.T, projects map[string]string, warn, cleanBelow co
 		c.DiskPollInterval = diskInterval
 		c.PollInterval = 20 * time.Millisecond
 		c.DiskSpace = config.DiskSpaceConfig{WarnBelow: warn, CleanBelow: cleanBelow, CleanupCommand: []string{"go", "clean", "-cache"}}
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
 	}}, opts...)
 	r.h = servertest.StartWithStore(t, store, all...)
 	r.start, _, _ = servertest.RegisterTurn(r.h)
@@ -141,14 +142,14 @@ func (r *cleanRig) countBodies(sub string) int {
 
 func (r *cleanRig) waitCalls(t *testing.T, n int) []string {
 	t.Helper()
-	waitFor(t, func() bool { return len(r.clean.recorded()) >= n })
+	servertest.Await(t, func() bool { return len(r.clean.recorded()) >= n })
 	return r.clean.recorded()
 }
 
 // waitClean waits for n clean notices and returns the last one's body.
 func (r *cleanRig) waitClean(t *testing.T, n int) string {
 	t.Helper()
-	waitFor(t, func() bool { return r.countBodies("disk clean") >= n })
+	servertest.Await(t, func() bool { return r.countBodies("disk clean") >= n })
 	var last string
 	for _, b := range r.bodies() {
 		if strings.Contains(b, "disk clean") {
@@ -223,7 +224,7 @@ func TestDiskClean_CleanupOffHoldsAndSaysSo(t *testing.T) {
 
 func (r *cleanRig) disksWhen(t *testing.T, what string, pred func([]wire.DiskStatus) bool) []wire.DiskStatus {
 	t.Helper()
-	return (&diskRig{h: r.h}).disksWhen(t, what, pred)
+	return (&servertest.DiskRig{H: r.h}).DisksWhen(t, what, pred)
 }
 
 // Story 3.
@@ -255,7 +256,7 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 	if !strings.Contains(body, "dispatch is not held") {
 		t.Errorf("notice = %s, want not held", body)
 	}
-	waitFor(t, func() bool { return len(r.start()) >= 1 })
+	servertest.Await(t, func() bool { return len(r.start()) >= 1 })
 	if r.countBodies("dispatch resumed") != 0 {
 		t.Error("a resume notice was sent for the end of a clean")
 	}
@@ -286,7 +287,7 @@ func TestDiskClean_DedupesPairs(t *testing.T) {
 		c.DiskPollInterval = diskInterval
 		c.DiskSpace = config.DiskSpaceConfig{CleanBelow: 10 * gb, CleanupCommand: []string{"go", "clean", "-cache"}}
 	})
-	waitFor(t, func() bool { return len(fake.recorded()) >= 1 })
+	servertest.Await(t, func() bool { return len(fake.recorded()) >= 1 })
 	disks.WaitReads(t, 10)
 	if got := fake.recorded(); len(got) != 1 {
 		t.Errorf("calls for a shared repo = %v, want 1", got)
@@ -333,7 +334,7 @@ func TestDiskClean_NoCleanInNormalUse(t *testing.T) {
 	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.queue(t, "proj:epic-a/01")
-	waitFor(t, func() bool { return len(r.start()) >= 1 })
+	servertest.Await(t, func() bool { return len(r.start()) >= 1 })
 	r.wantCalls(t, 0)
 
 	path := filepath.Join(r.store, "proj", "epic-a", "issues", "01-first.md")
@@ -345,7 +346,7 @@ func TestDiskClean_NoCleanInNormalUse(t *testing.T) {
 	if err := os.WriteFile(path, []byte(finished), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, func() bool { return len(r.h.Server.Runs()) == 0 })
+	servertest.Await(t, func() bool { return len(r.h.Server.Runs()) == 0 })
 	r.wantCalls(t, 0)
 }
 
@@ -399,7 +400,7 @@ func TestDiskClean_TimeLimitKillsTheCommand(t *testing.T) {
 	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": `,"disk-space":{"cleanup-command":["sleep","5"]}`}, 0, 10*gb,
 		func(c *server.Config) {
-			c.CleanupRunner = server.RunCleanupCommand
+			c.CleanupRunner = disk.RunCleanupCommand
 			c.CleanupTimeout = 200 * time.Millisecond
 		})
 	start := time.Now()
@@ -464,7 +465,7 @@ func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
 	r.start, _, _ = servertest.RegisterTurn(r.h)
 	r.queue(t, "proj:epic-a/01")
 	r.waitClean(t, 2)
-	waitFor(t, func() bool { return r.countBodies("low disk space") == 2 })
+	servertest.Await(t, func() bool { return r.countBodies("low disk space") == 2 })
 	ex, err := r.h.Client.Explain(context.Background(), "proj:epic-a/01")
 	if err != nil || ex.Verdict != wire.VerdictDiskLow {
 		t.Errorf("explain = %+v, %v, want %q", ex, err, wire.VerdictDiskLow)

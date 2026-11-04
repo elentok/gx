@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
@@ -225,7 +226,7 @@ func runServer(ctx context.Context, d deps) error {
 	// interval, so a flow can steer the disk watcher from outside the process.
 	var freeSpace func(string) (wire.DiskReading, error)
 	if v := os.Getenv("GX_DISK_FREE_FILE"); v != "" {
-		freeSpace = server.FileFreeSpace(v)
+		freeSpace = disk.FileFreeSpace(v)
 	}
 	var diskPollInterval time.Duration
 	if v := os.Getenv("GX_DISK_WATCH_INTERVAL"); v != "" {

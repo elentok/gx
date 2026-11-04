@@ -1,4 +1,4 @@
-package server_test
+package disk_test
 
 import (
 	"context"
@@ -64,7 +64,7 @@ func startHoldRig(t *testing.T, repos map[string]string, clean config.ByteSize, 
 		c.PollInterval = 20 * time.Millisecond
 		c.DiskSpace = config.DiskSpaceConfig{CleanBelow: clean}
 		c.GoCacheDir = func() (string, error) { return "/gocache", nil }
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
 	}}, opts...)
 	rig.h = servertest.StartWithStore(t, store, all...)
 	rig.start, _, _ = servertest.RegisterTurn(rig.h)
@@ -141,7 +141,7 @@ func TestDiskHold_PreClaimReadingHoldsBeforeTheTimer(t *testing.T) {
 	r.queue(t, "proj:epic-a/01")
 	r.neverStarts(t)
 	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", wire.VerdictDiskLow), "/vol-proj", "3.0 GB")
-	waitFor(t, func() bool { return len(cleaner.recorded()) >= 1 })
+	servertest.Await(t, func() bool { return len(cleaner.recorded()) >= 1 })
 	if got, want := cleaner.recorded(), []string{"go clean -cache @ " + repo}; !slices.Equal(got, want) {
 		t.Errorf("clean calls = %q, want %q", got, want)
 	}
@@ -176,7 +176,7 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 	h.OnTurn(func(p *servertest.Turn) {
 		close(launched)
 		<-release
-		commitWork(t, p, "epic-a")
+		servertest.CommitWork(t, p, "epic-a")
 	})
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("queue = %+v, %v", res, err)
@@ -198,7 +198,7 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 		t.Fatalf("runs during hold = %d, want the agent still running", len(h.Server.Runs()))
 	}
 	close(release)
-	waitFor(t, func() bool {
+	servertest.Await(t, func() bool {
 		b, _ := os.ReadFile(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"))
 		return strings.Contains(string(b), "status: done")
 	})
@@ -212,7 +212,7 @@ func TestDiskHold_OtherDiskStillDispatches(t *testing.T) {
 	r.disks.SetFree(low, gb)
 	r.queue(t, "low:epic-a/01")
 	r.queue(t, "fine:epic-a/01")
-	waitFor(t, func() bool {
+	servertest.Await(t, func() bool {
 		for _, run := range r.h.Server.Runs() {
 			if run.Address == "fine:epic-a/01" {
 				return true
@@ -252,8 +252,8 @@ func TestDiskHold_ResumeStartsTicketAndNotifiesOnce(t *testing.T) {
 	r.queue(t, "proj:epic-a/01")
 	r.explainWhen(t, "proj:epic-a/01", wire.VerdictDiskLow)
 	r.disks.SetFree(repo, 10*gb)
-	waitFor(t, r.started(1))
-	waitFor(t, func() bool { return r.resume() >= 1 })
+	servertest.Await(t, r.started(1))
+	servertest.Await(t, func() bool { return r.resume() >= 1 })
 	time.Sleep(quiet) // negative wait: no second resume notice
 	if n := r.resume(); n != 1 {
 		t.Errorf("resume notices = %d, want 1", n)
@@ -273,7 +273,7 @@ func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
 	}
 	r.disks.SetFree(a, 50*gb)
 	r.disks.SetFree(b, 50*gb)
-	waitFor(t, func() bool { return r.resume() >= 1 })
+	servertest.Await(t, func() bool { return r.resume() >= 1 })
 	time.Sleep(quiet) // negative wait: no second resume notice
 	if n := r.resume(); n != 1 {
 		t.Errorf("resume notices = %d, want 1", n)
@@ -315,7 +315,7 @@ func TestDiskHold_CleanThresholdOffNeverHolds(t *testing.T) {
 	r := startHoldRig(t, map[string]string{"proj": repo}, 0)
 	r.disks.SetFree(repo, 1)
 	r.queue(t, "proj:epic-a/01")
-	waitFor(t, r.started(1))
+	servertest.Await(t, r.started(1))
 }
 
 // Seam: retry and relaunch are refused on a held disk and pass on a free one.

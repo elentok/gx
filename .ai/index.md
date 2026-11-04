@@ -129,6 +129,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/webauth/` holds web login: the login store (password, TOTP, devices, setup code, rate
   limits), the cookie gate (`Gate`) and the login routes (imports `webtls` and `wire`; the root
   implements `Host`; `cmd` and `testutil/gxfixture` import it too);
+  `server/disk/` holds disk watching: free-space status, the watch loop, the hold, the clean-now
+  flow and the temp sweep (the root sets its `HealthSink`; `cmd` imports it for `FileFreeSpace`);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

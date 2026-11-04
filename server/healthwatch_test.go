@@ -55,21 +55,6 @@ func waitReads(t *testing.T, fake *servertest.FakeSystem, n int) {
 	}
 }
 
-// healthEvents counts the health-changed events on stream until it is quiet.
-func healthEvents(ch <-chan wire.Event) int {
-	n := 0
-	for {
-		select {
-		case ev := <-ch:
-			if ev.Type == wire.EventHealthChanged {
-				n++
-			}
-		case <-time.After(150 * time.Millisecond):
-			return n
-		}
-	}
-}
-
 // Seam: no client asks while the watcher reads; the first snapshot already
 // holds the one-minute average (story 22) and the state follows it (story 10).
 func TestHealth_AverageIsReadyInTheFirstSnapshotAfterTwelveReadings(t *testing.T) {
@@ -116,7 +101,7 @@ func TestHealth_LevelChangePublishesOneEvent(t *testing.T) {
 	fake.SetMem(30)
 	healthWhen(t, h, "memory level 1", func(v wire.Health) bool { return v.Memory.Level == 1 })
 	waitReads(t, fake, fake.Reads()+syshealth.AverageWindow)
-	if n := healthEvents(ch); n != 1 {
+	if n := servertest.HealthEvents(ch); n != 1 {
 		t.Fatalf("health events = %d, want 1", n)
 	}
 }
@@ -140,7 +125,7 @@ func TestHealth_MovementWithinAStepPublishesNoEvent(t *testing.T) {
 		fake.SetMem(float64(10 + 4*(i%2)))
 		waitReads(t, fake, fake.Reads()+1)
 	}
-	if n := healthEvents(ch); n != 0 {
+	if n := servertest.HealthEvents(ch); n != 0 {
 		t.Fatalf("health events = %d, want 0", n)
 	}
 }

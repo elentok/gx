@@ -1,7 +1,10 @@
-package server
+// Package disk watches free space on the disks the projects live on, holds
+// dispatch when one runs low, and cleans it.
+package disk
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"os/exec"
 	"slices"
@@ -13,9 +16,72 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
+
+// Config is the slice of the server's config the disk watcher reads. A zero
+// field takes the default its comment names.
+type Config struct {
+	// FreeSpace reads the disk holding a path; nil reads the real one.
+	FreeSpace func(path string) (wire.DiskReading, error)
+	// GoCacheDir finds the Go build cache; nil runs `go env GOCACHE`.
+	GoCacheDir func() (string, error)
+	// DiskPollInterval is how often the watcher reads; zero means one minute.
+	DiskPollInterval time.Duration
+	// CleanupRunner runs one cleanup command in dir; nil runs the real command.
+	CleanupRunner func(ctx context.Context, argv []string, dir string) ([]byte, error)
+	// CleanupTimeout is the time limit per cleanup command; zero means ten minutes.
+	CleanupTimeout time.Duration
+	// TempSweepDir is the temp dir a clean sweeps; empty covers os.TempDir() and /tmp.
+	TempSweepDir string
+	// TempSweepMinAge is how long a temp dir sits untouched before the sweep removes it.
+	TempSweepMinAge time.Duration
+	// CacheGateCap bounds the wait for running Go builds before a clean.
+	CacheGateCap time.Duration
+	// CacheGateScan replaces the `go` process scan; nil scans the real processes.
+	CacheGateScan func() (bool, error)
+	StateDir      string
+	TicketStore   string
+	Env           []string
+}
+
+// Deps is what the watcher needs from the root. HealthSink, when set, is called
+// after every reading so the health meter follows the disk state; disk does not
+// import health.
+type Deps struct {
+	Config     Config
+	Settings   *settings.Holder
+	Projects   *projects.Registry
+	Events     *broker.Broker
+	Chat       *ralphloop.ServerChat
+	Guards     *runs.Guards
+	Log        *slog.Logger
+	HealthSink func(now time.Time)
+}
+
+// Disk is the per-disk state, its watch loop and its clean flow.
+type Disk struct {
+	cfg        Config
+	settings   *settings.Holder
+	projects   *projects.Registry
+	events     *broker.Broker
+	chat       *ralphloop.ServerChat
+	guards     *runs.Guards
+	log        *slog.Logger
+	healthSink func(now time.Time)
+	disks      diskWatch
+}
+
+// New builds the disk watcher.
+func New(d Deps) *Disk {
+	return &Disk{cfg: d.Config, settings: d.Settings, projects: d.Projects, events: d.Events, chat: d.Chat,
+		guards: d.Guards, log: d.Log, healthSink: d.HealthSink}
+}
 
 const (
 	defaultDiskPoll = time.Minute
@@ -133,11 +199,13 @@ func (st *diskState) endTransition(free, warn, clean uint64, end cleanEnd) diskC
 // change with a snapshot of what the effects need. projects is who watches the
 // disk now; nil keeps the last list. probe is a path on the disk, read again
 // when a clean ends.
-func (s *Server) transition(r wire.DiskReading, probe string, projects []string, now time.Time,
+func (s *Disk) transition(r wire.DiskReading, probe string, projects []string, now time.Time,
 	fn func(st *diskState, warn, clean uint64) diskChange) (diskChange, diskSnapshot) {
 	ds := s.settings.Load().DiskSpace
 	d := &s.disks
-	defer s.observeDiskHealth(now) // runs after the unlock below
+	if s.healthSink != nil {
+		defer s.healthSink(now) // runs after the unlock below
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	st := d.disks[r.ID]
@@ -161,7 +229,7 @@ func (s *Server) transition(r wire.DiskReading, probe string, projects []string,
 
 // observe applies one ordinary reading to the state machine and reports
 // whether the disk is held after it.
-func (s *Server) observe(r wire.DiskReading, probe string, projects []string, now time.Time) (held bool) {
+func (s *Disk) observe(r wire.DiskReading, probe string, projects []string, now time.Time) (held bool) {
 	c, snap := s.transition(r, probe, projects, now, func(st *diskState, warn, clean uint64) diskChange {
 		return st.readTransition(r.Free, warn, clean)
 	})
@@ -182,7 +250,7 @@ func (s *Server) observe(r wire.DiskReading, probe string, projects []string, no
 
 // observeCleanEnd applies the reading that ends a clean and reports whether
 // the disk is held after it.
-func (s *Server) observeCleanEnd(r wire.DiskReading, probe string, end cleanEnd) (held bool) {
+func (s *Disk) observeCleanEnd(r wire.DiskReading, probe string, end cleanEnd) (held bool) {
 	c, snap := s.transition(r, probe, nil, time.Now(), func(st *diskState, warn, clean uint64) diskChange {
 		return st.endTransition(r.Free, warn, clean, end)
 	})
@@ -196,7 +264,7 @@ func (s *Server) observeCleanEnd(r wire.DiskReading, probe string, end cleanEnd)
 
 // publishChange announces a changed disk: the event, the warn and hold logs and
 // the warn notice.
-func (s *Server) publishChange(r wire.DiskReading, c diskChange) {
+func (s *Disk) publishChange(r wire.DiskReading, c diskChange) {
 	s.events.Publish(wire.EventDiskWarnChanged, "")
 	if c.warnSet {
 		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", c.warn)
@@ -213,7 +281,7 @@ func (s *Server) publishChange(r wire.DiskReading, c diskChange) {
 
 // watchedPaths is a project's repo path and the Go cache path: the paths whose
 // disks the project depends on. A project with no repo path has none.
-func (s *Server) watchedPaths(projectDir string) []string {
+func (s *Disk) watchedPaths(projectDir string) []string {
 	pf, err := config.ReadProjectFile(projectDir)
 	if err != nil || pf.Repo == nil {
 		return nil
@@ -225,10 +293,10 @@ func (s *Server) watchedPaths(projectDir string) []string {
 	return paths
 }
 
-// heldDiskOf returns the first held disk project watches, from the watcher's
+// HeldDiskOf returns the first held disk project watches, from the watcher's
 // state. It takes no reading.
-func (s *Server) heldDiskOf(project string) (wire.DiskStatus, bool) {
-	for _, d := range s.diskStatuses(false) {
+func (s *Disk) HeldDiskOf(project string) (wire.DiskStatus, bool) {
+	for _, d := range s.Statuses(false) {
 		if d.Held && slices.Contains(d.Projects, project) {
 			return d, true
 		}
@@ -236,10 +304,10 @@ func (s *Server) heldDiskOf(project string) (wire.DiskStatus, bool) {
 	return wire.DiskStatus{}, false
 }
 
-// freshHeldDisk reads every disk project watches (its repo disk and the Go
+// FreshHeldDisk reads every disk project watches (its repo disk and the Go
 // cache disk) and returns the first one that is held. A project with no repo
 // path has no disk to read.
-func (s *Server) freshHeldDisk(project string) (wire.DiskStatus, bool) {
+func (s *Disk) FreshHeldDisk(project string) (wire.DiskStatus, bool) {
 	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return wire.DiskStatus{}, false
@@ -263,21 +331,21 @@ func (s *Server) freshHeldDisk(project string) (wire.DiskStatus, bool) {
 }
 
 // diskStatus is one known disk's status.
-func (s *Server) diskStatus(id string) wire.DiskStatus {
+func (s *Disk) diskStatus(id string) wire.DiskStatus {
 	d := &s.disks
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.disks[id].status(id)
 }
 
-// diskLowReason says which disk holds dispatch and how much is free on it.
-func diskLowReason(d wire.DiskStatus) string {
+// LowReason says which disk holds dispatch and how much is free on it.
+func LowReason(d wire.DiskStatus) string {
 	return d.Name + " has " + humanize.Bytes(d.FreeBytes) + " free"
 }
 
-// diskStatuses lists the known disks by id; listedOnly keeps those whose warn
+// Statuses lists the known disks by id; listedOnly keeps those whose warn
 // mark is set or that are held.
-func (s *Server) diskStatuses(listedOnly bool) []wire.DiskStatus {
+func (s *Disk) Statuses(listedOnly bool) []wire.DiskStatus {
 	d := &s.disks
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -292,22 +360,23 @@ func (s *Server) diskStatuses(listedOnly bool) []wire.DiskStatus {
 	return out
 }
 
-// listedDisks lists the disks the snapshot shows: warn mark set or held, by id.
-func (s *Server) listedDisks() []wire.DiskStatus { return s.diskStatuses(true) }
+// Listed lists the disks the snapshot shows: warn mark set or held, by id.
+func (s *Disk) Listed() []wire.DiskStatus { return s.Statuses(true) }
 
-func (s *Server) diskStatusRead(w http.ResponseWriter, _ *http.Request) {
+func (s *Disk) statusRead(w http.ResponseWriter, _ *http.Request) {
 	ds := s.settings.Load().DiskSpace
-	writeJSON(w, wire.DiskReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow), Disks: s.diskStatuses(false)})
+	wire.WriteJSON(w, wire.DiskReport{WarnBelow: SizeOrOff(ds.WarnBelow), CleanBelow: SizeOrOff(ds.CleanBelow), Disks: s.Statuses(false)})
 }
 
-func sizeOrOff(b config.ByteSize) string {
+// SizeOrOff prints a threshold, "off" for zero.
+func SizeOrOff(b config.ByteSize) string {
 	if b == 0 {
 		return "off"
 	}
 	return b.String()
 }
 
-func (s *Server) freeSpace(path string) (wire.DiskReading, error) {
+func (s *Disk) freeSpace(path string) (wire.DiskReading, error) {
 	if s.cfg.FreeSpace != nil {
 		return s.cfg.FreeSpace(path)
 	}
@@ -315,14 +384,14 @@ func (s *Server) freeSpace(path string) (wire.DiskReading, error) {
 }
 
 // goCache is the build cache path, looked up once: the claim path needs it on every tick.
-func (s *Server) goCache() string {
+func (s *Disk) goCache() string {
 	d := &s.disks
 	d.goCacheOnce.Do(func() { d.goCachePath = s.lookupGoCache() })
 	return d.goCachePath
 }
 
 // lookupGoCache asks go for its build cache; "" means it is not watched.
-func (s *Server) lookupGoCache() string {
+func (s *Disk) lookupGoCache() string {
 	lookup := s.cfg.GoCacheDir
 	if lookup == nil {
 		lookup = func() (string, error) {
@@ -338,8 +407,8 @@ func (s *Server) lookupGoCache() string {
 	return path
 }
 
-// checkDisks reads every project's repo disk and the Go cache disk once.
-func (s *Server) checkDisks() {
+// Check reads every project's repo disk and the Go cache disk once.
+func (s *Disk) Check() {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return
@@ -378,9 +447,9 @@ func (s *Server) checkDisks() {
 	}
 }
 
-// keepDisksWatched reads free space on a timer until ctx ends. The serve path
-// takes the first reading itself, before the claim loop starts.
-func (s *Server) keepDisksWatched(ctx context.Context) {
+// Run reads free space on a timer until ctx ends. The serve path
+// takes the first reading itself (Check), before the claim loop starts.
+func (s *Disk) Run(ctx context.Context) {
 	interval := s.cfg.DiskPollInterval
 	if interval <= 0 {
 		interval = defaultDiskPoll
@@ -392,7 +461,7 @@ func (s *Server) keepDisksWatched(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			s.checkDisks()
+			s.Check()
 		}
 	}
 }

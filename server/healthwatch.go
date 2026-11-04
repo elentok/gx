@@ -121,7 +121,7 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 // status, the same list the disk status route shows, so the Tray and the banner
 // agree. It publishes an event only when the disk level or state changed.
 func (s *Server) observeDiskHealth(now time.Time) {
-	in := syshealthDisks(s.diskStatuses(false), uint64(s.settings.Load().DiskSpace.CleanBelow))
+	in := syshealthDisks(s.disks.Statuses(false), uint64(s.settings.Load().DiskSpace.CleanBelow))
 	worst := syshealth.WorstDisk(in)
 	w := &s.healthW
 	w.mu.Lock()

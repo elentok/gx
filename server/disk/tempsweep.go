@@ -1,4 +1,4 @@
-package server
+package disk
 
 import (
 	"io/fs"
@@ -99,7 +99,7 @@ func processCommands(env []string) string {
 // sweepTemp runs the sweep over the temp dirs and logs what it removed. The
 // configured TempSweepDir stands alone; otherwise it covers os.TempDir() and
 // /tmp, where the short-path test roots (gxf*, gxs*) go.
-func (s *Server) sweepTemp() {
+func (s *Disk) sweepTemp() {
 	dirs := []string{s.cfg.TempSweepDir}
 	if s.cfg.TempSweepDir == "" {
 		dirs = []string{os.TempDir(), "/tmp"}

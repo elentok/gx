@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-const routeGB = 1_000_000_000
+const routeGB = servertest.GB
 
 // startHealthRoute starts a server with one watched disk and a steerable system source.
 func startHealthRoute(t *testing.T, fake *servertest.FakeSystem) *servertest.Harness {
@@ -121,13 +121,13 @@ func TestHealthRoute_UnknownCarriesItsReason(t *testing.T) {
 func TestHealthRoute_DisksReportNamesTheWorstDisk(t *testing.T) {
 	t.Parallel()
 	repo, goCache := t.TempDir(), t.TempDir()
-	r := startDiskRig(t, map[string]string{"proj": repo}, 20*routeGB, func(c *server.Config) {
+	r := servertest.StartDiskRig(t, map[string]string{"proj": repo}, 20*routeGB, func(c *server.Config) {
 		c.GoCacheDir = func() (string, error) { return goCache, nil }
 	})
 	// d1 is small and normal, d2 is large and under the warn size.
-	r.disks.PutSized(repo, "d1", "/vol1", 25*routeGB, 30*routeGB)
-	r.disks.PutSized(goCache, "d2", "/vol2", 15*routeGB, 1000*routeGB)
-	rep := healthRouteWhen(t, r.h, "d2 as the worst disk", func(rep wire.HealthReport) bool { return rep.Disks.WorstID == "d2" })
+	r.Disks.PutSized(repo, "d1", "/vol1", 25*routeGB, 30*routeGB)
+	r.Disks.PutSized(goCache, "d2", "/vol2", 15*routeGB, 1000*routeGB)
+	rep := healthRouteWhen(t, r.H, "d2 as the worst disk", func(rep wire.HealthReport) bool { return rep.Disks.WorstID == "d2" })
 	if d := healthDisk(rep, "d2"); d.State != wire.HealthStateHigh {
 		t.Errorf("d2 = %+v, want high", d)
 	}
@@ -138,10 +138,10 @@ func TestHealthRoute_DisksReportNamesTheWorstDisk(t *testing.T) {
 
 func TestHealthRoute_NoDisksMeterIsUnknownWithAReason(t *testing.T) {
 	t.Parallel()
-	r := startDiskRig(t, nil, 20*routeGB, func(c *server.Config) {
+	r := servertest.StartDiskRig(t, nil, 20*routeGB, func(c *server.Config) {
 		c.FreeSpace = func(string) (wire.DiskReading, error) { return wire.DiskReading{}, errors.New("no disk") }
 	})
-	rep := healthRouteWhen(t, r.h, "an unknown disk meter", func(wire.HealthReport) bool { return true })
+	rep := healthRouteWhen(t, r.H, "an unknown disk meter", func(wire.HealthReport) bool { return true })
 	if rep.Disks.State != wire.HealthStateUnknown || rep.Disks.Reason == wire.HealthReasonNone || rep.Disks.WorstID != "" {
 		t.Errorf("disks = %+v, want unknown with a reason and no worst disk", rep.Disks)
 	}

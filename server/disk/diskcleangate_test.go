@@ -1,4 +1,4 @@
-package server_test
+package disk_test
 
 import (
 	"os"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 )
 
 func TestDiskCleanGate_CleanNowWaitsForARegisteredBuild(t *testing.T) {
@@ -56,7 +57,7 @@ func TestDiskCleanGate_CleansAfterTheCapAndLogsIt(t *testing.T) {
 	defer release()
 	r.setFree(3 * gb)
 	r.waitCalls(t, 1)
-	waitFor(t, func() bool {
+	servertest.Await(t, func() bool {
 		log, _ := os.ReadFile(server.LogPath(r.h.StateDir))
 		return strings.Contains(string(log), "went ahead after the build wait cap")
 	})

@@ -33,6 +33,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/disk"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -97,7 +98,7 @@ type Server struct {
 	restarting atomic.Bool
 	// cpuSpikes holds the CPU ticket cooldown.
 	cpuSpikes  cpuSpikes
-	disks      diskWatch
+	disks      *disk.Disk
 	healthW    healthWatch
 	procs      procWatch
 	ownerCache ownerCache
@@ -407,6 +408,17 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.settings.Store(&cfg.Settings)
 	s.settings.SetAppliers(s.reloadAppliers())
+	s.disks = disk.New(disk.Deps{
+		Config: disk.Config{
+			FreeSpace: cfg.FreeSpace, GoCacheDir: cfg.GoCacheDir, DiskPollInterval: cfg.DiskPollInterval,
+			CleanupRunner: cfg.CleanupRunner, CleanupTimeout: cfg.CleanupTimeout,
+			TempSweepDir: cfg.TempSweepDir, TempSweepMinAge: cfg.TempSweepMinAge,
+			CacheGateCap: cfg.CacheGateCap, CacheGateScan: cfg.CacheGateScan,
+			StateDir: cfg.StateDir, TicketStore: cfg.TicketStore, Env: cfg.Env,
+		},
+		Settings: &s.settings, Projects: s.projects, Events: events, Chat: s.chat, Guards: s.guards, Log: log,
+		HealthSink: s.observeDiskHealth,
+	})
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
@@ -448,12 +460,10 @@ var routeTable = []struct {
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
 	{"POST /v1/usage/report", (*Server).limitsReportWrite},
-	{"GET /v1/disk/status", (*Server).diskStatusRead},
 	{"GET /v1/health", (*Server).healthRead},
 	{"GET /v1/usage/summary", (*Server).usageSummaryRead},
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
 	{"POST /v1/restart", (*Server).restartWrite},
-	{"POST /v1/disk/clean", (*Server).diskCleanWrite},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/tickets/detail", (*Server).detail},
@@ -571,7 +581,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Migrating = s.migrator.Migrating()
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
-	snap.Disks = s.listedDisks()
+	snap.Disks = s.disks.Listed()
 	snap.Health = s.currentHealth()
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
@@ -732,7 +742,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	herdrDone := make(chan struct{})
 	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
 	// A claim must not see a low disk before the watcher has recorded its projects.
-	s.checkDisks()
+	s.disks.Check()
 	claimDone := make(chan struct{})
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
 	pruneDone := make(chan struct{})
@@ -746,7 +756,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	cpuDone := make(chan struct{})
 	go func() { defer close(cpuDone); s.keepCPUWatched(freshCtx) }()
 	disksDone := make(chan struct{})
-	go func() { defer close(disksDone); s.keepDisksWatched(freshCtx) }()
+	go func() { defer close(disksDone); s.disks.Run(freshCtx) }()
 	migFailDone := make(chan struct{})
 	go func() { defer close(migFailDone); s.migrator.KeepFailuresWatched(freshCtx) }()
 	healthDone := make(chan struct{})

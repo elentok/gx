@@ -1414,5 +1414,5 @@ func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
-	servertest.WaitFor(t, 15*time.Second, "the condition", ok)
+	servertest.Await(t, ok)
 }

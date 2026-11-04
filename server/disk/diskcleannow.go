@@ -1,4 +1,4 @@
-package server
+package disk
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 // cleanNow runs the disk's cleanup work in the caller and ends it through the
 // same rule as the automatic clean. It never touches armed/spent and never sets
 // the hold at its start.
-func (s *Server) cleanNow(id string) wire.CleanNowResult {
+func (s *Disk) cleanNow(id string) wire.CleanNowResult {
 	d := &s.disks
 	d.mu.Lock()
 	st := d.disks[id]
@@ -46,11 +46,11 @@ func (s *Server) cleanNow(id string) wire.CleanNowResult {
 	return wire.CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: end.failed, NoCleanupCommand: end.noWork}
 }
 
-func (s *Server) diskCleanWrite(w http.ResponseWriter, r *http.Request) {
+func (s *Disk) cleanWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.CleanNowRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, s.cleanNow(req.Disk))
+	wire.WriteJSON(w, s.cleanNow(req.Disk))
 }

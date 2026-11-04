@@ -22,7 +22,7 @@ import (
 
 // testFlushInterval stands in for the chat batcher's 6s tick in tests that
 // count sends but never assert two notices share one batch.
-const testFlushInterval = 100 * time.Millisecond
+const testFlushInterval = servertest.FlushInterval
 
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()

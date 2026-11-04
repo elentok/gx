@@ -1,4 +1,4 @@
-package server_test
+package disk_test
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func (r *cleanRig) cleanNowAsync() <-chan wire.CleanNowResult {
 // known waits for the watcher to have read the disk once.
 func (r *cleanRig) known(t *testing.T) {
 	t.Helper()
-	waitFor(t, func() bool {
+	servertest.Await(t, func() bool {
 		rep, err := r.h.Client.DiskStatus(context.Background())
 		if err != nil {
 			return false
@@ -109,7 +109,7 @@ func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
 	done := r.cleanNowAsync()
 	r.waitCalls(t, 1)
 	r.queue(t, "proj:epic-a/01")
-	waitFor(t, func() bool { return len(r.start()) >= 1 })
+	servertest.Await(t, func() bool { return len(r.start()) >= 1 })
 	r.clean.release()
 	if res := <-done; res.Refused || res.Held {
 		t.Fatalf("result = %+v", res)

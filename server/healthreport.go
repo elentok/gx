@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
 )
@@ -30,7 +31,7 @@ func (s *Server) healthReport(ctx context.Context, wait bool) wire.HealthReport 
 
 	ds := s.settings.Load().DiskSpace
 	cleanBelow := uint64(ds.CleanBelow)
-	statuses := s.diskStatuses(false)
+	statuses := s.disks.Statuses(false)
 	in := syshealthDisks(statuses, cleanBelow)
 	disks := make([]wire.HealthDisk, 0, len(statuses))
 	for i, d := range statuses {
@@ -50,7 +51,7 @@ func (s *Server) healthReport(ctx context.Context, wait bool) wire.HealthReport 
 		Memory: wire.MemoryReport{Percent: l.memPct, UsedBytes: l.memUsed, TotalBytes: l.memTotal, Average: l.memAvg,
 			Pressure: pressureName(l.pressure), Level: h.Memory.Level, State: h.Memory.State, Reason: h.Memory.Reason,
 			Thresholds: wire.HealthThresholds{High: syshealth.MemHigh, Critical: syshealth.MemCritical}, ReadAt: h.Memory.ReadAt},
-		Disks: wire.DisksReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow),
+		Disks: wire.DisksReport{WarnBelow: disk.SizeOrOff(ds.WarnBelow), CleanBelow: disk.SizeOrOff(ds.CleanBelow),
 			State: h.Disk.State, Level: h.Disk.Level, Reason: h.Disk.Reason, WorstID: worstID, Disks: disks},
 		Causes: s.healthCauses(ctx, wait),
 	}

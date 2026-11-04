@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
@@ -245,8 +246,8 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.Queue
 				return queue.Refusal(wire.ReasonUsageLimit, v), nil
 			}
 		}
-		if d, held := s.freshHeldDisk(ref.addr.Project); held {
-			return queue.Refusal(wire.ReasonDiskLow, diskLowReason(d)), nil
+		if d, held := s.disks.FreshHeldDisk(ref.addr.Project); held {
+			return queue.Refusal(wire.ReasonDiskLow, disk.LowReason(d)), nil
 		}
 		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, wire.ReasonAgentWorking, isWorking); refused || err != nil {
 			return res, err

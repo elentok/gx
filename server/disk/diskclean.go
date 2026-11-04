@@ -1,4 +1,4 @@
-package server
+package disk
 
 import (
 	"context"
@@ -44,7 +44,7 @@ type cleanEnd struct {
 // cleanWork is the distinct (argv, repo) pairs of every project that watches
 // the disk and has a cleanup command, in a stable order. It reads the settings
 // and project files now, so a reload applies to the next clean.
-func (s *Server) cleanWork(projects []string) []cleanCmd {
+func (s *Disk) cleanWork(projects []string) []cleanCmd {
 	base := config.Config{DiskSpace: s.settings.Load().DiskSpace}
 	var work []cleanCmd
 	seen := map[string]bool{}
@@ -76,7 +76,7 @@ func (s *Server) cleanWork(projects []string) []cleanCmd {
 // startClean runs the disk's cleanup work in the background. The caller has
 // marked the clean spent and running. A disk with no work ends at once with a
 // notice that says so.
-func (s *Server) startClean(id, probe string, projects []string) {
+func (s *Disk) startClean(id, probe string, projects []string) {
 	work := s.cleanWork(projects)
 	if len(work) == 0 {
 		s.sweepTemp()
@@ -90,7 +90,7 @@ func (s *Server) startClean(id, probe string, projects []string) {
 
 // runCleanWork runs every command, each under its own time limit, and returns
 // the first failed command ("" when none failed).
-func (s *Server) runCleanWork(work []cleanCmd) (failed string) {
+func (s *Disk) runCleanWork(work []cleanCmd) (failed string) {
 	limit := s.cfg.CleanupTimeout
 	if limit <= 0 {
 		limit = defaultCleanTimeout
@@ -151,7 +151,7 @@ func RunCleanupCommand(ctx context.Context, argv []string, dir string) ([]byte, 
 
 // endClean ends every clean: it reads the disk again and lets observe set the
 // hold from that reading. It returns that reading and whether the disk is held.
-func (s *Server) endClean(id, probe string, end cleanEnd) (wire.DiskReading, bool) {
+func (s *Disk) endClean(id, probe string, end cleanEnd) (wire.DiskReading, bool) {
 	r, err := s.freeSpace(probe)
 	if err != nil {
 		s.log.Warn("read free space", "path", probe, "err", err)
@@ -164,7 +164,7 @@ func (s *Server) endClean(id, probe string, end cleanEnd) (wire.DiskReading, boo
 }
 
 // sendCleanNotice sends the one notice of a clean.
-func (s *Server) sendCleanNotice(disk, outcome string, free uint64, held bool) {
+func (s *Disk) sendCleanNotice(disk, outcome string, free uint64, held bool) {
 	state := "dispatch is not held"
 	if held {
 		state = "dispatch is held"

@@ -184,7 +184,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	if _, missing := s.projects.UnavailablePath(addr.Project); missing {
 		return false, nil
 	}
-	if _, held := s.freshHeldDisk(addr.Project); held {
+	if _, held := s.disks.FreshHeldDisk(addr.Project); held {
 		return false, nil
 	}
 	if _, missing := s.trunkMissing.get(addr.Project); missing {
