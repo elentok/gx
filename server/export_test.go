@@ -218,6 +218,15 @@ func (s *Server) GateReleased(address string) bool { return s.registry.gateRelea
 // StartupDone closes once the startup steps, the first rescan among them, ended.
 func (s *Server) StartupDone() <-chan struct{} { return s.startupDone }
 
+// SetShutdownRecorder makes Serve report each shutdown step to rec; nil clears it.
+func SetShutdownRecorder(rec func(step string)) {
+	if rec == nil {
+		shutdownRecorder.Store(nil)
+		return
+	}
+	shutdownRecorder.Store(&rec)
+}
+
 // DropRun forgets a run the way its finish does.
 func (s *Server) DropRun(address string) { s.registry.delete(address) }
 

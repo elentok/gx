@@ -946,43 +946,71 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 	// Stop claiming, let a merge in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.
+	recordShutdown("stop-fresh")
 	stopFresh()
+	recordShutdown("limits-events-stop")
 	s.limitsEvents.stop()
+	recordShutdown("budget-events-stop")
 	s.budgetEvents.stop()
+	recordShutdown("session-watches-close")
 	s.sessionWatches.close()
-	<-freshDone
-	<-herdrDone
-	<-claimDone
-	<-pruneDone
-	<-budgetDone
-	<-tokensDone
-	<-gatesDone
-	<-cpuDone
-	<-disksDone
-	<-migFailDone
-	<-healthDone
-	<-usageDone
-	<-sweepDone
+	for _, w := range []struct {
+		name string
+		done chan struct{}
+	}{
+		{"wait-fresh", freshDone},
+		{"wait-herdr", herdrDone},
+		{"wait-claim", claimDone},
+		{"wait-prune", pruneDone},
+		{"wait-budget", budgetDone},
+		{"wait-tokens", tokensDone},
+		{"wait-gates", gatesDone},
+		{"wait-cpu", cpuDone},
+		{"wait-disks", disksDone},
+		{"wait-migration-failures", migFailDone},
+		{"wait-health", healthDone},
+		{"wait-usage", usageDone},
+		{"wait-sweep", sweepDone},
+	} {
+		recordShutdown(w.name)
+		<-w.done
+	}
 	// A watcher reload still in flight can start a countdown, so stop it after.
+	recordShutdown("config-watch-wait")
 	s.configWatch.running.Wait()
+	recordShutdown("stop-hard-grace")
 	s.stopHardGrace()
 	timeout := s.cfg.MergeStopTimeout
 	if timeout <= 0 {
 		timeout = DefaultMergeStopTimeout
 	}
+	recordShutdown("merges-close-and-wait")
 	if !s.merges.closeAndWait(timeout) {
 		s.log.Warn("stopping with a merge still in flight", "timeout", timeout)
 	}
+	recordShutdown("stop-commits")
 	stopCommits()
+	recordShutdown("chat-close")
 	s.chat.Close()
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
 	s.log.Info("server stopped")
 	_ = s.logf.Close()
+	recordShutdown("lock-release")
 	s.lock.release()
 	if err != nil {
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+// shutdownRecorder is nil in production; a test sets it to observe the order
+// Serve stops its parts in.
+var shutdownRecorder atomic.Pointer[func(step string)]
+
+func recordShutdown(step string) {
+	if rec := shutdownRecorder.Load(); rec != nil {
+		(*rec)(step)
+	}
 }
 
 func (s Settings) storeCommitDebounce() time.Duration {
