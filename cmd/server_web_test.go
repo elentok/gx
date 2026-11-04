@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -95,7 +96,7 @@ func finishWebSetupWithSecret(t *testing.T, h *servertest.Harness) (*http.Cookie
 	if err := json.Unmarshal(post("/v1/web/auth/setup-start", `{"code":"`+info.SetupCode+`"}`), &start); err != nil || start.Secret == "" {
 		t.Fatalf("setup-start: %v, secret %q", err, start.Secret)
 	}
-	totp, err := server.TOTPCode(start.Secret, time.Now().Unix()/30)
+	totp, err := webauth.TOTPCode(start.Secret, time.Now().Unix()/30)
 	if err != nil {
 		t.Fatal(err)
 	}

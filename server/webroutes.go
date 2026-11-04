@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -21,33 +22,11 @@ type WebOnlyRoute struct {
 // key of webWrites; a test checks the two against routeTable.
 var webOnlyRoutes = []WebOnlyRoute{
 	{Pattern: "POST /v1/client-errors", Public: true},
-	{Pattern: "GET " + webAuthPathState, Public: true},
-	{Pattern: "POST " + webAuthPathSetupStart, Public: true},
-	{Pattern: "POST " + webAuthPathSetupPassword, Public: true},
-	{Pattern: "POST " + webAuthPathSetupFinish, Public: true},
-	{Pattern: "POST " + webAuthPathLogin, Public: true},
-	{Pattern: "POST " + webAuthPathAddAuth, Public: true},
-	{Pattern: "POST " + webAuthPathSignOut},
-	{Pattern: "POST " + webAuthPathLogins},
-	{Pattern: "POST " + webAuthPathLoginRename},
-	{Pattern: "POST " + webAuthPathLoginRevoke},
-	{Pattern: "POST " + webAuthPathPassword},
-	{Pattern: "POST " + webAuthPathResetBegin},
-	{Pattern: "POST " + webAuthPathResetFinish},
-}
-
-// webPublicGets names the GET routes in webOnlyRoutes and their handlers.
-var webPublicGets = map[string]func(*Server) http.HandlerFunc{
-	"GET " + webAuthPathState: func(s *Server) http.HandlerFunc { return s.webAuthStateRead },
 }
 
 // WebPublicGetPatterns names every web-only "GET /path" the web mux serves.
 func WebPublicGetPatterns() []string {
-	out := make([]string, 0, len(webPublicGets))
-	for p := range webPublicGets {
-		out = append(out, p)
-	}
-	return append(out, patternsOf(webPublicGetRoutes(subsystemRoutes(nil)))...)
+	return patternsOf(webPublicGetRoutes(subsystemRoutes(nil)))
 }
 
 // WebOnlyRoutes returns a copy of the web-only route list.
@@ -80,10 +59,7 @@ func (s *Server) isWebRead(r *http.Request) bool {
 	if r.Method != http.MethodHead {
 		return false
 	}
-	_, public := webPublicGets["GET "+r.URL.Path]
-	if !public {
-		_, public = findRoute(s.routes, "GET "+r.URL.Path, wire.WebPublic)
-	}
+	_, public := findRoute(s.routes, "GET "+r.URL.Path, wire.WebPublic)
 	return public || !strings.HasPrefix(r.URL.Path, "/v1/")
 }
 
@@ -155,7 +131,7 @@ type clientErrorResult struct {
 // it reads only the four body fields: never a cookie or other header.
 func (s *Server) clientErrorReport(w http.ResponseWriter, r *http.Request) {
 	refuse := func(reason string) { writeJSON(w, clientErrorResult{Refused: true, Reason: reason}) }
-	ip := remoteIP(r)
+	ip := webauth.RemoteIP(r)
 	if !s.clientErrs.allow(ip, clientErrorRateLimit, clientErrorWindow) {
 		refuse("rate-limited")
 		return

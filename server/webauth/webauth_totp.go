@@ -1,4 +1,4 @@
-package server
+package webauth
 
 import (
 	"crypto/hmac"

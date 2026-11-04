@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/migrations"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -196,7 +196,7 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 		}
 	}
 	for i, ago := range sc.extraLogins {
-		if _, err := server.SeedWebLogin(f.stateD, fmt.Sprintf("gxfixture browser %d", i+1), time.Now().Add(-ago)); err != nil {
+		if _, err := webauth.SeedWebLogin(f.stateD, fmt.Sprintf("gxfixture browser %d", i+1), time.Now().Add(-ago)); err != nil {
 			return fmt.Errorf("seed web login: %w", err)
 		}
 	}

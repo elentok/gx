@@ -1,4 +1,4 @@
-package server_test
+package webauth_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/webauth"
 )
 
 const loginTestPassword = servertest.LoginPassword
@@ -85,7 +86,7 @@ func doBody(t *testing.T, req *http.Request) (*http.Response, string) {
 
 func (l *loginWeb) totp(t *testing.T, secret string) string {
 	t.Helper()
-	code, err := server.TOTPCode(secret, l.now().Unix()/30)
+	code, err := webauth.TOTPCode(secret, l.now().Unix()/30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +163,7 @@ func TestWebLogin_SetupFinishSetsTheCookieAndOpensTheApp(t *testing.T) {
 		cookie.MaxAge != 90*24*60*60 {
 		t.Errorf("cookie %+v lacks an attribute of the spec", cookie)
 	}
-	auth, err := server.OpenWebAuth(l.h.StateDir, l.now)
+	auth, err := webauth.OpenWebAuth(l.h.StateDir, l.now)
 	if err != nil {
 		t.Fatal(err)
 	}

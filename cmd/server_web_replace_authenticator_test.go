@@ -16,8 +16,8 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/webauth"
 )
 
 // secretLeak matches a base32 secret of the stored length or an otpauth:// URI.
@@ -82,7 +82,7 @@ func TestWebResetAuthenticator_PrintsASetupCodeAndNoSecret(t *testing.T) {
 			t.Errorf("logins after reset = %+v, %v; want none", list, err)
 		}
 
-		oldCode, _ := server.TOTPCode(secret, time.Now().Unix()/30)
+		oldCode, _ := webauth.TOTPCode(secret, time.Now().Unix()/30)
 		_, body := postLogin(t, base, `{"password":"correct horse battery","totp_code":"`+oldCode+`"}`)
 		if !strings.Contains(body, wire.ReasonSetupCodeRequired) {
 			t.Errorf("login without the Setup code = %s, want %s", body, wire.ReasonSetupCodeRequired)

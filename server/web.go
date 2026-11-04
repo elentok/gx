@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"mime"
@@ -12,11 +14,14 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/webui"
@@ -42,7 +47,7 @@ func (s *Server) bindWeb() {
 		s.webDev = proxy
 		s.log.Warn("web UI is served from a dev frontend", "url", s.cfg.WebDevURL)
 	}
-	auth, err := OpenWebAuth(s.cfg.StateDir, s.webNow)
+	auth, err := webauth.OpenWebAuth(s.cfg.StateDir, s.webNow)
 	if err != nil {
 		s.webErr = "web auth: " + err.Error()
 		s.log.Error("web auth unavailable", "err", err)
@@ -74,9 +79,17 @@ func (s *Server) bindWeb() {
 	}
 	ln := webtls.NewSniffListener(webtls.NewSourceIPListener(rawLn, s.log, time.Now), &tls.Config{GetCertificate: certs.GetCertificate, MinVersion: tls.VersionTLS12})
 	s.web, s.webListenIP, s.webCerts = ln, listenIP, certs
-	s.webAuth, s.webLoginCookie = auth, loginCookieName(ln)
+	s.webAuth = webauth.NewGate(webauth.Config{
+		Store:    auth,
+		Cookie:   webauth.LoginCookieName(ln),
+		TOTPOn:   func() bool { return !s.settings.Load().WebTOTPOff },
+		RootCert: func() *x509.Certificate { return s.webCerts.Root() },
+		Log:      s.log,
+		Now:      s.webNow,
+		Host:     webAuthHost{s},
+	})
 	mux := s.webHandler()
-	protected := s.requireWebLogin(mux, s.denyWeb(mux))
+	protected := s.webAuth.RequireLogin(mux, s.webAuth.Deny(mux))
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
 	s.webHTTP = &http.Server{Handler: webtls.RequireHost(allowed, webtls.RedirectPlainHTTP(s.servePublicFirst(mux, protected)))}
 }
@@ -118,10 +131,6 @@ func (s *Server) webHandler() http.Handler {
 				return
 			}
 			http.NotFound(w, r)
-			return
-		}
-		if handler, ok := webPublicGets["GET "+r.URL.Path]; ok {
-			handler(s)(w, r)
 			return
 		}
 		if route, ok := findRoute(s.routes, "GET "+r.URL.Path, wire.WebPublic, wire.WebRead); ok {
@@ -203,19 +212,28 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
 	"POST /v1/restart":           func(s *Server) http.HandlerFunc { return s.restartWrite },
 	"POST /v1/client-errors":     func(s *Server) http.HandlerFunc { return s.clientErrorReport },
+}
 
-	"POST " + webAuthPathSetupStart:    func(s *Server) http.HandlerFunc { return s.webSetupStart },
-	"POST " + webAuthPathSetupPassword: func(s *Server) http.HandlerFunc { return s.webSetupPassword },
-	"POST " + webAuthPathSetupFinish:   func(s *Server) http.HandlerFunc { return s.webSetupFinish },
-	"POST " + webAuthPathLogin:         func(s *Server) http.HandlerFunc { return s.webLoginWrite },
-	"POST " + webAuthPathAddAuth:       func(s *Server) http.HandlerFunc { return s.webAddAuthenticator },
-	"POST " + webAuthPathSignOut:       func(s *Server) http.HandlerFunc { return s.webSignOut },
-	"POST " + webAuthPathLogins:        func(s *Server) http.HandlerFunc { return s.webLoginsList },
-	"POST " + webAuthPathLoginRename:   func(s *Server) http.HandlerFunc { return s.webLoginRename },
-	"POST " + webAuthPathLoginRevoke:   func(s *Server) http.HandlerFunc { return s.webLoginRevoke },
-	"POST " + webAuthPathPassword:      func(s *Server) http.HandlerFunc { return s.webChangePassword },
-	"POST " + webAuthPathResetBegin:    func(s *Server) http.HandlerFunc { return s.webAuthenticatorBegin },
-	"POST " + webAuthPathResetFinish:   func(s *Server) http.HandlerFunc { return s.webAuthenticatorFinish },
+func (s *Server) webNow() time.Time {
+	if s.cfg.Clock != nil {
+		return s.cfg.Clock()
+	}
+	return time.Now()
+}
+
+// webAuthHost lets the web login gate ask the server what it cannot know.
+type webAuthHost struct{ s *Server }
+
+func (h webAuthHost) IsWebRead(r *http.Request) bool { return h.s.isWebRead(r) }
+func (h webAuthHost) CloseLogins(ids ...string)      { h.s.webStreams.closeLogins(ids...) }
+
+// removeLegacyWebToken deletes the shared token file an older version left in the state dir.
+func removeLegacyWebToken(stateDir string) error {
+	err := os.Remove(filepath.Join(stateDir, "web-token"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
 }
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the

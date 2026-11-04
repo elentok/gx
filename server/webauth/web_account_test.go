@@ -1,4 +1,4 @@
-package server_test
+package webauth_test
 
 import (
 	"encoding/json"
@@ -138,7 +138,7 @@ func TestWebAccount_RevokeAndSignOutForgetTheCookieRenewal(t *testing.T) {
 	a := startAccountWeb(t)
 	a.logins(t, a.first)
 	a.logins(t, a.second)
-	if got := a.h.Server.WebRenewedCount(); got != 2 {
+	if got := a.h.Server.WebAuth().RenewedCount(); got != 2 {
 		t.Fatalf("renewal entries before = %d, want 2", got)
 	}
 	var second accountLogin
@@ -148,11 +148,11 @@ func TestWebAccount_RevokeAndSignOutForgetTheCookieRenewal(t *testing.T) {
 		}
 	}
 	a.post(t, "/v1/web/logins/revoke", `{"id":"`+second.ID+`"}`, a.first)
-	if got := a.h.Server.WebRenewedCount(); got != 1 {
+	if got := a.h.Server.WebAuth().RenewedCount(); got != 1 {
 		t.Errorf("renewal entries after revoke = %d, want 1", got)
 	}
 	a.post(t, "/v1/web/auth/sign-out", `{}`, a.first)
-	if got := a.h.Server.WebRenewedCount(); got != 0 {
+	if got := a.h.Server.WebAuth().RenewedCount(); got != 0 {
 		t.Errorf("renewal entries after sign-out = %d, want 0", got)
 	}
 }

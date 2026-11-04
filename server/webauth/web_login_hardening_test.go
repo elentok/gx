@@ -1,4 +1,4 @@
-package server_test
+package webauth_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
@@ -192,7 +193,7 @@ func TestWebLoginLimits_TwoLoginsFromOneIPMakeTwoWebLogins(t *testing.T) {
 	l := startLoginWeb(t)
 	_, secret := l.signIn(t)
 	l.goodLogin(t, secret)
-	auth, err := server.OpenWebAuth(l.h.StateDir, l.now)
+	auth, err := webauth.OpenWebAuth(l.h.StateDir, l.now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +212,7 @@ func TestWebLoginLog_EachEventWritesOneLineWithIPAndName(t *testing.T) {
 	l.post(t, "/v1/web/auth/sign-out", `{}`, cookie)
 
 	log := readGxLog(t, l)
-	auth, err := server.OpenWebAuth(l.h.StateDir, l.now)
+	auth, err := webauth.OpenWebAuth(l.h.StateDir, l.now)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/webauth"
 )
 
 // smokeScenarios are the scenarios no other test starts, plus "ready" as the
@@ -116,7 +116,7 @@ func TestWebLoginScenario_LogsInWithItsPasswordAndSecret(t *testing.T) {
 		}
 		body := map[string]string{"password": r.Password}
 		if !totpOff {
-			code, err := server.TOTPCode(r.TOTPSecret, r.TOTPStep+1)
+			code, err := webauth.TOTPCode(r.TOTPSecret, r.TOTPStep+1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -159,7 +159,7 @@ func TestWebLoginsScenario_HasFourLoginsOneIdleSeventyDays(t *testing.T) {
 	if code := r.get(t, r.WebURL+"/v1/snapshot", true); code != http.StatusOK {
 		t.Errorf("GET /v1/snapshot with the cookie = %d, want 200", code)
 	}
-	auth, err := server.OpenWebAuth(r.StateDir, time.Now)
+	auth, err := webauth.OpenWebAuth(r.StateDir, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

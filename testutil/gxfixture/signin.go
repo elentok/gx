@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/webauth"
 )
 
 // fixturePassword is the password every fixture's web login is set up with.
@@ -102,11 +102,11 @@ func webSetup(stateDir, webURL, setupCode string) (signIn, error) {
 		// steps for the flows to use without waiting. Near the end of a step the server's clock
 		// could already be on the next one, which no longer accepts the previous.
 		now := time.Now()
-		in.totpSecret, in.totpStep = started.Secret, server.TOTPStepAt(now)
+		in.totpSecret, in.totpStep = started.Secret, webauth.TOTPStepAt(now)
 		if now.Unix()%30 < 25 {
 			in.totpStep--
 		}
-		if finish["totp_code"], err = server.TOTPCode(in.totpSecret, in.totpStep); err != nil {
+		if finish["totp_code"], err = webauth.TOTPCode(in.totpSecret, in.totpStep); err != nil {
 			return signIn{}, err
 		}
 	}

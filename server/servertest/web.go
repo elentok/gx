@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/webauth"
 )
 
 // LoginPassword is the password SignIn sets on the account.
@@ -83,7 +84,7 @@ func SignIn(t *testing.T, h *Harness, base string, now func() time.Time) (*http.
 	if err := json.Unmarshal([]byte(body), &start); err != nil || start.Secret == "" {
 		t.Fatalf("setup-start body %q: %v", body, err)
 	}
-	code, err := server.TOTPCode(start.Secret, now().Unix()/30)
+	code, err := webauth.TOTPCode(start.Secret, now().Unix()/30)
 	if err != nil {
 		t.Fatal(err)
 	}

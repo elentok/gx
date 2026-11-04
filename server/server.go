@@ -37,6 +37,7 @@ import (
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/skills"
@@ -130,17 +131,15 @@ type Server struct {
 	webCerts    *webtls.Certs // nil unless the web listener is bound
 	clientErrs  ipLimiter
 	// webAuth is the web login store; nil unless the web listener is bound.
-	webAuth        *WebAuth
-	webLoginCookie string
-	webStreams     webStreams
-	webRenewed     sync.Map // map web login id -> time its cookie was last renewed
-	logf           *rotatingFile
-	log            *slog.Logger
-	idx            *index.Index
-	harness        *harnesschoice.Harness
-	projects       *projects.Registry
-	migrator       *projects.Migrator
-	checks         *projects.Checks
+	webAuth    *webauth.Gate
+	webStreams webStreams
+	logf       *rotatingFile
+	log        *slog.Logger
+	idx        *index.Index
+	harness    *harnesschoice.Harness
+	projects   *projects.Registry
+	migrator   *projects.Migrator
+	checks     *projects.Checks
 
 	queue        *queue.Queue
 	afk          *queue.AFK
@@ -618,7 +617,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cancel()
 	ctx := r.Context()
-	if id := webLoginIDFrom(ctx); id != "" {
+	if id := webauth.LoginIDFrom(ctx); id != "" {
 		var untrack func()
 		ctx, untrack = s.webStreams.track(ctx, id)
 		defer untrack()

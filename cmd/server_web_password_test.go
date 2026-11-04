@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -28,7 +29,7 @@ const newWebPassword = "a brand new passphrase"
 // webLoginReason posts a login and returns the refusal reason ("" when it is not refused).
 func webLoginReason(t *testing.T, baseURL, password, secret string) string {
 	t.Helper()
-	code, err := server.TOTPCode(secret, time.Now().Unix()/30+1)
+	code, err := webauth.TOTPCode(secret, time.Now().Unix()/30+1)
 	if err != nil {
 		t.Fatal(err)
 	}

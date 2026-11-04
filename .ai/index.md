@@ -126,6 +126,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
+  `server/webauth/` holds web login: the login store (password, TOTP, devices, setup code, rate
+  limits), the cookie gate (`Gate`) and the login routes (imports `webtls` and `wire`; the root
+  implements `Host`; `cmd` and `testutil/gxfixture` import it too);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

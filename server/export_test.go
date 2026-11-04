@@ -29,13 +29,6 @@ var (
 // the placeholder embed does not have.
 func ServeAsset(assets fs.FS) http.Handler { return serveAsset(assets) }
 
-// WebRenewedCount counts the web logins the cookie renewal table remembers.
-func (s *Server) WebRenewedCount() int {
-	n := 0
-	s.webRenewed.Range(func(_, _ any) bool { n++; return true })
-	return n
-}
-
 // LiveDesignSessionID is the ID of epicAddr's newest live design session
 // leaving out excludeID, or "".
 func (s *Server) LiveDesignSessionID(epicAddr, excludeID string) string {

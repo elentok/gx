@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 )
@@ -43,8 +44,8 @@ func (s *Server) webReset(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, wire.WebInfo{Refused: true, Reason: wire.ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
 		return
 	}
-	s.dropWebLogins(removed...)
-	s.logWebAuth("web reset", "cli", "", "")
+	s.webAuth.DropLogins(removed...)
+	s.webAuth.LogEvent("web reset", "cli", "", "")
 	writeJSON(w, s.webInfoNow())
 }
 
@@ -62,8 +63,8 @@ func (s *Server) webResetAuthenticator(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, wire.WebInfo{Refused: true, Reason: wire.ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
 		return
 	}
-	s.dropWebLogins(removed...)
-	s.logWebAuth("web authenticator reset", "cli", "", "")
+	s.webAuth.DropLogins(removed...)
+	s.webAuth.LogEvent("web authenticator reset", "cli", "", "")
 	info := s.webInfoNow()
 	s.addResetCode(&info)
 	writeJSON(w, info)
@@ -108,9 +109,9 @@ func (s *Server) webLoginRevokeCLI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad JSON", http.StatusBadRequest)
 		return
 	}
-	switch err := s.revokeWebLogin(body.ID, "cli"); {
-	case errors.Is(err, ErrWebLoginNotFound):
-		s.logWebAuth("web login revoke refused", "cli", "", wire.ReasonLoginNotFound)
+	switch err := s.webAuth.Revoke(body.ID, "cli"); {
+	case errors.Is(err, webauth.ErrWebLoginNotFound):
+		s.webAuth.LogEvent("web login revoke refused", "cli", "", wire.ReasonLoginNotFound)
 		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonLoginNotFound, Message: "no web login has that id"})
 	case err != nil:
 		s.log.Error("web revoke failed", "err", err)
@@ -136,15 +137,15 @@ func (s *Server) webSetPasswordCLI(w http.ResponseWriter, r *http.Request) {
 	}
 	removed, err := s.webAuth.SetPassword(body.Password)
 	switch {
-	case errors.Is(err, ErrPasswordTooShort):
-		s.logWebAuth("web password change refused", "cli", "", wire.ReasonPasswordTooShort)
+	case errors.Is(err, webauth.ErrPasswordTooShort):
+		s.webAuth.LogEvent("web password change refused", "cli", "", wire.ReasonPasswordTooShort)
 		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
 	case err != nil:
 		s.log.Error("web password change failed", "err", err)
 		writeJSON(w, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
 	default:
-		s.logWebAuth("web password changed", "cli", "", "")
-		s.dropWebLogins(removed...)
+		s.webAuth.LogEvent("web password changed", "cli", "", "")
+		s.webAuth.DropLogins(removed...)
 		writeJSON(w, wire.WebLoginsResult{})
 	}
 }
@@ -168,7 +169,7 @@ func (s *Server) webInfoNow() wire.WebInfo {
 		s.log.Error("web setup state unavailable", "err", err)
 	}
 	info.SetupPending, info.SetupCode, info.SetupExpires = pending, code, expires
-	if !pending && s.webTOTPOn() {
+	if !pending && s.webAuth.TOTPOn() {
 		s.addResetCode(&info)
 	}
 	for _, ip := range skipped.IPs {

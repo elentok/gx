@@ -1,4 +1,4 @@
-package server_test
+package webauth_test
 
 import (
 	"context"
@@ -49,7 +49,11 @@ func (w *totpWeb) setTOTP(t *testing.T, on bool) {
 func (w *totpWeb) reloadTOTP(t *testing.T, on bool) {
 	t.Helper()
 	w.setTOTP(t, on)
-	if res := reload(t, w.h); res.Refused {
+	res, err := w.h.Client.ReloadConfig(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Refused {
 		t.Fatalf("reload = %+v", res)
 	}
 }
