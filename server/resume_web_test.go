@@ -250,7 +250,7 @@ func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{BlockedBy: []string{"01", "02"}})
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	if _, err := h.Server.ClaimTicket("proj:epic-a/03", "claude"); err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestDetail_AmbiguousBaseListsTheCompetingBlockers(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{BlockedBy: []string{"01", "02"}})
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	if _, err := h.Server.ClaimTicket("proj:epic-a/03", "claude"); err != nil {
 		t.Fatal(err)
 	}

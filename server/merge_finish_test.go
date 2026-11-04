@@ -52,9 +52,9 @@ func assertFixturePaused(t *testing.T, f *schedFixture, tk schema.Ticket, status
 	t.Helper()
 	assertPaused(t, tk, legacyClass(status), schema.ParsePauseReason(string(kind)))
 	if t.Failed() {
-		t.Fatalf("ticket:\n%s", readFile(t, f.ticketFile(t, "01")))
+		t.Fatalf("ticket:\n%s", servertest.ReadFile(t, f.ticketFile(t, "01")))
 	}
-	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, reason) {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, reason) {
 		t.Errorf("ticket lacks reason %q:\n%s", reason, body)
 	}
 }

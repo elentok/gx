@@ -131,7 +131,7 @@ func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTim
 
 	// A top-level trunk-conflict ticket in the root epic names the ref and files.
 	ticket := f.ticketFile(t, "02")
-	md := readFile(t, ticket)
+	md := servertest.ReadFile(t, ticket)
 	// Not "status: open": the queue may have claimed the ticket by the time it is read.
 	for _, want := range []string{"type: trunk-conflict", refs[0], "same.txt", "late.txt"} {
 		if !strings.Contains(md, want) {

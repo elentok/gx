@@ -32,7 +32,7 @@ func TestTrunkMissingAtMerging_TicketMergesOnItsRootAndTheRootPauses(t *testing.
 	f, develop, chatCount := trunkDeletedMidRun(t, true)
 	f.runEpic(t, wire.EventRootPaused)
 
-	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket did not merge on its root's branch:\n%s", body)
 	}
 	if got := f.git(t, "show", schedEpic+":01.txt"); got != "01" {
@@ -54,7 +54,7 @@ func TestTrunkMissingAtMerging_AutoMergeOffIsNotPaused(t *testing.T) {
 	f, _, _ := trunkDeletedMidRun(t, false)
 	f.runEpic(t, wire.EventRootCompleted)
 
-	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket not done:\n%s", body)
 	}
 	if slices.Contains(f.h.Server.LockedTrunks(), "") {

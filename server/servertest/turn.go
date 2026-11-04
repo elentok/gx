@@ -291,6 +291,30 @@ func (h *Harness) OnTurn(agent func(t *Turn)) {
 	})
 }
 
+// RegisterTurn makes the harness's agents take no-op turns and returns what the
+// server launched: the starts, the prompt texts and the cwd of the latest start.
+func RegisterTurn(h *Harness) (starts func() []AgentStart, prompts func() []string, cwd func() string) {
+	var mu sync.Mutex
+	var texts []string
+	h.OnTurn(func(turn *Turn) {
+		mu.Lock()
+		defer mu.Unlock()
+		texts = append(texts, turn.Text)
+	})
+	prompts = func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(texts)
+	}
+	cwd = func() string {
+		if all := h.Starts(); len(all) > 0 {
+			return all[len(all)-1].Cwd
+		}
+		return ""
+	}
+	return h.Starts, prompts, cwd
+}
+
 // AgentNotFound is the error a fake `herdr agent get` returns for an unknown target.
 func AgentNotFound(target string) error {
 	return errors.New(`{"error":{"code":"agent_not_found","message":"agent target ` + target + ` not found"}}`)

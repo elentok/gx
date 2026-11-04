@@ -48,7 +48,7 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 		c.PollInterval = 50 * time.Millisecond
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

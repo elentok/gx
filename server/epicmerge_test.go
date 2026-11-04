@@ -32,7 +32,7 @@ func ticketFiles(t *testing.T, store string) map[string]string {
 	}
 	files := map[string]string{}
 	for _, p := range paths {
-		files[p] = readFile(t, p)
+		files[p] = servertest.ReadFile(t, p)
 	}
 	return files
 }
@@ -441,7 +441,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeForksANormalTicket(t *testing.T) {
 	if err != nil || res.Refused || res.Merged || res.Paused || res.MergeTicket != "proj:"+schedEpic+"/02" {
 		t.Fatalf("merge = %+v, %v, want merge ticket 02", res, err)
 	}
-	if body := readFile(t, f.ticketFile(t, "02")); strings.Contains(body, "manual:") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "02")); strings.Contains(body, "manual:") {
 		t.Errorf("race-forked ticket is manual:\n%s", body)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
@@ -472,7 +472,7 @@ func (f *schedFixture) assertManualTicket(t *testing.T, res wire.QueueResult, wa
 	if res.Refused || res.Merged || res.MergeTicket != "proj:"+schedEpic+"/"+wantID {
 		t.Fatalf("merge = %+v, want merge ticket %s", res, wantID)
 	}
-	if body := readFile(t, f.ticketFile(t, wantID)); !strings.Contains(body, "manual: true") || !strings.Contains(body, "type: merge") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, wantID)); !strings.Contains(body, "manual: true") || !strings.Contains(body, "type: merge") {
 		t.Errorf("ticket %s is not a manual merge ticket:\n%s", wantID, body)
 	}
 }
@@ -553,7 +553,7 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 	if got := f.merges.Load(); got != 2 {
 		t.Errorf("merge turns = %d, want 2", got)
 	}
-	if body := readFile(t, f.ticketFile(t, "03")); strings.Contains(body, "manual:") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "03")); strings.Contains(body, "manual:") {
 		t.Errorf("retry ticket is manual:\n%s", body)
 	}
 	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {

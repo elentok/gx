@@ -57,7 +57,7 @@ func startRecoveryWith(t *testing.T, optOut bool, authority recovery.Authority) 
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = cat
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	return h, results
 }
 
@@ -126,7 +126,7 @@ func TestRecovery_SpinningPauseIsRecordedByR1WithoutANudge(t *testing.T) {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = recovery.Default()
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 
 	if err := h.Server.PauseAs("proj:epic-a/01", events.Spinning, "paused and re-claimed 3 times within 5m0s"); err != nil {
 		t.Fatal(err)
@@ -601,7 +601,7 @@ func TestRecovery_ZeroCommitPauseWithR2DisabledInvestigatesWithoutR2Events(t *te
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = recovery.Default()
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 
 	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
 		t.Fatal(err)
@@ -636,7 +636,7 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 			c.Recovery.Entries[i].Enabled = true
 		}
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 
 	if err := h.Server.PauseAs("proj:epic-a/01", events.AmbiguousMerge, "done but commits missing from epic-a"); err != nil {
 		t.Fatal(err)
@@ -673,7 +673,7 @@ func startR3(t *testing.T, opts ...func(*server.Config)) *servertest.Harness {
 			c.Recovery.Entries[i].Enabled = true
 		}
 	}}, opts...)...)
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	return h
 }
 
@@ -802,7 +802,7 @@ func TestRecovery_EnabledR4MatchForksAnInvestigateTicketNamingR4(t *testing.T) {
 			c.Recovery.Entries[i].Enabled = true
 		}
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 
 	if err := h.Server.PauseAs("proj:epic-a/01", events.BlockedPane, "epic-a-01 is blocked on a prompt gx did not send; answer it in the pane"); err != nil {
 		t.Fatal(err)
@@ -851,7 +851,7 @@ func pauseLaunchCollision(t *testing.T, kind events.Kind, earlier ...events.Type
 			c.Recovery.Entries[i].Enabled = true
 		}
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	if err := h.Server.PauseAs("proj:epic-a/01", kind, "launch failed: "+string(kind)); err != nil {
 		t.Fatal(err)
 	}
@@ -944,7 +944,7 @@ func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.
 			c.Recovery.Entries[i].Enabled = true
 		}
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
 		t.Fatal(err)
 	}

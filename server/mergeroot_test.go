@@ -154,7 +154,7 @@ func TestMergeRoot_StampsMergedAtAndCompletedAtWhenTheEpicMerges(t *testing.T) {
 func (f *schedFixture) finishCommitless(t *testing.T, id string) {
 	t.Helper()
 	path := f.ticketFile(t, id)
-	body := strings.Replace(readFile(t, path), "---\n", "---\ncommitless: true\niteration_status: finished\n", 1)
+	body := strings.Replace(servertest.ReadFile(t, path), "---\n", "---\ncommitless: true\niteration_status: finished\n", 1)
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), body)
 }
 

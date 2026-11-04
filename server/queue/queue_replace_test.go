@@ -1,4 +1,4 @@
-package server_test
+package queue_test
 
 import (
 	"context"
@@ -34,7 +34,7 @@ func startReplaceHarness(t *testing.T) *servertest.Harness {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	return h
 }
 

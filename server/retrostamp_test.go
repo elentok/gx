@@ -13,6 +13,16 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// readFile stays here: this internal test cannot import servertest (it imports server).
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 // retroFixture writes an epic with an extra frontmatter key and an evolve
 // one-off targeting it.
 func retroFixture(t *testing.T, epicFM string) (store string, addr tickets.Address, ticketPath, epicTicket string) {
@@ -52,15 +62,6 @@ func retroServer(store string) *Server {
 	s := withProjects(&Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	s.settings.Store(&Settings{})
 	return s
-}
-
-func readFile(t *testing.T, path string) string {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
 }
 
 func TestStampRetro_DoneStampsEvolvedAtAndTicketKeepingOtherKeys(t *testing.T) {

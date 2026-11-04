@@ -1,4 +1,4 @@
-package server_test
+package queue_test
 
 import (
 	"context"
@@ -46,14 +46,14 @@ func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-t01.md"), false)
 	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "02-t02.md"), false)
 
-	done := readFile(t, filepath.Join(archived, "01-t01.md"))
+	done := servertest.ReadFile(t, filepath.Join(archived, "01-t01.md"))
 	if !strings.Contains(done, "completed_at:") {
 		t.Errorf("done one-off has no completed_at:\n%s", done)
 	}
 	if !strings.Contains(done, "- original: proj:one-offs/01") {
 		t.Errorf("done one-off does not name its original address:\n%s", done)
 	}
-	cancelled := readFile(t, filepath.Join(archived, "02-t02.md"))
+	cancelled := servertest.ReadFile(t, filepath.Join(archived, "02-t02.md"))
 	if strings.Contains(cancelled, "completed_at:") {
 		t.Errorf("cancelled one-off has a completed_at:\n%s", cancelled)
 	}
@@ -65,7 +65,7 @@ func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 			t.Errorf("%s left one-offs: %v", name, err)
 		}
 	}
-	if blocker := readFile(t, filepath.Join(proj, "feature", "issues", "01-after.md")); !strings.Contains(blocker, "one-offs-archived/01") {
+	if blocker := servertest.ReadFile(t, filepath.Join(proj, "feature", "issues", "01-after.md")); !strings.Contains(blocker, "one-offs-archived/01") {
 		t.Errorf("blocked_by was not rewritten to the archive:\n%s", blocker)
 	}
 }
@@ -77,7 +77,7 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
 	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsArchivedEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
 	archivedCopy := filepath.Join(proj, queue.OneOffsArchivedEpic, "issues", "01-a.md")
-	if err := os.WriteFile(archivedCopy, []byte(readFile(t, archivedCopy)+"\n## Resolution\n\n- original: proj:one-offs/01\n"), 0o644); err != nil {
+	if err := os.WriteFile(archivedCopy, []byte(servertest.ReadFile(t, archivedCopy)+"\n## Resolution\n\n- original: proj:one-offs/01\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{BlockedBy: []string{"one-offs/01"}})
@@ -88,7 +88,7 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("archive holds %d files (err %v), want 1", len(entries), err)
 	}
-	if blocker := readFile(t, filepath.Join(proj, "feature", "issues", "01-after.md")); !strings.Contains(blocker, "one-offs-archived/01") {
+	if blocker := servertest.ReadFile(t, filepath.Join(proj, "feature", "issues", "01-after.md")); !strings.Contains(blocker, "one-offs-archived/01") {
 		t.Errorf("blocked_by of the half-moved ticket still dangles:\n%s", blocker)
 	}
 }
@@ -244,7 +244,7 @@ func TestSweep_CancelArchivesTheOneOff(t *testing.T) {
 		return false
 	})
 	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-a.md"), false)
-	got := readFile(t, filepath.Join(proj, queue.OneOffsArchivedEpic, "issues", "01-a.md"))
+	got := servertest.ReadFile(t, filepath.Join(proj, queue.OneOffsArchivedEpic, "issues", "01-a.md"))
 	if !strings.Contains(got, "status: cancelled") || strings.Contains(got, "completed_at:") {
 		t.Errorf("archived cancel:\n%s", got)
 	}

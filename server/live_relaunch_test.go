@@ -117,7 +117,7 @@ func TestRetry_RepairPauseKeepsTheBranchHead(t *testing.T) {
 	head := git("rev-parse", branch)
 
 	h := servertest.StartWithStore(t, store, func(*server.Config) {})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}

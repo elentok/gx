@@ -49,7 +49,7 @@ func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing
 		t.Fatal("the trunk-conflict ticket was never claimed")
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
-	if body := readFile(t, f.ticketFile(t, "02")); !strings.Contains(body, "status: done") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "02")); !strings.Contains(body, "status: done") {
 		t.Errorf("trunk-conflict ticket not done:\n%s", body)
 	}
 }
@@ -103,7 +103,7 @@ func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *test
 
 	// A person finishes the ticket by hand.
 	path := f.ticketFile(t, "02")
-	body := strings.Replace(readFile(t, path), "status: paused\n", "status: done\n", 1)
+	body := strings.Replace(servertest.ReadFile(t, path), "status: paused\n", "status: done\n", 1)
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

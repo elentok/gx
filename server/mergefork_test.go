@@ -148,7 +148,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 	if len(files) != 1 {
 		t.Fatalf("merge tickets = %v, want one", files)
 	}
-	body := readFile(t, files[0])
+	body := servertest.ReadFile(t, files[0])
 	if strings.Contains(body, "parent:") || !strings.Contains(body, "type: merge") || !strings.Contains(body, "status: done") {
 		t.Errorf("merge ticket is not a done top-level merge ticket:\n%s", body)
 	}
@@ -192,7 +192,7 @@ func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 		t.Fatalf("merge tickets = %v, want three", files)
 	}
 	for _, path := range files {
-		if body := readFile(t, path); !strings.Contains(body, "status: done") {
+		if body := servertest.ReadFile(t, path); !strings.Contains(body, "status: done") {
 			t.Errorf("merge ticket not done:\n%s", body)
 		}
 	}
@@ -217,7 +217,7 @@ func TestMergeFork_DirtyTrunkAfterAMergeTicketPausesWithoutAnother(t *testing.T)
 	if len(files) != 1 {
 		t.Fatalf("merge tickets = %v, want one", files)
 	}
-	if body := readFile(t, files[0]); !strings.Contains(body, "status: done") {
+	if body := servertest.ReadFile(t, files[0]); !strings.Contains(body, "status: done") {
 		t.Errorf("merge ticket not done:\n%s", body)
 	}
 	if got := f.merges.Load(); got != 1 {

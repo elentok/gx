@@ -35,7 +35,7 @@ func runFailingInstall(t *testing.T, typ string) (f *schedFixture, starts func()
 
 func assertPausedOnInstallFailure(t *testing.T, f *schedFixture, starts func() []servertest.AgentStart) {
 	t.Helper()
-	body := readFile(t, f.ticketFile(t, "01"))
+	body := servertest.ReadFile(t, f.ticketFile(t, "01"))
 	if !strings.Contains(body, "status: paused") {
 		t.Errorf("ticket not paused:\n%s", body)
 	}

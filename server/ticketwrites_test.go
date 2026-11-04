@@ -349,7 +349,7 @@ func TestUnmute_RefusesUnknownTicket(t *testing.T) {
 func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 	t.Parallel()
 	h, path := startTicketWrites(t)
-	start, prompt, _ := registerTurn(h)
+	start, prompt, _ := servertest.RegisterTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

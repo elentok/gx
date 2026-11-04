@@ -45,11 +45,11 @@ func TestMigrationBlock_FailedProjectIsNotClaimedAndOthersAre(t *testing.T) {
 		}
 	}
 	if !servertest.Poll(10*time.Second, func() bool {
-		return strings.Contains(readFile(t, otherFile(t, f.store)), "status: done")
+		return strings.Contains(servertest.ReadFile(t, otherFile(t, f.store)), "status: done")
 	}) {
 		t.Fatal("the other project's ticket was not claimed")
 	}
-	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: open") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: open") {
 		t.Fatalf("blocked project's ticket was claimed:\n%s", body)
 	}
 
@@ -76,7 +76,7 @@ func TestMigrationBlock_FailedProjectIsNotClaimedAndOthersAre(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !servertest.Poll(10*time.Second, func() bool {
-		return !strings.Contains(readFile(t, f.ticketFile(t, "01")), "status: open")
+		return !strings.Contains(servertest.ReadFile(t, f.ticketFile(t, "01")), "status: open")
 	}) {
 		t.Fatal("the ticket was not claimed after the failure cleared")
 	}

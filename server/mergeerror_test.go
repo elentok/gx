@@ -200,7 +200,7 @@ func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *te
 		}
 	}
 	for _, n := range files {
-		if got := readFile(t, filepath.Join(f.repo, n)); got != "local "+n {
+		if got := servertest.ReadFile(t, filepath.Join(f.repo, n)); got != "local "+n {
 			t.Errorf("%s = %q, want the local content untouched", n, got)
 		}
 	}
@@ -246,7 +246,7 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	}
 	// Reopen the ticket, so its second finish runs the merge step again.
 	path := f.ticketFile(t, "01")
-	reopened := strings.Replace(readFile(t, path), "status: done", "status: open", 1)
+	reopened := strings.Replace(servertest.ReadFile(t, path), "status: done", "status: open", 1)
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), reopened)
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")

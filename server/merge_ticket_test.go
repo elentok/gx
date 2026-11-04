@@ -70,7 +70,7 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 // reportIteration is the agent writing iteration_status onto its claimed ticket.
 func reportIteration(t *testing.T, path, status string) {
 	t.Helper()
-	body := strings.Replace(readFile(t, path), "status: claimed\n", "status: claimed\niteration_status: "+status+"\n", 1)
+	body := strings.Replace(servertest.ReadFile(t, path), "status: claimed\n", "status: claimed\niteration_status: "+status+"\n", 1)
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Error(err)
 	}
@@ -120,7 +120,7 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 	if got[0].iterationBranch != "" {
 		t.Errorf("iteration branch created for a merge ticket: %s", got[0].iterationBranch)
 	}
-	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket not done:\n%s", body)
 	}
 	f.assertFeatureKept(t, "finish")

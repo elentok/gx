@@ -197,7 +197,7 @@ func startRetryEnv(t *testing.T, typ string, earlierClaude bool, extra ...func(*
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "probe", servertest.TicketOpts{Type: "investigate", Parent: "01"})
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithDefaultHarness("codex")}, extra...)...)
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	if earlierClaude {
 		servertest.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", true)
 	}

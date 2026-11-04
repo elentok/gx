@@ -41,7 +41,7 @@ func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 
 	f.runEpic(t, wire.EventRootCompleted)
 
-	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: develop@"+develop) {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: develop@"+develop) {
 		t.Errorf("ticket lacks resolved_base develop@%s:\n%s", develop, body)
 	}
 	if got := f.rev(t, "develop"); got != f.rev(t, schedEpic) {
@@ -60,7 +60,7 @@ func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 
 	f.runEpic(t, wire.EventRootCompleted)
 
-	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: release-1.2@"+release) {
+	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: release-1.2@"+release) {
 		t.Errorf("ticket lacks resolved_base release-1.2@%s:\n%s", release, body)
 	}
 	if got := f.rev(t, "develop"); got != f.rev(t, schedEpic) {

@@ -68,7 +68,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	if len(matches) != 1 {
 		t.Fatalf("ticket files = %v", matches)
 	}
-	body := readFile(t, matches[0])
+	body := servertest.ReadFile(t, matches[0])
 	if !strings.Contains(body, "status: paused") {
 		t.Errorf("ticket after launch failure:\n%s\nwant status: paused", body)
 	}

@@ -159,7 +159,7 @@ func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harnes
 		runGitIn(t, wt, "reset", "-q", "--hard", "HEAD~1")
 	}
 	pause := "status: paused\npause_reason: " + kind
-	testutil.WriteFile(t, filepath.Dir(ticketPath), filepath.Base(ticketPath), strings.Replace(readFile(t, ticketPath), "status: claimed", pause, 1))
+	testutil.WriteFile(t, filepath.Dir(ticketPath), filepath.Base(ticketPath), strings.Replace(servertest.ReadFile(t, ticketPath), "status: claimed", pause, 1))
 	return h, ticketPath
 }
 

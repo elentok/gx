@@ -67,7 +67,7 @@ func startHoldRig(t *testing.T, repos map[string]string, clean config.ByteSize, 
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	}}, opts...)
 	rig.h = servertest.StartWithStore(t, store, all...)
-	rig.start, _, _ = registerTurn(rig.h)
+	rig.start, _, _ = servertest.RegisterTurn(rig.h)
 	return rig
 }
 

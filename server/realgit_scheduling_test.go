@@ -121,7 +121,7 @@ func (f *schedFixture) git(t *testing.T, args ...string) string {
 func (f *schedFixture) assertMerged(t *testing.T, ids ...string) {
 	t.Helper()
 	for _, id := range ids {
-		if body := readFile(t, f.ticketFile(t, id)); !strings.Contains(body, "status: done") {
+		if body := servertest.ReadFile(t, f.ticketFile(t, id)); !strings.Contains(body, "status: done") {
 			t.Errorf("ticket %s not done:\n%s", id, body)
 		}
 		if got := f.git(t, "show", schedEpic+":"+id+".txt"); got != id {
@@ -223,7 +223,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 		if cur == 1 {
 			commitWork(t, p, "pre")
 			// The agent reports a question for a person.
-			body := readFile(t, ticketPath)
+			body := servertest.ReadFile(t, ticketPath)
 			body = strings.Replace(body, "status: claimed\n", "status: claimed\niteration_status: asking\n", 1)
 			if err := os.WriteFile(ticketPath, []byte(body), 0o644); err != nil {
 				t.Error(err)

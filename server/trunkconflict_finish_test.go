@@ -29,7 +29,7 @@ func TestTrunkConflict_MarkersLeftPauseTheTicketAndKeepTheBackup(t *testing.T) {
 
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 
-	md := readFile(t, f.ticketFile(t, "02"))
+	md := servertest.ReadFile(t, f.ticketFile(t, "02"))
 	if !strings.Contains(md, "status: paused") || !strings.Contains(md, "pause_reason: conflict-markers") {
 		t.Errorf("ticket not paused conflict-markers:\n%s", md)
 	}
@@ -57,7 +57,7 @@ func TestTrunkConflict_NoMarkersLeftMakesTheTicketDoneDeletesTheBackupAndLandsTh
 
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
-	if md := readFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
+	if md := servertest.ReadFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
 		t.Errorf("ticket not done:\n%s", md)
 	}
 	if refs := f.backupRefs(t); len(refs) != 0 {
@@ -92,7 +92,7 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 	if got := f.read(t, "same.txt"); got != "local" {
 		t.Errorf("same.txt = %q, want the backed-up local edit", got)
 	}
-	if md := readFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
+	if md := servertest.ReadFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
 		t.Errorf("ticket not done:\n%s", md)
 	}
 	if refs := f.backupRefs(t); len(refs) != 0 {
@@ -122,7 +122,7 @@ func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
 	}
 
 	path := f.ticketFile(t, "02")
-	body := strings.Replace(readFile(t, path), "status: paused\n", "status: done\n", 1)
+	body := strings.Replace(servertest.ReadFile(t, path), "status: paused\n", "status: done\n", 1)
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -27,30 +27,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// registerTurn makes the harness's agents take no-op turns and returns what the
-// server launched: the starts, the prompt texts and the cwd of the latest start.
-func registerTurn(h *servertest.Harness) (starts func() []servertest.AgentStart, prompts func() []string, cwd func() string) {
-	var mu sync.Mutex
-	var texts []string
-	h.OnTurn(func(turn *servertest.Turn) {
-		mu.Lock()
-		defer mu.Unlock()
-		texts = append(texts, turn.Text)
-	})
-	prompts = func() []string {
-		mu.Lock()
-		defer mu.Unlock()
-		return slices.Clone(texts)
-	}
-	cwd = func() string {
-		if all := h.Starts(); len(all) > 0 {
-			return all[len(all)-1].Cwd
-		}
-		return ""
-	}
-	return h.Starts, prompts, cwd
-}
-
 func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
@@ -119,7 +95,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store)
-	_, prompt, _ := registerTurn(h)
+	_, prompt, _ := servertest.RegisterTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -157,7 +133,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
 			servertest.SetProjectRepo(t, store, "proj", repo)
 			h := servertest.StartWithStore(t, store)
-			_, prompt, _ := registerTurn(h)
+			_, prompt, _ := servertest.RegisterTurn(h)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
@@ -194,7 +170,7 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 		c.PollInterval = time.Hour
 		c.BudgetPollInterval = time.Hour // a budget poll also rescans, which would catch the index up
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	// Each call gets its own deadline: one shared context ran out under heavy load.
 	call := func() (context.Context, context.CancelFunc) {
 		return context.WithTimeout(context.Background(), 30*time.Second)
@@ -243,18 +219,9 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	// A restart is the next pass over a fresh index: it sees the edit and claims.
 	h.Restart(t)
 	servertest.WaitFor(t, 30*time.Second, "the ticket to be claimed after the index caught up", func() bool {
-		got := readFile(t, path)
+		got := servertest.ReadFile(t, path)
 		return strings.Contains(got, "status: claimed") || strings.Contains(got, "status: done")
 	})
-}
-
-func readFile(t *testing.T, path string) string {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
 }
 
 func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
@@ -363,7 +330,7 @@ func TestRunner_AmbiguousBasePausesWithoutLaunching(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{BlockedBy: []string{"01", "02"}})
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 
 	launched, err := h.Server.ClaimTicket("proj:epic-a/03", "claude")
 	if err != nil {
@@ -446,7 +413,7 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 			c.MaxAgentsPerRoot = tc.perRoot
 			c.PollInterval = 50 * time.Millisecond
 		})
-		registerTurn(h)
+		servertest.RegisterTurn(h)
 		// One agent of the root is already running.
 		h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 		// The no-start case waits out the whole timeout, so it stays short.
@@ -492,7 +459,7 @@ func TestRunner_SkipsAFrontierTicketThatIsAlreadyTracked(t *testing.T) {
 		c.MaxAgentsPerRoot = 2
 		c.PollInterval = 50 * time.Millisecond
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -538,7 +505,7 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	h.Server.Registry().PutRun("proj-a:epic-a", runs.Run{Address: "proj-a:epic-a/00", Runner: "herdr"}) // proj-a is at its cap
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -642,7 +609,7 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 		c.PollInterval = 50 * time.Millisecond
 		c.MaxAgents = 1
 	})
-	registerTurn(h)
+	servertest.RegisterTurn(h)
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -836,7 +803,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
-	registerTurn(h) // the agent finishes without committing, so the ticket pauses
+	servertest.RegisterTurn(h) // the agent finishes without committing, so the ticket pauses
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	started := chat.waitStarted(t) // so the pause message never shares a post with it

@@ -49,11 +49,11 @@ func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *
 	}
 	time.Sleep(200 * time.Millisecond) // negative wait: a stamp would land within a few polls
 	md := filepath.Join(store, "proj", "landed", "ticket.md")
-	if strings.Contains(readFile(t, md), "merged_at:") {
+	if strings.Contains(servertest.ReadFile(t, md), "merged_at:") {
 		t.Error("merged_at stamped while the trunk lock was held")
 	}
 	release()
-	waitUntil(t, "merged_at after release", func() bool { return strings.Contains(readFile(t, md), "merged_at:") })
+	waitUntil(t, "merged_at after release", func() bool { return strings.Contains(servertest.ReadFile(t, md), "merged_at:") })
 }
 
 func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
