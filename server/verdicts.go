@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -136,7 +137,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		return ex
 	}
 	if d, held := s.heldDiskOf(addr.Project); held {
-		ex.Verdict, ex.Reason = VerdictDiskLow, diskLowReason(d)
+		ex.Verdict, ex.Reason = wire.VerdictDiskLow, diskLowReason(d)
 		return ex
 	}
 	if h, held := s.claimHold(addr.Project, t, s.resolveTicket(addr, t).ResolvedHarness); held {

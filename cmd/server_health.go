@@ -11,7 +11,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func newServerHealthCmd(d deps) *cobra.Command {
@@ -64,10 +64,10 @@ func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		}
 		lines = append(lines, line)
 	}
-	lines = append(lines, causeLines("top by cpu", rep.Causes.CPU, func(r server.CauseRow) string {
+	lines = append(lines, causeLines("top by cpu", rep.Causes.CPU, func(r wire.CauseRow) string {
 		return fmt.Sprintf("%.1f%%", r.CPU)
 	})...)
-	lines = append(lines, causeLines("top by memory", rep.Causes.Memory, func(r server.CauseRow) string {
+	lines = append(lines, causeLines("top by memory", rep.Causes.Memory, func(r wire.CauseRow) string {
 		return config.ByteSize(r.MemBytes).String()
 	})...)
 	_, err = fmt.Fprintln(w, strings.Join(lines, "\n"))
@@ -75,11 +75,11 @@ func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 }
 
 // causeLines is one cause list; a marker takes the place of its rows.
-func causeLines(title string, list server.CauseList, value func(server.CauseRow) string) []string {
+func causeLines(title string, list wire.CauseList, value func(wire.CauseRow) string) []string {
 	switch list.Marker {
-	case server.CauseMarkerReading:
+	case wire.CauseMarkerReading:
 		return []string{title + ": reading…"}
-	case server.CauseMarkerUnavailable:
+	case wire.CauseMarkerUnavailable:
 		return []string{title + ": processes unavailable"}
 	}
 	lines := []string{title + ":"}
@@ -94,8 +94,8 @@ func causeLines(title string, list server.CauseList, value func(server.CauseRow)
 }
 
 // meterLine is one CPU or memory line; an unknown meter names its reason.
-func meterLine(name string, state server.HealthState, reason server.HealthReason, pct, avg float64) string {
-	if state == server.HealthStateUnknown {
+func meterLine(name string, state wire.HealthState, reason wire.HealthReason, pct, avg float64) string {
+	if state == wire.HealthStateUnknown {
 		return fmt.Sprintf("%s: unknown (%s)", name, reason)
 	}
 	return fmt.Sprintf("%s: %s, %.0f%% now, %.0f%% average", name, state, pct, avg)

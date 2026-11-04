@@ -6,13 +6,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
 )
 
 const defaultHealthPoll = 5 * time.Second
 
 // waitingMeter is a meter with no value yet.
-var waitingMeter = MeterHealth{State: HealthStateUnknown, Reason: HealthReasonWaiting}
+var waitingMeter = wire.MeterHealth{State: wire.HealthStateUnknown, Reason: wire.HealthReasonWaiting}
 
 // meterTrack is one meter's history between readings.
 type meterTrack struct {
@@ -23,26 +24,26 @@ type meterTrack struct {
 
 // next adds v and returns the meter for the new average. prev is the meter
 // before this reading.
-func (m *meterTrack) next(prev MeterHealth, v float64, at time.Time) MeterHealth {
+func (m *meterTrack) next(prev wire.MeterHealth, v float64, at time.Time) wire.MeterHealth {
 	m.win.Add(v)
 	avg := m.win.Average()
-	return MeterHealth{
+	return wire.MeterHealth{
 		Level:  syshealth.NextLevel(levelSeed(prev), avg),
-		State:  HealthState(syshealth.NextState(syshealth.State(prev.State), avg, m.high, m.crit)),
+		State:  wire.HealthState(syshealth.NextState(syshealth.State(prev.State), avg, m.high, m.crit)),
 		ReadAt: at,
 	}
 }
 
 // levelSeed is the level a new reading starts from: none after an unknown meter.
-func levelSeed(prev MeterHealth) int {
-	if prev.State == HealthStateUnknown {
+func levelSeed(prev wire.MeterHealth) int {
+	if prev.State == wire.HealthStateUnknown {
 		return -1
 	}
 	return prev.Level
 }
 
 // syshealthDisks converts the disk watcher's statuses for the health rules.
-func syshealthDisks(statuses []DiskStatus, cleanBelow uint64) []syshealth.Disk {
+func syshealthDisks(statuses []wire.DiskStatus, cleanBelow uint64) []syshealth.Disk {
 	in := make([]syshealth.Disk, len(statuses))
 	for i, d := range statuses {
 		in[i] = syshealth.Disk{Free: d.FreeBytes, Total: d.TotalBytes, Warned: d.Warned, Held: d.Held, CleanBelow: cleanBelow}
@@ -53,7 +54,7 @@ func syshealthDisks(statuses []DiskStatus, cleanBelow uint64) []syshealth.Disk {
 // healthWatch is the CPU and memory meters. Every reading goes through observe.
 type healthWatch struct {
 	mu     sync.Mutex
-	health Health
+	health wire.Health
 	prev   *syshealth.Reading
 	// started is set by the first reading, which sets the baseline without an event.
 	started bool
@@ -70,7 +71,7 @@ type latestReading struct {
 }
 
 func (s *Server) initHealth() {
-	s.healthW.health = Health{CPU: waitingMeter, Memory: waitingMeter, Disk: waitingMeter}
+	s.healthW.health = wire.Health{CPU: waitingMeter, Memory: waitingMeter, Disk: waitingMeter}
 	s.healthW.cpu = meterTrack{high: syshealth.CPUHigh, crit: syshealth.CPUCritical}
 	s.healthW.mem = meterTrack{high: syshealth.MemHigh, crit: syshealth.MemCritical}
 }
@@ -83,11 +84,11 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 	old := w.health
 	switch {
 	case err != nil:
-		reason := HealthReasonError
+		reason := wire.HealthReasonError
 		if errors.Is(err, syshealth.ErrUnavailable) {
-			reason = HealthReasonUnavailable
+			reason = wire.HealthReasonUnavailable
 		}
-		unknown := MeterHealth{State: HealthStateUnknown, Reason: reason, ReadAt: now}
+		unknown := wire.MeterHealth{State: wire.HealthStateUnknown, Reason: reason, ReadAt: now}
 		w.health.CPU, w.health.Memory = unknown, unknown
 		w.prev = nil
 		// The level restarts from none after unknown, so the average must too.
@@ -99,7 +100,7 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 		w.prev = &r
 		w.latest.cpuPct, w.latest.cpuAvg = 0, 0
 		if reason != "" {
-			w.health.CPU = MeterHealth{State: HealthStateUnknown, Reason: HealthReason(reason), ReadAt: now}
+			w.health.CPU = wire.MeterHealth{State: wire.HealthStateUnknown, Reason: wire.HealthReason(reason), ReadAt: now}
 		} else {
 			w.health.CPU = w.cpu.next(old.CPU, busy, now)
 			w.latest.cpuPct, w.latest.cpuAvg = busy, w.cpu.win.Average()
@@ -112,7 +113,7 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 	w.started = true
 	w.mu.Unlock()
 	if !first && (meterChanged(old.CPU, cur.CPU) || meterChanged(old.Memory, cur.Memory) || meterChanged(old.Disk, cur.Disk)) {
-		s.events.publish(EventHealthChanged, "")
+		s.events.publish(wire.EventHealthChanged, "")
 	}
 }
 
@@ -127,9 +128,9 @@ func (s *Server) observeDiskHealth(now time.Time) {
 	old := w.health.Disk
 	cur := waitingMeter
 	if worst >= 0 {
-		cur = MeterHealth{
+		cur = wire.MeterHealth{
 			Level:  syshealth.NextLevel(levelSeed(old), in[worst].PercentUsed()),
-			State:  HealthState(in[worst].State()),
+			State:  wire.HealthState(in[worst].State()),
 			ReadAt: now,
 		}
 	}
@@ -137,16 +138,16 @@ func (s *Server) observeDiskHealth(now time.Time) {
 	started := w.started
 	w.mu.Unlock()
 	if started && meterChanged(old, cur) {
-		s.events.publish(EventHealthChanged, "")
+		s.events.publish(wire.EventHealthChanged, "")
 	}
 }
 
 // meterChanged compares what a client shows; the reading time alone is no change.
-func meterChanged(a, b MeterHealth) bool {
+func meterChanged(a, b wire.MeterHealth) bool {
 	return a.Level != b.Level || a.State != b.State || a.Reason != b.Reason
 }
 
-func (s *Server) currentHealth() Health {
+func (s *Server) currentHealth() wire.Health {
 	s.healthW.mu.Lock()
 	defer s.healthW.mu.Unlock()
 	return s.healthW.health

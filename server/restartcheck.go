@@ -14,54 +14,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/migratefail"
+	"github.com/elentok/gx/server/wire"
 )
-
-// RestartCheckOutput is what `gx restart-check` prints. A binary without the
-// command exits non-zero with an unknown-command error; one that ran exits zero
-// even when the config or a dry run failed (the failure is in the JSON).
-type RestartCheckOutput struct {
-	Version  string                `json:"version"`
-	Config   RestartCheckConfig    `json:"config"`
-	Projects []RestartCheckProject `json:"projects"`
-}
-
-type RestartCheckConfig struct {
-	OK    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
-}
-
-type RestartCheckProject struct {
-	Name  string   `json:"name"`
-	OK    bool     `json:"ok"`
-	Error string   `json:"error,omitempty"`
-	Files []string `json:"files"`
-	// Pending is how many migration steps the new binary would still run for
-	// the project (its registry minus the project's applied list).
-	Pending int `json:"pending"`
-}
-
-// Restart check statuses.
-const (
-	RestartCheckOK         = "ok"
-	RestartCheckUnreadable = "unreadable"
-	RestartCheckTooOld     = "too_old"
-)
-
-// RestartCheckReport is the restart check route's answer. Config and Projects
-// are set only when Status is "ok".
-type RestartCheckReport struct {
-	Status         string                `json:"status"`
-	Error          string                `json:"error,omitempty"`
-	Hint           string                `json:"hint,omitempty"`
-	Binary         string                `json:"binary"`
-	RunningVersion string                `json:"running_version"`
-	NewVersion     string                `json:"new_version,omitempty"`
-	Config         RestartCheckConfig    `json:"config"`
-	Projects       []RestartCheckProject `json:"projects"`
-	Agents         int                   `json:"agents"`
-	Instance       string                `json:"instance"`
-	RestartLog     string                `json:"restart_log"`
-}
 
 const restartCheckTimeout = 2 * time.Minute
 
@@ -98,11 +52,11 @@ func (s *Server) restartCheckRead(w http.ResponseWriter, r *http.Request) {
 
 // restartCheck runs the restart check from the binary a restart would start.
 // It never touches this server.
-func (s *Server) restartCheck(ctx context.Context) RestartCheckReport {
-	rep := RestartCheckReport{
+func (s *Server) restartCheck(ctx context.Context) wire.RestartCheckReport {
+	rep := wire.RestartCheckReport{
 		Binary:         s.restartBinary(),
 		RunningVersion: s.cfg.Build,
-		Projects:       []RestartCheckProject{},
+		Projects:       []wire.RestartCheckProject{},
 		Agents:         s.runningAgents(),
 		Instance:       s.instanceID,
 		RestartLog:     migratefail.RestartLogPath(s.cfg.StateDir),
@@ -110,24 +64,24 @@ func (s *Server) restartCheck(ctx context.Context) RestartCheckReport {
 	out, status, detail := runRestartCheckBinary(ctx, rep.Binary, s.cfg.Env)
 	rep.Status, rep.Error = status, detail
 	switch status {
-	case RestartCheckOK:
+	case wire.RestartCheckOK:
 		rep.NewVersion, rep.Config = out.Version, out.Config
 		if out.Projects != nil {
 			rep.Projects = out.Projects
 		}
-	case RestartCheckTooOld:
+	case wire.RestartCheckTooOld:
 		rep.Hint = "that binary has no restart check; use `gx server restart` instead"
 	}
 	return rep
 }
 
-func runRestartCheckBinary(ctx context.Context, bin string, env []string) (RestartCheckOutput, string, string) {
-	var out RestartCheckOutput
+func runRestartCheckBinary(ctx context.Context, bin string, env []string) (wire.RestartCheckOutput, string, string) {
+	var out wire.RestartCheckOutput
 	if bin == "" {
-		return out, RestartCheckUnreadable, "no binary to restart with"
+		return out, wire.RestartCheckUnreadable, "no binary to restart with"
 	}
 	if _, err := os.Stat(bin); err != nil {
-		return out, RestartCheckUnreadable, err.Error()
+		return out, wire.RestartCheckUnreadable, err.Error()
 	}
 	ctx, cancel := context.WithTimeout(ctx, restartCheckTimeout)
 	defer cancel()
@@ -139,15 +93,15 @@ func runRestartCheckBinary(ctx context.Context, bin string, env []string) (Resta
 		msg := strings.TrimSpace(stderr.String())
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && strings.Contains(msg, "unknown command") {
-			return out, RestartCheckTooOld, msg
+			return out, wire.RestartCheckTooOld, msg
 		}
 		if msg == "" {
 			msg = err.Error()
 		}
-		return out, RestartCheckUnreadable, msg
+		return out, wire.RestartCheckUnreadable, msg
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
-		return out, RestartCheckUnreadable, "unreadable output: " + err.Error()
+		return out, wire.RestartCheckUnreadable, "unreadable output: " + err.Error()
 	}
-	return out, RestartCheckOK, ""
+	return out, wire.RestartCheckOK, ""
 }

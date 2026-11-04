@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func newServerDiskCmd(d deps) *cobra.Command {
@@ -73,7 +74,7 @@ func runDiskClean(ctx context.Context, cl *apiclient.Client, w io.Writer, disk s
 	res, err := cl.CleanDisk(ctx, id)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.CleanNowResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.CleanNowResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

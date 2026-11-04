@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // The restart scenarios point the server's restart binary (GX_RESTART_BINARY) at
@@ -91,14 +91,14 @@ esac
 func (f *fixture) restartDir() string { return filepath.Join(f.root, "restart") }
 
 // checkOutput is what the fake prints for the scenario's projects.
-func (r restartSpec) checkOutput(projects []string) server.RestartCheckOutput {
+func (r restartSpec) checkOutput(projects []string) wire.RestartCheckOutput {
 	version := r.version
 	if version == "" {
 		version = defaultNewVersion
 	}
-	out := server.RestartCheckOutput{Version: version, Config: server.RestartCheckConfig{OK: r.configError == "", Error: r.configError}}
+	out := wire.RestartCheckOutput{Version: version, Config: wire.RestartCheckConfig{OK: r.configError == "", Error: r.configError}}
 	for _, name := range projects {
-		p := server.RestartCheckProject{Name: name, OK: true, Files: []string{}, Pending: r.pending[name]}
+		p := wire.RestartCheckProject{Name: name, OK: true, Files: []string{}, Pending: r.pending[name]}
 		if msg, bad := r.failing[name]; bad {
 			p.OK, p.Error = false, msg
 		}

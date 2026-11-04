@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -56,9 +57,9 @@ func startOwnedRun(t *testing.T, r *pidRunner) *servertest.Harness {
 	return h
 }
 
-func settledCauses(t *testing.T, h *servertest.Harness) server.HealthCauses {
+func settledCauses(t *testing.T, h *servertest.Harness) wire.HealthCauses {
 	t.Helper()
-	var causes server.HealthCauses
+	var causes wire.HealthCauses
 	testutil.WaitFor(t, 10*time.Second, "the cause lists to settle", func() bool {
 		rep := health(t, h, true)
 		causes = rep.Causes

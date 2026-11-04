@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -117,9 +118,9 @@ type Snapshot struct {
 	// enqueue confirm can warn; filled in by the handler.
 	ExtraUsage bool `json:"extra_usage,omitempty"`
 	// Disks lists the disks under the warn threshold; filled in by the handler.
-	Disks []DiskStatus `json:"disks,omitempty"`
+	Disks []wire.DiskStatus `json:"disks,omitempty"`
 	// Health is the CPU, memory and disk meters; filled in by the handler.
-	Health  Health       `json:"health"`
+	Health  wire.Health  `json:"health"`
 	Tickets []TicketInfo `json:"tickets"`
 	// Pending is every queue entry with its explain verdict, so a client never
 	// asks per row. Filled in by the handler, like HerdrUnavailable.

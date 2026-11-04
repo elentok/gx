@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -17,9 +17,9 @@ import (
 // with an unknown-command error, one that ran exits zero even when the config
 // or a dry run failed (the failure is in the JSON).
 type (
-	restartCheck        = server.RestartCheckOutput
-	restartCheckConfig  = server.RestartCheckConfig
-	restartCheckProject = server.RestartCheckProject
+	restartCheck        = wire.RestartCheckOutput
+	restartCheckConfig  = wire.RestartCheckConfig
+	restartCheckProject = wire.RestartCheckProject
 )
 
 func newRestartCheckCmd(d deps) *cobra.Command {

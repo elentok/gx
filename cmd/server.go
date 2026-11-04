@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
 	"github.com/spf13/cobra"
 )
@@ -220,7 +221,7 @@ func runServer(ctx context.Context, d deps) error {
 	}
 	// Test hook: gxfixture reads free space from a file and shortens the watcher
 	// interval, so a flow can steer the disk watcher from outside the process.
-	var freeSpace func(string) (server.DiskReading, error)
+	var freeSpace func(string) (wire.DiskReading, error)
 	if v := os.Getenv("GX_DISK_FREE_FILE"); v != "" {
 		freeSpace = server.FileFreeSpace(v)
 	}

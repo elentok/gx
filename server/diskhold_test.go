@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -109,8 +110,8 @@ func (r *holdRig) neverStarts(t *testing.T) {
 
 func assertLowReason(t *testing.T, ex server.Explanation, disk, free string) {
 	t.Helper()
-	if ex.Verdict != server.VerdictDiskLow || !strings.Contains(ex.Reason, disk) || !strings.Contains(ex.Reason, free) {
-		t.Errorf("explain = %+v, want %q naming %s and %s", ex, server.VerdictDiskLow, disk, free)
+	if ex.Verdict != wire.VerdictDiskLow || !strings.Contains(ex.Reason, disk) || !strings.Contains(ex.Reason, free) {
+		t.Errorf("explain = %+v, want %q naming %s and %s", ex, wire.VerdictDiskLow, disk, free)
 	}
 }
 
@@ -122,7 +123,7 @@ func TestDiskHold_LowDiskStopsClaimAndExplains(t *testing.T) {
 	r.disks.SetFree(repo, 3*gb)
 	r.queue(t, "proj:epic-a/01")
 	r.neverStarts(t)
-	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", server.VerdictDiskLow), "/vol-proj", "3.0 GB")
+	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", wire.VerdictDiskLow), "/vol-proj", "3.0 GB")
 }
 
 // Seam: pre-claim reading (story 11): the timer never fires, so only the
@@ -139,7 +140,7 @@ func TestDiskHold_PreClaimReadingHoldsBeforeTheTimer(t *testing.T) {
 	r.disks.SetFree(repo, 3*gb)
 	r.queue(t, "proj:epic-a/01")
 	r.neverStarts(t)
-	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", server.VerdictDiskLow), "/vol-proj", "3.0 GB")
+	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", wire.VerdictDiskLow), "/vol-proj", "3.0 GB")
 	waitFor(t, func() bool { return len(cleaner.recorded()) >= 1 })
 	if got, want := cleaner.recorded(), []string{"go clean -cache @ " + repo}; !slices.Equal(got, want) {
 		t.Errorf("clean calls = %q, want %q", got, want)
@@ -154,7 +155,7 @@ func TestDiskHold_GoCacheDiskAloneHolds(t *testing.T) {
 	r.disks.Put("/gocache", "disk-cache", "/vol-cache", 2*gb)
 	r.queue(t, "proj:epic-a/01")
 	r.neverStarts(t)
-	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", server.VerdictDiskLow), "/vol-cache", "2.0 GB")
+	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", wire.VerdictDiskLow), "/vol-cache", "2.0 GB")
 }
 
 // Seam: running work keeps running (story 30).
@@ -191,7 +192,7 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return slices.ContainsFunc(rep.Disks, func(d server.DiskStatus) bool { return d.Held })
+		return slices.ContainsFunc(rep.Disks, func(d wire.DiskStatus) bool { return d.Held })
 	})
 	if len(h.Server.Runs()) != 1 {
 		t.Fatalf("runs during hold = %d, want the agent still running", len(h.Server.Runs()))
@@ -219,7 +220,7 @@ func TestDiskHold_OtherDiskStillDispatches(t *testing.T) {
 		}
 		return false
 	})
-	r.explainWhen(t, "low:epic-a/01", server.VerdictDiskLow)
+	r.explainWhen(t, "low:epic-a/01", wire.VerdictDiskLow)
 	for _, run := range r.h.Server.Runs() {
 		if strings.HasPrefix(run.Address, "low:") {
 			t.Errorf("run on the held disk: %+v", run)
@@ -238,7 +239,7 @@ func TestDiskHold_OneOffOnHeldDiskWaits(t *testing.T) {
 		t.Fatalf("one-off = %+v, %v", res, err)
 	}
 	r.neverStarts(t)
-	assertLowReason(t, r.explainWhen(t, res.Address, server.VerdictDiskLow), "/vol-proj", "1.0 GB")
+	assertLowReason(t, r.explainWhen(t, res.Address, wire.VerdictDiskLow), "/vol-proj", "1.0 GB")
 }
 
 // Seam: resume (stories 34, 35): the ticket starts alone and the chat hears
@@ -249,7 +250,7 @@ func TestDiskHold_ResumeStartsTicketAndNotifiesOnce(t *testing.T) {
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, 3*gb)
 	r.queue(t, "proj:epic-a/01")
-	r.explainWhen(t, "proj:epic-a/01", server.VerdictDiskLow)
+	r.explainWhen(t, "proj:epic-a/01", wire.VerdictDiskLow)
 	r.disks.SetFree(repo, 10*gb)
 	waitFor(t, r.started(1))
 	waitFor(t, func() bool { return r.resume() >= 1 })
@@ -266,7 +267,7 @@ func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
 	r := startHoldRig(t, map[string]string{"a": a, "b": b}, 10*gb)
 	r.disks.Put(a, "shared", "/shared", 3*gb)
 	r.disks.Put(b, "shared", "/shared", 3*gb)
-	got := waitDisks(t, r, func(d []server.DiskStatus) bool { return len(d) == 1 })
+	got := waitDisks(t, r, func(d []wire.DiskStatus) bool { return len(d) == 1 })
 	if !got[0].Held || len(got[0].Projects) != 2 {
 		t.Errorf("entry = %+v, want one held disk with both projects", got[0])
 	}
@@ -279,9 +280,9 @@ func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
 	}
 }
 
-func waitDisks(t *testing.T, r *holdRig, pred func([]server.DiskStatus) bool) []server.DiskStatus {
+func waitDisks(t *testing.T, r *holdRig, pred func([]wire.DiskStatus) bool) []wire.DiskStatus {
 	t.Helper()
-	var last []server.DiskStatus
+	var last []wire.DiskStatus
 	servertest.WaitFor(t, 10*time.Second, "the expected snapshot disks", func() bool {
 		snap, err := r.h.Client.Snapshot(context.Background())
 		if err != nil {
@@ -299,12 +300,12 @@ func TestDiskHold_HeldDiskListedWithWarnOff(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, 3*gb)
-	got := waitDisks(t, r, func(d []server.DiskStatus) bool { return len(d) == 1 })
+	got := waitDisks(t, r, func(d []wire.DiskStatus) bool { return len(d) == 1 })
 	if !got[0].Held || got[0].Warned {
 		t.Errorf("entry = %+v, want held and not warned", got[0])
 	}
 	r.disks.SetFree(repo, 50*gb)
-	waitDisks(t, r, func(d []server.DiskStatus) bool { return len(d) == 0 })
+	waitDisks(t, r, func(d []wire.DiskStatus) bool { return len(d) == 0 })
 }
 
 // Seam: clean threshold off never holds (story 3, hold part).
@@ -333,15 +334,15 @@ func TestDiskHold_RelaunchAndRetryRefused(t *testing.T) {
 		"relaunch": func() (server.QueueResult, error) { return r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false) },
 	} {
 		res, err := call()
-		if err != nil || !res.Refused || res.Reason != server.ReasonDiskLow || !strings.Contains(res.Message, "/vol-proj") || !strings.Contains(res.Message, "3.0 GB") {
-			t.Errorf("%s = %+v, %v; want refusal %s naming the disk and its free space", name, res, err, server.ReasonDiskLow)
+		if err != nil || !res.Refused || res.Reason != wire.ReasonDiskLow || !strings.Contains(res.Message, "/vol-proj") || !strings.Contains(res.Message, "3.0 GB") {
+			t.Errorf("%s = %+v, %v; want refusal %s naming the disk and its free space", name, res, err, wire.ReasonDiskLow)
 		}
 	}
 	if len(r.start()) != 0 {
 		t.Errorf("agent started on a held disk: %v", r.start())
 	}
 	r.disks.SetFree(repo, 50*gb)
-	if res, err := r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Reason == server.ReasonDiskLow {
+	if res, err := r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Reason == wire.ReasonDiskLow {
 		t.Errorf("relaunch on a free disk = %+v, %v; want no disk refusal", res, err)
 	}
 }

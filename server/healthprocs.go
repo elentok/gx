@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
 )
 
@@ -119,7 +120,7 @@ func (s *Server) scheduleSecondRead() chan struct{} {
 // healthCauses answers the route's two cause lists. With wait, a call that would
 // show the reading marker blocks until the second read ends, ctx ends or the
 // cap passes.
-func (s *Server) healthCauses(ctx context.Context, wait bool) HealthCauses {
+func (s *Server) healthCauses(ctx context.Context, wait bool) wire.HealthCauses {
 	s.ensureFresh(ctx)
 	p := &s.procs
 	p.mu.Lock()
@@ -142,21 +143,21 @@ func (s *Server) healthCauses(ctx context.Context, wait bool) HealthCauses {
 	p.mu.Unlock()
 
 	if cur == nil {
-		marker := CauseMarkerUnavailable
+		marker := wire.CauseMarkerUnavailable
 		if err == nil {
 			// Never read: the caller's context ended before the first read.
-			marker = CauseMarkerReading
+			marker = wire.CauseMarkerReading
 		}
-		return HealthCauses{CPU: CauseList{Marker: marker}, Memory: CauseList{Marker: marker}}
+		return wire.HealthCauses{CPU: wire.CauseList{Marker: marker}, Memory: wire.CauseList{Marker: marker}}
 	}
 	first := prev
 	if first == nil {
 		first = cur
 	}
 	lists := syshealth.TopCauses(*first, *cur, s.healthOwners(*cur), s.cfg.ProcessSource.Argv)
-	out := HealthCauses{CPU: causeList(lists.CPU), Memory: causeList(lists.Memory)}
+	out := wire.HealthCauses{CPU: causeList(lists.CPU), Memory: causeList(lists.Memory)}
 	if prev == nil {
-		out.CPU = CauseList{Marker: CauseMarkerReading}
+		out.CPU = wire.CauseList{Marker: wire.CauseMarkerReading}
 	}
 	return out
 }
@@ -174,10 +175,10 @@ func serverOwners(t syshealth.ProcessTable) map[syshealth.OwnerKey]syshealth.Own
 	return nil
 }
 
-func causeList(rows []syshealth.Cause) CauseList {
-	out := CauseList{Rows: make([]CauseRow, 0, len(rows))}
+func causeList(rows []syshealth.Cause) wire.CauseList {
+	out := wire.CauseList{Rows: make([]wire.CauseRow, 0, len(rows))}
 	for _, c := range rows {
-		out.Rows = append(out.Rows, CauseRow{
+		out.Rows = append(out.Rows, wire.CauseRow{
 			Kind: string(c.Kind), Label: c.Label, Busiest: c.Busiest, Ticket: c.Ticket,
 			CPU: c.CPU, MemBytes: c.MemBytes,
 		})

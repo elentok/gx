@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -214,13 +215,13 @@ func TestDiskClean_CleanupOffHoldsAndSaysSo(t *testing.T) {
 		t.Errorf("notice = %s, want no command set and held", body)
 	}
 	r.wantCalls(t, 0)
-	r.disksWhen(t, "one held disk", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
+	r.disksWhen(t, "one held disk", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
 	if r.countBodies("disk clean") != 1 {
 		t.Errorf("clean notices = %d, want 1", r.countBodies("disk clean"))
 	}
 }
 
-func (r *cleanRig) disksWhen(t *testing.T, what string, pred func([]server.DiskStatus) bool) []server.DiskStatus {
+func (r *cleanRig) disksWhen(t *testing.T, what string, pred func([]wire.DiskStatus) bool) []wire.DiskStatus {
 	t.Helper()
 	return (&diskRig{h: r.h}).disksWhen(t, what, pred)
 }
@@ -242,13 +243,13 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 	r.setFree(3 * gb)
 	r.waitCalls(t, 1)
 	r.queue(t, "proj:epic-a/01")
-	r.disksWhen(t, "held and cleaning", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held && d[0].Cleaning })
+	r.disksWhen(t, "held and cleaning", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held && d[0].Cleaning })
 	r.setFree(50 * gb)
 	r.letWatcherRead(t)
 	if len(r.start()) != 0 || len(r.h.Server.Runs()) != 0 {
 		t.Fatalf("a ticket started during the clean: %v", r.start())
 	}
-	r.disksWhen(t, "still held", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held })
+	r.disksWhen(t, "still held", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held })
 	r.clean.release()
 	body := r.waitClean(t, 1)
 	if !strings.Contains(body, "dispatch is not held") {
@@ -386,7 +387,7 @@ func TestDiskClean_FailureIsLoggedNoticedAndKeepsTheHold(t *testing.T) {
 	if !strings.Contains(body, "failed") || !strings.Contains(body, "go clean -cache") {
 		t.Errorf("notice = %s, want the failure and the command", body)
 	}
-	r.disksWhen(t, "held", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
+	r.disksWhen(t, "held", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
 	logs, _ := os.ReadFile(server.LogPath(r.h.StateDir))
 	if !strings.Contains(string(logs), "go clean -cache") || !strings.Contains(string(logs), "boom") {
 		t.Errorf("server log lacks the command and its error: %s", logs)
@@ -465,8 +466,8 @@ func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
 	r.waitClean(t, 2)
 	waitFor(t, func() bool { return r.countBodies("low disk space") == 2 })
 	ex, err := r.h.Client.Explain(context.Background(), "proj:epic-a/01")
-	if err != nil || ex.Verdict != server.VerdictDiskLow {
-		t.Errorf("explain = %+v, %v, want %q", ex, err, server.VerdictDiskLow)
+	if err != nil || ex.Verdict != wire.VerdictDiskLow {
+		t.Errorf("explain = %+v, %v, want %q", ex, err, wire.VerdictDiskLow)
 	}
 	if len(r.start()) != 0 {
 		t.Errorf("a claim started on a held disk: %v", r.start())

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil"
 )
@@ -42,7 +42,7 @@ func TestServerHealth_JSONMatchesTheRoute(t *testing.T) {
 	if err := runServerHealth(context.Background(), h.Client, &out, true); err != nil {
 		t.Fatal(err)
 	}
-	var got server.HealthReport
+	var got wire.HealthReport
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("decode %q: %v", out.String(), err)
 	}
@@ -74,11 +74,11 @@ func TestServerHealth_UsesWaitAndPrintsBothLists(t *testing.T) {
 
 // Seam 3: an agent row prints as `<address> · <busiest process>`.
 func TestServerHealth_AgentRowShowsAddressAndBusiestProcess(t *testing.T) {
-	list := server.CauseList{Rows: []server.CauseRow{
+	list := wire.CauseList{Rows: []wire.CauseRow{
 		{Kind: "agent", Label: "gx:foo/03", Ticket: "gx:foo/03", Busiest: "go test", CPU: 12.5},
 		{Kind: "process", Label: "hog", CPU: 3},
 	}}
-	got := causeLines("top by cpu", list, func(r server.CauseRow) string { return fmt.Sprintf("%.1f%%", r.CPU) })
+	got := causeLines("top by cpu", list, func(r wire.CauseRow) string { return fmt.Sprintf("%.1f%%", r.CPU) })
 	want := []string{"top by cpu:", "  gx:foo/03 · go test 12.5%", "  hog 3.0%"}
 	if !slices.Equal(got, want) {
 		t.Errorf("lines = %q, want %q", got, want)
@@ -93,7 +93,7 @@ func waitHealthKnown(t *testing.T, h *servertest.Harness) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return rep.Memory.State != server.HealthStateUnknown
+		return rep.Memory.State != wire.HealthStateUnknown
 	})
 	if !known {
 		t.Fatal("watcher never read the system")

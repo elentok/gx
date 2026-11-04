@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/syshealth"
@@ -121,7 +122,7 @@ type Config struct {
 	// LookPath finds a harness's program; nil looks over Env's PATH.
 	LookPath func(file string) (string, error)
 	// FreeSpace reads the disk holding a path; nil reads the real one.
-	FreeSpace func(path string) (DiskReading, error)
+	FreeSpace func(path string) (wire.DiskReading, error)
 	// GoCacheDir finds the Go build cache; nil runs `go env GOCACHE`.
 	GoCacheDir func() (string, error)
 	// DiskPollInterval is how often the disk watcher reads; zero means one minute.

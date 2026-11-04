@@ -10,8 +10,8 @@
 # The steps are separate processes, each with its own output file:
 #   race    the PTY-runner packages under -race (a vt emulator shared with a
 #           background goroutine, and herdrrunner's use of the herdr fake)
-#   go      every other package except ./server and ./e2e
-#   server  ./server
+#   go      every other package except ./server/... and ./e2e
+#   server  ./server/... (server and its subpackages)
 #   web     make web-test (install, tsc, vitest with 3 workers)
 #   e2e     make web-e2e (Playwright); only with GX_TEST_E2E=1, which `gx check
 #           --full` sets. `make test` (CI) leaves it off: CI runs web-e2e as its own job.
@@ -49,11 +49,11 @@ go build -o "$work/gx" .
 gx=$work/gx
 
 # Package paths (not dirs) of everything the "go" step runs.
-skip=$(printf '%s\n' "$module/server" "$module/e2e" "${race_pkgs[@]/#.\//$module/}")
+skip=$(printf '%s\n' "$module/e2e" "${race_pkgs[@]/#.\//$module/}")
 other_pkgs=()
 while IFS= read -r pkg; do
 	other_pkgs+=("$pkg")
-done < <(go list ./... | grep -Fvx -f <(echo "$skip"))
+done < <(go list ./... | grep -Fvx -f <(echo "$skip") | grep -Ev "^$module/server(/|$)")
 
 names=(race go server web)
 if [[ ${GX_TEST_E2E:-} == 1 ]]; then
@@ -78,7 +78,7 @@ run_step race env GOMAXPROCS=1 "$gx" brief go-test -race -timeout=10m -count=1 "
 pids=("$!")
 run_step go "$gx" brief go-test -timeout=10m -count=1 "${other_pkgs[@]}" &
 pids+=("$!")
-run_step server "$gx" brief go-test -timeout=10m -count=1 ./server &
+run_step server "$gx" brief go-test -timeout=10m -count=1 ./server/... &
 pids+=("$!")
 run_step web make web-test GX="$gx" WEB_TEST_WORKERS=3 &
 pids+=("$!")

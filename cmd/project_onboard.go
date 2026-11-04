@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -72,7 +73,7 @@ func isTerminal(d deps) bool { return d.stdinIsTerminal != nil && d.stdinIsTermi
 func onboardCommand(project string) string { return "gx project onboard " + project }
 
 // missingChecks returns the project's check state, or nil when it has config.
-func missingChecks(ctx context.Context, cl *apiclient.Client, project string) (*server.ProjectChecks, error) {
+func missingChecks(ctx context.Context, cl *apiclient.Client, project string) (*wire.ProjectChecks, error) {
 	st, err := cl.ChecksStatus(ctx, project)
 	if err != nil {
 		return nil, fmt.Errorf("server read failed (is `gx server` running?): %w", err)
@@ -85,17 +86,17 @@ func missingChecks(ctx context.Context, cl *apiclient.Client, project string) (*
 	return nil, nil
 }
 
-func missingKinds(pc server.ProjectChecks) []string {
+func missingKinds(pc wire.ProjectChecks) []string {
 	kinds := []string{}
 	for _, k := range pc.Kinds {
-		if k.State != server.KindStateConfigured {
+		if k.State != wire.KindStateConfigured {
 			kinds = append(kinds, k.Kind)
 		}
 	}
 	return kinds
 }
 
-func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, project string, pc server.ProjectChecks) error {
+func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, project string, pc wire.ProjectChecks) error {
 	in := bufio.NewReader(d.stdin)
 	proposal := proposeChecks(pc)
 
@@ -150,7 +151,7 @@ func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, p
 
 // proposeChecks turns the recommendations into checks.json: found commands as
 // {"full": cmd}, kinds with nothing found left out.
-func proposeChecks(pc server.ProjectChecks) []byte {
+func proposeChecks(pc wire.ProjectChecks) []byte {
 	cfg := map[string]map[string]string{}
 	for _, k := range pc.Kinds {
 		if k.Recommended != nil {

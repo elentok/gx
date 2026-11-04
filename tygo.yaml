@@ -4,11 +4,8 @@ packages:
     output_path: "webui/src/generated/server.ts"
     include_files:
       - budget.go
-      - checkstatus.go
       - designs.go
       - detail.go
-      - diskcleannow.go
-      - diskwatch.go
       - detailrelated.go
       - detailruns.go
       - epiccard.go
@@ -18,14 +15,10 @@ packages:
       - epicsummary.go
       - fixagent.go
       - harnesslabel.go
-      - healthreport.go
-      - healthtypes.go
       - index.go
       - pause.go
       - projectworktrees.go
       - recentlyfinished.go
-      - restart.go
-      - restartcheck.go
       - sessionautoadvance.go
       - sessionchat.go
       - sessioncommands.go
@@ -48,6 +41,30 @@ packages:
       - usagesample.go
       - usagesummary.go
       - verdicts.go
+    # Moved types stay importable from generated/server. A wire type the
+    # remaining server types use needs an import here and a type_mappings entry
+    # below (tygo loads syntax only, so it cannot resolve wire.X itself).
+    frontmatter: |
+      export * from './wire';
+      import type { DiskStatus, Health } from './wire';
+    type_mappings:
+      time.Time: "string"
+      tickets.DesignStep: "string"
+      wire.DiskStatus: "DiskStatus"
+      wire.Health: "Health"
+    enum_style: "union"
+  # tygo writes each package to its own file (one output_path per package, no
+  # merging), so wire has its own file; server.ts re-exports it.
+  - path: "github.com/elentok/gx/server/wire"
+    output_path: "webui/src/generated/wire.ts"
+    include_files:
+      - checkstatus.go
+      - diskcleannow.go
+      - diskwatch.go
+      - healthreport.go
+      - healthtypes.go
+      - restart.go
+      - restartcheck.go
     type_mappings:
       time.Time: "string"
       tickets.DesignStep: "string"

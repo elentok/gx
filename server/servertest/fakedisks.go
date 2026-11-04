@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 // A path with no entry reports one shared disk with plenty of space.
 type FakeDisks struct {
 	mu     sync.Mutex
-	byPath map[string]server.DiskReading
+	byPath map[string]wire.DiskReading
 	reads  int
 }
 
@@ -34,9 +34,9 @@ func (f *FakeDisks) PutSized(path, id, name string, free, total uint64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.byPath == nil {
-		f.byPath = map[string]server.DiskReading{}
+		f.byPath = map[string]wire.DiskReading{}
 	}
-	f.byPath[path] = server.DiskReading{ID: id, Name: name, Free: free, Total: total}
+	f.byPath[path] = wire.DiskReading{ID: id, Name: name, Free: free, Total: total}
 }
 
 // SetTotal changes path's total bytes and keeps the rest of its reading.
@@ -46,7 +46,7 @@ func (f *FakeDisks) SetTotal(path string, total uint64) {
 	r := f.read(path)
 	r.Total = total
 	if f.byPath == nil {
-		f.byPath = map[string]server.DiskReading{}
+		f.byPath = map[string]wire.DiskReading{}
 	}
 	f.byPath[path] = r
 }
@@ -58,13 +58,13 @@ func (f *FakeDisks) SetFree(path string, free uint64) {
 	r := f.read(path)
 	r.Free = free
 	if f.byPath == nil {
-		f.byPath = map[string]server.DiskReading{}
+		f.byPath = map[string]wire.DiskReading{}
 	}
 	f.byPath[path] = r
 }
 
 // Read is the server.Config FreeSpace source.
-func (f *FakeDisks) Read(path string) (server.DiskReading, error) {
+func (f *FakeDisks) Read(path string) (wire.DiskReading, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reads++
@@ -87,9 +87,9 @@ func (f *FakeDisks) WaitReads(t *testing.T, n int) {
 	WaitFor(t, 5*time.Second, "the watcher to read again", func() bool { return f.Reads() >= want })
 }
 
-func (f *FakeDisks) read(path string) server.DiskReading {
+func (f *FakeDisks) read(path string) wire.DiskReading {
 	if r, ok := f.byPath[path]; ok {
 		return r
 	}
-	return server.DiskReading{ID: "fake", Name: "/fake", Free: plentyFree, Total: defaultTotal}
+	return wire.DiskReading{ID: "fake", Name: "/fake", Free: plentyFree, Total: defaultTotal}
 }

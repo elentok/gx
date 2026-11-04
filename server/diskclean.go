@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 )
 
 const (
@@ -153,7 +154,7 @@ func RunCleanupCommand(ctx context.Context, argv []string, dir string) ([]byte, 
 
 // endClean ends every clean: it reads the disk again and lets observe set the
 // hold from that reading. It returns that reading and whether the disk is held.
-func (s *Server) endClean(id, probe string, end cleanEnd) (DiskReading, bool) {
+func (s *Server) endClean(id, probe string, end cleanEnd) (wire.DiskReading, bool) {
 	r, err := s.freeSpace(probe)
 	if err != nil {
 		s.log.Warn("read free space", "path", probe, "err", err)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil"
 )
@@ -33,9 +34,9 @@ func snapshotHealth(t *testing.T, h *servertest.Harness) server.Snapshot {
 }
 
 // healthWhen polls the snapshot until pred accepts its health.
-func healthWhen(t *testing.T, h *servertest.Harness, what string, pred func(server.Health) bool) server.Health {
+func healthWhen(t *testing.T, h *servertest.Harness, what string, pred func(wire.Health) bool) wire.Health {
 	t.Helper()
-	var last server.Health
+	var last wire.Health
 	ok := testutil.Poll(10*time.Second, 5*time.Millisecond, func() bool {
 		last = snapshotHealth(t, h).Health
 		return pred(last)
@@ -60,7 +61,7 @@ func healthEvents(ch <-chan server.Event) int {
 	for {
 		select {
 		case ev := <-ch:
-			if ev.Type == server.EventHealthChanged {
+			if ev.Type == wire.EventHealthChanged {
 				n++
 			}
 		case <-time.After(150 * time.Millisecond):
@@ -79,7 +80,7 @@ func TestHealth_AverageIsReadyInTheFirstSnapshotAfterTwelveReadings(t *testing.T
 	// The first reading has no CPU value, so 13 readings give 12 busy values.
 	waitReads(t, fake, syshealth.AverageWindow+1)
 	got := snapshotHealth(t, h).Health.CPU
-	if got.State != server.HealthStateHigh || got.Level != 3 {
+	if got.State != wire.HealthStateHigh || got.Level != 3 {
 		t.Fatalf("cpu = %+v, want high at level 3", got)
 	}
 }
@@ -90,10 +91,10 @@ func TestHealth_SingleSpikeKeepsStateNormal(t *testing.T) {
 	fake := servertest.NewFakeSystem()
 	fake.SetBusy(5)
 	h := startHealth(t, fake, healthInterval)
-	healthWhen(t, h, "a known cpu", func(v server.Health) bool { return v.CPU.State == server.HealthStateNormal })
+	healthWhen(t, h, "a known cpu", func(v wire.Health) bool { return v.CPU.State == wire.HealthStateNormal })
 	fake.QueueBusy(100)
 	waitReads(t, fake, fake.Reads()+4)
-	if got := snapshotHealth(t, h).Health.CPU; got.State != server.HealthStateNormal {
+	if got := snapshotHealth(t, h).Health.CPU; got.State != wire.HealthStateNormal {
 		t.Fatalf("cpu = %+v, want normal", got)
 	}
 }
@@ -113,7 +114,7 @@ func TestHealth_LevelChangePublishesOneEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake.SetMem(30)
-	healthWhen(t, h, "memory level 1", func(v server.Health) bool { return v.Memory.Level == 1 })
+	healthWhen(t, h, "memory level 1", func(v wire.Health) bool { return v.Memory.Level == 1 })
 	waitReads(t, fake, fake.Reads()+syshealth.AverageWindow)
 	if n := healthEvents(ch); n != 1 {
 		t.Fatalf("health events = %d, want 1", n)
@@ -152,19 +153,19 @@ func TestHealth_ReadErrorClearsTheOneMinuteWindows(t *testing.T) {
 	fake.SetBusy(90)
 	h := startHealth(t, fake, healthInterval)
 	waitReads(t, fake, syshealth.AverageWindow+2)
-	healthWhen(t, h, "high memory and cpu", func(v server.Health) bool {
-		return v.Memory.State != server.HealthStateNormal && v.CPU.State != server.HealthStateNormal
+	healthWhen(t, h, "high memory and cpu", func(v wire.Health) bool {
+		return v.Memory.State != wire.HealthStateNormal && v.CPU.State != wire.HealthStateNormal
 	})
 	fake.Fail(errors.New("boom"))
-	healthWhen(t, h, "unknown after the error", func(v server.Health) bool { return v.Memory.State == server.HealthStateUnknown })
+	healthWhen(t, h, "unknown after the error", func(v wire.Health) bool { return v.Memory.State == wire.HealthStateUnknown })
 	fake.SetMem(10)
 	fake.SetBusy(5)
 	fake.Fail(nil)
 	// The first known meters come from fresh windows: one low reading, not a stale average.
-	got := healthWhen(t, h, "known memory and cpu", func(v server.Health) bool {
-		return v.Memory.State != server.HealthStateUnknown && v.CPU.State != server.HealthStateUnknown
+	got := healthWhen(t, h, "known memory and cpu", func(v wire.Health) bool {
+		return v.Memory.State != wire.HealthStateUnknown && v.CPU.State != wire.HealthStateUnknown
 	})
-	if got.Memory.State != server.HealthStateNormal || got.CPU.State != server.HealthStateNormal {
+	if got.Memory.State != wire.HealthStateNormal || got.CPU.State != wire.HealthStateNormal {
 		t.Fatalf("health = %+v, want memory and cpu normal", got)
 	}
 }
@@ -175,24 +176,24 @@ func TestHealth_UnknownReasons(t *testing.T) {
 	t.Run("first interval is waiting", func(t *testing.T) {
 		fake := servertest.NewFakeSystem()
 		h := startHealth(t, fake, time.Hour)
-		got := healthWhen(t, h, "memory read", func(v server.Health) bool { return v.Memory.State == server.HealthStateNormal })
-		if got.CPU.State != server.HealthStateUnknown || got.CPU.Reason != server.HealthReasonWaiting {
+		got := healthWhen(t, h, "memory read", func(v wire.Health) bool { return v.Memory.State == wire.HealthStateNormal })
+		if got.CPU.State != wire.HealthStateUnknown || got.CPU.Reason != wire.HealthReasonWaiting {
 			t.Fatalf("cpu = %+v, want unknown/waiting", got.CPU)
 		}
 	})
 	for name, tc := range map[string]struct {
 		err    error
-		reason server.HealthReason
+		reason wire.HealthReason
 	}{
-		"unavailable source": {syshealth.ErrUnavailable, server.HealthReasonUnavailable},
-		"failing read":       {errors.New("boom"), server.HealthReasonError},
+		"unavailable source": {syshealth.ErrUnavailable, wire.HealthReasonUnavailable},
+		"failing read":       {errors.New("boom"), wire.HealthReasonError},
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := servertest.NewFakeSystem()
 			fake.Fail(tc.err)
 			h := startHealth(t, fake, healthInterval)
-			got := healthWhen(t, h, "unknown "+string(tc.reason), func(v server.Health) bool { return v.CPU.Reason == tc.reason })
-			if got.CPU.State != server.HealthStateUnknown || got.Memory.State != server.HealthStateUnknown || got.Memory.Reason != tc.reason {
+			got := healthWhen(t, h, "unknown "+string(tc.reason), func(v wire.Health) bool { return v.CPU.Reason == tc.reason })
+			if got.CPU.State != wire.HealthStateUnknown || got.Memory.State != wire.HealthStateUnknown || got.Memory.Reason != tc.reason {
 				t.Fatalf("health = %+v, want cpu and memory unknown/%s", got, tc.reason)
 			}
 		})

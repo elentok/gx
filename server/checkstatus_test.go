@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -36,7 +37,7 @@ func writeNested(t *testing.T, repo, name, content string) {
 	testutil.WriteFile(t, repo, name, content)
 }
 
-func demoChecks(t *testing.T, h *servertest.Harness) server.ProjectChecks {
+func demoChecks(t *testing.T, h *servertest.Harness) wire.ProjectChecks {
 	t.Helper()
 	st, err := h.Client.ChecksStatus(context.Background(), "demo")
 	if err != nil {
@@ -48,7 +49,7 @@ func demoChecks(t *testing.T, h *servertest.Harness) server.ProjectChecks {
 	return st.Projects[0]
 }
 
-func checkKind(t *testing.T, p server.ProjectChecks, kind string) server.KindCheck {
+func checkKind(t *testing.T, p wire.ProjectChecks, kind string) wire.KindCheck {
 	t.Helper()
 	for _, k := range p.Kinds {
 		if k.Kind == kind {
@@ -56,7 +57,7 @@ func checkKind(t *testing.T, p server.ProjectChecks, kind string) server.KindChe
 		}
 	}
 	t.Fatalf("no kind %q in %+v", kind, p.Kinds)
-	return server.KindCheck{}
+	return wire.KindCheck{}
 }
 
 func TestChecksStatus_RanksSourcesAndRunsNothing(t *testing.T) {

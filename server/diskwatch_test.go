@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 const (
@@ -80,9 +81,9 @@ func startDiskRig(t *testing.T, projects map[string]string, warn config.ByteSize
 }
 
 // disksWhen polls the snapshot until pred accepts its disk list.
-func (r *diskRig) disksWhen(t *testing.T, what string, pred func([]server.DiskStatus) bool) []server.DiskStatus {
+func (r *diskRig) disksWhen(t *testing.T, what string, pred func([]wire.DiskStatus) bool) []wire.DiskStatus {
 	t.Helper()
-	var last []server.DiskStatus
+	var last []wire.DiskStatus
 	servertest.WaitFor(t, 10*time.Second, "snapshot disks "+what, func() bool {
 		snap, err := r.h.Client.Snapshot(context.Background())
 		if err != nil {
@@ -118,8 +119,8 @@ func (r *diskRig) waitReading(t *testing.T, id string, free uint64) {
 // later positive event to wait on.
 const quiet = 15*diskInterval + 2*testFlushInterval
 
-func oneDisk(d []server.DiskStatus) bool { return len(d) == 1 }
-func noDisks(d []server.DiskStatus) bool { return len(d) == 0 }
+func oneDisk(d []wire.DiskStatus) bool { return len(d) == 1 }
+func noDisks(d []wire.DiskStatus) bool { return len(d) == 0 }
 
 // Seam: the watcher reads with no queued root.
 func TestDiskWatch_LowDiskShowsInSnapshotWithNoQueue(t *testing.T) {
@@ -155,7 +156,7 @@ func TestDiskWatch_TwoProjectsOnOneDiskShareEntryAndNotice(t *testing.T) {
 	r := startDiskRig(t, map[string]string{"a": a, "b": b}, 20*gb)
 	r.disks.Put(a, "d1", "/vol1", 5*gb)
 	r.disks.Put(b, "d1", "/vol1", 5*gb)
-	got := r.disksWhen(t, "one entry for both projects", func(d []server.DiskStatus) bool {
+	got := r.disksWhen(t, "one entry for both projects", func(d []wire.DiskStatus) bool {
 		return len(d) == 1 && len(d[0].Projects) == 2
 	})[0]
 	if !slices.Equal(got.Projects, []string{"a", "b"}) {

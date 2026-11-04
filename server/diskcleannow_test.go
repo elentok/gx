@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 const cleanDisk = "d1"
 
-func (r *cleanRig) cleanNow(t *testing.T) server.CleanNowResult {
+func (r *cleanRig) cleanNow(t *testing.T) wire.CleanNowResult {
 	t.Helper()
 	res, err := r.h.Client.CleanDisk(context.Background(), cleanDisk)
 	if err != nil {
@@ -22,8 +22,8 @@ func (r *cleanRig) cleanNow(t *testing.T) server.CleanNowResult {
 }
 
 // cleanNowAsync starts a "clean now" that blocks on the runner.
-func (r *cleanRig) cleanNowAsync() <-chan server.CleanNowResult {
-	done := make(chan server.CleanNowResult, 1)
+func (r *cleanRig) cleanNowAsync() <-chan wire.CleanNowResult {
+	done := make(chan wire.CleanNowResult, 1)
 	go func() {
 		res, _ := r.h.Client.CleanDisk(context.Background(), cleanDisk)
 		done <- res
@@ -78,7 +78,7 @@ func TestDiskCleanNow_HoldEndsInTheResponse(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.setFree(3 * gb)
 	r.waitClean(t, 1)
-	r.disksWhen(t, "held", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
+	r.disksWhen(t, "held", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held && !d[0].Cleaning })
 	r.afterEachRun(func() { r.setFree(50 * gb) })
 	res := r.cleanNow(t)
 	if res.Refused || res.Held || res.FreeBytes != 50*gb || res.FreedBytes != 47*gb {
@@ -149,7 +149,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 		r.setFree(3 * gb)
 		r.waitCalls(t, 1)
 		res := r.cleanNow(t)
-		if !res.Refused || res.Reason != server.ReasonCleanRunning || res.Message != "clean already running" {
+		if !res.Refused || res.Reason != wire.ReasonCleanRunning || res.Message != "clean already running" {
 			t.Errorf("result = %+v", res)
 		}
 		r.clean.release()
@@ -174,7 +174,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 		t.Parallel()
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 		res, err := r.h.Client.CleanDisk(context.Background(), "nope")
-		if err != nil || !res.Refused || res.Reason != server.ReasonUnknownDisk {
+		if err != nil || !res.Refused || res.Reason != wire.ReasonUnknownDisk {
 			t.Errorf("result = %+v, %v", res, err)
 		}
 	})
@@ -189,7 +189,7 @@ func TestDiskCleanNow_ArmedStaysArmed(t *testing.T) {
 	done := r.cleanNowAsync()
 	r.waitCalls(t, 1)
 	r.setFree(3 * gb)
-	r.disksWhen(t, "held", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held })
+	r.disksWhen(t, "held", func(d []wire.DiskStatus) bool { return len(d) == 1 && d[0].Held })
 	r.wantCalls(t, 1)
 	r.clean.release()
 	if res := <-done; !res.Held {
@@ -217,7 +217,7 @@ func TestWebDiskClean_PostReachesTheHandler(t *testing.T) {
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	code, body := webPostJSON(t, base+"/v1/disk/clean", `{"disk":"nope"}`, cookie, "", jsonPost(base))
-	if code != http.StatusOK || reasonOf(t, body) != server.ReasonUnknownDisk {
+	if code != http.StatusOK || reasonOf(t, body) != wire.ReasonUnknownDisk {
 		t.Errorf("web disk clean = %d %s", code, body)
 	}
 }

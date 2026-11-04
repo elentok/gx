@@ -3,53 +3,29 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/elentok/gx/server/wire"
 )
-
-const (
-	// ReasonUnknownDisk refuses a "clean now" for a disk the watcher does not know.
-	ReasonUnknownDisk = "unknown-disk"
-	// ReasonCleanRunning refuses a "clean now" while any clean runs on the disk.
-	ReasonCleanRunning = "clean-running"
-)
-
-// CleanNowRequest names the disk to clean.
-type CleanNowRequest struct {
-	Disk string `json:"disk"`
-}
-
-// CleanNowResult is the answer to a "clean now". A failed command is an answer
-// (Failure set), not a refusal.
-type CleanNowResult struct {
-	FreedBytes uint64 `json:"freed_bytes"`
-	FreeBytes  uint64 `json:"free_bytes"`
-	Held       bool   `json:"held"`
-	Failure    string `json:"failure,omitempty"`
-	// NoCleanupCommand says no project on the disk had cleanup work to run.
-	NoCleanupCommand bool   `json:"no_cleanup_command,omitempty"`
-	Refused          bool   `json:"refused,omitempty"`
-	Reason           string `json:"reason,omitempty"`
-	Message          string `json:"message,omitempty"`
-}
 
 // cleanNow runs the disk's cleanup work in the caller and ends it through the
 // same rule as the automatic clean. It never touches armed/spent and never sets
 // the hold at its start.
-func (s *Server) cleanNow(id string) CleanNowResult {
+func (s *Server) cleanNow(id string) wire.CleanNowResult {
 	d := &s.disks
 	d.mu.Lock()
 	st := d.disks[id]
 	switch {
 	case st == nil:
 		d.mu.Unlock()
-		return CleanNowResult{Refused: true, Reason: ReasonUnknownDisk, Message: "unknown disk " + id}
+		return wire.CleanNowResult{Refused: true, Reason: wire.ReasonUnknownDisk, Message: "unknown disk " + id}
 	case st.cleaning:
 		d.mu.Unlock()
-		return CleanNowResult{Refused: true, Reason: ReasonCleanRunning, Message: "clean already running"}
+		return wire.CleanNowResult{Refused: true, Reason: wire.ReasonCleanRunning, Message: "clean already running"}
 	}
 	probe, projects, before := st.probe, st.projects, st.reading.Free
 	st.beginClean(before)
 	d.mu.Unlock()
-	s.events.publish(EventDiskWarnChanged, "")
+	s.events.publish(wire.EventDiskWarnChanged, "")
 
 	// The fresh read, not the last poll, is what "freed" is measured from.
 	if r, err := s.freeSpace(probe); err != nil {
@@ -67,11 +43,11 @@ func (s *Server) cleanNow(id string) CleanNowResult {
 	}
 	end := cleanEnd{failed: s.runCleanWork(work), noWork: len(work) == 0}
 	r, held := s.endClean(id, probe, end)
-	return CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: end.failed, NoCleanupCommand: end.noWork}
+	return wire.CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: end.failed, NoCleanupCommand: end.noWork}
 }
 
 func (s *Server) diskCleanWrite(w http.ResponseWriter, r *http.Request) {
-	var req CleanNowRequest
+	var req wire.CleanNowRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

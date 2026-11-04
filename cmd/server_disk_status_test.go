@@ -13,11 +13,12 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 const diskGB = 1_000_000_000
 
-func diskByID(disks []server.DiskStatus, id string) *server.DiskStatus {
+func diskByID(disks []wire.DiskStatus, id string) *wire.DiskStatus {
 	for i := range disks {
 		if disks[i].ID == id {
 			return &disks[i]
@@ -51,7 +52,7 @@ func startDiskStatusServer(t *testing.T, ds config.DiskSpaceConfig) *servertest.
 		c.DiskPollInterval = 10 * time.Millisecond
 		c.DiskSpace = ds
 	})
-	var rep server.DiskReport
+	var rep wire.DiskReport
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		var err error
 		if rep, err = h.Client.DiskStatus(context.Background()); err != nil {
@@ -136,7 +137,7 @@ func TestDiskStatus_JSONMatchesTheRoute(t *testing.T) {
 	if err := runDiskStatus(context.Background(), h.Client, &out, true); err != nil {
 		t.Fatal(err)
 	}
-	var rep server.DiskReport
+	var rep wire.DiskReport
 	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
 		t.Fatal(err)
 	}

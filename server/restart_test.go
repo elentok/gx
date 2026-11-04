@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 type restartFixture struct {
@@ -63,10 +64,10 @@ cat `+f.output)
 
 const confirmedBody = `{"new_version":"new-2","config_ok":true,"failing_projects":["q"]}`
 
-func (f *restartFixture) post(t *testing.T, body string) (int, server.RestartResult) {
+func (f *restartFixture) post(t *testing.T, body string) (int, wire.RestartResult) {
 	t.Helper()
 	code, out := webPostJSON(t, f.base+"/v1/restart", body, login(t, f.h.StateDir, f.base), "", jsonPost(f.base))
-	var res server.RestartResult
+	var res wire.RestartResult
 	if code == http.StatusOK {
 		if err := json.Unmarshal([]byte(out), &res); err != nil {
 			t.Fatalf("body %q: %v", out, err)
@@ -101,7 +102,7 @@ func TestRestart_ChangedValuesAreRefusedWithTheNewOnes(t *testing.T) {
 			f := newRestartFixture(t)
 			f.setOutput(t, changed)
 			code, res := f.post(t, confirmedBody)
-			if code != http.StatusOK || !res.Refused || res.Reason != server.ReasonRestartChanged || res.Report == nil {
+			if code != http.StatusOK || !res.Refused || res.Reason != wire.ReasonRestartChanged || res.Report == nil {
 				t.Fatalf("code=%d res=%+v", code, res)
 			}
 			if len(f.spawned()) != 0 {
@@ -132,7 +133,7 @@ func TestRestart_ASecondRequestDuringARestartIsRefused(t *testing.T) {
 		t.Fatalf("first = %+v", res)
 	}
 	_, res := f.post(t, confirmedBody)
-	if !res.Refused || res.Reason != server.ReasonRestartInProgress || !res.Restarting {
+	if !res.Refused || res.Reason != wire.ReasonRestartInProgress || !res.Restarting {
 		t.Errorf("second = %+v", res)
 	}
 	if len(f.spawned()) != 1 {
@@ -145,7 +146,7 @@ func TestRestart_UnreadableCheckIsRefusedAndSpawnsNothing(t *testing.T) {
 	f := newRestartFixture(t)
 	f.setOutput(t, "not json")
 	_, res := f.post(t, confirmedBody)
-	if !res.Refused || res.Reason != server.ReasonRestartCheck || len(f.spawned()) != 0 {
+	if !res.Refused || res.Reason != wire.ReasonRestartCheck || len(f.spawned()) != 0 {
 		t.Errorf("res = %+v, spawns = %v", res, f.spawned())
 	}
 }

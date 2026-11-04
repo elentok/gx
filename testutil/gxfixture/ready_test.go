@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -289,26 +290,26 @@ func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 }
 
 // checksOf is `gx server checks --json`, by project.
-func (r *running) checksOf(t *testing.T) map[string]server.ProjectChecks {
+func (r *running) checksOf(t *testing.T) map[string]wire.ProjectChecks {
 	t.Helper()
-	var st server.ChecksStatus
+	var st wire.ChecksStatus
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "checks", "--json")), &st); err != nil {
 		t.Fatal(err)
 	}
-	out := map[string]server.ProjectChecks{}
+	out := map[string]wire.ProjectChecks{}
 	for _, p := range st.Projects {
 		out[p.Project] = p
 	}
 	return out
 }
 
-func kindOf(p server.ProjectChecks, kind string) server.KindCheck {
+func kindOf(p wire.ProjectChecks, kind string) wire.KindCheck {
 	for _, k := range p.Kinds {
 		if k.Kind == kind {
 			return k
 		}
 	}
-	return server.KindCheck{}
+	return wire.KindCheck{}
 }
 
 func TestChecksMissingScenarioReportsBothProjectsMissing(t *testing.T) {

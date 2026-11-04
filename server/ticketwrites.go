@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/elentok/gx/events"
 	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
@@ -261,7 +263,7 @@ func (s *Server) ticketRelaunch(req QueueRequest, qc queueCtx) (QueueResult, err
 			}
 		}
 		if d, held := s.freshHeldDisk(ref.addr.Project); held {
-			return refusal(ReasonDiskLow, diskLowReason(d)), nil
+			return refusal(wire.ReasonDiskLow, diskLowReason(d)), nil
 		}
 		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, ReasonAgentWorking, isWorking); refused || err != nil {
 			return res, err

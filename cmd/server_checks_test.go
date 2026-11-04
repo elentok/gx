@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestServerChecksSave_JSONPrintsTheRouteResult(t *testing.T) {
@@ -41,7 +42,7 @@ func TestServerChecks_JSONMatchesTheRoute(t *testing.T) {
 	if err := runServerChecks(ctx, h.Client, &out, "", true); err != nil {
 		t.Fatal(err)
 	}
-	var got server.ChecksStatus
+	var got wire.ChecksStatus
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}

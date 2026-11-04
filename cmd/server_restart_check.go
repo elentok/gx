@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -39,12 +39,12 @@ func newServerRestartCheckCmd(d deps) *cobra.Command {
 	return c
 }
 
-func writeRestartCheck(w io.Writer, rep server.RestartCheckReport) error {
+func writeRestartCheck(w io.Writer, rep wire.RestartCheckReport) error {
 	fmt.Fprintf(w, "running: %s\nbinary:  %s\n", rep.RunningVersion, rep.Binary)
 	switch rep.Status {
-	case server.RestartCheckTooOld:
+	case wire.RestartCheckTooOld:
 		fmt.Fprintf(w, "too old: %s\n%s\n", rep.Error, rep.Hint)
-	case server.RestartCheckUnreadable:
+	case wire.RestartCheckUnreadable:
 		fmt.Fprintf(w, "unreadable version: %s\n", rep.Error)
 	default:
 		fmt.Fprintf(w, "new:     %s\n", rep.NewVersion)

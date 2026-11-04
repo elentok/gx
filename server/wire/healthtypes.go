@@ -1,6 +1,8 @@
-package server
+package wire
 
-import "time"
+import (
+	"time"
+)
 
 // HealthState is what a Tray meter shows.
 type HealthState string

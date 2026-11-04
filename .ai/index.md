@@ -114,7 +114,8 @@ a gx CLI step. A new pause kind needs a row in the pause-to-verb table. See
 There is no `internal/` directory. Top-level packages live at the repo root:
 
 - `cmd/` — CLI commands (`gx tickets`, `gx agent`, ...)
-- `server/` — the gx server; `server/servertest/` holds its test helpers
+- `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the
+  wire types, consts and pure methods (no behaviour, no import of `server`)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners
@@ -168,9 +169,13 @@ Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
 - The web UI does not use prettier. Never run it: it reformats unrelated lines.
-- Regenerate `webui/src/generated/server.ts` with `make web-types`. tygo cannot resolve a constant
-  or alias from another package (it emits `any`), so give wire types in `server/` literal values
-  and map cross-package types in `tygo.yaml` `type_mappings`. Check `git diff` for `any`.
+- Regenerate `webui/src/generated/server.ts` and `wire.ts` with `make web-types`. Wire types live in
+  `server/wire` and generate `wire.ts`; `server.ts` re-exports it, so web code keeps importing
+  `generated/server`. tygo cannot resolve a constant or alias from another package (it emits
+  `any`), so give wire types literal values and map cross-package types in `tygo.yaml`
+  `type_mappings` (a wire type used by a `server` type needs an `import type` in the `server`
+  entry's `frontmatter` too). Check `git diff` for `any`. During the wire split,
+  `scripts/webtypes-diff.sh <base-sha>` compares the output with the base.
 - Run e2e with `make web-e2e`. It rebuilds the web bundle first. `pnpm e2e` does not rebuild.
 
 ## UI

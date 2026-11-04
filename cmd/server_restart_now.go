@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func runServerRestartNow(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}
-	if rep.Status != server.RestartCheckOK {
+	if rep.Status != wire.RestartCheckOK {
 		return fmt.Errorf("restart check failed (%s): %s", rep.Status, rep.Error)
 	}
 	res, err := cl.Restart(ctx, restartRequestFor(rep))
@@ -58,8 +58,8 @@ func runServerRestartNow(ctx context.Context, cl *apiclient.Client, w io.Writer,
 }
 
 // restartRequestFor confirms the values a check showed.
-func restartRequestFor(rep server.RestartCheckReport) server.RestartRequest {
-	req := server.RestartRequest{NewVersion: rep.NewVersion, ConfigOK: rep.Config.OK, FailingProjects: []string{}}
+func restartRequestFor(rep wire.RestartCheckReport) wire.RestartRequest {
+	req := wire.RestartRequest{NewVersion: rep.NewVersion, ConfigOK: rep.Config.OK, FailingProjects: []string{}}
 	for _, p := range rep.Projects {
 		if !p.OK {
 			req.FailingProjects = append(req.FailingProjects, p.Name)

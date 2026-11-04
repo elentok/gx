@@ -13,53 +13,19 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
 const (
-	// NoticeDiskWarn is the notify kind for a disk that dropped under the warn threshold.
-	NoticeDiskWarn = "disk-warn"
-	// EventDiskWarnChanged is emitted when a disk's warn mark is set or cleared.
-	EventDiskWarnChanged = "disk-warn-changed"
-	// NoticeDiskResume is the notify kind for a held disk that climbed back to the clean threshold.
-	NoticeDiskResume = "disk-resume"
-	// VerdictDiskLow is the explain verdict for a queued ticket whose project watches a held disk.
-	VerdictDiskLow = "disk low"
-	// ReasonDiskLow refuses a relaunch while a disk of the ticket's project is held.
-	ReasonDiskLow = "disk-low"
-
 	defaultDiskPoll = time.Minute
 	// diskWarnMargin is how far above the warn threshold a disk must climb
 	// before its mark clears, so a reading near the threshold does not flap.
 	diskWarnMargin = 2 * humanize.GByte
 )
 
-// DiskReading is one free-space reading of a disk (a volume, not a path).
-type DiskReading struct {
-	ID   string // device id, shared by every path on the volume
-	Name string // mount point or volume name
-	Free uint64 // bytes available to a non-root user
-	// Total is the size of the volume in bytes.
-	Total uint64
-}
-
-// DiskStatus is one disk, in the snapshot (warned or held disks only) and in
-// the disk status route (every known disk).
-type DiskStatus struct {
-	ID         string    `json:"id"`
-	Name       string    `json:"name"`
-	FreeBytes  uint64    `json:"free_bytes"`
-	TotalBytes uint64    `json:"total_bytes"`
-	Projects   []string  `json:"projects"`
-	Warned     bool      `json:"warned"`
-	Held       bool      `json:"held"`
-	ReadAt     time.Time `json:"read_at"`
-	Cleaning   bool      `json:"cleaning"`
-	LastClean  string    `json:"last_clean"` // bytes freed, the failure, or that no command is set
-}
-
 type diskState struct {
-	reading   DiskReading
+	reading   wire.DiskReading
 	at        time.Time
 	projects  []string
 	warned    bool
@@ -71,8 +37,8 @@ type diskState struct {
 	probe     string // a path on the disk, read again when a clean ends
 }
 
-func (st *diskState) status(id string) DiskStatus {
-	return DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free,
+func (st *diskState) status(id string) wire.DiskStatus {
+	return wire.DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free,
 		TotalBytes: st.reading.Total, Projects: slices.Clone(st.projects), Warned: st.warned, Held: st.held, ReadAt: st.at,
 		Cleaning: st.cleaning, LastClean: st.lastClean}
 }
@@ -167,7 +133,7 @@ func (st *diskState) endTransition(free, warn, clean uint64, end cleanEnd) diskC
 // change with a snapshot of what the effects need. projects is who watches the
 // disk now; nil keeps the last list. probe is a path on the disk, read again
 // when a clean ends.
-func (s *Server) transition(r DiskReading, probe string, projects []string, now time.Time,
+func (s *Server) transition(r wire.DiskReading, probe string, projects []string, now time.Time,
 	fn func(st *diskState, warn, clean uint64) diskChange) (diskChange, diskSnapshot) {
 	ds := s.settings.Load().DiskSpace
 	d := &s.disks
@@ -195,7 +161,7 @@ func (s *Server) transition(r DiskReading, probe string, projects []string, now 
 
 // observe applies one ordinary reading to the state machine and reports
 // whether the disk is held after it.
-func (s *Server) observe(r DiskReading, probe string, projects []string, now time.Time) (held bool) {
+func (s *Server) observe(r wire.DiskReading, probe string, projects []string, now time.Time) (held bool) {
 	c, snap := s.transition(r, probe, projects, now, func(st *diskState, warn, clean uint64) diskChange {
 		return st.readTransition(r.Free, warn, clean)
 	})
@@ -204,7 +170,7 @@ func (s *Server) observe(r DiskReading, probe string, projects []string, now tim
 	}
 	s.publishChange(r, c)
 	if c.resumed {
-		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
+		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
 			Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
 		s.kickRunner()
 	}
@@ -216,7 +182,7 @@ func (s *Server) observe(r DiskReading, probe string, projects []string, now tim
 
 // observeCleanEnd applies the reading that ends a clean and reports whether
 // the disk is held after it.
-func (s *Server) observeCleanEnd(r DiskReading, probe string, end cleanEnd) (held bool) {
+func (s *Server) observeCleanEnd(r wire.DiskReading, probe string, end cleanEnd) (held bool) {
 	c, snap := s.transition(r, probe, nil, time.Now(), func(st *diskState, warn, clean uint64) diskChange {
 		return st.endTransition(r.Free, warn, clean, end)
 	})
@@ -230,11 +196,11 @@ func (s *Server) observeCleanEnd(r DiskReading, probe string, end cleanEnd) (hel
 
 // publishChange announces a changed disk: the event, the warn and hold logs and
 // the warn notice.
-func (s *Server) publishChange(r DiskReading, c diskChange) {
-	s.events.publish(EventDiskWarnChanged, "")
+func (s *Server) publishChange(r wire.DiskReading, c diskChange) {
+	s.events.publish(wire.EventDiskWarnChanged, "")
 	if c.warnSet {
 		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", c.warn)
-		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
+		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
 			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(c.warn)})
 	}
 	if c.holdSet {
@@ -261,22 +227,22 @@ func (s *Server) watchedPaths(projectDir string) []string {
 
 // heldDiskOf returns the first held disk project watches, from the watcher's
 // state. It takes no reading.
-func (s *Server) heldDiskOf(project string) (DiskStatus, bool) {
+func (s *Server) heldDiskOf(project string) (wire.DiskStatus, bool) {
 	for _, d := range s.diskStatuses(false) {
 		if d.Held && slices.Contains(d.Projects, project) {
 			return d, true
 		}
 	}
-	return DiskStatus{}, false
+	return wire.DiskStatus{}, false
 }
 
 // freshHeldDisk reads every disk project watches (its repo disk and the Go
 // cache disk) and returns the first one that is held. A project with no repo
 // path has no disk to read.
-func (s *Server) freshHeldDisk(project string) (DiskStatus, bool) {
+func (s *Server) freshHeldDisk(project string) (wire.DiskStatus, bool) {
 	dir, err := s.projectDir(project)
 	if err != nil {
-		return DiskStatus{}, false
+		return wire.DiskStatus{}, false
 	}
 	var heldID string
 	now := time.Now()
@@ -291,13 +257,13 @@ func (s *Server) freshHeldDisk(project string) (DiskStatus, bool) {
 		}
 	}
 	if heldID == "" {
-		return DiskStatus{}, false
+		return wire.DiskStatus{}, false
 	}
 	return s.diskStatus(heldID), true
 }
 
 // diskStatus is one known disk's status.
-func (s *Server) diskStatus(id string) DiskStatus {
+func (s *Server) diskStatus(id string) wire.DiskStatus {
 	d := &s.disks
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -305,41 +271,33 @@ func (s *Server) diskStatus(id string) DiskStatus {
 }
 
 // diskLowReason says which disk holds dispatch and how much is free on it.
-func diskLowReason(d DiskStatus) string {
+func diskLowReason(d wire.DiskStatus) string {
 	return d.Name + " has " + humanize.Bytes(d.FreeBytes) + " free"
 }
 
 // diskStatuses lists the known disks by id; listedOnly keeps those whose warn
 // mark is set or that are held.
-func (s *Server) diskStatuses(listedOnly bool) []DiskStatus {
+func (s *Server) diskStatuses(listedOnly bool) []wire.DiskStatus {
 	d := &s.disks
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	var out []DiskStatus
+	var out []wire.DiskStatus
 	for id, st := range d.disks {
 		if listedOnly && !st.warned && !st.held {
 			continue
 		}
 		out = append(out, st.status(id))
 	}
-	slices.SortFunc(out, func(a, b DiskStatus) int { return strings.Compare(a.ID, b.ID) })
+	slices.SortFunc(out, func(a, b wire.DiskStatus) int { return strings.Compare(a.ID, b.ID) })
 	return out
 }
 
 // listedDisks lists the disks the snapshot shows: warn mark set or held, by id.
-func (s *Server) listedDisks() []DiskStatus { return s.diskStatuses(true) }
-
-// DiskReport is the disk status route's result: the effective thresholds as
-// size strings ("off" when a threshold is off) and every known disk.
-type DiskReport struct {
-	WarnBelow  string       `json:"warn_below"`
-	CleanBelow string       `json:"clean_below"`
-	Disks      []DiskStatus `json:"disks"`
-}
+func (s *Server) listedDisks() []wire.DiskStatus { return s.diskStatuses(true) }
 
 func (s *Server) diskStatusRead(w http.ResponseWriter, _ *http.Request) {
 	ds := s.settings.Load().DiskSpace
-	writeJSON(w, DiskReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow), Disks: s.diskStatuses(false)})
+	writeJSON(w, wire.DiskReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow), Disks: s.diskStatuses(false)})
 }
 
 func sizeOrOff(b config.ByteSize) string {
@@ -349,7 +307,7 @@ func sizeOrOff(b config.ByteSize) string {
 	return b.String()
 }
 
-func (s *Server) freeSpace(path string) (DiskReading, error) {
+func (s *Server) freeSpace(path string) (wire.DiskReading, error) {
 	if s.cfg.FreeSpace != nil {
 		return s.cfg.FreeSpace(path)
 	}
@@ -387,7 +345,7 @@ func (s *Server) checkDisks() {
 		return
 	}
 	type watched struct {
-		reading  DiskReading
+		reading  wire.DiskReading
 		probe    string
 		projects []string
 	}

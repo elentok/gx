@@ -95,8 +95,7 @@ var allowed = map[string]allowance{
 	"ralphloop/mergelock.go":              allow("on-disk land-locks state dir; renaming would orphan live locks", "land"),
 	"ralphloop/notification_text.go":      allow("chat headlines \"needs answer\" and \"needs repair\"", "needsanswer", "needsrepair"),
 	"ralphloop/waitforfinish_recovery.go": allow("comment names the legacy Needs Answer heading", "needsanswer"),
-	"webui/src/generated/server.ts":       allow("generated from the wire fields above", "park", "needsanswer"),
-	"webui/src/epic/rows.ts":              allow("maps the legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
+	"webui/src/generated/server.ts":       allow("generated from the wire fields above", "park", "needsanswer"), "webui/src/epic/rows.ts": allow("maps the legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
 	// Tests of the read shim, the hidden aliases and the kept wire names.
 	"cmd/server_parity_test.go":                allow("lists the hidden drain, park and unpark routes", "drain", "park"),
 	"cmd/tickets_alias_test.go":                allow("tests the retired land, reset, unpark and drain aliases", "park", "land", "reset", "drain"),

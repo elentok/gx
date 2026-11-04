@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // SetAFK sets AFK mode; a nil on toggles it.
@@ -64,31 +65,31 @@ func (c *Client) ConfigStatus(ctx context.Context) (server.ConfigStatus, error) 
 }
 
 // RestartCheck runs the restart check from the binary a restart would start.
-func (c *Client) RestartCheck(ctx context.Context) (server.RestartCheckReport, error) {
-	var rep server.RestartCheckReport
+func (c *Client) RestartCheck(ctx context.Context) (wire.RestartCheckReport, error) {
+	var rep wire.RestartCheckReport
 	err := c.get(ctx, "/v1/restart/check", &rep)
 	return rep, err
 }
 
 // Restart starts a restart when the check still matches req. A refusal is a
 // result (Refused set), not an error.
-func (c *Client) Restart(ctx context.Context, req server.RestartRequest) (server.RestartResult, error) {
-	var res server.RestartResult
+func (c *Client) Restart(ctx context.Context, req wire.RestartRequest) (wire.RestartResult, error) {
+	var res wire.RestartResult
 	err := c.post(ctx, "/v1/restart", req, &res)
 	return res, err
 }
 
 // CleanDisk runs the cleanup of one disk now. A refusal is a result (Refused
 // set), not an error.
-func (c *Client) CleanDisk(ctx context.Context, disk string) (server.CleanNowResult, error) {
-	var res server.CleanNowResult
-	err := c.post(ctx, "/v1/disk/clean", server.CleanNowRequest{Disk: disk}, &res)
+func (c *Client) CleanDisk(ctx context.Context, disk string) (wire.CleanNowResult, error) {
+	var res wire.CleanNowResult
+	err := c.post(ctx, "/v1/disk/clean", wire.CleanNowRequest{Disk: disk}, &res)
 	return res, err
 }
 
 // DiskStatus is the disk-space thresholds and every disk the watcher knows.
-func (c *Client) DiskStatus(ctx context.Context) (server.DiskReport, error) {
-	var rep server.DiskReport
+func (c *Client) DiskStatus(ctx context.Context) (wire.DiskReport, error) {
+	var rep wire.DiskReport
 	err := c.get(ctx, "/v1/disk/status", &rep)
 	return rep, err
 }
@@ -119,8 +120,8 @@ func (c *Client) SetDefaultHarness(ctx context.Context, req server.SetDefaultHar
 
 // ChecksStatus is each project's check config and detected commands. An empty
 // project means every registered project.
-func (c *Client) ChecksStatus(ctx context.Context, project string) (server.ChecksStatus, error) {
-	var st server.ChecksStatus
+func (c *Client) ChecksStatus(ctx context.Context, project string) (wire.ChecksStatus, error) {
+	var st wire.ChecksStatus
 	q := url.Values{}
 	if project != "" {
 		q.Set("project", project)
@@ -130,16 +131,16 @@ func (c *Client) ChecksStatus(ctx context.Context, project string) (server.Check
 }
 
 // Health is the machine's health: host, CPU, memory and every watched disk.
-func (c *Client) Health(ctx context.Context) (server.HealthReport, error) {
-	var rep server.HealthReport
+func (c *Client) Health(ctx context.Context) (wire.HealthReport, error) {
+	var rep wire.HealthReport
 	err := c.get(ctx, "/v1/health", &rep)
 	return rep, err
 }
 
 // HealthWait is Health with the `wait` option: a CPU list still reading is
 // held back until the server's second process read ends.
-func (c *Client) HealthWait(ctx context.Context) (server.HealthReport, error) {
-	var rep server.HealthReport
+func (c *Client) HealthWait(ctx context.Context) (wire.HealthReport, error) {
+	var rep wire.HealthReport
 	err := c.get(ctx, "/v1/health?wait", &rep)
 	return rep, err
 }

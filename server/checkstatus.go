@@ -8,44 +8,9 @@ import (
 
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
-
-// ChecksStatus is what `gx server checks` and the web "Set up checks" dialog
-// read: each project's check config today and what gx would recommend.
-type ChecksStatus struct {
-	Projects []ProjectChecks `json:"projects"`
-}
-
-// ProjectChecks is one project's check state.
-type ProjectChecks struct {
-	Project string `json:"project"`
-	// Missing is true when the project has neither .gx/checks.json nor a
-	// checks key in project.json. A project with broken config is not missing.
-	Missing     bool     `json:"missing"`
-	Trunk       string   `json:"trunk"`
-	SaveTargets []string `json:"save_targets"`
-	// Error is set when the repo file or the checks key is invalid.
-	Error string      `json:"error"`
-	Kinds []KindCheck `json:"kinds"`
-}
-
-// States of a check kind.
-const (
-	KindStateConfigured = "configured"
-	KindStateDefault    = "gx-default"
-	KindStateOff        = "off"
-)
-
-// KindCheck is one kind's state and detection result.
-type KindCheck struct {
-	Kind string `json:"kind"`
-	// State is configured, gx-default or off.
-	State       string            `json:"state"`
-	Default     string            `json:"default"`
-	Recommended *check.Candidate  `json:"recommended,omitempty"`
-	Candidates  []check.Candidate `json:"candidates"`
-}
 
 func (s *Server) checksStatusRead(w http.ResponseWriter, r *http.Request) {
 	st, err := s.checksStatus(r.URL.Query().Get("project"))
@@ -63,8 +28,8 @@ func (s *Server) checksStatusRead(w http.ResponseWriter, r *http.Request) {
 
 // checksStatus answers for one project, or for every registered project when
 // project is empty.
-func (s *Server) checksStatus(project string) (ChecksStatus, error) {
-	st := ChecksStatus{Projects: []ProjectChecks{}}
+func (s *Server) checksStatus(project string) (wire.ChecksStatus, error) {
+	st := wire.ChecksStatus{Projects: []wire.ProjectChecks{}}
 	var dirs []string
 	if project != "" {
 		dir, err := tickets.ProjectDirByName(s.cfg.TicketStore, project)
@@ -84,10 +49,10 @@ func (s *Server) checksStatus(project string) (ChecksStatus, error) {
 	return st, nil
 }
 
-func (s *Server) projectChecks(dir string) ProjectChecks {
+func (s *Server) projectChecks(dir string) wire.ProjectChecks {
 	name := tickets.ProjectName(dir)
 	pf, err := config.ReadProjectFile(dir)
-	pc := ProjectChecks{Project: name, SaveTargets: []string{SaveTargetRepo, SaveTargetProjectJSON}, Kinds: []KindCheck{}}
+	pc := wire.ProjectChecks{Project: name, SaveTargets: []string{SaveTargetRepo, SaveTargetProjectJSON}, Kinds: []wire.KindCheck{}}
 	if err != nil {
 		pc.Error = err.Error()
 	}
@@ -114,11 +79,11 @@ func (s *Server) projectChecks(dir string) ProjectChecks {
 		found = check.Detect(root)
 	}
 	for _, kind := range check.Kinds {
-		kc := KindCheck{Kind: kind, State: KindStateDefault, Default: check.DefaultLine[kind], Candidates: []check.Candidate{}}
+		kc := wire.KindCheck{Kind: kind, State: wire.KindStateDefault, Default: check.DefaultLine[kind], Candidates: []check.Candidate{}}
 		if c, ok := cfg[kind]; ok {
-			kc.State = KindStateConfigured
+			kc.State = wire.KindStateConfigured
 			if c.Off {
-				kc.State = KindStateOff
+				kc.State = wire.KindStateOff
 			}
 		}
 		if cands := found[kind]; len(cands) > 0 {
