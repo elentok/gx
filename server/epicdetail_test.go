@@ -1,7 +1,6 @@
 package server_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -15,28 +14,10 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func getEpicDetail(t *testing.T, h *servertest.Harness, base, address string) (int, wire.EpicDetail, string) {
-	t.Helper()
-	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics/detail?address="+address)
-	var d wire.EpicDetail
-	if code == http.StatusOK {
-		if err := json.Unmarshal([]byte(body), &d); err != nil {
-			t.Fatalf("body %q: %v", body, err)
-		}
-	}
-	return code, d, body
-}
-
-func rowOf(t *testing.T, d wire.EpicDetail, address string) wire.EpicDetailRow {
-	t.Helper()
-	for _, r := range d.Rows {
-		if r.Address == address {
-			return r
-		}
-	}
-	t.Fatalf("no row %s in %+v", address, d.Rows)
-	return wire.EpicDetailRow{}
-}
+var (
+	getEpicDetail = servertest.GetEpicDetail
+	rowOf         = servertest.RowOf
+)
 
 func TestEpicDetail_LoopEpic(t *testing.T) {
 	t.Parallel()

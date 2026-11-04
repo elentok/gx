@@ -1,4 +1,4 @@
-package server_test
+package harness_test
 
 import (
 	"context"
@@ -14,11 +14,11 @@ import (
 // the snapshot; both must agree.
 func labelsOf(t *testing.T, h *servertest.Harness, base, epic, address string) wire.HarnessLabel {
 	t.Helper()
-	code, d, body := getEpicDetail(t, h, base, epic)
+	code, d, body := servertest.GetEpicDetail(t, h, base, epic)
 	if code != 200 {
 		t.Fatalf("detail status %d: %s", code, body)
 	}
-	fromDetail := rowOf(t, d, address).HarnessLabel
+	fromDetail := servertest.RowOf(t, d, address).HarnessLabel
 	snap, err := h.Client.Snapshot(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestHarnessLabel_RunningRowCarriesTheRunsConfig(t *testing.T) {
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	waitKind(t, fake, "epic-a-iter-01")
+	servertest.WaitKind(t, fake, "epic-a-iter-01")
 	var got wire.HarnessLabel
 	servertest.WaitFor(t, 10*time.Second, "running label", func() bool {
 		got = labelsOf(t, h, hs.WebURL, "proj:epic-a", "proj:epic-a/01")

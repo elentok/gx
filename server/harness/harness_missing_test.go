@@ -1,4 +1,4 @@
-package server_test
+package harness_test
 
 import (
 	"context"
@@ -85,10 +85,10 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 		wantFrom string
 	}{
 		{"project override", func(t *testing.T, h *servertest.Harness, _, _ string) {
-			setHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			servertest.SetHarness(t, h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 		}, "the project default"},
 		{"reload", func(t *testing.T, h *servertest.Harness, path, store string) {
-			switchDefaultHarness(t, h, path, store, "codex")
+			servertest.SwitchDefaultHarness(t, h, path, store, "codex")
 		}, "the global default"},
 	}
 	for _, tc := range cases {

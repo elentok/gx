@@ -1,4 +1,4 @@
-package server_test
+package harness_test
 
 import (
 	"context"
@@ -60,7 +60,7 @@ func TestResume_TierOverrideLaunchesOnceOnThatTier(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	path := pausedOnModel(t, store)
-	writeProjectAgents(t, store, repo, tierProjectAgents)
+	servertest.WriteProjectAgents(t, store, repo, tierProjectAgents)
 	rec := &startRecorder{Runner: runnerfake.NewRunner()}
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec))
 	ctx := context.Background()
@@ -76,7 +76,7 @@ func TestResume_TierOverrideLaunchesOnceOnThatTier(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 20*time.Second, "the first launch", func() bool { return rec.count() >= 1 })
-	if !hasFlag(rec.args(0), "--model", "opus") {
+	if !servertest.HasFlag(rec.args(0), "--model", "opus") {
 		t.Errorf("first launch args = %q, want --model opus", rec.args(0))
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.TierOverride != "" {
@@ -88,7 +88,7 @@ func TestResume_WithoutTierLeavesTheWorkerModel(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	path := pausedOnModel(t, store)
-	writeProjectAgents(t, store, repo, tierProjectAgents)
+	servertest.WriteProjectAgents(t, store, repo, tierProjectAgents)
 	rec := &startRecorder{Runner: runnerfake.NewRunner()}
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec))
 	ctx := context.Background()
@@ -103,7 +103,7 @@ func TestResume_WithoutTierLeavesTheWorkerModel(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 20*time.Second, "the launch", func() bool { return rec.count() >= 1 })
-	if !hasFlag(rec.args(0), "--model", "sonnet") {
+	if !servertest.HasFlag(rec.args(0), "--model", "sonnet") {
 		t.Errorf("launch args = %q, want --model sonnet", rec.args(0))
 	}
 }
@@ -113,7 +113,7 @@ func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) 
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: string(schema.TypeImplement)})
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	writeProjectAgents(t, store, repo, `,"agents":{"claude":{"effort":"low"}}`)
+	servertest.WriteProjectAgents(t, store, repo, `,"agents":{"claude":{"effort":"low"}}`)
 	rec := &startRecorder{Runner: runnerfake.NewRunner()}
 	// A model-mismatch pause reaches chat, not the OS banner, so a fake Slack
 	// webhook stands in for the banner.

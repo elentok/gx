@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -64,13 +63,10 @@ func (r *turnRunner) started(prefix string) (string, bool) {
 	return r.labels[i], true
 }
 
-func writeProjectAgents(t *testing.T, store, repo, agents string) {
-	t.Helper()
-	body := `{"name":"proj","repo":"` + repo + `","auto-ff-merge":true` + agents + `}`
-	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
+var (
+	writeProjectAgents = servertest.WriteProjectAgents
+	hasFlag            = servertest.HasFlag
+)
 
 // runToConflict launches proj:epic-a/01 whose commit conflicts with the feature
 // tip, calls midRun during the agent's turn, and returns the iteration's and the
@@ -109,11 +105,6 @@ func runToConflict(t *testing.T, agents string, midRun func(store, repo string))
 	})
 	iterLabel, _ := fake.started("epic-a-iter-")
 	return fake.Args(iterLabel), fake.Args(label)
-}
-
-func hasFlag(args []string, flag, value string) bool {
-	i := slices.Index(args, flag)
-	return i >= 0 && i+1 < len(args) && args[i+1] == value
 }
 
 func TestConflictAgent_InheritsTheParentRunsModelAndEffort(t *testing.T) {

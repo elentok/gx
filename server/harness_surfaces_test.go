@@ -109,7 +109,7 @@ func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
 	}
 	// Meta's first_prompt is cleared once typed, so it is read from the log.
 	waitPromptTyped(t, f.h, first.Session.ID, "$gx-design proj:map-a")
-	switchDefaultHarness(t, f.h, path, store, "claude")
+	servertest.SwitchDefaultHarness(t, f.h, path, store, "claude")
 	second := f.open(t, "proj:map-b", false)
 	if second.Refused || second.Session == nil {
 		t.Fatalf("open map-b = %+v", second)
@@ -215,11 +215,11 @@ func TestRelaunch_EarlierClaudeRunPicksTheClaudeRunner(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "one", "")
 	h, claude, pty, path := startSplitRunners(t, store)
 	servertest.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", true)
-	switchDefaultHarness(t, h, path, store, "codex")
+	servertest.SwitchDefaultHarness(t, h, path, store, "codex")
 	if res, err := h.Client.TicketRelaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("relaunch: %+v, %v", res, err)
 	}
-	if k := waitKind(t, claude, "epic-a-iter-01"); k != "claude" {
+	if k := servertest.WaitKind(t, claude, "epic-a-iter-01"); k != "claude" {
 		t.Errorf("retry started as %q, want claude", k)
 	}
 	if k := pty.Kind("epic-a-iter-01"); k != "" {
@@ -270,7 +270,7 @@ func TestRelaunch_FollowsCodexDefaultGateAndRunner(t *testing.T) {
 		t.Run(typ+" runner", func(t *testing.T) {
 			t.Parallel()
 			_, claude, pty := setup(t)
-			if k := waitKind(t, pty, "epic-a-iter-01"); k != "codex" {
+			if k := servertest.WaitKind(t, pty, "epic-a-iter-01"); k != "codex" {
 				t.Errorf("relaunch started as %q on pty, want codex", k)
 			}
 			if k := claude.Kind("epic-a-iter-01"); k != "" {

@@ -67,12 +67,12 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 		run  func(t *testing.T, f refusalFixture) wire.SessionResult
 	}{
 		{"project override", "the project default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			setHarness(t, f.h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+			servertest.SetHarness(t, f.h, wire.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{})
 		}},
 		{"default changed by reload", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{})
 		}},
@@ -81,7 +81,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			return f.create(t, wire.CreateSessionRequest{Harness: "codex"})
 		}},
 		{"design step", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "proj:map"})
 			if err != nil {
@@ -90,7 +90,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			return res
 		}},
 		{"fix agent", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			res, err := f.h.Client.FixAgent(f.ctx, wire.FixAgentRequest{Address: "proj:loop/01"})
 			if err != nil {
@@ -99,7 +99,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			return res.SessionResult
 		}},
 		{"investigate", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
-			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
+			servertest.SwitchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			return f.create(t, wire.CreateSessionRequest{Ticket: "proj:loop/01", Prompt: "investigate"})
 		}},
@@ -230,7 +230,7 @@ func startKept(t *testing.T, label string) keptSession {
 
 func (k keptSession) switchDefault(t *testing.T, to string) {
 	t.Helper()
-	switchDefaultHarness(t, k.h, k.cfg, k.store, to)
+	servertest.SwitchDefaultHarness(t, k.h, k.cfg, k.store, to)
 }
 
 // A default switched to codex leaves a running Claude-format session read as
@@ -314,7 +314,7 @@ func TestHarnessSwitch_ChartingHandoffKeepsTheSessionsKind(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), "config.json")
 	f := startHandoff(t, "chart", servertest.WithConfigFile(cfg))
 	servertest.WriteConfig(t, cfg, f.store, nil)
-	switchDefaultHarness(t, f.h, cfg, f.store, "codex")
+	servertest.SwitchDefaultHarness(t, f.h, cfg, f.store, "codex")
 	setMapStep(t, f.store, "resolve-tickets")
 	f.continueSession(t)
 	f.wantRestartedOnWorker(t)
