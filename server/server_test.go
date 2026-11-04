@@ -31,9 +31,7 @@ func TestMain(m *testing.M) {
 	// moved the budget day under its parallel neighbours.
 	time.Local = time.FixedZone("test", 5*3600)
 	code := m.Run()
-	if fakeCodexBin != "" {
-		os.RemoveAll(fakeCodexBin)
-	}
+	servertest.RemoveFakeCodex()
 	os.Exit(code)
 }
 

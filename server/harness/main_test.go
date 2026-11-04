@@ -14,5 +14,7 @@ import (
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
-	os.Exit(m.Run())
+	code := m.Run()
+	servertest.RemoveFakeCodex()
+	os.Exit(code)
 }

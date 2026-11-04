@@ -1,14 +1,12 @@
-package server_test
+package harness_test
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -23,36 +21,12 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-var (
-	fakeCodexOnce sync.Once
-	fakeCodexBin  string // dir holding the built "codex"; removed by TestMain
-	fakeCodexErr  error
-)
-
-// fakeCodexDir builds fakecodex once per package run. Tests only read it.
-func fakeCodexDir(t *testing.T) string {
-	t.Helper()
-	fakeCodexOnce.Do(func() {
-		fakeCodexBin, fakeCodexErr = os.MkdirTemp("", "fakecodex-")
-		if fakeCodexErr != nil {
-			return
-		}
-		if out, err := exec.Command("go", "build", "-o", filepath.Join(fakeCodexBin, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex").CombinedOutput(); err != nil {
-			fakeCodexErr = fmt.Errorf("%w\n%s", err, out)
-		}
-	})
-	if fakeCodexErr != nil {
-		t.Fatalf("build fakecodex: %v", fakeCodexErr)
-	}
-	return fakeCodexBin
-}
-
 // withFakeAgents puts the fake codex first on PATH, so a session on the codex
 // harness runs it. Claude sessions are not run here: these tests read what a
 // session was started as from its meta.
 func withFakeAgents(t *testing.T) func(*server.Config) {
 	t.Helper()
-	bin, home := fakeCodexDir(t), t.TempDir()
+	bin, home := servertest.FakeCodexDir(t), t.TempDir()
 	return servertest.WithEnv(
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"HOME="+home,
@@ -96,30 +70,30 @@ func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
 	seedMap(t, store, "map-a")
 	seedMap(t, store, "map-b")
 	path := filepath.Join(t.TempDir(), "config.json")
-	f := startDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), servertest.WithConfigFile(path), withFakeAgents(t))
+	f := servertest.StartDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), servertest.WithConfigFile(path), withFakeAgents(t))
 	servertest.WriteConfig(t, path, store, map[string]any{"agents": map[string]any{"default-harness": "codex"}})
 
-	first := f.open(t, "proj:map-a", false)
+	first := f.Open(t, "proj:map-a", false)
 	if first.Refused || first.Session == nil {
 		t.Fatalf("open map-a = %+v", first)
 	}
-	meta := readMeta(t, f.h, first.Session.ID)
+	meta := servertest.ReadMeta(t, f.H, first.Session.ID)
 	if meta["harness"] != "codex" {
 		t.Fatalf("first design meta = %v, want codex", meta)
 	}
 	// Meta's first_prompt is cleared once typed, so it is read from the log.
-	waitPromptTyped(t, f.h, first.Session.ID, "$gx-design proj:map-a")
-	servertest.SwitchDefaultHarness(t, f.h, path, store, "claude")
-	second := f.open(t, "proj:map-b", false)
+	waitPromptTyped(t, f.H, first.Session.ID, "$gx-design proj:map-a")
+	servertest.SwitchDefaultHarness(t, f.H, path, store, "claude")
+	second := f.Open(t, "proj:map-b", false)
 	if second.Refused || second.Session == nil {
 		t.Fatalf("open map-b = %+v", second)
 	}
-	meta = readMeta(t, f.h, second.Session.ID)
+	meta = servertest.ReadMeta(t, f.H, second.Session.ID)
 	// No fake claude runs, so this prompt is never typed and stays in meta.
 	if meta["harness"] != "claude" || meta["first_prompt"] != "/gx-design proj:map-b" {
 		t.Errorf("design after the switch meta = %v, want claude and a / skill prompt", meta)
 	}
-	if got := readMeta(t, f.h, first.Session.ID)["harness"]; got != "codex" {
+	if got := servertest.ReadMeta(t, f.H, first.Session.ID)["harness"]; got != "codex" {
 		t.Errorf("running design session harness = %v after the switch, want codex", got)
 	}
 }
@@ -132,26 +106,26 @@ func TestFixAgent_StartsOnACodexDefault(t *testing.T) {
 			t.Parallel()
 			store := t.TempDir()
 			servertest.WriteTicketWith(t, store, "proj", "loop", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
-			f := startDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), withFakeAgents(t))
+			f := servertest.StartDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), withFakeAgents(t))
 			if route == "tui" {
-				if res := f.fix(t, "proj:loop/01"); res.Refused {
+				if res := f.Fix(t, "proj:loop/01"); res.Refused {
 					t.Fatalf("fix = %+v", res)
 				}
 			} else {
-				body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: repairToken})
-				if code, out := servertest.WebPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", servertest.JSONPost(f.base)); code != 200 || servertest.ReasonOf(t, out) != "" {
+				body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: servertest.RepairToken})
+				if code, out := servertest.WebPostJSON(t, f.Base+"/v1/tickets/fix-agent", string(body), f.Ck, "", servertest.JSONPost(f.Base)); code != 200 || servertest.ReasonOf(t, out) != "" {
 					t.Fatalf("web fix = %d %s", code, out)
 				}
 			}
-			live := f.live(t)
+			live := f.Live(t)
 			if len(live) != 1 {
 				t.Fatalf("%d live sessions, want the Fix agent", len(live))
 			}
-			meta := readMeta(t, f.h, live[0].ID)
+			meta := servertest.ReadMeta(t, f.H, live[0].ID)
 			if meta["harness"] != "codex" {
 				t.Errorf("fix agent meta = %v, want codex", meta)
 			}
-			waitPromptTyped(t, f.h, live[0].ID, "$gx-investigate proj:loop/01")
+			waitPromptTyped(t, f.H, live[0].ID, "$gx-investigate proj:loop/01")
 		})
 	}
 }
@@ -204,7 +178,7 @@ func startRetryEnv(t *testing.T, typ string, earlierClaude bool, extra ...func(*
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
-	return retryAs(t, h, investigateAddr)
+	return servertest.RetryAs(t, h, servertest.InvestigateAddr)
 }
 
 // A person's relaunch of a ticket that ran on Claude, after a switch to
@@ -237,13 +211,13 @@ func TestInvestigateRetry_EarlierClaudeRunChecksClaudeGate(t *testing.T) {
 
 	t.Run("claude gate holds it", func(t *testing.T) {
 		t.Parallel()
-		if res := startRetryEnv(t, "implement", true, withUsageSample(t, claudeGated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Claude usage: 98% of the 5-hour limit") {
+		if res := startRetryEnv(t, "implement", true, servertest.WithUsageSample(t, claudeGated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Claude usage: 98% of the 5-hour limit") {
 			t.Errorf("retry = %+v, want a Claude usage-limit refusal", res)
 		}
 	})
 	t.Run("codex gate does not", func(t *testing.T) {
 		t.Parallel()
-		if res := startRetryEnv(t, "implement", true, withCodexUsageSample(t, codexGated)); res.Refused {
+		if res := startRetryEnv(t, "implement", true, servertest.WithCodexUsageSample(t, codexGated)); res.Refused {
 			t.Errorf("retry = %+v, want it let through", res)
 		}
 	})
@@ -279,7 +253,7 @@ func TestRelaunch_FollowsCodexDefaultGateAndRunner(t *testing.T) {
 		})
 		t.Run(typ+" gate", func(t *testing.T) {
 			t.Parallel()
-			if res := startRetryEnv(t, typ, false, withCodexUsageSample(t, gated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Codex usage: 98% of the weekly limit") {
+			if res := startRetryEnv(t, typ, false, servertest.WithCodexUsageSample(t, gated)); !res.Refused || res.Reason != wire.ReasonUsageLimit || !strings.Contains(res.Message, "Codex usage: 98% of the weekly limit") {
 				t.Errorf("retry = %+v, want a Codex usage-limit refusal", res)
 			}
 		})

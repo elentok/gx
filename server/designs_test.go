@@ -16,7 +16,6 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -45,46 +44,23 @@ func startDesigns(t *testing.T, opts ...func(*server.Config)) designsFixture {
 // startDesignsIn is startDesigns on a store the caller has already seeded.
 func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
-	repo := testutil.TempRepo(t)
-	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
-	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)),
-		func(c *server.Config) { c.WebAddr = "127.0.0.1:0" }}, opts...)
-	h := servertest.StartWithStore(t, store, opts...)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	t.Cleanup(cancel)
-	evs, err := h.Client.Events(ctx, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hs, err := h.Client.Handshake(ctx)
-	if err != nil || hs.WebURL == "" {
-		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
-	}
-	return designsFixture{h: h, ctx: ctx, evs: evs, repo: repo, base: hs.WebURL, ck: servertest.Login(t, h.StateDir, hs.WebURL)}
+	d := servertest.StartDesignsIn(t, store, opts...)
+	return designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck}
+}
+
+// shared is the servertest fixture the shared methods run on.
+func (f designsFixture) shared() servertest.DesignsFixture {
+	return servertest.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
 }
 
 func (f designsFixture) open(t *testing.T, epic string, isNew bool) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: epic, New: isNew})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
+	return f.shared().Open(t, epic, isNew)
 }
 
 func (f designsFixture) live(t *testing.T) []wire.SessionInfo {
 	t.Helper()
-	snap, err := f.h.Client.Snapshot(f.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out []wire.SessionInfo
-	for _, s := range snap.Sessions {
-		if s.Status.State != wire.SessionExited {
-			out = append(out, s)
-		}
-	}
-	return out
+	return f.shared().Live(t)
 }
 
 func TestDesignsOpen_CreatesWithTheTuiPrefill(t *testing.T) {

@@ -1,0 +1,85 @@
+package servertest
+
+import (
+	"context"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
+)
+
+// RepairToken is the state token of a ticket paused for repair.
+const RepairToken = "0:repair"
+
+// DesignsFixture is a server with the web mux up, for tests that open design
+// and fix-agent sessions.
+type DesignsFixture struct {
+	H    *Harness
+	Ctx  context.Context
+	Evs  <-chan wire.Event
+	Repo string
+	Base string
+	Ck   *http.Cookie
+}
+
+// StartDesignsIn starts a server on a store the caller has already seeded, in
+// project proj whose repo is the trunk checkout.
+func StartDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) DesignsFixture {
+	t.Helper()
+	repo := testutil.TempRepo(t)
+	SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	opts = append([]func(*server.Config){WithTestHolder(), WithChatHarness(string(agentfake.HarnessKind)), WithDefaultHarness(string(agentfake.HarnessKind)),
+		func(c *server.Config) { c.WebAddr = "127.0.0.1:0" }}, opts...)
+	h := StartWithStore(t, store, opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hs, err := h.Client.Handshake(ctx)
+	if err != nil || hs.WebURL == "" {
+		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
+	}
+	return DesignsFixture{H: h, Ctx: ctx, Evs: evs, Repo: repo, Base: hs.WebURL, Ck: Login(t, h.StateDir, hs.WebURL)}
+}
+
+// Open opens (or creates, when isNew) the design session of epic.
+func (f DesignsFixture) Open(t *testing.T, epic string, isNew bool) wire.SessionResult {
+	t.Helper()
+	res, err := f.H.Client.OpenDesign(f.Ctx, wire.DesignOpenRequest{Epic: epic, New: isNew})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+// Live lists the sessions that have not exited.
+func (f DesignsFixture) Live(t *testing.T) []wire.SessionInfo {
+	t.Helper()
+	snap, err := f.H.Client.Snapshot(f.Ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []wire.SessionInfo
+	for _, s := range snap.Sessions {
+		if s.Status.State != wire.SessionExited {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// Fix starts the Fix agent for the ticket at address.
+func (f DesignsFixture) Fix(t *testing.T, address string) wire.FixAgentResult {
+	t.Helper()
+	res, err := f.H.Client.FixAgent(f.Ctx, wire.FixAgentRequest{Address: address})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}

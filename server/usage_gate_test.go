@@ -2,38 +2,19 @@ package server_test
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-// withUsageSample seeds the persisted usage sample the server loads at start.
-func withUsageSample(t *testing.T, rec nativerunner.UsageRecord) func(*server.Config) {
-	t.Helper()
-	return func(c *server.Config) {
-		data, err := json.Marshal(rec)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.MkdirAll(c.StateDir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(c.StateDir, "usage-sample.json"), data, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
+var withUsageSample = servertest.WithUsageSample
 
 func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 	t.Parallel()

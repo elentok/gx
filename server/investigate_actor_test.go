@@ -1,12 +1,9 @@
 package server_test
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
@@ -15,7 +12,7 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-const investigateAddr = "proj:epic-a/02"
+const investigateAddr = servertest.InvestigateAddr
 
 // startInvestigateEnv starts a server whose ticket 01 is paused with kind and
 // whose ticket 02 is the investigate ticket forked off it.
@@ -33,16 +30,7 @@ func startInvestigateEnv(t *testing.T, kind events.Kind) *servertest.Harness {
 	return h
 }
 
-func retryAs(t *testing.T, h *servertest.Harness, investigator string) wire.QueueResult {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	res, err := apiclient.New(server.SocketPath(h.StateDir)).AsInvestigator(investigator).TicketRetry(ctx, "proj:epic-a/01", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
-}
+var retryAs = servertest.RetryAs
 
 func TestInvestigateRetry_LogsRecoveryAppliedNotHumanRelaunch(t *testing.T) {
 	t.Parallel()

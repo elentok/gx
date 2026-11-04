@@ -78,20 +78,6 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 	return s.claimAndLaunch(queue.RootOf(addr), addr, ref.ticket, ref.repo, ralphloop.AgentKind(agent), epics)
 }
 
-// PauseAs pauses a ticket as the given kind the way the server's own pauses do,
-// including starting recovery.
-func (s *Server) PauseAs(address string, kind events.Kind, reason string) error {
-	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
-	if err != nil {
-		return err
-	}
-	ref, ok, err := s.findTicket(address)
-	if err != nil || !ok {
-		return errors.Join(err, errors.New("no ticket "+address))
-	}
-	return s.pauseTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, runs.Run{})
-}
-
 // SetCostOf swaps how an iteration's cost is read.
 func (s *Server) SetCostOf(f func(wire.IterationInfo) (float64, bool)) { s.costOf = f }
 

@@ -29,7 +29,7 @@ func startCodexPromptSession(t *testing.T, extraEnv ...string) promptFixture {
 func startCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEnv ...string) promptFixture {
 	t.Helper()
 	codexPromptConv := "thread-server-prompt-" + strings.ReplaceAll(t.Name(), "/", "-")
-	bin := fakeCodexDir(t)
+	bin := servertest.FakeCodexDir(t)
 	home := t.TempDir()
 	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = grace },
 		servertest.WithChatHarness("codex"),

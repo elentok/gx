@@ -12,6 +12,21 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// PauseAs pauses a ticket as the given kind the way the server's own pauses do,
+// including starting recovery. Tests in other packages call it, so it cannot
+// live in an export_test.go.
+func (s *Server) PauseAs(address string, kind events.Kind, reason string) error {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return err
+	}
+	ref, ok, err := s.findTicket(address)
+	if err != nil || !ok {
+		return errors.Join(err, errors.New("no ticket "+address))
+	}
+	return s.pauseTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, runs.Run{})
+}
+
 // pauseTicket is the one way the server pauses a ticket: the write, the
 // EventTicketPaused event and the chat message all come from the same kind and
 // reason, so the three cannot disagree. A pause that finds the ticket done (it

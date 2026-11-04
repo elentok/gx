@@ -615,18 +615,7 @@ func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, ev
 	}
 }
 
-func readMeta(t *testing.T, h *servertest.Harness, id string) map[string]any {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(h.SessionsDir, id, "meta.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var meta map[string]any
-	if err := json.Unmarshal(data, &meta); err != nil {
-		t.Fatal(err)
-	}
-	return meta
-}
+var readMeta = servertest.ReadMeta
 
 // killHolder SIGKILLs the session's holder, leaving its child, and returns
 // the child's pid.
