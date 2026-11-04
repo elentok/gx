@@ -4,88 +4,42 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 )
-
-func testIterationParams() iterationParams {
-	return iterationParams{
-		WorkspaceID:     "ws-1",
-		RepoDir:         "/fake/repo",
-		WorktreeDir:     "/fake/worktrees",
-		FeatureWorktree: "/fake/repo",
-		FeatureBranch:   "feature",
-		Agent:           AgentClaude,
-		Ticket:          tickets.Ticket{Identifier: "04"},
-		WorktreeLock:    &sync.Mutex{},
-		Gate:            NewGate(),
-		Sink:            noopEventSink{},
-	}
-}
 
 const launchEpic = "my-epic"
 
 var launchLabel = iterLabel(launchEpic, "01")
 
-// runLaunchEpic runs a one-ticket epic on d, until it pauses if pauses is set,
-// and returns its scratch dir.
-func runLaunchEpic(t *testing.T, d Deps, pauses bool) string {
-	t.Helper()
-	scratchDir := writeEpic(t, launchEpic, map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
-	})
-	opts := RunOptions{EpicName: launchEpic, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}
-	if pauses {
-		runUntilPaused(t, opts, d, noopEventSink{})
-	} else if err := Run(opts, d, noopEventSink{}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-	return scratchDir
+// launchResult is what the server's launch sees from StartAndPrompt: the
+// session, the error, and every nudge decision as (attempt, decision).
+type launchResult struct {
+	session agentrunner.Session
+	err     error
+	nudges  []string
 }
 
-func assertTicketStatus(t *testing.T, scratchDir, status string) {
+// launchOn starts the launch epic's ticket on r the way the server's launch
+// does.
+func launchOn(t *testing.T, r agentrunner.Runner) launchResult {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(scratchDir, launchEpic, "issues", "01-first.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if tk := parseRawTicket(t, string(raw)); string(tk.Status) != status {
-		t.Errorf("ticket status = %q, want %q", tk.Status, status)
-	}
+	var res launchResult
+	res.session, res.err = StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic}, "/gx-implement gx:my-epic/01",
+		func(attempt int, decision string) { res.nudges = append(res.nudges, fmt.Sprintf("%d:%s", attempt, decision)) })
+	return res
 }
 
-// assertTicketPaused checks the launch epic's ticket is paused in class.
-func assertTicketPaused(t *testing.T, scratchDir string, class schema.PauseClass) {
+// assertLaunchFailure checks err is a launch failure of kind.
+func assertLaunchFailure(t *testing.T, err error, kind events.Kind) {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(scratchDir, launchEpic, "issues", "01-first.md"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+	if got, ok := LaunchFailureKind(err); !ok || got != kind {
+		t.Fatalf("launch failure kind = %q (found %v) from %v, want %q", got, ok, err, kind)
 	}
-	assertRawPaused(t, string(raw), class, "")
-}
-
-func launchFailedEvents(t *testing.T, scratchDir string) []Event {
-	t.Helper()
-	evs, ok, err := ReadEvents(scratchDir, launchEpic)
-	if !ok || err != nil {
-		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
-	}
-	var failed []Event
-	for _, ev := range evs {
-		if ev.Type == string(events.LaunchFailed) {
-			failed = append(failed, ev)
-		}
-	}
-	return failed
 }
 
 // nudgingRunner reports decisions on every PromptNudged, as herdr and pty do
@@ -102,29 +56,17 @@ func (n nudgingRunner) PromptNudged(s agentrunner.Session, text string, onNudge 
 	return n.Prompt(s, text)
 }
 
-func TestRunIteration_LogsEveryNudgeDecision(t *testing.T) {
+func TestStartAndPrompt_ReportsEveryNudgeDecision(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
-	d.Runner = nudgingRunner{Runner: d.Runner, decisions: []string{"retype", "enter"}}
 
-	scratchDir := runLaunchEpic(t, d, false)
+	res := launchOn(t, nudgingRunner{Runner: d.Runner, decisions: []string{"retype", "enter"}})
 
-	evs, _, err := ReadEvents(scratchDir, launchEpic)
-	if err != nil {
-		t.Fatal(err)
+	if res.err != nil {
+		t.Fatalf("StartAndPrompt = %v", res.err)
 	}
-	var got []string
-	for _, ev := range evs {
-		if ev.Type != string(events.PromptNudged) {
-			continue
-		}
-		if ev.Ticket != "01" || ev.Label != launchLabel || ev.Attempt != 1 {
-			t.Errorf("prompt-nudged event = %+v, want ticket 01, label %s, attempt 1", ev, launchLabel)
-		}
-		got = append(got, ev.Reason)
-	}
-	if want := []string{"retype", "enter"}; !slices.Equal(got, want) {
-		t.Fatalf("prompt-nudged reasons = %v, want %v", got, want)
+	if want := []string{"1:retype", "1:enter"}; !slices.Equal(res.nudges, want) {
+		t.Fatalf("nudges = %v, want %v", res.nudges, want)
 	}
 }
 
@@ -171,118 +113,94 @@ func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 	}
 }
 
-func TestRunIteration_LaunchPromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
+func TestStartAndPrompt_LaunchPromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	launches := 0
-	d.Runner = launchRunner{Runner: d.Runner, rejects: 1, launches: &launches}
 
-	scratchDir := runLaunchEpic(t, d, false)
+	res := launchOn(t, launchRunner{Runner: d.Runner, rejects: 1, launches: &launches})
 
-	assertTicketStatus(t, scratchDir, "done")
+	if res.err != nil {
+		t.Fatalf("StartAndPrompt = %v, want the fresh session to launch", res.err)
+	}
 	if launches != 2 {
 		t.Errorf("launch prompts = %d, want 2 (rejected, then the fresh session)", launches)
 	}
-	failed := launchFailedEvents(t, scratchDir)
-	if len(failed) != 1 || failed[0].Kind != string(events.AgentPromptStalled) {
-		t.Errorf("launch-failed events = %+v, want one agent_prompt_stalled", failed)
-	}
 }
 
-func TestRunIteration_LaunchPromptNotDeliveredTwice_PausesPromptStalled(t *testing.T) {
+func TestStartAndPrompt_LaunchPromptNotDeliveredTwice_FailsPromptStalled(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	launches := 0
-	d.Runner = launchRunner{Runner: d.Runner, rejects: 2, launches: &launches}
 
-	scratchDir := runLaunchEpic(t, d, true)
+	res := launchOn(t, launchRunner{Runner: d.Runner, rejects: 2, launches: &launches})
 
-	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
+	assertLaunchFailure(t, res.err, events.AgentPromptStalled)
 	if launches != 2 {
 		t.Errorf("launch prompts = %d, want 2", launches)
 	}
-	if failed := launchFailedEvents(t, scratchDir); len(failed) != 2 {
-		t.Errorf("launch-failed events = %d, want 2", len(failed))
-	}
 }
 
-func TestRunIteration_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
+func TestStartAndPrompt_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
 	r.FailNextPrompts(launchLabel, 1, agentrunner.ErrNotDelivered)
 
-	scratchDir := runLaunchEpic(t, d, false)
+	res := launchOn(t, r)
 
-	assertTicketStatus(t, scratchDir, "done")
+	if res.err != nil {
+		t.Fatalf("StartAndPrompt = %v, want the fresh session to launch", res.err)
+	}
 	if got := r.Prompts(launchLabel); len(got) != 1 {
 		t.Errorf("delivered prompts = %v, want one on the fresh session", got)
 	}
-	failed := launchFailedEvents(t, scratchDir)
-	if len(failed) != 1 || failed[0].Kind != string(events.AgentPromptStalled) || failed[0].Attempt != 1 {
-		t.Errorf("launch-failed events = %+v, want one agent_prompt_stalled for attempt 1", failed)
-	}
 }
 
-func TestRunIteration_PromptNotDeliveredTwice_PausesPromptStalled(t *testing.T) {
+func TestStartAndPrompt_PromptNotDeliveredTwice_FailsPromptStalledAndStopsBoth(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
 	r.FailNextPrompts(launchLabel, 2, agentrunner.ErrNotDelivered)
 
-	scratchDir := runLaunchEpic(t, d, true)
+	res := launchOn(t, r)
 
-	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
+	assertLaunchFailure(t, res.err, events.AgentPromptStalled)
 	if _, found, _ := r.Find(launchLabel); found {
 		t.Error("an undelivered session is still live, want both stopped")
 	}
-	failed := launchFailedEvents(t, scratchDir)
-	if len(failed) != 2 {
-		t.Fatalf("launch-failed events = %d, want 2", len(failed))
-	}
-	for i, ev := range failed {
-		if ev.Kind != string(events.AgentPromptStalled) || ev.Attempt != i+1 || ev.Label != launchLabel {
-			t.Errorf("event %d = kind %q attempt %d label %q", i, ev.Kind, ev.Attempt, ev.Label)
-		}
-	}
 }
 
-func TestRunIteration_MissingCapability_PausesWithDoctorHint(t *testing.T) {
+func TestStartAndPrompt_MissingCapability_CarriesDoctorHint(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
 	r.FailNextPrompts(launchLabel, 1, fmt.Errorf("%w: msg_lifecycle_v1", agentrunner.ErrMissingCapability))
 
-	scratchDir := runLaunchEpic(t, d, true)
+	res := launchOn(t, r)
 
-	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
-	failed := launchFailedEvents(t, scratchDir)
-	if len(failed) != 1 {
-		t.Fatalf("launch-failed events = %+v, want one", failed)
+	if res.err == nil {
+		t.Fatal("StartAndPrompt = nil, want the missing-capability error")
 	}
 	for _, want := range []string{"msg_lifecycle_v1", "gx claude doctor"} {
-		if !strings.Contains(failed[0].Reason, want) {
-			t.Errorf("reason %q lacks %q", failed[0].Reason, want)
+		if !strings.Contains(res.err.Error(), want) {
+			t.Errorf("error %q lacks %q", res.err, want)
 		}
 	}
 }
 
-func TestRunIteration_MissingCapabilityOnStart_PausesWithDoctorHint(t *testing.T) {
+func TestStartAndPrompt_MissingCapabilityOnStart_FailsIterationErrorWithDoctorHint(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
 	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
 
-	scratchDir := runLaunchEpic(t, d, true)
+	res := launchOn(t, r)
 
-	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
-	failed := launchFailedEvents(t, scratchDir)
-	if len(failed) != 1 {
-		t.Fatalf("launch-failed events = %+v, want one", failed)
-	}
+	assertLaunchFailure(t, res.err, events.IterationError)
 	for _, want := range []string{"pid_status_v1", "gx claude doctor"} {
-		if !strings.Contains(failed[0].Reason, want) {
-			t.Errorf("reason %q lacks %q", failed[0].Reason, want)
+		if !strings.Contains(res.err.Error(), want) {
+			t.Errorf("error %q lacks %q", res.err, want)
 		}
 	}
 }
@@ -300,69 +218,52 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 	}
 }
 
-func TestRunIteration_SessionDiedInWait_PausesRepairWithReason(t *testing.T) {
+func TestWaitIterationFinished_SessionDied_ReturnsDiedReason(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
 	r.DieAfterPrompt(launchLabel, agentrunner.SessionDied("claude exited (code 1)"))
-
-	scratchDir := runLaunchEpic(t, d, true)
-
-	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
-	evs, _, err := ReadEvents(scratchDir, launchEpic)
-	if err != nil {
-		t.Fatalf("ReadEvents() error = %v", err)
+	res := launchOn(t, r)
+	if res.err != nil {
+		t.Fatalf("StartAndPrompt = %v", res.err)
 	}
-	var paused []Event
-	for _, ev := range evs {
-		if ev.Type == string(events.Paused) {
-			paused = append(paused, ev)
-		}
-	}
-	if len(paused) != 1 || paused[0].Kind != string(events.IterationError) ||
-		!strings.Contains(paused[0].Reason, "claude exited (code 1)") {
-		t.Errorf("paused events = %+v, want one iteration_error carrying the died reason", paused)
+
+	err := WaitIterationFinished(d, OneIteration{Agent: AgentClaude, Epic: launchEpic}, IterationWorktree{Label: launchLabel}, res.session)
+
+	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.Contains(err.Error(), "claude exited (code 1)") {
+		t.Errorf("WaitIterationFinished = %v, want ErrSessionDied carrying the died reason", err)
 	}
 }
 
-func TestRunIteration_HolderStartFailure_PausesIterationErrorWithStderr(t *testing.T) {
+func TestStartAndPrompt_HolderStartFailure_FailsIterationErrorWithStderr(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
 	r.SetStartErr(launchLabel, errors.New("pty start: holder exited: Error: listen unix: invalid argument"))
 
-	scratchDir := runLaunchEpic(t, d, true)
+	res := launchOn(t, r)
 
-	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
-	evs, _, err := ReadEvents(scratchDir, launchEpic)
-	if err != nil {
-		t.Fatalf("ReadEvents() error = %v", err)
+	assertLaunchFailure(t, res.err, events.IterationError)
+	if !strings.Contains(res.err.Error(), "listen unix: invalid argument") {
+		t.Errorf("error %q lacks the holder's stderr", res.err)
 	}
-	for _, ev := range evs {
-		if ev.Type == string(events.Paused) {
-			if ev.Kind != string(events.IterationError) || !strings.Contains(ev.Reason, "listen unix: invalid argument") {
-				t.Errorf("paused event = %+v, want iteration_error carrying the holder's stderr", ev)
-			}
-			return
-		}
-	}
-	t.Error("no paused event")
 }
 
-func TestRunIteration_OtherPromptError_PausesWithoutRetry(t *testing.T) {
+func TestStartAndPrompt_OtherPromptError_ReturnsWithoutRetryAndKeepsSession(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
 	r.FailNextPrompts(launchLabel, 1, errors.New("boom"))
 
-	scratchDir := runLaunchEpic(t, d, true)
+	res := launchOn(t, r)
 
-	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
+	if res.err == nil || !strings.Contains(res.err.Error(), "boom") {
+		t.Fatalf("StartAndPrompt = %v, want the prompt error", res.err)
+	}
+	if _, ok := LaunchFailureKind(res.err); ok {
+		t.Errorf("err %v is a launch failure, want a plain error with no retry", res.err)
+	}
 	if _, found, _ := r.Find(launchLabel); !found {
 		t.Error("session was stopped, want it left for repair inspection")
-	}
-	failed := launchFailedEvents(t, scratchDir)
-	if len(failed) != 1 || failed[0].Kind != string(events.IterationError) {
-		t.Errorf("launch-failed events = %+v, want one iteration_error", failed)
 	}
 }
