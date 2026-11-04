@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"time"
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/ralphloop"
@@ -141,6 +142,17 @@ func (s *Server) earlierRunHarness(addr tickets.Address) string {
 }
 
 func (s *Server) sessionRecorded(r ralphloop.IterationSession) bool {
+	key := string(r.Agent) + "\x00" + r.Cwd + "\x00" + r.Session
+	now := time.Now()
+	if found, ok := s.recorded.lookup(key, now); ok {
+		return found
+	}
+	found := s.sessionRecordedUncached(r)
+	s.recorded.store(key, found, now)
+	return found
+}
+
+func (s *Server) sessionRecordedUncached(r ralphloop.IterationSession) bool {
 	switch r.Agent {
 	case ralphloop.AgentClaude:
 		home, err := s.envHome()

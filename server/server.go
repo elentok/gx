@@ -259,6 +259,8 @@ type Server struct {
 	// success: the new server replaces this one.
 	restarting atomic.Bool
 	reloads    reloadHistory
+	// recorded caches sessionRecorded, which globs every Claude project dir.
+	recorded recordedCache
 	// cpuSpikes holds the CPU ticket cooldown.
 	cpuSpikes  cpuSpikes
 	disks      diskWatch
