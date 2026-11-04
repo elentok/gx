@@ -432,6 +432,137 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 	}
 }
 
+// driveDeferredMerge drives the fixture ticket through FinishIteration with its
+// merge deferred, calling onRetry(n) at the n-th merge retry sleep and returning
+// the outcome and how many retry sleeps there were.
+func driveDeferredMerge(t *testing.T, d Deps, scratchDir, path string, onRetry func(n int)) (FinishOutcome, int) {
+	t.Helper()
+	retries := 0
+	d.Sleep = func(dur time.Duration) {
+		if dur == mergeDeferRetryInterval {
+			retries++
+			onRetry(retries)
+		}
+	}
+	out := driveIteration(t, d, scratchDir, path, noopEventSink{})
+	return out, retries
+}
+
+// A held merge lock defers the merge without picking or failing the ticket; the
+// merge happens once the lock frees.
+func TestMergeBuilt_LockHeld_DefersThenMergesOnceReleased(t *testing.T) {
+	t.Parallel()
+	scratchDir, path := finishFixture(t)
+	lockDir := mustMergeLockDir(t, scratchDir, "epic")
+	if err := AcquireMergeLock(lockDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
+	d, _, _ := fakeDeps()
+	picks := 0
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		picks++
+		return nil
+	}
+
+	out, retries := driveDeferredMerge(t, d, scratchDir, path, func(n int) {
+		if picks != 0 {
+			t.Errorf("CherryPickRange calls = %d while the lock was held, want 0", picks)
+		}
+		if n == 3 {
+			if err := ReleaseMergeLock(lockDir); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+
+	if retries != 3 {
+		t.Errorf("retry sleeps = %d, want 3 (held 3 times, then free)", retries)
+	}
+	if !out.Merged {
+		t.Errorf("outcome = %+v, want merged", out)
+	}
+	if picks != 1 {
+		t.Errorf("CherryPickRange calls = %d, want 1", picks)
+	}
+}
+
+// With a merge marker, in-progress sequencer state is a person's pending
+// conflict, so the merge defers and must not abort it.
+func TestMergeBuilt_MergeMarkerPresent_SkipsStaleAbort(t *testing.T) {
+	t.Parallel()
+	scratchDir, path := finishFixture(t)
+	lockDir := mustMergeLockDir(t, scratchDir, "epic")
+	if err := WriteMergeMarker(lockDir, MergeMarker{Epic: "epic", Ticket: "01"}); err != nil {
+		t.Fatal(err)
+	}
+	d, _, _ := fakeDeps()
+	inProgress := true
+	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress, nil }
+	aborts := 0
+	d.AbortCherryPick = func(dir string) error {
+		aborts++
+		return nil
+	}
+
+	out, retries := driveDeferredMerge(t, d, scratchDir, path, func(n int) {
+		if aborts != 0 {
+			t.Errorf("AbortCherryPick calls = %d with a marker, want 0", aborts)
+		}
+		if n == 3 {
+			inProgress = false
+			if err := ClearMerge(lockDir); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+
+	if retries != 3 {
+		t.Errorf("retry sleeps = %d, want 3 (deferred while the marker stood)", retries)
+	}
+	if !out.Merged {
+		t.Errorf("outcome = %+v, want merged after the marker cleared", out)
+	}
+}
+
+// Many retries under one contention episode log a single merge-deferred event.
+func TestMergeBuilt_LockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
+	t.Parallel()
+	scratchDir, path := finishFixture(t)
+	lockDir := mustMergeLockDir(t, scratchDir, "epic")
+	if err := AcquireMergeLock(lockDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
+	d, _, _ := fakeDeps()
+
+	const holds = 20
+	_, retries := driveDeferredMerge(t, d, scratchDir, path, func(n int) {
+		if n == holds {
+			if err := ReleaseMergeLock(lockDir); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+
+	if retries != holds {
+		t.Fatalf("retry sleeps = %d, want %d", retries, holds)
+	}
+	evs, _, err := ReadEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, e := range evs {
+		if e.Type == string(events.MergeDeferred) {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("merge-deferred events = %d, want 1", n)
+	}
+}
+
 // blockedWaitFixture is a blocked agent on the named runner; onSleep runs when
 // the loop sleeps (the dwell).
 func blockedWaitFixture(t *testing.T, agent AgentKind, runner string, onSleep func(*runnerfake.Runner)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {

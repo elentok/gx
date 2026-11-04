@@ -153,15 +153,15 @@ func loadChild(p iterationParams) (string, error) {
 	return matches[0], nil
 }
 
-// TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing covers a
+// TestFinishIteration_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing covers a
 // fork's placeholder authored with `base:` that the agent then closes as
 // `--iteration-status finished --commitless true`: the CLI drops base on that
 // transition (cmd's tickets set tests), so adoption must read it as a valid
 // commitless ticket and write done rather than pausing on validation.
-func TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing(t *testing.T) {
+func TestFinishIteration_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nbase: main\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\nbase: main\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
@@ -175,8 +175,8 @@ func TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing(t *test
 		})
 	})
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
-		t.Fatalf("Run() error = %v", err)
+	if out := driveIteration(t, d, scratchDir, ticketPath, noopEventSink{}); !out.Merged {
+		t.Errorf("outcome = %+v, want merged", out)
 	}
 
 	got := mustParse(t, ticketPath)

@@ -73,6 +73,15 @@ func mergeLockDir(scratchDir, epic string) (string, error) {
 	return testDeps().mergeLockDir(scratchDir, epic)
 }
 
+func mustMergeLockDir(t *testing.T, scratchDir, epic string) string {
+	t.Helper()
+	dir, err := mergeLockDir(scratchDir, epic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 // testDepsWithOverrides is testDeps with DepsOverrides applied, for tests
 // that need to isolate HOME/CODEX_HOME/PATH without mutating process env via
 // t.Setenv.

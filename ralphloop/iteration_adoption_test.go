@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -37,12 +36,9 @@ func reportIterationStatus(t *testing.T, d Deps, path, label, value string) {
 // reason to hold them open across it), but the iteration branch itself
 // survives — DeleteBranch must never be called — since a resume reattaches
 // to it to merge both sides of the answer boundary in one pick.
-func TestRun_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
+func TestFinishIteration_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	scratchDir, path := finishFixture(t)
 	d, _, removed := fakeDeps()
 
 	cherryPickCalled := false
@@ -60,7 +56,7 @@ func TestRun_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
 	// reported.
 	reportIterationStatus(t, d, path, "epic-iter-01", string(schema.IterationStatusAsking))
 
-	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
+	driveIteration(t, d, scratchDir, path, &recordingSink{})
 
 	if cherryPickCalled {
 		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted asking report")
@@ -90,19 +86,16 @@ func TestRun_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
 // never conclude one on its own — the commit count still decides. A finished
 // report with nothing merged takes the ordinary zero-commit path instead of
 // gx trusting the report into done.
-func TestRun_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.T) {
+func TestFinishIteration_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	scratchDir, path := finishFixture(t)
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
 	reportIterationStatus(t, d, path, "epic-iter-01", "finished")
 
-	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
+	driveIteration(t, d, scratchDir, path, &recordingSink{})
 
 	raw, err := os.ReadFile(path)
 	if err != nil {

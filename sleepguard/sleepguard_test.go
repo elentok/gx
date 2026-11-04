@@ -69,7 +69,7 @@ var allowed = map[string]int{
 	"ralphloop/eventlog_test.go":                    2,
 	"ralphloop/loop_agent_test.go":                  1,
 	"ralphloop/loop_test.go":                        1,
-	"ralphloop/mergequeue_test.go":                  2,
+	"ralphloop/mergequeue_test.go":                  1,
 	"ralphloop/permit_test.go":                      2,
 	"ralphloop/resumeticket_test.go":                1,
 	"ralphloop/run_realgit_watchdog_test.go":        1,
