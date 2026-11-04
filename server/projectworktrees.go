@@ -18,14 +18,14 @@ func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, list)
+	wire.WriteJSON(w, list)
 }
 
 // tierModels resolves each tier's model for the harness a web-created session
 // launches.
 func (p *Registry) TierModels(project string) map[string]string {
 	agents := p.AgentsConfig(project)
-	agent := ralphloop.AgentFor(p.back.launchHarness(project))
+	agent := ralphloop.AgentFor(p.back.LaunchHarness(project))
 	out := map[string]string{}
 	for _, t := range ralphloop.AllTiers {
 		out[string(t)], _ = ralphloop.ResolveTier(agents, agent, t)
@@ -35,7 +35,7 @@ func (p *Registry) TierModels(project string) map[string]string {
 
 // listProjectWorktrees lists each project that has a repo in project.json.
 func (p *Registry) ListWorktrees() ([]wire.ProjectWorktrees, error) {
-	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {
 		return nil, err
 	}

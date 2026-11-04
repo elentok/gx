@@ -30,6 +30,15 @@ func ParseEpicAddress(s string) (project, epic string, ok bool) {
 	return m[1], m[2], true
 }
 
+// ParseQueuedAddress parses a queue entry: a ticket address, or an epic address
+// ("project:epic"), which comes back with an empty ID.
+func ParseQueuedAddress(s string) (Address, error) {
+	if project, epic, ok := ParseEpicAddress(s); ok {
+		return Address{Project: project, Epic: epic}, nil
+	}
+	return ParseAddress(s, AddressContext{})
+}
+
 // EpicUpdate is the settable epic fields one `set` call changes; a nil field
 // is left as it is.
 type EpicUpdate struct {

@@ -19,7 +19,7 @@ const (
 // Failures reads the saved failed migrations of the projects now in the ticket
 // store. The CLI writes the record, so each call reads the file.
 func (m *Migrator) Failures() []wire.MigrationFailure {
-	dirs, err := tickets.ProjectDirs(m.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(m.cfg().TicketStore)
 	if err != nil {
 		return nil
 	}
@@ -30,7 +30,7 @@ func (m *Migrator) Failures() []wire.MigrationFailure {
 		names = append(names, name)
 		dirOf[name] = d
 	}
-	recorded, err := migratefail.Read(m.cfg.StateDir, names)
+	recorded, err := migratefail.Read(m.cfg().StateDir, names)
 	if err != nil {
 		m.log.Warn("read migration failures", "err", err)
 		return nil
@@ -43,7 +43,7 @@ func (m *Migrator) Failures() []wire.MigrationFailure {
 }
 
 func (m *Migrator) readFailureFile() []byte {
-	data, _ := os.ReadFile(migratefail.Path(m.cfg.StateDir))
+	data, _ := os.ReadFile(migratefail.Path(m.cfg().StateDir))
 	return data
 }
 
@@ -53,7 +53,7 @@ func (m *Migrator) readFailureFile() []byte {
 // a record that already exists costs one harmless event. It polls: the writers
 // are other processes, and a rename over the file is the only change they make.
 func (m *Migrator) KeepFailuresWatched(ctx context.Context) {
-	interval := m.cfg.MigrationFailurePollInterval
+	interval := m.cfg().MigrationFailurePollInterval
 	if interval <= 0 {
 		interval = defaultMigrationFailurePoll
 	}
@@ -68,7 +68,7 @@ func (m *Migrator) KeepFailuresWatched(ctx context.Context) {
 		case <-tick.C:
 			if cur := read(); !bytes.Equal(cur, last) {
 				last = cur
-				m.back.failuresChanged()
+				m.back.FailuresChanged()
 			}
 		}
 	}

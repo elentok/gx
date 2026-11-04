@@ -8,11 +8,11 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// sessionFinished reports whether the ticket behind s's iteration label has
+// SessionFinished reports whether the ticket behind s's iteration label has
 // iteration_status finished. The label can't be parsed back to a ticket (long
 // epic names are hashed), so it is matched against every indexed ticket, and
 // the status is read from the file: the index may lag the agent's own report.
-func (s *Server) sessionFinished(sess agentrunner.Session) bool {
+func (s *Server) SessionFinished(sess agentrunner.Session) bool {
 	for _, epics := range s.idx.AllEpics() {
 		for _, e := range epics {
 			epic := filepath.Base(e.Path)

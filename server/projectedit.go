@@ -19,10 +19,10 @@ func refuseProject(reason, msg string) (wire.ProjectResult, error) {
 // projectBusy reports a queued or running ticket of project.
 func (p *Registry) Busy(project string) (address string, busy bool) {
 	inProject := func(addr string) bool {
-		a, err := parseQueuedAddress(addr)
+		a, err := tickets.ParseQueuedAddress(addr)
 		return err == nil && a.Project == project
 	}
-	for _, addr := range p.back.busyAddresses() {
+	for _, addr := range p.back.BusyAddresses() {
 		if inProject(addr) {
 			return addr, true
 		}
@@ -72,7 +72,7 @@ func (p *Registry) SetPath(req wire.ProjectRequest) (wire.ProjectResult, error) 
 	} else if pf.VCS == nil || *pf.VCS != config.VCSNone {
 		return refuseProject(wire.ReasonNotRepo, req.Path+" is not a git repo")
 	}
-	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {
 		return wire.ProjectResult{}, err
 	}
@@ -101,6 +101,6 @@ func (s *Server) projectWrite(do func(wire.ProjectRequest) (wire.ProjectResult, 
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }

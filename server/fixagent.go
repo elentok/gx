@@ -105,7 +105,7 @@ func (s *Server) startFixProjectAgent(project string) (wire.FixAgentResult, erro
 		Dir:        checkout,
 		Name:       FixAgentName(project),
 		UniqueName: true,
-		Prompt:     fixProjectPrompt(s.launchHarness(project), *failure),
+		Prompt:     fixProjectPrompt(s.LaunchHarness(project), *failure),
 		Tier:       ralphloop.TierStrongest,
 	}
 	res, err := s.createSession(cs, sessionCtx{})
@@ -163,10 +163,10 @@ func (s *Server) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAgen
 		Dir:        checkout,
 		Name:       FixAgentName(addr),
 		UniqueName: true,
-		Prompt:     fixAgentPrompt(s.launchHarness(ref.addr.Project), addr, t),
+		Prompt:     fixAgentPrompt(s.LaunchHarness(ref.addr.Project), addr, t),
 		Tier:       ralphloop.TierStrongest,
 	}
-	remote := settings.AgentsFixAgentRemoteControl && s.launchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
+	remote := settings.AgentsFixAgentRemoteControl && s.LaunchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
 	var sc sessionCtx
 	if remote {
 		sc.remoteControl = addr

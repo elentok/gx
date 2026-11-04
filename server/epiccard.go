@@ -89,7 +89,7 @@ type queueIndex struct {
 func (s *Server) newQueueIndex() queueIndex {
 	idx := queueIndex{slots: map[string]int{}, enqueued: map[string]time.Time{}}
 	for _, it := range s.queued.list() {
-		a, err := parseQueuedAddress(it.Address)
+		a, err := tickets.ParseQueuedAddress(it.Address)
 		if err != nil {
 			continue
 		}

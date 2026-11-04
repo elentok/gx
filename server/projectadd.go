@@ -60,7 +60,7 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
-	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {
 		return wire.AddProjectResult{}, err
 	}
@@ -83,7 +83,7 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 	if req.VCS != "" {
 		pf.VCS = &req.VCS
 	}
-	projectDir := filepath.Join(p.cfg.TicketStore, name)
+	projectDir := filepath.Join(p.cfg().TicketStore, name)
 	if err := tickets.WriteProjectFile(projectDir, pf); err != nil {
 		return wire.AddProjectResult{}, err
 	}
@@ -116,5 +116,5 @@ func (s *Server) projectAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }

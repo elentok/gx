@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/runs"
@@ -16,32 +18,59 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// registryBack is what the Registry reads from the Server.
-type registryBack interface {
-	sessionFinished(sess agentrunner.Session) bool
-	launchHarness(project string) string
-	// busyAddresses is the address of every queued ticket, then of every run.
-	busyAddresses() []string
+// RegistryBack is what the Registry reads from the Server.
+type RegistryBack interface {
+	SessionFinished(sess agentrunner.Session) bool
+	LaunchHarness(project string) string
+	// BusyAddresses is the address of every queued ticket, then of every run.
+	BusyAddresses() []string
+}
+
+// projectsEnv is the part of the Server's Config that Registry, Migrator and
+// Checks read.
+type projectsEnv struct {
+	TicketStore                  string
+	StateDir                     string
+	Env                          []string
+	Migrations                   *migrations.Registry
+	MigrationFailurePollInterval time.Duration
+	Chat                         ralphloop.ServerChatConfig
+	GuardPoll                    time.Duration
+	InstallDeps                  func(path, logDir string) ([]string, error)
+	RateLimitResetBuffer         time.Duration
+	RunnerWait                   time.Duration
+	Sleep                        func(time.Duration)
+}
+
+// projectsEnvOf is how the three types see the Server's config: they hold this
+// getter and call it on every read, so a later change to the config shows.
+func (s *Server) projectsEnvOf() projectsEnv {
+	c := &s.cfg
+	return projectsEnv{
+		TicketStore: c.TicketStore, StateDir: c.StateDir, Env: c.Env, Migrations: c.Migrations,
+		MigrationFailurePollInterval: c.MigrationFailurePollInterval, Chat: c.Chat, GuardPoll: c.GuardPoll,
+		InstallDeps: c.InstallDeps, RateLimitResetBuffer: c.RateLimitResetBuffer, RunnerWait: c.RunnerWait, Sleep: c.Sleep,
+	}
 }
 
 // Registry is project lookup and edit: the store's project dirs, their
 // project.json, the env-derived dirs and the typing rules.
 type Registry struct {
-	cfg         *Config // the Server's own, so a later change to it shows here
+	cfg         func() projectsEnv
 	log         *slog.Logger
 	idx         *index.Index
 	settings    *settings.Holder
 	chat        *ralphloop.ServerChat
-	back        registryBack
+	back        RegistryBack
 	unavailable unavailableNotes
 }
 
 // initProjects builds the projects Registry, Migrator and Checks from the
 // Server's own fields. Tests that build a bare Server call it too.
 func (s *Server) initProjects() {
-	s.projects = &Registry{cfg: &s.cfg, log: s.log, idx: s.idx, settings: &s.settings, chat: s.chat, back: s}
-	s.migrator = &Migrator{cfg: &s.cfg, log: s.log, back: s, done: make(chan struct{}), startupDone: make(chan struct{})}
-	s.checks = &Checks{cfg: &s.cfg, projects: s.projects, guards: s.guards}
+	s.projects = &Registry{cfg: s.projectsEnvOf, log: s.log, idx: s.idx, settings: &s.settings, chat: s.chat, back: s}
+	s.migrator = &Migrator{cfg: s.projectsEnvOf, log: s.log, back: s, done: make(chan struct{}), startupDone: make(chan struct{})}
+	s.checks = &Checks{cfg: s.projectsEnvOf, projects: s.projects, guards: s.guards}
 }
 
 // withProjects is initProjects for a bare Server literal in a test.
@@ -50,8 +79,8 @@ func withProjects(s *Server) *Server {
 	return s
 }
 
-// busyAddresses implements registryBack.
-func (s *Server) busyAddresses() []string {
+// BusyAddresses implements RegistryBack.
+func (s *Server) BusyAddresses() []string {
 	var out []string
 	for _, it := range s.queued.list() {
 		out = append(out, it.Address)
@@ -64,7 +93,7 @@ func (s *Server) busyAddresses() []string {
 
 // Dir finds the project's directory in the store.
 func (p *Registry) Dir(project string) (string, error) {
-	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {
 		return "", err
 	}
@@ -95,7 +124,7 @@ func (p *Registry) Of(project string) (dir, repo string, err error) {
 // Epics is the named project's epics as of the last store scan; a project the
 // scan has not seen yet is read from disk.
 func (p *Registry) Epics(project string) ([]tickets.Epic, error) {
-	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +142,7 @@ func (p *Registry) Epics(project string) ([]tickets.Epic, error) {
 
 // WorktreeDir is where the project's repo keeps its linked worktrees.
 func (p *Registry) WorktreeDir(project string) string {
-	pf, err := config.ReadProjectFile(filepath.Join(p.cfg.TicketStore, project))
+	pf, err := config.ReadProjectFile(filepath.Join(p.cfg().TicketStore, project))
 	if err != nil || pf.Repo == nil {
 		return ""
 	}
@@ -128,11 +157,11 @@ func (p *Registry) WorktreeDir(project string) string {
 func (p *Registry) DepsWith(runner agentrunner.Runner) ralphloop.Deps {
 	deps := p.DefaultDeps()
 	deps.Runner = runner
-	if p.cfg.Sleep != nil {
-		deps.Sleep = p.cfg.Sleep
+	if p.cfg().Sleep != nil {
+		deps.Sleep = p.cfg().Sleep
 	}
-	if p.cfg.InstallDeps != nil {
-		deps.InstallDeps = p.cfg.InstallDeps
+	if p.cfg().InstallDeps != nil {
+		deps.InstallDeps = p.cfg().InstallDeps
 	}
 	return deps
 }
@@ -153,7 +182,7 @@ func (p *Registry) ChatOverride(project string) *ralphloop.ServerChatConfig {
 		TelegramBotToken: n.Telegram.BotToken,
 		TelegramChatID:   n.Telegram.ChatID,
 		SlackWebhookURL:  n.Slack.WebhookURL,
-		GateStatePath:    p.cfg.Chat.GateStatePath,
+		GateStatePath:    p.cfg().Chat.GateStatePath,
 	}
 }
 

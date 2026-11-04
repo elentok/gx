@@ -374,7 +374,7 @@ func New(cfg Config) (*Server, error) {
 	s.initProjects()
 	s.giveLog(cfg.Runner)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
-		h.Finished = s.sessionFinished
+		h.Finished = s.SessionFinished
 	}
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)

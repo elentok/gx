@@ -14,7 +14,7 @@ import (
 func (s *Server) stampHandMerged() {
 	queued := map[rootRef]bool{}
 	for _, item := range s.queued.list() {
-		if addr, err := parseQueuedAddress(item.Address); err == nil {
+		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil {
 			queued[rootOf(addr)] = true
 		}
 	}

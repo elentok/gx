@@ -123,7 +123,7 @@ func (s *Server) mapEpicRefusal(address string) *wire.QueueResult {
 
 // inMapEpic reports whether address names a ticket (or root) of a map epic.
 func (s *Server) inMapEpic(address string) bool {
-	a, err := parseQueuedAddress(address)
+	a, err := tickets.ParseQueuedAddress(address)
 	if err != nil {
 		return false
 	}
@@ -284,7 +284,7 @@ func (s *Server) queueAddItem(req wire.QueueRequest) (wire.QueueResult, error) {
 func (s *Server) stampQueuedAt(t queueTarget) {
 	epic := t.epic
 	if !t.isEpic() {
-		a, err := parseQueuedAddress(t.address)
+		a, err := tickets.ParseQueuedAddress(t.address)
 		if err != nil {
 			return
 		}

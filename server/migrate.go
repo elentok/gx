@@ -17,18 +17,18 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// migratorBack is what the Migrator reads from the Server.
-type migratorBack interface {
-	// failuresChanged announces a change to the saved migration failures.
-	failuresChanged()
+// MigratorBack is what the Migrator reads from the Server.
+type MigratorBack interface {
+	// FailuresChanged announces a change to the saved migration failures.
+	FailuresChanged()
 }
 
 // Migrator runs the start-up migration of every project and the retries, and
 // reads the failures they leave.
 type Migrator struct {
-	cfg  *Config // the Server's own, so a later change to it shows here
+	cfg  func() projectsEnv
 	log  *slog.Logger
-	back migratorBack
+	back MigratorBack
 	// done closes when the start-up migration run ends.
 	done chan struct{}
 	// startupDone closes when the steps that run after the migrations (the
@@ -52,8 +52,8 @@ func (s *Server) MigrationRunning(project string) bool { return s.migrator.Runni
 // the ticket store. The CLI writes the record, so each call reads the file.
 func (s *Server) MigrationFailures() []wire.MigrationFailure { return s.migrator.Failures() }
 
-// failuresChanged implements migratorBack.
-func (s *Server) failuresChanged() {
+// FailuresChanged implements MigratorBack.
+func (s *Server) FailuresChanged() {
 	s.events.Publish(wire.EventMigrationFailuresChanged, "")
 	s.guards.Kick() // a clear ends a Migration block: claim now, not at the next tick
 }
@@ -72,8 +72,8 @@ func (m *Migrator) Migrating() bool {
 }
 
 func (m *Migrator) Steps() *migrations.Registry {
-	if m.cfg.Migrations != nil {
-		return m.cfg.Migrations
+	if m.cfg().Migrations != nil {
+		return m.cfg().Migrations
 	}
 	return migrations.Default
 }
@@ -83,10 +83,10 @@ func (m *Migrator) Steps() *migrations.Registry {
 // ends; it only starts no further project.
 func (m *Migrator) MigrateAll(ctx context.Context) {
 	defer close(m.done)
-	if m.cfg.TicketStore == "" {
+	if m.cfg().TicketStore == "" {
 		return
 	}
-	dirs, err := tickets.ProjectDirs(m.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(m.cfg().TicketStore)
 	if err != nil {
 		m.log.Error("list projects to migrate", "err", err)
 		return
@@ -117,15 +117,15 @@ func (s *Server) retryMigrationWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, s.migrator.Retry(req.Project))
+	wire.WriteJSON(w, s.migrator.Retry(req.Project))
 }
 
 // retryMigration runs the project's pending steps in the background, the same
 // code path as the start-up run.
 func (m *Migrator) Retry(project string) wire.RetryMigrationResult {
 	dir := ""
-	if m.cfg.TicketStore != "" {
-		dirs, _ := tickets.ProjectDirs(m.cfg.TicketStore)
+	if m.cfg().TicketStore != "" {
+		dirs, _ := tickets.ProjectDirs(m.cfg().TicketStore)
 		for _, d := range dirs {
 			if tickets.ProjectName(d) == project {
 				dir = d
@@ -186,10 +186,10 @@ func (m *Migrator) migrateProject(reg *migrations.Registry, dir string, pass *mi
 	}
 	defer unlock()
 	changes, _, err := reg.Run(migrations.Env{
-		Dirs: config.DirsFrom(m.cfg.Env), Root: dir, LookupRoot: dir,
+		Dirs: config.DirsFrom(m.cfg().Env), Root: dir, LookupRoot: dir,
 		AppliedPath: filepath.Join(dir, migrations.AppliedFile),
 		SkipApplied: true,
-		StateDir:    m.cfg.StateDir, Pass: pass,
+		StateDir:    m.cfg().StateDir, Pass: pass,
 	})
 	for _, c := range changes {
 		for _, note := range c.Notes {
@@ -201,17 +201,17 @@ func (m *Migrator) migrateProject(reg *migrations.Registry, dir string, pass *mi
 		return
 	}
 	// Clear takes a lock file in the state dir; skip it when there is no record.
-	if recorded, err := migratefail.Read(m.cfg.StateDir, []string{name}); err == nil && len(recorded) == 0 {
+	if recorded, err := migratefail.Read(m.cfg().StateDir, []string{name}); err == nil && len(recorded) == 0 {
 		return
 	}
-	if err := migratefail.Clear(m.cfg.StateDir, name); err != nil {
+	if err := migratefail.Clear(m.cfg().StateDir, name); err != nil {
 		m.log.Error("clear migration failure", "project", name, "err", err)
 	}
 }
 
 func (m *Migrator) recordFailure(project string, err error) {
 	m.log.Error("migration failed", "project", project, "err", err)
-	if recErr := migratefail.Record(m.cfg.StateDir, project, err.Error()); recErr != nil {
+	if recErr := migratefail.Record(m.cfg().StateDir, project, err.Error()); recErr != nil {
 		m.log.Error("save migration failure", "project", project, "err", recErr)
 	}
 }

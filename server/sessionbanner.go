@@ -112,7 +112,7 @@ func (s *Server) designDone(m sessionMeta) bool {
 	if !m.Design || m.Ticket == "" {
 		return false
 	}
-	addr, err := parseQueuedAddress(m.Ticket)
+	addr, err := tickets.ParseQueuedAddress(m.Ticket)
 	if err != nil {
 		return false
 	}
@@ -139,7 +139,7 @@ func (s *Server) designLink(m sessionMeta) string {
 	if base == "" || !m.Design || m.Ticket == "" {
 		return ""
 	}
-	addr, err := parseQueuedAddress(m.Ticket)
+	addr, err := tickets.ParseQueuedAddress(m.Ticket)
 	if err != nil {
 		return ""
 	}

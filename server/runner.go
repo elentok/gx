@@ -80,7 +80,7 @@ func (s *Server) claimNext() {
 	running := s.registry.Count()
 	seen := map[string]bool{}
 	for _, item := range s.queued.list() {
-		addr, err := parseQueuedAddress(item.Address)
+		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || seen[rootOf(addr).String()] {
 			continue
 		}
@@ -168,7 +168,7 @@ func (s *Server) concurrencyLimit() int {
 // claimRoot reports whether it launched an iteration for item's root. A claim
 // that paused instead (ambiguous base) launched nothing, so it used no slot.
 func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
-	addr, err := parseQueuedAddress(item.Address)
+	addr, err := tickets.ParseQueuedAddress(item.Address)
 	if err != nil {
 		return false, err
 	}

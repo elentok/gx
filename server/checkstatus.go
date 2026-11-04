@@ -15,7 +15,7 @@ import (
 
 // Checks reads and saves a project's check configuration.
 type Checks struct {
-	cfg      *Config // the Server's own, so a later change to it shows here
+	cfg      func() projectsEnv
 	projects *Registry
 	guards   *runs.Guards
 }
@@ -31,7 +31,7 @@ func (s *Server) checksStatusRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), code)
 		return
 	}
-	writeJSON(w, st)
+	wire.WriteJSON(w, st)
 }
 
 // checksStatus answers for one project, or for every registered project when
@@ -40,14 +40,14 @@ func (c *Checks) Status(project string) (wire.ChecksStatus, error) {
 	st := wire.ChecksStatus{Projects: []wire.ProjectChecks{}}
 	var dirs []string
 	if project != "" {
-		dir, err := tickets.ProjectDirByName(c.cfg.TicketStore, project)
+		dir, err := tickets.ProjectDirByName(c.cfg().TicketStore, project)
 		if err != nil {
 			return st, err
 		}
 		dirs = []string{dir}
 	} else {
 		var err error
-		if dirs, err = tickets.ProjectDirs(c.cfg.TicketStore); err != nil {
+		if dirs, err = tickets.ProjectDirs(c.cfg().TicketStore); err != nil {
 			return st, err
 		}
 	}
@@ -68,8 +68,8 @@ func (c *Checks) Project(dir string) wire.ProjectChecks {
 	if vcsNone {
 		pc.SaveTargets = []string{wire.SaveTargetProjectJSON}
 	}
-	root := tickets.TrunkCheckout(c.cfg.TicketStore, name)
-	if repo := tickets.ProjectRepoRoot(c.cfg.TicketStore, name); repo != "" {
+	root := tickets.TrunkCheckout(c.cfg().TicketStore, name)
+	if repo := tickets.ProjectRepoRoot(c.cfg().TicketStore, name); repo != "" {
 		pc.Trunk, _ = tickets.Trunk(dir, repo)
 	}
 

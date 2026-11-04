@@ -208,7 +208,7 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) wire.Epi
 	}
 	if status == tickets.StatusPausedRepair {
 		row.State = repairState(evs, t.PausedClass())
-		row.FixPrompt = fixAgentPrompt(s.launchHarness(root.Project), row.Address, t)
+		row.FixPrompt = fixAgentPrompt(s.LaunchHarness(root.Project), row.Address, t)
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()

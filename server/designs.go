@@ -354,7 +354,7 @@ func (s *Server) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionR
 	if ticket != "" {
 		target += "/" + ticket
 	}
-	prompt := harness.SkillCommand(s.launchHarness(project), "gx-design", target)
+	prompt := harness.SkillCommand(s.LaunchHarness(project), "gx-design", target)
 	return s.createSession(wire.CreateSessionRequest{
 		Project:      project,
 		Dir:          d.Path,
@@ -425,7 +425,7 @@ func (s *Server) designWorktree(req wire.DesignWorktreeRequest) (wire.DesignWork
 	if d.Clash != "" {
 		return designWorktreeRefusal(wire.ReasonDesignBranchClash, d.Clash), nil
 	}
-	return wire.DesignWorktreeResult{Path: d.Path, Note: d.Note, AfterBranch: d.Past, Harness: s.launchHarness(project)}, nil
+	return wire.DesignWorktreeResult{Path: d.Path, Note: d.Note, AfterBranch: d.Past, Harness: s.LaunchHarness(project)}, nil
 }
 
 // openNewDesign starts a design session for an idea with no map yet: Epic is
@@ -490,7 +490,7 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) wire.S
 		MadeWorktree: true,
 		Name:         slug,
 		Ticket:       addr,
-		Prompt:       harness.SkillCommand(s.launchHarness(project), "gx-design", addr),
+		Prompt:       harness.SkillCommand(s.LaunchHarness(project), "gx-design", addr),
 		RebaseNote:   rebaseNote,
 	}, sessionCtx{launchDesign: true})
 	switch {

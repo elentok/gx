@@ -197,7 +197,7 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 	}
 	seen := map[rootRef]bool{}
 	for _, item := range s.queued.list() {
-		addr, err := parseQueuedAddress(item.Address)
+		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || !inScope(addr.Project) || seen[rootOf(addr)] {
 			continue
 		}

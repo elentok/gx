@@ -74,10 +74,10 @@ func (s *Server) defaultHarness(project string) ralphloop.AgentKind {
 	return defaultOrClaude(s.projects.AgentsConfig(project).DefaultHarness)
 }
 
-// launchHarness is the harness a new interactive session in project starts on
+// LaunchHarness is the harness a new interactive session in project starts on
 // when its request names none. Unlike defaultHarness it keeps an unregistered
 // name, so createSession refuses it instead of silently running Claude.
-func (s *Server) launchHarness(project string) string {
+func (s *Server) LaunchHarness(project string) string {
 	return cmp.Or(s.projects.AgentsConfig(project).DefaultHarness, string(ralphloop.AgentClaude))
 }
 
@@ -114,7 +114,7 @@ func (s *Server) resolveTicket(addr tickets.Address, t tickets.Ticket) ticketHar
 // names one.
 func (s *Server) queueItemAgent(addr tickets.Address) string {
 	for _, item := range s.queued.list() {
-		if a, err := parseQueuedAddress(item.Address); err == nil && rootOf(a) == rootOf(addr) && item.Agent != "" {
+		if a, err := tickets.ParseQueuedAddress(item.Address); err == nil && rootOf(a) == rootOf(addr) && item.Agent != "" {
 			return item.Agent
 		}
 	}

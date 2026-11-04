@@ -64,7 +64,7 @@ func (p *Registry) UnavailablePath(project string) (string, bool) {
 // poll. The first poll that finds one missing sends the one notification; the
 // claim and explain paths read the path themselves, so they never lag it.
 func (p *Registry) Check() {
-	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
 	if err != nil {
 		return
 	}

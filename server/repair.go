@@ -172,7 +172,7 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 
 func (s *Server) rootQueued(root rootRef) bool {
 	for _, it := range s.queued.list() {
-		if a, err := parseQueuedAddress(it.Address); err == nil && rootOf(a) == root {
+		if a, err := tickets.ParseQueuedAddress(it.Address); err == nil && rootOf(a) == root {
 			return true
 		}
 	}

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -18,7 +20,7 @@ import (
 // envHome is the home dir the server reads: HOME of Config.Env, which New
 // fills from the process env when the caller leaves it nil.
 func (p *Registry) EnvHome() (string, error) {
-	if home := harness.LookupEnv(p.cfg.Env, "HOME"); home != "" {
+	if home := harness.LookupEnv(p.cfg().Env, "HOME"); home != "" {
 		return home, nil
 	}
 	return "", errors.New("HOME is not set in the server env")
@@ -26,7 +28,7 @@ func (p *Registry) EnvHome() (string, error) {
 
 // codexHome is the resolved codex dir of Config.Env.
 func (p *Registry) CodexHome() (string, error) {
-	if dir := harness.LookupEnv(p.cfg.Env, "CODEX_HOME"); dir != "" {
+	if dir := harness.LookupEnv(p.cfg().Env, "CODEX_HOME"); dir != "" {
 		return dir, nil
 	}
 	home, err := p.EnvHome()
@@ -53,7 +55,7 @@ func (p *Registry) LastCodexText(id string) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	texts := trailingAgentTexts(res.Messages)
+	texts := transcript.TrailingAgentTexts(res.Messages)
 	if len(texts) == 0 {
 		return codexsession.LastAssistantTextIn(home, id)
 	}
@@ -72,7 +74,7 @@ func (p *Registry) TranscriptPath(cwd, sessionID string) (string, error) {
 
 // defaultDeps is ralphloop's default deps reading Config.Env's home dirs.
 func (p *Registry) DefaultDeps() ralphloop.Deps {
-	o := ralphloop.DepsOverrides{RunnerWait: p.cfg.RunnerWait, Finished: p.back.sessionFinished, RateLimitResetBuffer: p.cfg.RateLimitResetBuffer, GuardPoll: p.cfg.GuardPoll}
+	o := ralphloop.DepsOverrides{RunnerWait: p.cfg().RunnerWait, Finished: p.back.SessionFinished, RateLimitResetBuffer: p.cfg().RateLimitResetBuffer, GuardPoll: p.cfg().GuardPoll}
 	o.Home, _ = p.EnvHome()
 	o.CodexHome, _ = p.CodexHome()
 	o.StateDir, _ = p.LockStateDir()
@@ -81,7 +83,7 @@ func (p *Registry) DefaultDeps() ralphloop.Deps {
 
 // lockStateDir is the gx state dir of Config.Env that merge locks live under.
 func (p *Registry) LockStateDir() (string, error) {
-	if dir := harness.LookupEnv(p.cfg.Env, "XDG_STATE_HOME"); dir != "" {
+	if dir := harness.LookupEnv(p.cfg().Env, "XDG_STATE_HOME"); dir != "" {
 		return filepath.Join(dir, "gx"), nil
 	}
 	home, err := p.EnvHome()
@@ -102,14 +104,14 @@ func (p *Registry) MergeLockDir(epicPath string) (string, error) {
 
 // typing is the typing rules for the claude sessions this server runs, reading
 // claude's config from Config.Env.
-func (p *Registry) Typing() harness.Typing { return harness.ClaudeTypingIn(p.cfg.Env) }
+func (p *Registry) Typing() harness.Typing { return harness.ClaudeTypingIn(p.cfg().Env) }
 
 // typingIO is the ready-to-type step's view of the session in dir. It carries
 // the session id the probe keys its memory by, the server logger and the
 // caller's label, so the probe's decisions reach server.log.
 func (p *Registry) TypingIO(dir string, c *nativerunner.HolderClient, caller string) harness.TypingIO {
 	io := nativerunner.HolderTypingIO(c)
-	if meta, err := readSessionMeta(dir); err == nil {
+	if meta, err := readTypingMeta(dir); err == nil {
 		io.Session = meta.ConversationID
 	}
 	io.Log = p.log.With("gx_session", filepath.Base(dir))
@@ -117,10 +119,25 @@ func (p *Registry) TypingIO(dir string, c *nativerunner.HolderClient, caller str
 	return io
 }
 
+// typingMeta is the part of a session's meta.json the typing rules read.
+type typingMeta struct {
+	Harness        string `json:"harness"`
+	ConversationID string `json:"conversation_id"`
+}
+
+func readTypingMeta(dir string) (typingMeta, error) {
+	var meta typingMeta
+	data, err := os.ReadFile(filepath.Join(dir, "meta.json"))
+	if err != nil {
+		return meta, err
+	}
+	return meta, json.Unmarshal(data, &meta)
+}
+
 // sessionTyping is the typing rules of the session in dir, claude's when its
 // meta can't be read.
 func (p *Registry) SessionTyping(dir string) harness.Typing {
-	meta, err := readSessionMeta(dir)
+	meta, err := readTypingMeta(dir)
 	if err != nil {
 		return p.Typing()
 	}

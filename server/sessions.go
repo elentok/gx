@@ -107,7 +107,7 @@ func (s *Server) createSession(req wire.CreateSessionRequest, sc sessionCtx) (wi
 	}
 	from := "the request"
 	if req.Harness == "" {
-		req.Harness = s.launchHarness(req.Project)
+		req.Harness = s.LaunchHarness(req.Project)
 		from = s.defaultHarnessSource(req.Project)
 	}
 	if _, err := harness.Lookup(agentrunner.Kind(req.Harness)); err != nil {

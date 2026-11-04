@@ -88,7 +88,7 @@ func (s *Server) herdrWaiting() []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, item := range s.queued.list() {
-		addr, err := parseQueuedAddress(item.Address)
+		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil || seen[rootOf(addr).String()] {
 			continue
 		}

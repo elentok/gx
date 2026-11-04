@@ -30,7 +30,7 @@ func (s *Server) checksSaveWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 func (c *Checks) Save(req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
@@ -69,8 +69,8 @@ func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req wire.SaveChe
 }
 
 func (c *Checks) SaveToRepo(dir string, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
-	root := tickets.TrunkCheckout(c.cfg.TicketStore, req.Project)
-	repo := tickets.ProjectRepoRoot(c.cfg.TicketStore, req.Project)
+	root := tickets.TrunkCheckout(c.cfg().TicketStore, req.Project)
+	repo := tickets.ProjectRepoRoot(c.cfg().TicketStore, req.Project)
 	if root == "" || repo == "" {
 		return refuseSave(wire.ReasonNoTrunk, req.Project+" has no trunk checkout")
 	}

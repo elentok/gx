@@ -112,24 +112,9 @@ func afterRoundNumber(header string) string {
 	return strings.TrimLeft(rest, "-:– ")
 }
 
-// trailingAgentTexts lists the agent text messages after the person's last
-// message, newest first.
-func trailingAgentTexts(msgs []transcript.ChatMessage) []string {
-	var out []string
-	for i := len(msgs) - 1; i >= 0; i-- {
-		switch m := msgs[i]; {
-		case m.Role == transcript.ChatRolePerson || m.Kind == transcript.ChatKindCompacted:
-			return out
-		case m.Kind == transcript.ChatKindText:
-			out = append(out, m.Text)
-		}
-	}
-	return out
-}
-
 // chatRound is the round the agent's last turn ended with, or nil.
 func chatRound(msgs []transcript.ChatMessage) []wire.SessionRoundCard {
-	for _, text := range trailingAgentTexts(msgs) {
+	for _, text := range transcript.TrailingAgentTexts(msgs) {
 		if grillround.HasMarker(text) {
 			return roundCards(text)
 		}
@@ -139,7 +124,7 @@ func chatRound(msgs []transcript.ChatMessage) []wire.SessionRoundCard {
 
 // chatNext is the run-end line of the agent's last turn, or nil.
 func chatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ticket string, final bool) *wire.SessionNext {
-	for _, text := range trailingAgentTexts(msgs) {
+	for _, text := range transcript.TrailingAgentTexts(msgs) {
 		if a, ok := runEndNext(text, ticket, string(kind), final); ok {
 			return &wire.SessionNext{Action: a}
 		}

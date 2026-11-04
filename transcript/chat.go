@@ -45,6 +45,21 @@ type ChatMessage struct {
 	At    time.Time
 }
 
+// TrailingAgentTexts lists the agent text messages after the person's last
+// message, newest first.
+func TrailingAgentTexts(msgs []ChatMessage) []string {
+	var out []string
+	for i := len(msgs) - 1; i >= 0; i-- {
+		switch m := msgs[i]; {
+		case m.Role == ChatRolePerson || m.Kind == ChatKindCompacted:
+			return out
+		case m.Kind == ChatKindText:
+			out = append(out, m.Text)
+		}
+	}
+	return out
+}
+
 type chatLine struct {
 	Type             string `json:"type"`
 	Subtype          string `json:"subtype"`

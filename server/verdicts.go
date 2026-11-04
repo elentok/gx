@@ -154,7 +154,7 @@ func frontierIndex(e tickets.Epic, t tickets.Ticket) int {
 func (s *Server) rootsAhead(root string) (ahead int, queued bool) {
 	seen := map[string]bool{}
 	for _, item := range s.queued.list() {
-		a, err := parseQueuedAddress(item.Address)
+		a, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil {
 			continue
 		}
@@ -206,7 +206,7 @@ func (s *Server) pendingRows() []wire.PendingRow {
 	// A ticket queued alone has its own row; its epic's entry adds none for it.
 	covered := map[string]bool{}
 	for _, item := range items {
-		if addr, err := parseQueuedAddress(item.Address); err == nil && addr.ID != "" {
+		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil && addr.ID != "" {
 			covered[addr.String()] = true
 		}
 	}
@@ -236,7 +236,7 @@ func (s *Server) pendingRows() []wire.PendingRow {
 // entry and for an epic entry whose next ticket is unknown or already covered;
 // a chosen epic ticket is marked covered.
 func (s *Server) queuedTarget(item wire.QueueItem, covered map[string]bool, epicsOf func(project string) ([]tickets.Epic, error)) (tickets.Address, bool) {
-	addr, err := parseQueuedAddress(item.Address)
+	addr, err := tickets.ParseQueuedAddress(item.Address)
 	if err != nil {
 		return tickets.Address{}, false
 	}
