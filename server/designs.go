@@ -188,7 +188,7 @@ func (s *Server) scanDesignCleanups() {
 				continue
 			}
 			s.log.Info("design step moved past branch", "map", project+":"+epic, "step", step)
-			s.goSettle(func() {
+			s.guards.GoSettle(func() {
 				if step == tickets.StepDone {
 					s.stopFinishedDesign(project, epic)
 				}

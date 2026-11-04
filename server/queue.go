@@ -107,7 +107,7 @@ func (s *Server) writeQueue(address string, mutate func(items []wire.QueueItem) 
 		return wire.QueueResult{}, err
 	}
 	s.events.Publish(wire.EventQueueChanged, address)
-	s.kickRunner()
+	s.guards.Kick()
 	return wire.QueueResult{Queue: append([]wire.QueueItem{}, next...)}, nil
 }
 

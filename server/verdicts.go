@@ -86,7 +86,7 @@ func (s *Server) waitingVerdict(addr tickets.Address) (string, bool) {
 // where it stands in the queue and the slots.
 func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.Address) wire.Explanation {
 	ex := wire.Explanation{Address: addr.String()}
-	if s.refused.has(ex.Address) {
+	if s.guards.Refused.Has(ex.Address) {
 		ex.Verdict = wire.VerdictClaimRereadMismatch
 		return ex
 	}

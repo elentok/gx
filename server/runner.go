@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -33,137 +32,9 @@ const (
 	mergeSkill = "gx-merge --ticket"
 )
 
-// refusals holds the tickets the last claim pass refused for a changed file,
-// until a claim or a later pass that finds the file unchanged clears them.
-type refusals struct {
-	mu   sync.Mutex
-	addr map[string]bool
-}
-
-func (r *refusals) set(addr string, refused bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.addr == nil {
-		r.addr = map[string]bool{}
-	}
-	if refused {
-		r.addr[addr] = true
-	} else {
-		delete(r.addr, addr)
-	}
-}
-
-func (r *refusals) has(addr string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.addr[addr]
-}
-
-// mergeGuard lets a stop wait for merges in flight and keeps new ones from
-// starting: a merge cut off halfway leaves a ticket the store cannot explain.
-type mergeGuard struct {
-	mu     sync.Mutex
-	closed bool
-	wg     sync.WaitGroup
-}
-
-// begin reports false once the server is stopping; the caller must then not merge.
-func (g *mergeGuard) begin() bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.closed {
-		return false
-	}
-	g.wg.Add(1)
-	return true
-}
-
-func (g *mergeGuard) end() { g.wg.Done() }
-
-// closeAndWait refuses new merges, then reports whether the running ones
-// finished within timeout.
-func (g *mergeGuard) closeAndWait(timeout time.Duration) bool {
-	g.mu.Lock()
-	g.closed = true
-	g.mu.Unlock()
-	done := make(chan struct{})
-	go func() { g.wg.Wait(); close(done) }()
-	select {
-	case <-done:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
-}
-
-// trunkLocks serializes root merges per repo and trunk. Unserialized, two
-// merges into one trunk race on git's own locks and the second fails instead
-// of seeing a clean non-ff.
-type trunkLocks struct {
-	mu    sync.Mutex
-	locks map[string]*sync.Mutex
-}
-
-func (l *trunkLocks) lock(repo, trunk string) (unlock func()) {
-	m := l.mutex(repo, trunk)
-	m.Lock()
-	return m.Unlock
-}
-
-func (l *trunkLocks) mutex(repo, trunk string) *sync.Mutex {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	key := repo + "\x00" + trunk
-	m := l.locks[key]
-	if m == nil {
-		if l.locks == nil {
-			l.locks = map[string]*sync.Mutex{}
-		}
-		m = &sync.Mutex{}
-		l.locks[key] = m
-	}
-	return m
-}
-
-// tryLock is lock without the wait: ok is false when the trunk is held.
-func (l *trunkLocks) tryLock(repo, trunk string) (unlock func(), ok bool) {
-	m := l.mutex(repo, trunk)
-	if !m.TryLock() {
-		return nil, false
-	}
-	return m.Unlock, true
-}
-
-// goSettle runs f, a finishRun, settleRun or recoverFrom, on its own
-// goroutine. Each writes to the ticket store and may outlive Serve's stop.
-func (s *Server) goSettle(f func()) {
-	s.settling.Add(1)
-	go func() {
-		defer s.settling.Done()
-		f()
-	}()
-}
-
-// WaitSettled waits for every goSettle goroutine and reports
-// whether they all ended within timeout. Serve's stop leaves them running
-// (agents outlive the server), so a test must wait before deleting their dirs.
+// WaitSettled waits for every settle goroutine; see runs.Guards.WaitSettled.
 func (s *Server) WaitSettled(timeout time.Duration) bool {
-	done := make(chan struct{})
-	go func() { s.settling.Wait(); close(done) }()
-	select {
-	case <-done:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
-}
-
-// kickRunner asks the runner to look at the queue now instead of at its next tick.
-func (s *Server) kickRunner() {
-	select {
-	case s.kick <- struct{}{}:
-	default:
-	}
+	return s.guards.WaitSettled(timeout)
 }
 
 // keepClaiming launches queued roots. The tick is the guarantee; the kick from a queue write only makes it sooner.
@@ -192,7 +63,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-		case <-s.kick:
+		case <-s.guards.Kicked():
 		}
 	}
 }
@@ -249,8 +120,8 @@ func (s *Server) stalledNudgeDelay() time.Duration {
 // claimRootAfterAdoption is claimRoot once a late-finish adoption in flight is
 // done, so a root never launches an investigation the adoption is about to cancel.
 func (s *Server) claimRootAfterAdoption(item wire.QueueItem) (bool, error) {
-	s.adoptMu.Lock()
-	defer s.adoptMu.Unlock()
+	s.guards.AdoptMu.Lock()
+	defer s.guards.AdoptMu.Unlock()
 	return s.claimRoot(item)
 }
 
@@ -350,10 +221,10 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 			return false, err
 		}
 		if seen, _ := s.idx.sumOf(ticketAddr); seen != onDisk {
-			s.refused.set(ticketAddr, true)
+			s.guards.Refused.Set(ticketAddr, true)
 			return false, nil
 		}
-		s.refused.set(ticketAddr, false)
+		s.guards.Refused.Set(ticketAddr, false)
 		resolved := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t)
 		if _, held := s.claimHold(addr.Project, t, resolved.ResolvedHarness); held {
 			return false, nil
@@ -541,7 +412,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
 	s.events.Publish(wire.EventIterationStarted, ticketAddr)
-	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
+	s.guards.GoSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
 	return true, nil
 }
 
@@ -788,7 +659,7 @@ type runContext struct {
 // found already finished at reattach skips the wait and comes straight here.
 func (s *Server) settleRun(rc runContext, err error) {
 	deps, root, mode, one, wt, run, ticketAddr := rc.deps, rc.root, rc.mode, rc.one, rc.wt, rc.run, rc.ticketAddr
-	defer s.kickRunner()
+	defer s.guards.Kick()
 	s.registry.MarkSettling(ticketAddr)
 	keepRun := false
 	defer func() {
@@ -834,11 +705,11 @@ func (s *Server) settleRun(rc runContext, err error) {
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next
 		// server, which reclaims it from the saved registry: keep it there.
-		if !s.merges.begin() {
+		if !s.guards.Merges.Begin() {
 			keepRun = true
 			return
 		}
-		defer s.merges.end()
+		defer s.guards.Merges.End()
 		one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
 		one.KeepAskedAgent = !s.cfg.DropAskedAgent && keepsAskedAgent(run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)

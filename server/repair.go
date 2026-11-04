@@ -163,8 +163,8 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	if !s.rootQueued(rootOf(addr)) {
 		return res, nil
 	}
-	if _, t, ok := s.freshTicket(addr); ok && s.merges.begin() {
-		defer s.merges.end()
+	if _, t, ok := s.freshTicket(addr); ok && s.guards.Merges.Begin() {
+		defer s.guards.Merges.End()
 		s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	}
 	return res, nil

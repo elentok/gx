@@ -31,7 +31,7 @@ func (s *Server) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error)
 		return wire.QueueResult{}, err
 	}
 	one := ralphloop.OneIteration{Epic: m.root.Epic, Ticket: first}
-	unlock := s.trunkLocks.lock(m.repo, target)
+	unlock := s.guards.Trunks.Lock(m.repo, target)
 	res, d, err := s.stashMergeLocked(m, one, target)
 	unlock()
 	if err != nil {

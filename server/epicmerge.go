@@ -31,7 +31,7 @@ func (s *Server) epicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 		return wire.QueueResult{}, err
 	}
 	one := ralphloop.OneIteration{Epic: m.root.Epic, Ticket: first}
-	unlock := s.trunkLocks.lock(m.repo, target)
+	unlock := s.guards.Trunks.Lock(m.repo, target)
 	d, err := s.epicMergeLocked(m.root, one, m.repo, m.epics, m.epic, target)
 	unlock()
 	if err != nil {

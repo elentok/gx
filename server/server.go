@@ -177,11 +177,7 @@ type Server struct {
 	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry       *runs.Registry
 	savedRuns      []runs.TrackedRun // handles the previous server left; consumed by reclaimRuns
-	refused        refusals
-	heldMerges     refusals // roots whose merge waits for a trunk-conflict ticket, keyed by root
-	merges         mergeGuard
-	adoptMu        sync.Mutex // a late-finish adoption holds it from its finish to the cancel of unstarted investigations; the runner claims under it
-	trunkLocks     trunkLocks
+	guards         *runs.Guards
 	mergeTargets   mergeTargetCache
 	projectRepos   projectRepoCache
 	mergeInto      func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
@@ -190,13 +186,11 @@ type Server struct {
 	nudges         nudgeLimiter
 	unavailable    unavailableNotes
 	trunkMissing   missingTrunks
-	kick           chan struct{} // wakes keepClaiming
 	sessionWatches *sessionWatches
 	designOpens    sync.Map // epic address -> *sync.Mutex, serializing designs open
 	focus          *focusReports
 	sessionBanners sessionBanners
-	settling       sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
-	unblockMu      sync.Mutex     // makes leaving a headless block happen once, whoever sees it first
+	unblockMu      sync.Mutex // makes leaving a headless block happen once, whoever sees it first
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -385,7 +379,7 @@ func New(cfg Config) (*Server, error) {
 		mergeInto:    git.MergeBranchInto,
 		mergedProbe:  git.IsAncestor,
 		events:       events,
-		kick:         make(chan struct{}, 1),
+		guards:       runs.NewGuards(),
 
 		sessionWatches: newSessionWatches(),
 		focus:          newFocusReports(),
@@ -836,7 +830,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		timeout = DefaultMergeStopTimeout
 	}
 	recordShutdown("merges-close-and-wait")
-	if !s.merges.closeAndWait(timeout) {
+	if !s.guards.Merges.CloseAndWait(timeout) {
 		s.log.Warn("stopping with a merge still in flight", "timeout", timeout)
 	}
 	recordShutdown("stop-commits")

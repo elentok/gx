@@ -172,7 +172,7 @@ func (s *Server) observe(r wire.DiskReading, probe string, projects []string, no
 	if c.resumed {
 		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
 			Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
-		s.kickRunner()
+		s.guards.Kick()
 	}
 	if c.startClean {
 		s.startClean(r.ID, probe, snap.projects)
@@ -188,7 +188,7 @@ func (s *Server) observeCleanEnd(r wire.DiskReading, probe string, end cleanEnd)
 	})
 	s.publishChange(r, c)
 	if c.resumed {
-		s.kickRunner()
+		s.guards.Kick()
 	}
 	s.sendCleanNotice(r.Name, snap.lastClean, r.Free, snap.held)
 	return snap.held

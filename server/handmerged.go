@@ -61,7 +61,7 @@ func (s *Server) stampIfMerged(root rootRef, epics []tickets.Epic, e tickets.Epi
 	if err != nil {
 		return
 	}
-	unlock, ok := s.trunkLocks.tryLock(repo, target)
+	unlock, ok := s.guards.Trunks.TryLock(repo, target)
 	if !ok {
 		return
 	}

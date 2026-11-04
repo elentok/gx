@@ -61,12 +61,12 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 	if err == nil {
 		if holder := s.trunkConflictHolder(root.Project, epics, repo, target, one.Epic); holder != "" {
 			// Not a pause: the root stays queued and claimRoot retries once the ticket is done.
-			s.heldMerges.set(root.String(), true)
+			s.guards.HeldMerges.Set(root.String(), true)
 			s.log.Info("land waits for a trunk-conflict ticket", "root", root, "holder", holder, "target", target)
 			return
 		}
 	}
-	unlock := s.trunkLocks.lock(repo, lockKey)
+	unlock := s.guards.Trunks.Lock(repo, lockKey)
 	d := s.mergeEpic(root, one, repo, epics, e, target, false)
 	unlock()
 	s.actOnMerge(root, one, dir, e, d)
@@ -101,16 +101,16 @@ func (s *Server) trunkConflictHolder(project string, epics []tickets.Epic, repo,
 // retryHeldMerge merges root again once the trunk-conflict ticket that held its
 // merge is gone. The hold lives in memory only: a server restart forgets it.
 func (s *Server) retryHeldMerge(root rootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
-	if !s.heldMerges.has(root.String()) {
+	if !s.guards.HeldMerges.Has(root.String()) {
 		return
 	}
 	_, _, target, err := s.epicRefs(root.Project, epics, root.Epic, repo)
 	if err == nil && s.trunkConflictHolder(root.Project, epics, repo, target, root.Epic) != "" {
 		return
 	}
-	s.heldMerges.set(root.String(), false)
+	s.guards.HeldMerges.Set(root.String(), false)
 	one := ralphloop.OneIteration{Epic: root.Epic, Ticket: lowestTicket(e)}
-	s.goSettle(func() { s.completeRootIfDone(root, one) })
+	s.guards.GoSettle(func() { s.completeRootIfDone(root, one) })
 }
 
 // mergeOutcome is how a merge ended; the zero value is a refusal with nothing
@@ -222,7 +222,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		s.stampMergedEpic(root, e, added, removed, countErr)
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		// On the settle group: it takes the worktree lock, which the merge must not wait on.
-		s.goSettle(func() { s.removeLeftoverWorktrees(repo, e) })
+		s.guards.GoSettle(func() { s.removeLeftoverWorktrees(repo, e) })
 		first = true
 	default:
 		s.stampEpic(root, e.Path, "completed_at")
@@ -360,7 +360,7 @@ func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
 		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
 		}
-		s.goSettle(func() { s.removeMergedWorktree(root) })
+		s.guards.GoSettle(func() { s.removeMergedWorktree(root) })
 	}
 }
 

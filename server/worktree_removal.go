@@ -52,7 +52,7 @@ func (s *Server) removeMergedWorktree(root rootRef) {
 func (s *Server) waitOutStamping(root rootRef, project, dir, repoDir string) {
 	if epics, err := tickets.LoadResolved(project, dir); err == nil {
 		_, _, target, refsErr := s.epicRefs(project, epics, root.Epic, repoDir)
-		s.trunkLocks.lock(repoDir, mergeLockKey(root, target, refsErr))()
+		s.guards.Trunks.Lock(repoDir, mergeLockKey(root, target, refsErr))()
 	}
 }
 

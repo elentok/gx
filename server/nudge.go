@@ -112,7 +112,7 @@ func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
 	}
 	r := it.runner
 	s.registry.Put(t)
-	s.goSettle(func() {
+	s.guards.GoSettle(func() {
 		defer s.registry.DeleteWatched(t)
 		// The nudge may not have shown as working yet; a pane already idle
 		// again by the deadline simply settles below.

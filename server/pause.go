@@ -100,7 +100,7 @@ func (s *Server) setMode(paused bool) (wire.QueueResult, error) {
 		return wire.QueueResult{}, err
 	}
 	s.events.Publish(wire.EventQueueChanged, "")
-	s.kickRunner()
+	s.guards.Kick()
 	return wire.QueueResult{Queue: s.queued.list(), Mode: p.mode()}, nil
 }
 

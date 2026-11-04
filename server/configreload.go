@@ -39,7 +39,7 @@ func (s *Server) reloadAppliers() settings.Appliers {
 				}
 				return nil
 			},
-			func(Settings, Settings) func() { s.kickRunner(); return nil },
+			func(Settings, Settings) func() { s.guards.Kick(); return nil },
 		},
 	}
 }

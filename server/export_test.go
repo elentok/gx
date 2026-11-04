@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/events"
@@ -226,7 +225,7 @@ func (s *Server) HoldTrunkLock(project, trunk string) (release func(), err error
 	if err != nil {
 		return nil, err
 	}
-	return s.trunkLocks.lock(repo, trunk), nil
+	return s.guards.Trunks.Lock(repo, trunk), nil
 }
 
 // CompleteRootIfDone runs the all-done check of address's root as if its
@@ -248,7 +247,7 @@ func (s *Server) CompleteRootIfDone(address string) error {
 // does, on the settle group.
 func (s *Server) RemoveMergedWorktree(project, epic string) {
 	root := rootRef{Project: project, Epic: epic}
-	s.goSettle(func() { s.removeMergedWorktree(root) })
+	s.guards.GoSettle(func() { s.removeMergedWorktree(root) })
 }
 
 // PutRunIn is Registry.PutRunIn on the configured runner.
@@ -258,12 +257,5 @@ func (s *Server) PutRunIn(address, root, cwd string, launching bool) {
 
 // LockedTrunks lists the trunks any merge has locked so far, in any repo.
 func (s *Server) LockedTrunks() []string {
-	s.trunkLocks.mu.Lock()
-	defer s.trunkLocks.mu.Unlock()
-	var trunks []string
-	for key := range s.trunkLocks.locks {
-		_, trunk, _ := strings.Cut(key, "\x00")
-		trunks = append(trunks, trunk)
-	}
-	return trunks
+	return s.guards.Trunks.Locked()
 }

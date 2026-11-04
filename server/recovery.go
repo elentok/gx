@@ -136,14 +136,14 @@ func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) 
 // tickets and recovery starts agents, and neither may happen before they end.
 func (s *Server) recoverAsync(f recovery.Failure) {
 	if s.migrating() {
-		s.goSettle(func() {
+		s.guards.GoSettle(func() {
 			<-s.migrationsDone
 			s.recoverAsync(f)
 		})
 		return
 	}
 	if plan, ok := s.planRecovery(f); ok {
-		s.goSettle(func() { s.recoverFrom(plan, f) })
+		s.guards.GoSettle(func() { s.recoverFrom(plan, f) })
 	}
 }
 
@@ -229,7 +229,7 @@ func (s *Server) holdPauseForRecovery(addr tickets.Address, ticketPath string, k
 	}
 	if !plan.holdsPause() {
 		s.pauseHold.start(f.Address)
-		s.goSettle(func() {
+		s.guards.GoSettle(func() {
 			s.recoverFrom(plan, f)
 			// An opened investigation keeps it pending from here: see recoveryState.
 			if s.pauseHold.started(f.Address) {
@@ -242,7 +242,7 @@ func (s *Server) holdPauseForRecovery(addr tickets.Address, ticketPath string, k
 		s.events.Publish(wire.EventTicketChanged, f.Address)
 		s.notifyPause(addr, ticketPath, kind, reason)
 	})
-	s.goSettle(func() { s.recoverFrom(plan, f) })
+	s.guards.GoSettle(func() { s.recoverFrom(plan, f) })
 	return true
 }
 

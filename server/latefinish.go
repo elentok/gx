@@ -106,7 +106,7 @@ func (s *Server) scanLateFinishes() {
 				if !ok || !s.lateFinishes.start(addr.String()) {
 					continue
 				}
-				s.goSettle(func() {
+				s.guards.GoSettle(func() {
 					defer s.lateFinishes.end(addr.String())
 					_ = s.adoptLateFinish(lf)
 				})
@@ -198,18 +198,18 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 			return false
 		}
 	}
-	if !s.merges.begin() {
+	if !s.guards.Merges.Begin() {
 		return false
 	}
-	defer s.merges.end()
+	defer s.guards.Merges.End()
 	// The finish makes the ticket's investigations claimable; the claim waits
 	// until the unstarted ones are cancelled.
-	s.adoptMu.Lock()
+	s.guards.AdoptMu.Lock()
 	unlocked := false
 	unlock := func() {
 		if !unlocked {
 			unlocked = true
-			s.adoptMu.Unlock()
+			s.guards.AdoptMu.Unlock()
 		}
 	}
 	defer unlock()
@@ -249,7 +249,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	unlock()
 	// The adopted ticket may be the epic's last; settleRun would have completed it.
 	s.completeRootIfDone(rootOf(addr), one)
-	s.kickRunner()
+	s.guards.Kick()
 	return true
 }
 

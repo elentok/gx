@@ -83,7 +83,7 @@ func (s *Server) startClean(id, probe string, projects []string) {
 		s.endClean(id, probe, cleanEnd{noWork: true})
 		return
 	}
-	s.goSettle(func() {
+	s.guards.GoSettle(func() {
 		s.endClean(id, probe, cleanEnd{failed: s.runCleanWork(work)})
 	})
 }

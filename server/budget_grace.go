@@ -66,7 +66,7 @@ func (s *Server) cancelHardGrace() {
 	if s.ledger.held() || !s.stopHardGrace() {
 		return
 	}
-	s.kickRunner()
+	s.guards.Kick()
 	s.banner(wire.EventLevelSuccess, "gx: agent stop cancelled — hard budget limit raised.", "")
 }
 
@@ -118,7 +118,7 @@ func (s *Server) endHardGrace(gen int) {
 	s.settings.Unlock()
 	s.events.Publish(wire.EventQueueChanged, "")
 	if !hard {
-		s.kickRunner()
+		s.guards.Kick()
 		return
 	}
 	n := s.killRuns(now, runs)

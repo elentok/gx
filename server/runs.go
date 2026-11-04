@@ -130,7 +130,7 @@ func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) e
 	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.GateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished || reportedFinished(t.TicketPath) {
-		s.goSettle(func() { s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil) })
+		s.guards.GoSettle(func() { s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil) })
 		return nil
 	}
 	if !t.WaitingSince.IsZero() {
@@ -140,7 +140,7 @@ func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) e
 		return nil
 	}
 	s.holdIfRateLimited(runner, t)
-	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
+	s.guards.GoSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
 	return nil
 }
 
@@ -214,11 +214,11 @@ func (s *Server) reclaim(t runs.TrackedRun) error {
 	rc := runContext{deps, root, mode, one, wt, t.Run, t.Address}
 	if reportedFinished(t.TicketPath) {
 		// The wait reads the agent's state, which a leftover background task can hold at working.
-		s.goSettle(func() { s.settleRun(rc, nil) })
+		s.guards.GoSettle(func() { s.settleRun(rc, nil) })
 		return nil
 	}
 	s.holdIfRateLimited(runner, t)
-	s.goSettle(func() { s.finishRun(rc) })
+	s.guards.GoSettle(func() { s.finishRun(rc) })
 	return nil
 }
 

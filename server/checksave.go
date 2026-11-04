@@ -78,7 +78,7 @@ func (s *Server) saveChecksToRepo(dir string, req wire.SaveChecksRequest) (wire.
 	if err != nil {
 		return refuseSave(wire.ReasonNoTrunk, err.Error())
 	}
-	defer s.trunkLocks.lock(repo, trunk)()
+	defer s.guards.Trunks.Lock(repo, trunk)()
 
 	branch, err := git.CurrentBranch(root)
 	if err != nil {
