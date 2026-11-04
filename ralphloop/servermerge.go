@@ -509,7 +509,7 @@ func mergeBuilt(d Deps, p iterationParams, built *builtAwaitingMergeError) error
 	}
 	r := mergeOne(d, lp, built.job)
 	// A held merge lock is routine (another merging, a person's conflict
-	// resolution), so retry as runMergeQueue does instead of failing the finish.
+	// resolution), so retry instead of failing the finish.
 	logged := false
 	for waited := time.Duration(0); r.mergeDeferred && waited < mergeDeferCap; waited += mergeDeferRetryInterval {
 		if !logged {

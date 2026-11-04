@@ -362,7 +362,7 @@ func TestClaim_ResumedButUnclaimedKeepsRepairVisible(t *testing.T) {
 
 // TestReattach_ClearIterationStatusDoesNotRetireRepair pins the ticket
 // 19 behaviour change: the ordinary reattach path (a still-claimed ticket
-// resumed via schema.ClearIterationStatus, see reattachIteration) does not
+// resumed via schema.ClearIterationStatus) does not
 // go through Claim, so it must not retire "## Needs Repair" — only an
 // actual claim does. A ticket can reattach several times within one claim;
 // retiring here would fire repeatedly instead of exactly once at claim.

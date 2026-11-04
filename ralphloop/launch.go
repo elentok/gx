@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// iterationParams are the per-ticket inputs to runIteration.
+// iterationParams are the per-ticket inputs to an iteration's launch and finish.
 type iterationParams struct {
 	WorkspaceID string
 	RepoDir     string
@@ -33,7 +33,7 @@ type iterationParams struct {
 	Runner string
 	Label  string
 	// Model and Effort are the resolved per-agent config the launched agent
-	// process starts under (see RunOptions.Agents); empty omits that one
+	// process starts under (see ResolveTier); empty omits that one
 	// flag from the launch argv.
 	Model  string
 	Effort string

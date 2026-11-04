@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 
@@ -28,8 +27,8 @@ func (d Deps) mergeLockDir(scratchDir, epic string) (string, error) {
 // finishCleanup need that only exists as live-process state (pane/tab/
 // sessionID/path), captured at the moment finishIteration discovered ahead >
 // 0 commits ready to merge. None of this is persisted — the worker recomputes
-// which ticket is eligible to merge from disk each pass (see runMergeQueue);
-// this struct only carries what disk can't tell it.
+// which ticket is eligible to merge from disk; this struct only carries what
+// disk can't tell it.
 type mergeJob struct {
 	ticket    tickets.Ticket
 	base      string
@@ -42,10 +41,9 @@ type mergeJob struct {
 // builtAwaitingMergeError is finishIteration's signal that a build finished
 // with commits ready to merge (ahead > 0): iteration_status: finished has
 // already been written (see MarkBuiltAwaitingMerge), and job carries what the
-// merge-queue worker needs to merge it later. It is not a real failure — every
-// caller up the stack (runIteration, reattachIteration, launch's goroutine in
-// loop.go) must recognize it via errors.As and route it to the merge queue
-// instead of treating it as an iteration error.
+// merge step needs to merge it later. It is not a real failure — every
+// caller up the stack must recognize it via errors.As and route it to the
+// merge step instead of treating it as an iteration error.
 type builtAwaitingMergeError struct {
 	job mergeJob
 }
@@ -67,7 +65,7 @@ type mergeQueueParams struct {
 	FeatureBranch   string
 	Agent           AgentKind
 	// Model and Effort are the resolved per-agent config a merged
-	// conflict-resolution agent starts under (see RunOptions.Agents); empty
+	// conflict-resolution agent starts under (see ResolveTier); empty
 	// omits that one flag from the launch argv.
 	Model        string
 	Effort       string
@@ -103,62 +101,6 @@ func (lp mergeQueueParams) iterationParamsFor(job mergeJob) iterationParams {
 	}
 }
 
-// runMergeQueue is the merge-queue worker: one goroutine per Run call,
-// replacing featureMu as the sole serializer of cherry-pick merges onto the
-// feature branch. Each pass picks the lowest-numbered ticket already queued
-// in mergeJobs (see pickEligibleMergeJob) — no persisted state of its own —
-// and merges it using the in-memory job data captured at build time (see
-// mergeJob's doc). It blocks on wake between passes that find nothing queued,
-// rather than busy-polling, and exits once done is closed (Run returning).
-func runMergeQueue(d Deps, lp mergeQueueParams, mergeJobs map[string]mergeJob, mergeJobsMu *sync.Mutex, wake <-chan struct{}, done <-chan struct{}, mergeResults chan<- outcome) {
-	deferredLogged := false // an episode ends when a merge is attempted without deferring
-	for {
-		select {
-		case <-done:
-			return
-		default:
-		}
-
-		job, ok := claimEligibleMergeJob(mergeJobs, mergeJobsMu)
-		if !ok {
-			select {
-			case <-done:
-				return
-			case <-wake:
-			}
-			continue
-		}
-
-		r := mergeOne(d, lp, job)
-		if !r.mergeDeferred {
-			deferredLogged = false
-		}
-		if r.mergeDeferred {
-			if !deferredLogged {
-				deferredLogged = true
-				logMergeDeferred(d, lp.iterationParamsFor(job))
-			}
-			// Re-queue and retry on the next tick instead of waiting on the
-			// lock; a fresh build's wake just brings the retry forward.
-			mergeJobsMu.Lock()
-			mergeJobs[job.ticket.Identifier] = job
-			mergeJobsMu.Unlock()
-			select {
-			case <-done:
-				return
-			case <-wake:
-			case <-time.After(mergeDeferRetryInterval):
-			}
-			continue
-		}
-		select {
-		case mergeResults <- r:
-		case <-done:
-			return
-		}
-	}
-}
-
 // logMergeDeferred records why a merge is waiting, naming the lock's owner when
 // there is one.
 func logMergeDeferred(d Deps, p iterationParams) {
@@ -169,56 +111,6 @@ func logMergeDeferred(d Deps, p iterationParams) {
 		}
 	}
 	p.logTicketEventReason(string(events.MergeDeferred), "", "", "", reason)
-}
-
-// claimEligibleMergeJob picks the lowest-numbered job in mergeJobs (see
-// pickEligibleMergeJob) and removes it before returning, so a concurrent
-// build goroutine populating a different entry can never see or re-claim the
-// same job twice. ok is false if mergeJobs is empty.
-func claimEligibleMergeJob(mergeJobs map[string]mergeJob, mergeJobsMu *sync.Mutex) (mergeJob, bool) {
-	mergeJobsMu.Lock()
-	defer mergeJobsMu.Unlock()
-	job, ok := pickEligibleMergeJob(mergeJobs)
-	if ok {
-		delete(mergeJobs, job.ticket.Identifier)
-	}
-	return job, ok
-}
-
-// pickEligibleMergeJob returns the lowest-numbered ticket among mergeJobs.
-// mergeJobs membership alone is what makes a ticket eligible — a build only
-// ever adds an entry right after writing MarkBuiltAwaitingMerge, and only the
-// worker itself ever removes one (see claimEligibleMergeJob) — so there is
-// deliberately no re-read of the ticket's own status/iteration_status/
-// blocked_by here: a ticket file is a shared, unlocked plain file (see
-// loop.go's launched doc), and an unrelated writer can revert its status out
-// from under an already-queued job exactly the way claimNext's own
-// launched-map guards against a stray revert causing a reclaim. Trusting
-// disk for that would strand the job forever instead. A blocked_by recheck
-// was tried and reverted: a type: code-review ticket's Blocked by: is
-// synthesized as "every other ticket in the epic" (see
-// tickets/status.go's effectiveBlockedBy) and recomputed live, so a review
-// that forks findings mid-turn (exactly what a review is for) sees its own
-// freshly-written children join that synthesized list the moment they hit
-// disk — blocking its own merging on children who in turn can't be claimed
-// until their parent (this same ticket) is done. A ticket can only be
-// claimed, and thus only ever reach the build that produces a mergeJob, once
-// its own blockers already show done, so nothing upstream of it can newly
-// unresolve here — recomputing at merge time only re-adds this self-inflicted
-// deadlock, so blocked_by is trusted from claim time onward and never
-// rechecked.
-func pickEligibleMergeJob(mergeJobs map[string]mergeJob) (mergeJob, bool) {
-	if len(mergeJobs) == 0 {
-		return mergeJob{}, false
-	}
-	eligible := make([]mergeJob, 0, len(mergeJobs))
-	for _, job := range mergeJobs {
-		eligible = append(eligible, job)
-	}
-	sort.Slice(eligible, func(i, j int) bool {
-		return eligible[i].ticket.Number < eligible[j].ticket.Number
-	})
-	return eligible[0], true
 }
 
 // mergeOne runs job's merge — cherry-pick (with conflict resolution if

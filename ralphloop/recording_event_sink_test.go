@@ -200,7 +200,7 @@ func (s *recordingEventSink) EpicComplete(epicName string, completed int, elapse
 	s.record(LiveEvent{Kind: LiveEventEpicComplete, EpicName: epicName, Completed: completed, ElapsedSeconds: elapsedSeconds})
 }
 
-// EpicFailed is a no-op here, matching ChannelEventSink: by the time the
+// EpicFailed is a no-op here: by the time the
 // registry calls it, this sink has already been closed and emptied (see
 // EventSink's doc comment on EpicFailed).
 func (s *recordingEventSink) EpicFailed(epicName string, err error) {}

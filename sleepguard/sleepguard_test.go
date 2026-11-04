@@ -67,12 +67,9 @@ var allowed = map[string]int{
 	"ralphloop/commitless_test.go":                  1, // negative wait: a kept worktree is not removed and no wait is scheduled
 	"ralphloop/claim_test.go":                       1,
 	"ralphloop/eventlog_test.go":                    2,
-	"ralphloop/loop_agent_test.go":                  1,
-	"ralphloop/loop_test.go":                        1,
-	"ralphloop/mergequeue_test.go":                  1,
-	"ralphloop/permit_test.go":                      2,
 	"ralphloop/resumeticket_test.go":                1,
-	"ralphloop/run_realgit_watchdog_test.go":        1,
+	"ralphloop/slack_transport_test.go":             4, // 15 renamed slack_eventsink_test.go and dropped its entry by mistake
+	"ralphloop/telegram_transport_test.go":          7, // same rename as slack_transport_test.go
 	"server/budget_limits_test.go":                  2,
 	"server/claimhold_test.go":                      1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":              2,

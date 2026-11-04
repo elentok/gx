@@ -137,30 +137,6 @@ func (s *recordingSink) SmartZoneFinishingUp(identifier string) { s.record("Smar
 func (s *recordingSink) SmartZoneRecovered(identifier string)   { s.record("SmartZoneRecovered") }
 func (s *recordingSink) VerifyCapStopped(identifier string)     { s.record("VerifyCapStopped") }
 
-func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
-	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	d, _, _ := fakeDeps()
-
-	sink := &recordingSink{}
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	want := []string{"EpicStarted", "TicketClaimed", "IterationStarted", "CherryPickStarted", "IterationFinished", "EpicComplete"}
-	got := sink.snapshot()
-	if len(got) != len(want) {
-		t.Fatalf("events = %v, want %v", got, want)
-	}
-	for i, w := range want {
-		if got[i] != w {
-			t.Errorf("events[%d] = %q, want %q (full sequence %v)", i, got[i], w, got)
-		}
-	}
-}
-
 func TestRecordingSink_CapturesIterationFinishedStatsAndEpicCompleteElapsedSeconds(t *testing.T) {
 	t.Parallel()
 	sink := &recordingSink{}
@@ -174,41 +150,5 @@ func TestRecordingSink_CapturesIterationFinishedStatsAndEpicCompleteElapsedSecon
 	sink.EpicComplete("epic", 5, 300)
 	if sink.lastEpicElapsedSeconds != 300 {
 		t.Errorf("lastEpicElapsedSeconds = %d, want 300", sink.lastEpicElapsedSeconds)
-	}
-}
-
-func TestRun_EventSink_NoTicketsFound(t *testing.T) {
-	t.Parallel()
-	scratchDir := t.TempDir()
-	d, _, _ := fakeDeps()
-
-	sink := &recordingSink{}
-	if err := Run(RunOptions{EpicName: "missing-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	if got := sink.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
-		t.Errorf("events = %v, want [EpicStarted]", got)
-	}
-}
-
-// TestRun_EventSink_AlreadyCompleteEpic_EmitsExactlyOneEpicStarted pins the
-// other half of the fold: an epic whose every ticket is already done
-// produces the same single EpicStarted event as a fresh run or an empty
-// epic, not a separate "already complete" event.
-func TestRun_EventSink_AlreadyCompleteEpic_EmitsExactlyOneEpicStarted(t *testing.T) {
-	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# A\n",
-	})
-	d, _, _ := fakeDeps()
-
-	sink := &recordingSink{}
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	if got := sink.snapshot(); len(got) != 1 || got[0] != "EpicStarted" {
-		t.Errorf("events = %v, want [EpicStarted]", got)
 	}
 }

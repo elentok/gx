@@ -21,114 +21,6 @@ import (
 // distinct, actionable error instead of hanging the whole loop forever.
 const conflictResolutionTimeoutMs = 30 * 60 * 1000
 
-// runIteration drives one ticket through the full iteration lifecycle:
-// create its worktree, launch and prompt the agent, wait for it to finish,
-// adopt any iteration_status report the agent left, cherry-pick its commits
-// onto the feature branch, mark the ticket done, and remove the iteration
-// worktree. An `iteration_status: asking` report is adopted before any
-// of that: see adoptAskingReport. Otherwise, if the agent finishes
-// without merging any commits, the ticket is marked paused (answer) instead and
-// the worktree/tab are left in place for inspection — unless the agent
-// itself declared the zero-commit finish intentional via `gx tickets set
-// --iteration-status finished --commitless true`, in which case gx itself
-// writes status: done and the worktree/tab are cleaned up normally with no
-// commit merged.
-func runIteration(d Deps, p iterationParams) error {
-	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
-	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
-	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
-
-	// A branch surviving under this name means a prior pause dropped this
-	// ticket's worktree/tab but kept its branch, per finishIteration's
-	// paused (answer) adoption cleanup. Merging that resumed iteration's commits
-	// — both the ones from before the pause and whatever it adds after —
-	// needs the merge base of the two branches, not the feature tip: basing
-	// off today's tip would silently drop the pre-pause commits, since the
-	// feature branch has very likely advanced past the point this branch
-	// forked from.
-	var base string
-	var err error
-	if branchExists(d, p.FeatureWorktree, branch) {
-		base, err = d.MergeBase(p.FeatureWorktree, branch, p.FeatureBranch)
-		if err != nil {
-			return fmt.Errorf("resolving %s's original base: %w", branch, err)
-		}
-	} else {
-		base, err = d.RevParse(p.FeatureWorktree, p.FeatureBranch)
-		if err != nil {
-			return fmt.Errorf("resolving %s tip: %w", p.FeatureBranch, err)
-		}
-	}
-
-	p.WorktreeLock.Lock()
-	err = d.AddWorktree(p.RepoDir, path, branch, base)
-	p.WorktreeLock.Unlock()
-	if err != nil {
-		return fmt.Errorf("creating iteration worktree: %w", err)
-	}
-
-	// Runs synchronously here, before the agent's tab/session exist, so an
-	// install failure surfaces as an iteration-lifecycle error immediately
-	// rather than eating into the agent's own turn or smart-zone budget.
-	commands, err := d.InstallDeps(path, p.ScratchDir)
-	if err != nil {
-		return err
-	}
-	p.logTicketEventReason(string(events.DepsInstalled), "", "", path, strings.Join(commands, "; "))
-
-	prompt := skillPrompt(p.Agent, launchSkill(p.Ticket, p.Skill), ticketAddress(p.Ticket))
-
-	l, err := startAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
-		Label: label,
-		Epic:  p.FeatureBranch,
-		Cwd:   path,
-		Kind:  agentrunner.Kind(p.Agent),
-		Args:  agentArgs(p.Agent, path, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
-	}, prompt, func(attempt int, kind events.Kind, err error) {
-		p.logLaunchFailed(label, attempt, kind, err)
-	}, func(attempt int, decision string) {
-		p.logPromptNudged(label, attempt, decision)
-	})
-
-	var launchFail *launchFailure
-	if errors.As(err, &launchFail) {
-		return err
-	}
-	launchParams := p.launchAndPromptParams(label, l.ID, prompt, path, string(events.IterationStarted), string(events.IterationFinished))
-	launchParams.verifyCap = p.verifyCap
-	launchParams.Session = l.Session
-	var sessionID string
-	switch {
-	case err != nil:
-		err = fmt.Errorf("sending initial prompt: %w", err)
-		p.logLaunchFailed(label, 1, events.IterationError, err)
-		return &launchFailure{Kind: events.IterationError, Err: err}
-	case l.Adopted:
-		sessionID, err = adoptedLaunch(d, launchParams)
-	default:
-		sessionID, err = promptedLaunch(d, launchParams, l.Baseline)
-	}
-	paused := errors.Is(err, errBlockedPanePaused)
-	if err != nil && !paused {
-		return err
-	}
-	if sessionID != "" {
-		if err := AppendSessionID(p.Ticket.Path, sessionID); err != nil {
-			return fmt.Errorf("appending session id for ticket %s: %w", p.Ticket.Identifier, err)
-		}
-	}
-	if paused {
-		// The pause already ended the iteration: the agent is still live in its
-		// pane, so finishIteration's commit-check/cherry-pick/cleanup — which
-		// assumes the agent actually finished — must not run. Only gx's
-		// watcher goes away; the pane, and worktree survive for a person
-		// to answer in the pane.
-		return nil
-	}
-
-	return finishIteration(d, p, path, launchParams.Pane, base, branch, sessionID)
-}
-
 // iterationSession is the live session of p's ticket, for cleanup; the zero
 // Session when the iteration has no pane.
 func iterationSession(p iterationParams, pane string) agentrunner.Session {
@@ -136,162 +28,6 @@ func iterationSession(p iterationParams, pane string) agentrunner.Session {
 		return agentrunner.Session{}
 	}
 	return agentrunner.Session{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), ID: pane}
-}
-
-// reattachIteration resumes a claimed ticket whose worktree, and agent
-// survived a prior invocation. The stable iteration label locates the live
-// agent, while its recovered pane and native session identity drive the
-// remaining wait, lifecycle logging, and completion work. Codex sessions are
-// accepted only when their rollout metadata belongs to this worktree.
-func reattachIteration(d Deps, p iterationParams) error {
-	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
-	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
-	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
-
-	// A reattach that stays claimed throughout (the common case) never goes
-	// through Claim, so a stale iteration_status left by a pre-restart report
-	// must be cleared here instead - unconditionally, so it can't survive
-	// into the new attach before finishIteration/waitForFinish run. The
-	// pre-clear value is kept: if the agent turns out to be alreadyFinished
-	// below, there is no further run of it to produce a fresh report, so the
-	// cleared value is this iteration's only report and is restored before
-	// finishIteration reads it - otherwise a genuine finished+commitless
-	// report left by an agent that exited while the loop itself was down
-	// would be wiped by this same clear and wrongly fall to paused (answer).
-	preClear, err := schema.ParseTicket(p.Ticket.Path)
-	if err != nil {
-		return fmt.Errorf("reading ticket %s before clearing iteration_status: %w", p.Ticket.Identifier, err)
-	}
-	priorIterationStatus := preClear.IterationStatus
-	if err := schema.ClearIterationStatus(p.Ticket.Path); err != nil {
-		return fmt.Errorf("clearing iteration_status for reattached ticket %s: %w", p.Ticket.Identifier, err)
-	}
-
-	session, found, err := d.Runner.Find(label)
-	if err != nil {
-		return fmt.Errorf("finding live session for reattached iteration %s: %w", label, err)
-	}
-	if !found {
-		return fmt.Errorf("no live session found for reattached iteration %s", label)
-	}
-	agent, err := d.Runner.Status(session)
-	if err != nil {
-		return fmt.Errorf("reattached iteration %s: %w", label, err)
-	}
-	if p.Agent == AgentCodex {
-		if agent.SessionID == "" {
-			return fmt.Errorf("missing live Codex session for reattached iteration %s; keep the tab open and retry after Herdr reports its session", label)
-		}
-		verified, verifyErr := d.VerifyCodexSession(path, agent.SessionID)
-		if verifyErr != nil {
-			return fmt.Errorf("verifying live Codex session %s for reattached iteration %s: %w", agent.SessionID, label, verifyErr)
-		}
-		if !verified {
-			return fmt.Errorf("live Codex session %s for reattached iteration %s does not match rollout metadata for cwd %s", agent.SessionID, label, path)
-		}
-	}
-	p.Sink.TicketReattached(p.Ticket.Identifier, label, path, agent.SessionID)
-	if agent.SessionID != "" {
-		if err := AppendSessionID(p.Ticket.Path, agent.SessionID); err != nil {
-			return fmt.Errorf("appending session id for reattached ticket %s: %w", p.Ticket.Identifier, err)
-		}
-	}
-
-	base, err := d.MergeBase(path, branch, p.FeatureBranch)
-	if err != nil {
-		return fmt.Errorf("resolving %s's original base: %w", branch, err)
-	}
-
-	// StartEvent remains empty because reattachment must not imply a fresh
-	// launch; all later events use the recovered native session identity.
-	launchParams := p.launchAndPromptParams(label, session.ID, "", path, "", string(events.IterationFinished))
-	launchParams.verifyCap = p.verifyCap
-	finished := false
-	if alreadyFinished(string(agent.State)) {
-		// An idle pane at reattach gets the same debounce and background-task
-		// gate a live finish gets in waitForFinish (confirmFinished /
-		// waitForBackgroundTasks): without them, a genuine mid-turn pause or a
-		// still-outstanding backgrounded shell command reads as finished,
-		// merging a partial commit set and tearing down the worktree under a
-		// still-working agent - which is how both real pause/reopen/reattach
-		// incidents actually looped, since this short-circuit used to skip
-		// waitForFinish (and its gate) entirely.
-		confirmed, err := confirmFinished(d, nil, launchParams.session(), runnerFinishStates)
-		if err != nil {
-			return fmt.Errorf("confirming %s already finished at reattach: %w", label, err)
-		}
-		if confirmed {
-			sessionID := resolveReattachSessionID(p, agent.SessionID, preClear.SessionIDs)
-			elapsedMs := 0
-			finishedAfterGate, err := waitForBackgroundTasks(d, launchParams, sessionID, runnerFinishStates, &elapsedMs)
-			if err != nil {
-				return err
-			}
-			finished = finishedAfterGate
-		}
-	}
-	if finished {
-		// An agent that finished while the loop was down has no future state
-		// transition for AgentWait to observe.
-		if p.Report != nil {
-			p.Report("%s already finished at reattach; skipping wait\n", label)
-		}
-		if priorIterationStatus != "" {
-			if err := schema.UpdateTicket(p.Ticket.Path, func(t *schema.Ticket) {
-				t.IterationStatus = priorIterationStatus
-			}); err != nil {
-				return fmt.Errorf("restoring iteration_status for already-finished reattached ticket %s: %w", p.Ticket.Identifier, err)
-			}
-		}
-		launchParams.logLifecycleEvent(launchParams.FinishEvent, agent.SessionID)
-	} else if err := waitForFinish(d, launchParams, agent.SessionID); err != nil {
-		if errors.Is(err, errBlockedPanePaused) {
-			// Same as runIteration's pause: the iteration ends here, the pane/
-			// tab/worktree survive, and finishIteration must not run.
-			return nil
-		}
-		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
-	}
-	if p.Ticket.PausedForRepair() {
-		if err := Claim(p.Ticket.Path); err != nil {
-			return fmt.Errorf("restoring ticket to claimed: %w", err)
-		}
-		p.Sink.IterationResumed(p.Ticket.Identifier, label, PauseRepair)
-		if p.Report != nil {
-			p.Report("resumed %s after restart recheck\n", label)
-		}
-		launchParams.logLifecycleEvent(string(events.Resumed), agent.SessionID)
-		p.Gate.ForceResume(label)
-	}
-
-	return finishIteration(d, p, path, session.ID, base, branch, agent.SessionID)
-}
-
-// resolveReattachSessionID recovers a session id for
-// reattachIteration's already-finished background-task gate check: Claude's
-// AgentSession is empty at reattach until the live agent produces one, so
-// this falls back through the same chain established for a reattached
-// close's metadata (backfillDoneMetadata) - the ticket's own most recently
-// recorded session (priorSessionIDs, read before this reattach could have
-// appended one of its own), then the run log's last iteration-started event.
-// Returns "" if none of those resolve, which waitForBackgroundTasks treats
-// as no session to gate on rather than an error.
-func resolveReattachSessionID(p iterationParams, agentSession string, priorSessionIDs []string) string {
-	if agentSession != "" {
-		return agentSession
-	}
-	if n := len(priorSessionIDs); n > 0 {
-		return priorSessionIDs[n-1]
-	}
-	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
-	if err != nil || !ok {
-		return ""
-	}
-	sessionID, _, _, ok := lastIterationSession(events, p.Ticket.Identifier)
-	if !ok {
-		return ""
-	}
-	return sessionID
 }
 
 // finishIteration merges a finished iteration's commits (or marks it
@@ -309,7 +45,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 	}
 	if adopted {
 		// The branch is what makes a later resume able to merge both sides of
-		// the answer boundary in one pick (see runIteration's branch-reuse
+		// the answer boundary in one pick (see PrepareIteration's branch-reuse
 		// base computation). The worktree stays too, so the relaunch finds the
 		// agent's uncommitted work; only the session and tab are redundant
 		// while the ticket waits on an answer.
@@ -592,7 +328,7 @@ func (p iterationParams) pauseAsking(kind events.Kind, reason, pane, sessionID, 
 
 // markDoneStampingCloseMetadata marks p.Ticket done, stamping the closing
 // iteration's compaction count when sessionID is a live, fresh-iteration
-// session (runIteration's case) — its peak context window was already
+// session (a fresh iteration's case) — its peak context window was already
 // stamped by mergeCherryPick. A reattached close (sessionID == "") skipped
 // that stamp, so it backfills from the ticket's original iteration-started
 // session in the run log instead.

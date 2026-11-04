@@ -108,7 +108,7 @@ var allowed = map[string]allowance{
 	"events/legacy_test.go":                    allow("tests the legacy event reader", "park", "needsanswer", "needsrepair", "land", "reset"),
 	"ralphloop/notification_text_test.go":      allow("chat headlines \"needs answer\" and \"needs repair\"", "needsanswer", "needsrepair"),
 	"ralphloop/claim_test.go":                  allow("tests demoting the legacy Needs Answer and Needs Repair sections", "park", "needsanswer", "needsrepair"),
-	"ralphloop/resumeticket_test.go":           allow("tests demoting the legacy Needs Answer and Needs Repair sections", "needsanswer", "needsrepair"),
+	"ralphloop/resumeticket_test.go":           allow("tests demoting the legacy Needs Repair section", "needsrepair"),
 	"tickets/loader_test.go":                   allow("loads legacy statuses, park_kind and headings", "land", "needsanswer", "needsrepair"),
 	"tickets/log_test.go":                      allow("reads legacy park.* log events and writes under a legacy needs-answer ticket", "park", "needsanswer"),
 	"migrations/steps.go":                      allow("comment names the legacy Needs Answer heading the question step reads", "needsanswer"),

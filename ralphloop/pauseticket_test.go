@@ -7,60 +7,11 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// Seam B: a ticket paused by the loop's catch-all writes the ticket, appends
-// exactly one paused (repair) event with a kind and address, and notifies.
-func TestRun_CatchAll_PausesThroughOnePath(t *testing.T) {
-	t.Parallel()
-	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	path := ticketPath(scratchDir, "my-epic", "01-a.md")
-	d, _, _ := fakeDeps()
-	origAddWorktree := d.AddWorktree
-	d.AddWorktree = func(repoDir, wtPath, branch, base string) error {
-		if strings.Contains(wtPath, "my-epic-item-01") {
-			return errors.New("simulated git hiccup")
-		}
-		return origAddWorktree(repoDir, wtPath, branch, base)
-	}
-	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
-		// End the run: a human closes the paused ticket.
-		if err := SetStatus(path, "done"); err != nil {
-			t.Errorf("SetStatus: %v", err)
-		}
-		return readyTimer(dur)
-	}
-	sink := &recordingSink{}
-
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	evs, _, err := ReadEvents(scratchDir, "my-epic")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var repairs []Event
-	for _, ev := range evs {
-		if ev.Type == string(events.Paused) {
-			repairs = append(repairs, ev)
-		}
-	}
-	if len(repairs) != 1 {
-		t.Fatalf("paused events = %d, want 1 (%v)", len(repairs), evs)
-	}
-	ev := repairs[0]
-	if ev.Kind != string(events.IterationError) || ev.Address != canonicalAddr(scratchDir, "my-epic", "01") || !strings.Contains(ev.Reason, "simulated git hiccup") {
-		t.Errorf("event = %+v, want kind iteration-error, address 01, reason naming the error", ev)
-	}
-}
 
 func TestPause_WritesTicketEventAndNotifies(t *testing.T) {
 	t.Parallel()

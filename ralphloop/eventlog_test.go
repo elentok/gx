@@ -257,29 +257,6 @@ func TestSanitizeSendError_LeavesNonURLErrorsUnchanged(t *testing.T) {
 	}
 }
 
-func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T) {
-	t.Parallel()
-	dir := epicScratchDir(t, "epic")
-	if err := LogNotificationsConfigured(dir, "epic", true, false); err != nil {
-		t.Fatalf("LogNotificationsConfigured: %v", err)
-	}
-
-	events, ok, err := ReadEvents(dir, "epic")
-	if err != nil || !ok || len(events) != 1 {
-		t.Fatalf("ReadEvents: events=%#v ok=%v err=%v", events, ok, err)
-	}
-	ev := events[0]
-	if ev.Type != string(eventsc.NotificationsConfigured) {
-		t.Errorf("Type = %q, want %q", ev.Type, string(eventsc.NotificationsConfigured))
-	}
-	if ev.Telegram == nil || *ev.Telegram != true {
-		t.Errorf("Telegram = %v, want true", ev.Telegram)
-	}
-	if ev.Slack == nil || *ev.Slack != false {
-		t.Errorf("Slack = %v, want false (recorded explicitly, not omitted)", ev.Slack)
-	}
-}
-
 func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.T) {
 	t.Parallel()
 	dir := epicScratchDir(t, "epic")
