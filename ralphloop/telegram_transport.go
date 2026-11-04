@@ -147,22 +147,6 @@ func (t *telegramTransport) post(ctx context.Context, text, parseMode string) (s
 	return sendResult{StatusCode: resp.StatusCode}, nil
 }
 
-// NewTelegramEventSink returns an EventSink that wraps inner and additionally
-// sends a Telegram message via botToken/chatID for every chat-member event
-// (see chatEventSink). Sends run in their own goroutine and never return an
-// error or block the caller: a failed send is logged via gx's logger and,
-// tagged with the triggering event, appended to scratchDir/epicName's
-// run-log.jsonl.
-func NewTelegramEventSink(inner EventSink, botToken, chatID, scratchDir, epicName string) EventSink {
-	return newTelegramEventSink(inner, botToken, chatID, telegramAPIBaseURL, scratchDir, epicName)
-}
-
-func newTelegramEventSink(inner EventSink, botToken, chatID, apiBaseURL, scratchDir, epicName string) *chatEventSink {
-	s := newChatEventSink(inner, telegramStyle, newTelegramTransport(botToken, chatID, apiBaseURL), scratchDir, epicName)
-	s.startFlushLoop(batchFlushInterval)
-	return s
-}
-
 // SendTelegramTestMessage synchronously sends a fixed test notification via
 // the Telegram Bot API and returns any error instead of swallowing it, for
 // callers like `gx config test-notifications` that need to report

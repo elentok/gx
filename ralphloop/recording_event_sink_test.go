@@ -7,12 +7,75 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// LiveEventKind identifies which EventSink method produced a LiveEvent.
+type LiveEventKind int
+
+const (
+	LiveEventEpicStarted LiveEventKind = iota
+	LiveEventTicketReverted
+	LiveEventTicketReattached
+	LiveEventTicketNeedsHuman
+	LiveEventTicketClaimed
+	LiveEventIterationStarted
+	LiveEventIterationPaused
+	LiveEventIterationResumed
+	LiveEventIterationFinished
+	LiveEventTranscriptLine
+	LiveEventTicketCleanupFinished
+	LiveEventTicketRecovering
+	LiveEventTicketRecovered
+	LiveEventTicketUnrecoverable
+	LiveEventEpicPaused
+	LiveEventEpicComplete
+	LiveEventCherryPickStarted
+	LiveEventConflictResolutionStarted
+	LiveEventSmartZoneCompactStarted
+	LiveEventSmartZoneFinishingUp
+	LiveEventSmartZoneRecovered
+	LiveEventVerifyCapStopped
+	LiveEventContextOccupancy
+	LiveEventNotificationFailed
+)
+
+// LiveEvent captures one EventSink call: a single struct with the union of
+// every method's arguments, since most fields only matter for a few Kinds.
+// Identifier is the ticket's Identifier (not Number) for every kind that
+// names a ticket, matching EventSink's own convention.
+type LiveEvent struct {
+	Kind LiveEventKind
+
+	EpicName   string
+	Identifier string
+	Label      string
+	Reason     string
+	Status     string
+	PauseKind  PauseKind
+	Line       string
+	Ticket     tickets.Ticket
+	Done       int
+	Total      int
+	Completed  int
+	Branch     string
+	MergedSHA  string
+	Cwd        string
+	SessionID  string
+	AgentKind  AgentKind
+	PaneID     string
+	// Tokens is ContextOccupancy's context-window token count.
+	Tokens int
+	// Stats is IterationFinished's metrics and epic progress counts.
+	Stats IterationStats
+	// ElapsedSeconds is EpicComplete's total wall-clock duration.
+	ElapsedSeconds int
+	// Stalled is EpicPaused's human-clearable tickets.
+	Stalled []StalledTicket
+	// Channel is NotificationFailed's chat transport ("telegram"/"slack").
+	Channel string
+}
+
 // recordingEventSink implements EventSink by recording every call as a
-// LiveEvent (see live_events.go) in call order, synchronously — unlike
-// ChannelEventSink's channel, a test can call Events() right after Run()
-// returns with no empty goroutine to coordinate. It exists so tests can
-// assert on the same structured data a real consumer (the TUI, via
-// ChannelEventSink) would see, instead of parsing rendered CLI text.
+// LiveEvent in call order, synchronously, so a test can call Events() right
+// after Run() returns with no goroutine to coordinate.
 type recordingEventSink struct {
 	mu     sync.Mutex
 	events []LiveEvent

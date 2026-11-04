@@ -15,6 +15,14 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// newSlackEventSink wires a chatEventSink to a Slack transport the way
+// ServerChat does, with a live flush loop.
+func newSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string) *chatEventSink {
+	s := newChatEventSink(inner, slackStyle, newSlackTransport(webhookURL), scratchDir, epicName)
+	s.startFlushLoop(batchFlushInterval)
+	return s
+}
+
 // slackRequest captures one decoded call to the fake Slack webhook.
 type slackRequest struct {
 	Text string `json:"text"`

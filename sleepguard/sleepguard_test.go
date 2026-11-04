@@ -73,8 +73,6 @@ var allowed = map[string]int{
 	"ralphloop/permit_test.go":                      2,
 	"ralphloop/resumeticket_test.go":                1,
 	"ralphloop/run_realgit_watchdog_test.go":        1,
-	"ralphloop/slack_eventsink_test.go":             4,
-	"ralphloop/telegram_eventsink_test.go":          7,
 	"server/budget_limits_test.go":                  2,
 	"server/claimhold_test.go":                      1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":              2,

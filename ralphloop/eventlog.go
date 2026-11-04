@@ -478,10 +478,8 @@ func retryDelay(result sendResult) (time.Duration, bool) {
 
 // sendNotification runs sendNotificationSync in its own goroutine, unbounded
 // by any caller-supplied context (context.Background()), so a slow or
-// unreachable notification endpoint never blocks the caller. This is
-// epicFailureReporter's path — by the time it sends, the run's own sink has
-// already closed and emptied (see EventSink.EpicFailed), so there is no
-// shutdown-ordering concern to cancel against; chatEventSink.sendRaw instead
+// unreachable notification endpoint never blocks the caller. Only tests call
+// it now; chatEventSink.sendRaw instead
 // calls sendNotificationSync directly with its own cancellable context, so
 // Close() can cut an in-flight attempt short (see chat_eventsink.go).
 func sendNotification(scratchDir, epicName, channel, notifyKind, body string, timeout time.Duration, sendSync func(ctx context.Context) (sendResult, error), onFailed func(reason string)) {
@@ -505,8 +503,8 @@ func sendNotification(scratchDir, epicName, channel, notifyKind, body string, ti
 // notifyKind (the live event that triggered it). onFailed, if non-nil, is
 // called with the sanitized error once both attempts fail (or the call is
 // cancelled) — chatEventSink.sendRaw uses it to also surface the failure as a
-// LiveEventNotificationFailed on its embedded EventSink, for a TUI toast;
-// epicFailureReporter's own call passes nil. A send that succeeds only via
+// NotificationFailed on its embedded EventSink, for a TUI toast; a nil
+// onFailed skips that. A send that succeeds only via
 // telegramTransport.sendSync's plain-text fallback (result.Degraded) is
 // logged via logNotificationDegraded instead of logNotificationSent, and
 // also routed through onFailed (with degradedReason's wording) so the

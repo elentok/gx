@@ -70,13 +70,10 @@ type sendResult struct {
 // chat message), IterationFinished, TicketNeedsHuman, EpicPaused,
 // and EpicComplete. Every other event is a pure pass-through
 // to the embedded EventSink.
-// ChatEventSink is the interface NewTelegramEventSink/NewSlackEventSink's
-// return value actually satisfies (both are declared to return the plainer
-// EventSink so callers not wired to chat can ignore it) — a named interface
-// a caller like ui/tickets/implement.go can assert against to close the
-// sink's flush loop on shutdown, instead of an anonymous method-set cast
-// that would silently no-op if the concrete type ever stopped implementing
-// it.
+// ChatEventSink is the interface chatEventSink satisfies — a named interface
+// a caller like ServerChat can assert against to close the sink's flush loop
+// on shutdown, instead of an anonymous method-set cast that would silently
+// no-op if the concrete type ever stopped implementing it.
 type ChatEventSink interface {
 	EventSink
 	// Close stops the periodic flush loop and flushes any queued messages
@@ -117,8 +114,8 @@ type chatEventSink struct {
 
 	// flushTicker/flushDone/flushLoopExited back the periodic flush loop (see
 	// startFlushLoop/stopFlushLoop); all three are nil until startFlushLoop
-	// runs, which production sinks do at construction (see
-	// newSlackEventSink/newTelegramEventSink) and tests do explicitly, if at
+	// runs, which ServerChat does at construction
+	// and tests do explicitly, if at
 	// all, to exercise the periodic-tick behavior — most tests drive
 	// flush()/Close() directly instead. flushLoopExited is closed by the loop
 	// goroutine itself right before it returns, so stopFlushLoop can wait for
@@ -165,8 +162,8 @@ type batchedMessage struct {
 // event's rendered text passes through the budget/mute gate (see send) and,
 // if allowed, is queued rather than sent immediately — a periodic flush
 // (see flush) renders every queued message as one send. newChatEventSink
-// itself does not start the flush loop (see startFlushLoop); production
-// callers (newSlackEventSink/newTelegramEventSink) do, so a bare
+// itself does not start the flush loop (see startFlushLoop); ServerChat
+// does, so a bare
 // newChatEventSink is inert until flush()/Close() is driven explicitly —
 // the shape tests rely on.
 func newChatEventSink(inner EventSink, style mrkdwnStyle, transport chatTransport, scratchDir, epicName string) *chatEventSink {
@@ -470,7 +467,7 @@ func distinctKinds(items []batchedMessage) []string {
 
 // epicSourcePrefix is the ticket-less NotificationGate source sentinel for
 // epic-level events (no single ticket to attribute or mute it to) — shared
-// by epicSource, EpicFailureReporter, and isTicketlessSource so the format
+// by epicSource and isTicketlessSource so the format
 // can't desync across call sites.
 const epicSourcePrefix = "epic:"
 

@@ -13,6 +13,14 @@ import (
 	eventsc "github.com/elentok/gx/events"
 )
 
+// newTelegramEventSink wires a chatEventSink to a Telegram transport the way
+// ServerChat does, with a live flush loop.
+func newTelegramEventSink(inner EventSink, botToken, chatID, apiBaseURL, scratchDir, epicName string) *chatEventSink {
+	s := newChatEventSink(inner, telegramStyle, newTelegramTransport(botToken, chatID, apiBaseURL), scratchDir, epicName)
+	s.startFlushLoop(batchFlushInterval)
+	return s
+}
+
 // telegramRequest captures one decoded call to the fake Telegram API's
 // sendMessage endpoint.
 type telegramRequest struct {

@@ -62,21 +62,6 @@ func (t *slackTransport) sendSync(ctx context.Context, text chatmarkup.Text) (se
 	return sendResult{StatusCode: resp.StatusCode}, nil
 }
 
-// NewSlackEventSink returns an EventSink that wraps inner and additionally
-// posts a Slack message to webhookURL for every chat-member event (see
-// chatEventSink). Sends run in their own goroutine and never return an error
-// or block the caller: a failed send is logged via gx's logger and, tagged
-// with the triggering event, appended to scratchDir/epicName's run-log.jsonl.
-func NewSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string) EventSink {
-	return newSlackEventSink(inner, webhookURL, scratchDir, epicName)
-}
-
-func newSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string) *chatEventSink {
-	s := newChatEventSink(inner, slackStyle, newSlackTransport(webhookURL), scratchDir, epicName)
-	s.startFlushLoop(batchFlushInterval)
-	return s
-}
-
 // SendSlackTestMessage synchronously sends a fixed test notification to the
 // Slack webhook and returns any error instead of swallowing it, for callers
 // like `gx config test-notifications` that need to report success/failure

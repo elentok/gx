@@ -214,8 +214,8 @@ func (s mrkdwnStyle) epicOutcomeText(glyph, title, epicName string, counts EpicC
 
 // epicFailedText renders the "epic failed" notification — the second of the
 // two epic-level messages a failed run produces (epicStartedText is the
-// first), emitted by EpicFailureReporter after the run's own sink has
-// already closed and emptied (see epic_failure_reporter.go), so counts is
+// first), emitted after the run's own sink has
+// already closed and emptied, so counts is
 // loaded fresh rather than carried over from a live event:
 //
 //	🔥 *epic failed*

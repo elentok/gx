@@ -160,7 +160,7 @@ type EventSink interface {
 	// (a doneRecoverable ticket, or an orphaned claim with unmerged commits)
 	// — fired before the CherryPickStarted/ConflictResolutionStarted events
 	// that follow, so a renderer has a live row to update: unlike a normal
-	// iteration, there's no LiveEventIterationStarted/TicketReattached ahead
+	// iteration, there's no IterationStarted/TicketReattached ahead
 	// of this recovery to seed one.
 	TicketRecovering(identifier string)
 	// TicketRecovered reports that a done ticket's commits were missing from
@@ -188,11 +188,9 @@ type EventSink interface {
 	// other event here, this one is not fired from inside the run: by the
 	// time the loop registry records a run's failure the run has already
 	// returned and its sink has been closed and emptied, so there is no
-	// live run-scoped emitter left to call this through. The registry's
-	// EpicFailureReporter (see epic_failure_reporter.go) is the one path
-	// that calls it — a chat message emitted straight to the transport
-	// after the empty, not through this interface — which is why
-	// EpicFailed exists on EventSink at all: purely so the contract test in
+	// live run-scoped emitter left to call this through. No production
+	// code dispatches it, which is why EpicFailed exists on EventSink at
+	// all: purely so the contract test in
 	// eventsink_contract_test.go can record its chat membership, not
 	// because any EventSink implementation dispatches it.
 	EpicFailed(epicName string, err error)
