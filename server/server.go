@@ -225,6 +225,8 @@ const DefaultTCPAddr = "127.0.0.1:7421"
 // Server owns the state-dir lock and the listening socket.
 type Server struct {
 	cfg Config
+	// routes is what the moved subsystems serve (subsystemRoutes), gathered once in New.
+	routes []wire.Route
 	// instanceID is new on every start: a restart is done when it changes.
 	instanceID string
 	// settings is the live copy of cfg.Settings. A reader loads it once per
@@ -555,6 +557,8 @@ func New(cfg Config) (*Server, error) {
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
 	}
+	s.routes = subsystemRoutes(s)
+	registerRoutes(mux, s.routes)
 	s.http = &http.Server{Handler: mux}
 	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
 	s.bindWeb()
@@ -681,6 +685,11 @@ func RoutePatterns() []string {
 	out := make([]string, len(routeTable))
 	for i, r := range routeTable {
 		out[i] = r.pattern
+	}
+	for _, r := range subsystemRoutes(nil) {
+		if r.Handler != nil {
+			out = append(out, r.Pattern)
+		}
 	}
 	return out
 }

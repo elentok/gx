@@ -89,6 +89,10 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 
 A new route needs all of these. A missing one fails a test, not the build:
 
+- A subsystem moved out of root lists its routes in `Routes() []wire.Route` (`server/wire/route.go`:
+  pattern, socket handler, web mode, web variant) and `subsystemRoutes` in `server/routes.go` gathers
+  it. This replaces the three steps below for that subsystem. Root still has `routeTable` and
+  `webWrites` until the root cleanup ticket removes them.
 - `routeTable` in `server/server.go`.
 - A CLI verb: `routeVerbs` in `cmd/server_parity_test.go` plus the command itself
   (`TestRouteTableHasCLIVerbs`).

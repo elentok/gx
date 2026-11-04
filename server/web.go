@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/webui"
 )
 
@@ -75,7 +76,7 @@ func (s *Server) bindWeb() {
 	mux := s.webHandler()
 	protected := s.requireWebLogin(mux, s.denyWeb(mux))
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
-	s.webHTTP = &http.Server{Handler: requireHost(allowed, redirectPlainHTTP(servePublicFirst(mux, protected)))}
+	s.webHTTP = &http.Server{Handler: requireHost(allowed, redirectPlainHTTP(s.servePublicFirst(mux, protected)))}
 }
 
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.
@@ -100,13 +101,18 @@ func (s *Server) interfaceIPs() []net.IP {
 func (s *Server) webHandler() http.Handler {
 	static := serveAsset(webui.Assets())
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !isWebRead(r) {
+		if !s.isWebRead(r) {
 			if reason := checkWriteRequest(r); reason != "" {
 				http.Error(w, reason, http.StatusForbidden)
 				return
 			}
-			if handler, ok := webWrites[r.Method+" "+r.URL.Path]; ok {
+			key := r.Method + " " + r.URL.Path
+			if handler, ok := webWrites[key]; ok {
 				handler(s)(w, r)
+				return
+			}
+			if route, ok := findRoute(s.routes, key, wire.WebWrite, wire.WebPublic); ok {
+				webServe(route)(w, r)
 				return
 			}
 			http.NotFound(w, r)
@@ -114,6 +120,10 @@ func (s *Server) webHandler() http.Handler {
 		}
 		if handler, ok := webPublicGets["GET "+r.URL.Path]; ok {
 			handler(s)(w, r)
+			return
+		}
+		if route, ok := findRoute(s.routes, "GET "+r.URL.Path, wire.WebPublic, wire.WebRead); ok {
+			webServe(route)(w, r)
 			return
 		}
 		switch {

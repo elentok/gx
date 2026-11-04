@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 // WebOnlyRoute is a route the web mux serves and the socket does not.
@@ -49,11 +51,19 @@ func WebPublicGetPatterns() []string {
 	for p := range webPublicGets {
 		out = append(out, p)
 	}
-	return out
+	return append(out, patternsOf(webPublicGetRoutes(subsystemRoutes(nil)))...)
 }
 
 // WebOnlyRoutes returns a copy of the web-only route list.
-func WebOnlyRoutes() []WebOnlyRoute { return append([]WebOnlyRoute(nil), webOnlyRoutes...) }
+func WebOnlyRoutes() []WebOnlyRoute {
+	out := append([]WebOnlyRoute(nil), webOnlyRoutes...)
+	for _, r := range subsystemRoutes(nil) {
+		if r.Handler == nil && (r.Web == wire.WebWrite || r.Web == wire.WebPublic) {
+			out = append(out, WebOnlyRoute{Pattern: r.Pattern, Public: r.Web == wire.WebPublic})
+		}
+	}
+	return out
+}
 
 // WebWritePatterns names every "METHOD /path" write the web mux serves.
 func WebWritePatterns() []string {
@@ -61,13 +71,13 @@ func WebWritePatterns() []string {
 	for p := range webWrites {
 		out = append(out, p)
 	}
-	return out
+	return append(out, patternsOf(webWriteRoutes(subsystemRoutes(nil)))...)
 }
 
 // isWebRead reports whether the web mux serves r as a read. HEAD counts only
 // for the public GET routes and the page and assets, never for /v1/ reads: the
 // event stream would block on it.
-func isWebRead(r *http.Request) bool {
+func (s *Server) isWebRead(r *http.Request) bool {
 	if r.Method == http.MethodGet {
 		return true
 	}
@@ -75,12 +85,15 @@ func isWebRead(r *http.Request) bool {
 		return false
 	}
 	_, public := webPublicGets["GET "+r.URL.Path]
+	if !public {
+		_, public = findRoute(s.routes, "GET "+r.URL.Path, wire.WebPublic)
+	}
 	return public || !strings.HasPrefix(r.URL.Path, "/v1/")
 }
 
-func isPublicWebRoute(r *http.Request) bool {
+func (s *Server) isPublicWebRoute(r *http.Request) bool {
 	method := r.Method
-	if isWebRead(r) {
+	if s.isWebRead(r) {
 		method = http.MethodGet
 	}
 	key := method + " " + r.URL.Path
@@ -89,14 +102,15 @@ func isPublicWebRoute(r *http.Request) bool {
 			return true
 		}
 	}
-	return false
+	_, ok := findRoute(s.routes, key, wire.WebPublic)
+	return ok
 }
 
 // servePublicFirst sends public web-only routes straight to the mux, ahead of
 // the login check; everything else goes through protected.
-func servePublicFirst(mux, protected http.Handler) http.Handler {
+func (s *Server) servePublicFirst(mux, protected http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isPublicWebRoute(r) {
+		if s.isPublicWebRoute(r) {
 			mux.ServeHTTP(w, r)
 			return
 		}
