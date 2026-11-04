@@ -10,9 +10,10 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
-func usageSummary(t *testing.T, h *servertest.Harness) server.UsageSummary {
+func usageSummary(t *testing.T, h *servertest.Harness) wire.UsageSummary {
 	t.Helper()
 	u, err := h.Client.UsageSummary(context.Background())
 	if err != nil {
@@ -25,23 +26,23 @@ func TestUsageSummary_ModeFollowsStoredWindows(t *testing.T) {
 	dir := t.TempDir()
 	h := servertest.StartWithStore(t, dir, servertest.WithTestHolder())
 
-	if u := usageSummary(t, h); u.Mode != server.UsageModeSpending || u.Limits.FiveHour != nil || u.Limits.SevenDay != nil {
+	if u := usageSummary(t, h); u.Mode != wire.UsageModeSpending || u.Limits.FiveHour != nil || u.Limits.SevenDay != nil {
 		t.Fatalf("before any report = %+v, want spending with no windows", u)
 	}
 
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	u := usageSummary(t, h)
-	if u.Mode != server.UsageModeLimits || u.Limits.FiveHour == nil || u.Limits.FiveHour.ReceivedAt <= 0 || u.Limits.SevenDay != nil {
+	if u.Mode != wire.UsageModeLimits || u.Limits.FiveHour == nil || u.Limits.FiveHour.ReceivedAt <= 0 || u.Limits.SevenDay != nil {
 		t.Fatalf("after a report = %+v, want limits with five_hour and its received-at", u)
 	}
 
-	sendLimits(t, h, server.LimitsReport{})
-	if u := usageSummary(t, h); u.Mode != server.UsageModeLimits {
+	sendLimits(t, h, wire.LimitsReport{})
+	if u := usageSummary(t, h); u.Mode != wire.UsageModeLimits {
 		t.Errorf("after an empty report mode = %q, want limits", u.Mode)
 	}
 
 	h.Restart(t)
-	if u := usageSummary(t, h); u.Mode != server.UsageModeLimits || u.Limits.FiveHour == nil {
+	if u := usageSummary(t, h); u.Mode != wire.UsageModeLimits || u.Limits.FiveHour == nil {
 		t.Errorf("after restart = %+v, want limits with five_hour", u)
 	}
 }
@@ -82,7 +83,7 @@ func seedLimitHistory(t *testing.T, h *servertest.Harness, ids []string, latestA
 func TestUsageSummary_WeeklyCarriesChipAndForecast(t *testing.T) {
 	h := limitsHarness(t)
 	resets := seedLimitHistory(t, h, []string{server.LimitIDClaudeWeekly}, 0)
-	sendLimits(t, h, server.LimitsReport{
+	sendLimits(t, h, wire.LimitsReport{
 		FiveHour: limitWin(20, 4_000_000_000),
 		SevenDay: limitWin(50, resets),
 	})
@@ -92,11 +93,11 @@ func TestUsageSummary_WeeklyCarriesChipAndForecast(t *testing.T) {
 	if five == nil || five.Chip != nil || five.Forecast != nil {
 		t.Errorf("5h = %+v, want a plain window", five)
 	}
-	if week == nil || week.Chip == nil || week.Chip.Yesterday != 10 || week.Chip.Today != 0 || week.Chip.Direction != server.LimitChipDown {
+	if week == nil || week.Chip == nil || week.Chip.Yesterday != 10 || week.Chip.Today != 0 || week.Chip.Direction != wire.LimitChipDown {
 		t.Fatalf("weekly chip = %+v, want yesterday 10, today 0, down", week)
 	}
 	f := week.Forecast
-	if f == nil || f.Status != server.LimitForecastProjected || f.Pace != 10 || f.AtReset != 80 || f.RunsOutAt != 0 {
+	if f == nil || f.Status != wire.LimitForecastProjected || f.Pace != 10 || f.AtReset != 80 || f.RunsOutAt != 0 {
 		t.Errorf("weekly forecast = %+v, want projected, pace 10, 80 at reset", f)
 	}
 	if u.Codex != nil {
@@ -106,9 +107,9 @@ func TestUsageSummary_WeeklyCarriesChipAndForecast(t *testing.T) {
 
 func TestUsageSummary_NoChipWithoutAFullDay(t *testing.T) {
 	h := limitsHarness(t)
-	sendLimits(t, h, server.LimitsReport{SevenDay: limitWin(50, time.Now().Add(72*time.Hour).Unix())})
+	sendLimits(t, h, wire.LimitsReport{SevenDay: limitWin(50, time.Now().Add(72*time.Hour).Unix())})
 	week := usageSummary(t, h).Limits.SevenDay
-	if week == nil || week.Chip != nil || week.Forecast == nil || week.Forecast.Status != server.LimitForecastNeedsData {
+	if week == nil || week.Chip != nil || week.Forecast == nil || week.Forecast.Status != wire.LimitForecastNeedsData {
 		t.Errorf("weekly = %+v, want no chip and a needs-data forecast", week)
 	}
 }

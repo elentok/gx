@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -198,8 +199,8 @@ func TestUsageOverride_CodexLiftsOnlyCodexAndSurvivesRestart(t *testing.T) {
 	}
 
 	res, err = s.usageOverride(now, ralphloop.AgentCodex)
-	if err != nil || !res.Refused || res.Reason != ReasonNotGated {
-		t.Errorf("second Codex override = %+v, %v; want refused %s", res, err, ReasonNotGated)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
+		t.Errorf("second Codex override = %+v, %v; want refused %s", res, err, wire.ReasonNotGated)
 	}
 }
 
@@ -212,7 +213,7 @@ func TestUsageOverride_RefusalNamesTheHarness(t *testing.T) {
 		ralphloop.AgentCodex:  "no Codex usage window is at its limit",
 	} {
 		res, err := s.usageOverride(now, agent)
-		if err != nil || !res.Refused || res.Reason != ReasonNotGated || res.Message != want {
+		if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated || res.Message != want {
 			t.Errorf("%s override = %+v, %v; want refused %q", agent, res, err, want)
 		}
 	}

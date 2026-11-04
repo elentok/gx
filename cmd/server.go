@@ -340,7 +340,7 @@ type StatusInfo struct {
 	Starting bool     `json:"starting,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
 	// Budget is today's spend and limits; nil when the server did not answer.
-	Budget *server.BudgetStatus `json:"budget,omitempty"`
+	Budget *wire.BudgetStatus `json:"budget,omitempty"`
 	// Config is the reload status; nil when there is nothing to show.
 	Config *server.ConfigStatus `json:"config,omitempty"`
 	// ConfigError is why config.json does not load; status then uses defaults.

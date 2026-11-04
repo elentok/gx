@@ -8,6 +8,8 @@ import (
 	"math"
 	"net/http"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 // ReasonInvalidReport refuses a limits report with a non-finite or
@@ -18,14 +20,14 @@ const ReasonInvalidReport = "invalid-report"
 // after the merge, or a refusal. A report with no windows changes nothing and
 // reads the stored windows back.
 type LimitsReportResult struct {
-	FiveHour *LimitWindow `json:"five_hour,omitempty"`
-	SevenDay *LimitWindow `json:"seven_day,omitempty"`
-	Refused  bool         `json:"refused,omitempty"`
-	Reason   string       `json:"reason,omitempty"`
-	Message  string       `json:"message,omitempty"`
+	FiveHour *wire.LimitWindow `json:"five_hour,omitempty"`
+	SevenDay *wire.LimitWindow `json:"seven_day,omitempty"`
+	Refused  bool              `json:"refused,omitempty"`
+	Reason   string            `json:"reason,omitempty"`
+	Message  string            `json:"message,omitempty"`
 }
 
-func validLimitWindow(name string, w *LimitWindow) error {
+func validLimitWindow(name string, w *wire.LimitWindow) error {
 	if w == nil {
 		return nil
 	}
@@ -39,14 +41,14 @@ func validLimitWindow(name string, w *LimitWindow) error {
 }
 
 func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
-	var req LimitsReport
+	var req wire.LimitsReport
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	for _, c := range []struct {
 		name string
-		win  *LimitWindow
+		win  *wire.LimitWindow
 	}{{"five_hour", req.FiveHour}, {"seven_day", req.SevenDay}} {
 		if err := validLimitWindow(c.name, c.win); err != nil {
 			writeJSON(w, LimitsReportResult{Refused: true, Reason: ReasonInvalidReport, Message: err.Error()})

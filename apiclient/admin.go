@@ -24,8 +24,8 @@ func (c *Client) SetViMode(ctx context.Context, on *bool) (server.ViModeResult, 
 
 // BudgetOverride lifts the budget latches. A refusal is a result (Refused set),
 // not an error.
-func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error) {
-	var res server.BudgetResult
+func (c *Client) BudgetOverride(ctx context.Context) (wire.BudgetResult, error) {
+	var res wire.BudgetResult
 	err := c.post(ctx, "/v1/budget/override", struct{}{}, &res)
 	return res, err
 }
@@ -33,16 +33,16 @@ func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error
 // UsageOverride lifts one harness's usage gate until the gating windows reset;
 // an empty harness means the Default harness. A refusal is a result (Refused
 // set), not an error.
-func (c *Client) UsageOverride(ctx context.Context, harness string) (server.UsageOverrideResult, error) {
-	var res server.UsageOverrideResult
-	err := c.post(ctx, "/v1/usage/override", server.UsageOverrideRequest{Harness: harness}, &res)
+func (c *Client) UsageOverride(ctx context.Context, harness string) (wire.UsageOverrideResult, error) {
+	var res wire.UsageOverrideResult
+	err := c.post(ctx, "/v1/usage/override", wire.UsageOverrideRequest{Harness: harness}, &res)
 	return res, err
 }
 
 // ReportLimits sends Claude rate-limit windows and returns the windows the
 // server stores after the merge. A report with no windows reads them back. A
 // refusal is a result (Refused set), not an error.
-func (c *Client) ReportLimits(ctx context.Context, report server.LimitsReport) (server.LimitsReportResult, error) {
+func (c *Client) ReportLimits(ctx context.Context, report wire.LimitsReport) (server.LimitsReportResult, error) {
 	var res server.LimitsReportResult
 	err := c.post(ctx, "/v1/usage/report", report, &res)
 	return res, err
@@ -147,8 +147,8 @@ func (c *Client) HealthWait(ctx context.Context) (wire.HealthReport, error) {
 
 // BudgetIncrease raises the live budget limits until the server restarts. A
 // refusal is a result (Refused set), not an error.
-func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRequest) (server.BudgetResult, error) {
-	var res server.BudgetResult
+func (c *Client) BudgetIncrease(ctx context.Context, req wire.BudgetIncreaseRequest) (wire.BudgetResult, error) {
+	var res wire.BudgetResult
 	err := c.post(ctx, "/v1/budget/increase", req, &res)
 	return res, err
 }

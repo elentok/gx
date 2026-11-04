@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -121,8 +122,8 @@ func TestUsageGate_OverrideLetsAClaudeTicketClaim(t *testing.T) {
 	}
 	servertest.WaitFor(t, 10*time.Second, "the claim lands after the override", func() bool { return len(pty.Prompts("epic-a-iter-01")) > 0 })
 	res, err = h.Client.UsageOverride(ctx, "")
-	if err != nil || !res.Refused || res.Reason != server.ReasonNotGated {
-		t.Errorf("second override = %+v, %v; want refused %s", res, err, server.ReasonNotGated)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
+		t.Errorf("second override = %+v, %v; want refused %s", res, err, wire.ReasonNotGated)
 	}
 }
 

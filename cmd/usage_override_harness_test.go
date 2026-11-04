@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestUsageOverrideCmd_NamesTheHarnessAndRefusesUnknownOnes(t *testing.T) {
@@ -30,11 +30,11 @@ func TestUsageOverrideCmd_NamesTheHarnessAndRefusesUnknownOnes(t *testing.T) {
 		{nil, "no Claude usage window"}, // the Default harness
 	} {
 		err := run(tc.args...)
-		if err == nil || !strings.Contains(err.Error(), server.ReasonNotGated) || !strings.Contains(err.Error(), tc.want) {
-			t.Errorf("override %v = %v, want a %s refusal containing %q", tc.args, err, server.ReasonNotGated, tc.want)
+		if err == nil || !strings.Contains(err.Error(), wire.ReasonNotGated) || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("override %v = %v, want a %s refusal containing %q", tc.args, err, wire.ReasonNotGated, tc.want)
 		}
 	}
-	if err := run("gemini"); err == nil || strings.Contains(err.Error(), server.ReasonNotGated) {
+	if err := run("gemini"); err == nil || strings.Contains(err.Error(), wire.ReasonNotGated) {
 		t.Errorf("override gemini = %v, want an invalid-argument error", err)
 	}
 }

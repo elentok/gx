@@ -1,6 +1,9 @@
 package server
 
-import "github.com/elentok/gx/tokenledger"
+import (
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tokenledger"
+)
 
 // Cost sources for one day of the cost charts. A day uses exactly one.
 const (
@@ -23,8 +26,8 @@ type costSourceInput struct {
 // groupCost is one agent group's day. Harness is empty on stamp days: stamps
 // do not record it.
 type groupCost struct {
-	Tokens, Dollars StatsAmount
-	Harness         map[string]StatsHarnessAmount
+	Tokens, Dollars wire.StatsAmount
+	Harness         map[string]wire.StatsHarnessAmount
 }
 
 // costLedger is the ledger as the stats build reads it: the rows of the
@@ -55,14 +58,14 @@ func (s *Server) costLedger(win statsWindow) (costLedger, error) {
 
 // statsCostOf turns the picked days into the payload. Partial is set when any
 // day is rebuilt or stamp-only.
-func statsCostOf(days []dayCost) StatsCost {
-	out := StatsCost{Sources: make([]string, len(days))}
+func statsCostOf(days []dayCost) wire.StatsCost {
+	out := wire.StatsCost{Sources: make([]string, len(days))}
 	for _, g := range costGroups {
-		out.Groups = append(out.Groups, StatsCostGroup{
+		out.Groups = append(out.Groups, wire.StatsCostGroup{
 			Group:   g,
-			Tokens:  make([]StatsAmount, len(days)),
-			Spend:   make([]StatsAmount, len(days)),
-			Harness: make([]map[string]StatsHarnessAmount, len(days)),
+			Tokens:  make([]wire.StatsAmount, len(days)),
+			Spend:   make([]wire.StatsAmount, len(days)),
+			Harness: make([]map[string]wire.StatsHarnessAmount, len(days)),
 		})
 	}
 	for i, d := range days {
@@ -73,7 +76,7 @@ func statsCostOf(days []dayCost) StatsCost {
 			out.Groups[gi].Tokens[i], out.Groups[gi].Spend[i] = c.Tokens, c.Dollars
 			out.Groups[gi].Harness[i] = c.Harness
 			if c.Harness == nil {
-				out.Groups[gi].Harness[i] = map[string]StatsHarnessAmount{}
+				out.Groups[gi].Harness[i] = map[string]wire.StatsHarnessAmount{}
 			}
 		}
 	}
@@ -133,7 +136,7 @@ func pickCostSource(in costSourceInput) []dayCost {
 func ledgerGroups(rows []tokenledger.Row) map[string]groupCost {
 	groups := make(map[string]groupCost, len(costGroups))
 	for _, g := range costGroups {
-		groups[g] = groupCost{Harness: map[string]StatsHarnessAmount{}}
+		groups[g] = groupCost{Harness: map[string]wire.StatsHarnessAmount{}}
 	}
 	for _, r := range rows {
 		g, ok := groups[r.Group]

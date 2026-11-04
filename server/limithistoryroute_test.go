@@ -7,14 +7,15 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestLimitHistory_ReportSurvivesRestart(t *testing.T) {
 	h := limitsHarness(t)
 	dir := h.StateDir
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(10, 4_000_000_000), SevenDay: limitWin(3, 4_000_000_001)})
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(10, 4_000_000_000)}) // unchanged: no sample
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(25.5, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(10, 4_000_000_000), SevenDay: limitWin(3, 4_000_000_001)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(10, 4_000_000_000)}) // unchanged: no sample
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(25.5, 4_000_000_000)})
 	h.Restart(t)
 
 	data, err := os.ReadFile(filepath.Join(dir, "limit-history.json"))
@@ -36,7 +37,7 @@ func TestLimitHistory_ReportSurvivesRestart(t *testing.T) {
 	}
 
 	// A report after the restart appends to what was loaded.
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
 	data, _ = os.ReadFile(filepath.Join(dir, "limit-history.json"))
 	if err := json.Unmarshal(data, &f); err != nil {
 		t.Fatal(err)

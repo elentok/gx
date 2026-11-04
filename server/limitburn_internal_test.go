@@ -3,6 +3,8 @@ package server
 import (
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 func withLocalZone(t *testing.T, loc *time.Location) {
@@ -209,37 +211,37 @@ func TestLimitBurnChip(t *testing.T) {
 	cases := []struct {
 		name    string
 		samples []LimitSample
-		want    LimitBurnChip
+		want    wire.LimitBurnChip
 	}{
 		{
 			name:    "present once yesterday starts at the first sample; above yesterday",
 			samples: []LimitSample{ls(5, r, 2026, 10, 6, 0, 0), ls(8, r, 2026, 10, 6, 9, 0), ls(20, r, 2026, 10, 7, 9, 0)},
-			want:    LimitBurnChip{Today: 12, Yesterday: 3, Direction: LimitChipUp},
+			want:    wire.LimitBurnChip{Today: 12, Yesterday: 3, Direction: wire.LimitChipUp},
 		},
 		{
 			name:    "below yesterday",
 			samples: []LimitSample{ls(5, r, 2026, 10, 5, 8, 0), ls(30, r, 2026, 10, 6, 9, 0), ls(33, r, 2026, 10, 7, 9, 0)},
-			want:    LimitBurnChip{Today: 3, Yesterday: 25, Direction: LimitChipDown},
+			want:    wire.LimitBurnChip{Today: 3, Yesterday: 25, Direction: wire.LimitChipDown},
 		},
 		{
 			name:    "equal after rounding",
 			samples: []LimitSample{ls(5, r, 2026, 10, 5, 8, 0), ls(9.6, r, 2026, 10, 6, 9, 0), ls(14.2, r, 2026, 10, 7, 9, 0)},
-			want:    LimitBurnChip{Today: 5, Yesterday: 5, Direction: LimitChipEqual},
+			want:    wire.LimitBurnChip{Today: 5, Yesterday: 5, Direction: wire.LimitChipEqual},
 		},
 		{
 			name:    "fractional burn reaches the chip as whole points",
 			samples: []LimitSample{ls(5, r, 2026, 10, 5, 8, 0), ls(9.6, r, 2026, 10, 6, 9, 0), ls(17, r, 2026, 10, 7, 9, 0)},
-			want:    LimitBurnChip{Today: 7, Yesterday: 5, Direction: LimitChipUp},
+			want:    wire.LimitBurnChip{Today: 7, Yesterday: 5, Direction: wire.LimitChipUp},
 		},
 		{
 			name:    "a quiet yesterday counts 0",
 			samples: []LimitSample{ls(5, r, 2026, 10, 5, 8, 0), ls(9, r, 2026, 10, 7, 9, 0)},
-			want:    LimitBurnChip{Today: 4, Yesterday: 0, Direction: LimitChipUp},
+			want:    wire.LimitBurnChip{Today: 4, Yesterday: 0, Direction: wire.LimitChipUp},
 		},
 		{
 			name:    "no burn today yet is 0, still shown",
 			samples: []LimitSample{ls(5, r, 2026, 10, 5, 8, 0), ls(9, r, 2026, 10, 6, 9, 0)},
-			want:    LimitBurnChip{Today: 0, Yesterday: 4, Direction: LimitChipDown},
+			want:    wire.LimitBurnChip{Today: 0, Yesterday: 4, Direction: wire.LimitChipDown},
 		},
 	}
 	for _, tc := range cases {
@@ -310,55 +312,55 @@ func TestLimitForecast(t *testing.T) {
 		name    string
 		samples []LimitSample
 		latest  LimitSample
-		want    LimitForecast
+		want    wire.LimitForecast
 	}{
 		{
 			name:    "projects used plus pace times time left",
 			samples: history(reset), latest: latest(50, reset),
-			want: LimitForecast{Status: LimitForecastProjected, Pace: 10, AtReset: 70},
+			want: wire.LimitForecast{Status: wire.LimitForecastProjected, Pace: 10, AtReset: 70},
 		},
 		{
 			name:    "over 100 gives the time the limit runs out",
 			samples: history(reset), latest: latest(90, reset),
-			want: LimitForecast{
-				Status: LimitForecastProjected, Pace: 10, AtReset: 110,
+			want: wire.LimitForecast{
+				Status: wire.LimitForecastProjected, Pace: 10, AtReset: 110,
 				RunsOutAt: now.Add(24 * time.Hour).Unix(), // (100-90)/10 days
 			},
 		},
 		{
 			name:    "exactly 100 at reset does not run out",
 			samples: history(reset), latest: latest(80, reset),
-			want: LimitForecast{Status: LimitForecastProjected, Pace: 10, AtReset: 100},
+			want: wire.LimitForecast{Status: wire.LimitForecastProjected, Pace: 10, AtReset: 100},
 		},
 		{
 			name:    "at or above 100 gets no forecast",
 			samples: history(reset), latest: latest(100, reset),
-			want: LimitForecast{Status: LimitForecastNone, Pace: 10},
+			want: wire.LimitForecast{Status: wire.LimitForecastNone, Pace: 10},
 		},
 		{
 			name:    "a past-reset row gets none, ahead of needs-data",
 			samples: short, latest: latest(10, past),
-			want: LimitForecast{Status: LimitForecastNone, Pace: 10},
+			want: wire.LimitForecast{Status: wire.LimitForecastNone, Pace: 10},
 		},
 		{
 			name:    "a past-reset row with long history gets none",
 			samples: history(past), latest: latest(50, past),
-			want: LimitForecast{Status: LimitForecastNone, Pace: 10},
+			want: wire.LimitForecast{Status: wire.LimitForecastNone, Pace: 10},
 		},
 		{
 			name:    "under 3 days needs data",
 			samples: short, latest: latest(10, reset),
-			want: LimitForecast{Status: LimitForecastNeedsData, Pace: 10},
+			want: wire.LimitForecast{Status: wire.LimitForecastNeedsData, Pace: 10},
 		},
 		{
 			name:    "a stale row with under 3 days needs data",
 			samples: short, latest: LimitSample{UsedPercentage: 10, ResetsAt: reset.Unix(), ReceivedAt: now.Add(-48 * time.Hour).Unix()},
-			want: LimitForecast{Status: LimitForecastNeedsData, Pace: 10},
+			want: wire.LimitForecast{Status: wire.LimitForecastNeedsData, Pace: 10},
 		},
 		{
 			name:    "a stale row with history still projects from the last known value",
 			samples: history(reset), latest: LimitSample{UsedPercentage: 50, ResetsAt: reset.Unix(), ReceivedAt: now.Add(-48 * time.Hour).Unix()},
-			want: LimitForecast{Status: LimitForecastProjected, Pace: 10, AtReset: 70},
+			want: wire.LimitForecast{Status: wire.LimitForecastProjected, Pace: 10, AtReset: 70},
 		},
 		{
 			name: "pace 0 shows the current percentage and no run-out",
@@ -366,7 +368,7 @@ func TestLimitForecast(t *testing.T) {
 				ls(40, reset, 2026, 10, 16, 0, 0), ls(40, reset, 2026, 10, 19, 9, 0),
 			},
 			latest: latest(95.4, reset),
-			want:   LimitForecast{Status: LimitForecastProjected, Pace: 0, AtReset: 95},
+			want:   wire.LimitForecast{Status: wire.LimitForecastProjected, Pace: 0, AtReset: 95},
 		},
 	}
 	for _, tc := range cases {

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/server/wire"
 )
 
 // limitHistoryFile keeps every limit sample, beside claude-limits.json.
@@ -98,7 +99,7 @@ func (h *limitHistory) Latest(id string) (LimitSample, bool) {
 // percentage or the reset time differs from the limit's last sample, or when
 // the last sample is an hour old. The in-memory state only moves once the save
 // succeeds.
-func (h *limitHistory) record(id string, w LimitWindow, now int64) (saved bool, err error) {
+func (h *limitHistory) record(id string, w wire.LimitWindow, now int64) (saved bool, err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	sample := LimitSample{LimitID: id, UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: now}
@@ -161,7 +162,7 @@ var codexLimitIDs = map[int]string{300: LimitIDCodex5h, 10080: LimitIDCodexWeekl
 // sample was saved.
 func (h *limitHistory) recordCodex(samples []codexsession.UsageSample, now int64) (bool, error) {
 	type reading struct {
-		w    LimitWindow
+		w    wire.LimitWindow
 		seen int64
 	}
 	merged := map[string]reading{}
@@ -171,7 +172,7 @@ func (h *limitHistory) recordCodex(samples []codexsession.UsageSample, now int64
 			if !ok {
 				continue
 			}
-			r := reading{w: LimitWindow{UsedPercentage: cw.UsedPercent, ResetsAt: cw.ResetsAt.Unix()}, seen: s.SeenAt.Unix()}
+			r := reading{w: wire.LimitWindow{UsedPercentage: cw.UsedPercent, ResetsAt: cw.ResetsAt.Unix()}, seen: s.SeenAt.Unix()}
 			cur, have := merged[id]
 			switch {
 			case !have, r.w.ResetsAt > cur.w.ResetsAt:
@@ -203,16 +204,16 @@ func (h *limitHistory) recordCodex(samples []codexsession.UsageSample, now int64
 }
 
 // recordClaude saves history for each window the merge accepted.
-func (h *limitHistory) recordClaude(report LimitsReport, res LimitsApplyResult, now int64) error {
+func (h *limitHistory) recordClaude(report wire.LimitsReport, res wire.LimitsApplyResult, now int64) error {
 	for _, c := range []struct {
 		id  string
-		in  *LimitWindow
-		res *LimitResult
+		in  *wire.LimitWindow
+		res *wire.LimitResult
 	}{
 		{LimitIDClaude5h, report.FiveHour, res.FiveHour},
 		{LimitIDClaudeWeekly, report.SevenDay, res.SevenDay},
 	} {
-		if c.in == nil || c.res == nil || c.res.Outcome == LimitDropped {
+		if c.in == nil || c.res == nil || c.res.Outcome == wire.LimitDropped {
 			continue
 		}
 		if _, err := h.record(c.id, *c.in, now); err != nil {

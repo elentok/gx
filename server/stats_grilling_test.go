@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func grillItem(id string, at time.Time, q, w int) conversations.GrillingItem {
@@ -17,7 +17,7 @@ func grillItem(id string, at time.Time, q, w int) conversations.GrillingItem {
 
 // grillingStats serves /v1/stats with the given records seeded straight into
 // the conversations dir.
-func grillingStats(t *testing.T, recs []conversations.Record) (get func(query string) server.Stats) {
+func grillingStats(t *testing.T, recs []conversations.Record) (get func(query string) wire.Stats) {
 	t.Helper()
 	h, base := startEpicDetail(t, func(store string) {
 		writeProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", nil)
@@ -30,13 +30,13 @@ func grillingStats(t *testing.T, recs []conversations.Record) (get func(query st
 			t.Fatal(err)
 		}
 	}
-	return func(query string) server.Stats {
+	return func(query string) wire.Stats {
 		t.Helper()
 		code, body := webDo(t, h, http.MethodGet, base+"/v1/stats"+query)
 		if code != http.StatusOK {
 			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
 		}
-		var s server.Stats
+		var s wire.Stats
 		if err := json.Unmarshal([]byte(body), &s); err != nil {
 			t.Fatalf("body %q: %v", body, err)
 		}
@@ -44,7 +44,7 @@ func grillingStats(t *testing.T, recs []conversations.Record) (get func(query st
 	}
 }
 
-func amountAt(t *testing.T, s server.Stats, series []server.StatsAmount, n int) server.StatsAmount {
+func amountAt(t *testing.T, s wire.Stats, series []wire.StatsAmount, n int) wire.StatsAmount {
 	t.Helper()
 	i := slices.Index(s.Days, statsDate(n))
 	if i < 0 {
@@ -98,7 +98,7 @@ func TestStats_GrillingNothingCountedIsAllNoData(t *testing.T) {
 		{ID: "impl", Ticket: "proj:loop/01", Grilling: []conversations.GrillingItem{grillItem("m1", statsNoon(2), 1, 9)}},
 	})
 	s := get("?range=30")
-	for _, series := range [][]server.StatsAmount{s.Grilling.Words, s.Grilling.Questions} {
+	for _, series := range [][]wire.StatsAmount{s.Grilling.Words, s.Grilling.Questions} {
 		if len(series) != len(s.Days) {
 			t.Fatalf("series has %d points, want %d", len(series), len(s.Days))
 		}

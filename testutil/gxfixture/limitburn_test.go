@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 type seededHistory struct {
@@ -62,14 +63,14 @@ func daysCovered(samples []server.LimitSample, now time.Time) int {
 func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 	for _, tc := range []struct {
 		shape string
-		check func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory)
+		check func(t *testing.T, now time.Time, l wire.UsageLimits, h seededHistory)
 	}{
-		{"", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
+		{"", func(t *testing.T, now time.Time, l wire.UsageLimits, h seededHistory) {
 			if l.SevenDay == nil || l.SevenDay.UsedPercentage != 81 {
 				t.Errorf("default shape is not menu: %+v", l)
 			}
 		}},
-		{"menu", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
+		{"menu", func(t *testing.T, now time.Time, l wire.UsageLimits, h seededHistory) {
 			if l.FiveHour == nil || l.SevenDay == nil || l.SevenDay.UsedPercentage != 81 {
 				t.Fatalf("want Claude 5h and weekly at 81%%: %+v", l)
 			}
@@ -89,7 +90,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 				}
 			}
 		}},
-		{"few-days", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
+		{"few-days", func(t *testing.T, now time.Time, l wire.UsageLimits, h seededHistory) {
 			if l.SevenDay == nil || l.SevenDay.UsedPercentage != 22 {
 				t.Fatalf("want Claude weekly at 22%%: %+v", l)
 			}
@@ -101,7 +102,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 				t.Errorf("Codex data seeded: %+v", h.Samples)
 			}
 		}},
-		{"stale", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
+		{"stale", func(t *testing.T, now time.Time, l wire.UsageLimits, h seededHistory) {
 			for _, id := range []string{server.LimitIDClaudeWeekly, server.LimitIDCodexWeekly} {
 				samples := h.Samples[id]
 				if got := daysCovered(samples, now); got < 7 {
@@ -116,7 +117,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 				}
 			}
 		}},
-		{"past-reset", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
+		{"past-reset", func(t *testing.T, now time.Time, l wire.UsageLimits, h seededHistory) {
 			if l.SevenDay == nil || l.SevenDay.ResetsAt >= now.Unix() {
 				t.Errorf("weekly reset is not in the past: %+v", l.SevenDay)
 			} else if l.SevenDay.Chip == nil {
@@ -131,7 +132,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 			}
 			r := startWith(t, "limit-burn", nil, flags...)
 			defer r.stop(t)
-			var sum server.UsageSummary
+			var sum wire.UsageSummary
 			if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
 				t.Fatal(err)
 			}
@@ -148,7 +149,7 @@ func TestLimitBurnFixture_StatsShape(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for name, b := range map[string]server.StatsLimitBurn{
+	for name, b := range map[string]wire.StatsLimitBurn{
 		"claude_5h": st.LimitBurn.Claude5h, "claude_weekly": st.LimitBurn.ClaudeWeekly,
 		"codex_5h": st.LimitBurn.Codex5h, "codex_weekly": st.LimitBurn.CodexWeekly,
 	} {
@@ -189,7 +190,7 @@ func TestLimitBurnFixture_StatsShape(t *testing.T) {
 			t.Errorf("source of day %d = %q, want %q", i, src, want)
 		}
 	}
-	groups := map[string]server.StatsCostGroup{}
+	groups := map[string]wire.StatsCostGroup{}
 	for _, g := range st.Cost.Groups {
 		groups[g.Group] = g
 	}

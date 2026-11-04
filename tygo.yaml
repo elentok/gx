@@ -3,7 +3,6 @@ packages:
   - path: "github.com/elentok/gx/server"
     output_path: "webui/src/generated/server.ts"
     include_files:
-      - budget.go
       - designs.go
       - detail.go
       - detailrelated.go
@@ -11,7 +10,6 @@ packages:
       - epiccard.go
       - epicdetail.go
       - epiclist.go
-      - limitburn.go
       - epicsummary.go
       - fixagent.go
       - harnesslabel.go
@@ -19,24 +17,18 @@ packages:
       - pause.go
       - projectworktrees.go
       - recentlyfinished.go
-      - stats.go
-      - statsgrilling.go
-      - statslimitburn.go
-      - limitsstore.go
       - migrate.go
-      - limitsevents.go
-      - usagesample.go
-      - usagesummary.go
       - verdicts.go
     # Moved types stay importable from generated/server. A wire type the
     # remaining server types use needs an import here and a type_mappings entry
     # below (tygo loads syntax only, so it cannot resolve wire.X itself).
     frontmatter: |
       export * from './wire';
-      import type { DiskStatus, Health, SessionInfo, SessionResult } from './wire';
+      import type { BudgetStatus, DiskStatus, Health, SessionInfo, SessionResult } from './wire';
     type_mappings:
       time.Time: "string"
       tickets.DesignStep: "string"
+      wire.BudgetStatus: "BudgetStatus"
       wire.DiskStatus: "DiskStatus"
       wire.Health: "Health"
       wire.SessionInfo: "SessionInfo"
@@ -47,11 +39,15 @@ packages:
   - path: "github.com/elentok/gx/server/wire"
     output_path: "webui/src/generated/wire.ts"
     include_files:
+      - budget.go
       - checkstatus.go
       - diskcleannow.go
       - diskwatch.go
       - healthreport.go
       - healthtypes.go
+      - limitburn.go
+      - limitsevents.go
+      - limitsstore.go
       - restart.go
       - restartcheck.go
       - sessionautoadvance.go
@@ -67,6 +63,11 @@ packages:
       - sessionstate.go
       - sessions.go
       - sessiontypes.go
+      - stats.go
+      - statsgrilling.go
+      - statslimitburn.go
+      - usagesample.go
+      - usagesummary.go
     type_mappings:
       time.Time: "string"
       tickets.DesignStep: "string"

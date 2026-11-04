@@ -88,8 +88,8 @@ func (f *streamFake) QueueItems(context.Context) ([]server.QueueItem, error) {
 	return f.queue, nil
 }
 
-func (f *streamFake) Budget(context.Context) (server.BudgetStatus, error) {
-	return server.BudgetStatus{}, nil
+func (f *streamFake) Budget(context.Context) (wire.BudgetStatus, error) {
+	return wire.BudgetStatus{}, nil
 }
 
 // fetches is how many snapshots and queue reads the server has answered.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -212,7 +213,7 @@ func TestServerNotices_IncreaseRearmsAgainstSpendBeyondOverride(t *testing.T) {
 	s.ledger.record("", "a", 55, now.Add(time.Minute))
 	s.notifyBudget(now.Add(time.Minute)) // 25 beyond: soft
 	soft := 30.0
-	if _, err := s.budgetIncrease(now.Add(time.Minute), BudgetIncreaseRequest{Soft: &soft}); err != nil {
+	if _, err := s.budgetIncrease(now.Add(time.Minute), wire.BudgetIncreaseRequest{Soft: &soft}); err != nil {
 		t.Fatal(err)
 	}
 	s.ledger.record("", "a", 62, now.Add(2*time.Minute))

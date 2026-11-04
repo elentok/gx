@@ -10,44 +10,44 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // limitShapes are the --shape values of a limits scenario. Each builds the
 // seeded state from the real clock, so countdowns and "seen … ago" stay right.
-var limitShapes = map[string]func(now time.Time) server.LimitsReport{
+var limitShapes = map[string]func(now time.Time) wire.LimitsReport{
 	// fresh: both windows received now; the weekly one is amber.
-	"fresh": func(now time.Time) server.LimitsReport {
-		return server.LimitsReport{
+	"fresh": func(now time.Time) wire.LimitsReport {
+		return wire.LimitsReport{
 			FiveHour: limitWindow(now, 34, 2*time.Hour+10*time.Minute, 0),
 			SevenDay: limitWindow(now, 81, 52*time.Hour, 0),
 		}
 	},
 	// stale: both received 3 hours ago.
-	"stale": func(now time.Time) server.LimitsReport {
-		return server.LimitsReport{
+	"stale": func(now time.Time) wire.LimitsReport {
+		return wire.LimitsReport{
 			FiveHour: limitWindow(now, 34, 2*time.Hour+10*time.Minute, 3*time.Hour),
 			SevenDay: limitWindow(now, 52, 52*time.Hour, 3*time.Hour),
 		}
 	},
 	// past-reset: the 5h reset time is an hour gone.
-	"past-reset": func(now time.Time) server.LimitsReport {
-		return server.LimitsReport{
+	"past-reset": func(now time.Time) wire.LimitsReport {
+		return wire.LimitsReport{
 			FiveHour: limitWindow(now, 34, -time.Hour, 6*time.Hour),
 			SevenDay: limitWindow(now, 52, 52*time.Hour, 6*time.Hour),
 		}
 	},
 	// one-window: the weekly window only.
-	"one-window": func(now time.Time) server.LimitsReport {
-		return server.LimitsReport{
+	"one-window": func(now time.Time) wire.LimitsReport {
+		return wire.LimitsReport{
 			SevenDay: limitWindow(now, 12, 5*24*time.Hour+9*time.Hour, 0),
 		}
 	},
 }
 
 // limitWindow resets in resetsIn and was received receivedAgo before now.
-func limitWindow(now time.Time, pct float64, resetsIn, receivedAgo time.Duration) *server.LimitWindow {
-	return &server.LimitWindow{
+func limitWindow(now time.Time, pct float64, resetsIn, receivedAgo time.Duration) *wire.LimitWindow {
+	return &wire.LimitWindow{
 		UsedPercentage: pct,
 		ResetsAt:       now.Add(resetsIn).Unix(),
 		ReceivedAt:     now.Add(-receivedAgo).Unix(),

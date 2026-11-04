@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestUsageSummary_JSONVerb(t *testing.T) {
@@ -25,11 +26,11 @@ func TestUsageSummary_JSONVerb(t *testing.T) {
 	if err := c.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	var u server.UsageSummary
+	var u wire.UsageSummary
 	if err := json.Unmarshal(out.Bytes(), &u); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)
 	}
-	if u.Mode != server.UsageModeSpending {
+	if u.Mode != wire.UsageModeSpending {
 		t.Errorf("mode = %q, want spending", u.Mode)
 	}
 }

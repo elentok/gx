@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestServerStats_HasJSONRangeAndProjectFlags(t *testing.T) {
@@ -22,11 +22,11 @@ func TestServerStats_HasJSONRangeAndProjectFlags(t *testing.T) {
 }
 
 func TestServerStats_JSONHoldsLimitBurnSeries(t *testing.T) {
-	s := server.Stats{LimitBurn: server.StatsLimitBurns{
-		ClaudeWeekly: server.StatsLimitBurn{
-			Days:     []server.LimitBurnDay{{Date: "2026-11-01", Burn: 7}},
+	s := wire.Stats{LimitBurn: wire.StatsLimitBurns{
+		ClaudeWeekly: wire.StatsLimitBurn{
+			Days:     []wire.LimitBurnDay{{Date: "2026-11-01", Burn: 7}},
 			Sum:      7,
-			Forecast: &server.LimitForecast{Status: server.LimitForecastProjected, Pace: 7},
+			Forecast: &wire.LimitForecast{Status: wire.LimitForecastProjected, Pace: 7},
 		},
 	}}
 	var buf bytes.Buffer
@@ -41,9 +41,9 @@ func TestServerStats_JSONHoldsLimitBurnSeries(t *testing.T) {
 }
 
 func TestServerStats_JSONHoldsGrillingSeries(t *testing.T) {
-	s := server.Stats{Grilling: server.StatsGrilling{
-		Words:     []server.StatsAmount{{Value: 12}},
-		Questions: []server.StatsAmount{{NoData: true}},
+	s := wire.Stats{Grilling: wire.StatsGrilling{
+		Words:     []wire.StatsAmount{{Value: 12}},
+		Questions: []wire.StatsAmount{{NoData: true}},
 	}}
 	var buf bytes.Buffer
 	if err := encodeProvenance(&buf, s, viaServer, callerActor(func() (string, error) { return "", nil })); err != nil {

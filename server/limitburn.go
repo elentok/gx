@@ -3,6 +3,8 @@ package server
 import (
 	"math"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 // limitForecastMinDays is the full local days of history a forecast needs, and
@@ -11,55 +13,6 @@ const (
 	limitForecastMinDays = 3
 	limitPaceDays        = 7
 )
-
-// LimitBurnDay is one local day of a limit's burn. NoData marks a day before the
-// limit's first sample; ResetDay marks a day a new window started.
-type LimitBurnDay struct {
-	Date     string  `json:"date"`
-	Burn     float64 `json:"burn"`
-	NoData   bool    `json:"no_data"`
-	ResetDay bool    `json:"reset_day"`
-}
-
-// LimitChipDirection is how today so far compares with yesterday.
-type LimitChipDirection string
-
-const (
-	LimitChipUp    LimitChipDirection = "up"
-	LimitChipDown  LimitChipDirection = "down"
-	LimitChipEqual LimitChipDirection = "equal"
-)
-
-// LimitBurnChip compares today's burn so far with yesterday's full day, in whole
-// points.
-type LimitBurnChip struct {
-	Today     int                `json:"today"`
-	Yesterday int                `json:"yesterday"`
-	Direction LimitChipDirection `json:"direction"`
-}
-
-// LimitForecastStatus says which forecast line a row shows.
-type LimitForecastStatus string
-
-const (
-	// LimitForecastNone shows no forecast line.
-	LimitForecastNone LimitForecastStatus = "none"
-	// LimitForecastNeedsData shows "Forecast needs 3 days of data".
-	LimitForecastNeedsData LimitForecastStatus = "needs_data"
-	// LimitForecastProjected shows the percentage at reset, and when the limit
-	// runs out if RunsOutAt is set.
-	LimitForecastProjected LimitForecastStatus = "projected"
-)
-
-// LimitForecast is the forecast line of a weekly limit. Pace is points per day.
-// AtReset is rounded to whole points; RunsOutAt is epoch seconds and set only
-// when the forecast passes 100.
-type LimitForecast struct {
-	Status    LimitForecastStatus `json:"status"`
-	Pace      float64             `json:"pace"`
-	AtReset   int                 `json:"at_reset"`
-	RunsOutAt int64               `json:"runs_out_at,omitempty"`
-}
 
 // limitBurnSeries is the burn of every local day seen in a limit's samples.
 type limitBurnSeries struct {
@@ -128,13 +81,13 @@ func (s limitBurnSeries) fullDays(now time.Time) int {
 }
 
 // limitBurnDays is the burn of each of the last n local days, ending today.
-func limitBurnDays(samples []LimitSample, n int, now time.Time) []LimitBurnDay {
+func limitBurnDays(samples []LimitSample, n int, now time.Time) []wire.LimitBurnDay {
 	s := newLimitBurnSeries(samples)
 	win := newStatsWindow(n, now)
-	out := make([]LimitBurnDay, n)
+	out := make([]wire.LimitBurnDay, n)
 	for i, day := range win.days {
 		key := day.Format(statsDayLayout)
-		out[i] = LimitBurnDay{
+		out[i] = wire.LimitBurnDay{
 			Date:     key,
 			Burn:     s.burn[key],
 			NoData:   !s.ok || key < s.first.In(time.Local).Format(statsDayLayout),
@@ -146,22 +99,22 @@ func limitBurnDays(samples []LimitSample, n int, now time.Time) []LimitBurnDay {
 
 // limitBurnChip compares today so far with yesterday. It is nil until yesterday
 // is a full local day on or after the first sample; a quiet day counts as 0.
-func limitBurnChip(samples []LimitSample, now time.Time) *LimitBurnChip {
+func limitBurnChip(samples []LimitSample, now time.Time) *wire.LimitBurnChip {
 	s := newLimitBurnSeries(samples)
 	if !s.fullDay(now, 1) {
 		return nil
 	}
-	chip := &LimitBurnChip{
+	chip := &wire.LimitBurnChip{
 		Today:     int(math.Round(s.dayBurn(now, 0))),
 		Yesterday: int(math.Round(s.dayBurn(now, 1))),
 	}
 	switch {
 	case chip.Today > chip.Yesterday:
-		chip.Direction = LimitChipUp
+		chip.Direction = wire.LimitChipUp
 	case chip.Today < chip.Yesterday:
-		chip.Direction = LimitChipDown
+		chip.Direction = wire.LimitChipDown
 	default:
-		chip.Direction = LimitChipEqual
+		chip.Direction = wire.LimitChipEqual
 	}
 	return chip
 }
@@ -184,21 +137,21 @@ func limitPace(samples []LimitSample, now time.Time) (pace float64, days int) {
 // limitForecast is the forecast line of a weekly limit; latest is the newest
 // reading, which may be newer than the last sample. Precedence: a past-reset
 // row, then too little history, then a full bar, then a zero pace.
-func limitForecast(samples []LimitSample, latest LimitSample, now time.Time) LimitForecast {
+func limitForecast(samples []LimitSample, latest LimitSample, now time.Time) wire.LimitForecast {
 	pace, days := limitPace(samples, now)
-	none := LimitForecast{Status: LimitForecastNone, Pace: pace}
+	none := wire.LimitForecast{Status: wire.LimitForecastNone, Pace: pace}
 	if now.Unix() >= latest.ResetsAt {
 		return none
 	}
 	if days < limitForecastMinDays {
-		none.Status = LimitForecastNeedsData
+		none.Status = wire.LimitForecastNeedsData
 		return none
 	}
 	used := latest.UsedPercentage
 	if used >= 100 {
 		return none
 	}
-	f := LimitForecast{Status: LimitForecastProjected, Pace: pace, AtReset: int(math.Round(used))}
+	f := wire.LimitForecast{Status: wire.LimitForecastProjected, Pace: pace, AtReset: int(math.Round(used))}
 	if pace == 0 {
 		return f
 	}

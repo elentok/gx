@@ -30,6 +30,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/storecommit"
@@ -554,8 +555,8 @@ func New(cfg Config) (*Server, error) {
 		usage:        openUsageSamples(cfg.StateDir),
 		limits:       openLimitsStore(cfg.StateDir),
 		limitHistory: openLimitHistory(cfg.StateDir),
-		limitsEvents: newEventThrottle(limitsEventInterval(cfg), func() { events.publish(EventLimitsChanged, "") }),
-		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.publish(EventBudgetChanged, "") }),
+		limitsEvents: newEventThrottle(limitsEventInterval(cfg), func() { events.publish(wire.EventLimitsChanged, "") }),
+		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.publish(wire.EventBudgetChanged, "") }),
 		usageCodex:   openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
 		costOf:       iterationCostIn(cfg.Env),
 		mergeInto:    git.MergeBranchInto,

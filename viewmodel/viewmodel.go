@@ -49,7 +49,7 @@ type State struct {
 	// HerdrText says which tickets wait on herdr. Events carry none, so it stays
 	// empty until the next snapshot.
 	HerdrText string
-	Budget    server.BudgetStatus
+	Budget    wire.BudgetStatus
 	// ExtraUsage is the snapshot's extra-usage warning flag.
 	ExtraUsage bool
 	// Tickets is in snapshot order (by address, forks under their parent).

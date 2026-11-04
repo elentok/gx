@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func budgetLimits(soft, hard float64) map[string]any {
@@ -59,7 +60,7 @@ func TestConfigReload_KeepsIncreaseOnUneditedField(t *testing.T) {
 	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 5, 20)
 	soft := 10.0
-	if res, err := h.Client.BudgetIncrease(context.Background(), server.BudgetIncreaseRequest{Soft: &soft}); err != nil || res.Refused {
+	if res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft}); err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
 

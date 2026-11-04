@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -75,7 +76,7 @@ func budgetEvents(ch <-chan server.Event) int {
 	for {
 		select {
 		case ev := <-ch:
-			if ev.Type == server.EventBudgetChanged {
+			if ev.Type == wire.EventBudgetChanged {
 				n++
 			}
 		case <-time.After(3 * budgetEventInterval):

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -39,7 +40,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
 		t.Fatal(err)
 	}
-	var status BudgetStatus
+	var status wire.BudgetStatus
 	rec = httptest.NewRecorder()
 	s.budget(rec, httptest.NewRequest("GET", "/v1/budget", nil))
 	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {

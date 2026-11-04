@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/events"
 	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
@@ -263,34 +265,14 @@ func (l *budgetLedger) override(now time.Time) {
 	l.hardHeld = false
 }
 
-// BudgetStatus is today's spend against the configured limits, in dollars. A
-// zero limit means that limit is off. Shared by /v1/budget and the snapshot.
-// BudgetPaused is the budget's hold on new starts; it is independent of the
-// operator's queue pause.
-type BudgetStatus struct {
-	Day          string  `json:"day"`
-	Total        float64 `json:"total"`
-	SoftLimit    float64 `json:"soft_limit"`
-	HardLimit    float64 `json:"hard_limit"`
-	BudgetPaused bool    `json:"budget_paused"`
-	HardLatched  bool    `json:"hard_latched"`
-	// Override is today's total at the last override; zero means none today.
-	// Limits count only spend beyond it.
-	Override float64 `json:"override,omitempty"`
-	// Projects is each project's share of Total.
-	Projects map[string]float64 `json:"projects,omitempty"`
-	// Roots is each root's ("project:epic") share of Total.
-	Roots map[string]float64 `json:"roots,omitempty"`
-}
+// budgetSpent is the spend the limits count: today's total beyond the override.
+func budgetSpent(st wire.BudgetStatus) float64 { return st.Total - st.Override }
 
-// spent is the spend the limits count: today's total beyond the override.
-func (st BudgetStatus) spent() float64 { return st.Total - st.Override }
-
-func (s *Server) budgetStatus(now time.Time) BudgetStatus {
+func (s *Server) budgetStatus(now time.Time) wire.BudgetStatus {
 	latch := s.budgetLatches(now)
 	soft, hard := s.ledger.limits()
 	day := now.Format(budgetDayLayout)
-	return BudgetStatus{
+	return wire.BudgetStatus{
 		Day:          day,
 		Total:        s.ledger.today(now),
 		Projects:     s.ledger.byProject(day),
@@ -307,52 +289,30 @@ func (s *Server) budgetLatches(now time.Time) budgetLatch {
 	return s.ledger.latches(now)
 }
 
-// BudgetResult is the outcome of a budget write: the status after it, or a
-// refusal.
-type BudgetResult struct {
-	Budget  *BudgetStatus `json:"budget,omitempty"`
-	Refused bool          `json:"refused,omitempty"`
-	Reason  string        `json:"reason,omitempty"`
-	Message string        `json:"message,omitempty"`
-}
-
-// ReasonNothingLatched refuses an override when no limit is holding anything.
-const ReasonNothingLatched = "nothing-latched"
-
 // budgetOverride lifts the latches so work may resume. The ledger is saved
 // before it returns, so a restart cannot bring the latch back.
-func (s *Server) budgetOverride(now time.Time) (BudgetResult, error) {
+func (s *Server) budgetOverride(now time.Time) (wire.BudgetResult, error) {
 	if !s.budgetLatches(now).Soft {
-		return BudgetResult{Refused: true, Reason: ReasonNothingLatched, Message: "no budget limit is reached"}, nil
+		return wire.BudgetResult{Refused: true, Reason: wire.ReasonNothingLatched, Message: "no budget limit is reached"}, nil
 	}
 	s.ledger.override(now)
 	if err := s.ledger.save(now); err != nil {
-		return BudgetResult{}, err
+		return wire.BudgetResult{}, err
 	}
 	s.cancelHardGrace()
 	status := s.budgetStatus(now)
 	s.rearmBudgetNotes(status)
 	s.events.publish(EventQueueChanged, "")
 	s.kickRunner()
-	return BudgetResult{Budget: &status}, nil
+	return wire.BudgetResult{Budget: &status}, nil
 }
-
-// BudgetIncreaseRequest raises the live daily limits, in dollars. A nil field
-// leaves that limit as it is.
-type BudgetIncreaseRequest struct {
-	Soft *float64 `json:"soft,omitempty"`
-	Hard *float64 `json:"hard,omitempty"`
-}
-
-// ReasonNotAnIncrease refuses a limit that is off or not raised.
-const ReasonNotAnIncrease = "not-an-increase"
 
 // budgetIncrease raises the live limits until the server restarts, then lifts
 // each latch that spend since the override no longer reaches. A soft limit
 // raised past the hard one takes the hard one with it, as config does.
-func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (BudgetResult, error) {
+func (s *Server) budgetIncrease(now time.Time, req wire.BudgetIncreaseRequest) (wire.BudgetResult, error) {
 	if req.Soft == nil && req.Hard == nil {
-		return BudgetResult{Refused: true, Reason: ReasonNotAnIncrease, Message: "name a soft or hard limit"}, nil
+		return wire.BudgetResult{Refused: true, Reason: wire.ReasonNotAnIncrease, Message: "name a soft or hard limit"}, nil
 	}
 	soft, hard := s.ledger.limits()
 	for _, l := range []struct {
@@ -363,9 +323,9 @@ func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (Budge
 		switch {
 		case l.next == nil:
 		case l.cur == 0:
-			return BudgetResult{Refused: true, Reason: ReasonNotAnIncrease, Message: l.name + " limit is off; any limit would lower it"}, nil
+			return wire.BudgetResult{Refused: true, Reason: wire.ReasonNotAnIncrease, Message: l.name + " limit is off; any limit would lower it"}, nil
 		case *l.next <= l.cur:
-			return BudgetResult{Refused: true, Reason: ReasonNotAnIncrease, Message: fmt.Sprintf("%s limit is already %s", l.name, tickets.FormatCost(l.cur))}, nil
+			return wire.BudgetResult{Refused: true, Reason: wire.ReasonNotAnIncrease, Message: fmt.Sprintf("%s limit is already %s", l.name, tickets.FormatCost(l.cur))}, nil
 		}
 	}
 	if req.Soft != nil {
@@ -379,18 +339,18 @@ func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (Budge
 	}
 	s.ledger.setLimits(now, soft, hard)
 	if err := s.ledger.save(now); err != nil {
-		return BudgetResult{}, err
+		return wire.BudgetResult{}, err
 	}
 	s.cancelHardGrace()
 	status := s.budgetStatus(now)
 	s.rearmBudgetNotes(status)
 	s.events.publish(EventQueueChanged, "")
 	s.kickRunner()
-	return BudgetResult{Budget: &status}, nil
+	return wire.BudgetResult{Budget: &status}, nil
 }
 
 func (s *Server) budgetIncreaseWrite(w http.ResponseWriter, r *http.Request) {
-	var req BudgetIncreaseRequest
+	var req wire.BudgetIncreaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

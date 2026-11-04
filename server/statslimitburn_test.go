@@ -9,11 +9,12 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 // limitBurnStats seeds five days of history for the Claude weekly limit (10
 // points a day) and returns a getter for /v1/stats.
-func limitBurnStats(t *testing.T) func(query string) server.Stats {
+func limitBurnStats(t *testing.T) func(query string) wire.Stats {
 	t.Helper()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	seedLimitHistory(t, h, []string{server.LimitIDClaudeWeekly}, 0)
@@ -21,13 +22,13 @@ func limitBurnStats(t *testing.T) func(query string) server.Stats {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return func(query string) server.Stats {
+	return func(query string) wire.Stats {
 		t.Helper()
 		code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/stats"+query)
 		if code != http.StatusOK {
 			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
 		}
-		var s server.Stats
+		var s wire.Stats
 		if err := json.Unmarshal([]byte(body), &s); err != nil {
 			t.Fatalf("body %q: %v", body, err)
 		}
@@ -40,7 +41,7 @@ func TestStatsLimitBurn_WeeklyCarriesSeriesHeadlineAndForecast(t *testing.T) {
 	for _, n := range []int{7, 30, 90} {
 		s := get("?range=" + strconv.Itoa(n))
 		lb := s.LimitBurn
-		for name, series := range map[string]server.StatsLimitBurn{
+		for name, series := range map[string]wire.StatsLimitBurn{
 			"claude5h": lb.Claude5h, "claudeWeekly": lb.ClaudeWeekly, "codex5h": lb.Codex5h, "codexWeekly": lb.CodexWeekly,
 		} {
 			if len(series.Days) != n {
@@ -65,7 +66,7 @@ func TestStatsLimitBurn_WeeklyCarriesSeriesHeadlineAndForecast(t *testing.T) {
 		if w.Days[0].NoData != (n > 6) {
 			t.Errorf("range %d: first day no_data = %v", n, w.Days[0].NoData)
 		}
-		if w.Forecast == nil || w.Forecast.Status != server.LimitForecastProjected || w.Forecast.Pace != 10 {
+		if w.Forecast == nil || w.Forecast.Status != wire.LimitForecastProjected || w.Forecast.Pace != 10 {
 			t.Errorf("range %d: forecast = %+v, want projected with pace 10", n, w.Forecast)
 		}
 		if lb.Claude5h.Forecast != nil || lb.Codex5h.Forecast != nil {

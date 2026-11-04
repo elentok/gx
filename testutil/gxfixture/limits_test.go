@@ -7,20 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestLimitsFixture_ShapesShowInTheSummary(t *testing.T) {
 	for _, tc := range []struct {
 		shape string
-		check func(t *testing.T, now int64, l server.LimitsReport)
+		check func(t *testing.T, now int64, l wire.LimitsReport)
 	}{
-		{"", func(t *testing.T, now int64, l server.LimitsReport) {
+		{"", func(t *testing.T, now int64, l wire.LimitsReport) {
 			if l.FiveHour == nil || l.SevenDay == nil || l.SevenDay.UsedPercentage != 81 {
 				t.Errorf("default shape is not fresh: %+v", l)
 			}
 		}},
-		{"fresh", func(t *testing.T, now int64, l server.LimitsReport) {
+		{"fresh", func(t *testing.T, now int64, l wire.LimitsReport) {
 			if l.FiveHour == nil || l.SevenDay == nil {
 				t.Fatalf("want two windows: %+v", l)
 			}
@@ -31,17 +31,17 @@ func TestLimitsFixture_ShapesShowInTheSummary(t *testing.T) {
 				t.Errorf("fresh window received %ds ago", age)
 			}
 		}},
-		{"stale", func(t *testing.T, now int64, l server.LimitsReport) {
+		{"stale", func(t *testing.T, now int64, l wire.LimitsReport) {
 			if l.FiveHour == nil || l.SevenDay == nil {
 				t.Fatalf("want two windows: %+v", l)
 			}
-			for _, w := range []*server.LimitWindow{l.FiveHour, l.SevenDay} {
+			for _, w := range []*wire.LimitWindow{l.FiveHour, l.SevenDay} {
 				if age := time.Duration(now-w.ReceivedAt) * time.Second; age < 170*time.Minute || age > 190*time.Minute {
 					t.Errorf("received %v ago, want about 3h", age)
 				}
 			}
 		}},
-		{"past-reset", func(t *testing.T, now int64, l server.LimitsReport) {
+		{"past-reset", func(t *testing.T, now int64, l wire.LimitsReport) {
 			if l.FiveHour == nil || l.FiveHour.ResetsAt >= now {
 				t.Errorf("5h reset is not in the past: %+v", l.FiveHour)
 			}
@@ -49,7 +49,7 @@ func TestLimitsFixture_ShapesShowInTheSummary(t *testing.T) {
 				t.Errorf("weekly reset is not in the future: %+v", l.SevenDay)
 			}
 		}},
-		{"one-window", func(t *testing.T, now int64, l server.LimitsReport) {
+		{"one-window", func(t *testing.T, now int64, l wire.LimitsReport) {
 			if l.FiveHour != nil || l.SevenDay == nil || l.SevenDay.UsedPercentage != 12 {
 				t.Errorf("want only a 12%% weekly window: %+v", l)
 			}
@@ -62,14 +62,14 @@ func TestLimitsFixture_ShapesShowInTheSummary(t *testing.T) {
 			}
 			r := startWith(t, "limits", nil, flags...)
 			defer r.stop(t)
-			var sum server.UsageSummary
+			var sum wire.UsageSummary
 			if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
 				t.Fatal(err)
 			}
-			if sum.Mode != server.UsageModeLimits {
+			if sum.Mode != wire.UsageModeLimits {
 				t.Errorf("mode %q, want limits", sum.Mode)
 			}
-			var report server.LimitsReport
+			var report wire.LimitsReport
 			if w := sum.Limits.FiveHour; w != nil {
 				report.FiveHour = &w.LimitWindow
 			}

@@ -23,7 +23,7 @@ import (
 // limitBurnSeed is the state of a limit-burn shape: the Claude limits file and
 // the limit history, whose file shape comes from server.limitHistoryState.
 type limitBurnSeed struct {
-	report  server.LimitsReport
+	report  wire.LimitsReport
 	samples map[string][]server.LimitSample
 	// ledger is the token ledger and the stamped tickets behind it; nil leaves
 	// both empty.
@@ -57,7 +57,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		reset := localMidnight(now).AddDate(0, 0, 4)
 		first := localMidnight(now).Add(now.Sub(localMidnight(now)) / 2)
 		return limitBurnSeed{
-			report: server.LimitsReport{SevenDay: limitWindow(now, 22, reset.Sub(now), 0)},
+			report: wire.LimitsReport{SevenDay: limitWindow(now, 22, reset.Sub(now), 0)},
 			samples: map[string][]server.LimitSample{server.LimitIDClaudeWeekly: {
 				limitSample(server.LimitIDClaudeWeekly, 15, reset, first),
 				limitSample(server.LimitIDClaudeWeekly, 22, reset, now),
@@ -71,7 +71,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		claudeReset, codexReset := m.AddDate(0, 0, 2), m.AddDate(0, 0, 3)
 		const age = 30 * time.Minute
 		return limitBurnSeed{
-			report: server.LimitsReport{SevenDay: limitWindow(now, 52, claudeReset.Sub(now), age)},
+			report: wire.LimitsReport{SevenDay: limitWindow(now, 52, claudeReset.Sub(now), age)},
 			samples: map[string][]server.LimitSample{
 				server.LimitIDClaudeWeekly: weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, age,
 					[]float64{8, 16, 24, 33, 40}, 52, []float64{50, 70}),
@@ -84,7 +84,7 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 	"past-reset": func(now time.Time) limitBurnSeed {
 		reset := now.Add(-2 * time.Hour)
 		return limitBurnSeed{
-			report: server.LimitsReport{SevenDay: limitWindow(now, 75, -2*time.Hour, 6*time.Hour)},
+			report: wire.LimitsReport{SevenDay: limitWindow(now, 75, -2*time.Hour, 6*time.Hour)},
 			samples: map[string][]server.LimitSample{server.LimitIDClaudeWeekly: {
 				limitSample(server.LimitIDClaudeWeekly, 30, reset, now.Add(-72*time.Hour)),
 				limitSample(server.LimitIDClaudeWeekly, 60, reset, now.Add(-30*time.Hour)),
@@ -111,11 +111,11 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 			ledger: statsLedger(now),
 		}
 		last := func(id string) server.LimitSample { v := s.samples[id]; return v[len(v)-1] }
-		window := func(id string) *server.LimitWindow {
+		window := func(id string) *wire.LimitWindow {
 			l := last(id)
-			return &server.LimitWindow{UsedPercentage: l.UsedPercentage, ResetsAt: l.ResetsAt, ReceivedAt: l.ReceivedAt}
+			return &wire.LimitWindow{UsedPercentage: l.UsedPercentage, ResetsAt: l.ResetsAt, ReceivedAt: l.ReceivedAt}
 		}
-		s.report = server.LimitsReport{FiveHour: window(server.LimitIDClaude5h), SevenDay: window(server.LimitIDClaudeWeekly)}
+		s.report = wire.LimitsReport{FiveHour: window(server.LimitIDClaude5h), SevenDay: window(server.LimitIDClaudeWeekly)}
 		return s
 	},
 }
@@ -125,7 +125,7 @@ func menuSeed(now time.Time) limitBurnSeed {
 	claudeReset := m.AddDate(0, 0, 2)
 	codexReset := m.AddDate(0, 0, 3)
 	s := limitBurnSeed{
-		report: server.LimitsReport{
+		report: wire.LimitsReport{
 			FiveHour: limitWindow(now, 34, 2*time.Hour+10*time.Minute, 0),
 			SevenDay: limitWindow(now, 81, claudeReset.Sub(now), 0),
 		},

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // syncBuilder lets a server handler look at the output while the command runs.
@@ -38,7 +39,7 @@ func (b *syncBuilder) String() string {
 // reportServer is a unix-socket HTTP server that records /v1/usage/report calls.
 type reportServer struct {
 	mu       sync.Mutex
-	reports  []server.LimitsReport
+	reports  []wire.LimitsReport
 	lineSeen []bool
 	out      *syncBuilder
 }
@@ -56,7 +57,7 @@ func startReportServer(t *testing.T, out *syncBuilder, handle func(w http.Respon
 	}
 	rs := &reportServer{out: out}
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var rep server.LimitsReport
+		var rep wire.LimitsReport
 		_ = json.NewDecoder(r.Body).Decode(&rep)
 		rs.mu.Lock()
 		rs.reports = append(rs.reports, rep)

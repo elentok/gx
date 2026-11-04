@@ -3,56 +3,14 @@ package server
 import (
 	"net/http"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 )
-
-// Usage modes: limits once the limits store holds any window, else spending.
-// The store never expires a window, so the mode never goes back.
-const (
-	UsageModeLimits   = "limits"
-	UsageModeSpending = "spending"
-)
-
-// UsageSpend is the spend block of the usage summary, in dollars. A *Short
-// flag is set when the ledger starts after that window's start day, so the
-// client writes "since <FirstDay>". FirstDay is omitted for an empty ledger.
-type UsageSpend struct {
-	Today            float64 `json:"today"`
-	SinceSunday      float64 `json:"since_sunday"`
-	SinceSundayShort bool    `json:"since_sunday_short,omitempty"`
-	SinceFirst       float64 `json:"since_first"`
-	SinceFirstShort  bool    `json:"since_first_short,omitempty"`
-	FirstDay         string  `json:"first_day,omitempty"`
-}
-
-// UsageLimitWindow is a limit window as the menu shows it. Chip and Forecast
-// are set on weekly limits only; Chip is absent until a full day of history
-// exists.
-type UsageLimitWindow struct {
-	LimitWindow `tstype:",extends"`
-	Chip        *LimitBurnChip `json:"chip,omitempty"`
-	Forecast    *LimitForecast `json:"forecast,omitempty"`
-}
-
-// UsageLimits is the 5-hour and weekly window of one provider.
-type UsageLimits struct {
-	FiveHour *UsageLimitWindow `json:"five_hour,omitempty"`
-	SevenDay *UsageLimitWindow `json:"seven_day,omitempty"`
-}
-
-// UsageSummary is the one read the web menu fetches. The spend block is always
-// filled; the client picks the block to show by Mode. Codex is set only once
-// the history holds a Codex sample.
-type UsageSummary struct {
-	Mode   string       `json:"mode"`
-	Limits UsageLimits  `json:"limits"`
-	Codex  *UsageLimits `json:"codex,omitempty"`
-	Spend  UsageSpend   `json:"spend"`
-}
 
 // usageLimitWindow builds a row from a window and, for a weekly limit, the
 // history of limit id.
-func (s *Server) usageLimitWindow(w LimitWindow, id string, weekly bool, now time.Time) *UsageLimitWindow {
-	row := &UsageLimitWindow{LimitWindow: w}
+func (s *Server) usageLimitWindow(w wire.LimitWindow, id string, weekly bool, now time.Time) *wire.UsageLimitWindow {
+	row := &wire.UsageLimitWindow{LimitWindow: w}
 	if !weekly {
 		return row
 	}
@@ -67,12 +25,12 @@ func (s *Server) usageLimitWindow(w LimitWindow, id string, weekly bool, now tim
 	return row
 }
 
-func (s *Server) codexSummary(now time.Time) *UsageLimits {
-	var out UsageLimits
+func (s *Server) codexSummary(now time.Time) *wire.UsageLimits {
+	var out wire.UsageLimits
 	for _, c := range []struct {
 		id     string
 		weekly bool
-		dst    **UsageLimitWindow
+		dst    **wire.UsageLimitWindow
 	}{
 		{LimitIDCodex5h, false, &out.FiveHour},
 		{LimitIDCodexWeekly, true, &out.SevenDay},
@@ -81,7 +39,7 @@ func (s *Server) codexSummary(now time.Time) *UsageLimits {
 		if !ok {
 			continue
 		}
-		w := LimitWindow{UsedPercentage: latest.UsedPercentage, ResetsAt: latest.ResetsAt, ReceivedAt: latest.ReceivedAt}
+		w := wire.LimitWindow{UsedPercentage: latest.UsedPercentage, ResetsAt: latest.ResetsAt, ReceivedAt: latest.ReceivedAt}
 		*c.dst = s.usageLimitWindow(w, c.id, c.weekly, now)
 	}
 	if out.FiveHour == nil && out.SevenDay == nil {
@@ -92,12 +50,12 @@ func (s *Server) codexSummary(now time.Time) *UsageLimits {
 
 func (s *Server) usageSummaryRead(w http.ResponseWriter, _ *http.Request) {
 	limits := s.limits.read()
-	mode := UsageModeSpending
+	mode := wire.UsageModeSpending
 	if limits.FiveHour != nil || limits.SevenDay != nil {
-		mode = UsageModeLimits
+		mode = wire.UsageModeLimits
 	}
 	now := time.Now()
-	var claude UsageLimits
+	var claude wire.UsageLimits
 	if limits.FiveHour != nil {
 		claude.FiveHour = s.usageLimitWindow(*limits.FiveHour, LimitIDClaude5h, false, now)
 	}
@@ -105,11 +63,11 @@ func (s *Server) usageSummaryRead(w http.ResponseWriter, _ *http.Request) {
 		claude.SevenDay = s.usageLimitWindow(*limits.SevenDay, LimitIDClaudeWeekly, true, now)
 	}
 	sw := computeSpendWindows(now, s.ledger.daysCopy())
-	writeJSON(w, UsageSummary{
+	writeJSON(w, wire.UsageSummary{
 		Mode:   mode,
 		Limits: claude,
 		Codex:  s.codexSummary(now),
-		Spend: UsageSpend{
+		Spend: wire.UsageSpend{
 			Today:            sw.Today.Total,
 			SinceSunday:      sw.Week.Total,
 			SinceSundayShort: sw.Week.Short,

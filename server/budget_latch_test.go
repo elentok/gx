@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func startLatchServer(t *testing.T) *servertest.Harness {
@@ -67,7 +68,7 @@ func TestBudgetOverride_RefusesWhenNothingLatched(t *testing.T) {
 	t.Parallel()
 	h := startLatchServer(t)
 	res, err := h.Client.BudgetOverride(context.Background())
-	if err != nil || !res.Refused || res.Reason != server.ReasonNothingLatched {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNothingLatched {
 		t.Fatalf("override = %+v, %v; want nothing-latched refusal", res, err)
 	}
 }
@@ -113,7 +114,7 @@ func TestBudgetIncrease_LiftsLatchWithoutMovingOverride(t *testing.T) {
 		t.Fatal("not latched")
 	}
 	soft := 10.0
-	res, err := h.Client.BudgetIncrease(context.Background(), server.BudgetIncreaseRequest{Soft: &soft})
+	res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
 	if err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
@@ -132,7 +133,7 @@ func TestBudgetIncrease_KeepsLatchWhenStillReached(t *testing.T) {
 	h := startLatchServer(t)
 	h.Server.RecordSpend("spent", 9)
 	soft := 8.0
-	res, err := h.Client.BudgetIncrease(context.Background(), server.BudgetIncreaseRequest{Soft: &soft})
+	res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
 	if err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
@@ -148,7 +149,7 @@ func TestBudgetIncrease_SoftPastHardRaisesHard(t *testing.T) {
 		c.BudgetPollInterval = time.Hour
 	})
 	soft := 9.0
-	res, err := h.Client.BudgetIncrease(context.Background(), server.BudgetIncreaseRequest{Soft: &soft})
+	res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
 	if err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
@@ -162,13 +163,13 @@ func TestBudgetIncrease_RefusesLowerOrOffLimit(t *testing.T) {
 	h := startLatchServer(t)
 	ctx := context.Background()
 	lower, some := 4.0, 100.0
-	for name, req := range map[string]server.BudgetIncreaseRequest{
+	for name, req := range map[string]wire.BudgetIncreaseRequest{
 		"lower soft": {Soft: &lower},
 		"off hard":   {Hard: &some},
 		"empty":      {},
 	} {
 		res, err := h.Client.BudgetIncrease(ctx, req)
-		if err != nil || !res.Refused || res.Reason != server.ReasonNotAnIncrease {
+		if err != nil || !res.Refused || res.Reason != wire.ReasonNotAnIncrease {
 			t.Errorf("%s: %+v, %v; want not-an-increase refusal", name, res, err)
 		}
 	}

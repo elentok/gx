@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -82,8 +83,8 @@ func TestUsageGate_CodexSampleHoldsCodexClaimsOnlyAndItsOverrideLiftsThem(t *tes
 		t.Fatalf("codex ticket got %d prompts while gated", n)
 	}
 
-	if res, err := h.Client.UsageOverride(ctx, "claude"); err != nil || !res.Refused || res.Reason != server.ReasonNotGated {
-		t.Errorf("claude override = %+v, %v; want refused %s", res, err, server.ReasonNotGated)
+	if res, err := h.Client.UsageOverride(ctx, "claude"); err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
+		t.Errorf("claude override = %+v, %v; want refused %s", res, err, wire.ReasonNotGated)
 	}
 	if res, err := h.Client.UsageOverride(ctx, "no-such"); err == nil {
 		t.Errorf("unknown harness override = %+v, want an error", res)

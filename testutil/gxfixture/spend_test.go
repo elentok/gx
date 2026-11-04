@@ -8,21 +8,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestSpendFixture_ShapesShowInTheSummary(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 	for _, tc := range []struct {
 		shape string
-		check func(t *testing.T, s server.UsageSpend)
+		check func(t *testing.T, s wire.UsageSpend)
 	}{
-		{"", func(t *testing.T, s server.UsageSpend) {
+		{"", func(t *testing.T, s wire.UsageSpend) {
 			if s.Today != 4.82 || s.SinceSunday < s.Today || s.SinceFirst < s.SinceSunday {
 				t.Errorf("default shape is not normal: %+v", s)
 			}
 		}},
-		{"normal", func(t *testing.T, s server.UsageSpend) {
+		{"normal", func(t *testing.T, s wire.UsageSpend) {
 			if s.Today != 4.82 || s.SinceSunday < s.Today || s.SinceFirst < s.SinceSunday {
 				t.Errorf("windows do not nest: %+v", s)
 			}
@@ -30,12 +30,12 @@ func TestSpendFixture_ShapesShowInTheSummary(t *testing.T) {
 				t.Errorf("a window is short: %+v", s)
 			}
 		}},
-		{"short", func(t *testing.T, s server.UsageSpend) {
+		{"short", func(t *testing.T, s wire.UsageSpend) {
 			if s.FirstDay != today || s.Today != 4.82 {
 				t.Errorf("want first day %s and 4.82 today: %+v", today, s)
 			}
 		}},
-		{"empty", func(t *testing.T, s server.UsageSpend) {
+		{"empty", func(t *testing.T, s wire.UsageSpend) {
 			if s.Today != 0 || s.SinceSunday != 0 || s.SinceFirst != 0 || s.FirstDay != "" {
 				t.Errorf("want an empty ledger: %+v", s)
 			}
@@ -48,11 +48,11 @@ func TestSpendFixture_ShapesShowInTheSummary(t *testing.T) {
 			}
 			r := startWith(t, "spend", nil, flags...)
 			defer r.stop(t)
-			var sum server.UsageSummary
+			var sum wire.UsageSummary
 			if err := json.Unmarshal([]byte(r.gx(t, "usage", "summary", "--json")), &sum); err != nil {
 				t.Fatal(err)
 			}
-			if sum.Mode != server.UsageModeSpending {
+			if sum.Mode != wire.UsageModeSpending {
 				t.Errorf("mode %q, want spending", sum.Mode)
 			}
 			tc.check(t, sum.Spend)
@@ -67,7 +67,7 @@ func TestSpendFixture_AppendedUsageRaisesTodaysTotal(t *testing.T) {
 		t.Fatal("no agent_transcript in the output")
 	}
 	total := func() float64 {
-		var b server.BudgetStatus
+		var b wire.BudgetStatus
 		if err := json.Unmarshal([]byte(r.gx(t, "budget", "status", "--json")), &b); err != nil {
 			t.Fatal(err)
 		}

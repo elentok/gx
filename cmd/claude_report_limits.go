@@ -10,20 +10,21 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // limitsReportFromPayload extracts the two windows from a statusline payload.
 // ok is false when the payload has no usable window, so nothing is sent.
-func limitsReportFromPayload(payload []byte) (report server.LimitsReport, ok bool, err error) {
+func limitsReportFromPayload(payload []byte) (report wire.LimitsReport, ok bool, err error) {
 	rl, err := parseStatuslineRateLimits(payload)
 	if err != nil || rl == nil {
 		return report, false, err
 	}
 	if w := rl.FiveHour; w != nil {
-		report.FiveHour = &server.LimitWindow{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt}
+		report.FiveHour = &wire.LimitWindow{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt}
 	}
 	if w := rl.SevenDay; w != nil {
-		report.SevenDay = &server.LimitWindow{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt}
+		report.SevenDay = &wire.LimitWindow{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt}
 	}
 	return report, report.FiveHour != nil || report.SevenDay != nil, nil
 }

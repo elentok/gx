@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 )
 
 // historyRig runs a report through the real merge, then the history.
@@ -17,7 +19,7 @@ func newHistoryRig(t *testing.T, dir string) *historyRig {
 	return &historyRig{t: t, l: openLimitsStore(dir), h: openLimitHistory(dir)}
 }
 
-func (r *historyRig) report(rep LimitsReport, now int64) {
+func (r *historyRig) report(rep wire.LimitsReport, now int64) {
 	r.t.Helper()
 	res, err := r.l.apply(rep, now)
 	if err != nil {
@@ -28,8 +30,8 @@ func (r *historyRig) report(rep LimitsReport, now int64) {
 	}
 }
 
-func five(pct float64, reset int64) LimitsReport {
-	return LimitsReport{FiveHour: &LimitWindow{UsedPercentage: pct, ResetsAt: reset}}
+func five(pct float64, reset int64) wire.LimitsReport {
+	return wire.LimitsReport{FiveHour: &wire.LimitWindow{UsedPercentage: pct, ResetsAt: reset}}
 }
 
 func TestLimitHistory_FileSitsBesideLimitsAndStaleCheckReadsLimitsOnly(t *testing.T) {
@@ -44,8 +46,8 @@ func TestLimitHistory_FileSitsBesideLimitsAndStaleCheckReadsLimitsOnly(t *testin
 	if _, err := r.l.apply(five(10, 5000), old); err != nil {
 		t.Fatal(err)
 	}
-	fresh := old + 10*LimitsStaleAfterSeconds
-	if err := r.h.recordClaude(five(10, 5000), LimitsApplyResult{FiveHour: &LimitResult{Outcome: LimitChanged}}, fresh); err != nil {
+	fresh := old + 10*wire.LimitsStaleAfterSeconds
+	if err := r.h.recordClaude(five(10, 5000), wire.LimitsApplyResult{FiveHour: &wire.LimitResult{Outcome: wire.LimitChanged}}, fresh); err != nil {
 		t.Fatal(err)
 	}
 	res, err := r.l.apply(five(10, 5000), fresh+1)
@@ -116,7 +118,7 @@ func TestLimitHistory_DroppedWindowSavesNothing(t *testing.T) {
 
 func TestLimitHistory_WeeklyHasItsOwnID(t *testing.T) {
 	r := newHistoryRig(t, t.TempDir())
-	r.report(LimitsReport{SevenDay: &LimitWindow{UsedPercentage: 5, ResetsAt: 7000}}, 1000)
+	r.report(wire.LimitsReport{SevenDay: &wire.LimitWindow{UsedPercentage: 5, ResetsAt: 7000}}, 1000)
 	if n := len(r.h.Samples(LimitIDClaudeWeekly)); n != 1 {
 		t.Errorf("weekly samples = %d, want 1", n)
 	}

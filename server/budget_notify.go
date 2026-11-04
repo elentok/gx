@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -53,11 +54,11 @@ func (b *budgetNotes) markHard() {
 
 func (s *Server) seedBudgetNotes(now time.Time) {
 	st := s.budgetStatus(now)
-	s.budgetNotes.seed(st.Day, st.spent(), st.SoftLimit, st.HardLimit)
+	s.budgetNotes.seed(st.Day, budgetSpent(st), st.SoftLimit, st.HardLimit)
 }
 
-func (s *Server) rearmBudgetNotes(st BudgetStatus) {
-	s.budgetNotes.rearm(st.spent(), st.SoftLimit, st.HardLimit)
+func (s *Server) rearmBudgetNotes(st wire.BudgetStatus) {
+	s.budgetNotes.rearm(budgetSpent(st), st.SoftLimit, st.HardLimit)
 }
 
 // notifyBudget sends the day's summary when the budget day rolls over, then a
@@ -70,7 +71,7 @@ func (s *Server) notifyBudget(now time.Time) {
 	if st.Day != prevDay {
 		b.day, b.soft, b.hard = st.Day, false, false
 	}
-	spent := st.spent()
+	spent := budgetSpent(st)
 	softNow := !b.soft && st.SoftLimit > 0 && spent >= st.SoftLimit
 	// The latch, not the limit: a hard limit held after a reload has stopped nothing.
 	hardNow := !b.hard && st.HardLatched

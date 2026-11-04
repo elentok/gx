@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
 )
@@ -167,7 +168,7 @@ func (s *Server) TokenTranscriptPath(address string) (string, bool) {
 func (s *Server) PollBudget() { s.pollBudget(time.Now()) }
 
 // BudgetStatusAt is the budget status as of now.
-func (s *Server) BudgetStatusAt(now time.Time) BudgetStatus { return s.budgetStatus(now) }
+func (s *Server) BudgetStatusAt(now time.Time) wire.BudgetStatus { return s.budgetStatus(now) }
 
 // HardStopAt is the config status's grace countdown deadline.
 func (s *Server) HardStopAt() time.Time { return s.configStatus().HardStopAt }

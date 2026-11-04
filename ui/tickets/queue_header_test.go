@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -203,7 +204,7 @@ func TestQueueHeaderCostSuffixFormats(t *testing.T) {
 	}
 
 	withBudget := budgetOff
-	withBudget.serverBudget = server.BudgetStatus{Total: 50, SoftLimit: 100}
+	withBudget.serverBudget = wire.BudgetStatus{Total: 50, SoftLimit: 100}
 	if got, want := withBudget.queueHeaderCostSuffix(), "today $50.00 of $100.00"; got != want {
 		t.Fatalf("soft limit set: queueHeaderCostSuffix() = %q, want %q", got, want)
 	}

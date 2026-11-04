@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ func newServerStatsCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.Stats, error) {
+				func(ctx context.Context, cl *apiclient.Client) (wire.Stats, error) {
 					return cl.Stats(ctx, days, project)
 				},
 				printStats)
@@ -33,7 +33,7 @@ func newServerStatsCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func printStats(w io.Writer, s server.Stats) error {
+func printStats(w io.Writer, s wire.Stats) error {
 	if _, err := fmt.Fprintln(w, "date\ttickets_merged\tepics_merged\tdesigns_completed"); err != nil {
 		return err
 	}

@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -21,15 +21,15 @@ func TestRunUsageOverride_RefusesWhenNothingGates(t *testing.T) {
 	c.SetOut(&out)
 
 	err := runUsageOverride(dial, c, "", false)
-	if err == nil || !strings.Contains(err.Error(), server.ReasonNotGated) {
-		t.Fatalf("err = %v, want a %s refusal", err, server.ReasonNotGated)
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonNotGated) {
+		t.Fatalf("err = %v, want a %s refusal", err, wire.ReasonNotGated)
 	}
 
 	out.Reset()
 	if err := runUsageOverride(dial, c, "", true); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), `"reason": "`+server.ReasonNotGated+`"`) && !strings.Contains(out.String(), `"reason":"`+server.ReasonNotGated+`"`) {
+	if !strings.Contains(out.String(), `"reason": "`+wire.ReasonNotGated+`"`) && !strings.Contains(out.String(), `"reason":"`+wire.ReasonNotGated+`"`) {
 		t.Errorf("json output %q lacks the refusal reason", out.String())
 	}
 }

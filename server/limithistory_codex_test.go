@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -34,7 +35,7 @@ func limitsEventsSince(t *testing.T, s *Server, seq uint64) int {
 	for {
 		select {
 		case ev := <-ch:
-			if ev.Type == EventLimitsChanged {
+			if ev.Type == wire.EventLimitsChanged {
 				n++
 			}
 		default:

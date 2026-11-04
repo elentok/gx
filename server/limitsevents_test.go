@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 const limitsEventInterval = 50 * time.Millisecond
@@ -42,7 +43,7 @@ func limitsEvents(ch <-chan server.Event) int {
 	for {
 		select {
 		case ev := <-ch:
-			if ev.Type == server.EventLimitsChanged {
+			if ev.Type == wire.EventLimitsChanged {
 				n++
 			}
 		case <-time.After(10 * limitsEventInterval):
@@ -61,30 +62,30 @@ func wantLimitsEvents(t *testing.T, ch <-chan server.Event, want int) {
 func TestLimitsEvent_FirstReportPublishesOne(t *testing.T) {
 	h := limitsEventHarness(t)
 	ch := limitsEventStream(t, h)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 1)
 }
 
 func TestLimitsEvent_ChangedPercentagePublishes(t *testing.T) {
 	h := limitsEventHarness(t)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	ch := limitsEventStream(t, h)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 1)
 }
 
 func TestLimitsEvent_FractionOnlyChangePublishesNothing(t *testing.T) {
 	h := limitsEventHarness(t)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34.1, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34.1, 4_000_000_000)})
 	ch := limitsEventStream(t, h)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34.3, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34.3, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 0)
 }
 
 func TestLimitsEvent_ConfirmOfStaleWindowPublishes(t *testing.T) {
 	h := limitsEventHarness(t)
-	old := time.Now().Unix() - 2*server.LimitsStaleAfterSeconds
-	seed := server.LimitsReport{FiveHour: &server.LimitWindow{UsedPercentage: 34, ResetsAt: 4_000_000_000, ReceivedAt: old}}
+	old := time.Now().Unix() - 2*wire.LimitsStaleAfterSeconds
+	seed := wire.LimitsReport{FiveHour: &wire.LimitWindow{UsedPercentage: 34, ResetsAt: 4_000_000_000, ReceivedAt: old}}
 	data, err := json.Marshal(seed)
 	if err != nil {
 		t.Fatal(err)
@@ -94,38 +95,38 @@ func TestLimitsEvent_ConfirmOfStaleWindowPublishes(t *testing.T) {
 	}
 	h.Restart(t)
 	ch := limitsEventStream(t, h)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 1)
 }
 
 func TestLimitsEvent_ConfirmOfFreshWindowPublishesNothing(t *testing.T) {
 	h := limitsEventHarness(t)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	ch := limitsEventStream(t, h)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(34, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 0)
 }
 
 func TestLimitsEvent_DroppedReportPublishesNothing(t *testing.T) {
 	h := limitsEventHarness(t)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(50, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(50, 4_000_000_000)})
 	ch := limitsEventStream(t, h)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(40, 4_000_000_000)})
 	wantLimitsEvents(t, ch, 0)
 }
 
 func TestLimitsEvent_BurstCoalescesAndTrailingPublishShowsLastValue(t *testing.T) {
 	h := limitsEventHarness(t)
-	sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(1, 4_000_000_000)})
+	sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(1, 4_000_000_000)})
 	ch := limitsEventStream(t, h)
 	for pct := 2; pct <= 21; pct++ {
-		sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(float64(pct), 4_000_000_000)})
+		sendLimits(t, h, wire.LimitsReport{FiveHour: limitWin(float64(pct), 4_000_000_000)})
 	}
 	got := limitsEvents(ch)
 	if got < 1 || got >= 20 {
 		t.Fatalf("limits-changed events = %d, want at least a trailing one and far fewer than 20", got)
 	}
-	res := sendLimits(t, h, server.LimitsReport{})
+	res := sendLimits(t, h, wire.LimitsReport{})
 	if res.FiveHour == nil || res.FiveHour.UsedPercentage != 21 {
 		t.Fatalf("stored = %+v, want 21", res.FiveHour)
 	}

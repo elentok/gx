@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
@@ -22,7 +23,7 @@ type serverDoneMsg struct {
 // serverPauseStateMsg carries the budget the "p" key reads before deciding
 // which of override, pause or resume to offer.
 type serverPauseStateMsg struct {
-	budget server.BudgetStatus
+	budget wire.BudgetStatus
 	err    error
 }
 
@@ -45,7 +46,7 @@ const (
 
 // serverPauseActionFor is the three states of "p": a latched budget wins
 // (override), else a paused queue resumes, else it pauses.
-func serverPauseActionFor(b server.BudgetStatus, paused bool) serverPauseAction {
+func serverPauseActionFor(b wire.BudgetStatus, paused bool) serverPauseAction {
 	switch {
 	case b.BudgetPaused || b.HardLatched:
 		return serverActionOverride
@@ -139,7 +140,7 @@ func (m QueueModel) handleServerPauseKey() (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m QueueModel) openServerPauseConfirm(b server.BudgetStatus) QueueModel {
+func (m QueueModel) openServerPauseConfirm(b wire.BudgetStatus) QueueModel {
 	api := m.serverAPI
 	var prompt string
 	var accept tea.Cmd

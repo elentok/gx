@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
@@ -230,7 +231,7 @@ func TestHardLimitGrace_BudgetIncreaseCancels(t *testing.T) {
 	f.expectHeld(t)
 
 	hard := 30.0
-	if res, err := f.h.Client.BudgetIncrease(f.ctx, server.BudgetIncreaseRequest{Hard: &hard}); err != nil || res.Refused {
+	if res, err := f.h.Client.BudgetIncrease(f.ctx, wire.BudgetIncreaseRequest{Hard: &hard}); err != nil || res.Refused {
 		t.Fatalf("increase = %+v, %v", res, err)
 	}
 	f.expectCancelled(t)

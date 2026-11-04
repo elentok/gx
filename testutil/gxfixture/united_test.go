@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // cardsOf is `gx server epics --json`.
@@ -191,7 +192,7 @@ func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
 		{[]string{"--range", "7", "--project", "other"}, 200, 4},
 	}
 	for _, tt := range tests {
-		var st server.Stats
+		var st wire.Stats
 		if err := json.Unmarshal([]byte(r.gx(t, append([]string{"server", "stats", "--json"}, tt.args...)...)), &st); err != nil {
 			t.Fatal(err)
 		}
@@ -206,7 +207,7 @@ func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
 	}
 
 	// 30 days: index 0 is 29 days ago. Days 29..26 ago precede the earliest count.
-	var st server.Stats
+	var st wire.Stats
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "stats", "--json", "--range", "30")), &st); err != nil {
 		t.Fatal(err)
 	}

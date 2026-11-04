@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 // Projects returns every project in the server's ticket store with its state.
@@ -53,15 +54,15 @@ func (c *Client) Locks(ctx context.Context) ([]server.LockInfo, error) {
 }
 
 // Budget returns today's spend and the configured limits.
-func (c *Client) Budget(ctx context.Context) (server.BudgetStatus, error) {
-	var b server.BudgetStatus
+func (c *Client) Budget(ctx context.Context) (wire.BudgetStatus, error) {
+	var b wire.BudgetStatus
 	err := c.get(ctx, "/v1/budget", &b)
 	return b, err
 }
 
 // UsageSummary returns the usage mode, the stored limit windows and the spend totals.
-func (c *Client) UsageSummary(ctx context.Context) (server.UsageSummary, error) {
-	var u server.UsageSummary
+func (c *Client) UsageSummary(ctx context.Context) (wire.UsageSummary, error) {
+	var u wire.UsageSummary
 	err := c.get(ctx, "/v1/usage/summary", &u)
 	return u, err
 }
@@ -103,7 +104,7 @@ func (c *Client) EpicDetail(ctx context.Context, address string) (server.EpicDet
 
 // Stats returns the per-day stats for one range in days (0 is the server's
 // default) and one project (empty means all).
-func (c *Client) Stats(ctx context.Context, days int, project string) (server.Stats, error) {
+func (c *Client) Stats(ctx context.Context, days int, project string) (wire.Stats, error) {
 	q := url.Values{}
 	if days > 0 {
 		q.Set("range", strconv.Itoa(days))
@@ -111,7 +112,7 @@ func (c *Client) Stats(ctx context.Context, days int, project string) (server.St
 	if project != "" {
 		q.Set("project", project)
 	}
-	var s server.Stats
+	var s wire.Stats
 	err := c.get(ctx, "/v1/stats?"+q.Encode(), &s)
 	return s, err
 }

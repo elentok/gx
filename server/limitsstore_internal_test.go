@@ -4,39 +4,45 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 )
 
-func lw(pct float64, reset, received int64) *LimitWindow {
-	return &LimitWindow{UsedPercentage: pct, ResetsAt: reset, ReceivedAt: received}
+func lw(pct float64, reset, received int64) *wire.LimitWindow {
+	return &wire.LimitWindow{UsedPercentage: pct, ResetsAt: reset, ReceivedAt: received}
+}
+
+func win(pct float64, reset, received int64) wire.LimitWindow {
+	return *lw(pct, reset, received)
 }
 
 func TestLimitsStoreMergeBranches(t *testing.T) {
 	const now = 1000
 	tests := []struct {
 		name     string
-		stored   *LimitWindow
-		in       *LimitWindow
-		outcome  LimitOutcome
-		want     LimitWindow
+		stored   *wire.LimitWindow
+		in       *wire.LimitWindow
+		outcome  wire.LimitOutcome
+		want     wire.LimitWindow
 		prev     int64
 		wantFile bool
 	}{
-		{"no stored", nil, lw(10, 2000, 0), LimitNew, LimitWindow{10, 2000, now}, 0, true},
-		{"same reset higher", lw(10, 2000, 500), lw(30, 2000, 0), LimitChanged, LimitWindow{30, 2000, now}, 500, true},
-		{"same reset higher same rounded", lw(10.2, 2000, 500), lw(10.4, 2000, 0), LimitConfirmed, LimitWindow{10.4, 2000, now}, 500, true},
-		{"same reset equal", lw(10, 2000, 500), lw(10, 2000, 0), LimitConfirmed, LimitWindow{10, 2000, now}, 500, true},
-		{"same reset lower", lw(30, 2000, 500), lw(10, 2000, 0), LimitDropped, LimitWindow{30, 2000, 500}, 500, false},
-		{"earlier reset stored future", lw(30, 2000, 500), lw(90, 1500, 0), LimitDropped, LimitWindow{30, 2000, 500}, 500, false},
-		{"earlier reset stored past", lw(30, 900, 500), lw(5, 800, 0), LimitChanged, LimitWindow{5, 800, now}, 500, true},
-		{"later reset lower pct", lw(30, 2000, 500), lw(5, 3000, 0), LimitChanged, LimitWindow{5, 3000, now}, 500, true},
-		{"stored at reset", lw(30, 1000, 500), lw(5, 1500, 0), LimitChanged, LimitWindow{5, 1500, now}, 500, true},
+		{"no stored", nil, lw(10, 2000, 0), wire.LimitNew, win(10, 2000, now), 0, true},
+		{"same reset higher", lw(10, 2000, 500), lw(30, 2000, 0), wire.LimitChanged, win(30, 2000, now), 500, true},
+		{"same reset higher same rounded", lw(10.2, 2000, 500), lw(10.4, 2000, 0), wire.LimitConfirmed, win(10.4, 2000, now), 500, true},
+		{"same reset equal", lw(10, 2000, 500), lw(10, 2000, 0), wire.LimitConfirmed, win(10, 2000, now), 500, true},
+		{"same reset lower", lw(30, 2000, 500), lw(10, 2000, 0), wire.LimitDropped, win(30, 2000, 500), 500, false},
+		{"earlier reset stored future", lw(30, 2000, 500), lw(90, 1500, 0), wire.LimitDropped, win(30, 2000, 500), 500, false},
+		{"earlier reset stored past", lw(30, 900, 500), lw(5, 800, 0), wire.LimitChanged, win(5, 800, now), 500, true},
+		{"later reset lower pct", lw(30, 2000, 500), lw(5, 3000, 0), wire.LimitChanged, win(5, 3000, now), 500, true},
+		{"stored at reset", lw(30, 1000, 500), lw(5, 1500, 0), wire.LimitChanged, win(5, 1500, now), 500, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			s := openLimitsStore(dir)
 			s.state.FiveHour = tc.stored
-			res, err := s.apply(LimitsReport{FiveHour: tc.in}, now)
+			res, err := s.apply(wire.LimitsReport{FiveHour: tc.in}, now)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -59,12 +65,12 @@ func TestLimitsStoreMergeBranches(t *testing.T) {
 
 func TestLimitsStoreWindowsMergeIndependently(t *testing.T) {
 	s := openLimitsStore(t.TempDir())
-	s.state = LimitsReport{FiveHour: lw(50, 2000, 500), SevenDay: lw(10, 9000, 500)}
-	res, err := s.apply(LimitsReport{FiveHour: lw(20, 2000, 0), SevenDay: lw(20, 9000, 0)}, 1000)
+	s.state = wire.LimitsReport{FiveHour: lw(50, 2000, 500), SevenDay: lw(10, 9000, 500)}
+	res, err := s.apply(wire.LimitsReport{FiveHour: lw(20, 2000, 0), SevenDay: lw(20, 9000, 0)}, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.FiveHour.Outcome != LimitDropped || res.SevenDay.Outcome != LimitChanged {
+	if res.FiveHour.Outcome != wire.LimitDropped || res.SevenDay.Outcome != wire.LimitChanged {
 		t.Fatalf("result = %+v %+v", res.FiveHour, res.SevenDay)
 	}
 	got := s.read()
@@ -76,7 +82,7 @@ func TestLimitsStoreWindowsMergeIndependently(t *testing.T) {
 func TestLimitsStoreEmptyReportWritesNothing(t *testing.T) {
 	dir := t.TempDir()
 	s := openLimitsStore(dir)
-	res, err := s.apply(LimitsReport{}, 1000)
+	res, err := s.apply(wire.LimitsReport{}, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +97,7 @@ func TestLimitsStoreEmptyReportWritesNothing(t *testing.T) {
 func TestLimitsStorePersistsAcrossOpen(t *testing.T) {
 	dir := t.TempDir()
 	s := openLimitsStore(dir)
-	if _, err := s.apply(LimitsReport{FiveHour: lw(34, 2000, 0), SevenDay: lw(60, 9000, 0)}, 1000); err != nil {
+	if _, err := s.apply(wire.LimitsReport{FiveHour: lw(34, 2000, 0), SevenDay: lw(60, 9000, 0)}, 1000); err != nil {
 		t.Fatal(err)
 	}
 	got := openLimitsStore(dir).read()

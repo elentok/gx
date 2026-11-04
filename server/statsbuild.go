@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -62,17 +63,17 @@ func emptyCounts(n int) []map[string]int {
 }
 
 // newStats is an all-zero payload with one point per day in every series.
-func newStats(n int) Stats {
+func newStats(n int) wire.Stats {
 	ints := func() []int { return make([]int, n) }
-	return Stats{
+	return wire.Stats{
 		Range: n,
-		Throughput: StatsThroughput{
+		Throughput: wire.StatsThroughput{
 			TicketsMerged: ints(), EpicsMerged: ints(), DesignsCompleted: ints(),
 			LinesAdded: ints(), LinesRemoved: ints(),
 			FollowUpsCreated: ints(), FollowUpsFinished: ints(),
 			WaitingForDesign: ints(),
 		},
-		Friction: StatsFriction{
+		Friction: wire.StatsFriction{
 			PauseReasons:   []string{},
 			PausesByReason: emptyCounts(n), RunEvents: emptyCounts(n), PauseEndings: emptyCounts(n),
 		},
@@ -81,7 +82,7 @@ func newStats(n int) Stats {
 	}
 }
 
-func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time, led costLedger) Stats {
+func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time, led costLedger) wire.Stats {
 	win := newStatsWindow(n, now)
 	out := newStats(n)
 	out.Project, out.Days = project, win.labels()
@@ -109,7 +110,7 @@ func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time, l
 // statsBuilder sums every series while the epics are walked once.
 type statsBuilder struct {
 	win      statsWindow
-	tp       *StatsThroughput
+	tp       *wire.StatsThroughput
 	design   costSeries
 	impl     costSeries
 	friction frictionTally
@@ -226,8 +227,8 @@ func (c costSeries) addMapRemainder(win statsWindow, e tickets.Epic) {
 
 // amounts returns the tokens and spend series. Stamps are all or nothing, so
 // both share the same "no data" days.
-func (c costSeries) amounts() (tokens, spend []StatsAmount) {
-	tokens, spend = make([]StatsAmount, len(c)), make([]StatsAmount, len(c))
+func (c costSeries) amounts() (tokens, spend []wire.StatsAmount) {
+	tokens, spend = make([]wire.StatsAmount, len(c)), make([]wire.StatsAmount, len(c))
 	for i, d := range c {
 		if d.finished && !d.stamped {
 			tokens[i].NoData, spend[i].NoData = true, true
@@ -267,7 +268,7 @@ func (f *frictionTally) addTicket(i int, tk tickets.Ticket) {
 
 // fill writes the tally into the payload: the top reasons of the range plus
 // "other", and the headline values over person-ended pauses only.
-func (f *frictionTally) fill(out *StatsFriction) {
+func (f *frictionTally) fill(out *wire.StatsFriction) {
 	reasons := make([]string, 0, len(f.reasonTotal))
 	for k := range f.reasonTotal {
 		reasons = append(reasons, k)

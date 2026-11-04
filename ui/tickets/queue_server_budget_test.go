@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
-func loadedServerQueueWithBudget(t *testing.T, budget server.BudgetStatus) QueueModel {
+func loadedServerQueueWithBudget(t *testing.T, budget wire.BudgetStatus) QueueModel {
 	t.Helper()
 	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Budget: budget, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
@@ -16,7 +17,7 @@ func loadedServerQueueWithBudget(t *testing.T, budget server.BudgetStatus) Queue
 }
 
 func TestQueueServerMode_HeaderShowsTodaysSpendOfLimit(t *testing.T) {
-	m := loadedServerQueueWithBudget(t, server.BudgetStatus{Total: 12.5, SoftLimit: 50})
+	m := loadedServerQueueWithBudget(t, wire.BudgetStatus{Total: 12.5, SoftLimit: 50})
 
 	if got, want := m.queueHeaderTitle(), "Queue · today $12.50 of $50.00"; got != want {
 		t.Errorf("queueHeaderTitle() = %q, want %q", got, want)
@@ -54,7 +55,7 @@ func TestQueueServerMode_HeaderColourBands(t *testing.T) {
 
 func TestQueueServerMode_EpicStatusLineShowsTicketCostSum(t *testing.T) {
 	m, _ := deliverQueue(t, server.Snapshot{Seq: 1,
-		Budget: server.BudgetStatus{Total: 5, SoftLimit: 50, Roots: map[string]float64{"gx:alpha": 99}},
+		Budget: wire.BudgetStatus{Total: 5, SoftLimit: 50, Roots: map[string]float64{"gx:alpha": 99}},
 		Tickets: []server.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: "done", ActualCost: 1.5},
 			{Address: "gx:alpha/02", Title: "Second", Status: "open", ActualCost: 1.75},

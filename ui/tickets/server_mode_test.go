@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
@@ -34,7 +35,7 @@ type fakeServerAPI struct {
 	// detail and detailErr are what Detail returns for any address.
 	detail     server.TicketDetail
 	detailErr  error
-	budget     server.BudgetStatus
+	budget     wire.BudgetStatus
 	iterations []server.IterationInfo
 	// designWorktree is what DesignWorktree returns.
 	designWorktree    server.DesignWorktreeResult
@@ -86,11 +87,11 @@ func (f fakeServerAPI) QueueResume(context.Context) (server.QueueResult, error) 
 	return server.QueueResult{Mode: "running"}, nil
 }
 
-func (f fakeServerAPI) Budget(context.Context) (server.BudgetStatus, error) { return f.budget, nil }
+func (f fakeServerAPI) Budget(context.Context) (wire.BudgetStatus, error) { return f.budget, nil }
 
-func (f fakeServerAPI) BudgetOverride(context.Context) (server.BudgetResult, error) {
+func (f fakeServerAPI) BudgetOverride(context.Context) (wire.BudgetResult, error) {
 	f.verb("override")
-	return server.BudgetResult{}, nil
+	return wire.BudgetResult{}, nil
 }
 
 func (f fakeServerAPI) QueueReplace(_ context.Context, _ string, items []server.QueueItem) (server.QueueResult, error) {

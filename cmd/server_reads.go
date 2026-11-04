@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -224,7 +225,7 @@ func newBudgetCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.BudgetStatus, error) { return cl.Budget(ctx) },
+				func(ctx context.Context, cl *apiclient.Client) (wire.BudgetStatus, error) { return cl.Budget(ctx) },
 				printBudget)
 		},
 	}
@@ -272,7 +273,7 @@ func newUsageCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return serverRead(d.dial(), c.Context(), summaryJSON, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (server.UsageSummary, error) {
+				func(ctx context.Context, cl *apiclient.Client) (wire.UsageSummary, error) {
 					return cl.UsageSummary(ctx)
 				},
 				printUsageSummary)
@@ -283,11 +284,11 @@ func newUsageCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func printUsageSummary(w io.Writer, u server.UsageSummary) error {
+func printUsageSummary(w io.Writer, u wire.UsageSummary) error {
 	fmt.Fprintf(w, "mode: %s\n", u.Mode)
 	for _, row := range []struct {
 		name string
-		win  *server.UsageLimitWindow
+		win  *wire.UsageLimitWindow
 	}{{"five_hour", u.Limits.FiveHour}, {"seven_day", u.Limits.SevenDay}} {
 		if row.win != nil {
 			fmt.Fprintf(w, "%s: %.0f%% used, resets at %d\n", row.name, row.win.UsedPercentage, row.win.ResetsAt)
@@ -296,7 +297,7 @@ func printUsageSummary(w io.Writer, u server.UsageSummary) error {
 	if u.Codex != nil {
 		for _, row := range []struct {
 			name string
-			win  *server.UsageLimitWindow
+			win  *wire.UsageLimitWindow
 		}{{"codex_five_hour", u.Codex.FiveHour}, {"codex_seven_day", u.Codex.SevenDay}} {
 			if row.win != nil {
 				fmt.Fprintf(w, "%s: %.0f%% used, resets at %d\n", row.name, row.win.UsedPercentage, row.win.ResetsAt)
@@ -328,7 +329,7 @@ func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, 
 	res, err := cl.UsageOverride(ctx, harness)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.UsageOverrideResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.UsageOverrideResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -351,7 +352,7 @@ func newBudgetIncreaseCmd(d deps) *cobra.Command {
 		Short: "raise a daily limit on the running server until it restarts (edit config.json to keep it)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			var req server.BudgetIncreaseRequest
+			var req wire.BudgetIncreaseRequest
 			if c.Flags().Changed("soft") {
 				req.Soft = &soft
 			}
@@ -361,7 +362,7 @@ func newBudgetIncreaseCmd(d deps) *cobra.Command {
 			if req.Soft == nil && req.Hard == nil {
 				return fmt.Errorf("pass --soft or --hard")
 			}
-			return runBudgetWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
+			return runBudgetWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.BudgetResult, error) {
 				return cl.BudgetIncrease(ctx, req)
 			})
 		},
@@ -374,14 +375,14 @@ func newBudgetIncreaseCmd(d deps) *cobra.Command {
 
 // runBudgetOverride mirrors runServerQueueWrite.
 func runBudgetOverride(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool) error {
-	return runBudgetWrite(dial, c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
+	return runBudgetWrite(dial, c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.BudgetResult, error) {
 		return cl.BudgetOverride(ctx)
 	})
 }
 
 // runBudgetWrite runs one budget write: with --json the result or refusal is
 // the output; otherwise a refusal is an error.
-func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool, write func(context.Context, *apiclient.Client) (server.BudgetResult, error)) error {
+func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool, write func(context.Context, *apiclient.Client) (wire.BudgetResult, error)) error {
 	ctx := c.Context()
 	if ctx == nil {
 		ctx = context.Background()
@@ -393,7 +394,7 @@ func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, js
 	res, err := write(ctx, cl)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.BudgetResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.BudgetResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
@@ -407,7 +408,7 @@ func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, js
 	return printBudget(w, *res.Budget)
 }
 
-func printBudget(w io.Writer, b server.BudgetStatus) error {
+func printBudget(w io.Writer, b wire.BudgetStatus) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(tw, "budget %s: %s\n", b.Day, budgetState(b))
 	fmt.Fprintf(tw, "  spent\t%s\n", tickets.FormatCost(b.Total))
@@ -441,7 +442,7 @@ func budgetLimit(limit, counted float64, does string) string {
 }
 
 // budgetLine is the one-line budget summary `gx server status` prints.
-func budgetLine(b server.BudgetStatus) string {
+func budgetLine(b wire.BudgetStatus) string {
 	line := fmt.Sprintf("%s spent today, %s", tickets.FormatCost(b.Total), budgetState(b))
 	if b.Override > 0 {
 		line += fmt.Sprintf(", overridden at %s", tickets.FormatCost(b.Override))
@@ -450,7 +451,7 @@ func budgetLine(b server.BudgetStatus) string {
 }
 
 // budgetState is the budget's effect on the queue right now.
-func budgetState(b server.BudgetStatus) string {
+func budgetState(b wire.BudgetStatus) string {
 	switch {
 	case b.HardLatched:
 		return "STOPPED: hard limit reached (gx budget override)"

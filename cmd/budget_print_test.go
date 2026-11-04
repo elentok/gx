@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestPrintBudget_ShowsOverrideAndWhatIsLeft(t *testing.T) {
 	t.Parallel()
 	var out strings.Builder
-	b := server.BudgetStatus{Day: "2026-10-08", Total: 304.19, SoftLimit: 300, HardLimit: 350, Override: 301.22,
+	b := wire.BudgetStatus{Day: "2026-10-08", Total: 304.19, SoftLimit: 300, HardLimit: 350, Override: 301.22,
 		Projects: map[string]float64{"gx": 255.64}}
 	if err := printBudget(&out, b); err != nil {
 		t.Fatal(err)
@@ -24,7 +24,7 @@ func TestPrintBudget_ShowsOverrideAndWhatIsLeft(t *testing.T) {
 
 func TestBudgetLine_NamesOverride(t *testing.T) {
 	t.Parallel()
-	got := budgetLine(server.BudgetStatus{Total: 304.19, SoftLimit: 300, Override: 301.22})
+	got := budgetLine(wire.BudgetStatus{Total: 304.19, SoftLimit: 300, Override: 301.22})
 	if !strings.Contains(got, "overridden at $301.22") {
 		t.Errorf("line = %q, want the override point", got)
 	}

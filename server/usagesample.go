@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -219,48 +220,29 @@ func (s *Server) usageGate(agent ralphloop.AgentKind, now time.Time) (string, bo
 		time.Unix(w.ResetsAt, 0).UTC().Format(time.RFC3339)), true
 }
 
-// UsageOverrideResult is the outcome of lifting the usage gate: the windows
-// lifted and when the lift ends, or a refusal.
-type UsageOverrideResult struct {
-	Windows []string  `json:"windows,omitempty"`
-	Until   time.Time `json:"until,omitzero"`
-	Refused bool      `json:"refused,omitempty"`
-	Reason  string    `json:"reason,omitempty"`
-	Message string    `json:"message,omitempty"`
-}
-
-// ReasonNotGated refuses a usage override when no window is gating.
-const ReasonNotGated = "not-gated"
-
-// UsageOverrideRequest names the harness whose gate to lift; empty means the
-// Default harness.
-type UsageOverrideRequest struct {
-	Harness string `json:"harness,omitempty"`
-}
-
 // usageOverride lets new claims of a harness start until its gating windows
 // reset. It lifts that harness only.
-func (s *Server) usageOverride(now time.Time, agent ralphloop.AgentKind) (UsageOverrideResult, error) {
+func (s *Server) usageOverride(now time.Time, agent ralphloop.AgentKind) (wire.UsageOverrideResult, error) {
 	samples, prefix := s.usageFor(agent)
 	var names []string
 	var until time.Time
 	if samples != nil {
 		var err error
 		if names, until, err = samples.lift(now); err != nil {
-			return UsageOverrideResult{}, err
+			return wire.UsageOverrideResult{}, err
 		}
 	}
 	if len(names) == 0 {
-		return UsageOverrideResult{Refused: true, Reason: ReasonNotGated,
+		return wire.UsageOverrideResult{Refused: true, Reason: wire.ReasonNotGated,
 			Message: fmt.Sprintf("no %s usage window is at its limit", strings.TrimSuffix(prefix, " usage: "))}, nil
 	}
 	s.events.publish(EventQueueChanged, "")
 	s.kickRunner()
-	return UsageOverrideResult{Windows: names, Until: until}, nil
+	return wire.UsageOverrideResult{Windows: names, Until: until}, nil
 }
 
 func (s *Server) usageOverrideWrite(w http.ResponseWriter, r *http.Request) {
-	var req UsageOverrideRequest
+	var req wire.UsageOverrideRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

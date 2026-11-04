@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tokenledger"
 )
 
@@ -23,7 +23,7 @@ func statsStamp(n int) string { return statsNoon(n).UTC().Format(time.RFC3339) }
 
 func statsDate(n int) string { return statsNoon(n).Format("2006-01-02") }
 
-func statsAt(t *testing.T, s server.Stats, series []int, n int) int {
+func statsAt(t *testing.T, s wire.Stats, series []int, n int) int {
 	t.Helper()
 	i := slices.Index(s.Days, statsDate(n))
 	if i < 0 {
@@ -32,7 +32,7 @@ func statsAt(t *testing.T, s server.Stats, series []int, n int) int {
 	return series[i]
 }
 
-func statsFixture(t *testing.T) (get func(query string) server.Stats) {
+func statsFixture(t *testing.T) (get func(query string) wire.Stats) {
 	t.Helper()
 	loop := "---\nstatus: open\n---\n"
 	return statsStore(t, func(store string) {
@@ -65,16 +65,16 @@ func statsFixture(t *testing.T) (get func(query string) server.Stats) {
 
 // statsStore serves the store built by setup. TestMain keeps the local zone
 // away from UTC, so a UTC-day bucket would disagree with the local one.
-func statsStore(t *testing.T, setup func(store string)) (get func(query string) server.Stats) {
+func statsStore(t *testing.T, setup func(store string)) (get func(query string) wire.Stats) {
 	t.Helper()
 	h, base := startEpicDetail(t, setup)
-	return func(query string) server.Stats {
+	return func(query string) wire.Stats {
 		t.Helper()
 		code, body := webDo(t, h, http.MethodGet, base+"/v1/stats"+query)
 		if code != http.StatusOK {
 			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
 		}
-		var s server.Stats
+		var s wire.Stats
 		if err := json.Unmarshal([]byte(body), &s); err != nil {
 			t.Fatalf("body %q: %v", body, err)
 		}
@@ -259,7 +259,7 @@ func TestStats_WaitingForDesignCountsOpenMapDays(t *testing.T) {
 	}
 }
 
-func statsAmountAt(t *testing.T, s server.Stats, series []server.StatsAmount, n int) server.StatsAmount {
+func statsAmountAt(t *testing.T, s wire.Stats, series []wire.StatsAmount, n int) wire.StatsAmount {
 	t.Helper()
 	i := slices.Index(s.Days, statsDate(n))
 	if i < 0 {
@@ -268,7 +268,7 @@ func statsAmountAt(t *testing.T, s server.Stats, series []server.StatsAmount, n 
 	return series[i]
 }
 
-func costGroupOf(t *testing.T, s server.Stats, name string) server.StatsCostGroup {
+func costGroupOf(t *testing.T, s wire.Stats, name string) wire.StatsCostGroup {
 	t.Helper()
 	for _, g := range s.Cost.Groups {
 		if g.Group == name {
@@ -276,7 +276,7 @@ func costGroupOf(t *testing.T, s server.Stats, name string) server.StatsCostGrou
 		}
 	}
 	t.Fatalf("no cost group %q in %+v", name, s.Cost.Groups)
-	return server.StatsCostGroup{}
+	return wire.StatsCostGroup{}
 }
 
 func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
@@ -296,19 +296,19 @@ func TestStats_CostFollowsTheLedgerAndProjectFilter(t *testing.T) {
 	add("proj", tokenledger.GroupQueue, "claude", 100, 1)
 	add("proj", tokenledger.GroupQueue, "codex", 50, 0)
 	add("other", tokenledger.GroupOneOff, "claude", 7, 0.5)
-	get := func(query string) server.Stats {
+	get := func(query string) wire.Stats {
 		t.Helper()
 		code, body := webDo(t, h, http.MethodGet, base+"/v1/stats"+query)
 		if code != http.StatusOK {
 			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
 		}
-		var s server.Stats
+		var s wire.Stats
 		if err := json.Unmarshal([]byte(body), &s); err != nil {
 			t.Fatal(err)
 		}
 		return s
 	}
-	last := func(a []server.StatsAmount) server.StatsAmount { return a[len(a)-1] }
+	last := func(a []wire.StatsAmount) wire.StatsAmount { return a[len(a)-1] }
 
 	all := get("?range=30")
 	// The web legend follows this order.
@@ -364,23 +364,23 @@ func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 	design, queue := costGroupOf(t, s, tokenledger.GroupDesign), costGroupOf(t, s, tokenledger.GroupQueue)
 	cases := []struct {
 		name   string
-		series []server.StatsAmount
+		series []wire.StatsAmount
 		day    int
-		want   server.StatsAmount
+		want   wire.StatsAmount
 	}{
-		{"design tokens: ticket", design.Tokens, 3, server.StatsAmount{Value: 30}},
-		{"design tokens: ticket plus map remainder", design.Tokens, 2, server.StatsAmount{Value: 70}},
-		{"design spend: ticket plus map remainder", design.Spend, 2, server.StatsAmount{Value: 0.7}},
-		{"design: unstamped pre-recording map", design.Tokens, 8, server.StatsAmount{NoData: true}},
-		{"design: no finished items", design.Tokens, 4, server.StatsAmount{}},
-		{"queue tokens: mixed day is data", queue.Tokens, 4, server.StatsAmount{Value: 100}},
-		{"queue spend: mixed day is data", queue.Spend, 4, server.StatsAmount{Value: 1}},
-		{"queue: only unstamped is no data", queue.Tokens, 5, server.StatsAmount{NoData: true}},
-		{"queue spend: only unstamped is no data", queue.Spend, 5, server.StatsAmount{NoData: true}},
-		{"queue: only a cancel is zero", queue.Tokens, 6, server.StatsAmount{}},
-		{"queue: stamped zero is data", queue.Tokens, 7, server.StatsAmount{}},
-		{"queue: no finished items", queue.Tokens, 9, server.StatsAmount{}},
-		{"queue: map days are not queue", queue.Tokens, 2, server.StatsAmount{}},
+		{"design tokens: ticket", design.Tokens, 3, wire.StatsAmount{Value: 30}},
+		{"design tokens: ticket plus map remainder", design.Tokens, 2, wire.StatsAmount{Value: 70}},
+		{"design spend: ticket plus map remainder", design.Spend, 2, wire.StatsAmount{Value: 0.7}},
+		{"design: unstamped pre-recording map", design.Tokens, 8, wire.StatsAmount{NoData: true}},
+		{"design: no finished items", design.Tokens, 4, wire.StatsAmount{}},
+		{"queue tokens: mixed day is data", queue.Tokens, 4, wire.StatsAmount{Value: 100}},
+		{"queue spend: mixed day is data", queue.Spend, 4, wire.StatsAmount{Value: 1}},
+		{"queue: only unstamped is no data", queue.Tokens, 5, wire.StatsAmount{NoData: true}},
+		{"queue spend: only unstamped is no data", queue.Spend, 5, wire.StatsAmount{NoData: true}},
+		{"queue: only a cancel is zero", queue.Tokens, 6, wire.StatsAmount{}},
+		{"queue: stamped zero is data", queue.Tokens, 7, wire.StatsAmount{}},
+		{"queue: no finished items", queue.Tokens, 9, wire.StatsAmount{}},
+		{"queue: map days are not queue", queue.Tokens, 2, wire.StatsAmount{}},
 	}
 	for _, c := range cases {
 		got := statsAmountAt(t, s, c.series, c.day)

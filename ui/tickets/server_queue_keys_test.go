@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
@@ -63,14 +64,14 @@ func accept(t *testing.T, m QueueModel) QueueModel {
 func TestServerPauseActionFor(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		budget server.BudgetStatus
+		budget wire.BudgetStatus
 		paused bool
 		want   serverPauseAction
 	}{
-		{"running", server.BudgetStatus{}, false, serverActionPause},
-		{"paused", server.BudgetStatus{}, true, serverActionResume},
-		{"soft latched", server.BudgetStatus{BudgetPaused: true}, false, serverActionOverride},
-		{"hard latched beats paused", server.BudgetStatus{HardLatched: true}, true, serverActionOverride},
+		{"running", wire.BudgetStatus{}, false, serverActionPause},
+		{"paused", wire.BudgetStatus{}, true, serverActionResume},
+		{"soft latched", wire.BudgetStatus{BudgetPaused: true}, false, serverActionOverride},
+		{"hard latched beats paused", wire.BudgetStatus{HardLatched: true}, true, serverActionOverride},
 	} {
 		if got := serverPauseActionFor(tc.budget, tc.paused); got != tc.want {
 			t.Errorf("%s: got %v want %v", tc.name, got, tc.want)
@@ -81,13 +82,13 @@ func TestServerPauseActionFor(t *testing.T) {
 func TestQueueServerKeys_PauseResumeOverrideReachVerbs(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		budget server.BudgetStatus
+		budget wire.BudgetStatus
 		paused bool
 		want   string
 	}{
-		{"pause", server.BudgetStatus{}, false, "pause"},
-		{"resume", server.BudgetStatus{}, true, "resume"},
-		{"override", server.BudgetStatus{BudgetPaused: true}, false, "override"},
+		{"pause", wire.BudgetStatus{}, false, "pause"},
+		{"resume", wire.BudgetStatus{}, true, "resume"},
+		{"override", wire.BudgetStatus{BudgetPaused: true}, false, "override"},
 	} {
 		var calls []string
 		m := newMaintenanceQueue(t, fakeServerAPI{calls: &calls, budget: tc.budget})

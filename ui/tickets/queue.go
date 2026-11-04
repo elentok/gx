@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
@@ -55,7 +56,7 @@ type QueueModel struct {
 	finishedGen int
 	// serverBudget is the last snapshot's budget: the header's spend and the
 	// root rows' cost in server mode.
-	serverBudget     server.BudgetStatus
+	serverBudget     wire.BudgetStatus
 	implementSpinner spinner.Model
 
 	width, height int

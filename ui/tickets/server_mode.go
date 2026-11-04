@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -26,8 +27,8 @@ type ServerAPI interface {
 	QueueRemove(ctx context.Context, address string) (server.QueueResult, error)
 	QueuePause(ctx context.Context) (server.QueueResult, error)
 	QueueResume(ctx context.Context) (server.QueueResult, error)
-	Budget(ctx context.Context) (server.BudgetStatus, error)
-	BudgetOverride(ctx context.Context) (server.BudgetResult, error)
+	Budget(ctx context.Context) (wire.BudgetStatus, error)
+	BudgetOverride(ctx context.Context) (wire.BudgetResult, error)
 	TicketPause(ctx context.Context, address, reason string) (server.QueueResult, error)
 	TicketCancel(ctx context.Context, address string, stop bool) (server.QueueResult, error)
 	TicketRelaunch(ctx context.Context, address string, stop bool) (server.QueueResult, error)

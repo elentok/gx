@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestUsageOverride_HoldsUntilResetsAtThenGatesAgain(t *testing.T) {
@@ -70,13 +71,13 @@ func TestUsageOverride_RefusesWhenNothingGates(t *testing.T) {
 	s := r.server()
 	now := time.Unix(1_000_000, 0)
 	res, err := s.usageOverride(now, ralphloop.AgentClaude)
-	if err != nil || !res.Refused || res.Reason != ReasonNotGated {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
 		t.Fatalf("no sample: %+v, %v", res, err)
 	}
 	r.write("a", usageRecord(now, 50, now.Add(time.Hour)))
 	s.scanUsage()
 	res, err = s.usageOverride(now, ralphloop.AgentClaude)
-	if err != nil || !res.Refused || res.Reason != ReasonNotGated {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
 		t.Fatalf("50%%: %+v, %v", res, err)
 	}
 }
