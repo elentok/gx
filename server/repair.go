@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -510,7 +511,7 @@ func (s *Server) iterationSession(dir string, addr tickets.Address) (agentrunner
 		if pause.Label != "" {
 			label = pause.Label
 		}
-		if r := s.runnerForRun(Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
+		if r := s.runnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
 			runner = r
 		}
 	}
@@ -565,7 +566,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 			}
 			return repairRefusal(&repair.RefusalError{Reason: wire.ReasonAgentWaiting, Message: msg}), true, nil
 		}
-		s.registry.delete(address)
+		s.registry.Delete(address)
 	}
 	if !selfReported {
 		return wire.RepairResult{}, false, nil

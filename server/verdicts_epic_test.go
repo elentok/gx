@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,7 +32,7 @@ func startCapHeldEpics(t *testing.T) (*servertest.Harness, string) {
 		c.MaxAgents = 1
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00", Runner: "herdr"})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 	return h, repo
 }
 
@@ -54,7 +55,7 @@ func TestPending_WholeEpicEntryGivesOneRowForItsFrontierTicket(t *testing.T) {
 
 func TestPending_WholeEpicEntrySkipsAFrontierTicketThatIsAlreadyRunning(t *testing.T) {
 	h, _ := startCapHeldEpics(t)
-	h.Server.PutRun("proj:epic-b/01", server.Run{Address: "proj:epic-b/01"})
+	h.Server.Registry().PutRun("proj:epic-b/01", runs.Run{Address: "proj:epic-b/01"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {

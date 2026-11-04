@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"os/exec"
 	"strings"
@@ -77,7 +78,7 @@ func (w *herdrWatch) probe(r agentrunner.Runner, configured bool) (changed bool)
 // herdrRunner is the runner that hosts herdr tickets, or nil when the server
 // cannot build one.
 func (s *Server) herdrRunner() agentrunner.Runner {
-	return s.runnerNamed(runnerHerdr, runnerbuild.FallbackProject)
+	return s.runnerNamed(runs.RunnerHerdr, runnerbuild.FallbackProject)
 }
 
 // herdrWaiting is the tickets that need herdr: queued ones that launch on it
@@ -97,12 +98,12 @@ func (s *Server) herdrWaiting() []string {
 			continue
 		}
 		agent := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t).Harness
-		if r := s.launchRunner(addr.Project, agent); r != nil && r.Name() == runnerHerdr {
+		if r := s.launchRunner(addr.Project, agent); r != nil && r.Name() == runs.RunnerHerdr {
 			out = append(out, item.Address)
 		}
 	}
-	for _, t := range s.registry.list() {
-		if r := s.runnerForRun(t.Run); r != nil && r.Name() == runnerHerdr {
+	for _, t := range s.registry.List() {
+		if r := s.runnerForRun(t.Run); r != nil && r.Name() == runs.RunnerHerdr {
 			out = append(out, t.Address)
 		}
 	}
@@ -113,7 +114,7 @@ func (s *Server) herdrWaiting() []string {
 // is down or missing and a ticket needs it. Only a herdr config shows it: a
 // session herdr left behind reclaims without a banner.
 func (s *Server) herdrBanner() (string, bool) {
-	if s.cfg.Runner.Name() != runnerHerdr {
+	if s.cfg.Runner.Name() != runs.RunnerHerdr {
 		return "", false
 	}
 	reason, down := s.herdr.holdReason()
@@ -130,7 +131,7 @@ func (s *Server) herdrBanner() (string, bool) {
 // checkHerdr probes once and, on a transition, logs it. The banner transition
 // is streamed by syncHerdrBanner.
 func (s *Server) checkHerdr() {
-	changed := s.herdr.probe(s.herdrRunner(), s.cfg.Runner.Name() == runnerHerdr)
+	changed := s.herdr.probe(s.herdrRunner(), s.cfg.Runner.Name() == runs.RunnerHerdr)
 	if changed {
 		s.log.Warn("herdr state changed", "unavailable", s.herdr.isUnavailable())
 	}

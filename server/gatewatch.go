@@ -49,7 +49,7 @@ func (s *Server) watchGates(now time.Time) {
 	if s.gatesRaised == nil {
 		s.gatesRaised = map[gateHold]bool{}
 	}
-	for _, run := range s.registry.list() {
+	for _, run := range s.registry.List() {
 		addr, err := tickets.ParseAddress(run.Address, tickets.AddressContext{})
 		if err != nil {
 			continue

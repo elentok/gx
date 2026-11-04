@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +27,7 @@ func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, liv
 	t.Helper()
 	registerTurn(h)
 	for i := 0; i < live; i++ {
-		h.Server.PutRun(root, server.Run{Address: root + "/9" + string(rune('0'+i)), Runner: "herdr"})
+		h.Server.Registry().PutRun(root, runs.Run{Address: root + "/9" + string(rune('0'+i)), Runner: "herdr"})
 	}
 	wait := 2 * time.Second
 	if wantStart {

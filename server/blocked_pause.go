@@ -16,7 +16,7 @@ func (s *Server) waitsOnBlockedPause(tk schema.Ticket, address string) bool {
 	if s.registry == nil || tk.PauseReason != schema.PauseBlockedPane {
 		return false
 	}
-	_, ok := s.registry.tracked(address)
+	_, ok := s.registry.Tracked(address)
 	return ok
 }
 
@@ -30,7 +30,7 @@ func (s *Server) leaveBlocked(address string) error {
 	}
 	s.unblockMu.Lock()
 	defer s.unblockMu.Unlock()
-	run, ok := s.registry.tracked(address)
+	run, ok := s.registry.Tracked(address)
 	if !ok || run.WaitingSince.IsZero() {
 		return nil
 	}
@@ -65,7 +65,7 @@ func (s *Server) leaveBlocked(address string) error {
 // the interrupt finds nothing left to do. Interrupt waits for idle, which a raw
 // Esc would not: the retry prompt then lands on an agent that is ready for it.
 func (s *Server) retryBlocked(address string) (bool, error) {
-	run, ok := s.registry.tracked(address)
+	run, ok := s.registry.Tracked(address)
 	if !ok {
 		return false, nil
 	}
@@ -94,7 +94,7 @@ func (s *Server) watchUnblock(r agentrunner.Runner, sess agentrunner.Session, ad
 	for {
 		_, err := r.Wait(sess, until, blockWatchPoll)
 		if errors.Is(err, agentrunner.ErrTimeout) {
-			if run, ok := s.registry.tracked(address); !ok || run.WaitingSince.IsZero() {
+			if run, ok := s.registry.Tracked(address); !ok || run.WaitingSince.IsZero() {
 				return
 			}
 			continue

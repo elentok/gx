@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"log/slog"
 
 	"github.com/elentok/gx/agentrunner"
@@ -18,7 +19,7 @@ func (s *Server) runnerFor(project string) agentrunner.Runner {
 // headless runner hosts only Claude, so Codex runs on pty unless herdr is
 // configured.
 func (s *Server) launchRunner(project string, agent ralphloop.AgentKind) agentrunner.Runner {
-	if agent == ralphloop.AgentCodex && s.cfg.Runner.Name() != runnerHerdr {
+	if agent == ralphloop.AgentCodex && s.cfg.Runner.Name() != runs.RunnerHerdr {
 		return s.runnerNamed(string(agentrunner.ChoicePTY), project)
 	}
 	return s.runnerFor(project)
@@ -26,10 +27,10 @@ func (s *Server) launchRunner(project string, agent ralphloop.AgentKind) agentru
 
 // runnerForRun is the runner that started run, whatever the configured one is.
 // It is nil when that runner cannot be built.
-func (s *Server) runnerForRun(run Run) agentrunner.Runner {
+func (s *Server) runnerForRun(run runs.Run) agentrunner.Runner {
 	name := run.Runner
 	if name == "" {
-		name = runnerHerdr
+		name = runs.RunnerHerdr
 	}
 	project := ""
 	if addr, err := tickets.ParseAddress(run.Address, tickets.AddressContext{}); err == nil {
@@ -39,13 +40,13 @@ func (s *Server) runnerForRun(run Run) agentrunner.Runner {
 }
 
 // runnerOf is runnerForRun, failing when the run's runner cannot be built.
-func (s *Server) runnerOf(run Run) (agentrunner.Runner, error) {
+func (s *Server) runnerOf(run runs.Run) (agentrunner.Runner, error) {
 	if r := s.runnerForRun(run); r != nil {
 		return r, nil
 	}
 	name := run.Runner
 	if name == "" {
-		name = runnerHerdr
+		name = runs.RunnerHerdr
 	}
 	return nil, fmt.Errorf("started by %s; %s unavailable", name, name)
 }
@@ -66,7 +67,7 @@ func (s *Server) liveSession(addr tickets.Address) (agentrunner.Runner, agentrun
 // iterationRunner is the runner hosting address's iteration: a tracked run's
 // own runner, else the configured one.
 func (s *Server) iterationRunner(addr tickets.Address) (agentrunner.Runner, error) {
-	if run, ok := s.registry.runOf(addr.String()); ok {
+	if run, ok := s.registry.RunOf(addr.String()); ok {
 		return s.runnerOf(run)
 	}
 	agent := s.defaultHarness(addr.Project)

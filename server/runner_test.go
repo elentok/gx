@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -446,7 +447,7 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 		})
 		registerTurn(h)
 		// One agent of the root is already running.
-		h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00", Runner: "herdr"})
+		h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 		// The no-start case waits out the whole timeout, so it stays short.
 		timeout := time.Second
 		if tc.starts {
@@ -491,7 +492,7 @@ func TestRunner_SkipsAFrontierTicketThatIsAlreadyTracked(t *testing.T) {
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "pty"})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -537,7 +538,7 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj-a:epic-a", server.Run{Address: "proj-a:epic-a/00", Runner: "herdr"}) // proj-a is at its cap
+	h.Server.Registry().PutRun("proj-a:epic-a", runs.Run{Address: "proj-a:epic-a/00", Runner: "herdr"}) // proj-a is at its cap
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -641,7 +642,7 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 		c.MaxAgents = 1
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00", Runner: "herdr"})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {

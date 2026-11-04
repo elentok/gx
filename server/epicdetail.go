@@ -108,7 +108,7 @@ func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) wi
 	queued := s.rootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
-		State: epicStateFor(root, e, s.registry.startedAtOf),
+		State: epicStateFor(root, e, s.registry.StartedAtOf),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 		Queueable: epicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),
@@ -199,7 +199,7 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) wire.Epi
 	if t.Parent != nil {
 		row.Parent = ticketAddress(root, *t.Parent)
 	}
-	if at, ok := s.registry.startedAtOf(row.Address); ok && status == tickets.StatusClaimed {
+	if at, ok := s.registry.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
 	}
 	evs := readLogLenient(t)

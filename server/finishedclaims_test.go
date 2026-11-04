@@ -2,10 +2,10 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/runs"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -94,14 +94,14 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 	// A run with no Runner means herdr, and the snapshot that follows
 	// TicketChanged asks the forbidding herdr fake for `agent get`.
 	reclaim()
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "pty"})
-	h.Server.MarkSettling("proj:epic-a/01")
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
+	h.Server.Registry().MarkSettling("proj:epic-a/01")
 	h.Server.PauseStuckFinishedClaims(past)
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusClaimed {
 		t.Fatalf("settling run: status = %q, err = %v, want claimed", tk.Status, err)
 	}
 
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "pty"})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
 	h.Server.PauseStuckFinishedClaims(past)
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusPaused {
 		t.Errorf("run stuck in a wait: status = %q, err = %v, want paused", tk.Status, err)

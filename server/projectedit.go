@@ -27,7 +27,7 @@ func (s *Server) projectBusy(project string) (address string, busy bool) {
 			return it.Address, true
 		}
 	}
-	for _, r := range s.registry.list() {
+	for _, r := range s.registry.List() {
 		if inProject(r.Address) {
 			return r.Address, true
 		}

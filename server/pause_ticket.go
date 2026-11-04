@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 
@@ -16,8 +17,8 @@ import (
 // reason, so the three cannot disagree. A pause that finds the ticket done (it
 // lost a race with a merge) is not an error to the caller: nothing is left to pause.
 // run is the paused run, zero when none launched.
-func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run Run) error {
-	if err := ralphloop.Pause(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.pauseEvent()); errors.Is(err, ralphloop.ErrPauseDone) {
+func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run runs.Run) error {
+	if err := ralphloop.Pause(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.PauseEvent()); errors.Is(err, ralphloop.ErrPauseDone) {
 		s.log.Warn("pause refused: ticket is done", "ticket", addr.String(), "kind", kind, "reason", reason)
 		return nil
 	} else if err != nil {

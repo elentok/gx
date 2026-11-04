@@ -196,7 +196,7 @@ func (s *Server) epicListRow(project string, e tickets.Epic, queue queueIndex) w
 	if e.IsMap {
 		row.Kind = wire.EpicKindMap
 	}
-	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.registry.startedAtOf))
+	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.registry.StartedAtOf))
 	if row.State == wire.EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}

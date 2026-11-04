@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"slices"
 	"testing"
@@ -36,7 +37,7 @@ func liveUnder(t *testing.T, own renamedFake, opts ...func(*server.Config)) (*se
 	own.SetState(routedLabel, agentrunner.StateWorking, "")
 	h, ticketPath := restartUnder(t, own.name, newRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.name: own}, opts...)
 	if !servertest.Poll(10*time.Second, func() bool {
-		return slices.ContainsFunc(h.Server.Runs(), func(r server.Run) bool { return r.Runner == own.name })
+		return slices.ContainsFunc(h.Server.Runs(), func(r runs.Run) bool { return r.Runner == own.name })
 	}) {
 		t.Fatalf("run not reclaimed under %s: %+v", own.name, h.Server.Runs())
 	}

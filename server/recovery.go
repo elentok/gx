@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"crypto/sha256"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -623,7 +624,7 @@ func (s *Server) agentState(addr tickets.Address) (state agentrunner.State, idle
 // merge unfinished work, so its finish pauses background-task-gate instead.
 func (s *Server) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		run, ok := s.registry.tracked(ref.addr.String())
+		run, ok := s.registry.Tracked(ref.addr.String())
 		if !ok {
 			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
@@ -649,7 +650,7 @@ func (s *Server) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call) (wi
 				pause = gatePauseReason(dirty)
 			}
 		}
-		s.registry.releaseGate(ref.addr.String(), pause)
+		s.registry.ReleaseGate(ref.addr.String(), pause)
 		return wire.QueueResult{}, nil
 	})
 }
@@ -664,8 +665,8 @@ func gatePauseReason(dirty []git.Change) string {
 
 // pauseReleasedGate writes the pause release-gate left for a run in place of its
 // finish, leaving worktree and pane for a person. False when there is none.
-func (s *Server) pauseReleasedGate(scratchDir string, addr tickets.Address, ticketPath string, run Run) bool {
-	reason := s.registry.gatePause(addr.String())
+func (s *Server) pauseReleasedGate(scratchDir string, addr tickets.Address, ticketPath string, run runs.Run) bool {
+	reason := s.registry.GatePause(addr.String())
 	if reason == "" {
 		return false
 	}
@@ -685,7 +686,7 @@ var finishPoll = time.Second
 // recoveryFinish holds no ticket lock while it waits: the merge it waits for
 // needs it.
 func (s *Server) recoveryFinish(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
-	if !s.registry.waitGone(req.Address, finishWaitTimeout, finishPoll) {
+	if !s.registry.WaitGone(req.Address, finishWaitTimeout, finishPoll) {
 		return refusal(wire.ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
 	}
 	return wire.QueueResult{}, nil

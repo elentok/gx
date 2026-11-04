@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
@@ -54,7 +55,7 @@ func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralp
 // one-shot tier override. ok is false when an implement launch resolved to no
 // model: it is refused and paused, and no agent may start.
 func (s *Server) launchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) (model, effort string, ok bool) {
-	var tierRun Run
+	var tierRun runs.Run
 	if tier := takeTierOverride(t.Path); tier != "" {
 		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.agentsConfig(addr.Project), agent, tier)
 	}
@@ -71,13 +72,13 @@ func (s *Server) launchModel(scratchDir string, t tickets.Ticket, addr tickets.A
 // is nothing to stop.
 func (s *Server) refuseEmptyModel(scratchDir, path string, addr tickets.Address) {
 	m := &ralphloop.ModelMismatchError{Ran: emptyModelRan, Expected: emptyModelExpected}
-	s.recordModelMismatch(scratchDir, path, addr, Run{}, m, nil)
+	s.recordModelMismatch(scratchDir, path, addr, runs.Run{}, m, nil)
 }
 
 // recordModelMismatch pauses the ticket with both model names recorded, notifies
 // and files or updates the follow-up. stopErr is any error from stopping the
 // session, logged with the rest.
-func (s *Server) recordModelMismatch(scratchDir, path string, addr tickets.Address, run Run, m *ralphloop.ModelMismatchError, stopErr error) {
+func (s *Server) recordModelMismatch(scratchDir, path string, addr tickets.Address, run runs.Run, m *ralphloop.ModelMismatchError, stopErr error) {
 	ticketAddr := addr.String()
 	if err := tickets.EndOpenRound(path, tickets.SourceGx, tickets.HowAuto, ralphloop.CloseModelMismatch); err != nil {
 		stopErr = errors.Join(stopErr, err)

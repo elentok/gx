@@ -49,7 +49,7 @@ func (s *Server) startHardGrace(now time.Time, limit, spent float64) {
 	g.mu.Unlock()
 	s.banner(wire.EventLevelWarning, hardGraceTitle(grace), fmt.Sprintf(
 		"New hard budget limit (%s) is below today's spend (%s). %d agents will stop. Raise the limit in config.json or run `gx budget increase` to cancel.",
-		tickets.FormatCost(limit), tickets.FormatCost(spent), len(s.registry.list())))
+		tickets.FormatCost(limit), tickets.FormatCost(spent), len(s.registry.List())))
 }
 
 // hardGraceTitle counts whole-second durations in seconds, as the spec's

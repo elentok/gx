@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,10 +107,10 @@ func (s *Server) liveWorkIn(root rootRef, path string) string {
 			}
 		}
 	}
-	for _, t := range s.registry.list() {
+	for _, t := range s.registry.List() {
 		// An older server saved no cwd: any live run of the epic may be inside.
 		inside := dirInside(t.Cwd, path) || (t.Cwd == "" && t.Root == root.String())
-		if inside && (t.State == runLaunching || s.runLive(t.Run)) {
+		if inside && (t.State == runs.Launching || s.runLive(t.Run)) {
 			return "run " + t.Address + " is live in it"
 		}
 	}
@@ -118,13 +119,13 @@ func (s *Server) liveWorkIn(root rootRef, path string) string {
 
 // runLive is liveIteration's rule applied to a registry entry, which settleRun
 // can leave behind after the agent stopped.
-func (s *Server) runLive(run Run) bool {
+func (s *Server) runLive(run runs.Run) bool {
 	runner := s.runnerForRun(run)
 	if runner == nil || run.Session.ID == "" {
 		return false
 	}
 	st, err := runner.Status(run.Session)
-	return err == nil && (st.State != agentrunner.StateDone || runner.Name() == runnerHerdr)
+	return err == nil && (st.State != agentrunner.StateDone || runner.Name() == runs.RunnerHerdr)
 }
 
 // dirInside reports whether dir is path or below it, through symlinks and by

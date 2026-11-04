@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
@@ -162,7 +163,7 @@ func pauseStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event,
 		c.Recovery = recovery.Default()
 	})
 	const addr = "proj:epic-a/01"
-	h.Server.PutRunFrom("proj:epic-a", server.Run{Address: addr, Runner: "headless", Session: sess}, "main")
+	h.Server.Registry().PutRunFrom("proj:epic-a", runs.Run{Address: addr, Runner: "headless", Session: sess}, "main")
 	dir := filepath.Join(store, "proj")
 	stalled := ralphloop.Event{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(events.AgentPromptStalled), Attempt: 1}
 	if err := ralphloop.AppendEvent(dir, "epic-a", stalled); err != nil {
@@ -1006,7 +1007,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	prepare(worktree)
 
 	const addr = "proj:epic-a/01"
-	h.Server.PutRunFrom("proj:epic-a", server.Run{Address: addr, Runner: runner, Session: sess}, "main")
+	h.Server.Registry().PutRunFrom("proj:epic-a", runs.Run{Address: addr, Runner: runner, Session: sess}, "main")
 	dir := filepath.Join(store, "proj")
 	held := ralphloop.Event{Type: string(events.BackgroundTaskGateHeld), Ticket: "01", Reason: "background task task-1"}
 	if err := ralphloop.AppendEvent(dir, "epic-a", held); err != nil {
@@ -1015,7 +1016,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	h.Server.RecoverAsync(recovery.Failure{Address: addr, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
 	var got gateRaise
 	waitFor(t, func() bool {
-		if h.Server.GateReleased(addr) {
+		if h.Server.Registry().IsGateReleased(addr) {
 			h.Server.SettleReleasedRun(addr)
 		}
 		got.log, _, _ = ralphloop.ReadEvents(dir, "epic-a")
@@ -1343,7 +1344,7 @@ func watchHeldGate(t *testing.T, state agentrunner.State, seed ...ralphloop.Even
 			t.Fatal(err)
 		}
 	}
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "headless", Session: sess})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "headless", Session: sess})
 	pass = func() { h.Server.WatchGates(gateWatchStart.Add(time.Hour)) }
 	applied = func() int {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")

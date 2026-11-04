@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"io"
 	"log/slog"
 	"net"
@@ -174,8 +175,8 @@ type Server struct {
 	sweepMu      sync.Mutex             // one archive sweep at a time; the move's own writes wake the watcher
 
 	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
-	registry       *runRegistry
-	savedRuns      []trackedRun // handles the previous server left; consumed by reclaimRuns
+	registry       *runs.Registry
+	savedRuns      []runs.TrackedRun // handles the previous server left; consumed by reclaimRuns
 	refused        refusals
 	heldMerges     refusals // roots whose merge waits for a trunk-conflict ticket, keyed by root
 	merges         mergeGuard
@@ -340,7 +341,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: cfg.LogLevel}))
-	registry, savedRuns, err := openRuns(cfg.StateDir, log)
+	registry, savedRuns, err := runs.Open(cfg.StateDir, log)
 	if err != nil {
 		ln.Close()
 		if tcp != nil {
@@ -590,7 +591,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 		}
 		switch t.Status {
 		case string(schema.StatusClaimed):
-			snap.Tickets[i].ClaimedAt, _ = s.registry.startedAtOf(t.Address)
+			snap.Tickets[i].ClaimedAt, _ = s.registry.StartedAtOf(t.Address)
 		case string(schema.StatusPaused), string(schema.StatusLegacyAnswer), string(schema.StatusLegacyRepair):
 			snap.Tickets[i].Recovery = recoveryState(s.pauseHold.state(t.Address), t.Address, snap.Tickets)
 		}

@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 
@@ -94,7 +95,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 		s.events.Publish(wire.EventMergeRolledBack, addr)
 	default:
 		reason := fmt.Sprintf("merge interrupted by a crash (lock owner %s) and verify cannot tell whether it merged: %s", owner.Describe(), v.Merging)
-		if err := s.pauseTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, Run{}); err != nil {
+		if err := s.pauseTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, runs.Run{}); err != nil {
 			return fmt.Errorf("pausing %s: %w", addr, err)
 		}
 	}

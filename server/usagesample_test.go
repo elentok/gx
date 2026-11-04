@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,8 +166,8 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	}
 
 	reset := now.Add(2 * time.Hour)
-	s.registry.runs["proj:e/01"] = trackedRun{Run: Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}}
-	s.registry.markRateLimit("proj:e/01", true, reset)
+	s.registry.Put(runs.TrackedRun{Run: runs.Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}})
+	s.registry.MarkRateLimit("proj:e/01", true, reset)
 	h, held = s.claimHold("proj", tickets.Ticket{}, ResolvedHarness{Harness: ralphloop.AgentClaude})
 	if !held || h.Verdict != rateLimitVerdict(reset) {
 		t.Errorf("hold and gate = %+v, %v; want the hold's verdict", h, held)

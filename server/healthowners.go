@@ -53,7 +53,7 @@ func (s *Server) healthOwners(t syshealth.ProcessTable) map[syshealth.OwnerKey]s
 }
 
 func (s *Server) addRunOwners(owners map[syshealth.OwnerKey]syshealth.Owner) {
-	for _, t := range s.registry.list() {
+	for _, t := range s.registry.List() {
 		runner := s.runnerForRun(t.Run)
 		if runner == nil {
 			s.log.Warn("health owners: no runner for run", "address", t.Address, "runner", t.Runner)

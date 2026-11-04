@@ -158,7 +158,7 @@ func TestRecoveryRunner_NudgePromptsThroughTheRunnerAndWatchesItsKind(t *testing
 	if got := fake.Prompts(iterLabel); !slices.Equal(got, []string{"go on"}) {
 		t.Errorf("prompts = %q, want the nudge", got)
 	}
-	run, ok := h.Server.RunOf("proj:epic-a/01")
+	run, ok := h.Server.Registry().RunOf("proj:epic-a/01")
 	if !ok || run.Runner != "headless" || run.Session.ID != sess.ID {
 		t.Errorf("watched run = %+v, %v; want headless on %s", run, ok, sess.ID)
 	}

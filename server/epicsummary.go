@@ -33,7 +33,7 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 		if i < 0 || epics[i].IsMap || !epics[i].MergedAt.IsZero() {
 			continue
 		}
-		sum := summarizeEpic(root, epics[i], s.registry.startedAtOf, recoveryOf, readLogLenient)
+		sum := summarizeEpic(root, epics[i], s.registry.StartedAtOf, recoveryOf, readLogLenient)
 		for j := range sum.Active {
 			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
 		}

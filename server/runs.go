@@ -1,519 +1,28 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/server/wire"
-	"log/slog"
 	"maps"
 	"os"
-	"path/filepath"
 	"slices"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
-const runsFileName = "runs.json"
-
-// Run is one launched iteration in the server's run registry.
-type Run struct {
-	Address string `json:"address"`
-	Agent   string `json:"agent"`
-	// Runner names the agentrunner hosting Session, e.g. "herdr".
-	Runner  string              `json:"runner"`
-	Session agentrunner.Session `json:"session"`
-	// Model and Effort are what the agent launched under; a conflict on its
-	// merge inherits them. Empty when the launch named none.
-	Model  string `json:"model,omitempty"`
-	Effort string `json:"effort,omitempty"`
-}
-
-// pauseEvent is the run's agent context on its pause event: the pause drops the
-// runs.json entry, so late-finish adoption finds the runner from here.
-func (r Run) pauseEvent() ralphloop.Event {
-	return ralphloop.Event{Agent: ralphloop.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID, Model: r.Model, Effort: r.Effort}
-}
-
-// runnerHerdr is the Runner of every launch until the server launches
-// through agentrunner, and of any run an older server saved.
-const runnerHerdr = "herdr"
-
-// runLaunching is the State of a run whose agent may not be started or prompted yet.
-const runLaunching = "launching"
-
-// savedRun reads runs.json, including files written before Run held a
-// Session: those carried the herdr pane at the top level instead.
-type savedRun struct {
-	trackedRun
-	Pane string `json:"pane"`
-}
-
-// iterationLabel is the agent label of the iteration of the ticket at address.
-func iterationLabel(address string) string {
-	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
-	if err != nil {
-		return address
-	}
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
-	return label
-}
-
-// trackedRun is a Run plus what a restarted server needs to finish it.
-type trackedRun struct {
-	Run
-	Root       string `json:"root"`
-	Repo       string `json:"repo"`
-	Workspace  string `json:"workspace"`
-	Base       string `json:"base"`
-	TicketPath string `json:"ticket_path"`
-	// Cwd is the directory the agent started in. Empty for a run an older
-	// server saved, which worktree removal then treats as inside its epic.
-	Cwd string `json:"cwd,omitempty"`
-	// StartedAt is when the claim launched; it survives a restart with the
-	// registry file. Zero for a run an older server recorded.
-	StartedAt time.Time `json:"started_at,omitzero"`
-	// WaitingSince is when the agent asked a question and went idle, still
-	// alive for the answer. Zero while it works.
-	WaitingSince time.Time `json:"waiting_since,omitzero"`
-	// SlotReleased marks a waiting run that outlived the grace period: it stays
-	// alive but no longer counts toward the slot caps. Cleared by the answer.
-	SlotReleased bool `json:"slot_released,omitempty"`
-	// State is runLaunching from the claim until the agent has started and
-	// been prompted, so a crash in between leaves a handle reclaim can see.
-	State string `json:"state,omitempty"`
-	// Watched marks a pane a nudge set working again after its run ended
-	// (see watchNudgedPane): it is metered and budget-stopped like a run, but
-	// never finished, and never saved, so a restart cannot reclaim it.
-	Watched bool `json:"-"`
-	// Settling is set once settleRun starts merging the run, while the ticket
-	// still reads finished. Never saved: a restart reclaims and settles again.
-	Settling bool `json:"-"`
-	// RateLimited marks a run the wait loop holds for the agent's rate limit;
-	// RateLimitReset is when it resets (zero when unknown). Never saved: a
-	// restart re-derives the hold from the runner's rate-limit check.
-	RateLimited    bool      `json:"-"`
-	RateLimitReset time.Time `json:"-"`
-}
-
-// runRegistry is the server's own record of launched iterations, keyed by
-// ticket address (a root may hold several). Independent of the TUI's.
-// It lives in a state-dir file too, so a restart can reclaim what is running.
-type runRegistry struct {
-	mu   sync.Mutex
-	path string
-	log  *slog.Logger
-	runs map[string]trackedRun
-	// released are the runs whose background-task gate recovery forced open.
-	// In memory only: a reclaimed run starts with its gate closed again.
-	released map[string]gateRelease
-	// budgetStops are the runs the budget hard limit is stopping, true once
-	// one path has paused it budget-killed. In memory only.
-	budgetStops map[string]bool
-}
-
-// openRuns returns the registry and the handles the previous server left behind.
-// The registry itself starts empty: only reclaimed handles go back into it.
-func openRuns(stateDir string, log *slog.Logger) (*runRegistry, []trackedRun, error) {
-	r := &runRegistry{path: filepath.Join(stateDir, runsFileName), log: log, runs: map[string]trackedRun{}}
-	data, err := os.ReadFile(r.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return r, nil, nil
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	var saved []savedRun
-	if err := json.Unmarshal(data, &saved); err != nil {
-		return nil, nil, err
-	}
-	out := make([]trackedRun, 0, len(saved))
-	for _, s := range saved {
-		t := s.trackedRun
-		if t.Session.ID == "" && s.Pane != "" {
-			t.Runner = runnerHerdr
-			t.Session = agentrunner.Session{Label: iterationLabel(t.Address), ID: s.Pane}
-		}
-		out = append(out, t)
-	}
-	return r, out, nil
-}
-
-// save writes through a rename so a crash never leaves a torn file. Callers hold mu.
-func (r *runRegistry) save() {
-	list := make([]trackedRun, 0, len(r.runs))
-	for _, t := range r.runs {
-		if !t.Watched {
-			list = append(list, t)
-		}
-	}
-	data, err := json.Marshal(list)
-	if err == nil {
-		tmp := r.path + ".tmp"
-		if err = os.WriteFile(tmp, data, 0o600); err == nil {
-			err = os.Rename(tmp, r.path)
-		}
-	}
-	if err != nil && r.log != nil {
-		r.log.Warn("persist runs", "err", err)
-	}
-}
-
-func (r *runRegistry) has(address string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	_, ok := r.runs[address]
-	return ok
-}
-
-// waitGone polls has every poll until address leaves the registry. False means
-// it was still there at timeout.
-func (r *runRegistry) waitGone(address string, timeout, poll time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for r.has(address) {
-		if time.Now().After(deadline) {
-			return false
-		}
-		time.Sleep(poll)
-	}
-	return true
-}
-
-// countWhere counts the runs that hold a slot and match keep.
-func (r *runRegistry) countWhere(keep func(trackedRun) bool) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	n := 0
-	for _, t := range r.runs {
-		if !t.SlotReleased && keep(t) {
-			n++
-		}
-	}
-	return n
-}
-
-// countRoot is how many iterations of root's tickets hold a slot.
-func (r *runRegistry) countRoot(root string) int {
-	return r.countWhere(func(t trackedRun) bool { return t.Root == root })
-}
-
-// countProject is how many iterations of the project's tickets hold a slot.
-func (r *runRegistry) countProject(project string) int {
-	return r.countWhere(func(t trackedRun) bool { return strings.HasPrefix(t.Root, project+":") })
-}
-
-// runOf returns the run whose iteration is of the ticket at address.
-func (r *runRegistry) runOf(address string) (Run, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, t := range r.runs {
-		if t.Address == address {
-			return t.Run, true
-		}
-	}
-	return Run{}, false
-}
-
-// startedAtOf returns when the iteration of the ticket at address was launched.
-func (r *runRegistry) startedAtOf(address string) (time.Time, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, t := range r.runs {
-		if t.Address == address && !t.StartedAt.IsZero() {
-			return t.StartedAt, true
-		}
-	}
-	return time.Time{}, false
-}
-
-func (r *runRegistry) list() []trackedRun {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	out := make([]trackedRun, 0, len(r.runs))
-	for _, t := range r.runs {
-		out = append(out, t)
-	}
-	return out
-}
-
-// count is how many runs hold a slot toward the global cap.
-func (r *runRegistry) count() int {
-	return r.countWhere(func(trackedRun) bool { return true })
-}
-
-// waitState is where the run at address stands in its wait for an answer.
-type waitState struct {
-	Waiting  bool // the run is alive and waiting
-	Released bool // it gave its slot up
-	// CapHeld: the grace period is over but the release cap kept the slot.
-	CapHeld bool
-}
-
-// waitStateOf reports the wait of the run at address, judged at now against
-// grace and the release cap max.
-func (r *runRegistry) waitStateOf(address string, now time.Time, grace time.Duration, max int) waitState {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	t, ok := r.runs[address]
-	if !ok || t.WaitingSince.IsZero() {
-		return waitState{}
-	}
-	if t.SlotReleased {
-		return waitState{Waiting: true, Released: true}
-	}
-	if now.Sub(t.WaitingSince) < grace {
-		return waitState{Waiting: true}
-	}
-	released := 0
-	for _, o := range r.runs {
-		if o.SlotReleased {
-			released++
-		}
-	}
-	return waitState{Waiting: true, CapHeld: released >= max}
-}
-
-// releaseWaiting releases the slot of each run that has waited at least grace,
-// oldest wait first, while fewer than max runs are released. It reports how
-// many it released.
-func (r *runRegistry) releaseWaiting(now time.Time, grace time.Duration, max int) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	released := 0
-	var due []trackedRun
-	for _, t := range r.runs {
-		switch {
-		case t.SlotReleased:
-			released++
-		case !t.WaitingSince.IsZero() && now.Sub(t.WaitingSince) >= grace:
-			due = append(due, t)
-		}
-	}
-	slices.SortFunc(due, func(a, b trackedRun) int { return a.WaitingSince.Compare(b.WaitingSince) })
-	n := 0
-	for _, t := range due {
-		if released+n >= max {
-			break
-		}
-		t.SlotReleased = true
-		r.runs[t.Address] = t
-		n++
-	}
-	if n > 0 {
-		r.save()
-	}
-	return n
-}
-
-func (r *runRegistry) tracked(address string) (trackedRun, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	t, ok := r.runs[address]
-	return t, ok
-}
-
-// gateRelease is what recovery left on a run whose gate it forced open.
-type gateRelease struct {
-	// pause is the reason the run's finish pauses with instead of merging; ""
-	// lets the finish run.
-	pause string
-}
-
-func (r *runRegistry) releaseGate(address, pause string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.released == nil {
-		r.released = map[string]gateRelease{}
-	}
-	r.released[address] = gateRelease{pause: pause}
-}
-
-// gatePause is the pause reason release-gate left for the run at address.
-func (r *runRegistry) gatePause(address string) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.released[address].pause
-}
-
-// gateReleased is the Deps.GateReleased hook of the run at address.
-func (r *runRegistry) gateReleased(address string) func() bool {
-	return func() bool {
-		r.mu.Lock()
-		defer r.mu.Unlock()
-		_, ok := r.released[address]
-		return ok
-	}
-}
-
-// markBudgetStop records that the budget hard limit is stopping the run at
-// address, before its agent is interrupted.
-func (r *runRegistry) markBudgetStop(address string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.budgetStops == nil {
-		r.budgetStops = map[string]bool{}
-	}
-	if _, ok := r.budgetStops[address]; !ok {
-		r.budgetStops[address] = false
-	}
-}
-
-// claimBudgetStop reports whether the run at address is being budget-stopped,
-// and whether this caller is the first to claim it, so the run is paused
-// budget-killed exactly once: by the kill or by the run's own settle.
-func (r *runRegistry) claimBudgetStop(address string) (stopping, first bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	paused, ok := r.budgetStops[address]
-	if !ok {
-		return false, false
-	}
-	r.budgetStops[address] = true
-	return true, !paused
-}
-
-// deleteWatched drops the watched pane t, unless a run has since replaced it
-// (e.g. a relaunch claimed the ticket again).
-func (r *runRegistry) deleteWatched(t trackedRun) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if cur, ok := r.runs[t.Address]; ok && cur.Watched && cur.Session.ID == t.Session.ID {
-		r.deleteLocked(t.Address)
-	}
-}
-
-func (r *runRegistry) delete(address string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.deleteLocked(address)
-}
-
-func (r *runRegistry) deleteLocked(address string) {
-	delete(r.runs, address)
-	delete(r.released, address)
-	delete(r.budgetStops, address)
-	r.save()
-}
-
-// markWaiting flags the run at address as waiting for an answer since at.
-func (r *runRegistry) markWaiting(address string, at time.Time) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if t, ok := r.runs[address]; ok {
-		t.WaitingSince = at
-		r.runs[address] = t
-		r.save()
-	}
-}
-
-// markRateLimit sets or clears the rate-limit hold of the run at address.
-func (r *runRegistry) markRateLimit(address string, limited bool, resetAt time.Time) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if t, ok := r.runs[address]; ok {
-		t.RateLimited, t.RateLimitReset = limited, resetAt
-		r.runs[address] = t
-	}
-}
-
-// rateLimitedRuns are the held runs, ordered by address.
-func (r *runRegistry) rateLimitedRuns() []trackedRun {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	var held []trackedRun
-	for _, t := range r.runs {
-		if t.RateLimited {
-			held = append(held, t)
-		}
-	}
-	slices.SortFunc(held, func(a, b trackedRun) int { return strings.Compare(a.Address, b.Address) })
-	return held
-}
-
-// rateLimitHeld reports the held run of agent that resets last (any run when
-// none has a known reset), whose limit the whole harness shares.
-func (r *runRegistry) rateLimitHeld(agent string) (trackedRun, bool) {
-	var best trackedRun
-	found := false
-	for _, t := range r.rateLimitedRuns() {
-		if t.Agent == agent && (!found || t.RateLimitReset.After(best.RateLimitReset)) {
-			best, found = t, true
-		}
-	}
-	return best, found
-}
-
-// markSettling flags the run at address as inside settleRun.
-func (r *runRegistry) markSettling(address string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if t, ok := r.runs[address]; ok {
-		t.Settling = true
-		r.runs[address] = t
-	}
-}
-
-// clearWaiting ends the run's wait for an answer. The run takes its slot back
-// at once, even over the limit.
-func (r *runRegistry) clearWaiting(address string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if t, ok := r.runs[address]; ok {
-		t.WaitingSince = time.Time{}
-		t.SlotReleased = false
-		r.runs[address] = t
-		r.save()
-	}
-}
-
-// putIfAbsent records t unless its ticket already has an entry, so two claims
-// of one ticket cannot both launch.
-func (r *runRegistry) putIfAbsent(t trackedRun) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.runs[t.Address]; ok {
-		return false
-	}
-	r.runs[t.Address] = t
-	r.save()
-	return true
-}
-
-// deleteStarted drops the entry at address only if it is the one started at
-// startedAt, so a failed launch never removes another run's entry.
-func (r *runRegistry) deleteStarted(address string, startedAt time.Time) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if cur, ok := r.runs[address]; ok && cur.StartedAt.Equal(startedAt) {
-		r.deleteLocked(address)
-	}
-}
-
-func (r *runRegistry) put(t trackedRun) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.runs[t.Address] = t
-	r.save()
-}
-
 // Runs lists the registry, for tests and later reads.
-func (s *Server) Runs() []Run {
-	s.registry.mu.Lock()
-	defer s.registry.mu.Unlock()
-	out := make([]Run, 0, len(s.registry.runs))
-	for _, t := range s.registry.runs {
-		out = append(out, t.Run)
-	}
-	return out
-}
+func (s *Server) Runs() []runs.Run { return s.registry.Runs() }
+
+// Registry is the run registry, for tests that seed or read it.
+func (s *Server) Registry() *runs.Registry { return s.registry }
 
 // reclaimRuns takes over every persisted iteration that is still alive: its
 // agent is known to its runner and its worktree exists. It asks nothing, so a
@@ -536,10 +45,10 @@ func (s *Server) reclaimRuns() {
 // that still hosts live runs; those runs flush on it while new launches don't.
 func (s *Server) logFlushingRunners() {
 	counts := map[string]int{}
-	for _, t := range s.registry.list() {
+	for _, t := range s.registry.List() {
 		name := t.Runner
 		if name == "" {
-			name = runnerHerdr
+			name = runs.RunnerHerdr
 		}
 		if name != s.cfg.Runner.Name() {
 			counts[name]++
@@ -555,7 +64,7 @@ var errHandleMismatch = errors.New("handle mismatch")
 
 // pauseUnreclaimed pauses the ticket of a handle that cannot be reclaimed, so a
 // person sees it instead of it staying claimed forever.
-func (s *Server) pauseUnreclaimed(t trackedRun, cause error) {
+func (s *Server) pauseUnreclaimed(t runs.TrackedRun, cause error) {
 	kind := events.IterationError
 	if errors.Is(cause, errHandleMismatch) {
 		kind = events.HandleMismatch
@@ -577,7 +86,7 @@ func (s *Server) pauseUnreclaimed(t trackedRun, cause error) {
 // one that died with the server down is reopened when it left nothing behind,
 // else pauses stuck with its dir kept. A live agent that was waiting for
 // an answer stays waiting and unsettled.
-func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error {
+func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return err
@@ -586,11 +95,11 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 	if !ok {
 		return fmt.Errorf("%w: runner %s cannot reattach", errHandleMismatch, t.Runner)
 	}
-	session, verdict, err := re.Reattach(iterationLabel(t.Address))
+	session, verdict, err := re.Reattach(runs.IterationLabel(t.Address))
 	if err != nil {
 		return fmt.Errorf("%w: reattach %s: %v", errHandleMismatch, t.Address, err)
 	}
-	if verdict == nativerunner.VerdictFinished && t.State == runLaunching {
+	if verdict == nativerunner.VerdictFinished && t.State == runs.Launching {
 		// Never settle it: the agent may have finished without ever being prompted.
 		return s.stopLaunching(t, runner, session, "finished")
 	}
@@ -616,10 +125,10 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 		t.Session = session
 	}
 	t.State = ""
-	s.registry.put(t)
+	s.registry.Put(t)
 	s.events.Publish(wire.EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
-	deps.GateReleased = s.registry.gateReleased(t.Address)
+	deps.GateReleased = s.registry.GateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished || reportedFinished(t.TicketPath) {
 		s.goSettle(func() { s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil) })
 		return nil
@@ -639,22 +148,22 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 // before the first claim pass, so a restart never claims a ticket of a limited
 // harness. The wait loop clears the mark when the limit lifts. The mark is
 // the whole state: nothing is stored.
-func (s *Server) holdIfRateLimited(runner agentrunner.Runner, t trackedRun) {
+func (s *Server) holdIfRateLimited(runner agentrunner.Runner, t runs.TrackedRun) {
 	resetAt, limited, err := runner.RateLimit(t.Session)
 	if err != nil || !limited {
 		return
 	}
-	s.registry.markRateLimit(t.Address, true, resetAt)
+	s.registry.MarkRateLimit(t.Address, true, resetAt)
 }
 
 // reclaim goes through the runner that started t, whatever runner is
 // configured now: a herdr run under a headless server is still herdr's. An
 // unavailable runner can't say whether the agent is gone, so only an agent
 // the runner reports gone is ever reopened.
-func (s *Server) reclaim(t trackedRun) error {
+func (s *Server) reclaim(t runs.TrackedRun) error {
 	name := t.Runner
 	if name == "" {
-		name = runnerHerdr
+		name = runs.RunnerHerdr
 	}
 	runner := s.runnerForRun(t.Run)
 	if runner == nil {
@@ -663,10 +172,10 @@ func (s *Server) reclaim(t trackedRun) error {
 	if err := agentrunner.Healthy(runner); err != nil {
 		return fmt.Errorf("%w: started by %s; %s unavailable: %v", errHandleMismatch, name, name, err)
 	}
-	if name != runnerHerdr {
+	if name != runs.RunnerHerdr {
 		return s.reclaimHeadless(t, runner)
 	}
-	label := iterationLabel(t.Address)
+	label := runs.IterationLabel(t.Address)
 	session, found, err := runner.Find(label)
 	if err != nil {
 		// A lookup that failed says nothing about whether the agent is gone.
@@ -678,7 +187,7 @@ func (s *Server) reclaim(t trackedRun) error {
 		}
 		return fmt.Errorf("%w: no pane", errHandleMismatch)
 	}
-	if t.State == runLaunching {
+	if t.State == runs.Launching {
 		st, err := runner.Status(session)
 		if err != nil {
 			return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
@@ -695,13 +204,13 @@ func (s *Server) reclaim(t trackedRun) error {
 	if err != nil {
 		return err
 	}
-	t.Runner = runnerHerdr
+	t.Runner = runs.RunnerHerdr
 	t.Session = agentrunner.Session{Label: label, ID: session.ID, SessionID: t.Session.SessionID}
 	t.State = ""
-	s.registry.put(t)
+	s.registry.Put(t)
 	s.events.Publish(wire.EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
-	deps.GateReleased = s.registry.gateReleased(t.Address)
+	deps.GateReleased = s.registry.GateReleased(t.Address)
 	rc := runContext{deps, root, mode, one, wt, t.Run, t.Address}
 	if reportedFinished(t.TicketPath) {
 		// The wait reads the agent's state, which a leftover background task can hold at working.
@@ -716,7 +225,7 @@ func (s *Server) reclaim(t trackedRun) error {
 // stopLaunching closes the agent of a launch the server died in, which is
 // waiting rather than working, so it may never have been prompted; then the
 // claim reopens if it is empty.
-func (s *Server) stopLaunching(t trackedRun, runner agentrunner.Runner, session agentrunner.Session, status string) error {
+func (s *Server) stopLaunching(t runs.TrackedRun, runner agentrunner.Runner, session agentrunner.Session, status string) error {
 	if err := runner.Stop(session); err != nil {
 		return fmt.Errorf("stop launching agent: %w", err)
 	}
@@ -728,7 +237,7 @@ func (s *Server) stopLaunching(t trackedRun, runner agentrunner.Runner, session 
 
 // resume rebuilds the iteration a persisted handle stands for, whose worktree
 // must still exist.
-func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
+func (s *Server) resume(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
 	one, wt, mode, err := s.resolveRun(t)
 	if err != nil {
 		return one, wt, mode, err
@@ -742,7 +251,7 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 // reopenEmptyClaim reopens the ticket of a gone agent that left nothing behind
 // (no commits past base, no edits), clearing its worktree and branch. It
 // reports false, touching nothing, when the iteration holds or may hold work.
-func (s *Server) reopenEmptyClaim(t trackedRun) (bool, error) {
+func (s *Server) reopenEmptyClaim(t runs.TrackedRun) (bool, error) {
 	one, wt, mode, err := s.resolveRun(t)
 	if err != nil {
 		return false, err
@@ -807,7 +316,7 @@ func iterationEmpty(mode iterationMode, wt ralphloop.IterationWorktree, repo, ba
 
 // resolveRun rebuilds the iteration a persisted handle stands for, whether or
 // not its worktree is still on disk.
-func (s *Server) resolveRun(t trackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
+func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err

@@ -108,7 +108,7 @@ func (s *Server) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 	}
 	// The web page sends the state it shows; the socket route sends none.
 	if shown := wire.EpicState(req.State); shown != "" {
-		now := epicStateFor(root, e, s.registry.startedAtOf)
+		now := epicStateFor(root, e, s.registry.StartedAtOf)
 		if shown = shownEpicState(shown, e); shown != now {
 			return mergeEpicRef{}, refuseMerge(wire.ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
 		}

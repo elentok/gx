@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/runs"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -43,7 +44,7 @@ func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
 		{"pty", "pty"},
 		{"", "herdr"},
 	} {
-		r, ok := s.runnerForRun(Run{Address: "proj:epic-a/01", Runner: tc.saved}).(*namedRunner)
+		r, ok := s.runnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: tc.saved}).(*namedRunner)
 		if !ok || r.name != tc.want || r.project != "proj" {
 			t.Errorf("runner %q: got %+v, want %s for proj", tc.saved, r, tc.want)
 		}
@@ -53,7 +54,7 @@ func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
 func TestRunnerForRun_UnbuildableRunnerIsNil(t *testing.T) {
 	t.Parallel()
 	s, _ := routingServer()
-	if r := s.runnerForRun(Run{Address: "proj:epic-a/01", Runner: "tmux"}); r != nil {
+	if r := s.runnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "tmux"}); r != nil {
 		t.Errorf("got %v, want nil", r)
 	}
 }
@@ -74,10 +75,10 @@ func TestRunnerForRun_FallsBackToTheConfiguredRunnerByName(t *testing.T) {
 	t.Parallel()
 	s, configured := routingServer()
 	s.cfg.RunnerFor = nil
-	if r := s.runnerForRun(Run{Address: "proj:epic-a/01", Runner: "headless"}); r != agentrunner.Runner(configured) {
+	if r := s.runnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "headless"}); r != agentrunner.Runner(configured) {
 		t.Errorf("got %v, want the configured runner", r)
 	}
-	if r := s.runnerForRun(Run{Address: "proj:epic-a/01"}); r != nil {
+	if r := s.runnerForRun(runs.Run{Address: "proj:epic-a/01"}); r != nil {
 		t.Errorf("herdr run under headless with no RunnerFor: got %v, want nil", r)
 	}
 }

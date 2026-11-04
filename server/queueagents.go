@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"github.com/elentok/gx/server/runs"
 	"path/filepath"
 	"strings"
 
@@ -31,7 +32,7 @@ func (s *Server) listSessionsWithQueue() ([]wire.SessionInfo, error) {
 // session; a paused ticket's live agent keeps its run.
 func (s *Server) queueAgentRows() []wire.SessionInfo {
 	var rows []wire.SessionInfo
-	for _, t := range s.registry.list() {
+	for _, t := range s.registry.List() {
 		if t.Runner != runnerPTY || t.Watched {
 			continue
 		}
@@ -42,7 +43,7 @@ func (s *Server) queueAgentRows() []wire.SessionInfo {
 	return rows
 }
 
-func (s *Server) queueAgentRow(t trackedRun) (wire.SessionInfo, bool) {
+func (s *Server) queueAgentRow(t runs.TrackedRun) (wire.SessionInfo, bool) {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return wire.SessionInfo{}, false
@@ -55,7 +56,7 @@ func (s *Server) queueAgentRow(t trackedRun) (wire.SessionInfo, bool) {
 	if err != nil {
 		return wire.SessionInfo{}, false
 	}
-	label := iterationLabel(t.Address)
+	label := runs.IterationLabel(t.Address)
 	info := wire.SessionInfo{
 		ID:              queueAgentIDPrefix + label,
 		Name:            label,

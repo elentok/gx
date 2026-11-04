@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"sync"
@@ -142,7 +143,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	if lf.pause.Label != "" {
 		label = lf.pause.Label
 	}
-	run := Run{
+	run := runs.Run{
 		Address: addr.String(), Agent: string(lf.pause.Agent), Runner: lf.pause.Runner,
 		Session: agentrunner.Session{Label: label, SessionID: lf.pause.AgentSession},
 		Model:   lf.pause.Model, Effort: lf.pause.Effort,
@@ -158,7 +159,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		return false
 	}
 	base, _ := git.MergeBase(worktree, branch, addr.Epic)
-	one, wt, mode, err := s.resolveRun(trackedRun{Run: run, Repo: repo, Base: base, TicketPath: lf.path})
+	one, wt, mode, err := s.resolveRun(runs.TrackedRun{Run: run, Repo: repo, Base: base, TicketPath: lf.path})
 	if err != nil {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
 		return false

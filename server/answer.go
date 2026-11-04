@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"slices"
 	"strings"
 	"time"
@@ -136,7 +137,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			return wire.QueueResult{Outcome: wire.OutcomeAdopted}, nil
 		}
 		address := ref.addr.String()
-		var run trackedRun
+		var run runs.TrackedRun
 		var queued bool
 		_, err := tickets.AppendLogFrom(ref.ticket.Path, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
 			t, err := schema.ParseTicket(ref.ticket.Path)
@@ -175,7 +176,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 				if res, refused := s.budgetRefusal(); refused {
 					return refuse(res)
 				}
-				run, _ = s.registry.tracked(address)
+				run, _ = s.registry.Tracked(address)
 				runner, err := s.runnerOf(run.Run)
 				if err != nil {
 					return tickets.LogEvent{}, err
@@ -213,7 +214,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		if queued {
 			// Open again for gx to claim; the dead run has nothing to settle.
-			s.registry.delete(address)
+			s.registry.Delete(address)
 			if err := ralphloop.ResumeTicket(ref.ticket.Path, time.Now()); err != nil {
 				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
 			}
@@ -234,7 +235,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 // agentGone reports that no live agent is waiting on address: its run is not
 // tracked as waiting, or its session is missing or died.
 func (s *Server) agentGone(address string) (bool, error) {
-	run, ok := s.registry.tracked(address)
+	run, ok := s.registry.Tracked(address)
 	if !ok || run.WaitingSince.IsZero() {
 		return true, nil
 	}
@@ -251,7 +252,7 @@ func (s *Server) agentGone(address string) (bool, error) {
 
 // resettleWaiting ends a run's wait for an answer and settles it as a normal
 // run: the run context is rebuilt from the registry entry, as a restart does.
-func (s *Server) resettleWaiting(t trackedRun) error {
+func (s *Server) resettleWaiting(t runs.TrackedRun) error {
 	runner, err := s.runnerOf(t.Run)
 	if err != nil {
 		return err
@@ -264,9 +265,9 @@ func (s *Server) resettleWaiting(t trackedRun) error {
 	if err != nil {
 		return err
 	}
-	s.registry.clearWaiting(t.Address)
+	s.registry.ClearWaiting(t.Address)
 	deps := s.depsWith(runner)
-	deps.GateReleased = s.registry.gateReleased(t.Address)
+	deps.GateReleased = s.registry.GateReleased(t.Address)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
 	return nil
 }

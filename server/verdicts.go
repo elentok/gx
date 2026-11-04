@@ -24,9 +24,9 @@ type verdictLog struct {
 // verdictOf is the full explain for one stored ticket.
 func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Address) wire.Explanation {
 	// A launch is tracked before the index may have reread its claim.
-	claimed := t.Status == "claimed" || s.registry.has(addr.String())
+	claimed := t.Status == "claimed" || s.registry.Has(addr.String())
 	// A rate-limit hold outranks every other wait reason.
-	if t, ok := s.registry.tracked(addr.String()); ok && t.RateLimited {
+	if t, ok := s.registry.Tracked(addr.String()); ok && t.RateLimited {
 		return wire.Explanation{Address: addr.String(), Verdict: rateLimitVerdict(t.RateLimitReset)}
 	}
 	// A live agent waiting for its answer outranks the stored status.
@@ -70,7 +70,7 @@ func rateLimitVerdict(resetAt time.Time) string {
 func (s *Server) waitingVerdict(addr tickets.Address) (string, bool) {
 	st, def := s.settings.Load(), config.DefaultExecutionQueueConfig()
 	grace := cmp.Or(st.WaitingSlotGrace, def.WaitingSlotGrace)
-	w := s.registry.waitStateOf(addr.String(), time.Now(), grace, st.MaxReleasedAgents)
+	w := s.registry.WaitStateOf(addr.String(), time.Now(), grace, st.MaxReleasedAgents)
 	switch {
 	case !w.Waiting:
 		return "", false
@@ -115,13 +115,13 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	// Every full cap is named, not just the first one hit.
 	var full []string
 	rootCap := s.perRootLimit(rootOf(addr))
-	if n, limit := s.registry.countRoot(root), rootCap; n >= limit {
+	if n, limit := s.registry.CountRoot(root), rootCap; n >= limit {
 		full = append(full, fmt.Sprintf("epic cap %d/%d", n, limit))
 	}
 	if n, limit, atCap := s.projectAtCap(addr.Project); atCap {
 		full = append(full, fmt.Sprintf("project cap %d/%d", n, limit))
 	}
-	limit, running := s.concurrencyLimit(), s.registry.count()
+	limit, running := s.concurrencyLimit(), s.registry.Count()
 	free := limit - running
 	if free <= 0 {
 		full = append(full, fmt.Sprintf("global cap %d/%d", running, limit))
@@ -129,7 +129,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	switch {
 	case len(full) > 0:
 		ex.Verdict, ex.Reason = wire.VerdictConcurrencyCap, strings.Join(full, ", ")
-	case frontierIndex(e, t) >= rootCap-s.registry.countRoot(root):
+	case frontierIndex(e, t) >= rootCap-s.registry.CountRoot(root):
 		ex.Verdict, ex.Reason = wire.VerdictWaitingInQueue, "earlier tickets of the epic go first"
 	case ahead >= free:
 		ex.Verdict, ex.Reason = wire.VerdictWaitingInQueue, fmt.Sprintf("%d queued root(s) ahead for %d free slot(s)", ahead, free)
@@ -162,7 +162,7 @@ func (s *Server) rootsAhead(root string) (ahead int, queued bool) {
 		if r == root {
 			return ahead, true
 		}
-		if !seen[r] && s.registry.countRoot(r) == 0 {
+		if !seen[r] && s.registry.CountRoot(r) == 0 {
 			seen[r] = true
 			ahead++
 		}
@@ -223,7 +223,7 @@ func (s *Server) pendingRows() []wire.PendingRow {
 	}
 	// A running ticket is no queue target; a held run still gets a row so the
 	// verdict plumbing shows its hold.
-	for _, t := range s.registry.rateLimitedRuns() {
+	for _, t := range s.registry.RateLimitedRuns() {
 		if !covered[t.Address] {
 			rows = append(rows, wire.PendingRow{Address: t.Address, Agent: t.Agent, Verdict: rateLimitVerdict(t.RateLimitReset)})
 		}

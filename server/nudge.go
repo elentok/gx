@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"strings"
 	"sync"
 	"time"
@@ -86,7 +87,7 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 			return wire.QueueResult{}, fmt.Errorf("logging nudge of %s: %w", address, err)
 		}
 		s.events.Publish(wire.EventTicketNudged, address)
-		if !s.registry.has(address) {
+		if !s.registry.Has(address) {
 			s.watchNudgedPane(ref, it)
 		}
 		return wire.QueueResult{}, nil
@@ -105,14 +106,14 @@ const (
 // as a run, so the budget meters it and the hard limit stops it. It is never
 // finished or merged; the paused ticket stays with whoever handles the pause.
 func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
-	t := trackedRun{
-		Run:  Run{Address: ref.addr.String(), Runner: it.runner.Name(), Session: it.session},
+	t := runs.TrackedRun{
+		Run:  runs.Run{Address: ref.addr.String(), Runner: it.runner.Name(), Session: it.session},
 		Root: ref.root().String(), TicketPath: ref.ticket.Path, Cwd: it.info.Worktree, StartedAt: time.Now(), Watched: true,
 	}
 	r := it.runner
-	s.registry.put(t)
+	s.registry.Put(t)
 	s.goSettle(func() {
-		defer s.registry.deleteWatched(t)
+		defer s.registry.DeleteWatched(t)
 		// The nudge may not have shown as working yet; a pane already idle
 		// again by the deadline simply settles below.
 		_, err := r.Wait(t.Session, []agentrunner.State{agentrunner.StateWorking}, nudgeWatchStart)
@@ -121,7 +122,7 @@ func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
 				break
 			}
 		}
-		if stopping, first := s.registry.claimBudgetStop(t.Address); stopping && first {
+		if stopping, first := s.registry.ClaimBudgetStop(t.Address); stopping && first {
 			if perr := s.pauseBudgetKilled(t); perr != nil {
 				s.log.Error("budget kill", "ticket", t.Address, "err", perr)
 			}

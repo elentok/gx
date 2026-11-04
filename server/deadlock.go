@@ -157,7 +157,7 @@ func cycleReason(root rootRef, e tickets.Epic) string {
 // recovery; it forgets the deadlock once the epic can move again.
 func (s *Server) checkDeadlock(root rootRef, projectDir string, e tickets.Epic) {
 	kind, stuck := deadlockKind(e)
-	if !stuck || s.registry.countRoot(root.String()) > 0 {
+	if !stuck || s.registry.CountRoot(root.String()) > 0 {
 		s.deadlocks.leave(root)
 		return
 	}

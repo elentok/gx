@@ -12,7 +12,7 @@ import "github.com/elentok/gx/check"
 // gone, so a killed waiter never leaves a label, and a run with no tracked
 // ticket matches nothing.
 func (s *Server) checkWaitingLabel(address string) string {
-	t, ok := s.registry.tracked(address)
+	t, ok := s.registry.Tracked(address)
 	if !ok || t.Cwd == "" {
 		return ""
 	}

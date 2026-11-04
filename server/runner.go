@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -204,7 +205,7 @@ func (s *Server) claimNext() {
 		return
 	}
 	limit := s.concurrencyLimit()
-	running := s.registry.count()
+	running := s.registry.Count()
 	seen := map[string]bool{}
 	for _, item := range s.queued.list() {
 		addr, err := parseQueuedAddress(item.Address)
@@ -232,7 +233,7 @@ func (s *Server) claimNext() {
 func (s *Server) releaseWaitingSlots(now time.Time) {
 	st, def := s.settings.Load(), config.DefaultExecutionQueueConfig()
 	grace := cmp.Or(st.WaitingSlotGrace, def.WaitingSlotGrace)
-	if n := s.registry.releaseWaiting(now, grace, st.MaxReleasedAgents); n > 0 {
+	if n := s.registry.ReleaseWaiting(now, grace, st.MaxReleasedAgents); n > 0 {
 		s.log.Info("released waiting slots", "count", n)
 	}
 }
@@ -281,7 +282,7 @@ func (s *Server) projectAtCap(project string) (running, limit int, atCap bool) {
 	if err != nil || pf.MaxAgents == nil || *pf.MaxAgents <= 0 {
 		return 0, 0, false
 	}
-	running, limit = s.registry.countProject(project), *pf.MaxAgents
+	running, limit = s.registry.CountProject(project), *pf.MaxAgents
 	return running, limit, running >= limit
 }
 
@@ -300,7 +301,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 		return false, err
 	}
 	root := rootOf(addr)
-	if s.registry.countRoot(root.String()) >= s.perRootLimit(root) {
+	if s.registry.CountRoot(root.String()) >= s.perRootLimit(root) {
 		return false, nil
 	}
 	if _, _, atCap := s.projectAtCap(addr.Project); atCap {
@@ -386,7 +387,7 @@ func (s *Server) parentAwaitsAdoption(dir string, addr tickets.Address, e ticket
 func (s *Server) nextUntracked(project string, e tickets.Epic) (tickets.Ticket, bool) {
 	for _, t := range ralphloop.Frontier(e) {
 		addr := tickets.Address{Project: project, Epic: filepath.Base(e.Path), ID: t.Identifier}
-		if !s.registry.has(addr.String()) {
+		if !s.registry.Has(addr.String()) {
 			return t, true
 		}
 	}
@@ -462,7 +463,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		if perr := s.pauseTicket(dir, ticket, t.Path, events.AmbiguousBase, reason, Run{}); perr != nil {
+		if perr := s.pauseTicket(dir, ticket, t.Path, events.AmbiguousBase, reason, runs.Run{}); perr != nil {
 			return false, fmt.Errorf("pause %s: %w", ticketAddr, perr)
 		}
 		return false, nil
@@ -489,7 +490,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),
 	}
 	deps := s.depsWith(s.launchRunner(ticket.Project, agent))
-	deps.GateReleased = s.registry.gateReleased(ticketAddr)
+	deps.GateReleased = s.registry.GateReleased(ticketAddr)
 	// Only Claude and Codex on the pty runner resume; every other claim starts
 	// cold, and so does one under another harness than the answered session's:
 	// the Handoff carries it over. launch drops a Codex id whose rollout is gone.
@@ -509,19 +510,19 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 			return false, fmt.Errorf("merge target for %s: %w", ticketAddr, err)
 		}
 	}
-	entry := trackedRun{
-		Run:  Run{Address: ticketAddr, Agent: string(agent), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
-		Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runLaunching,
+	entry := runs.TrackedRun{
+		Run:  runs.Run{Address: ticketAddr, Agent: string(agent), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
+		Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runs.Launching,
 	}
-	if !s.registry.putIfAbsent(entry) {
+	if !s.registry.PutIfAbsent(entry) {
 		return false, nil // a stale scan offered a ticket that is already running
 	}
 	run, wt, err := s.prepareAndLaunch(deps, &one, ticket, mode, func(wt ralphloop.IterationWorktree) {
 		entry.Workspace, entry.Base, entry.Cwd = one.WorkspaceID, wt.Base(), wt.Path
-		s.registry.put(entry)
+		s.registry.Put(entry)
 	})
 	if err != nil {
-		s.registry.deleteStarted(ticketAddr, entry.StartedAt)
+		s.registry.DeleteStarted(ticketAddr, entry.StartedAt)
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
 		kind, reason := events.IterationError, "launch failed: "+err.Error()
@@ -536,7 +537,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		s.events.Publish(wire.EventIterationLaunchFailed, ticketAddr)
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
-	s.registry.put(trackedRun{
+	s.registry.Put(runs.TrackedRun{
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
 	s.events.Publish(wire.EventIterationStarted, ticketAddr)
@@ -705,10 +706,10 @@ func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo stri
 func (s *Server) prepareAndLaunch(
 	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode iterationMode,
 	prepared func(ralphloop.IterationWorktree),
-) (Run, ralphloop.IterationWorktree, error) {
+) (runs.Run, ralphloop.IterationWorktree, error) {
 	wt, err := mode.prepare(deps, *one)
 	if err != nil {
-		return Run{}, ralphloop.IterationWorktree{}, err
+		return runs.Run{}, ralphloop.IterationWorktree{}, err
 	}
 	prepared(wt)
 	run, err := s.launch(deps, ticket, *one, wt.Path)
@@ -716,7 +717,7 @@ func (s *Server) prepareAndLaunch(
 		if derr := mode.discard(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
 		}
-		return Run{}, ralphloop.IterationWorktree{}, err
+		return runs.Run{}, ralphloop.IterationWorktree{}, err
 	}
 	return run, wt, nil
 }
@@ -726,7 +727,7 @@ func (s *Server) prepareAndLaunch(
 func (s *Server) finishRun(rc runContext) {
 	rc.one.Runner = rc.run.Runner
 	rc.one.OnRateLimit = func(limited bool, resetAt time.Time) {
-		s.registry.markRateLimit(rc.ticketAddr, limited, resetAt)
+		s.registry.MarkRateLimit(rc.ticketAddr, limited, resetAt)
 	}
 	addr, _ := tickets.ParseAddress(rc.ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
 	s.guardCallbacks(addr, &rc.one)
@@ -779,7 +780,7 @@ type runContext struct {
 	mode       iterationMode
 	one        ralphloop.OneIteration
 	wt         ralphloop.IterationWorktree
-	run        Run
+	run        runs.Run
 	ticketAddr string
 }
 
@@ -788,11 +789,11 @@ type runContext struct {
 func (s *Server) settleRun(rc runContext, err error) {
 	deps, root, mode, one, wt, run, ticketAddr := rc.deps, rc.root, rc.mode, rc.one, rc.wt, rc.run, rc.ticketAddr
 	defer s.kickRunner()
-	s.registry.markSettling(ticketAddr)
+	s.registry.MarkSettling(ticketAddr)
 	keepRun := false
 	defer func() {
 		if !keepRun {
-			s.registry.delete(ticketAddr)
+			s.registry.Delete(ticketAddr)
 			// The sweep skips a tracked run, so this is the earliest it can archive it.
 			if a, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}); err == nil && a.Epic == OneOffsEpic {
 				s.rescan()
@@ -801,8 +802,8 @@ func (s *Server) settleRun(rc runContext, err error) {
 	}()
 	// A run the budget hard limit is stopping never finishes, merges or pauses
 	// for its own reason: the first of it and the kill pauses it budget-killed.
-	if stopping, first := s.registry.claimBudgetStop(ticketAddr); stopping {
-		if t, ok := s.registry.tracked(ticketAddr); ok && first {
+	if stopping, first := s.registry.ClaimBudgetStop(ticketAddr); stopping {
+		if t, ok := s.registry.Tracked(ticketAddr); ok && first {
 			if perr := s.pauseBudgetKilled(t); perr != nil {
 				s.log.Error("budget kill", "ticket", ticketAddr, "err", perr)
 			}
@@ -818,7 +819,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		// The wait already wrote the pause. The agent is alive and waits for a
 		// person: hand the run to the waiting-run machinery as a question does.
 		keepRun = true
-		s.registry.markWaiting(ticketAddr, time.Now())
+		s.registry.MarkWaiting(ticketAddr, time.Now())
 		s.events.Publish(wire.EventIterationPaused, ticketAddr)
 		s.announcePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
 		go s.watchUnblock(deps.Runner, run.Session, ticketAddr)
@@ -858,7 +859,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		if one.KeepAskedAgent && out.Kind == events.SelfReported {
 			// The agent waits idle for the answer: its run, worktree and session stay.
 			keepRun = true
-			s.registry.markWaiting(ticketAddr, time.Now())
+			s.registry.MarkWaiting(ticketAddr, time.Now())
 		}
 		s.events.Publish(wire.EventIterationPaused, ticketAddr)
 		s.announcePause(addr, one.Ticket.Path, out.Kind, out.Reason)
@@ -883,10 +884,10 @@ func (s *Server) settleRun(rc runContext, err error) {
 // keepsAskedAgent reports whether run's agent stays alive after it asks: a
 // Claude agent on a native runner, or a Codex agent on the pty runner.
 // Herdr-hosted runs clean up as before.
-func keepsAskedAgent(run Run) bool {
+func keepsAskedAgent(run runs.Run) bool {
 	switch run.Agent {
 	case string(ralphloop.AgentClaude):
-		return run.Runner != "" && run.Runner != runnerHerdr
+		return run.Runner != "" && run.Runner != runs.RunnerHerdr
 	case string(ralphloop.AgentCodex):
 		return run.Runner == string(agentrunner.ChoicePTY)
 	}

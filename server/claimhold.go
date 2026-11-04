@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"time"
 
@@ -27,7 +28,7 @@ func (s *Server) claimHold(project string, t tickets.Ticket, rh ResolvedHarness)
 	if reason, held := s.herdrHolds(s.launchRunner(project, agent)); held {
 		return claimHold{Verdict: wire.VerdictHerdrDown, Reason: reason}, true
 	}
-	if limited, held := s.registry.rateLimitHeld(string(agent)); held {
+	if limited, held := s.registry.RateLimitHeld(string(agent)); held {
 		return claimHold{Verdict: rateLimitVerdict(limited.RateLimitReset)}, true
 	}
 	if answeredSession(t) == "" {
@@ -41,7 +42,7 @@ func (s *Server) claimHold(project string, t tickets.Ticket, rh ResolvedHarness)
 // herdrHolds reports why r cannot take work now: r is herdr and herdr is down
 // or not installed. Any other runner is never held by herdr.
 func (s *Server) herdrHolds(r agentrunner.Runner) (string, bool) {
-	if r == nil || r.Name() != runnerHerdr {
+	if r == nil || r.Name() != runs.RunnerHerdr {
 		return "", false
 	}
 	return s.herdr.holdReason()

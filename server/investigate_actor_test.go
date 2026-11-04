@@ -101,7 +101,7 @@ func TestInvestigateRetry_SecondRetryOfTheKindIsRefused(t *testing.T) {
 	if res := retryAs(t, h, investigateAddr); res.Refused {
 		t.Fatalf("first retry refused: %+v", res)
 	}
-	h.Server.DropRun("proj:epic-a/01")
+	h.Server.Registry().Delete("proj:epic-a/01")
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom again"); err != nil {
 		t.Fatal(err)
 	}

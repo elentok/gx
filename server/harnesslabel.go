@@ -24,7 +24,7 @@ func harnessDisplayName(h ralphloop.AgentKind) string {
 func (s *Server) harnessLabelFor(addr tickets.Address, agent string, status string) wire.HarnessLabel {
 	switch status {
 	case tickets.StatusClaimed.Word():
-		run, ok := s.registry.runOf(addr.String())
+		run, ok := s.registry.RunOf(addr.String())
 		if !ok {
 			return wire.HarnessLabel{}
 		}

@@ -204,7 +204,7 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 		seen[rootOf(addr)] = true
 		waiting += s.waitingOnDefault(addr)
 	}
-	for _, t := range s.registry.list() {
+	for _, t := range s.registry.List() {
 		if a, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil && inScope(a.Project) && t.Agent != string(now) {
 			running++
 		}

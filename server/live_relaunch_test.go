@@ -208,7 +208,7 @@ func TestRelaunch_OnlyAHumanRelaunchIsLogged(t *testing.T) {
 	if got := ofType(runLog(t, h), events.HumanRelaunch); len(got) != 0 {
 		t.Fatalf("recovery relaunch logged %+v", got)
 	}
-	h.Server.DropRun("proj:epic-a/01")
+	h.Server.Registry().Delete("proj:epic-a/01")
 	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
 	}

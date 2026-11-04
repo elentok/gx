@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"maps"
 	"net/http"
 	"os"
@@ -439,11 +440,11 @@ func (s *Server) budgetIteration(address string) (wire.IterationInfo, bool) {
 // ticket kinds count.
 func (s *Server) pollBudget(now time.Time) {
 	for _, t := range s.idx.snapshot().Tickets {
-		if t.Status != "claimed" && !s.registry.has(t.Address) {
+		if t.Status != "claimed" && !s.registry.Has(t.Address) {
 			continue
 		}
 		// The ledger is dollars, and only a Claude run has a dollar cost.
-		if run, found := s.registry.runOf(t.Address); found && isCodexRun(run) {
+		if run, found := s.registry.RunOf(t.Address); found && isCodexRun(run) {
 			continue
 		}
 		it, ok := s.budgetIteration(t.Address)
@@ -472,7 +473,7 @@ func (s *Server) pollBudget(now time.Time) {
 // isCodexRun reports a run on a harness other than Claude (today only Codex).
 // Only Claude has a dollar cost for the budget to count. An unset agent counts
 // as Claude.
-func isCodexRun(r Run) bool {
+func isCodexRun(r runs.Run) bool {
 	return r.Agent != "" && r.Agent != string(ralphloop.AgentClaude)
 }
 
@@ -492,28 +493,28 @@ func (s *Server) killForBudget(now time.Time) int {
 
 // killableRuns is the runs a budget kill stops: every Claude run with a
 // session. A Codex run spends no dollars, so the limit never stops it.
-func (s *Server) killableRuns() []trackedRun {
-	var runs []trackedRun
-	for _, t := range s.registry.list() {
+func (s *Server) killableRuns() []runs.TrackedRun {
+	var live []runs.TrackedRun
+	for _, t := range s.registry.List() {
 		// A launch has no session to interrupt yet; a later check stops it once it runs.
-		if t.State != runLaunching && !isCodexRun(t.Run) {
-			runs = append(runs, t)
+		if t.State != runs.Launching && !isCodexRun(t.Run) {
+			live = append(live, t)
 		}
 	}
-	return runs
+	return live
 }
 
 // killRuns is killForBudget for a run list taken earlier. The list is the
 // count the caller reports: a budget poll may stop and settle a run first.
-func (s *Server) killRuns(now time.Time, runs []trackedRun) int {
+func (s *Server) killRuns(now time.Time, list []runs.TrackedRun) int {
 	grace := s.cfg.BudgetKillGrace
 	if grace <= 0 {
 		grace = defaultBudgetKillGrace
 	}
 	deadline := now.Add(grace)
 	var wg sync.WaitGroup
-	for _, t := range runs {
-		s.registry.markBudgetStop(t.Address)
+	for _, t := range list {
+		s.registry.MarkBudgetStop(t.Address)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -528,20 +529,20 @@ func (s *Server) killRuns(now time.Time, runs []trackedRun) int {
 	}
 	wg.Wait()
 	time.Sleep(time.Until(deadline))
-	for _, t := range runs {
-		if _, first := s.registry.claimBudgetStop(t.Address); !first {
+	for _, t := range list {
+		if _, first := s.registry.ClaimBudgetStop(t.Address); !first {
 			continue // its run already settled and paused it
 		}
 		if err := s.pauseBudgetKilled(t); err != nil {
 			s.log.Error("budget kill", "ticket", t.Address, "err", err)
 		}
 	}
-	return len(runs)
+	return len(list)
 }
 
 // pauseBudgetKilled stops the session through its runner, then pauses the ticket
 // stuck.
-func (s *Server) pauseBudgetKilled(t trackedRun) error {
+func (s *Server) pauseBudgetKilled(t runs.TrackedRun) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"slices"
 
@@ -91,7 +92,7 @@ func (s *Server) agentsConfig(project string) config.AgentsConfig {
 // runAgentConfig is the model and effort run's agent launched under, else
 // the project's agents.* config. Every launch, finish and adoption resolves
 // them here.
-func (s *Server) runAgentConfig(project string, agent ralphloop.AgentKind, run Run) (model, effort string) {
+func (s *Server) runAgentConfig(project string, agent ralphloop.AgentKind, run runs.Run) (model, effort string) {
 	model, effort = ralphloop.ResolveTier(s.agentsConfig(project), agent, ralphloop.TierWorker)
 	return cmp.Or(run.Model, model), cmp.Or(run.Effort, effort)
 }
@@ -109,7 +110,7 @@ func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agent ral
 
 // launch starts one's agent in cwd. Its Codex sandbox gets one.ScratchDir, the
 // project dir where the epic's tickets live.
-func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (Run, error) {
+func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (runs.Run, error) {
 	t, agent := one.Ticket, one.Agent
 	var extraDirs []string
 	if t.Type == string(schema.TypeEvolve) {
@@ -163,10 +164,10 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	if errors.Is(err, agentrunner.ErrLabelTaken) {
 		taken := &nameTakenError{reason: s.labelHolder(deps.Runner, ticket, label, err).describe(), err: err}
 		s.logEvent(ticket, ralphloop.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
-		return Run{}, taken
+		return runs.Run{}, taken
 	}
 	if err != nil {
-		return Run{}, err
+		return runs.Run{}, err
 	}
 	path := "cold-start"
 	if resumeID != "" {
@@ -176,7 +177,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 		Type: string(events.IterationStarted), Agent: agent, Label: label, Cwd: cwd,
 		AgentSession: session.SessionID, Path: path, TargetTip: one.TargetTip,
 	})
-	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
+	run := runs.Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
 }
 
@@ -264,7 +265,7 @@ func (s *Server) labelHolder(r agentrunner.Runner, ticket tickets.Address, label
 	if h.Status, err = r.Status(sess); err != nil {
 		return h
 	}
-	tracked := slices.ContainsFunc(s.registry.list(), func(t trackedRun) bool {
+	tracked := slices.ContainsFunc(s.registry.List(), func(t runs.TrackedRun) bool {
 		return t.Address != ticket.String() && (t.Session.Label == sess.Label || (sess.ID != "" && t.Session.ID == sess.ID))
 	})
 	h.stale = !tracked && h.Waiting()

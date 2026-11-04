@@ -2,13 +2,13 @@ package server
 
 import (
 	"errors"
+	"github.com/elentok/gx/server/runs"
 	"io/fs"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
@@ -56,18 +56,11 @@ func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string 
 // LaunchingRuns counts runs whose agent has no session yet, which a budget
 // stop skips.
 func (s *Server) LaunchingRuns() int {
-	return len(s.registry.list()) - len(s.killableRuns())
+	return len(s.registry.List()) - len(s.killableRuns())
 }
 
 // HardGraceRunning reports whether a hard-limit countdown is running.
 func (s *Server) HardGraceRunning() bool { return !s.hardGrace.deadline().IsZero() }
-
-// PutRun records a launched iteration without launching one, so tests can hold
-// a run live as long as they need.
-func (s *Server) PutRun(root string, r Run) { s.registry.put(trackedRun{Run: r, Root: root}) }
-
-// MarkSettling flags the tracked run at address as inside settleRun.
-func (s *Server) MarkSettling(address string) { s.registry.markSettling(address) }
 
 // ClaimTicket claims and launches one ticket the way a claim pass would, but
 // without asking the frontier, and reports whether an iteration launched.
@@ -98,7 +91,7 @@ func (s *Server) PauseAs(address string, kind events.Kind, reason string) error 
 	if err != nil || !ok {
 		return errors.Join(err, errors.New("no ticket "+address))
 	}
-	return s.pauseTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, Run{})
+	return s.pauseTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, runs.Run{})
 }
 
 // SetCostOf swaps how an iteration's cost is read.
@@ -165,11 +158,6 @@ func (s *Server) RecordProjectSpend(project, key string, cost float64) {
 // RecordSpend adds spend to today's ledger.
 func (s *Server) RecordSpend(key string, cost float64) { s.ledger.record("", key, cost, time.Now()) }
 
-// PutRunAt is PutRun with the time the iteration was launched.
-func (s *Server) PutRunAt(root string, r Run, at time.Time) {
-	s.registry.put(trackedRun{Run: r, Root: root, StartedAt: at})
-}
-
 // AgentWaiting reports whether the run's agent is not working (idle or done).
 func (s *Server) AgentWaiting(project, epic, id string) bool {
 	_, idle, err := s.agentState(tickets.Address{Project: project, Epic: epic, ID: id})
@@ -181,19 +169,11 @@ func (s *Server) AgentWaiting(project, epic, id string) bool {
 func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason string) error {
 	dir := filepath.Join(s.cfg.TicketStore, project)
 	path := filepath.Join(dir, epic, "issues", id+"-first.md")
-	return s.pauseTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, Run{})
+	return s.pauseTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, runs.Run{})
 }
 
 // PruneBackups runs the backup-ref prune as of now.
 func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.pruneBackups(repoRoot, now) }
-
-// PutRunFrom is PutRun with the base the iteration branched from.
-func (s *Server) PutRunFrom(root string, r Run, base string) {
-	s.registry.put(trackedRun{Run: r, Root: root, Base: base})
-}
-
-// GateReleased reports whether the run's background-task gate was released.
-func (s *Server) GateReleased(address string) bool { return s.registry.gateReleased(address)() }
 
 // StartupDone closes once the startup steps, the first rescan among them, ended.
 func (s *Server) StartupDone() <-chan struct{} { return s.startupDone }
@@ -207,18 +187,15 @@ func SetShutdownRecorder(rec func(step string)) {
 	shutdownRecorder.Store(&rec)
 }
 
-// DropRun forgets a run the way its finish does.
-func (s *Server) DropRun(address string) { s.registry.delete(address) }
-
 // SettleReleasedRun stands in for the finish of a run whose gate was released:
 // the pause release-gate left, if any, then the run is dropped.
 func (s *Server) SettleReleasedRun(address string) {
 	addr, _ := tickets.ParseAddress(address, tickets.AddressContext{})
 	dir := filepath.Join(s.cfg.TicketStore, addr.Project)
-	if run, ok := s.registry.runOf(address); ok {
+	if run, ok := s.registry.RunOf(address); ok {
 		s.pauseReleasedGate(dir, addr, filepath.Join(dir, addr.Epic, "issues", addr.ID+"-first.md"), run)
 	}
-	s.registry.delete(address)
+	s.registry.Delete(address)
 }
 
 // ClaimNext runs one claim pass now.
@@ -229,9 +206,6 @@ func (s *Server) RecoverAsync(f recovery.Failure) { s.recoverAsync(f) }
 
 // RecoveryDo calls one server verb the way a remedy does.
 func (s *Server) RecoveryDo(c recovery.Call) (recovery.Result, error) { return recoveryVerbs{s}.Do(c) }
-
-// RunOf is the tracked run of address, watched ones included.
-func (s *Server) RunOf(address string) (Run, bool) { return s.registry.runOf(address) }
 
 // WatchGates runs one gate watchdog pass as of now.
 func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
@@ -277,16 +251,9 @@ func (s *Server) RemoveMergedWorktree(project, epic string) {
 	s.goSettle(func() { s.removeMergedWorktree(root) })
 }
 
-// PutRunIn registers a run of address in root, started in cwd, whose session
-// on the configured runner does not exist (a stopped agent whose entry
-// settleRun has not yet deleted). launching marks it as one whose agent may not
-// have started.
+// PutRunIn is Registry.PutRunIn on the configured runner.
 func (s *Server) PutRunIn(address, root, cwd string, launching bool) {
-	t := trackedRun{Run: Run{Address: address, Runner: s.cfg.Runner.Name(), Session: agentrunner.Session{Label: "gone", ID: "gone"}}, Root: root, Cwd: cwd}
-	if launching {
-		t.State = runLaunching
-	}
-	s.registry.put(t)
+	s.registry.PutRunIn(address, root, cwd, s.cfg.Runner.Name(), launching)
 }
 
 // LockedTrunks lists the trunks any merge has locked so far, in any repo.

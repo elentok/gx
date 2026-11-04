@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 )
@@ -13,7 +14,7 @@ import (
 // "could not tell" for "not active".
 func PersistedActive(stateDir string) ([]string, error) {
 	var out []string
-	for _, name := range []string{queueFileName, runsFileName} {
+	for _, name := range []string{queueFileName, runs.FileName} {
 		data, err := os.ReadFile(filepath.Join(stateDir, name))
 		if errors.Is(err, os.ErrNotExist) {
 			continue

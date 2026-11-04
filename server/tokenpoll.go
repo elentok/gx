@@ -72,7 +72,7 @@ func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
 	}
 	label, _, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
 	agentDir := filepath.Join(nativerunner.AgentsRoot(s.cfg.StateDir, a.Project), label)
-	run, _ := s.registry.runOf(address)
+	run, _ := s.registry.RunOf(address)
 	codex := isCodexRun(run)
 	if d, err := nativerunner.OpenDir(agentDir); err == nil && agentrunner.Kind(d.Meta.Harness) == harness.Codex {
 		codex = true
@@ -150,7 +150,7 @@ func (p *tokenPoller) changed(ts tokenSession) bool {
 func (s *Server) pollTokens(now time.Time) {
 	day := now.Format(tokenledger.DayLayout)
 	for _, t := range s.idx.snapshot().Tickets {
-		if t.Status != "claimed" && !s.registry.has(t.Address) {
+		if t.Status != "claimed" && !s.registry.Has(t.Address) {
 			continue
 		}
 		if ts, ok := s.tokenSessionOf(t.Address); ok {

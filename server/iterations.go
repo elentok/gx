@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/runs"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -49,7 +50,7 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 	}
 	st, err := runner.Status(sess)
 	// herdr's done is a finished turn resting in its pane, not an exit.
-	if err != nil || (st.State == agentrunner.StateDone && runner.Name() != runnerHerdr) {
+	if err != nil || (st.State == agentrunner.StateDone && runner.Name() != runs.RunnerHerdr) {
 		return liveIter{}, false
 	}
 	if sess.SessionID == "" {
@@ -58,16 +59,16 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
 	it := wire.IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
 	if runner.Name() == runnerPTY {
-		it.QueueAgent = queueAgentIDPrefix + iterationLabel(address)
+		it.QueueAgent = queueAgentIDPrefix + runs.IterationLabel(address)
 	}
-	if runner.Name() == runnerHerdr {
+	if runner.Name() == runs.RunnerHerdr {
 		it.Pane = sess.ID
 		cli := herdr.CLI{Env: s.cfg.Env}
 		if agent, err := cli.AgentGet(label); err == nil {
 			it.Tab = agent.TabID
 		}
 	}
-	if run, ok := s.registry.runOf(address); ok {
+	if run, ok := s.registry.RunOf(address); ok {
 		it.Agent = run.Agent
 	}
 	// Base and transcript are best effort: a missing git worktree or session

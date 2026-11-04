@@ -83,7 +83,7 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 // ticket write shares, before do runs.
 func (s *Server) ticketWrite(req wire.QueueRequest, do func(ticketRef) (wire.QueueResult, error)) (wire.QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		if s.registry.has(ref.addr.String()) {
+		if s.registry.Has(ref.addr.String()) {
 			return refusal(wire.ReasonIterationRunning, "an iteration is running in "+ref.addr.String()), nil
 		}
 		return do(ref)
@@ -125,7 +125,7 @@ func (s *Server) ticketPause(req wire.QueueRequest) (wire.QueueResult, error) {
 		if ref.epic.IsMap {
 			return refusal(wire.ReasonMapEpic, ref.addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
 		}
-		run, _ := s.registry.tracked(ref.addr.String())
+		run, _ := s.registry.Tracked(ref.addr.String())
 		if err := s.pauseTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.Manual, reason, run.Run); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("pause %s: %w", ref.addr, err)
 		}
@@ -345,7 +345,7 @@ func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) e
 // still reads the worktree, and a missing one would pause the cancelled ticket.
 // False means the run never settled, so its worktree is left for the epic merge.
 func (s *Server) awaitRunSettled(addr string) bool {
-	return s.registry.waitGone(addr, 5*time.Second, 20*time.Millisecond)
+	return s.registry.WaitGone(addr, 5*time.Second, 20*time.Millisecond)
 }
 
 // cancelInvestigateChild is a person's recovery verb withdrawing ref's

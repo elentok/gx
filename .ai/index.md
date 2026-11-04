@@ -127,7 +127,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
   `server/settings/` holds the settings holder, config reload, config status and config file watch
-  (imports `wire` only; the root registers its appliers)
+  (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
+  (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

@@ -39,7 +39,7 @@ func (s *Server) sweepOneOffs() {
 				continue
 			}
 			addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: OneOffsEpic, ID: t.Identifier}
-			if _, tracked := s.registry.tracked(addr.String()); tracked {
+			if _, tracked := s.registry.Tracked(addr.String()); tracked {
 				continue
 			}
 			if err := archiveOneOff(dir, archived, addr, t, now); err != nil {
@@ -85,7 +85,7 @@ func (s *Server) oneOffsLive(dir string, root rootRef) bool {
 	}
 	for _, t := range live.Tickets {
 		addr := tickets.Address{Project: root.Project, Epic: OneOffsEpic, ID: t.Identifier}
-		if _, tracked := s.registry.tracked(addr.String()); tracked {
+		if _, tracked := s.registry.Tracked(addr.String()); tracked {
 			return true
 		}
 		if !tickets.IsTerminalStatus(t.Status) {
