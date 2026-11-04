@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -22,7 +24,7 @@ func TestSessionChatChanged_CodexRolloutGrowthPublishes(t *testing.T) {
 	writeTranscript(t, path, codexMessageLine)
 	conv, _ := readMeta(t, h, id)["conversation_id"].(string)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitSessionState(ctx, t, h, id, server.SessionWorking)
+	waitSessionState(ctx, t, h, id, wire.SessionWorking)
 	if !codexEventWithin(evs, t, path, id, 5*time.Second) {
 		t.Fatal("no session-chat-changed event while the rollout grew")
 	}

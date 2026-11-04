@@ -52,14 +52,14 @@ func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T)
 // tests in ralphloop and by the Playwright pause and codex flows.
 func (r *running) waitBlockedSession(t *testing.T, addr string) {
 	t.Helper()
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
 		list = nil
 		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
-		return slices.ContainsFunc(list, func(s server.SessionInfo) bool {
-			return s.Ticket == addr && s.Status.State == server.SessionBlocked
+		return slices.ContainsFunc(list, func(s wire.SessionInfo) bool {
+			return s.Ticket == addr && s.Status.State == wire.SessionBlocked
 		})
 	}) {
 		t.Fatalf("no blocked session on %s; sessions = %+v", addr, list)
@@ -330,7 +330,7 @@ func TestChecksMissingScenarioReportsBothProjectsMissing(t *testing.T) {
 func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents")
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
@@ -344,23 +344,23 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 		got = append(got, row{s.Project, s.Harness, s.Status.State, s.Design, s.Unread.Unread, s.Actionable.Reason})
 	}
 	want := []row{
-		{"demo", "claude", server.SessionIdle, false, false, ""},
-		{"demo", "claude", server.SessionWorking, false, false, ""},
-		{"demo", "claude", server.SessionIdle, true, false, "needs a decision"},
-		{"demo", "codex", server.SessionIdle, false, false, ""},
-		{"other", "claude", server.SessionIdle, false, true, ""},
-		{"other", "claude", server.SessionIdle, false, false, "needs a decision"},
-		{"site", "claude", server.SessionIdle, true, false, ""},
-		{"site", "claude", server.SessionExited, false, false, ""},
+		{"demo", "claude", wire.SessionIdle, false, false, ""},
+		{"demo", "claude", wire.SessionWorking, false, false, ""},
+		{"demo", "claude", wire.SessionIdle, true, false, "needs a decision"},
+		{"demo", "codex", wire.SessionIdle, false, false, ""},
+		{"other", "claude", wire.SessionIdle, false, true, ""},
+		{"other", "claude", wire.SessionIdle, false, false, "needs a decision"},
+		{"site", "claude", wire.SessionIdle, true, false, ""},
+		{"site", "claude", wire.SessionExited, false, false, ""},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("sessions = %+v\nwant     %+v", got, want)
 	}
-	if list[7].Exit != server.SessionExitCrashed {
+	if list[7].Exit != wire.SessionExitCrashed {
 		t.Errorf("c2 exit = %q, want crashed", list[7].Exit)
 	}
 	chatLen := func(i int) int {
-		var chat server.SessionChatResponse
+		var chat wire.SessionChatResponse
 		if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[i].ID, "--json")), &chat); err != nil {
 			t.Fatal(err)
 		}
@@ -388,9 +388,9 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 func TestQueueAgentsScenario_ListsAQueueAgentAndADesignAgent(t *testing.T) {
 	t.Parallel()
 	r := start(t, "queue-agents")
-	var queue, design []server.SessionInfo
+	var queue, design []wire.SessionInfo
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
-		var list []server.SessionInfo
+		var list []wire.SessionInfo
 		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
@@ -412,7 +412,7 @@ func TestQueueAgentsScenario_ListsAQueueAgentAndADesignAgent(t *testing.T) {
 func TestAgentsFailuresScenario_OneSessionPerFailureKind(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-failures")
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
@@ -422,11 +422,11 @@ func TestAgentsFailuresScenario_OneSessionPerFailureKind(t *testing.T) {
 			t.Fatalf("session %s has no failure: %+v", s.ID, s.Status)
 		}
 		kinds = append(kinds, s.Failure.Kind)
-		if s.Failure.Kind == server.FailureKindRateLimit && !strings.Contains(s.Failure.Text, "resets at") {
+		if s.Failure.Kind == wire.FailureKindRateLimit && !strings.Contains(s.Failure.Text, "resets at") {
 			t.Errorf("rate-limit text = %q, want it to say when the limit resets", s.Failure.Text)
 		}
 	}
-	want := []string{server.FailureKindStalled, server.FailureKindAuth, server.FailureKindRateLimit, server.FailureKindBlocked}
+	want := []string{wire.FailureKindStalled, wire.FailureKindAuth, wire.FailureKindRateLimit, wire.FailureKindBlocked}
 	if !slices.Equal(kinds, want) {
 		t.Fatalf("failure kinds = %v, want %v", kinds, want)
 	}

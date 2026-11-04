@@ -8,11 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
@@ -22,26 +23,26 @@ var update = flag.Bool("update", false, "rewrite the golden files")
 
 // fixtureSessions interleaves projects so grouping is exercised, and covers
 // every status, both marks, +bg, a Session ticket and a Design session.
-func fixtureSessions() []server.SessionInfo {
-	return []server.SessionInfo{
+func fixtureSessions() []wire.SessionInfo {
+	return []wire.SessionInfo{
 		{ID: "s1", Name: "fix login", Project: "gx", Ticket: "gx:auth/03",
-			Status: server.SessionStatus{State: server.SessionWorking, Background: true},
-			Unread: server.SessionUnread{Unread: true}},
+			Status: wire.SessionStatus{State: wire.SessionWorking, Background: true},
+			Unread: wire.SessionUnread{Unread: true}},
 		{ID: "s2", Name: "nvim", Project: "dotfiles",
-			Status: server.SessionStatus{State: server.SessionExited}, Exit: server.SessionExitCrashed,
-			Actionable: server.SessionActionable{Reason: "crashed"}},
+			Status: wire.SessionStatus{State: wire.SessionExited}, Exit: wire.SessionExitCrashed,
+			Actionable: wire.SessionActionable{Reason: "crashed"}},
 		{ID: "s3", Name: "docs", Project: "gx", Ticket: "gx:map/01",
-			Status: server.SessionStatus{State: server.SessionIdle}},
-		{ID: "s4", Name: "review", Project: "gx", Status: server.SessionStatus{State: server.SessionBlocked},
-			Unread: server.SessionUnread{Unread: true}},
+			Status: wire.SessionStatus{State: wire.SessionIdle}},
+		{ID: "s4", Name: "review", Project: "gx", Status: wire.SessionStatus{State: wire.SessionBlocked},
+			Unread: wire.SessionUnread{Unread: true}},
 		{ID: "s5", Name: "zsh", Project: "dotfiles",
-			Status: server.SessionStatus{State: server.SessionExited}, Exit: server.SessionExitClean},
-		{ID: "s6", Name: "limits", Project: "dotfiles", Status: server.SessionStatus{State: server.SessionRateLimited}},
-		{ID: "s7", Project: "dotfiles", Status: server.SessionStatus{State: server.SessionStarting}},
+			Status: wire.SessionStatus{State: wire.SessionExited}, Exit: wire.SessionExitClean},
+		{ID: "s6", Name: "limits", Project: "dotfiles", Status: wire.SessionStatus{State: wire.SessionRateLimited}},
+		{ID: "s7", Project: "dotfiles", Status: wire.SessionStatus{State: wire.SessionStarting}},
 	}
 }
 
-func sidebarModel(t *testing.T, nerd bool, sessions []server.SessionInfo, width, height int) Model {
+func sidebarModel(t *testing.T, nerd bool, sessions []wire.SessionInfo, width, height int) Model {
 	t.Helper()
 	dirs := config.DirsFrom([]string{"HOME=" + t.TempDir()})
 	m := NewModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd, Dirs: dirs})
@@ -115,13 +116,13 @@ func assertGolden(t *testing.T, name, text string) {
 
 func TestMarks_QueueAndDesignAgentsShowNone(t *testing.T) {
 	icons := ui.IconSet{Unread: "U", SuggestedAction: "A"}
-	flagged := server.SessionInfo{
-		Status: server.SessionStatus{State: server.SessionBlocked},
-		Unread: server.SessionUnread{Unread: true}, Actionable: server.SessionActionable{Reason: "blocked"}}
+	flagged := wire.SessionInfo{
+		Status: wire.SessionStatus{State: wire.SessionBlocked},
+		Unread: wire.SessionUnread{Unread: true}, Actionable: wire.SessionActionable{Reason: "blocked"}}
 	if got := ansi.Strip(marks(flagged, icons)); got != "U A " {
 		t.Fatalf("plain marks = %q, want both", got)
 	}
-	for name, s := range map[string]server.SessionInfo{"queue": flagged, "design": flagged} {
+	for name, s := range map[string]wire.SessionInfo{"queue": flagged, "design": flagged} {
 		s.Queue, s.Design = name == "queue", name == "design"
 		if got := strings.TrimSpace(ansi.Strip(marks(s, icons))); got != "" {
 			t.Errorf("%s marks = %q, want none", name, got)
@@ -246,7 +247,7 @@ func TestSidebar_ClickIsIgnoredUnderAPopup(t *testing.T) {
 
 func TestSidebar_SelectionFollowsTheSessionAcrossUpdates(t *testing.T) {
 	m := press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "j")
-	sessions := append([]server.SessionInfo{{ID: "s0", Project: "gx"}}, fixtureSessions()...)
+	sessions := append([]wire.SessionInfo{{ID: "s0", Project: "gx"}}, fixtureSessions()...)
 	m = withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)
 	if got := m.selectedID(); got != "s3" {
 		t.Fatalf("selected %s after an update, want s3", got)
@@ -254,8 +255,8 @@ func TestSidebar_SelectionFollowsTheSessionAcrossUpdates(t *testing.T) {
 }
 
 func TestSidebar_SelectionMovesUpWhenTheSelectedSessionGoes(t *testing.T) {
-	without := func(id string) []server.SessionInfo {
-		return slices.DeleteFunc(fixtureSessions(), func(s server.SessionInfo) bool { return s.ID == id })
+	without := func(id string) []wire.SessionInfo {
+		return slices.DeleteFunc(fixtureSessions(), func(s wire.SessionInfo) bool { return s.ID == id })
 	}
 
 	m := press(t, press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "j"), "j")
@@ -287,8 +288,8 @@ func TestSidebar_BTogglesTheSidebar(t *testing.T) {
 }
 
 func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
-	idle := []server.SessionInfo{{ID: "a", Project: "gx", Status: server.SessionStatus{State: server.SessionIdle}}}
-	working := []server.SessionInfo{{ID: "w", Project: "gx", Status: server.SessionStatus{State: server.SessionWorking}}}
+	idle := []wire.SessionInfo{{ID: "a", Project: "gx", Status: wire.SessionStatus{State: wire.SessionIdle}}}
+	working := []wire.SessionInfo{{ID: "w", Project: "gx", Status: wire.SessionStatus{State: wire.SessionWorking}}}
 
 	m := NewModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = "" // no attach, so a cmd can only be a tick
@@ -307,7 +308,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 	}
 
 	// Many idle sessions push the only Working one below the sidebar's fold.
-	var offscreen []server.SessionInfo
+	var offscreen []wire.SessionInfo
 	for range 20 {
 		offscreen = append(offscreen, idle[0])
 	}
@@ -321,7 +322,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 }
 
 func TestJump_SpinnerTicksForAWorkingSessionWithTheSidebarHidden(t *testing.T) {
-	working := []server.SessionInfo{{ID: "w", Name: "worker", Project: "gx", Status: server.SessionStatus{State: server.SessionWorking}}}
+	working := []wire.SessionInfo{{ID: "w", Name: "worker", Project: "gx", Status: wire.SessionStatus{State: wire.SessionWorking}}}
 	m := NewModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = ""
 	m.hideSidebar = true

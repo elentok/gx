@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 )
 
@@ -20,7 +21,7 @@ const (
 	groupDesign
 )
 
-func groupOf(s server.SessionInfo) agentGroup {
+func groupOf(s wire.SessionInfo) agentGroup {
 	switch {
 	case s.Queue:
 		return groupQueue

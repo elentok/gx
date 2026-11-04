@@ -4,18 +4,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	ticketsui "github.com/elentok/gx/ui/tickets"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/viewmodel"
 )
 
-func groupSessions() []server.SessionInfo {
-	return []server.SessionInfo{
+func groupSessions() []wire.SessionInfo {
+	return []wire.SessionInfo{
 		{ID: "r1", Name: "regular", Project: "gx"},
 		{ID: "q1", Name: "queue-one", Project: "gx", Queue: true},
 		{ID: "q2", Name: "queue-two", Project: "gx", Queue: true},

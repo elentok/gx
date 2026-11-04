@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/testutil"
 )
 
@@ -23,7 +24,7 @@ func (r *running) serverLogHas(t *testing.T, text string) bool {
 func TestRejectedFirstPromptScenario_TheSessionShowsAnUnknownCommandFailure(t *testing.T) {
 	t.Parallel()
 	r := start(t, "rejected-first-prompt")
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}

@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
+	tea "charm.land/bubbletea/v2"
 )
 
 var (
@@ -155,7 +155,7 @@ func TestJump_SlashInSidebarOpensIt(t *testing.T) {
 
 func TestJump_RowShowsReasonOrDetail(t *testing.T) {
 	m := jumpModel(t)
-	m.sessions[5].Status = server.SessionStatus{State: server.SessionRateLimited, Kind: "limit", Message: "resets 5pm"}
+	m.sessions[5].Status = wire.SessionStatus{State: wire.SessionRateLimited, Kind: "limit", Message: "resets 5pm"}
 	view := plainView(m)
 	for _, want := range []string{"crashed", "limit: resets 5pm", "dotfiles"} {
 		if !strings.Contains(view, want) {

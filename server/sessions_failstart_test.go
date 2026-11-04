@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -50,8 +52,8 @@ func (l *linkedHolder) brk(t *testing.T) {
 // removed.
 func assertFailedStartEnded(ctx context.Context, t *testing.T, h *servertest.Harness, holder *linkedHolder, id string, wantRun any) {
 	t.Helper()
-	got := waitForSnapshot(ctx, t, h, id, func(server.SessionInfo) bool { return true })
-	if got.Status.State != server.SessionExited || got.Exit != server.SessionExitCrashed {
+	got := waitForSnapshot(ctx, t, h, id, func(wire.SessionInfo) bool { return true })
+	if got.Status.State != wire.SessionExited || got.Exit != wire.SessionExitCrashed {
 		t.Fatalf("session = %+v, want exited crashed", got)
 	}
 
@@ -60,8 +62,8 @@ func assertFailedStartEnded(ctx context.Context, t *testing.T, h *servertest.Har
 	// Negative wait: auto-resume runs after the restart returns; give it the
 	// time it would take to bump the run.
 	time.Sleep(3 * resumeSpacing)
-	got = waitForSnapshot(ctx, t, h, id, func(server.SessionInfo) bool { return true })
-	if got.Status.State != server.SessionExited {
+	got = waitForSnapshot(ctx, t, h, id, func(wire.SessionInfo) bool { return true })
+	if got.Status.State != wire.SessionExited {
 		t.Errorf("after restart = %+v, want still exited", got)
 	}
 	if run := readMeta(t, h, id)["run"]; run != wantRun {
@@ -84,7 +86,7 @@ func TestCreateSession_FailedHolderStartEndsCrashed(t *testing.T) {
 	t.Cleanup(cancel)
 	holder.brk(t)
 
-	if res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)}); err == nil {
+	if res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)}); err == nil {
 		t.Fatalf("create = %+v, want an error", res)
 	}
 	snap, err := h.Client.Snapshot(ctx)
@@ -97,7 +99,7 @@ func TestCreateSession_FailedHolderStartEndsCrashed(t *testing.T) {
 func TestResumeSession_FailedHolderStartEndsCrashed(t *testing.T) {
 	t.Parallel()
 	holder := newLinkedHolder(t)
-	h, ctx, evs, id, _ := startFakeSessionWith(t, server.CreateSessionRequest{}, resumeOnStart, holder.opt)
+	h, ctx, evs, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{}, resumeOnStart, holder.opt)
 	stopFakeSession(ctx, t, h, evs, id)
 	holder.brk(t)
 

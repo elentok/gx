@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -140,9 +141,9 @@ func blockedScenario() scenario {
 func stateCommandSessions() []sessionSpec {
 	return []sessionSpec{
 		// Only Codex reaches "Agent hit an error": Claude's status has no error kind.
-		{project: project, harness: "codex", failure: server.FailureKindBlocked,
+		{project: project, harness: "codex", failure: wire.FailureKindBlocked,
 			control: &agentfake.Control{Action: agentfake.ActionTaskError, Message: agentfake.CodexModelError, Error: "model_not_found"}},
-		{project: project, prompt: "hello", read: true, failure: server.FailureKindRateLimit,
+		{project: project, prompt: "hello", read: true, failure: wire.FailureKindRateLimit,
 			control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
 		{project: project, prompt: agentfake.ChatSlowMarker + " a second long turn"},
 	}
@@ -183,7 +184,7 @@ func blockedCommandSessions() []sessionSpec {
 	dontAsk := agentfake.BashPermissionDialog("rg --files")
 	dontAsk[4] = "❯ 1. Yes, and don't ask again for rg commands"
 	blocked := func(s sessionSpec) sessionSpec {
-		s.failure = server.FailureKindBlocked
+		s.failure = wire.FailureKindBlocked
 		return s
 	}
 	codexBlock := func(c agentfake.Control) sessionSpec {

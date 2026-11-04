@@ -39,7 +39,7 @@ func (s *Server) runningAgents() int {
 	n := s.registry.count()
 	sessions, _ := s.listSessions()
 	for _, si := range sessions {
-		if si.Status.State != SessionExited {
+		if si.Status.State != wire.SessionExited {
 			n++
 		}
 	}

@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
@@ -34,7 +36,7 @@ func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
 	}
 	dir := t.TempDir()
 
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{
 		Project: "proj", Dir: dir, Name: "spike", Ticket: "proj:epic/01",
 		Harness: string(agentfake.HarnessKind), Cols: 90, Rows: 30,
 	})
@@ -45,7 +47,7 @@ func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
 		t.Fatalf("create = %+v, want a session", res)
 	}
 	id := res.Session.ID
-	servertest.WaitForEvent(ctx, t, evs, server.EventSessionChanged, id)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventSessionChanged, id)
 
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
@@ -55,9 +57,9 @@ func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
 		t.Fatalf("snapshot sessions = %+v, want one", snap.Sessions)
 	}
 	got := snap.Sessions[0]
-	want := server.SessionInfo{
+	want := wire.SessionInfo{
 		ID: id, Name: "spike", Project: "proj", Dir: dir, Harness: string(agentfake.HarnessKind),
-		Ticket: "proj:epic/01", Status: server.SessionStatus{State: server.SessionStarting},
+		Ticket: "proj:epic/01", Status: wire.SessionStatus{State: wire.SessionStarting},
 	}
 	got.StatusChangedAt = time.Time{}
 	if got.ID != want.ID || got.Name != want.Name || got.Project != want.Project || got.Dir != want.Dir ||
@@ -98,14 +100,14 @@ func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
 	}
 }
 
-func uniqueNameReq(name string, t *testing.T) server.CreateSessionRequest {
-	return server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: name, UniqueName: true, Harness: string(agentfake.HarnessKind)}
+func uniqueNameReq(name string, t *testing.T) wire.CreateSessionRequest {
+	return wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: name, UniqueName: true, Harness: string(agentfake.HarnessKind)}
 }
 
 func TestCreateSession_ConcurrentUniqueNamesMakeOneSession(t *testing.T) {
 	t.Parallel()
 	h, ctx, _, _, _ := startFakeSession(t)
-	results := make([]server.SessionResult, 4)
+	results := make([]wire.SessionResult, 4)
 	var wg sync.WaitGroup
 	for i := range results {
 		req := uniqueNameReq("fixer", t)
@@ -125,12 +127,12 @@ func TestCreateSession_ConcurrentUniqueNamesMakeOneSession(t *testing.T) {
 		switch {
 		case res.Session != nil:
 			made++
-		case res.Refused && res.Reason == server.ReasonSessionNameTaken:
+		case res.Refused && res.Reason == wire.ReasonSessionNameTaken:
 			refused++
 		}
 	}
 	if made != 1 || refused != len(results)-1 {
-		t.Errorf("made %d, refused %d of %+v; want 1 made, rest %s", made, refused, results, server.ReasonSessionNameTaken)
+		t.Errorf("made %d, refused %d of %+v; want 1 made, rest %s", made, refused, results, wire.ReasonSessionNameTaken)
 	}
 }
 
@@ -146,7 +148,7 @@ func TestCreateSession_UniqueNameIgnoresAnExitedSession(t *testing.T) {
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
 	second, err := h.Client.CreateSession(ctx, uniqueNameReq("fixer", t))
 	if err != nil || second.Session == nil {
@@ -171,12 +173,12 @@ func TestCreateSession_RefusesBadRequests(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
 	for name, tc := range map[string]struct {
-		req    server.CreateSessionRequest
+		req    wire.CreateSessionRequest
 		reason string
 	}{
-		"no project":      {server.CreateSessionRequest{Dir: t.TempDir()}, server.ReasonSessionBadRequest},
-		"missing dir":     {server.CreateSessionRequest{Project: "p", Dir: filepath.Join(t.TempDir(), "gone")}, server.ReasonSessionBadRequest},
-		"unknown harness": {server.CreateSessionRequest{Project: "p", Dir: t.TempDir(), Harness: "nope"}, server.ReasonSessionUnknownHarness},
+		"no project":      {wire.CreateSessionRequest{Dir: t.TempDir()}, wire.ReasonSessionBadRequest},
+		"missing dir":     {wire.CreateSessionRequest{Project: "p", Dir: filepath.Join(t.TempDir(), "gone")}, wire.ReasonSessionBadRequest},
+		"unknown harness": {wire.CreateSessionRequest{Project: "p", Dir: t.TempDir(), Harness: "nope"}, wire.ReasonSessionUnknownHarness},
 	} {
 		res, err := h.Client.CreateSession(ctx, tc.req)
 		if err != nil {
@@ -198,19 +200,19 @@ func TestSessionStatus_FollowsHolderWatch(t *testing.T) {
 	var last time.Time
 	for _, step := range []struct {
 		report agentfake.Control
-		want   server.SessionStatus
+		want   wire.SessionStatus
 	}{
-		{agentfake.Control{State: "done"}, server.SessionStatus{State: server.SessionIdle}},
-		{agentfake.Control{State: "working"}, server.SessionStatus{State: server.SessionWorking}},
+		{agentfake.Control{State: "done"}, wire.SessionStatus{State: wire.SessionIdle}},
+		{agentfake.Control{State: "working"}, wire.SessionStatus{State: wire.SessionWorking}},
 		{agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"},
-			server.SessionStatus{State: server.SessionBlocked, Kind: "permission", Message: "run ls?"}},
-		{agentfake.Control{State: "done"}, server.SessionStatus{State: server.SessionIdle}},
+			wire.SessionStatus{State: wire.SessionBlocked, Kind: "permission", Message: "run ls?"}},
+		{agentfake.Control{State: "done"}, wire.SessionStatus{State: wire.SessionIdle}},
 	} {
 		step.report.Action = agentfake.ActionReport
 		if err := agentfake.SendProgramControl(conv, step.report); err != nil {
 			t.Fatal(err)
 		}
-		got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status == step.want })
+		got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status == step.want })
 		if !got.StatusChangedAt.After(last) {
 			t.Errorf("%s: status changed at %v, not after %v", step.want.State, got.StatusChangedAt, last)
 		}
@@ -223,20 +225,20 @@ func TestSessionStatus_FollowsHolderWatch(t *testing.T) {
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionConversation, ConversationID: "conv-2"}); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(server.SessionInfo) bool {
+	waitForSession(ctx, t, h, evs, id, func(wire.SessionInfo) bool {
 		return readMeta(t, h, id)["conversation_id"] == "conv-2"
 	})
 }
 
 func TestSessionStatus_ExitedCleanOrCrashed(t *testing.T) {
 	t.Parallel()
-	for name, code := range map[string]int{server.SessionExitClean: 0, server.SessionExitCrashed: 1} {
+	for name, code := range map[string]int{wire.SessionExitClean: 0, wire.SessionExitCrashed: 1} {
 		t.Run(name, func(t *testing.T) {
 			h, ctx, evs, id, conv := startFakeSession(t)
 			if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionExit, Code: code}); err != nil {
 				t.Fatal(err)
 			}
-			got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+			got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 			if got.Exit != name {
 				t.Errorf("exit = %q, want %q", got.Exit, name)
 			}
@@ -252,8 +254,8 @@ func TestSessionStatus_HolderDeathIsCrashed(t *testing.T) {
 	h, ctx, evs, id, _ := startFakeSession(t)
 	child := killHolder(t, h, id)
 	t.Cleanup(func() { _ = syscall.Kill(-child, syscall.SIGKILL) })
-	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
-	if got.Exit != server.SessionExitCrashed || !got.Unread.Unread {
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+	if got.Exit != wire.SessionExitCrashed || !got.Unread.Unread {
 		t.Errorf("session = %+v, want exited crashed and unread", got)
 	}
 }
@@ -271,8 +273,8 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 	if res.Refused || res.Session == nil {
 		t.Fatalf("stop = %+v, want the session", res)
 	}
-	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
-	if got.Exit != server.SessionExitClean || !got.Stopped || got.Unread.Unread {
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+	if got.Exit != wire.SessionExitClean || !got.Stopped || got.Unread.Unread {
 		t.Errorf("stopped session = %+v, want exited clean, stopped and read", got)
 	}
 	if _, err := nativerunner.DialHolder(dir); err == nil {
@@ -283,8 +285,8 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 	}
 
 	res, err = h.Client.StopSession(ctx, id)
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNotLive {
-		t.Errorf("stop again = %+v, %v; want refused %s", res, err, server.ReasonSessionNotLive)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotLive {
+		t.Errorf("stop again = %+v, %v; want refused %s", res, err, wire.ReasonSessionNotLive)
 	}
 }
 
@@ -335,8 +337,8 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	dir := filepath.Join(h.SessionsDir, id)
 
 	res, err := h.Client.RemoveSession(ctx, id)
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionLive {
-		t.Fatalf("remove live = %+v, %v; want refused %s", res, err, server.ReasonSessionLive)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionLive {
+		t.Fatalf("remove live = %+v, %v; want refused %s", res, err, wire.ReasonSessionLive)
 	}
 	if _, err := os.Stat(dir); err != nil {
 		t.Fatalf("refused remove touched the state dir: %v", err)
@@ -349,7 +351,7 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventSessionChanged, id)
+	servertest.WaitForEvent(ctx, t, evs, wire.EventSessionChanged, id)
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Errorf("state dir after remove: %v, want gone", err)
 	}
@@ -362,18 +364,18 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	}
 
 	res, err = h.Client.RemoveSession(ctx, id)
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionUnknown {
-		t.Errorf("remove gone = %+v, %v; want refused %s", res, err, server.ReasonSessionUnknown)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionUnknown {
+		t.Errorf("remove gone = %+v, %v; want refused %s", res, err, wire.ReasonSessionUnknown)
 	}
 }
 
 func TestFirstPrompt_WaitsOutBlockedThenTypedAtIdle(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"})
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: "fix the bug"})
 	holder := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 
 	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "trust?"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
 	if screenHas(t, holder, "fix the bug") {
 		t.Fatal("first prompt typed while Blocked")
 	}
@@ -387,14 +389,14 @@ func TestFirstPrompt_WaitsOutBlockedThenTypedAtIdle(t *testing.T) {
 
 func TestFirstPrompt_DroppedOnExit(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"})
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: "fix the bug"})
 	if readMeta(t, h, id)["first_prompt"] != "fix the bug" {
 		t.Fatal("first prompt not saved")
 	}
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionExit}); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if p, ok := readMeta(t, h, id)["first_prompt"]; ok {
 		t.Errorf("first prompt %v kept after exit", p)
 	}
@@ -402,30 +404,30 @@ func TestFirstPrompt_DroppedOnExit(t *testing.T) {
 
 func TestSessionName_FallsBackToDisplayNameThenProjectN(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{})
-	got := waitForSession(ctx, t, h, evs, id, func(server.SessionInfo) bool { return true })
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{})
+	got := waitForSession(ctx, t, h, evs, id, func(wire.SessionInfo) bool { return true })
 	if got.Name != "proj-1" {
 		t.Errorf("name = %q, want proj-1", got.Name)
 	}
 
-	typed, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "mine", Harness: string(agentfake.HarnessKind)})
+	typed, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "mine", Harness: string(agentfake.HarnessKind)})
 	if err != nil || typed.Session == nil || typed.Session.Name != "mine" {
 		t.Fatalf("create typed = %+v, %v", typed, err)
 	}
-	second, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	second, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || second.Session == nil || second.Session.Name != "proj-2" {
 		t.Fatalf("create second = %+v, %v; want proj-2", second, err)
 	}
 
 	title(t, conv, "Fix bug")
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Name == "Fix bug" })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Name == "Fix bug" })
 	title(t, conv, "Fix the other bug")
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Name == "Fix the other bug" })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Name == "Fix the other bug" })
 
 	typedConv, _ := readMeta(t, h, typed.Session.ID)["conversation_id"].(string)
 	title(t, typedConv, "Some title")
 	report(t, typedConv, agentfake.Control{State: "done"})
-	got = waitForSession(ctx, t, h, evs, typed.Session.ID, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	got = waitForSession(ctx, t, h, evs, typed.Session.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	if got.Name != "mine" {
 		t.Errorf("typed name = %q, want mine kept", got.Name)
 	}
@@ -449,7 +451,7 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{
 		Project: "proj", Worktree: "feat", Harness: string(agentfake.HarnessKind),
 	})
 	if err != nil || res.Session == nil {
@@ -480,7 +482,7 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if res, err := h.Client.RemoveSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
@@ -491,7 +493,7 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 
 func TestCreateSession_RequestCarriesMadeWorktreeAndRebaseNote(t *testing.T) {
 	t.Parallel()
-	h, _, _, id, _ := startFakeSessionWith(t, server.CreateSessionRequest{MadeWorktree: true, RebaseNote: "not rebased: dirty"})
+	h, _, _, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{MadeWorktree: true, RebaseNote: "not rebased: dirty"})
 	meta := readMeta(t, h, id)
 	if meta["made_worktree"] != true || meta["rebase_note"] != "not rebased: dirty" {
 		t.Errorf("meta made_worktree, rebase_note = %v, %v; want true, the note", meta["made_worktree"], meta["rebase_note"])
@@ -501,8 +503,8 @@ func TestCreateSession_RequestCarriesMadeWorktreeAndRebaseNote(t *testing.T) {
 func TestCreateSession_ExistingDirLeavesTrustDialog(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t, servertest.WithEnv(agentfake.ProgramTrustEnv+"=1"))
-	want := server.SessionStatus{State: server.SessionBlocked, Kind: "dialog"}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status == want })
+	want := wire.SessionStatus{State: wire.SessionBlocked, Kind: "dialog"}
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status == want })
 	// Negative wait: outlasts the holder's trust key repeat, which is the only way the dialog would be answered.
 	time.Sleep(time.Second)
 	if !screenHas(t, waitForHolder(t, filepath.Join(h.SessionsDir, id)), agentfake.ProgramTrustPrompt) {
@@ -518,7 +520,7 @@ func TestCreateSession_RefusesBadWorktrees(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
 	ctx := context.Background()
-	for name, req := range map[string]server.CreateSessionRequest{
+	for name, req := range map[string]wire.CreateSessionRequest{
 		"unknown project":  {Project: "nope", Worktree: "feat"},
 		"escaping name":    {Project: "proj", Worktree: "../feat"},
 		"dir and worktree": {Project: "proj", Worktree: "feat", Dir: t.TempDir()},
@@ -529,8 +531,8 @@ func TestCreateSession_RefusesBadWorktrees(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !res.Refused || res.Reason != server.ReasonSessionBadRequest {
-			t.Errorf("%s: create = %+v, want refused %s", name, res, server.ReasonSessionBadRequest)
+		if !res.Refused || res.Reason != wire.ReasonSessionBadRequest {
+			t.Errorf("%s: create = %+v, want refused %s", name, res, wire.ReasonSessionBadRequest)
 		}
 	}
 	if list, _ := h.Client.Sessions(ctx); len(list) != 0 {
@@ -571,11 +573,11 @@ func waitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
 // report, returning its id and conversation id.
 func startFakeSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	return startFakeSessionWith(t, server.CreateSessionRequest{}, opts...)
+	return startFakeSessionWith(t, wire.CreateSessionRequest{}, opts...)
 }
 
 // startFakeSessionWith is startFakeSession for req in project proj.
-func startFakeSessionWith(t *testing.T, req server.CreateSessionRequest, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startFakeSessionWith(t *testing.T, req wire.CreateSessionRequest, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
 	h := servertest.StartWithStore(t, t.TempDir(), append([]func(*server.Config){servertest.WithTestHolder()}, opts...)...)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -597,7 +599,7 @@ func startFakeSessionWith(t *testing.T, req server.CreateSessionRequest, opts ..
 // waitForSession waits until the snapshot's session id satisfies ok. It reads
 // the snapshot before each wait: a change that landed together with the one
 // the caller just waited for sends no further event.
-func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id string, ok func(server.SessionInfo) bool) server.SessionInfo {
+func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id string, ok func(wire.SessionInfo) bool) wire.SessionInfo {
 	t.Helper()
 	for {
 		snap, err := h.Client.Snapshot(ctx)
@@ -609,7 +611,7 @@ func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, ev
 				return s
 			}
 		}
-		servertest.WaitForEvent(ctx, t, evs, server.EventSessionChanged, id)
+		servertest.WaitForEvent(ctx, t, evs, wire.EventSessionChanged, id)
 	}
 }
 

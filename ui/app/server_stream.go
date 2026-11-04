@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
@@ -324,7 +326,7 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if toast, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
 			cmds = append(cmds, toastCmd(toast))
 		}
-		if m.stream.vm.Seq > seqBefore && msg.ev.Type == server.EventSessionFocus && msg.ev.Client == agentsui.FocusClient {
+		if m.stream.vm.Seq > seqBefore && msg.ev.Type == wire.EventSessionFocus && msg.ev.Client == agentsui.FocusClient {
 			var focus tea.Cmd
 			m, focus = m.focusSession(msg.ev.Address)
 			cmds = append(cmds, focus)

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 )
 
@@ -15,59 +17,59 @@ import (
 type fakeSessionClient struct {
 	mu     sync.Mutex
 	calls  []string
-	result server.SessionResult
+	result wire.SessionResult
 	err    error
 
-	creates []server.CreateSessionRequest
+	creates []wire.CreateSessionRequest
 
 	snapshot      server.Snapshot
 	queueRefusals map[string]string
 
-	reports     []server.FocusReport
-	focusResult server.SessionResult
+	reports     []wire.FocusReport
+	focusResult wire.SessionResult
 }
 
 var _ SessionClient = (*fakeSessionClient)(nil)
 
-func (f *fakeSessionClient) record(call string) (server.SessionResult, error) {
+func (f *fakeSessionClient) record(call string) (wire.SessionResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, call)
 	return f.result, f.err
 }
 
-func (f *fakeSessionClient) CreateSession(_ context.Context, req server.CreateSessionRequest) (server.SessionResult, error) {
+func (f *fakeSessionClient) CreateSession(_ context.Context, req wire.CreateSessionRequest) (wire.SessionResult, error) {
 	f.mu.Lock()
 	f.creates = append(f.creates, req)
 	f.mu.Unlock()
 	return f.record("create " + req.Project)
 }
 
-func (f *fakeSessionClient) StopSession(_ context.Context, id string) (server.SessionResult, error) {
+func (f *fakeSessionClient) StopSession(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("stop " + id)
 }
 
-func (f *fakeSessionClient) RemoveSession(_ context.Context, id string) (server.SessionResult, error) {
+func (f *fakeSessionClient) RemoveSession(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("remove " + id)
 }
 
-func (f *fakeSessionClient) ResumeSession(_ context.Context, id string) (server.SessionResult, error) {
+func (f *fakeSessionClient) ResumeSession(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("resume " + id)
 }
 
-func (f *fakeSessionClient) MarkSessionRead(_ context.Context, id string) (server.SessionResult, error) {
+func (f *fakeSessionClient) MarkSessionRead(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("mark-read " + id)
 }
 
-func (f *fakeSessionClient) RunSessionAction(_ context.Context, id string) (server.SessionResult, error) {
+func (f *fakeSessionClient) RunSessionAction(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("action " + id)
 }
 
-func (f *fakeSessionClient) SetAutoAdvance(_ context.Context, id string, on bool) (server.SessionResult, error) {
+func (f *fakeSessionClient) SetAutoAdvance(_ context.Context, id string, on bool) (wire.SessionResult, error) {
 	return f.record("auto-advance " + id + " " + strconv.FormatBool(on))
 }
 
-func (f *fakeSessionClient) CancelAutoAdvance(_ context.Context, id string) (server.SessionResult, error) {
+func (f *fakeSessionClient) CancelAutoAdvance(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("cancel-auto-advance " + id)
 }
 
@@ -94,7 +96,7 @@ func (f *fakeSessionClient) SetAFK(_ context.Context, on *bool) (server.AFKResul
 }
 
 // ReportFocus records reports apart from calls: every update may send one.
-func (f *fakeSessionClient) ReportFocus(_ context.Context, req server.FocusReport) (server.SessionResult, error) {
+func (f *fakeSessionClient) ReportFocus(_ context.Context, req wire.FocusReport) (wire.SessionResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reports = append(f.reports, req)
@@ -102,7 +104,7 @@ func (f *fakeSessionClient) ReportFocus(_ context.Context, req server.FocusRepor
 }
 
 // waitReport waits for the reporter to send want.
-func (f *fakeSessionClient) waitReport(t *testing.T, want server.FocusReport) {
+func (f *fakeSessionClient) waitReport(t *testing.T, want wire.FocusReport) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for {

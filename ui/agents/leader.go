@@ -4,10 +4,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -217,9 +218,9 @@ func (m Model) nextNeedingAttention() int {
 // attentionFrom is the first session from start, wrapping, that is
 // Actionable, or failing that Unread; -1 when there is none.
 func (m Model) attentionFrom(start int) int {
-	for _, needs := range []func(server.SessionInfo) bool{
+	for _, needs := range []func(wire.SessionInfo) bool{
 		isActionable,
-		func(s server.SessionInfo) bool { return s.Unread.Unread },
+		func(s wire.SessionInfo) bool { return s.Unread.Unread },
 	} {
 		for step := range len(m.sessions) {
 			i := (start + step) % len(m.sessions)

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -38,13 +40,13 @@ func startCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEn
 			agentfake.CodexIDEnv + "=" + codexPromptConv,
 			agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t),
 		}, extraEnv...)...))
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	id := res.Session.ID
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	return promptFixture{designsFixture: f, id: id, conv: codexPromptConv}
 }
 
@@ -55,9 +57,9 @@ func TestSessionPrompt_CodexIsRefusedWhileWorkingAndTypedAtIdle(t *testing.T) {
 		t.Fatalf("prompt at idle = %+v", res)
 	}
 	waitForSubmitted(t, f.conv, strconv.Quote("line one\nline two")+"\n")
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
-	if res := f.prompt(t, "again"); !res.Refused || res.Reason != server.ReasonSessionNotIdle {
-		t.Fatalf("prompt while working = %+v, want %s", res, server.ReasonSessionNotIdle)
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	if res := f.prompt(t, "again"); !res.Refused || res.Reason != wire.ReasonSessionNotIdle {
+		t.Fatalf("prompt while working = %+v, want %s", res, wire.ReasonSessionNotIdle)
 	}
 }
 
@@ -68,7 +70,7 @@ func TestSessionPrompt_CodexSkillTextKeepsTheNudgePath(t *testing.T) {
 		t.Fatalf("prompt = %+v", res)
 	}
 	waitForSubmitted(t, f.conv, strconv.Quote("$gx-x do it")+"\n")
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 }
 
 // A Codex turn that leaves a background terminal reaches the snapshot as
@@ -80,7 +82,7 @@ func TestSessionPrompt_CodexBackgroundAgentIsMarkedAndTakesAPrompt(t *testing.T)
 	if res := f.prompt(t, "start it"); res.Refused {
 		t.Fatalf("prompt at idle = %+v", res)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	for _, c := range []agentfake.Control{
 		{Action: agentfake.ActionBackground, Running: true},
 		{Action: agentfake.ActionFinish},
@@ -89,8 +91,8 @@ func TestSessionPrompt_CodexBackgroundAgentIsMarkedAndTakesAPrompt(t *testing.T)
 			t.Fatal(err)
 		}
 	}
-	s := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.Background })
-	if s.Status.State != server.SessionWorking {
+	s := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.Background })
+	if s.Status.State != wire.SessionWorking {
 		t.Errorf("state = %s, want working with the background mark", s.Status.State)
 	}
 	if res := f.prompt(t, "and then"); res.Refused {

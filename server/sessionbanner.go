@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/tickets"
@@ -95,11 +97,11 @@ func (s *Server) noteFailure(id string) {
 		return
 	}
 	reason := ""
-	if kind == FailureKindAuth || kind == FailureKindStalled {
+	if kind == wire.FailureKindAuth || kind == wire.FailureKindStalled {
 		reason = f.Label
 	}
 	// A Done Design exiting cleanly is expected; the Design page hides it too.
-	if kind == FailureKindEnded && s.designDone(m) {
+	if kind == wire.FailureKindEnded && s.designDone(m) {
 		return
 	}
 	s.triggerBanner(id, sound.Attention, reason)
@@ -159,7 +161,7 @@ func (s *Server) fireBanner(id string) {
 		return
 	}
 	info := m.info()
-	if quiet := info.Status.State == SessionWorking || info.Status.State == SessionStarting; quiet && m.Actionable.Reason == "" && t.reason == "" {
+	if quiet := info.Status.State == wire.SessionWorking || info.Status.State == wire.SessionStarting; quiet && m.Actionable.Reason == "" && t.reason == "" {
 		return
 	}
 	title, body := bannerTitle(info), t.reason
@@ -187,9 +189,9 @@ func (s *Server) fireBanner(id string) {
 	}
 }
 
-func bannerTitle(info SessionInfo) string { return info.Project + " · " + info.Name }
+func bannerTitle(info wire.SessionInfo) string { return info.Project + " · " + info.Name }
 
-func (s *Server) sendSessionBanner(info SessionInfo, title, body, link string) {
+func (s *Server) sendSessionBanner(info wire.SessionInfo, title, body, link string) {
 	term, connected := s.focus.clickTarget()
 	note := osnotify.Notification{
 		Title:    title,
@@ -207,20 +209,20 @@ func (s *Server) sendSessionBanner(info SessionInfo, title, body, link string) {
 }
 
 // sessionStatusText reads like "Blocked: permission — Bash(rm -rf build)".
-func sessionStatusText(info SessionInfo) string {
+func sessionStatusText(info wire.SessionInfo) string {
 	st := info.Status
 	labels := map[string]string{
-		SessionIdle:        "Done",
-		SessionBlocked:     "Blocked",
-		SessionRateLimited: "Rate-limited",
-		SessionExited:      "Exited",
+		wire.SessionIdle:        "Done",
+		wire.SessionBlocked:     "Blocked",
+		wire.SessionRateLimited: "Rate-limited",
+		wire.SessionExited:      "Exited",
 	}
 	text := labels[st.State]
 	if text == "" {
 		text = st.State
 	}
 	kind := st.Kind
-	if st.State == SessionExited {
+	if st.State == wire.SessionExited {
 		kind = info.Exit
 	}
 	if kind != "" {
@@ -234,7 +236,7 @@ func sessionStatusText(info SessionInfo) string {
 
 // unreadSound is the sound of an Unread raised by a move to state.
 func unreadSound(state string) sound.Name {
-	if state == SessionBlocked {
+	if state == wire.SessionBlocked {
 		return sound.Attention
 	}
 	return sound.Done

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -30,29 +32,29 @@ func idleWith(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-ch
 	t.Helper()
 	writeAssistantMessage(t, path, text)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 }
 
 // settled returns the Actionable after the detection of the last idle ran: a
 // later status change orders the read after it.
-func settled(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv string) server.SessionActionable {
+func settled(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv string) wire.SessionActionable {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "working"})
-	return waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking }).Actionable
+	return waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking }).Actionable
 }
 
 func TestDerivedActionable_PageAnswerClearsGrilling(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv, path := designPromptSession(t)
 	idleWith(ctx, t, h, evs, id, conv, path, grillTurn)
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Grilling })
-	res, err := h.Client.PromptSession(ctx, server.SessionPromptRequest{ID: id, Text: "my answer"})
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Grilling })
+	res, err := h.Client.PromptSession(ctx, wire.SessionPromptRequest{ID: id, Text: "my answer"})
 	if err != nil || res.Refused {
 		t.Fatalf("prompt = %+v, %v", res, err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason == "" })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason == "" })
 }
 
 func TestDerivedActionable_RunEndAfterGrilling(t *testing.T) {
@@ -60,7 +62,7 @@ func TestDerivedActionable_RunEndAfterGrilling(t *testing.T) {
 	for name, answer := range map[string]func(*testing.T, *servertest.Harness, context.Context, string){
 		"pane input": func(t *testing.T, h *servertest.Harness, _ context.Context, id string) { clearByInput(t, h, id) },
 		"page prompt": func(t *testing.T, h *servertest.Harness, ctx context.Context, id string) {
-			if _, err := h.Client.PromptSession(ctx, server.SessionPromptRequest{ID: id, Text: "my answer"}); err != nil {
+			if _, err := h.Client.PromptSession(ctx, wire.SessionPromptRequest{ID: id, Text: "my answer"}); err != nil {
 				t.Fatal(err)
 			}
 		},
@@ -69,10 +71,10 @@ func TestDerivedActionable_RunEndAfterGrilling(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			h, ctx, evs, id, conv, path := designPromptSession(t)
 			idleWith(ctx, t, h, evs, id, conv, path, grillTurn)
-			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Grilling })
+			waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Grilling })
 			answer(t, h, ctx, id)
 			idleWith(ctx, t, h, evs, id, conv, path, runEndTurn)
-			got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason == runEndLine }).Actionable
+			got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason == runEndLine }).Actionable
 			if len(got.Action) != 2 || got.Grilling {
 				t.Errorf("actionable = %+v, want Continue with its action", got)
 			}
@@ -84,7 +86,7 @@ func TestDerivedActionable_PlainTurnAfterGrillingClears(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv, path := designPromptSession(t)
 	idleWith(ctx, t, h, evs, id, conv, path, grillTurn)
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Grilling })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Grilling })
 	idleWith(ctx, t, h, evs, id, conv, path, plainTurn)
 	if got := settled(ctx, t, h, evs, id, conv); got.Reason != "" {
 		t.Errorf("actionable = %+v, want none", got)
@@ -103,7 +105,7 @@ func TestDerivedActionable_AgentRaised(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			h, ctx, evs, id, conv, path := designPromptSession(t)
-			if res, err := h.Client.MarkSessionActionable(ctx, server.MarkActionableRequest{ID: id, Reason: "review ready"}); err != nil || res.Refused {
+			if res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "review ready"}); err != nil || res.Refused {
 				t.Fatalf("mark = %+v, %v", res, err)
 			}
 			idleWith(ctx, t, h, evs, id, conv, path, tc.text)

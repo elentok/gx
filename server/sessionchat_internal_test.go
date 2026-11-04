@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/harness"
 )
 
@@ -17,7 +19,7 @@ func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
 	loads := 0
 	load := func(string) (chatSnapshot, error) {
 		loads++
-		return chatSnapshot{msgs: []SessionChatMessage{{ID: "m"}}}, nil
+		return chatSnapshot{msgs: []wire.SessionChatMessage{{ID: "m"}}}, nil
 	}
 	var c chatCache
 	for range 2 {

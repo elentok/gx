@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/sound"
@@ -16,7 +18,7 @@ import (
 )
 
 func (s *Server) sessionActionableWrite(w http.ResponseWriter, r *http.Request) {
-	var req MarkActionableRequest
+	var req wire.MarkActionableRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -31,48 +33,48 @@ func (s *Server) sessionActionableWrite(w http.ResponseWriter, r *http.Request) 
 
 // markSessionActionable saves an agent-raised Actionable, replacing any
 // earlier one.
-func (s *Server) markSessionActionable(req MarkActionableRequest) (SessionResult, error) {
+func (s *Server) markSessionActionable(req wire.MarkActionableRequest) (wire.SessionResult, error) {
 	if req.Reason == "" {
-		return sessionRefusal(ReasonSessionBadRequest, "an actionable needs a reason"), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, "an actionable needs a reason"), nil
 	}
 	dir, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if meta.Status.State == SessionExited {
-		return sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
+	if meta.Status.State == wire.SessionExited {
+		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
-	var info SessionInfo
+	var info wire.SessionInfo
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
-		m.Actionable = SessionActionable{Reason: req.Reason, Action: req.Action}
+		m.Actionable = wire.SessionActionable{Reason: req.Reason, Action: req.Action}
 		info = m.info()
 		return true
 	}); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	s.triggerBanner(req.ID, sound.Attention, req.Reason)
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 const grillingReason = "Grilling: waiting for your answers"
 
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
-func designActionable(text, ticket, agent string, final bool) (SessionActionable, bool) {
+func designActionable(text, ticket, agent string, final bool) (wire.SessionActionable, bool) {
 	if grillround.HasMarker(text) {
-		return SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
+		return wire.SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
 	}
 	return runEndNext(text, ticket, agent, final)
 }
 
 // runEndNext is the Actionable a gx-design run-end line raises: Continue in a
 // fresh conversation, or just the line when the design is at its final step.
-func runEndNext(text, ticket, agent string, final bool) (SessionActionable, bool) {
+func runEndNext(text, ticket, agent string, final bool) (wire.SessionActionable, bool) {
 	line := grillround.RunEndLine.FindString(text)
 	if line == "" {
-		return SessionActionable{}, false
+		return wire.SessionActionable{}, false
 	}
-	a := SessionActionable{Reason: strings.TrimSpace(line), Derived: true}
+	a := wire.SessionActionable{Reason: strings.TrimSpace(line), Derived: true}
 	if !final {
 		a.Action = designContinueAction(ticket, agent)
 	}
@@ -205,7 +207,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	a, matched := designActionable(text, design.Ticket, meta.Harness, s.designFinal(design.Ticket))
 	outcome := actionableNone
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
-		var next SessionActionable
+		var next wire.SessionActionable
 		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: maxAutoSends})
 		if outcome == actionableNone {
 			return false
@@ -217,7 +219,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	case actionableAdvance:
 		// A countdown that starts is silent: the person is told only if it does not send.
 		if s.startAutoAdvance(id) {
-			s.events.publish(EventSessionChanged, id)
+			s.events.publish(wire.EventSessionChanged, id)
 			return
 		}
 		s.triggerBanner(id, sound.Attention, a.Reason)
@@ -255,7 +257,7 @@ type actionablePolicy struct {
 // Actionable cur's meta should hold after a turn that matched a (or did not),
 // and what to do about it. A GxRaised one, or a session not waiting for the
 // person, is never touched.
-func decideActionable(cur sessionMeta, a SessionActionable, matched bool, p actionablePolicy) (SessionActionable, actionableOutcome) {
+func decideActionable(cur sessionMeta, a wire.SessionActionable, matched bool, p actionablePolicy) (wire.SessionActionable, actionableOutcome) {
 	old := cur.Actionable
 	if !cur.Status.Promptable() || old.GxRaised {
 		return old, actionableNone
@@ -264,7 +266,7 @@ func decideActionable(cur sessionMeta, a SessionActionable, matched bool, p acti
 		if !old.Derived {
 			return old, actionableNone
 		}
-		return SessionActionable{}, actionableCleared
+		return wire.SessionActionable{}, actionableCleared
 	}
 	if old.Derived && old.Reason == a.Reason && old.Grilling == a.Grilling {
 		return old, actionableNone
@@ -285,10 +287,10 @@ func (s *Server) raiseGxActionable(dir, reason string, action []string) {
 	id := filepath.Base(dir)
 	raised := false
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
-		if m.Status.State == SessionExited {
+		if m.Status.State == wire.SessionExited {
 			return false
 		}
-		m.Actionable = SessionActionable{Reason: reason, Action: action, GxRaised: true}
+		m.Actionable = wire.SessionActionable{Reason: reason, Action: action, GxRaised: true}
 		raised = true
 		return true
 	})

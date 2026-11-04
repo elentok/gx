@@ -7,13 +7,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-func (f designsFixture) openNew(t *testing.T, slug, idea string) server.SessionResult {
+func (f designsFixture) openNew(t *testing.T, slug, idea string) wire.SessionResult {
 	t.Helper()
 	res, err := f.h.Client.OpenDesign(f.ctx, server.DesignOpenRequest{Epic: slug, NewDesign: true, Idea: idea, Project: "proj"})
 	if err != nil {
@@ -109,15 +111,15 @@ func TestDesignsOpenNew_StampsTheDesignStart(t *testing.T) {
 func TestCreateSession_RefusedNameLeavesNoDesignStamp(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
-	req := func(ticket string) server.CreateSessionRequest {
-		return server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "taken", UniqueName: true, Ticket: ticket, Harness: string(agentfake.HarnessKind)}
+	req := func(ticket string) wire.CreateSessionRequest {
+		return wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "taken", UniqueName: true, Ticket: ticket, Harness: string(agentfake.HarnessKind)}
 	}
 	if res, err := f.h.Client.CreateSession(f.ctx, req("proj:plain")); err != nil || res.Session == nil {
 		t.Fatalf("holder = %+v, %v", res, err)
 	}
 	res, err := f.h.Client.CreateSession(f.ctx, req("proj:map"))
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNameTaken {
-		t.Fatalf("second = %+v, %v; want %s", res, err, server.ReasonSessionNameTaken)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNameTaken {
+		t.Fatalf("second = %+v, %v; want %s", res, err, wire.ReasonSessionNameTaken)
 	}
 	if got := designStartedAt(t, f.mapPath("map")); got != "" {
 		t.Errorf("a refused session left %q", got)
@@ -147,7 +149,7 @@ func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "a thing")
-	linked, err := f.h.Client.LinkSession(f.ctx, server.LinkSessionRequest{ID: res.Session.ID, Ticket: "fresh-idea"})
+	linked, err := f.h.Client.LinkSession(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "fresh-idea"})
 	if err != nil || linked.Refused || !linked.Session.Design {
 		t.Fatalf("link = %+v, %v; want Design kept", linked.Session, err)
 	}
@@ -186,12 +188,12 @@ func TestDesignsOpenNew_Refusals(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	for name, tc := range map[string]struct{ slug, idea, want string }{
-		"bad slug":     {"Bad Slug", "idea", server.ReasonSessionBadRequest},
-		"path slug":    {"a/b", "idea", server.ReasonSessionBadRequest},
+		"bad slug":     {"Bad Slug", "idea", wire.ReasonSessionBadRequest},
+		"path slug":    {"a/b", "idea", wire.ReasonSessionBadRequest},
 		"epic exists":  {"plain", "idea", server.ReasonDesignEpicExists},
 		"map exists":   {"map", "idea", server.ReasonDesignEpicExists},
 		"empty idea":   {"fresh-idea", " \n", server.ReasonEmptyPrompt},
-		"idea too big": {"fresh-idea", strings.Repeat("a", 32*1024+1), server.ReasonPromptTextTooLong},
+		"idea too big": {"fresh-idea", strings.Repeat("a", 32*1024+1), wire.ReasonPromptTextTooLong},
 	} {
 		if res := f.openNew(t, tc.slug, tc.idea); !res.Refused || res.Reason != tc.want || res.EpicCreated {
 			t.Errorf("%s: open = %+v, want reason %q with no marker", name, res, tc.want)

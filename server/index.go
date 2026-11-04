@@ -142,7 +142,7 @@ type Snapshot struct {
 	NodeMissing bool `json:"node_missing,omitempty"`
 	// Sessions are the interactive sessions, oldest first; filled in by the
 	// handler.
-	Sessions []SessionInfo `json:"sessions"`
+	Sessions []wire.SessionInfo `json:"sessions"`
 	// Epics summarizes every epic holding a queue item; filled in by the handler.
 	Epics []EpicSummary `json:"epics"`
 	// RecentlyFinished is the last completed loop epics, newest first; filled in

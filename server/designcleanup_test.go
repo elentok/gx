@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 )
 
@@ -265,7 +267,7 @@ func (f designsFixture) sessionExited(t *testing.T, id string) bool {
 	}
 	for _, s := range snap.Sessions {
 		if s.ID == id {
-			return s.Status.State == server.SessionExited
+			return s.Status.State == wire.SessionExited
 		}
 	}
 	return false

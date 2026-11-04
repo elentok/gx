@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -34,7 +36,7 @@ func startPromptSessionWithGrace(t *testing.T, grace time.Duration) promptFixtur
 	t.Helper()
 	cfg := t.TempDir()
 	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = grace }, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -42,13 +44,13 @@ func startPromptSessionWithGrace(t *testing.T, grace time.Duration) promptFixtur
 	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	return promptFixture{designsFixture: f, id: id, conv: conv, transcript: filepath.Join(cfg, "projects", "-repo", conv+".jsonl")}
 }
 
-func (f promptFixture) prompt(t *testing.T, text string) server.SessionResult {
+func (f promptFixture) prompt(t *testing.T, text string) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Text: text})
+	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Text: text})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,14 +88,14 @@ func TestSessionPrompt_Refusals(t *testing.T) {
 	f := startPromptSession(t)
 	for name, tc := range map[string]struct{ text, want string }{
 		"empty":    {"  \n", server.ReasonEmptyPrompt},
-		"bang":     {" !ls", server.ReasonPromptPrefixNotAllowed},
-		"too long": {strings.Repeat("a", 32*1024+1), server.ReasonPromptTextTooLong},
+		"bang":     {" !ls", wire.ReasonPromptPrefixNotAllowed},
+		"too long": {strings.Repeat("a", 32*1024+1), wire.ReasonPromptTextTooLong},
 	} {
 		res := f.prompt(t, tc.text)
 		if !res.Refused || res.Reason != tc.want {
 			t.Errorf("%s: prompt = %+v, want reason %q", name, res, tc.want)
 		}
-		if tc.want == server.ReasonPromptPrefixNotAllowed && (!strings.Contains(res.Message, "!") || strings.Contains(res.Message, "/")) {
+		if tc.want == wire.ReasonPromptPrefixNotAllowed && (!strings.Contains(res.Message, "!") || strings.Contains(res.Message, "/")) {
 			t.Errorf("%s: message %q should mention only !", name, res.Message)
 		}
 	}
@@ -152,8 +154,8 @@ func TestSessionPrompt_DesignSlashCommandStopsTheCountdown(t *testing.T) {
 			waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 			writeAssistantMessage(t, f.path, runEndText)
 			endTurn(t, f)
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-			res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Text: text})
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+			res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Text: text})
 			if err != nil || res.Refused {
 				t.Fatalf("prompt = %+v, %v", res, err)
 			}
@@ -186,16 +188,16 @@ func TestSessionPrompt_NotIdle(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	report(t, f.conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
-	if res := f.prompt(t, "hello"); !res.Refused || res.Reason != server.ReasonSessionNotIdle {
-		t.Errorf("prompt while working = %+v, want %s", res, server.ReasonSessionNotIdle)
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	if res := f.prompt(t, "hello"); !res.Refused || res.Reason != wire.ReasonSessionNotIdle {
+		t.Errorf("prompt while working = %+v, want %s", res, wire.ReasonSessionNotIdle)
 	}
 }
 
 func TestSessionPrompt_PlainSessionAcceptsText(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -203,8 +205,8 @@ func TestSessionPrompt_PlainSessionAcceptsText(t *testing.T) {
 	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
-	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: id, Text: "hello"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	got, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: id, Text: "hello"})
 	if err != nil || got.Refused {
 		t.Fatalf("prompt = %+v, %v; want accepted", got, err)
 	}
@@ -214,13 +216,13 @@ func TestSessionPrompt_PlainSessionAcceptsText(t *testing.T) {
 func TestSessionPrompt_HarnessWithoutChat(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind), Ticket: "proj:map"})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
-	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: res.Session.ID, Text: "hello"})
-	if err != nil || !got.Refused || got.Reason != server.ReasonPromptHarnessNotSupported {
-		t.Errorf("prompt = %+v, %v; want %s", got, err, server.ReasonPromptHarnessNotSupported)
+	got, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: res.Session.ID, Text: "hello"})
+	if err != nil || !got.Refused || got.Reason != wire.ReasonPromptHarnessNotSupported {
+		t.Errorf("prompt = %+v, %v; want %s", got, err, wire.ReasonPromptHarnessNotSupported)
 	}
 }
 
@@ -268,9 +270,9 @@ func TestWebSessionPrompt_StaleWhenTheTranscriptMoved(t *testing.T) {
 	waitForSubmitted(t, f.conv, "\"SQLite\"\n")
 }
 
-func (f promptFixture) cont(t *testing.T) server.SessionResult {
+func (f promptFixture) cont(t *testing.T) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Continue: true})
+	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,13 +295,13 @@ func TestSessionPrompt_ContinueTypesClearThenGxDesign(t *testing.T) {
 func TestSessionPrompt_ContinueRefusedOnANonDesignSession(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
-	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: res.Session.ID, Continue: true})
-	if err != nil || !got.Refused || got.Reason != server.ReasonSessionNotDesign {
-		t.Errorf("continue = %+v, %v; want %s", got, err, server.ReasonSessionNotDesign)
+	got, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: res.Session.ID, Continue: true})
+	if err != nil || !got.Refused || got.Reason != wire.ReasonSessionNotDesign {
+		t.Errorf("continue = %+v, %v; want %s", got, err, wire.ReasonSessionNotDesign)
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/ralphloop"
@@ -262,7 +264,7 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 	}
 	sessions, _ := s.listSessions()
 	for _, si := range sessions {
-		if inScope(si.Project) && si.Status.State != SessionExited && si.Harness != string(now) {
+		if inScope(si.Project) && si.Status.State != wire.SessionExited && si.Harness != string(now) {
 			running++
 		}
 	}

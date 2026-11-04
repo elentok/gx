@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -21,7 +22,7 @@ func personPrompt(uuid, text string) string {
 	return fmt.Sprintf(`{"type":"user","uuid":%q,"timestamp":"2026-01-01T10:00:01Z","message":{"content":%s}}`, uuid, b)
 }
 
-func chatOf(t *testing.T, lines ...string) server.SessionChatResponse {
+func chatOf(t *testing.T, lines ...string) wire.SessionChatResponse {
 	t.Helper()
 	h, ctx, _, id, _, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, lines...)

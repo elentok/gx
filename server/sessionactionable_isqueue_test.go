@@ -3,20 +3,20 @@ package server_test
 import (
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestSessionActionable_IsQueue(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
-		a    server.SessionActionable
+		a    wire.SessionActionable
 		want bool
 	}{
-		{"queue with target", server.SessionActionable{Kind: server.SessionActionableQueue, Target: "gx:epic-impl"}, true},
-		{"queue without target", server.SessionActionable{Kind: server.SessionActionableQueue}, false},
-		{"prompt action", server.SessionActionable{Reason: "done", Action: []string{"/next"}}, false},
-		{"derived blocked", server.SessionActionable{Kind: "blocked", Reason: "blocked"}, false},
+		{"queue with target", wire.SessionActionable{Kind: wire.SessionActionableQueue, Target: "gx:epic-impl"}, true},
+		{"queue without target", wire.SessionActionable{Kind: wire.SessionActionableQueue}, false},
+		{"prompt action", wire.SessionActionable{Reason: "done", Action: []string{"/next"}}, false},
+		{"derived blocked", wire.SessionActionable{Kind: "blocked", Reason: "blocked"}, false},
 	}
 	for _, c := range cases {
 		if got := c.a.IsQueue(); got != c.want {

@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -18,14 +19,14 @@ func TestUnread_RaisedByDoneBlockedAndCrashNotCancel(t *testing.T) {
 	step := func(c agentfake.Control, state string, want bool) {
 		t.Helper()
 		report(t, conv, c)
-		got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == state })
+		got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == state })
 		if got.Unread.Unread != want {
 			t.Fatalf("%s %s: unread = %v, want %v", c.State, state, got.Unread.Unread, want)
 		}
 	}
 
-	step(agentfake.Control{State: "working"}, server.SessionWorking, false)
-	step(agentfake.Control{State: "done"}, server.SessionIdle, true)
+	step(agentfake.Control{State: "working"}, wire.SessionWorking, false)
+	step(agentfake.Control{State: "done"}, wire.SessionIdle, true)
 	if saved, _ := readMeta(t, h, id)["unread"].(map[string]any); saved["unread"] != true {
 		t.Errorf("saved unread = %v, want unread", saved)
 	}
@@ -34,15 +35,15 @@ func TestUnread_RaisedByDoneBlockedAndCrashNotCancel(t *testing.T) {
 		t.Error("unread still saved after mark read")
 	}
 
-	step(agentfake.Control{State: "working"}, server.SessionWorking, false)
-	step(agentfake.Control{State: "idle"}, server.SessionIdle, false)
-	step(agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"}, server.SessionBlocked, true)
+	step(agentfake.Control{State: "working"}, wire.SessionWorking, false)
+	step(agentfake.Control{State: "idle"}, wire.SessionIdle, false)
+	step(agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"}, wire.SessionBlocked, true)
 	markRead(ctx, t, h, id)
 
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionExit, Code: 1}); err != nil {
 		t.Fatal(err)
 	}
-	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if !got.Unread.Unread {
 		t.Error("crash raised no unread")
 	}
@@ -62,39 +63,39 @@ func TestUnread_FocusedTUIViewingSuppressesAndClears(t *testing.T) {
 		for range tuiEvs {
 		}
 	}()
-	turn := func() server.SessionInfo {
+	turn := func() wire.SessionInfo {
 		t.Helper()
 		report(t, conv, agentfake.Control{State: "working"})
-		waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+		waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 		report(t, conv, agentfake.Control{State: "done"})
-		return waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+		return waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	}
 
-	reportFocus(ctx, t, h, server.FocusReport{Client: "tui-1", Focused: true, Session: id, TermProgram: "ghostty"})
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Focused: true, Session: id, TermProgram: "ghostty"})
 	if got := turn(); got.Unread.Unread {
 		t.Error("done raised unread while on screen in a focused TUI")
 	}
 	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
-	if got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked }); got.Unread.Unread {
+	if got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked }); got.Unread.Unread {
 		t.Error("blocked raised unread while on screen in a focused TUI")
 	}
 
-	reportFocus(ctx, t, h, server.FocusReport{Client: "tui-1", Session: id})
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Session: id})
 	if got := turn(); !got.Unread.Unread {
 		t.Error("a blurred TUI suppressed unread")
 	}
-	reportFocus(ctx, t, h, server.FocusReport{Client: "tui-1", Focused: true, Session: id})
-	if got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return !s.Unread.Unread }); got.Unread.Unread {
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Focused: true, Session: id})
+	if got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return !s.Unread.Unread }); got.Unread.Unread {
 		t.Error("viewing did not clear unread")
 	}
 
 	dropTUI()
 	servertest.WaitFor(t, 5*time.Second, "the focus report to be refused after its stream closed", func() bool {
-		res, err := h.Client.ReportFocus(ctx, server.FocusReport{Client: "tui-1", Focused: true})
+		res, err := h.Client.ReportFocus(ctx, wire.FocusReport{Client: "tui-1", Focused: true})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return res.Refused && res.Reason == server.ReasonFocusNotConnected
+		return res.Refused && res.Reason == wire.ReasonFocusNotConnected
 	})
 	if got := turn(); !got.Unread.Unread {
 		t.Error("a dropped TUI's report still suppressed unread")
@@ -110,20 +111,20 @@ func TestReportFocus_RefusesUnknownClientOrSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, tc := range map[string]struct {
-		req    server.FocusReport
+		req    wire.FocusReport
 		reason string
 	}{
-		"no client":       {server.FocusReport{Focused: true}, server.ReasonSessionBadRequest},
-		"no stream":       {server.FocusReport{Client: "tui-2", Focused: true}, server.ReasonFocusNotConnected},
-		"unknown session": {server.FocusReport{Client: "tui-1", Session: "abcdef"}, server.ReasonSessionUnknown},
+		"no client":       {wire.FocusReport{Focused: true}, wire.ReasonSessionBadRequest},
+		"no stream":       {wire.FocusReport{Client: "tui-2", Focused: true}, wire.ReasonFocusNotConnected},
+		"unknown session": {wire.FocusReport{Client: "tui-1", Session: "abcdef"}, wire.ReasonSessionUnknown},
 	} {
 		res, err := h.Client.ReportFocus(ctx, tc.req)
 		if err != nil || !res.Refused || res.Reason != tc.reason {
 			t.Errorf("%s: report = %+v, %v; want refused %s", name, res, err, tc.reason)
 		}
 	}
-	if res, err := h.Client.MarkSessionRead(ctx, "abcdef"); err != nil || res.Reason != server.ReasonSessionUnknown {
-		t.Errorf("mark read unknown = %+v, %v; want refused %s", res, err, server.ReasonSessionUnknown)
+	if res, err := h.Client.MarkSessionRead(ctx, "abcdef"); err != nil || res.Reason != wire.ReasonSessionUnknown {
+		t.Errorf("mark read unknown = %+v, %v; want refused %s", res, err, wire.ReasonSessionUnknown)
 	}
 }
 
@@ -131,9 +132,9 @@ func TestMarkRead_FailedSaveIsAnError(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "done"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Unread.Unread })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Unread.Unread })
 	dir := filepath.Join(h.SessionsDir, id)
 	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Fatal(err)
@@ -153,7 +154,7 @@ func markRead(ctx context.Context, t *testing.T, h *servertest.Harness, id strin
 	}
 }
 
-func reportFocus(ctx context.Context, t *testing.T, h *servertest.Harness, r server.FocusReport) {
+func reportFocus(ctx context.Context, t *testing.T, h *servertest.Harness, r wire.FocusReport) {
 	t.Helper()
 	res, err := h.Client.ReportFocus(ctx, r)
 	if err != nil || res.Refused {

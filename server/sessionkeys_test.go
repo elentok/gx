@@ -10,13 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-func (f promptFixture) keys(t *testing.T, req server.SessionKeysRequest) server.SessionResult {
+func (f promptFixture) keys(t *testing.T, req wire.SessionKeysRequest) wire.SessionResult {
 	t.Helper()
 	if req.ID == "" {
 		req.ID = f.id
@@ -29,7 +31,7 @@ func (f promptFixture) keys(t *testing.T, req server.SessionKeysRequest) server.
 }
 
 // keysWeb posts the request to the web mux and returns the refusal reason.
-func (f promptFixture) keysWeb(t *testing.T, req server.SessionKeysRequest) string {
+func (f promptFixture) keysWeb(t *testing.T, req wire.SessionKeysRequest) string {
 	t.Helper()
 	if req.ID == "" {
 		req.ID = f.id
@@ -61,28 +63,28 @@ func seedSession(t *testing.T, f promptFixture, id, state string) {
 func TestSessionKeys_Refusals(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	seedSession(t, f, "seeded-starting", server.SessionStarting)
-	seedSession(t, f, "seeded-exited", server.SessionExited)
-	seedSession(t, f, "seeded-nodial", server.SessionIdle)
+	seedSession(t, f, "seeded-starting", wire.SessionStarting)
+	seedSession(t, f, "seeded-exited", wire.SessionExited)
+	seedSession(t, f, "seeded-nodial", wire.SessionIdle)
 	for name, tc := range map[string]struct {
-		req  server.SessionKeysRequest
+		req  wire.SessionKeysRequest
 		want string
 	}{
-		"unknown session":    {server.SessionKeysRequest{ID: "nope", Key: "Esc"}, server.ReasonSessionUnknown},
-		"bad id":             {server.SessionKeysRequest{ID: "../x", Key: "Esc"}, server.ReasonSessionBadRequest},
-		"no input":           {server.SessionKeysRequest{}, server.ReasonSessionBadRequest},
-		"two inputs":         {server.SessionKeysRequest{Key: "Esc", Text: "a"}, server.ReasonSessionBadRequest},
-		"unknown key":        {server.SessionKeysRequest{Key: "F13"}, server.ReasonSessionBadRequest},
-		"newline in text":    {server.SessionKeysRequest{Text: "a\nb"}, server.ReasonSessionBadRequest},
-		"tab in text":        {server.SessionKeysRequest{Text: "a\tb"}, server.ReasonSessionBadRequest},
-		"escape in text":     {server.SessionKeysRequest{Text: "a\x1bb"}, server.ReasonSessionBadRequest},
-		"DEL in text":        {server.SessionKeysRequest{Text: "a\x7fb"}, server.ReasonSessionBadRequest},
-		"bang prefix":        {server.SessionKeysRequest{Text: "!ls"}, server.ReasonPromptPrefixNotAllowed},
-		"text too long":      {server.SessionKeysRequest{Text: strings.Repeat("a", 32*1024+1)}, server.ReasonPromptTextTooLong},
-		"guard while idle":   {server.SessionKeysRequest{Key: "Esc", OnlyBlocked: true}, server.ReasonNotBlocked},
-		"starting":           {server.SessionKeysRequest{ID: "seeded-starting", Key: "Esc"}, server.ReasonSessionNotLive},
-		"exited":             {server.SessionKeysRequest{ID: "seeded-exited", Key: "Esc"}, server.ReasonSessionNotLive},
-		"holder not dialled": {server.SessionKeysRequest{ID: "seeded-nodial", Key: "Esc"}, server.ReasonSessionNotLive},
+		"unknown session":    {wire.SessionKeysRequest{ID: "nope", Key: "Esc"}, wire.ReasonSessionUnknown},
+		"bad id":             {wire.SessionKeysRequest{ID: "../x", Key: "Esc"}, wire.ReasonSessionBadRequest},
+		"no input":           {wire.SessionKeysRequest{}, wire.ReasonSessionBadRequest},
+		"two inputs":         {wire.SessionKeysRequest{Key: "Esc", Text: "a"}, wire.ReasonSessionBadRequest},
+		"unknown key":        {wire.SessionKeysRequest{Key: "F13"}, wire.ReasonSessionBadRequest},
+		"newline in text":    {wire.SessionKeysRequest{Text: "a\nb"}, wire.ReasonSessionBadRequest},
+		"tab in text":        {wire.SessionKeysRequest{Text: "a\tb"}, wire.ReasonSessionBadRequest},
+		"escape in text":     {wire.SessionKeysRequest{Text: "a\x1bb"}, wire.ReasonSessionBadRequest},
+		"DEL in text":        {wire.SessionKeysRequest{Text: "a\x7fb"}, wire.ReasonSessionBadRequest},
+		"bang prefix":        {wire.SessionKeysRequest{Text: "!ls"}, wire.ReasonPromptPrefixNotAllowed},
+		"text too long":      {wire.SessionKeysRequest{Text: strings.Repeat("a", 32*1024+1)}, wire.ReasonPromptTextTooLong},
+		"guard while idle":   {wire.SessionKeysRequest{Key: "Esc", OnlyBlocked: true}, server.ReasonNotBlocked},
+		"starting":           {wire.SessionKeysRequest{ID: "seeded-starting", Key: "Esc"}, wire.ReasonSessionNotLive},
+		"exited":             {wire.SessionKeysRequest{ID: "seeded-exited", Key: "Esc"}, wire.ReasonSessionNotLive},
+		"holder not dialled": {wire.SessionKeysRequest{ID: "seeded-nodial", Key: "Esc"}, wire.ReasonSessionNotLive},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got := f.keys(t, tc.req); !got.Refused || got.Reason != tc.want {
@@ -102,10 +104,10 @@ func TestSessionKeys_Refusals(t *testing.T) {
 func TestSessionKeys_StartingSessionRefusesKeys(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	seedSession(t, f, "seeded-starting-only", server.SessionStarting)
-	got := f.keys(t, server.SessionKeysRequest{ID: "seeded-starting-only", Key: "Esc"})
-	if !got.Refused || got.Reason != server.ReasonSessionNotLive || !strings.Contains(got.Message, "is starting") {
-		t.Errorf("keys = %+v, want %s naming the starting state", got, server.ReasonSessionNotLive)
+	seedSession(t, f, "seeded-starting-only", wire.SessionStarting)
+	got := f.keys(t, wire.SessionKeysRequest{ID: "seeded-starting-only", Key: "Esc"})
+	if !got.Refused || got.Reason != wire.ReasonSessionNotLive || !strings.Contains(got.Message, "is starting") {
+		t.Errorf("keys = %+v, want %s naming the starting state", got, wire.ReasonSessionNotLive)
 	}
 }
 
@@ -113,9 +115,9 @@ func TestSessionKeys_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
 	h, row, release := startQueueChat(t, "hello")
 	defer release()
-	res, err := h.Client.KeysSession(context.Background(), server.SessionKeysRequest{ID: row.ID, Key: "Esc"})
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionReadOnly {
-		t.Errorf("keys = %+v, %v; want refusal %s", res, err, server.ReasonSessionReadOnly)
+	res, err := h.Client.KeysSession(context.Background(), wire.SessionKeysRequest{ID: row.ID, Key: "Esc"})
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionReadOnly {
+		t.Errorf("keys = %+v, %v; want refusal %s", res, err, wire.ReasonSessionReadOnly)
 	}
 }
 
@@ -124,7 +126,7 @@ func TestSessionKeys_NamedKeysReachTheFake(t *testing.T) {
 	f := startPromptSession(t)
 	// Esc is logged once the next key arrives.
 	for _, key := range []string{"Esc", "Tab", "Up", "Down", "Right", "Left", "Backspace", "Ctrl+C", "Shift+Tab", "enter"} {
-		if res := f.keys(t, server.SessionKeysRequest{Key: key}); res.Refused {
+		if res := f.keys(t, wire.SessionKeysRequest{Key: key}); res.Refused {
 			t.Fatalf("key %s = %+v", key, res)
 		}
 	}
@@ -153,17 +155,17 @@ func TestSessionKeys_KeysAndTextReachALiveSessionInEveryReachableState(t *testin
 			f := startPromptSession(t)
 			holder := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 			report(t, f.conv, tc.control)
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == tc.state })
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == tc.state })
 			for _, key := range []string{"Up", "Down"} {
-				if res := f.keys(t, server.SessionKeysRequest{Key: key}); res.Refused {
+				if res := f.keys(t, wire.SessionKeysRequest{Key: key}); res.Refused {
 					t.Fatalf("key %s = %+v", key, res)
 				}
 			}
-			if res := f.keys(t, server.SessionKeysRequest{Text: "typed"}); res.Refused {
+			if res := f.keys(t, wire.SessionKeysRequest{Text: "typed"}); res.Refused {
 				t.Fatalf("text = %+v", res)
 			}
 			waitForScreen(t, holder, "typed")
-			if res := f.keys(t, server.SessionKeysRequest{Key: "Enter"}); res.Refused {
+			if res := f.keys(t, wire.SessionKeysRequest{Key: "Enter"}); res.Refused {
 				t.Fatalf("enter = %+v", res)
 			}
 			waitForSubmitted(t, f.conv, strconv.Quote("<csi A>")+"\n"+strconv.Quote("<csi B>")+"\n"+strconv.Quote("typed")+"\n")
@@ -175,14 +177,14 @@ func TestSessionKeys_TextIsTypedWithoutEnter(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	holder := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	if res := f.keys(t, server.SessionKeysRequest{Text: "hello there"}); res.Refused {
+	if res := f.keys(t, wire.SessionKeysRequest{Text: "hello there"}); res.Refused {
 		t.Fatalf("text = %+v", res)
 	}
 	waitForScreen(t, holder, "hello there")
 	if got := submitted(t, f.conv); got != "" {
 		t.Errorf("submitted = %q, want the text left in the box", got)
 	}
-	if res := f.keys(t, server.SessionKeysRequest{Key: "Enter"}); res.Refused {
+	if res := f.keys(t, wire.SessionKeysRequest{Key: "Enter"}); res.Refused {
 		t.Fatalf("enter = %+v", res)
 	}
 	waitForSubmitted(t, f.conv, strconv.Quote("hello there")+"\n")
@@ -191,11 +193,11 @@ func TestSessionKeys_TextIsTypedWithoutEnter(t *testing.T) {
 func TestSessionKeys_GuardSendsNothingWhenNotBlocked(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	if res := f.keys(t, server.SessionKeysRequest{Key: "Enter", OnlyBlocked: true}); !res.Refused || res.Reason != server.ReasonNotBlocked {
+	if res := f.keys(t, wire.SessionKeysRequest{Key: "Enter", OnlyBlocked: true}); !res.Refused || res.Reason != server.ReasonNotBlocked {
 		t.Fatalf("guarded = %+v, want %s", res, server.ReasonNotBlocked)
 	}
 	// A guarded Enter that got through would log an empty entry before this one.
-	if res := f.keys(t, server.SessionKeysRequest{Key: "Tab"}); res.Refused {
+	if res := f.keys(t, wire.SessionKeysRequest{Key: "Tab"}); res.Refused {
 		t.Fatalf("tab = %+v", res)
 	}
 	waitForSubmitted(t, f.conv, strconv.Quote("<tab>")+"\n")
@@ -205,10 +207,10 @@ func TestSessionKeys_GuardedSendWaitsForTheSessionToLeaveBlocked(t *testing.T) {
 	t.Parallel()
 	f := startPromptSessionWithGrace(t, 10*time.Second)
 	report(t, f.conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
-	done := make(chan server.SessionResult, 1)
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+	done := make(chan wire.SessionResult, 1)
 	go func() {
-		res, err := f.h.Client.KeysSession(f.ctx, server.SessionKeysRequest{ID: f.id, Key: "Tab", OnlyBlocked: true})
+		res, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Key: "Tab", OnlyBlocked: true})
 		if err != nil {
 			t.Error(err)
 		}
@@ -235,10 +237,10 @@ func TestSessionKeys_GuardedSendThatLeavesBlockedIsNotDelivered(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	report(t, f.conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
-	got := f.keys(t, server.SessionKeysRequest{Key: "Tab", OnlyBlocked: true})
-	if !got.Refused || got.Reason != server.ReasonKeysNotDelivered {
-		t.Errorf("guarded = %+v, want %s", got, server.ReasonKeysNotDelivered)
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+	got := f.keys(t, wire.SessionKeysRequest{Key: "Tab", OnlyBlocked: true})
+	if !got.Refused || got.Reason != wire.ReasonKeysNotDelivered {
+		t.Errorf("guarded = %+v, want %s", got, wire.ReasonKeysNotDelivered)
 	}
 }
 
@@ -246,10 +248,10 @@ func TestSessionKeys_LogsOneEventWithoutTheText(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	const text = "secret-token"
-	if res := f.keys(t, server.SessionKeysRequest{Text: text}); res.Refused {
+	if res := f.keys(t, wire.SessionKeysRequest{Text: text}); res.Refused {
 		t.Fatalf("keys = %+v", res)
 	}
-	if reason := f.keysWeb(t, server.SessionKeysRequest{Key: "Tab"}); reason != "" {
+	if reason := f.keysWeb(t, wire.SessionKeysRequest{Key: "Tab"}); reason != "" {
 		t.Fatalf("web keys refused: %s", reason)
 	}
 	evs, ok, err := ralphloop.ReadServerEvents(f.h.TicketStore)
@@ -285,7 +287,7 @@ func TestSessionKeys_StopTheNudges(t *testing.T) {
 	}
 	// The key counts as a person's only once gx has typed.
 	waitForScreen(t, holder, "yes to both")
-	if res := f.keys(t, server.SessionKeysRequest{Key: "Tab"}); res.Refused {
+	if res := f.keys(t, wire.SessionKeysRequest{Key: "Tab"}); res.Refused {
 		t.Fatalf("tab = %+v", res)
 	}
 	time.Sleep(3 * time.Second) // negative wait: a nudge would come within two graces
@@ -302,17 +304,17 @@ func startKeysAdvancing(t *testing.T) *grillingFixture {
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	writeAssistantMessage(t, path, runEndText)
 	endTurn(t, f)
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 	return f
 }
 
 func TestSessionKeys_DesignKeyStopsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startKeysAdvancing(t)
-	if res, err := f.h.Client.KeysSession(f.ctx, server.SessionKeysRequest{ID: f.id, Key: "Tab"}); err != nil || res.Refused {
+	if res, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Key: "Tab"}); err != nil || res.Refused {
 		t.Fatalf("keys = %+v, %v", res, err)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
 	if n := autoSends(t, f); n != 0 {
 		t.Errorf("auto sends = %d, want none", n)
 	}
@@ -325,9 +327,9 @@ func TestSessionKeys_GuardedKeyKeepsTheCountdown(t *testing.T) {
 	if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionDialogBlock, Dialog: rows, Message: "run ls?"}); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
 	// Close dialog's Esc: whether the fake leaves Blocked on it does not matter here.
-	if _, err := f.h.Client.KeysSession(f.ctx, server.SessionKeysRequest{ID: f.id, Key: "Esc", OnlyBlocked: true}); err != nil {
+	if _, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Key: "Esc", OnlyBlocked: true}); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(time.Second) // negative wait: the holder wakes the session's stream within this window
@@ -339,7 +341,7 @@ func TestSessionKeys_GuardedKeyKeepsTheCountdown(t *testing.T) {
 func TestSessionKeys_GuardedRefusalKeepsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startKeysAdvancing(t)
-	res, err := f.h.Client.KeysSession(f.ctx, server.SessionKeysRequest{ID: f.id, Key: "Tab", OnlyBlocked: true})
+	res, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Key: "Tab", OnlyBlocked: true})
 	if err != nil || !res.Refused || res.Reason != server.ReasonNotBlocked {
 		t.Fatalf("keys = %+v, %v; want %s", res, err, server.ReasonNotBlocked)
 	}

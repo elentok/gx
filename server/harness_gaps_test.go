@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -43,7 +45,7 @@ func startRefusal(t *testing.T) refusalFixture {
 	return refusalFixture{h: h, ctx: ctx, path: path, store: store}
 }
 
-func (f refusalFixture) create(t *testing.T, req server.CreateSessionRequest) server.SessionResult {
+func (f refusalFixture) create(t *testing.T, req wire.CreateSessionRequest) wire.SessionResult {
 	t.Helper()
 	req.Project = "proj"
 	if req.Dir == "" {
@@ -63,23 +65,23 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 	cases := []struct {
 		name string
 		from string
-		run  func(t *testing.T, f refusalFixture) server.SessionResult
+		run  func(t *testing.T, f refusalFixture) wire.SessionResult
 	}{
-		{"project override", "the project default", func(t *testing.T, f refusalFixture) server.SessionResult {
+		{"project override", "the project default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			setHarness(t, f.h, server.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
 			f.h.Programs.Missing("codex")
-			return f.create(t, server.CreateSessionRequest{})
+			return f.create(t, wire.CreateSessionRequest{})
 		}},
-		{"default changed by reload", "the global default", func(t *testing.T, f refusalFixture) server.SessionResult {
+		{"default changed by reload", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
-			return f.create(t, server.CreateSessionRequest{})
+			return f.create(t, wire.CreateSessionRequest{})
 		}},
-		{"agents new", "the request", func(t *testing.T, f refusalFixture) server.SessionResult {
+		{"agents new", "the request", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			f.h.Programs.Missing("codex")
-			return f.create(t, server.CreateSessionRequest{Harness: "codex"})
+			return f.create(t, wire.CreateSessionRequest{Harness: "codex"})
 		}},
-		{"design step", "the global default", func(t *testing.T, f refusalFixture) server.SessionResult {
+		{"design step", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			res, err := f.h.Client.OpenDesign(f.ctx, server.DesignOpenRequest{Epic: "proj:map"})
@@ -88,7 +90,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			}
 			return res
 		}},
-		{"fix agent", "the global default", func(t *testing.T, f refusalFixture) server.SessionResult {
+		{"fix agent", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
 			res, err := f.h.Client.FixAgent(f.ctx, server.FixAgentRequest{Address: "proj:loop/01"})
@@ -97,10 +99,10 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			}
 			return res.SessionResult
 		}},
-		{"investigate", "the global default", func(t *testing.T, f refusalFixture) server.SessionResult {
+		{"investigate", "the global default", func(t *testing.T, f refusalFixture) wire.SessionResult {
 			switchDefaultHarness(t, f.h, f.path, f.store, "codex")
 			f.h.Programs.Missing("codex")
-			return f.create(t, server.CreateSessionRequest{Ticket: "proj:loop/01", Prompt: "investigate"})
+			return f.create(t, wire.CreateSessionRequest{Ticket: "proj:loop/01", Prompt: "investigate"})
 		}},
 	}
 	for _, tc := range cases {
@@ -108,7 +110,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			t.Parallel()
 			f := startRefusal(t)
 			res := tc.run(t, f)
-			if !res.Refused || res.Reason != server.ReasonSessionHarnessMissing {
+			if !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 				t.Fatalf("result = %+v, want a harness-missing refusal", res)
 			}
 			for _, want := range []string{"codex is not on PATH", tc.from, "Install it or change the default harness"} {
@@ -133,7 +135,7 @@ func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 	h.Programs.Missing("codex")
 
 	res, err := h.Client.ResumeSession(ctx, id)
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionHarnessMissing {
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 		t.Fatalf("resume = %+v, %v; want a harness-missing refusal", res, err)
 	}
 	for _, want := range []string{"codex is not on PATH", "the session's harness", "Install it or change the default harness"} {
@@ -142,7 +144,7 @@ func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 		}
 	}
 	list, err := h.Client.Sessions(ctx)
-	if err != nil || len(list) != 1 || list[0].Status.State != server.SessionExited {
+	if err != nil || len(list) != 1 || list[0].Status.State != wire.SessionExited {
 		t.Errorf("sessions = %+v, %v; want the one session still Exited", list, err)
 	}
 }
@@ -158,8 +160,8 @@ func TestHarnessMissing_ChartingHandoffRefusesBeforeStoppingTheOldAgent(t *testi
 	beforeSnap := sessionSnapshotOf(t, f.designsFixture, f.id)
 	f.h.Programs.Missing(os.Args[0])
 
-	res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Continue: true})
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionHarnessMissing {
+	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 		t.Fatalf("continue = %+v, %v; want a harness-missing refusal", res, err)
 	}
 	after := readMeta(t, f.h, f.id)
@@ -169,7 +171,7 @@ func TestHarnessMissing_ChartingHandoffRefusesBeforeStoppingTheOldAgent(t *testi
 		}
 	}
 	afterSnap := sessionSnapshotOf(t, f.designsFixture, f.id)
-	if afterSnap.Status.State == server.SessionExited || !reflect.DeepEqual(beforeSnap.Actionable, afterSnap.Actionable) {
+	if afterSnap.Status.State == wire.SessionExited || !reflect.DeepEqual(beforeSnap.Actionable, afterSnap.Actionable) {
 		t.Errorf("session = %+v, want it alive with actionable %+v kept", afterSnap, beforeSnap.Actionable)
 	}
 
@@ -204,7 +206,7 @@ func startKept(t *testing.T, label string) keptSession {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: fake})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: fake})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -253,7 +255,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 		writeTranscript(t, k.transcript, reply)
 		k.switchDefault(t, "codex")
 		report(t, k.conv, agentfake.Control{State: "working"})
-		waitSessionState(k.ctx, t, k.h, k.id, server.SessionWorking)
+		waitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
 		if !chatEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second, true) {
 			t.Error("no session-chat-changed event while the transcript grew")
 		}
@@ -264,7 +266,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 		writeTranscript(t, k.transcript, reply)
 		k.switchDefault(t, "codex")
 		report(t, k.conv, agentfake.Control{State: "done"})
-		waitSessionState(k.ctx, t, k.h, k.id, server.SessionIdle)
+		waitSessionState(k.ctx, t, k.h, k.id, wire.SessionIdle)
 		if !chatEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second, true) {
 			t.Error("no session-chat-changed event after the transcript grew past the idle edge")
 		}
@@ -299,7 +301,7 @@ func TestHarnessSwitch_RunningSessionKeepsItsKind(t *testing.T) {
 		writeTranscript(t, k.transcript, codexMessageLine)
 		k.switchDefault(t, "claude")
 		report(t, k.conv, agentfake.Control{State: "working"})
-		waitSessionState(k.ctx, t, k.h, k.id, server.SessionWorking)
+		waitSessionState(k.ctx, t, k.h, k.id, wire.SessionWorking)
 		if !codexEventWithin(k.evs, t, k.transcript, k.id, 5*time.Second) {
 			t.Error("no session-chat-changed event while the rollout grew")
 		}

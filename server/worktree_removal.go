@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
@@ -99,7 +101,7 @@ func (s *Server) liveWorkIn(root rootRef, path string) string {
 		return "sessions could not be listed: " + err.Error()
 	} else {
 		for _, in := range sessions {
-			if in.Status.State != SessionExited && dirInside(in.Dir, path) {
+			if in.Status.State != wire.SessionExited && dirInside(in.Dir, path) {
 				return "session " + in.ID + " is live in it"
 			}
 		}

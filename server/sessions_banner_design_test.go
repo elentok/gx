@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -36,9 +38,9 @@ func exitDesign(t *testing.T, frontmatter string, code int) int {
 	}
 	id := res.Session.ID
 	conv, _ := readMeta(t, h, id)["conversation_id"].(string)
-	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, server.SessionWorking)
+	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, wire.SessionWorking)
 	exitFake(t, conv, code)
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	banners, _ := waitAlerts(h, 1)
 	return len(banners)
 }

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -34,7 +36,7 @@ func startDeletable(t *testing.T) designsFixture {
 	return startDesignsIn(t, store)
 }
 
-func (f designsFixture) del(t *testing.T, epic string) server.SessionResult {
+func (f designsFixture) del(t *testing.T, epic string) wire.SessionResult {
 	t.Helper()
 	res, err := f.h.Client.DeleteDesign(f.ctx, server.DesignDeleteRequest{Epic: epic})
 	if err != nil {

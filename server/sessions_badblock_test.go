@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -19,7 +21,7 @@ const badRoundText = "❓ **Q1** Which store?\n\n```gx-question\noptions: [unclo
 func goIdle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan server.Event, id, conv string) {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	settle(t, h, ctx, evs, id, conv)
 }
 
@@ -28,7 +30,7 @@ func goIdle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan
 func settle(t *testing.T, h *servertest.Harness, ctx context.Context, evs <-chan server.Event, id, conv string) {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 }
 
 func badBlockTickets(t *testing.T, store string) []string {

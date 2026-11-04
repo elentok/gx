@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -81,19 +82,19 @@ func readServerHarness(dirs config.Dirs, sessionID string) (string, error) {
 	return s.Harness, nil
 }
 
-func findServerSession(dirs config.Dirs, sessionID string) (server.SessionInfo, error) {
+func findServerSession(dirs config.Dirs, sessionID string) (wire.SessionInfo, error) {
 	cl, err := serverClient(dirs)
 	if err != nil {
-		return server.SessionInfo{}, err
+		return wire.SessionInfo{}, err
 	}
 	sessions, err := cl.Sessions(context.Background())
 	if err != nil {
-		return server.SessionInfo{}, fmt.Errorf("reading gx session %s: %w", sessionID, err)
+		return wire.SessionInfo{}, fmt.Errorf("reading gx session %s: %w", sessionID, err)
 	}
 	for _, s := range sessions {
 		if s.ID == sessionID {
 			return s, nil
 		}
 	}
-	return server.SessionInfo{}, fmt.Errorf("gx session %s not found on the server", sessionID)
+	return wire.SessionInfo{}, fmt.Errorf("gx session %s not found on the server", sessionID)
 }

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/codexsession"
@@ -15,50 +17,8 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// SessionChatMessage is one visible message of a session's conversation. ID is
-// the transcript line's uuid.
-type SessionChatMessage struct {
-	ID   string    `json:"id"`
-	Role string    `json:"role"` // transcript.ChatRoleAgent or ChatRolePerson
-	Kind string    `json:"kind"` // text, prompt, command or output
-	Text string    `json:"text"`
-	At   time.Time `json:"at"`
-	// ToolCount and LastTool describe a tools entry, which folds a run of tool
-	// calls and carries no Text.
-	ToolCount int    `json:"tool_count,omitempty"`
-	LastTool  string `json:"last_tool,omitempty"`
-	// Calls is one line per folded tool call: the tool and its command or target.
-	Calls []string `json:"calls,omitempty"`
-}
-
 // maxChatMessages caps how many of the newest visible messages the chat loads.
 const maxChatMessages = 300
-
-// SessionChatResponse is the visible messages of a session's newest
-// conversation. ConversationID changes after a /clear. Unsupported marks a
-// session of a harness that has no chat; its Messages stay empty. Truncated
-// says earlier messages were cut to fit maxChatMessages. Round holds the cards
-// of a Grilling round the agent ended its last turn with and the person has not
-// answered; Next is the run-end line of that turn; Background lists the shells,
-// Monitors and subagents still running.
-type SessionChatResponse struct {
-	ConversationID string                  `json:"conversation_id"`
-	Messages       []SessionChatMessage    `json:"messages"`
-	Unsupported    bool                    `json:"unsupported,omitempty"`
-	Truncated      bool                    `json:"truncated,omitempty"`
-	Round          []SessionRoundCard      `json:"round" tstype:"SessionRoundCard[] | null"`
-	Next           *SessionNext            `json:"next"`
-	Background     []SessionBackgroundTask `json:"background"`
-	// Failure is the session's, as on its SessionInfo.
-	Failure *SessionFailure `json:"failure,omitempty"`
-	// Unreadable marks a Codex conversation that has turns but no message gx
-	// could read; CodexVersion is the Codex that wrote it.
-	Unreadable   bool   `json:"unreadable,omitempty"`
-	CodexVersion string `json:"codex_version,omitempty"`
-	// Archived marks a Codex conversation whose rollout is a .jsonl.zst: the
-	// messages stay empty until the archive route decodes it.
-	Archived bool `json:"archived,omitempty"`
-}
 
 // chatCache keeps each transcript's parsed chat until its size or mtime
 // changes, so polling a quiet session never rereads the file. The design's
@@ -81,10 +41,10 @@ type chatCacheEntry struct {
 // chatSnapshot is everything one read of a transcript yields. Tasks keeps the
 // unresolved markers, which age out at request time.
 type chatSnapshot struct {
-	msgs      []SessionChatMessage
+	msgs      []wire.SessionChatMessage
 	truncated bool
-	round     []SessionRoundCard
-	next      *SessionNext
+	round     []wire.SessionRoundCard
+	next      *wire.SessionNext
 	tasks     []transcript.BackgroundTaskMarker
 	// unreadable and codexVersion are set for a Codex rollout gx cannot read.
 	unreadable   bool
@@ -152,13 +112,13 @@ func snapshotOf(read chatreader.Result, kind agentrunner.Kind, ticket string, fi
 	if len(loaded) > maxChatMessages {
 		loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
 	}
-	snap.msgs = make([]SessionChatMessage, 0, len(loaded))
+	snap.msgs = make([]wire.SessionChatMessage, 0, len(loaded))
 	for _, m := range loaded {
 		text := m.Text
 		if m.Role == transcript.ChatRoleAgent && m.Kind == transcript.ChatKindText {
 			text, _ = grillround.SplitFences(text)
 		}
-		snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls})
+		snap.msgs = append(snap.msgs, wire.SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls})
 	}
 	return snap
 }
@@ -189,7 +149,7 @@ func (s *Server) sessionChatArchiveRead(w http.ResponseWriter, r *http.Request) 
 	_, meta, res, err := s.readableSession(id)
 	if res.Refused {
 		status := http.StatusBadRequest
-		if res.Reason == ReasonSessionUnknown {
+		if res.Reason == wire.ReasonSessionUnknown {
 			status = http.StatusNotFound
 		}
 		http.Error(w, res.Message, status)
@@ -210,20 +170,20 @@ func (s *Server) sessionChatArchiveRead(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	snap := snapshotOf(read, harness.Codex, meta.Ticket, s.designFinal(meta.Ticket))
-	writeJSON(w, SessionChatResponse{
+	writeJSON(w, wire.SessionChatResponse{
 		ConversationID: meta.ConversationID, Messages: snap.msgs, Truncated: snap.truncated,
-		Round: snap.round, Next: snap.next, Background: []SessionBackgroundTask{},
+		Round: snap.round, Next: snap.next, Background: []wire.SessionBackgroundTask{},
 		Failure:    s.sessionInfo(meta).Failure,
 		Unreadable: snap.unreadable, CodexVersion: snap.codexVersion,
 	})
 }
 
 // background lists the tasks still within their cap at now.
-func (c chatSnapshot) background(now time.Time) []SessionBackgroundTask {
-	out := []SessionBackgroundTask{}
+func (c chatSnapshot) background(now time.Time) []wire.SessionBackgroundTask {
+	out := []wire.SessionBackgroundTask{}
 	for _, mk := range c.tasks {
 		if now.Sub(mk.StartedAt) <= mk.Cap {
-			out = append(out, SessionBackgroundTask{Kind: mk.Kind, Label: mk.Label, StartedAt: mk.StartedAt.Format(time.RFC3339)})
+			out = append(out, wire.SessionBackgroundTask{Kind: mk.Kind, Label: mk.Label, StartedAt: mk.StartedAt.Format(time.RFC3339)})
 		}
 	}
 	return out
@@ -277,7 +237,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	_, meta, res, err := s.readableSession(id)
 	if res.Refused {
 		status := http.StatusBadRequest
-		if res.Reason == ReasonSessionUnknown {
+		if res.Reason == wire.ReasonSessionUnknown {
 			status = http.StatusNotFound
 		}
 		http.Error(w, res.Message, status)
@@ -287,7 +247,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	out := SessionChatResponse{ConversationID: meta.ConversationID, Messages: []SessionChatMessage{}, Background: []SessionBackgroundTask{}, Failure: s.sessionInfo(meta).Failure}
+	out := wire.SessionChatResponse{ConversationID: meta.ConversationID, Messages: []wire.SessionChatMessage{}, Background: []wire.SessionBackgroundTask{}, Failure: s.sessionInfo(meta).Failure}
 	if !s.settings.Load().hasChatReader(meta.Harness) {
 		out.Unsupported = true
 		writeJSON(w, out)

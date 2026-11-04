@@ -4,9 +4,10 @@ import (
 	"context"
 	"slices"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/nav"
@@ -16,16 +17,16 @@ import (
 
 type sessionActionMsg struct {
 	verb   string
-	result server.SessionResult
+	result wire.SessionResult
 	err    error
 }
 
-type sessionCall func(context.Context, string) (server.SessionResult, error)
+type sessionCall func(context.Context, string) (wire.SessionResult, error)
 
 // selected is the session under the cursor; ok is false when there is none.
-func (m Model) selected() (server.SessionInfo, bool) {
+func (m Model) selected() (wire.SessionInfo, bool) {
 	if m.client == nil || m.cursor >= len(m.sessions) {
-		return server.SessionInfo{}, false
+		return wire.SessionInfo{}, false
 	}
 	return m.sessions[m.cursor], true
 }
@@ -61,7 +62,7 @@ func (m Model) removeSelected() (tea.Model, tea.Cmd) {
 		return m, notify.Info(queueStopHint)
 	}
 	remove := sessionActionCmd("remove", m.client.RemoveSession, s.ID)
-	if s.Status.State != server.SessionExited {
+	if s.Status.State != wire.SessionExited {
 		return m, remove
 	}
 	m.confirm = m.confirm.Open(confirm.Options{Prompt: "Remove session " + displayName(s) + "?", AcceptCmd: remove})
@@ -81,7 +82,7 @@ func (m Model) resumeSelected() (tea.Model, tea.Cmd) {
 
 // actionSteps is what running a's Action does, one line per step: its prompts
 // in order, or the queue it runs. Empty means there is no Action.
-func actionSteps(a server.SessionActionable) []string {
+func actionSteps(a wire.SessionActionable) []string {
 	if a.IsQueue() {
 		return []string{"Queue `" + a.Target + "`"}
 	}
@@ -197,12 +198,12 @@ type sessionMenuPickMsg struct {
 
 // sessionMenuItems lists every session item in a fixed order; those that
 // don't apply to s are dim with the reason.
-func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInfo] {
-	live := s.Status.State != server.SessionExited
-	item := func(label, key, pick, disabled string) contextmenu.Item[server.SessionInfo] {
-		return contextmenu.Item[server.SessionInfo]{
+func sessionMenuItems(s wire.SessionInfo) []contextmenu.Item[wire.SessionInfo] {
+	live := s.Status.State != wire.SessionExited
+	item := func(label, key, pick, disabled string) contextmenu.Item[wire.SessionInfo] {
+		return contextmenu.Item[wire.SessionInfo]{
 			Label: label, Key: key, Group: contextmenu.Agent, Disabled: disabled,
-			Run: func(s server.SessionInfo) tea.Cmd {
+			Run: func(s wire.SessionInfo) tea.Cmd {
 				return func() tea.Msg { return sessionMenuPickMsg{id: s.ID, key: pick} }
 			},
 		}
@@ -213,7 +214,7 @@ func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInf
 		}
 		return why
 	}
-	var items []contextmenu.Item[server.SessionInfo]
+	var items []contextmenu.Item[wire.SessionInfo]
 	if !s.Queue {
 		items = append(items,
 			item("Stop", "x", "x", reason(live, "exited")),
@@ -292,7 +293,7 @@ func (m Model) updateMenuPick(msg sessionMenuPickMsg) (tea.Model, tea.Cmd) {
 		return m.unlockSelected()
 	case "auto-advance":
 		s, _ := m.selected()
-		return m, sessionActionCmd("auto-advance", func(ctx context.Context, id string) (server.SessionResult, error) {
+		return m, sessionActionCmd("auto-advance", func(ctx context.Context, id string) (wire.SessionResult, error) {
 			return m.client.SetAutoAdvance(ctx, id, !s.AutoAdvance)
 		}, s.ID)
 	case "cancel-auto-advance":
@@ -331,7 +332,7 @@ func (m Model) updateSessionAction(msg sessionActionMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	resumed := *msg.result.Session
-	i := slices.IndexFunc(m.sessions, func(s server.SessionInfo) bool { return s.ID == resumed.ID })
+	i := slices.IndexFunc(m.sessions, func(s wire.SessionInfo) bool { return s.ID == resumed.ID })
 	if i < 0 {
 		return m, nil
 	}

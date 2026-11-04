@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -67,7 +69,7 @@ func TestEpicList_DesignCards(t *testing.T) {
 
 	f := startDesignsIn(t, store, servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg))
 	startDesign := func(ticket string) (id, conv string) {
-		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
+		res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}
@@ -78,9 +80,9 @@ func TestEpicList_DesignCards(t *testing.T) {
 	id, conv := startDesign("proj:d-wait")
 	writeAssistantMessage(t, filepath.Join(cfg, "projects", "-repo", conv+".jsonl"), "❓ **Q1** Which store?")
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 
 	got := epicRows(t, f.h, f)
 	for _, w := range []struct {
@@ -127,7 +129,7 @@ func TestEpicList_DesignCountdownCarriesItsDeadline(t *testing.T) {
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	writeAssistantMessage(t, f.path, runEndText)
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 	list, err := f.h.Client.Epics(f.ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -162,9 +164,9 @@ func TestEpicList_NewDesignLifecycle(t *testing.T) {
 	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
 	writeAssistantMessage(t, filepath.Join(cfg, "projects", "-repo", conv+".jsonl"), "❓ **Q1** Which name?")
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 	if r := epicRows(t, f.h, f)["fresh-idea"]; r.Section != server.SectionNeedsYou || r.StatePill != server.PillQuestion {
 		t.Errorf("waiting row = section %q pill %q, want Needs you / Question", r.Section, r.StatePill)
 	}
@@ -181,7 +183,7 @@ func TestEpicList_NewDesignGoesToReadyToDesignWhenItsSessionEndsUncharted(t *tes
 	if _, err := f.h.Client.StopSession(f.ctx, res.Session.ID); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, res.Session.ID, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(f.ctx, t, f.h, f.evs, res.Session.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if r := waitForEpicRow(t, f, "fresh-idea", func(r server.EpicListRow) bool { return r.Section == server.SectionReadyToDesign }); r.StatusWords != "Not started" {
 		t.Errorf("row after the session ended = %+v, want Ready to design / Not started", r)
 	}

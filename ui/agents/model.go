@@ -7,13 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/confirm"
@@ -50,7 +51,7 @@ type Model struct {
 	link     ticketsui.ServerLink
 	loaded   bool
 	// sessions is in sidebar order (see orderedSessions); cursor indexes it.
-	sessions    []server.SessionInfo
+	sessions    []wire.SessionInfo
 	cursor      int
 	afk         bool
 	hideSidebar bool
@@ -78,7 +79,7 @@ type Model struct {
 	// confirm asks y/n before a Stop or Remove.
 	confirm confirm.Model
 	// menu is the `m` menu of the selected session's actions.
-	menu          contextmenu.Menu[server.SessionInfo]
+	menu          contextmenu.Menu[wire.SessionInfo]
 	help          help.Model
 	width, height int
 	// sessionsDir holds the sessions' state dirs; empty when unknown.
@@ -368,7 +369,7 @@ func (m Model) workingVisible() bool {
 		}
 	}
 	for _, i := range shown {
-		if m.sessions[i].Status.State == server.SessionWorking {
+		if m.sessions[i].Status.State == wire.SessionWorking {
 			return true
 		}
 	}
@@ -382,9 +383,9 @@ func (m Model) sidebarShown() bool {
 // followSelection is the cursor into next that keeps the session selected in
 // prev. When that session is gone it moves to the nearest one above it that
 // remains, so removing a session selects the one above; else the first.
-func followSelection(prev []server.SessionInfo, cursor int, next []server.SessionInfo) int {
+func followSelection(prev []wire.SessionInfo, cursor int, next []wire.SessionInfo) int {
 	index := func(id string) int {
-		return slices.IndexFunc(next, func(s server.SessionInfo) bool { return s.ID == id })
+		return slices.IndexFunc(next, func(s wire.SessionInfo) bool { return s.ID == id })
 	}
 	for i := min(cursor, len(prev)-1); i >= 0; i-- {
 		if j := index(prev[i].ID); j >= 0 {
@@ -484,7 +485,7 @@ func (m Model) lines() []string {
 	return nil
 }
 
-func displayName(s server.SessionInfo) string {
+func displayName(s wire.SessionInfo) string {
 	if s.Name != "" {
 		return s.Name
 	}

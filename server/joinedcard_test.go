@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -135,16 +137,16 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	if !h.Server.WaitSettled(10 * time.Second) {
 		t.Fatal("startup design cleanup did not settle")
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:m"})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:m"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	conv, _ := readMeta(t, h, res.Session.ID)["conversation_id"].(string)
 	writeAssistantMessage(t, filepath.Join(cfg, "projects", "-repo", conv+".jsonl"), "❓ **Q1** Which store?")
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, res.Session.ID, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, res.Session.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, res.Session.ID, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+	waitForSession(ctx, t, h, evs, res.Session.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 
 	r := row()
 	if r.Section != server.SectionNeedsYou || r.StatePill != server.PillQuestion {

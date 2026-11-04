@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/tickets"
@@ -19,7 +21,7 @@ const queueAgentIDPrefix = "queue-"
 // listSessionsWithQueue is listSessions plus a row per PTY Queue agent. Only
 // the snapshot and the sessions route show Queue rows; every other caller
 // (worktree removal, design lookup, resume) reads sessions-dir sessions only.
-func (s *Server) listSessionsWithQueue() ([]SessionInfo, error) {
+func (s *Server) listSessionsWithQueue() ([]wire.SessionInfo, error) {
 	list, err := s.listSessions()
 	return append(list, s.queueAgentRows()...), err
 }
@@ -27,8 +29,8 @@ func (s *Server) listSessionsWithQueue() ([]SessionInfo, error) {
 // queueAgentRows lists the tracked runs hosted on the PTY runner. A row lives
 // as long as its run's registry entry, which a finish or a stop drops with the
 // session; a paused ticket's live agent keeps its run.
-func (s *Server) queueAgentRows() []SessionInfo {
-	var rows []SessionInfo
+func (s *Server) queueAgentRows() []wire.SessionInfo {
+	var rows []wire.SessionInfo
 	for _, t := range s.registry.list() {
 		if t.Runner != runnerPTY || t.Watched {
 			continue
@@ -40,21 +42,21 @@ func (s *Server) queueAgentRows() []SessionInfo {
 	return rows
 }
 
-func (s *Server) queueAgentRow(t trackedRun) (SessionInfo, bool) {
+func (s *Server) queueAgentRow(t trackedRun) (wire.SessionInfo, bool) {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
-		return SessionInfo{}, false
+		return wire.SessionInfo{}, false
 	}
 	runner := s.runnerForRun(t.Run)
 	if runner == nil {
-		return SessionInfo{}, false
+		return wire.SessionInfo{}, false
 	}
 	st, err := runner.Status(t.Session)
 	if err != nil {
-		return SessionInfo{}, false
+		return wire.SessionInfo{}, false
 	}
 	label := iterationLabel(t.Address)
-	info := SessionInfo{
+	info := wire.SessionInfo{
 		ID:              queueAgentIDPrefix + label,
 		Name:            label,
 		Project:         addr.Project,
@@ -64,7 +66,7 @@ func (s *Server) queueAgentRow(t trackedRun) (SessionInfo, bool) {
 		Queue:           true,
 		Holder:          filepath.Join(nativerunner.AgentsRoot(s.cfg.StateDir, addr.Project), label),
 		WaitingLabel:    s.checkWaitingLabel(t.Address),
-		Status:          SessionStatus{State: queueAgentState(st.State, t.RateLimited)},
+		Status:          wire.SessionStatus{State: queueAgentState(st.State, t.RateLimited)},
 		StatusChangedAt: t.StartedAt,
 		RunStartedAt:    t.StartedAt,
 		Model:           t.Model,
@@ -79,9 +81,9 @@ func (s *Server) queueAgentRow(t trackedRun) (SessionInfo, bool) {
 // readableSession resolves a session read's id: a sessions-dir session, else a
 // live Queue agent. Only the chat and screen reads use it; the write routes
 // call sessionDir and so refuse a Queue agent id as an unknown session.
-func (s *Server) readableSession(id string) (string, sessionMeta, SessionResult, error) {
+func (s *Server) readableSession(id string) (string, sessionMeta, wire.SessionResult, error) {
 	dir, meta, res, err := s.sessionDir(id)
-	if !res.Refused || res.Reason != ReasonSessionUnknown || !strings.HasPrefix(id, queueAgentIDPrefix) {
+	if !res.Refused || res.Reason != wire.ReasonSessionUnknown || !strings.HasPrefix(id, queueAgentIDPrefix) {
 		return dir, meta, res, err
 	}
 	for _, row := range s.queueAgentRows() {
@@ -100,7 +102,7 @@ func (s *Server) readableSession(id string) (string, sessionMeta, SessionResult,
 			Dir:            cmp.Or(d.Meta.Cwd, row.Dir),
 			ConversationID: d.Meta.SessionID,
 			Status:         row.Status,
-		}, SessionResult{}, nil
+		}, wire.SessionResult{}, nil
 	}
 	return dir, meta, res, nil
 }
@@ -110,14 +112,14 @@ func (s *Server) readableSession(id string) (string, sessionMeta, SessionResult,
 func queueAgentState(state agentrunner.State, held bool) string {
 	switch {
 	case held:
-		return SessionRateLimited
+		return wire.SessionRateLimited
 	case state == agentrunner.StateWorking:
-		return SessionWorking
+		return wire.SessionWorking
 	case state == agentrunner.StateIdle:
-		return SessionIdle
+		return wire.SessionIdle
 	case state == agentrunner.StateBlocked:
-		return SessionBlocked
+		return wire.SessionBlocked
 	default:
-		return SessionExited
+		return wire.SessionExited
 	}
 }

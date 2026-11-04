@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner/claudeui"
 )
 
@@ -43,7 +45,7 @@ func (s *Server) clearSendFailed(dir string) {
 		if !m.Actionable.GxRaised || !strings.HasPrefix(m.Actionable.Reason, sendFailedPrefix) {
 			return false
 		}
-		m.Actionable = SessionActionable{}
+		m.Actionable = wire.SessionActionable{}
 		return true
 	})
 }

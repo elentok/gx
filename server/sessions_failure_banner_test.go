@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -56,13 +58,13 @@ func startFailureBannerSession(t *testing.T, web bool, opts ...func(*server.Conf
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map/01", Name: "fix-build"})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map/01", Name: "fix-build"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	id := res.Session.ID
 	conv, _ := readMeta(t, h, id)["conversation_id"].(string)
-	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, server.SessionWorking)
+	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, wire.SessionWorking)
 	return failureBannerFixture{h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl"), hs.WebURL}
 }
 
@@ -85,7 +87,7 @@ func TestFailureBanner_AuthSendsOneBanner(t *testing.T) {
 	t.Parallel()
 	f := startFailureBannerSession(t, false)
 	writeTranscript(t, f.path, apiError401)
-	f.reach(t, agentfake.Control{State: "done"}, server.SessionIdle)
+	f.reach(t, agentfake.Control{State: "done"}, wire.SessionIdle)
 	banners, _ := waitAlerts(f.h, 1)
 	if len(banners) != 1 || banners[0].Body != "Claude login needed" {
 		t.Fatalf("banners = %+v, want one for the login", banners)
@@ -145,7 +147,7 @@ func TestFailureBanner_ClickFocusesTheTUIOrCarriesTheLink(t *testing.T) {
 	t.Parallel()
 	f := startFailureBannerSession(t, true)
 	openTUI(f.ctx, t, f.h, "tui-1")
-	reportFocus(f.ctx, t, f.h, server.FocusReport{Client: "tui-1", Focused: true, TermProgram: "ghostty"})
+	reportFocus(f.ctx, t, f.h, wire.FocusReport{Client: "tui-1", Focused: true, TermProgram: "ghostty"})
 	f.stall(t)
 	banners, _ := waitAlerts(f.h, 1)
 	if len(banners) != 1 || banners[0].Execute != "gx agents focus "+f.id || banners[0].Link == "" {

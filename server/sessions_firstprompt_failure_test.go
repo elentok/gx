@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -20,7 +22,7 @@ const firstPromptStartTimeout = 300 * time.Millisecond
 // startFailingFirstPrompt's extra entries are KEY=VALUE env for the server.
 func startFailingFirstPrompt(t *testing.T, prompt string, extraEnv ...string) firstPromptFixture {
 	t.Helper()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace
 		c.FirstPromptStartTimeout = firstPromptStartTimeout
 	}, withAlerts(true, true), servertest.WithEnv(append([]string{agentfake.ProgramInputEnv + "=1"}, extraEnv...)...))
@@ -36,9 +38,9 @@ type firstPromptFixture struct {
 }
 
 // gxActionable waits for the session's gx-raised Actionable.
-func (f firstPromptFixture) gxActionable(t *testing.T) server.SessionActionable {
+func (f firstPromptFixture) gxActionable(t *testing.T) wire.SessionActionable {
 	t.Helper()
-	return waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
+	return waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
 }
 
 func TestFirstPromptFailure_StillStartingRaisesActionable(t *testing.T) {
@@ -115,15 +117,15 @@ func TestFirstPromptFailure_GxRaisedSurvivesInputAndAgentRaisedDoesNot(t *testin
 	}
 	// A later status change orders the check after the holder saw the input.
 	report(t, f.conv, agentfake.Control{State: "working"})
-	if got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking }); !got.Actionable.GxRaised {
+	if got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking }); !got.Actionable.GxRaised {
 		t.Errorf("actionable = %+v after input, want the gx-raised one kept", got.Actionable)
 	}
 
-	if res, err := f.h.Client.MarkSessionActionable(f.ctx, server.MarkActionableRequest{ID: f.id, Reason: "agent says"}); err != nil || res.Refused || res.Session.Actionable.GxRaised {
+	if res, err := f.h.Client.MarkSessionActionable(f.ctx, wire.MarkActionableRequest{ID: f.id, Reason: "agent says"}); err != nil || res.Refused || res.Session.Actionable.GxRaised {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
 	if err := att.SendKey(screen.Key{Code: 'y', Text: "y"}); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.Reason == "" })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.Reason == "" })
 }

@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
 )
 
 func newAgentsKeysCmd(d deps) *cobra.Command {
 	var jsonOut bool
-	req := server.SessionKeysRequest{}
+	req := wire.SessionKeysRequest{}
 	cmd := &cobra.Command{
 		Use:   "keys <session> (--key <name> | --text <text>) [--only-blocked]",
 		Short: "send a named key (Esc, Enter, Tab, Up, Down, Left, Right, Ctrl+C) or literal text to a live session",
@@ -37,8 +38,8 @@ func newAgentsKeysCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func runAgentsKeys(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.SessionKeysRequest) error {
-	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+func runAgentsKeys(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.SessionKeysRequest) error {
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
 		return cl.KeysSession(ctx, req)
 	})
 }

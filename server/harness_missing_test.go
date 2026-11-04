@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -139,8 +141,8 @@ func TestCreateSession_HarnessMissingRefused(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Worktree: "feature"})
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionHarnessMissing {
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Worktree: "feature"})
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 		t.Fatalf("create = %+v, %v; want a harness-missing refusal", res, err)
 	}
 	for _, want := range []string{"codex is not on PATH", "the global default", "Install it or change the default harness"} {

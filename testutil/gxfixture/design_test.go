@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -88,11 +90,11 @@ func (r *running) currentStep(t *testing.T) server.ProgressStep {
 }
 
 // waitChat polls the session's chat until ok accepts it.
-func (r *running) waitChat(t *testing.T, id string, ok func(server.SessionChatResponse) bool) server.SessionChatResponse {
+func (r *running) waitChat(t *testing.T, id string, ok func(wire.SessionChatResponse) bool) wire.SessionChatResponse {
 	t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
 	for {
-		var chat server.SessionChatResponse
+		var chat wire.SessionChatResponse
 		if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
 			t.Fatal(err)
 		}
@@ -124,12 +126,12 @@ func (r *running) waitIdle(t *testing.T, id string) {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		var list []server.SessionInfo
+		var list []wire.SessionInfo
 		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
 		for _, s := range list {
-			if s.ID == id && s.Status.State == server.SessionIdle {
+			if s.ID == id && s.Status.State == wire.SessionIdle {
 				return
 			}
 		}
@@ -140,7 +142,7 @@ func (r *running) waitIdle(t *testing.T, id string) {
 	}
 }
 
-func roundLabels(chat server.SessionChatResponse) []string {
+func roundLabels(chat wire.SessionChatResponse) []string {
 	var labels []string
 	for _, c := range chat.Round {
 		labels = append(labels, c.Label)
@@ -163,19 +165,19 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 		t.Errorf("trunk files = %q, %v; want only the worker config, so no spec", tracked, err)
 	}
 
-	var res server.SessionResult
+	var res wire.SessionResult
 	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
 		t.Fatalf("designs open = %+v, %v", res, err)
 	}
 	id := res.Session.ID
 
-	chat := r.waitChat(t, id, func(c server.SessionChatResponse) bool { return len(c.Round) > 0 })
+	chat := r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Round) > 0 })
 	if got := roundLabels(chat); !slices.Equal(got, []string{"8", "8b"}) {
 		t.Fatalf("round labels = %v, want 8 and 8b", got)
 	}
 
 	r.promptWhenIdle(t, id, "SQLite, and yes to the migration")
-	chat = r.waitChat(t, id, func(c server.SessionChatResponse) bool { return c.Next != nil })
+	chat = r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return c.Next != nil })
 	if len(chat.Next.Action.Action) == 0 {
 		t.Errorf("next = %+v, want the Continue action", chat.Next)
 	}
@@ -184,17 +186,17 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	// Actionable, which an answer typed by the server does not clear.
 	r.waitIdle(t, id)
 	r.postWhenIdle(t, id, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
-	r.waitChat(t, id, func(c server.SessionChatResponse) bool { return slices.Equal(roundLabels(c), []string{"9"}) })
+	r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return slices.Equal(roundLabels(c), []string{"9"}) })
 	r.stop(t)
 }
 
 func TestDesignTwoLiveScenario_TwoSessionsNewestPlaysRoundOne(t *testing.T) {
 	r := start(t, "design-two-live")
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
-	var live []server.SessionInfo
+	var live []wire.SessionInfo
 	for _, s := range list {
 		if s.Ticket == designAddr && s.Design {
 			live = append(live, s)
@@ -207,7 +209,7 @@ func TestDesignTwoLiveScenario_TwoSessionsNewestPlaysRoundOne(t *testing.T) {
 	if live[1].RunStartedAt.After(newest.RunStartedAt) {
 		newest = live[1]
 	}
-	chat := r.waitChat(t, newest.ID, func(c server.SessionChatResponse) bool { return len(c.Round) > 0 })
+	chat := r.waitChat(t, newest.ID, func(c wire.SessionChatResponse) bool { return len(c.Round) > 0 })
 	if got := roundLabels(chat); !slices.Equal(got, []string{"8", "8b"}) {
 		t.Errorf("round labels = %v, want 8 and 8b", got)
 	}
@@ -217,7 +219,7 @@ func TestDesignTwoLiveScenario_TwoSessionsNewestPlaysRoundOne(t *testing.T) {
 // openDesign opens the design session of the scenario's map and returns its id.
 func (r *running) openDesign(t *testing.T) string {
 	t.Helper()
-	var res server.SessionResult
+	var res wire.SessionResult
 	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
 		t.Fatalf("designs open = %+v, %v", res, err)
 	}
@@ -235,7 +237,7 @@ func (r *running) promptWhenIdle(t *testing.T, id, text string) {
 		cmd.Env = r.Env
 		if _, err := cmd.CombinedOutput(); err == nil {
 			for range 10 {
-				var chat server.SessionChatResponse
+				var chat wire.SessionChatResponse
 				if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
 					t.Fatal(err)
 				}
@@ -253,7 +255,7 @@ func (r *running) promptWhenIdle(t *testing.T, id, text string) {
 }
 
 // agentTexts are the text of the session's assistant messages, oldest first.
-func agentTexts(chat server.SessionChatResponse) []string {
+func agentTexts(chat wire.SessionChatResponse) []string {
 	var texts []string
 	for _, m := range chat.Messages {
 		if m.Role == transcript.ChatRoleAgent && m.Kind == transcript.ChatKindText {
@@ -284,7 +286,7 @@ func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 			r := startWith(t, tt.scenario, nil, "--auto-advance-delay", "1h")
 			id := r.openDesign(t)
 			for i, want := range tt.want {
-				r.waitChat(t, id, func(c server.SessionChatResponse) bool {
+				r.waitChat(t, id, func(c wire.SessionChatResponse) bool {
 					texts := agentTexts(c)
 					return len(texts) == i+1 && strings.Contains(texts[i], want)
 				})
@@ -299,16 +301,16 @@ func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 
 // designSessions polls `gx agents list` until every ticket has a design session
 // that satisfies ok, and returns them by ticket.
-func (r *running) designSessions(t *testing.T, tickets []string, ok func(server.SessionInfo) bool) map[string]server.SessionInfo {
+func (r *running) designSessions(t *testing.T, tickets []string, ok func(wire.SessionInfo) bool) map[string]wire.SessionInfo {
 	t.Helper()
-	var list []server.SessionInfo
-	got := map[string]server.SessionInfo{}
+	var list []wire.SessionInfo
+	got := map[string]wire.SessionInfo{}
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
 		list = nil
 		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
-		got = map[string]server.SessionInfo{}
+		got = map[string]wire.SessionInfo{}
 		for _, s := range list {
 			if s.Design && slices.Contains(tickets, s.Ticket) && ok(s) {
 				got[s.Ticket] = s
@@ -363,7 +365,7 @@ func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
 		"demo:tier-no-step":     "strongest",
 	}
 	tickets := slices.Collect(maps.Keys(want))
-	got := r.designSessions(t, tickets, func(server.SessionInfo) bool { return true })
+	got := r.designSessions(t, tickets, func(wire.SessionInfo) bool { return true })
 	for ticket, tier := range want {
 		if string(got[ticket].Tier) != tier {
 			t.Errorf("%s tier = %q, want %q", ticket, got[ticket].Tier, tier)
@@ -371,7 +373,7 @@ func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
 	}
 	r.waitLaunchModels(t, []string{"opus", "opus", "opus", "sonnet"})
 	// The session list shows the model the fake reports on its replies.
-	r.designSessions(t, tickets, func(s server.SessionInfo) bool {
+	r.designSessions(t, tickets, func(s wire.SessionInfo) bool {
 		return s.Model == map[string]string{"strongest": "opus", "worker": "sonnet"}[string(s.Tier)]
 	})
 	r.stop(t)
@@ -380,7 +382,7 @@ func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
 func TestChartingHandoffScenario_ContinueRestartsOnWorkerOrFailsOnStaleSlug(t *testing.T) {
 	r := start(t, "charting-handoff")
 	tickets := []string{"demo:handoff-auto", "demo:handoff-manual", "stale:handoff-stale"}
-	sessions := r.designSessions(t, tickets, func(s server.SessionInfo) bool { return s.Tier == "strongest" })
+	sessions := r.designSessions(t, tickets, func(s wire.SessionInfo) bool { return s.Tier == "strongest" })
 	if !sessions[tickets[0]].AutoAdvance {
 		t.Errorf("%s auto-advance is off, want on", tickets[0])
 	}
@@ -389,12 +391,12 @@ func TestChartingHandoffScenario_ContinueRestartsOnWorkerOrFailsOnStaleSlug(t *t
 		if sessions[ticket].AutoAdvance {
 			t.Errorf("%s auto-advance is on, want off", ticket)
 		}
-		chat := r.waitChat(t, id, func(c server.SessionChatResponse) bool { return len(c.Messages) > 0 })
+		chat := r.waitChat(t, id, func(c wire.SessionChatResponse) bool { return len(c.Messages) > 0 })
 		r.postWhenIdle(t, id, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
 	}
 	// The auto-advance countdown restarts the first session by itself.
-	r.designSessions(t, tickets[:2], func(s server.SessionInfo) bool { return s.Tier == "worker" })
-	r.designSessions(t, tickets[2:], func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	r.designSessions(t, tickets[:2], func(s wire.SessionInfo) bool { return s.Tier == "worker" })
+	r.designSessions(t, tickets[2:], func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if models := r.launchModels(t); !slices.Contains(models, agentfake.StaleModel) {
 		t.Errorf("launch models = %v, want the stale one among them", models)
 	}

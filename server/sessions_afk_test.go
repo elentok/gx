@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -47,9 +49,9 @@ func TestSessionAFK_DoneSendsBannerTextToChatEvenOnScreen(t *testing.T) {
 	h, chat, started, _, id, step := startAFKSession(t, true)
 	ctx := t.Context()
 	openTUI(ctx, t, h, "tui-1")
-	reportFocus(ctx, t, h, server.FocusReport{Client: "tui-1", Focused: true, Session: id})
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Focused: true, Session: id})
 
-	step(agentfake.Control{State: "done"}, server.SessionIdle)
+	step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	posts := chat.postsSince(started)
 	if len(posts) != 1 || !strings.Contains(posts[0], "proj · fix-build") || !strings.Contains(posts[0], "Done") {
 		t.Errorf("chat posts = %q, want one with the banner text", posts)
@@ -62,7 +64,7 @@ func TestSessionAFK_DoneSendsBannerTextToChatEvenOnScreen(t *testing.T) {
 func TestSessionAFK_OffSendsNoChat(t *testing.T) {
 	t.Parallel()
 	h, chat, started, _, _, step := startAFKSession(t, false)
-	step(agentfake.Control{State: "done"}, server.SessionIdle)
+	step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	if posts := chat.postsAfterAlert(h, started); len(posts) != 0 {
 		t.Errorf("chat posts = %q, want none", posts)
 	}
@@ -78,7 +80,7 @@ func TestSessionAFK_NotificationsDisabledSuppressesChat(t *testing.T) {
 	if err := os.WriteFile(gate, muted, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	step(agentfake.Control{State: "done"}, server.SessionIdle)
+	step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	if posts := chat.postsAfterAlert(h, started); len(posts) != 0 {
 		t.Errorf("chat posts = %q, want none while muted", posts)
 	}

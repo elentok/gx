@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/transcript"
@@ -68,7 +69,7 @@ func checkDesignCountsSaved(t *testing.T, h *servertest.Harness, writeGrillingRo
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -102,7 +103,7 @@ func checkDesignCountsSaved(t *testing.T, h *servertest.Harness, writeGrillingRo
 func TestSessionConversations_NonDesignSessionLeavesNoCounts(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"}, servertest.WithEnv("HOME="+home))
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Ticket: "proj:epic/01"}, servertest.WithEnv("HOME="+home))
 	dir, _ := readMeta(t, h, id)["dir"].(string)
 	writeGrillingRoundsAt(t, transcript.PathIn(home, dir, conv), time.Now())
 	stopFakeSession(ctx, t, h, evs, id)

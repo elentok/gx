@@ -4,9 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -61,10 +62,10 @@ func TestLeader_NextAndPreviousSession(t *testing.T) {
 func attentionModel(t *testing.T) Model {
 	t.Helper()
 	m := NewModel(&fakeSessionClient{}, ui.Settings{})
-	st := &viewmodel.State{Sessions: []server.SessionInfo{
+	st := &viewmodel.State{Sessions: []wire.SessionInfo{
 		{ID: "a", Project: "gx", Status: idleStatus},
-		{ID: "b", Project: "gx", Status: idleStatus, Unread: server.SessionUnread{Unread: true}},
-		{ID: "c", Project: "gx", Status: server.SessionStatus{State: server.SessionBlocked}},
+		{ID: "b", Project: "gx", Status: idleStatus, Unread: wire.SessionUnread{Unread: true}},
+		{ID: "c", Project: "gx", Status: wire.SessionStatus{State: wire.SessionBlocked}},
 	}}
 	return withState(t, m, st, ticketsui.ServerLinkUp)
 }
@@ -83,7 +84,7 @@ func TestLeader_UGoesToActionableBeforeUnread(t *testing.T) {
 
 func TestLeader_UFallsBackToUnread(t *testing.T) {
 	m := attentionModel(t)
-	m.sessions[2].Status.State = server.SessionIdle
+	m.sessions[2].Status.State = wire.SessionIdle
 	m, _ = leaderThen(t, m, letter("u"))
 	if m.selectedID() != "b" {
 		t.Fatalf("leader u selected %q, want the Unread b", m.selectedID())

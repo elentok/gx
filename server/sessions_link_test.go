@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -21,7 +22,7 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 	}
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
 	ctx := context.Background()
-	created, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+	created, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || created.Session == nil || !created.Session.Design {
 		t.Fatalf("create on a map = %+v, %v; want Design", created.Session, err)
 	}
@@ -36,11 +37,11 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 		{"proj:plain", "proj:plain", false},
 		{"proj:missing", "proj:missing", false},
 	} {
-		plain, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+		plain, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 		if err != nil || plain.Session == nil || plain.Session.Design {
 			t.Fatalf("create plain = %+v, %v; want not Design", plain.Session, err)
 		}
-		res, err := h.Client.LinkSession(ctx, server.LinkSessionRequest{ID: plain.Session.ID, Ticket: tc.ticket})
+		res, err := h.Client.LinkSession(ctx, wire.LinkSessionRequest{ID: plain.Session.ID, Ticket: tc.ticket})
 		if err != nil || res.Refused || res.Session.Ticket != tc.want || res.Session.Design != tc.design {
 			t.Errorf("link %s = %+v, %v; want ticket %s, design %v", tc.ticket, res.Session, err, tc.want, tc.design)
 		}
@@ -52,11 +53,11 @@ func TestLinkSession_Refusals(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
 	for name, tc := range map[string]struct {
-		req    server.LinkSessionRequest
+		req    wire.LinkSessionRequest
 		reason string
 	}{
-		"no ticket":       {server.LinkSessionRequest{ID: "abcdef"}, server.ReasonSessionBadRequest},
-		"unknown session": {server.LinkSessionRequest{ID: "abcdef", Ticket: "x"}, server.ReasonSessionUnknown},
+		"no ticket":       {wire.LinkSessionRequest{ID: "abcdef"}, wire.ReasonSessionBadRequest},
+		"unknown session": {wire.LinkSessionRequest{ID: "abcdef", Ticket: "x"}, wire.ReasonSessionUnknown},
 	} {
 		res, err := h.Client.LinkSession(ctx, tc.req)
 		if err != nil || !res.Refused || res.Reason != tc.reason {

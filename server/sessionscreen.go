@@ -6,16 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
-
-// SessionScreenResponse is a session's screen as plain text rows, without
-// colours: the live holder's, or the one saved when the session exited.
-type SessionScreenResponse struct {
-	Rows []string `json:"rows"`
-}
 
 // sessionScreenRead serves a design session's screen (session=) or a loop
 // ticket agent's (ticket=).
@@ -28,7 +24,7 @@ func (s *Server) sessionScreenRead(w http.ResponseWriter, r *http.Request) {
 	dir, meta, res, err := s.readableSession(id)
 	if res.Refused {
 		status := http.StatusBadRequest
-		if res.Reason == ReasonSessionUnknown {
+		if res.Reason == wire.ReasonSessionUnknown {
 			status = http.StatusNotFound
 		}
 		http.Error(w, res.Message, status)
@@ -38,7 +34,7 @@ func (s *Server) sessionScreenRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeScreen(w, dir, meta.Status.State == SessionExited)
+	writeScreen(w, dir, meta.Status.State == wire.SessionExited)
 }
 
 func (s *Server) ticketScreenRead(w http.ResponseWriter, address string) {
@@ -113,5 +109,5 @@ func writeRows(w http.ResponseWriter, rows []string, err error) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, SessionScreenResponse{Rows: rows})
+	writeJSON(w, wire.SessionScreenResponse{Rows: rows})
 }

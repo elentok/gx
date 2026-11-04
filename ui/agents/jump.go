@@ -5,10 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 )
 
@@ -49,7 +50,7 @@ func (m Model) jumpMatches() []int {
 	return out
 }
 
-func attentionBucket(s server.SessionInfo) int {
+func attentionBucket(s wire.SessionInfo) int {
 	switch {
 	case isActionable(s):
 		return 0
@@ -142,7 +143,7 @@ func (m Model) renderJump() string {
 
 // jumpRow is status icon, marks, name, project, dir, the time since the last
 // status change, status label and the Actionable reason or status detail.
-func (m Model) jumpRow(s server.SessionInfo, w int) string {
+func (m Model) jumpRow(s wire.SessionInfo, w int) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 	style := styleNameRead
 	if s.Unread.Unread {

@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -143,7 +144,7 @@ func (h *fakeHolders) dial(dir string) (AttachStream, []string, error) {
 	return h.attaches[id], nil, nil
 }
 
-var idleStatus = server.SessionStatus{State: server.SessionIdle}
+var idleStatus = wire.SessionStatus{State: wire.SessionIdle}
 
 // attachModel shows sessions a and b (idle, so no spinner cmd) over fake
 // holders, and returns the pending dial.
@@ -157,8 +158,8 @@ func attachModel(t *testing.T, h *fakeHolders) (Model, tea.Cmd) {
 }
 
 // withStatusOfA delivers a snapshot of sessions a (in status) and b (idle).
-func withStatusOfA(m Model, status server.SessionStatus) (Model, tea.Cmd) {
-	st := &viewmodel.State{Sessions: []server.SessionInfo{
+func withStatusOfA(m Model, status wire.SessionStatus) (Model, tea.Cmd) {
+	st := &viewmodel.State{Sessions: []wire.SessionInfo{
 		{ID: "a", Name: "alpha", Project: "gx", Status: status},
 		{ID: "b", Name: "beta", Project: "gx", Status: idleStatus},
 	}}
@@ -461,7 +462,7 @@ func TestAttach_OlderHolderShowsASnapshot(t *testing.T) {
 	}
 }
 
-var startingStatus = server.SessionStatus{State: server.SessionStarting}
+var startingStatus = wire.SessionStatus{State: wire.SessionStarting}
 
 // startingModel shows session a Starting over holders where a's is down.
 func startingModel(t *testing.T) (Model, tea.Cmd, *fakeHolders) {
@@ -589,7 +590,7 @@ func TestAttach_QueueAgentDialsItsHolderDir(t *testing.T) {
 		return newFakeAttach(), nil, nil
 	}
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
-	st := &viewmodel.State{Sessions: []server.SessionInfo{{
+	st := &viewmodel.State{Sessions: []wire.SessionInfo{{
 		ID: "queue-x-iter-01", Name: "x-iter-01", Project: "gx", Queue: true,
 		Holder: "/state/agents/gx/x-iter-01", Status: idleStatus,
 	}}}

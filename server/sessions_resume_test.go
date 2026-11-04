@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -22,7 +24,7 @@ func stopFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, e
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 }
 
 func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
@@ -36,7 +38,7 @@ func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
 	got := res.Session
-	if got.ID != id || got.Name != "proj-1" || got.Status.State != server.SessionStarting || got.Stopped || got.Exit != "" {
+	if got.ID != id || got.Name != "proj-1" || got.Status.State != wire.SessionStarting || got.Stopped || got.Exit != "" {
 		t.Errorf("resumed session = %+v, want %s proj-1 starting, not stopped", got, id)
 	}
 	if got.Actionable.Reason != "" {
@@ -45,7 +47,7 @@ func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
 
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 }
 
 func TestResumeSession_UsesNewestConversation(t *testing.T) {
@@ -57,14 +59,14 @@ func TestResumeSession_UsesNewestConversation(t *testing.T) {
 		t.Fatal(err)
 	}
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(server.SessionInfo) bool { return readMeta(t, h, id)["conversation_id"] == newer })
+	waitForSession(ctx, t, h, evs, id, func(wire.SessionInfo) bool { return readMeta(t, h, id)["conversation_id"] == newer })
 	stopFakeSession(ctx, t, h, evs, id)
 
 	if res, err := h.Client.ResumeSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
 	report(t, newer, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 }
 
 // Restore of an Exited Codex session needs the conversation's rollout: without
@@ -75,14 +77,14 @@ func TestResumeSession_CodexNeedsItsRollout(t *testing.T) {
 	h, ctx, id, conv, dir := stoppedCodexSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
 
 	res, err := h.Client.ResumeSession(ctx, id)
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNoResume || !strings.Contains(res.Message, "rollout") {
-		t.Fatalf("resume without rollout = %+v, %v; want refused %s naming the rollout", res, err, server.ReasonSessionNoResume)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoResume || !strings.Contains(res.Message, "rollout") {
+		t.Fatalf("resume without rollout = %+v, %v; want refused %s naming the rollout", res, err, wire.ReasonSessionNoResume)
 	}
 
 	writeCodexRollout(t, codexHome, conv, dir)
 	// Past the rollout check; a host without codex still refuses, for the missing binary.
 	res, err = h.Client.ResumeSession(ctx, id)
-	if err != nil || res.Reason == server.ReasonSessionNoResume {
+	if err != nil || res.Reason == wire.ReasonSessionNoResume {
 		t.Errorf("resume with rollout = %+v, %v; want it past the rollout check", res, err)
 	}
 }
@@ -150,17 +152,17 @@ func TestResumeSession_CodexLaunchesCodexResume(t *testing.T) {
 func TestResumeSession_Refusals(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
-	if res, err := h.Client.ResumeSession(ctx, id); err != nil || !res.Refused || res.Reason != server.ReasonSessionLive {
-		t.Errorf("resume live = %+v, %v; want refused %s", res, err, server.ReasonSessionLive)
+	if res, err := h.Client.ResumeSession(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionLive {
+		t.Errorf("resume live = %+v, %v; want refused %s", res, err, wire.ReasonSessionLive)
 	}
 
-	noResume, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind)})
+	noResume, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind)})
 	if err != nil || noResume.Session == nil {
 		t.Fatalf("create = %+v, %v", noResume, err)
 	}
 	stopFakeSession(ctx, t, h, evs, noResume.Session.ID)
-	if res, err := h.Client.ResumeSession(ctx, noResume.Session.ID); err != nil || !res.Refused || res.Reason != server.ReasonSessionNoResume {
-		t.Errorf("resume without harness resume = %+v, %v; want refused %s", res, err, server.ReasonSessionNoResume)
+	if res, err := h.Client.ResumeSession(ctx, noResume.Session.ID); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoResume {
+		t.Errorf("resume without harness resume = %+v, %v; want refused %s", res, err, wire.ReasonSessionNoResume)
 	}
 
 	stopFakeSession(ctx, t, h, evs, id)
@@ -169,7 +171,7 @@ func TestResumeSession_Refusals(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, err := h.Client.ResumeSession(ctx, id)
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionDirGone || res.Message != "dir is gone" {
-		t.Errorf("resume with dir gone = %+v, %v; want refused %s", res, err, server.ReasonSessionDirGone)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionDirGone || res.Message != "dir is gone" {
+		t.Errorf("resume with dir gone = %+v, %v; want refused %s", res, err, wire.ReasonSessionDirGone)
 	}
 }

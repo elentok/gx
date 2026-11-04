@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -19,7 +21,7 @@ const firstPromptGrace = 300 * time.Millisecond
 // prompt, still waiting for its ready report.
 func startFirstPromptSession(t *testing.T, prompt string, extraEnv ...string) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	return startFakeSessionWith(t, server.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
+	return startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace
 		c.ActionSlashSettle = 200 * time.Millisecond
 	}, servertest.WithEnv(append([]string{agentfake.ProgramInputEnv + "=1"}, extraEnv...)...))
@@ -30,7 +32,7 @@ func startFirstPromptSession(t *testing.T, prompt string, extraEnv ...string) (*
 // HOME instead of CLAUDE_CONFIG_DIR would press `i` into the prompt.
 func TestFirstPrompt_TypedWhenTheAgentEnvAndConfigDirComeFromServerEnv(t *testing.T) {
 	t.Parallel()
-	_, _, _, _, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"}, func(c *server.Config) {
+	_, _, _, _, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: "fix the bug"}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace
 	}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1"))
 	report(t, conv, agentfake.Control{State: "idle"})
@@ -51,7 +53,7 @@ func toVimNormal(t *testing.T, conv string) {
 func TestFirstPrompt_RealPromptInVimNormalIsDeliveredWithTheConfigDirFromServerEnv(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	_, _, _, _, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"}, func(c *server.Config) {
+	_, _, _, _, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Prompt: "fix the bug"}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace
 	}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+dir))
 	toVimNormal(t, conv)

@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 )
 
@@ -41,7 +42,7 @@ func (m Model) loadLastScreen() tea.Cmd {
 		return nil
 	}
 	s := m.sessions[m.cursor]
-	if s.Status.State != server.SessionExited ||
+	if s.Status.State != wire.SessionExited ||
 		(m.lastScreen.id == s.ID && m.lastScreen.changedAt.Equal(s.StatusChangedAt)) {
 		return nil
 	}
@@ -57,7 +58,7 @@ func (m Model) loadLastScreen() tea.Cmd {
 
 // terminalTitle is the left of the terminal header: status icon, name,
 // status label and Session ticket.
-func (m Model) terminalTitle(s server.SessionInfo, titleStyle lipgloss.Style) string {
+func (m Model) terminalTitle(s wire.SessionInfo, titleStyle lipgloss.Style) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 	title := m.statusIcon(s, icons) + " " + titleStyle.Render(displayName(s)) + " " + statusLabel(s)
 	rest := ""
@@ -81,7 +82,7 @@ func (m Model) terminalTitle(s server.SessionInfo, titleStyle lipgloss.Style) st
 // harnessLabelText is the session's dim ` harness · tier · model effort`,
 // cut to the header room left beside the right title (used is the width of
 // the title without it). Empty when a session has no harness or no room.
-func (m Model) harnessLabelText(s server.SessionInfo, used int) string {
+func (m Model) harnessLabelText(s wire.SessionInfo, used int) string {
 	if s.Harness == "" {
 		return ""
 	}
@@ -97,7 +98,7 @@ func (m Model) harnessLabelText(s server.SessionInfo, used int) string {
 // terminalRightTitle is the AFK mark, project, dir and the time since the
 // last status change; it takes at most half the header so the title stays
 // readable. Truncation cuts the project side, never the AFK mark.
-func (m Model) terminalRightTitle(s server.SessionInfo, width int) string {
+func (m Model) terminalRightTitle(s wire.SessionInfo, width int) string {
 	afk := ""
 	if m.afk {
 		afk = " AFK ·"
@@ -113,23 +114,23 @@ func (m Model) terminalRightTitle(s server.SessionInfo, width int) string {
 	return afk + right
 }
 
-func statusLabel(s server.SessionInfo) string {
+func statusLabel(s wire.SessionInfo) string {
 	switch s.Status.State {
-	case server.SessionStarting:
+	case wire.SessionStarting:
 		return styleStarting.Render("starting")
-	case server.SessionWorking:
+	case wire.SessionWorking:
 		if s.Status.Background {
 			return styleWorking.Render("working") + styleBackground.Render(" +bg")
 		}
 		return styleWorking.Render("working")
-	case server.SessionIdle:
+	case wire.SessionIdle:
 		return styleIdle.Render("idle")
-	case server.SessionBlocked:
+	case wire.SessionBlocked:
 		return styleBlocked.Render("blocked")
-	case server.SessionRateLimited:
+	case wire.SessionRateLimited:
 		return styleRateLimited.Render("rate-limited")
-	case server.SessionExited:
-		if s.Exit == server.SessionExitCrashed {
+	case wire.SessionExited:
+		if s.Exit == wire.SessionExitCrashed {
 			return styleCrashed.Render("crashed")
 		}
 		return styleExited.Render("exited")
@@ -139,13 +140,13 @@ func statusLabel(s server.SessionInfo) string {
 
 // terminalLines is the terminal panel body: the info row (then a blank row)
 // and the screen.
-func (m Model) terminalLines(s server.SessionInfo) []string {
+func (m Model) terminalLines(s wire.SessionInfo) []string {
 	lines := infoLines(s, m.now())
 	live := m.attach
 	if live != nil && live.id != s.ID {
 		live = nil
 	}
-	if s.Status.State != server.SessionExited && (live == nil || !live.exited) {
+	if s.Status.State != wire.SessionExited && (live == nil || !live.exited) {
 		switch {
 		case live != nil && live.err != nil && !live.retrying:
 			return append(lines, styleReason.Render("attach failed: "+live.err.Error()))
@@ -203,7 +204,7 @@ func (m Model) screenCell(mouse tea.Mouse) (x, y int, ok bool) {
 }
 
 // infoLines is the info row then a blank row, or none without an info row.
-func infoLines(s server.SessionInfo, now time.Time) []string {
+func infoLines(s wire.SessionInfo, now time.Time) []string {
 	if info := infoRow(s, now); info != "" {
 		return []string{info, ""}
 	}
@@ -223,7 +224,7 @@ func (m Model) screenSize() (cols, rows int) {
 // infoRow is the Actionable reason with the prompts `<leader> a` would run,
 // else the status detail. A running auto-advance countdown ends it, with the
 // way to cancel.
-func infoRow(s server.SessionInfo, now time.Time) string {
+func infoRow(s wire.SessionInfo, now time.Time) string {
 	if s.Actionable.Reason != "" {
 		row := styleReason.Render(s.Actionable.Reason)
 		if len(s.Actionable.Action) > 0 {
@@ -242,7 +243,7 @@ func infoRow(s server.SessionInfo, now time.Time) string {
 	return ""
 }
 
-func statusDetail(s server.SessionInfo) string {
+func statusDetail(s wire.SessionInfo) string {
 	var parts []string
 	for _, p := range []string{s.Status.Kind, s.Status.Message} {
 		if p != "" {

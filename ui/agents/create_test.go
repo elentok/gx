@@ -6,10 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -22,12 +23,12 @@ var (
 	keyBackspaceMsg = tea.KeyPressMsg{Code: tea.KeyBackspace}
 )
 
-func createSessions() []server.SessionInfo {
-	return []server.SessionInfo{
+func createSessions() []wire.SessionInfo {
+	return []wire.SessionInfo{
 		{ID: "w1", Project: "web", Dir: "/r/web", Status: idleStatus},
 		{ID: "g1", Project: "gx", Dir: "/r/gx/wt1", Status: idleStatus},
 		{ID: "g2", Project: "gx", Dir: "/r/gx/wt1", Status: idleStatus},
-		{ID: "g3", Project: "gx", Dir: "/r/gx/wt2", Status: server.SessionStatus{State: server.SessionExited}},
+		{ID: "g3", Project: "gx", Dir: "/r/gx/wt2", Status: wire.SessionStatus{State: wire.SessionExited}},
 	}
 }
 
@@ -68,7 +69,7 @@ func typeKeys(t *testing.T, m Model, keys ...tea.KeyPressMsg) Model {
 	return m
 }
 
-func lastCreate(t *testing.T, f *fakeSessionClient) server.CreateSessionRequest {
+func lastCreate(t *testing.T, f *fakeSessionClient) wire.CreateSessionRequest {
 	t.Helper()
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -145,24 +146,24 @@ func TestCreate_DirPickerCountsSessionsPerDir(t *testing.T) {
 }
 
 func TestCreate_SubmitSendsTheFieldsAndPanelSize(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Session: &server.SessionInfo{ID: "new"}}}
+	f := &fakeSessionClient{result: wire.SessionResult{Session: &wire.SessionInfo{ID: "new"}}}
 	m := step(t, createModel(t, f), letter("c"))
 	m = typeKeys(t, m, keyDownMsg, tab, letter("f"), letter("i"), letter("x"), tab, letter("g"), letter("o"))
 	m = step(t, m, keyEnterMsg)
-	want := server.CreateSessionRequest{Project: "gx", Dir: "/r/gx/wt1", Name: "fix", Prompt: "go", Cols: 80 - sidebarWidth - 3, Rows: 29}
+	want := wire.CreateSessionRequest{Project: "gx", Dir: "/r/gx/wt1", Name: "fix", Prompt: "go", Cols: 80 - sidebarWidth - 3, Rows: 29}
 	if got := lastCreate(t, f); got != want {
 		t.Fatalf("create = %+v, want %+v", got, want)
 	}
 	if m.create != nil {
 		t.Fatal("the form stayed open after a create")
 	}
-	st := &viewmodel.State{Sessions: append(createSessions(), server.SessionInfo{ID: "new", Project: "gx", Dir: "/r/gx/wt1"})}
+	st := &viewmodel.State{Sessions: append(createSessions(), wire.SessionInfo{ID: "new", Project: "gx", Dir: "/r/gx/wt1"})}
 	m = withState(t, m, st, ticketsui.ServerLinkUp)
 	assertFocus(t, m, true, "new")
 }
 
 func TestCreate_NewWorktreeAsksForAName(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Session: &server.SessionInfo{ID: "new"}}}
+	f := &fakeSessionClient{result: wire.SessionResult{Session: &wire.SessionInfo{ID: "new"}}}
 	m := step(t, createModel(t, f), letter("c"))
 	m = typeKeys(t, m, letter("g"), letter("x"), letter(" "), letter("n"), letter("e"), letter("w"), tab, letter("f"), letter("t"))
 	if !strings.Contains(plainView(m), "Worktree") {
@@ -175,7 +176,7 @@ func TestCreate_NewWorktreeAsksForAName(t *testing.T) {
 }
 
 func TestCreate_ErrorStaysInTheForm(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Refused: true, Message: "dir /r/gx does not exist"}}
+	f := &fakeSessionClient{result: wire.SessionResult{Refused: true, Message: "dir /r/gx does not exist"}}
 	m := step(t, step(t, createModel(t, f), letter("c")), keyEnterMsg)
 	if m.create == nil || !strings.Contains(plainView(m), "dir /r/gx does not exist") {
 		t.Fatalf("refusal not shown in the form:\n%s", plainView(m))
@@ -186,7 +187,7 @@ func TestCreate_ErrorStaysInTheForm(t *testing.T) {
 }
 
 func TestCreate_PrefilledFormIsEditable(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Session: &server.SessionInfo{ID: "new"}}}
+	f := &fakeSessionClient{result: wire.SessionResult{Session: &wire.SessionInfo{ID: "new"}}}
 	m := createModel(t, f)
 	m.cursor = 0
 	next, cmd := m.OpenCreateForm(CreatePrefill{Project: "gx", Dir: "/r/gx/wt2", Name: "plan", Prompt: "read it", Ticket: "gx:e/7"})
@@ -235,7 +236,7 @@ func TestCreate_PickerGroupsEveryProjectFocusedFirst(t *testing.T) {
 }
 
 func TestCreate_TypingFuzzyFiltersAcrossProjects(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Session: &server.SessionInfo{ID: "new"}}}
+	f := &fakeSessionClient{result: wire.SessionResult{Session: &wire.SessionInfo{ID: "new"}}}
 	m := step(t, createModel(t, f), letter("c"))
 	m = typeKeys(t, m, letter("W"), letter("b"))
 	view := ansi.Strip(m.renderCreate())

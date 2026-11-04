@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -33,7 +35,7 @@ func waitSessionState(ctx context.Context, t *testing.T, h *servertest.Harness, 
 	t.Helper()
 	servertest.WaitFor(t, 20*time.Second, fmt.Sprintf("session %s to reach %s", id, state), func() bool {
 		list, _ := h.Client.Sessions(ctx)
-		return slices.ContainsFunc(list, func(s server.SessionInfo) bool { return s.ID == id && s.Status.State == state })
+		return slices.ContainsFunc(list, func(s wire.SessionInfo) bool { return s.ID == id && s.Status.State == state })
 	})
 }
 
@@ -65,7 +67,7 @@ func TestSessionChatChanged_WorkingSessionPublishesOnGrowth(t *testing.T) {
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitSessionState(ctx, t, h, id, server.SessionWorking)
+	waitSessionState(ctx, t, h, id, wire.SessionWorking)
 	if !chatEventWithin(evs, t, path, id, 5*time.Second, true) {
 		t.Fatal("no session-chat-changed event while the transcript grew")
 	}
@@ -76,7 +78,7 @@ func TestSessionChatChanged_UnchangedTranscriptPublishesNothing(t *testing.T) {
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitSessionState(ctx, t, h, id, server.SessionWorking)
+	waitSessionState(ctx, t, h, id, wire.SessionWorking)
 	if chatEventWithin(evs, t, path, id, 10*chatPollTestInterval, false) {
 		t.Fatal("session-chat-changed fired for an unchanged transcript")
 	}
@@ -87,7 +89,7 @@ func TestSessionChatChanged_IdleSessionPublishesNothing(t *testing.T) {
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "done"})
-	waitSessionState(ctx, t, h, id, server.SessionIdle)
+	waitSessionState(ctx, t, h, id, wire.SessionIdle)
 	// Negative wait: the meta shows Idle a moment before the watch stops its poll, and no event marks the stop.
 	time.Sleep(2 * chatPollTestInterval)
 	if chatEventWithin(evs, t, path, id, 10*chatPollTestInterval, true) {
@@ -119,9 +121,9 @@ func TestSessionChatChanged_TurnWrittenAfterIdlePublishes(t *testing.T) {
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitSessionState(ctx, t, h, id, server.SessionWorking)
+	waitSessionState(ctx, t, h, id, wire.SessionWorking)
 	report(t, conv, agentfake.Control{State: "done"})
-	waitSessionState(ctx, t, h, id, server.SessionIdle)
+	waitSessionState(ctx, t, h, id, wire.SessionIdle)
 	// Negative wait: the meta shows Idle a moment before the watch stops its poll, and no event marks the stop.
 	time.Sleep(2 * chatPollTestInterval)
 	appendLines(t, path, chatLine, turnDurationLine)

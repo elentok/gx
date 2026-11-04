@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -48,7 +49,7 @@ func TestAgents_NoSessionsHintsNewSession(t *testing.T) {
 }
 
 func TestAgents_SessionsReplaceTheEmptyState(t *testing.T) {
-	st := &viewmodel.State{Sessions: []server.SessionInfo{{ID: "s1", Name: "fix login"}}}
+	st := &viewmodel.State{Sessions: []wire.SessionInfo{{ID: "s1", Name: "fix login"}}}
 	m := withState(t, NewModel(&fakeSessionClient{}, ui.Settings{}), st, ticketsui.ServerLinkUp)
 	tm := startAgentsTUI(t, m)
 	waitForText(t, tm, "fix login")

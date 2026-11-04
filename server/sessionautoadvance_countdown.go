@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/sound"
 )
 
@@ -101,7 +103,7 @@ func (s *Server) startAutoAdvance(id string) bool {
 		if !s.autoAdvances.finish(id, c) {
 			return
 		}
-		s.events.publish(EventSessionChanged, id)
+		s.events.publish(wire.EventSessionChanged, id)
 		s.sendAutoAdvance(id)
 	})
 	return true
@@ -113,21 +115,21 @@ func (s *Server) cancelAutoAdvance(id, why string) bool {
 	if !s.autoAdvances.stop(id) {
 		return false
 	}
-	s.events.publish(EventSessionChanged, id)
+	s.events.publish(wire.EventSessionChanged, id)
 	s.triggerBanner(id, sound.Attention, why)
 	return true
 }
 
 // cancelAutoAdvanceRoute is the cancel route: it stops a running countdown and
 // is a no-op with none.
-func (s *Server) cancelAutoAdvanceRoute(req SessionRequest) (SessionResult, error) {
+func (s *Server) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionResult, error) {
 	_, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	s.cancelAutoAdvance(req.ID, "Auto-advance cancelled")
 	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // sendAutoAdvance sends the Continue action if the session still waits on it
@@ -137,7 +139,7 @@ func (s *Server) sendAutoAdvance(id string) {
 	if res.Refused || err != nil || !meta.canAutoAdvance() {
 		return
 	}
-	if res, err := s.sendSessionAction(SessionRequest{ID: id}, true); err != nil || res.Refused {
+	if res, err := s.sendSessionAction(wire.SessionRequest{ID: id}, true); err != nil || res.Refused {
 		s.log.Info("auto-advance not sent", "session", id, "err", err, "reason", res.Reason)
 	}
 }

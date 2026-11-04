@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -15,9 +16,9 @@ func TestAgentsKeys_RefusalIsAnError(t *testing.T) {
 	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir())
 	var out bytes.Buffer
-	err := runAgentsKeys(context.Background(), h.Client, &out, false, server.SessionKeysRequest{ID: "nope", Key: "Esc"})
-	if err == nil || !strings.Contains(err.Error(), server.ReasonSessionUnknown) {
-		t.Errorf("err = %v, want it to name %s", err, server.ReasonSessionUnknown)
+	err := runAgentsKeys(context.Background(), h.Client, &out, false, wire.SessionKeysRequest{ID: "nope", Key: "Esc"})
+	if err == nil || !strings.Contains(err.Error(), wire.ReasonSessionUnknown) {
+		t.Errorf("err = %v, want it to name %s", err, wire.ReasonSessionUnknown)
 	}
 }
 
@@ -25,10 +26,10 @@ func TestAgentsKeys_JSONCarriesTheRefusal(t *testing.T) {
 	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir())
 	var out bytes.Buffer
-	_ = runAgentsKeys(context.Background(), h.Client, &out, true, server.SessionKeysRequest{ID: "nope", Text: "hi"})
-	var got server.SessionResult
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil || !got.Refused || got.Reason != server.ReasonSessionUnknown {
-		t.Errorf("output %q: %+v, %v; want refusal %s", out.String(), got, err, server.ReasonSessionUnknown)
+	_ = runAgentsKeys(context.Background(), h.Client, &out, true, wire.SessionKeysRequest{ID: "nope", Text: "hi"})
+	var got wire.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil || !got.Refused || got.Reason != wire.ReasonSessionUnknown {
+		t.Errorf("output %q: %+v, %v; want refusal %s", out.String(), got, err, wire.ReasonSessionUnknown)
 	}
 }
 

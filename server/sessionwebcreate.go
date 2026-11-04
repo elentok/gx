@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -31,9 +33,9 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 	var req WebCreateSessionRequest
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
-	var res SessionResult
+	var res wire.SessionResult
 	if err := dec.Decode(&req); err != nil {
-		res = sessionRefusal(ReasonSessionBadRequest, err.Error())
+		res = sessionRefusal(wire.ReasonSessionBadRequest, err.Error())
 	} else {
 		var err error
 		if res, err = s.createWebSession(req); err != nil {
@@ -46,40 +48,40 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 
 // checkProjectDir returns a refusal when project is not configured or a
 // non-empty dir is neither its root nor one of its worktrees; nil means ok.
-func (s *Server) checkProjectDir(project, dir string) (*SessionResult, error) {
+func (s *Server) checkProjectDir(project, dir string) (*wire.SessionResult, error) {
 	list, err := s.listProjectWorktrees()
 	if err != nil {
 		return nil, err
 	}
 	i := slices.IndexFunc(list, func(p ProjectWorktrees) bool { return p.Project == project })
 	if i < 0 {
-		res := sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %q is not configured", project))
+		res := sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %q is not configured", project))
 		return &res, nil
 	}
 	if dir != "" {
 		clean := filepath.Clean(dir)
 		known := filepath.Clean(list[i].Root) == clean || slices.ContainsFunc(list[i].Worktrees, func(wt string) bool { return filepath.Clean(wt) == clean })
 		if !known {
-			res := sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s is not the root or a worktree of %s", dir, project))
+			res := sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("dir %s is not the root or a worktree of %s", dir, project))
 			return &res, nil
 		}
 	}
 	return nil, nil
 }
 
-func (s *Server) createWebSession(req WebCreateSessionRequest) (SessionResult, error) {
+func (s *Server) createWebSession(req WebCreateSessionRequest) (wire.SessionResult, error) {
 	prompt, refusal := validatePromptText(req.Prompt, "the first prompt")
 	if refusal != nil {
 		return *refusal, nil
 	}
 	refusal, err := s.checkProjectDir(req.Project, req.Dir)
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	if refusal != nil {
 		return *refusal, nil
 	}
-	return s.createSession(CreateSessionRequest{
+	return s.createSession(wire.CreateSessionRequest{
 		Project:  req.Project,
 		Dir:      req.Dir,
 		Worktree: req.Worktree,

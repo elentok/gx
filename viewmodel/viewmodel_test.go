@@ -3,6 +3,8 @@ package viewmodel_test
 import (
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -75,7 +77,7 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 		{server.EventMergeRolledBack, resnap},
 		{server.EventTicketNudged, resnap},
 		{server.EventQueueChanged, resnap | viewmodel.EffectRefetchQueue},
-		{server.EventSessionChanged, resnap},
+		{wire.EventSessionChanged, resnap},
 		{server.EventHerdrUnavailable, viewmodel.EffectNone},
 		{server.EventHerdrAvailable, viewmodel.EffectNone},
 	}
@@ -93,7 +95,7 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 }
 
 func TestApplySnapshot_CarriesSessions(t *testing.T) {
-	sessions := []server.SessionInfo{{ID: "s1"}, {ID: "s2"}}
+	sessions := []wire.SessionInfo{{ID: "s1"}, {ID: "s2"}}
 	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 12, Sessions: sessions})
 	if len(s.Sessions) != 2 || s.Sessions[0].ID != "s1" || s.Sessions[1].ID != "s2" {
 		t.Fatalf("sessions = %+v, want s1, s2", s.Sessions)
@@ -108,13 +110,13 @@ func TestApplySnapshot_CarriesSessions(t *testing.T) {
 }
 
 func TestActionableCount(t *testing.T) {
-	s := viewmodel.State{}.ApplySnapshot(server.Snapshot{Sessions: []server.SessionInfo{
-		{ID: "a", Actionable: server.SessionActionable{Reason: "blocked"}},
+	s := viewmodel.State{}.ApplySnapshot(server.Snapshot{Sessions: []wire.SessionInfo{
+		{ID: "a", Actionable: wire.SessionActionable{Reason: "blocked"}},
 		{ID: "b"},
-		{ID: "c", Actionable: server.SessionActionable{Reason: "review"}},
-		{ID: "fix-gx:m/01", Actionable: server.SessionActionable{Reason: "blocked"}},
-		{ID: "d", Design: true, Actionable: server.SessionActionable{Reason: "review"}},
-		{ID: "q", Queue: true, Actionable: server.SessionActionable{Reason: "blocked"}},
+		{ID: "c", Actionable: wire.SessionActionable{Reason: "review"}},
+		{ID: "fix-gx:m/01", Actionable: wire.SessionActionable{Reason: "blocked"}},
+		{ID: "d", Design: true, Actionable: wire.SessionActionable{Reason: "review"}},
+		{ID: "q", Queue: true, Actionable: wire.SessionActionable{Reason: "blocked"}},
 	}})
 	if got := s.ActionableCount(); got != 3 {
 		t.Fatalf("ActionableCount = %d, want 3 (Design and Queue agents excluded)", got)

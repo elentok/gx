@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -13,7 +15,7 @@ func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	report(t, f.conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	res, err := f.h.Client.InterruptSession(f.ctx, f.id)
 	if err != nil || res.Refused {
 		t.Fatalf("interrupt = %+v, %v", res, err)
@@ -39,7 +41,7 @@ func TestWebSessions_InterruptNeedsAFreshTokenOnADesignSession(t *testing.T) {
 	waitForHolder(t, h.SessionsDir+"/"+design)
 	for _, tc := range []struct{ name, id, state, want string }{
 		{"no token", design, "", server.ReasonStale},
-		{"plain session", plain, sessionToken(ctx, t, h, plain), server.ReasonSessionNotDesign},
+		{"plain session", plain, sessionToken(ctx, t, h, plain), wire.ReasonSessionNotDesign},
 		{"fresh token, not working", design, sessionToken(ctx, t, h, design), server.ReasonSessionNotWorking},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "interrupt", tc.id, tc.state)

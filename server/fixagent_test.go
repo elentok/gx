@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -210,7 +212,7 @@ func TestFixAgent_ProjectStartsOnFailedMigration(t *testing.T) {
 		}
 	}
 	again := f.fixProject(t, "proj")
-	if !again.Refused || again.Reason != server.ReasonSessionNameTaken || again.Message != "an agent is already fixing proj" {
+	if !again.Refused || again.Reason != wire.ReasonSessionNameTaken || again.Message != "an agent is already fixing proj" {
 		t.Errorf("second start = %+v", again)
 	}
 }

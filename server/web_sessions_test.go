@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -36,7 +38,7 @@ func startWebDesign(t *testing.T) (h *servertest.Harness, base string, cookie *h
 		t.Fatal(err)
 	}
 	create := func(ticket string) string {
-		res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
+		res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}
@@ -81,14 +83,14 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 			t.Errorf("stop with %s = %d %s, want %s", tc.name, code, body, tc.want)
 		}
 	}
-	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != server.ReasonSessionNotDesign {
+	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != wire.ReasonSessionNotDesign {
 		t.Errorf("restore of a plain session = %d %s, want not-design-session", code, body)
 	}
 
 	if code, body := webSessionWrite(t, base, cookie, "stop", design, fresh); code != http.StatusOK || reasonOf(t, body) != "" {
 		t.Fatalf("stop with a fresh token = %d %s, want it to succeed", code, body)
 	}
-	waitForSession(ctx, t, h, evs, design, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, design, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
 	if code, body := webSessionWrite(t, base, cookie, "resume", design, fresh); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
 		t.Errorf("restore with the pre-stop token = %d %s, want stale", code, body)
@@ -104,13 +106,13 @@ func TestWebSessions_StopThenRemoveAPlainSession(t *testing.T) {
 	waitForHolder(t, filepath.Join(h.SessionsDir, plain))
 
 	live := sessionToken(ctx, t, h, plain)
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != server.ReasonSessionLive {
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != wire.ReasonSessionLive {
 		t.Fatalf("remove of a live session = %d %s, want session-live", code, body)
 	}
 	if code, body := webSessionWrite(t, base, cookie, "stop", plain, live); code != http.StatusOK || reasonOf(t, body) != "" {
 		t.Fatalf("stop of a plain session = %d %s, want it to succeed", code, body)
 	}
-	waitForSession(ctx, t, h, evs, plain, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, plain, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
 	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
 		t.Errorf("remove with the pre-stop token = %d %s, want stale", code, body)
@@ -153,7 +155,7 @@ func TestSessions_NonWebStopAndRestoreTakeNoToken(t *testing.T) {
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if res, err := h.Client.ResumeSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("restore = %+v, %v", res, err)
 	}

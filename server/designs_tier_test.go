@@ -5,7 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -62,11 +63,11 @@ func TestDesignsOpenNew_LaunchesOnStrongest(t *testing.T) {
 func TestLinkSession_KeepsTheLaunchTierAndSetsNoLaunchKind(t *testing.T) {
 	t.Parallel()
 	f := startDesignsMap(t, "design_step: resolve-tickets\n")
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
-	if _, err := f.h.Client.LinkSession(f.ctx, server.LinkSessionRequest{ID: res.Session.ID, Ticket: "map"}); err != nil {
+	if _, err := f.h.Client.LinkSession(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "map"}); err != nil {
 		t.Fatal(err)
 	}
 	meta := readMeta(t, f.h, res.Session.ID)

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
@@ -80,11 +82,11 @@ func TestCodexQueueScenario_TwoRunningThreeWaitingWithTheirNotes(t *testing.T) {
 func TestCodexDesignScenario_SessionOnCodexLinkedToTheMapWithTheScriptedRound(t *testing.T) {
 	t.Parallel()
 	r := start(t, "codex-design")
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
-	var designs []server.SessionInfo
+	var designs []wire.SessionInfo
 	for _, s := range list {
 		if s.Design {
 			designs = append(designs, s)
@@ -105,6 +107,6 @@ func TestCodexDesignScenario_SessionOnCodexLinkedToTheMapWithTheScriptedRound(t 
 	}) {
 		t.Errorf("no rollout under %s holds the scripted round", rollouts)
 	}
-	r.waitChat(t, designs[0].ID, func(c server.SessionChatResponse) bool { return len(c.Messages) > 0 && c.Round != nil })
+	r.waitChat(t, designs[0].ID, func(c wire.SessionChatResponse) bool { return len(c.Messages) > 0 && c.Round != nil })
 	r.stop(t)
 }

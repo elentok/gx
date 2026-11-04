@@ -5,6 +5,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
@@ -35,15 +37,15 @@ func (s *Server) chartingHandoffDue(meta sessionMeta, action []string) bool {
 // handoffRefusal is why a Continue of action must not start: it is a charting
 // handoff whose worker-tier harness is not on PATH. It runs before the run-end
 // line is cleared and the old agent stopped, so the session stays as it was.
-func (s *Server) handoffRefusal(meta sessionMeta, action []string) (SessionResult, bool) {
+func (s *Server) handoffRefusal(meta sessionMeta, action []string) (wire.SessionResult, bool) {
 	if !s.chartingHandoffDue(meta, action) {
-		return SessionResult{}, false
+		return wire.SessionResult{}, false
 	}
 	msg := s.interactiveMissingReason(meta.Harness, "the session's harness")
 	if msg == "" {
-		return SessionResult{}, false
+		return wire.SessionResult{}, false
 	}
-	return sessionRefusal(ReasonSessionHarnessMissing, msg), true
+	return sessionRefusal(wire.ReasonSessionHarnessMissing, msg), true
 }
 
 // chartingHandoff ends the session's strongest-tier conversation and starts a
@@ -83,7 +85,7 @@ func (s *Server) beginHandoff(dir, id string) (string, bool) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	meta, err := readSessionMeta(dir)
-	if err != nil || meta.Status.State == SessionExited {
+	if err != nil || meta.Status.State == wire.SessionExited {
 		return "", false
 	}
 	meta.Run++
@@ -106,18 +108,18 @@ func (s *Server) restartOnWorker(dir string, meta *sessionMeta, old string) erro
 	s.applyTier(meta, ralphloop.TierWorker)
 	meta.HandoffTier = true
 	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", ticketEpic(meta.Ticket))
-	meta.Actionable = SessionActionable{}
+	meta.Actionable = wire.SessionActionable{}
 	s.recordConversation(*meta)
 	if err := clearOldHolder(dir); err != nil {
 		return err
 	}
 	meta.Run++
-	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = SessionStatus{}, time.Now(), "", false
+	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = wire.SessionStatus{}, time.Now(), "", false
 	if err := s.startSessionHolder(dir, meta, 0, 0, false); err != nil {
 		return err
 	}
 	id, run := meta.ID, meta.Run
 	s.sessionWatches.start(func() { s.watchSession(dir, id, run, time.Time{}, false) })
-	s.events.publish(EventSessionChanged, id)
+	s.events.publish(wire.EventSessionChanged, id)
 	return nil
 }

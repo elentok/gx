@@ -9,7 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/transcript"
 )
 
@@ -21,13 +22,13 @@ func (r *running) home() string { return filepath.Join(fixtureRoot(r), "home") }
 func TestDefaultHarnessScenario_SessionsProjectsAndAWaitingTicket(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "default-harness", nil, "--fakecodex", fakeCodexBin)
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
 	harnesses := map[string]int{}
 	for _, s := range list {
-		if s.Design || s.Status.State == server.SessionExited {
+		if s.Design || s.Status.State == wire.SessionExited {
 			continue
 		}
 		harnesses[s.Harness]++

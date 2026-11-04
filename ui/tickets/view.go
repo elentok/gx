@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tree"
@@ -224,7 +225,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 // ticket is address, so nobody starts a second session on it; "" otherwise.
 func (m Model) sessionMarker(address string) string {
 	for _, s := range m.vm.Sessions {
-		if s.Ticket == address && s.Status.State != server.SessionExited {
+		if s.Ticket == address && s.Status.State != wire.SessionExited {
 			return " " + sessionMarkerStyle.Render(m.icons().SessionLive)
 		}
 	}

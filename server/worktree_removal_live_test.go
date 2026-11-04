@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -22,7 +24,7 @@ func newLiveWorkFixture(t *testing.T) *schedFixture {
 
 func (f *schedFixture) sessionIn(ctx context.Context, t *testing.T, dir string) string {
 	t.Helper()
-	res, err := f.h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: dir, Harness: string(agentfake.HarnessKind)})
+	res, err := f.h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: dir, Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -51,7 +53,7 @@ func TestWorktreeRemoval_LiveSessionKeepsTheWorktreeUntilItStops(t *testing.T) {
 	if _, err := f.h.Client.StopSession(ctx, id); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(ctx, t, f.h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, f.h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	f.h.Server.RemoveMergedWorktree("proj", schedEpic)
 	f.settle(t)
 	f.assertWorktreeRemoved(t)
@@ -71,7 +73,7 @@ func TestWorktreeRemoval_ExitedSessionDoesNotKeepTheWorktree(t *testing.T) {
 	if _, err := f.h.Client.StopSession(ctx, id); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(ctx, t, f.h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, f.h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
 	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)

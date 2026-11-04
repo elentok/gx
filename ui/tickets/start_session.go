@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/apiclient"
@@ -40,8 +42,8 @@ type GoToSessionMsg struct{ ID string }
 
 // latestSession is the ID of the most recently changed session whose Session
 // ticket matches; "" when none does. Exited and Stopped sessions count.
-func latestSession(sessions []server.SessionInfo, matches func(ticket string) bool) string {
-	var best *server.SessionInfo
+func latestSession(sessions []wire.SessionInfo, matches func(ticket string) bool) string {
+	var best *wire.SessionInfo
 	for i := range sessions {
 		s := &sessions[i]
 		if s.Ticket != "" && matches(s.Ticket) && (best == nil || s.StatusChangedAt.After(best.StatusChangedAt)) {
@@ -55,7 +57,7 @@ func latestSession(sessions []server.SessionInfo, matches func(ticket string) bo
 }
 
 // epicSession is the session linked to the epic or any of its tickets.
-func epicSession(sessions []server.SessionInfo, epicAddress string) string {
+func epicSession(sessions []wire.SessionInfo, epicAddress string) string {
 	return latestSession(sessions, func(ticket string) bool {
 		return ticket == epicAddress || strings.HasPrefix(ticket, epicAddress+"/")
 	})
@@ -63,7 +65,7 @@ func epicSession(sessions []server.SessionInfo, epicAddress string) string {
 
 // ticketSession is the session linked to the ticket, or to its epic while the
 // ticket is claimed.
-func ticketSession(sessions []server.SessionInfo, epicAddress string, ticket tickets.Ticket) string {
+func ticketSession(sessions []wire.SessionInfo, epicAddress string, ticket tickets.Ticket) string {
 	claimed := strings.EqualFold(strings.TrimSpace(ticket.Status), "claimed")
 	return latestSession(sessions, func(t string) bool {
 		return t == ticket.Path || (claimed && t == epicAddress)
@@ -71,7 +73,7 @@ func ticketSession(sessions []server.SessionInfo, epicAddress string, ticket tic
 }
 
 // queueAgentOf is the Queue agent row running address's ticket, "" when none.
-func queueAgentOf(sessions []server.SessionInfo, address string) string {
+func queueAgentOf(sessions []wire.SessionInfo, address string) string {
 	for _, s := range sessions {
 		if s.Queue && s.Ticket == address {
 			return s.ID

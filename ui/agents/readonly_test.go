@@ -5,10 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -17,7 +18,7 @@ import (
 
 // readOnlyTerminal is session a (flagged as info says) attached with the
 // terminal focused.
-func readOnlyTerminal(t *testing.T, info server.SessionInfo) (Model, *fakeAttach) {
+func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) {
 	t.Helper()
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
 	m := NewModel(&fakeSessionClient{}, ui.Settings{})
@@ -26,12 +27,12 @@ func readOnlyTerminal(t *testing.T, info server.SessionInfo) (Model, *fakeAttach
 	m.showQueue, m.showDesign = true, true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
 	info.ID, info.Name, info.Project, info.Status = "a", "alpha", "gx", idleStatus
-	st := &viewmodel.State{Sessions: []server.SessionInfo{info, {ID: "b", Name: "beta", Project: "gx", Status: idleStatus}}}
+	st := &viewmodel.State{Sessions: []wire.SessionInfo{info, {ID: "b", Name: "beta", Project: "gx", Status: idleStatus}}}
 	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
 	m = next.(Model)
 	if m.selectedID() != "a" {
 		// Regular sessions list before the Queue and Design groups.
-		m.cursor = slices.IndexFunc(m.sessions, func(s server.SessionInfo) bool { return s.ID == "a" })
+		m.cursor = slices.IndexFunc(m.sessions, func(s wire.SessionInfo) bool { return s.ID == "a" })
 		m, cmd = m.syncAttach()
 	}
 	m, _ = dialed(t, m, cmd)
@@ -64,7 +65,7 @@ func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 }
 
 func TestReadOnly_QueueAndDesignAgentsDropKeysAndPaste(t *testing.T) {
-	for name, info := range map[string]server.SessionInfo{"queue": {Queue: true}, "design": {Design: true}} {
+	for name, info := range map[string]wire.SessionInfo{"queue": {Queue: true}, "design": {Design: true}} {
 		t.Run(name, func(t *testing.T) {
 			m, fa := readOnlyTerminal(t, info)
 			if !m.terminalFocused {
@@ -80,7 +81,7 @@ func TestReadOnly_QueueAndDesignAgentsDropKeysAndPaste(t *testing.T) {
 }
 
 func TestReadOnly_PlainSessionAndFixAgentAreWritable(t *testing.T) {
-	m, fa := readOnlyTerminal(t, server.SessionInfo{})
+	m, fa := readOnlyTerminal(t, wire.SessionInfo{})
 	m = update1(t, m, letter("x"))
 	update1(t, m, tea.PasteMsg{Content: "pasted"})
 	if len(fa.keys) != 1 || !slices.Equal(fa.pastes, []string{"pasted"}) {
@@ -89,7 +90,7 @@ func TestReadOnly_PlainSessionAndFixAgentAreWritable(t *testing.T) {
 }
 
 func TestReadOnly_WheelAndCopyModeStillWork(t *testing.T) {
-	m, fa := readOnlyTerminal(t, server.SessionInfo{Queue: true})
+	m, fa := readOnlyTerminal(t, wire.SessionInfo{Queue: true})
 	fa.scrolledFrame(0, 100, 0, "$ claude")
 	m, _ = read(t, m, readAttach(m.attach))
 	m = update1(t, m, wheel(sidebarWidth+5, 4, tea.MouseWheelUp))
@@ -104,11 +105,11 @@ func TestReadOnly_WheelAndCopyModeStillWork(t *testing.T) {
 
 func TestReadOnly_UnlockConfirmNamesTheKindAndDefaultsToCancel(t *testing.T) {
 	for _, tc := range []struct {
-		info server.SessionInfo
+		info wire.SessionInfo
 		want string
 	}{
-		{server.SessionInfo{Queue: true}, "gx is driving this Queue agent"},
-		{server.SessionInfo{Design: true}, "This Design agent is waiting on gx-design"},
+		{wire.SessionInfo{Queue: true}, "gx is driving this Queue agent"},
+		{wire.SessionInfo{Design: true}, "This Design agent is waiting on gx-design"},
 	} {
 		t.Run(tc.want, func(t *testing.T) {
 			m, fa := readOnlyTerminal(t, tc.info)
@@ -127,7 +128,7 @@ func TestReadOnly_UnlockConfirmNamesTheKindAndDefaultsToCancel(t *testing.T) {
 }
 
 func TestReadOnly_ConfirmedUnlockLetsKeysThroughUntilTheNextOpen(t *testing.T) {
-	m, fa := readOnlyTerminal(t, server.SessionInfo{Queue: true})
+	m, fa := readOnlyTerminal(t, wire.SessionInfo{Queue: true})
 	opened := m.attach
 	m, _ = leaderThen(t, m, letter("i"))
 	next, cmd := m.Update(letter("y"))
@@ -152,10 +153,10 @@ func TestReadOnly_ConfirmedUnlockLetsKeysThroughUntilTheNextOpen(t *testing.T) {
 }
 
 func TestReadOnly_QueueAgentHidesStopRemoveAndRestore(t *testing.T) {
-	m, _ := readOnlyTerminal(t, server.SessionInfo{Queue: true})
+	m, _ := readOnlyTerminal(t, wire.SessionInfo{Queue: true})
 	s, _ := m.selected()
 	has := func(label string) bool {
-		return slices.ContainsFunc(sessionMenuItems(s), func(it contextmenu.Item[server.SessionInfo]) bool { return it.Label == label })
+		return slices.ContainsFunc(sessionMenuItems(s), func(it contextmenu.Item[wire.SessionInfo]) bool { return it.Label == label })
 	}
 	for _, label := range []string{"Stop", "Remove", "Restore session"} {
 		if has(label) {

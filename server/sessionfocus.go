@@ -5,27 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+
+	"github.com/elentok/gx/server/wire"
 )
-
-// ReasonFocusNotConnected refuses a focus report from a client with no open
-// event stream: the report would never expire.
-const ReasonFocusNotConnected = "not-connected"
-
-// EventSessionFocus asks a TUI to show a session; its Address is the session
-// id and its Client the TUI.
-const EventSessionFocus = "session-focus"
-
-// FocusReport is a TUI's terminal focus, the session it has on screen (empty
-// for none) and its terminal app. Client names the TUI's event stream
-// (/v1/events?client=); the report counts only while that stream is open.
-type FocusReport struct {
-	Client      string `json:"client"`
-	Focused     bool   `json:"focused,omitempty"`
-	Session     string `json:"session,omitempty"`
-	TermProgram string `json:"term_program,omitempty"`
-	// Web marks a web tab's report. Only the web mux sets it, never the body.
-	Web bool `json:"-"`
-}
 
 // focusReports holds the latest report of each connected TUI.
 type focusReports struct {
@@ -33,7 +15,7 @@ type focusReports struct {
 	// streams counts each client's open event streams; a reconnect can
 	// overlap the stream it replaces.
 	streams map[string]int
-	reports map[string]FocusReport
+	reports map[string]wire.FocusReport
 	// lastFocused is the client focused most recently; banner clicks go to it.
 	lastFocused string
 	// lastTerm outlives its client's disconnect, so a banner sent with no TUI
@@ -42,7 +24,7 @@ type focusReports struct {
 }
 
 func newFocusReports() *focusReports {
-	return &focusReports{streams: map[string]int{}, reports: map[string]FocusReport{}}
+	return &focusReports{streams: map[string]int{}, reports: map[string]wire.FocusReport{}}
 }
 
 func (f *focusReports) connect(client string) {
@@ -63,7 +45,7 @@ func (f *focusReports) disconnect(client string) {
 }
 
 // report saves r, reporting false when its client has no open stream.
-func (f *focusReports) report(r FocusReport) bool {
+func (f *focusReports) report(r wire.FocusReport) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.streams[r.Client] == 0 {
@@ -130,7 +112,7 @@ func (s *Server) sessionFocusWriteWeb(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) focusWrite(w http.ResponseWriter, r *http.Request, web bool) {
-	var req FocusReport
+	var req wire.FocusReport
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -146,9 +128,9 @@ func (s *Server) focusWrite(w http.ResponseWriter, r *http.Request, web bool) {
 
 // reportFocus saves a TUI's focus report; a focused TUI viewing a session
 // reads it.
-func (s *Server) reportFocus(req FocusReport) (SessionResult, error) {
+func (s *Server) reportFocus(req wire.FocusReport) (wire.SessionResult, error) {
 	if req.Client == "" {
-		return sessionRefusal(ReasonSessionBadRequest, "a focus report needs a client"), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, "a focus report needs a client"), nil
 	}
 	if req.Session != "" {
 		if _, _, res, err := s.sessionDir(req.Session); res.Refused || err != nil {
@@ -156,18 +138,18 @@ func (s *Server) reportFocus(req FocusReport) (SessionResult, error) {
 		}
 	}
 	if !s.focus.report(req) {
-		return sessionRefusal(ReasonFocusNotConnected, "client "+req.Client+" has no open event stream"), nil
+		return sessionRefusal(wire.ReasonFocusNotConnected, "client "+req.Client+" has no open event stream"), nil
 	}
 	if !req.Focused || req.Session == "" {
-		return SessionResult{}, nil
+		return wire.SessionResult{}, nil
 	}
-	return s.markSessionRead(SessionRequest{ID: req.Session})
+	return s.markSessionRead(wire.SessionRequest{ID: req.Session})
 }
 
 // focusSession asks the most recently focused TUI to show the session. With no
 // TUI connected it does nothing: the banner click has already brought the
 // terminal forward.
-func (s *Server) focusSession(req SessionRequest) (SessionResult, error) {
+func (s *Server) focusSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	_, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
@@ -175,25 +157,25 @@ func (s *Server) focusSession(req SessionRequest) (SessionResult, error) {
 	info := meta.info()
 	client := s.focus.focusedClient()
 	if client != "" {
-		s.events.publishEvent(Event{Type: EventSessionFocus, Address: req.ID, Client: client})
+		s.events.publishEvent(Event{Type: wire.EventSessionFocus, Address: req.ID, Client: client})
 	}
-	return SessionResult{Session: &info, Client: client}, nil
+	return wire.SessionResult{Session: &info, Client: client}, nil
 }
 
 // markSessionRead clears the session's Unread.
-func (s *Server) markSessionRead(req SessionRequest) (SessionResult, error) {
+func (s *Server) markSessionRead(req wire.SessionRequest) (wire.SessionResult, error) {
 	dir, _, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	var info SessionInfo
+	var info wire.SessionInfo
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
-		changed := m.Unread != SessionUnread{}
-		m.Unread = SessionUnread{}
+		changed := m.Unread != wire.SessionUnread{}
+		m.Unread = wire.SessionUnread{}
 		info = m.info()
 		return changed
 	}); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }

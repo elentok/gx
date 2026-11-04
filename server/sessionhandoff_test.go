@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -35,7 +37,7 @@ func startHandoff(t *testing.T, step string, opts ...func(*server.Config)) hando
 	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	// Idle can precede the launch prompt: a /clear typed meanwhile lands in the
 	// same input box and is never submitted alone.
 	waitForSubmitted(t, conv, "\"/gx-design proj:map\"\n")
@@ -52,7 +54,7 @@ func setMapStep(t *testing.T, store, step string) {
 
 func (f handoffFixture) continueSession(t *testing.T) {
 	t.Helper()
-	res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Continue: true})
+	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true})
 	if err != nil || res.Refused {
 		t.Fatalf("continue = %+v, %v", res, err)
 	}
@@ -85,12 +87,12 @@ func (f handoffFixture) wantRestartedOnWorker(t *testing.T) {
 	report(t, newConv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, newConv, "\"/gx-design map\"\n")
 	snap := sessionSnapshotOf(t, f.designsFixture, f.id)
-	if snap.Status.State == server.SessionExited {
+	if snap.Status.State == wire.SessionExited {
 		t.Errorf("session = %+v, want it alive", snap)
 	}
 }
 
-func sessionSnapshotOf(t *testing.T, f designsFixture, id string) server.SessionInfo {
+func sessionSnapshotOf(t *testing.T, f designsFixture, id string) wire.SessionInfo {
 	t.Helper()
 	snap, err := f.h.Client.Snapshot(f.ctx)
 	if err != nil {
@@ -102,7 +104,7 @@ func sessionSnapshotOf(t *testing.T, f designsFixture, id string) server.Session
 		}
 	}
 	t.Fatalf("session %s not in the snapshot", id)
-	return server.SessionInfo{}
+	return wire.SessionInfo{}
 }
 
 func TestChartingHandoff_ContinueRestartsUnderWorkerArgs(t *testing.T) {
@@ -142,8 +144,8 @@ func TestChartingHandoff_FailedRestartExitsCrashedAndResumeWorks(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.continueSession(t)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool {
-		return s.Status.State == server.SessionExited && s.Exit == server.SessionExitCrashed
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool {
+		return s.Status.State == wire.SessionExited && s.Exit == wire.SessionExitCrashed
 	})
 	if err := os.Rename(moved, dir); err != nil {
 		t.Fatal(err)
@@ -156,7 +158,7 @@ func TestChartingHandoff_FailedRestartExitsCrashedAndResumeWorks(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State != server.SessionExited })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State != wire.SessionExited })
 	if model := readMeta(t, f.h, f.id)["model"]; model != "sonnet" {
 		t.Errorf("model after Resume = %v, want the fixed config's sonnet", model)
 	}
@@ -186,7 +188,7 @@ func TestChartingHandoff_NothingRestartsOutsideAStrongestDesignLaunch(t *testing
 		f := startHandoff(t, "chart")
 		setMapStep(t, f.store, "resolve-tickets")
 		// A session linked to the design later has no launch kind.
-		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+		res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}
@@ -194,7 +196,7 @@ func TestChartingHandoff_NothingRestartsOutsideAStrongestDesignLaunch(t *testing
 		conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
 		waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
 		report(t, conv, agentfake.Control{State: "idle"})
-		waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+		waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 		other := handoffFixture{designsFixture: f.designsFixture, id: id, conv: conv}
 		other.continueSession(t)
 		wantResetInPlace(t, other, "worker")

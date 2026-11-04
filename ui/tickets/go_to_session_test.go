@@ -6,13 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/contextmenu"
 )
 
-func goToSessionModel(t *testing.T, ticketStatus string, sessions ...server.SessionInfo) Model {
+func goToSessionModel(t *testing.T, ticketStatus string, sessions ...wire.SessionInfo) Model {
 	t.Helper()
 	m := newServerModel(t).WithServer(fakeServerAPI{})
 	m = withState(m, server.Snapshot{
@@ -52,7 +54,7 @@ func TestGoToSession_EpicMenuMatchesEpicOrAnyTicketSession(t *testing.T) {
 		{"other epic", "gx:other", false},
 		{"epic name prefix only", "gx:map-two/01", false},
 	} {
-		m := goToSessionModel(t, "open", server.SessionInfo{ID: "s1", Ticket: tc.ticket})
+		m := goToSessionModel(t, "open", wire.SessionInfo{ID: "s1", Ticket: tc.ticket})
 		m = openEpicMenuOn(t, m, "gx:map")
 		if got := m.ticketMenu.IsOpen && menuViewHas(m, goToSessionLabel); got != tc.want {
 			t.Errorf("%s: go to session offered = %v, want %v", tc.name, got, tc.want)
@@ -65,18 +67,18 @@ func menuViewHas(m Model, label string) bool {
 }
 
 func TestGoToSession_TicketMenuMatching(t *testing.T) {
-	linked := func(ticket string) server.SessionInfo { return server.SessionInfo{ID: "s1", Ticket: ticket} }
+	linked := func(ticket string) wire.SessionInfo { return wire.SessionInfo{ID: "s1", Ticket: ticket} }
 	for _, tc := range []struct {
 		name   string
 		status string
-		s      server.SessionInfo
+		s      wire.SessionInfo
 		want   bool
 	}{
 		{"ticket-linked", "open", linked("gx:map/01"), true},
 		{"epic-linked, open ticket", "open", linked("gx:map"), false},
 		{"epic-linked, claimed ticket", "claimed", linked("gx:map"), true},
 		{"sibling ticket", "open", linked("gx:map/02"), false},
-		{"exited session", "open", server.SessionInfo{ID: "s1", Ticket: "gx:map/01", Status: server.SessionStatus{State: server.SessionExited}}, true},
+		{"exited session", "open", wire.SessionInfo{ID: "s1", Ticket: "gx:map/01", Status: wire.SessionStatus{State: wire.SessionExited}}, true},
 	} {
 		labels := ticketMenuLabels(t, goToSessionModel(t, tc.status, tc.s), "gx:map/01")
 		if got := slices.Contains(labels, goToSessionLabel); got != tc.want {
@@ -89,7 +91,7 @@ func TestGoToSession_NotOfferedOnNonMapTicket(t *testing.T) {
 	m := newServerModel(t).WithServer(fakeServerAPI{})
 	m = withState(m, server.Snapshot{
 		Tickets:  []server.TicketInfo{{Address: "gx:plain/01", Title: "One", Status: "claimed"}},
-		Sessions: []server.SessionInfo{{ID: "s1", Ticket: "gx:plain/01"}},
+		Sessions: []wire.SessionInfo{{ID: "s1", Ticket: "gx:plain/01"}},
 	})
 	setCollapsedSection(&m, sectionOpenMaps, false)
 	labels := ticketMenuLabels(t, m, "gx:plain/01")
@@ -99,7 +101,7 @@ func TestGoToSession_NotOfferedOnNonMapTicket(t *testing.T) {
 }
 
 func TestGoToSession_ListedAboveStartSession(t *testing.T) {
-	labels := ticketMenuLabels(t, goToSessionModel(t, "open", server.SessionInfo{ID: "s1", Ticket: "gx:map/01"}), "gx:map/01")
+	labels := ticketMenuLabels(t, goToSessionModel(t, "open", wire.SessionInfo{ID: "s1", Ticket: "gx:map/01"}), "gx:map/01")
 	goTo, start := slices.Index(labels, goToSessionLabel), slices.Index(labels, startSessionLabel)
 	if goTo < 0 || start < 0 || goTo > start {
 		t.Errorf("labels = %v, want %q above %q", labels, goToSessionLabel, startSessionLabel)
@@ -108,7 +110,7 @@ func TestGoToSession_ListedAboveStartSession(t *testing.T) {
 
 func TestGoToSession_MostRecentlyChangedWins(t *testing.T) {
 	now := time.Now()
-	sessions := []server.SessionInfo{
+	sessions := []wire.SessionInfo{
 		{ID: "old", Ticket: "gx:map/01", StatusChangedAt: now.Add(-time.Hour)},
 		{ID: "new", Ticket: "gx:map", StatusChangedAt: now},
 		{ID: "mid", Ticket: "gx:map/01", StatusChangedAt: now.Add(-time.Minute)},

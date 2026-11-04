@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
@@ -214,7 +216,7 @@ func (s *Server) stopFinishedDesign(project, epic string) {
 	if err != nil || live == nil {
 		return
 	}
-	if res, err := s.stopSession(SessionRequest{ID: live.ID}); err != nil || res.Refused {
+	if res, err := s.stopSession(wire.SessionRequest{ID: live.ID}); err != nil || res.Refused {
 		s.log.Warn("could not stop the finished design session", "map", project+":"+epic, "session", live.ID, "err", err, "refused", res.Message)
 		return
 	}
@@ -329,14 +331,14 @@ func (s *Server) designOpenHandler(web bool) http.HandlerFunc {
 
 // openDesign returns the Design's newest live session, or creates one. Calls
 // for one epic run one at a time, so a double click starts one session.
-func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, error) {
+func (s *Server) openDesign(req DesignOpenRequest, web bool) (wire.SessionResult, error) {
 	if req.NewDesign {
 		return s.openNewDesign(req)
 	}
 	epicAddr, ticket, _ := strings.Cut(req.Epic, "/")
 	project, epic, ok := strings.Cut(epicAddr, ":")
 	if !ok || project == "" || epic == "" || (strings.Contains(req.Epic, "/") && !designTicketRe.MatchString(ticket)) {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic or project:epic/NN)", req.Epic)), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic or project:epic/NN)", req.Epic)), nil
 	}
 	dir, reason, msg := s.mapEpicDir(project, epic)
 	if reason != "" {
@@ -349,10 +351,10 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 
 	live, err := s.liveDesignSession(epicAddr)
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	if live != nil && !req.New {
-		return SessionResult{Session: live}, nil
+		return wire.SessionResult{Session: live}, nil
 	}
 	if live != nil {
 		if msg := designClash(dir, project, epic); msg != "" {
@@ -361,14 +363,14 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		if web && req.State != SessionStateToken(*live) {
 			return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil
 		}
-		if res, err := s.stopSession(SessionRequest{ID: live.ID}); err != nil || (res.Refused && res.Reason != ReasonSessionNotLive) {
+		if res, err := s.stopSession(wire.SessionRequest{ID: live.ID}); err != nil || (res.Refused && res.Reason != wire.ReasonSessionNotLive) {
 			return res, err
 		}
 	}
 
 	d, err := s.resolveDesignDir(project, epic, "")
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	if d.Clash != "" {
 		return sessionRefusal(ReasonDesignBranchClash, d.Clash), nil
@@ -378,7 +380,7 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		target += "/" + ticket
 	}
 	prompt := harness.SkillCommand(s.launchHarness(project), "gx-design", target)
-	return s.createSession(CreateSessionRequest{
+	return s.createSession(wire.CreateSessionRequest{
 		Project:      project,
 		Dir:          d.Path,
 		MadeWorktree: !d.Past,
@@ -453,7 +455,7 @@ func (s *Server) designWorktreeWrite(w http.ResponseWriter, r *http.Request) {
 func (s *Server) designWorktree(req DesignWorktreeRequest) (DesignWorktreeResult, error) {
 	project, epic, ok := strings.Cut(req.Epic, ":")
 	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
-		return designWorktreeRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
+		return designWorktreeRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
 	}
 	_, reason, msg := s.mapEpicDir(project, epic)
 	if reason != "" {
@@ -476,21 +478,21 @@ func (s *Server) designWorktree(req DesignWorktreeRequest) (DesignWorktreeResult
 
 // openNewDesign starts a design session for an idea with no map yet: Epic is
 // the slug the map will take in Project. It creates no epic; Chart writes it.
-func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
+func (s *Server) openNewDesign(req DesignOpenRequest) (wire.SessionResult, error) {
 	slug := req.Epic
 	if !designSlugRe.MatchString(slug) {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", slug)), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", slug)), nil
 	}
 	idea := strings.TrimSpace(normalizeAnswer(req.Idea))
 	switch {
 	case idea == "":
 		return sessionRefusal(ReasonEmptyPrompt, "an idea is required"), nil
 	case len(idea) > maxSessionPromptBytes:
-		return sessionRefusal(ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
+		return sessionRefusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
 	}
 	dir, err := s.projectDir(req.Project)
 	if err != nil {
-		return sessionRefusal(ReasonSessionBadRequest, err.Error()), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, err.Error()), nil
 	}
 	addr := req.Project + ":" + slug
 
@@ -506,11 +508,11 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	}
 
 	if err := createMap(s.cfg.ConversationsDir, dir, slug, idea); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	d, err := s.resolveDesignDir(req.Project, slug, "")
 	if err != nil {
-		return SessionResult{EpicCreated: true, StartError: err.Error()}, nil
+		return wire.SessionResult{EpicCreated: true, StartError: err.Error()}, nil
 	}
 	return s.startSession(req.Project, slug, d.Path, d.Note), nil
 }
@@ -528,9 +530,9 @@ func createMap(conversationsDir, dir, slug, idea string) error {
 // startSession starts the design session for a map that now exists. A failure
 // is a result, not a refusal: the map is there, so the caller reports it as
 // created with the reason in StartError.
-func (s *Server) startSession(project, slug, worktree, rebaseNote string) SessionResult {
+func (s *Server) startSession(project, slug, worktree, rebaseNote string) wire.SessionResult {
 	addr := project + ":" + slug
-	res, err := s.createSession(CreateSessionRequest{
+	res, err := s.createSession(wire.CreateSessionRequest{
 		Project:      project,
 		Dir:          worktree,
 		MadeWorktree: true,
@@ -541,9 +543,9 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) Sessio
 	}, sessionCtx{launchDesign: true})
 	switch {
 	case err != nil:
-		return SessionResult{EpicCreated: true, StartError: err.Error()}
+		return wire.SessionResult{EpicCreated: true, StartError: err.Error()}
 	case res.Refused:
-		return SessionResult{EpicCreated: true, StartError: res.Message}
+		return wire.SessionResult{EpicCreated: true, StartError: res.Message}
 	}
 	return res
 }
@@ -585,10 +587,10 @@ func (s *Server) designDeleteWrite(w http.ResponseWriter, r *http.Request) {
 // deleteDesign removes an uncharted design's epic directory. It re-checks the
 // rule from disk under the lock designs open takes, so a session or a chart
 // that lands first wins. Exited session records stay.
-func (s *Server) deleteDesign(req DesignDeleteRequest) (SessionResult, error) {
+func (s *Server) deleteDesign(req DesignDeleteRequest) (wire.SessionResult, error) {
 	project, epic, ok := strings.Cut(req.Epic, ":")
 	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
 	}
 	dir, err := s.projectDir(project)
 	if err != nil {
@@ -601,7 +603,7 @@ func (s *Server) deleteDesign(req DesignDeleteRequest) (SessionResult, error) {
 
 	epics, err := tickets.LoadResolved(project, dir)
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic })
 	if i < 0 {
@@ -612,19 +614,19 @@ func (s *Server) deleteDesign(req DesignDeleteRequest) (SessionResult, error) {
 	}
 	uncharted, err := s.designUncharted(req.Epic, epics[i])
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	if !uncharted {
 		return sessionRefusal(ReasonDesignNotUncharted, fmt.Sprintf("%s is charted or has a live session", req.Epic)), nil
 	}
 	if err := s.forceRemoveDesign(project, epic); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	if err := os.RemoveAll(epics[i].Path); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	s.events.publish(EventTicketChanged, req.Epic)
-	return SessionResult{}, nil
+	return wire.SessionResult{}, nil
 }
 
 // forceRemoveDesign drops the map's design worktree and branch whatever they
@@ -641,21 +643,21 @@ func (s *Server) forceRemoveDesign(project, epic string) error {
 // liveDesignSession is the session of the Design at epicAddr that has not
 // exited and has the latest RunStartedAt, or nil. The Design page picks by the
 // same key (webui/src/design/view.ts).
-func (s *Server) liveDesignSession(epicAddr string) (*SessionInfo, error) {
+func (s *Server) liveDesignSession(epicAddr string) (*wire.SessionInfo, error) {
 	return s.liveDesignSessionExcept(epicAddr, "")
 }
 
 // liveDesignSessionExcept is liveDesignSession leaving out the session
 // excludeID, so a caller never counts itself. Empty excludes none.
-func (s *Server) liveDesignSessionExcept(epicAddr, excludeID string) (*SessionInfo, error) {
+func (s *Server) liveDesignSessionExcept(epicAddr, excludeID string) (*wire.SessionInfo, error) {
 	list, err := s.listSessions()
 	if err != nil {
 		return nil, err
 	}
-	var live *SessionInfo
+	var live *wire.SessionInfo
 	for i := range list {
 		in := &list[i]
-		if in.ID != excludeID && in.Design && in.Status.State != SessionExited && epicAddress(in.Ticket) == epicAddr &&
+		if in.ID != excludeID && in.Design && in.Status.State != wire.SessionExited && epicAddress(in.Ticket) == epicAddr &&
 			(live == nil || !in.RunStartedAt.Before(live.RunStartedAt)) {
 			live = in
 		}

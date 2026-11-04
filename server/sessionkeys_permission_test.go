@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -28,7 +30,7 @@ func (f promptFixture) block(t *testing.T, c agentfake.Control) {
 	if err := agentfake.SendProgramControl(f.conv, c); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
 }
 
 // blockOn opens a dialog that Enter or Esc closes.
@@ -37,9 +39,9 @@ func (f promptFixture) blockOn(t *testing.T, rows []string) {
 	f.block(t, agentfake.Control{Action: agentfake.ActionDialogBlock, Dialog: rows, Message: "run ls?"})
 }
 
-func (f promptFixture) permission(t *testing.T, decision, requestID string) server.SessionResult {
+func (f promptFixture) permission(t *testing.T, decision, requestID string) wire.SessionResult {
 	t.Helper()
-	return f.keys(t, server.SessionKeysRequest{Permission: decision, RequestID: requestID})
+	return f.keys(t, wire.SessionKeysRequest{Permission: decision, RequestID: requestID})
 }
 
 // nothingSent closes the dialog from the fake's side and sends a Tab: any key
@@ -47,8 +49,8 @@ func (f promptFixture) permission(t *testing.T, decision, requestID string) serv
 func (f promptFixture) nothingSent(t *testing.T) {
 	t.Helper()
 	report(t, f.conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
-	if res := f.keys(t, server.SessionKeysRequest{Key: "Tab"}); res.Refused {
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	if res := f.keys(t, wire.SessionKeysRequest{Key: "Tab"}); res.Refused {
 		t.Fatalf("tab = %+v", res)
 	}
 	waitForSubmitted(t, f.conv, strconv.Quote("<tab>")+"\n")
@@ -69,7 +71,7 @@ func TestSessionKeys_PermissionAllowSendsEnterAndDenySendsEsc(t *testing.T) {
 				t.Fatalf("%s = %+v", tc.decision, res)
 			}
 			waitForSubmitted(t, f.conv, tc.want)
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 		})
 	}
 }
@@ -140,8 +142,8 @@ func TestSessionKeys_PermissionWhoseDialogStaysOpenIsNotDelivered(t *testing.T) 
 	}
 	f.block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
 	waitForScreen(t, waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id)), "Do you want to proceed?")
-	if res := f.permission(t, "allow", ""); !res.Refused || res.Reason != server.ReasonKeysNotDelivered {
-		t.Fatalf("allow = %+v, want %s", res, server.ReasonKeysNotDelivered)
+	if res := f.permission(t, "allow", ""); !res.Refused || res.Reason != wire.ReasonKeysNotDelivered {
+		t.Fatalf("allow = %+v, want %s", res, wire.ReasonKeysNotDelivered)
 	}
 }
 
@@ -160,13 +162,13 @@ func TestSessionKeys_PermissionRefusals(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	for name, tc := range map[string]struct {
-		req  server.SessionKeysRequest
+		req  wire.SessionKeysRequest
 		want string
 	}{
-		"not blocked":     {server.SessionKeysRequest{Permission: "allow"}, server.ReasonNotBlocked},
-		"bad value":       {server.SessionKeysRequest{Permission: "maybe"}, server.ReasonSessionBadRequest},
-		"with a key":      {server.SessionKeysRequest{Permission: "allow", Key: "Tab"}, server.ReasonSessionBadRequest},
-		"unknown session": {server.SessionKeysRequest{ID: "nope", Permission: "allow"}, server.ReasonSessionUnknown},
+		"not blocked":     {wire.SessionKeysRequest{Permission: "allow"}, server.ReasonNotBlocked},
+		"bad value":       {wire.SessionKeysRequest{Permission: "maybe"}, wire.ReasonSessionBadRequest},
+		"with a key":      {wire.SessionKeysRequest{Permission: "allow", Key: "Tab"}, wire.ReasonSessionBadRequest},
+		"unknown session": {wire.SessionKeysRequest{ID: "nope", Permission: "allow"}, wire.ReasonSessionUnknown},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got := f.keys(t, tc.req); !got.Refused || got.Reason != tc.want {
@@ -189,8 +191,8 @@ func TestSessionKeys_PermissionKeepsADesignCountdown(t *testing.T) {
 			if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionDialogBlock, Dialog: rows, Message: "run ls?"}); err != nil {
 				t.Fatal(err)
 			}
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
-			res, err := f.h.Client.KeysSession(f.ctx, server.SessionKeysRequest{ID: f.id, Permission: decision})
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+			res, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Permission: decision})
 			if err != nil || res.Refused {
 				t.Fatalf("%s = %+v, %v", decision, res, err)
 			}

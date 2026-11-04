@@ -3,6 +3,8 @@ package server
 import (
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -35,7 +37,7 @@ func (s *Server) designActivities() map[string]designActivity {
 		}
 		addr := epicAddress(info.Ticket)
 		a := out[addr]
-		exited := info.Status.State == SessionExited
+		exited := info.Status.State == wire.SessionExited
 		switch {
 		case exited || info.Failure != nil:
 			if info.StatusChangedAt.After(a.endedAt) {

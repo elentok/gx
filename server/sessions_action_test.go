@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -21,8 +23,8 @@ const actionWatchSettle = 200 * time.Millisecond
 func idleWithAction(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv string, action ...string) {
 	t.Helper()
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
-	res, err := h.Client.MarkSessionActionable(ctx, server.MarkActionableRequest{ID: id, Reason: "ready", Action: action})
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready", Action: action})
 	if err != nil || res.Refused {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
@@ -47,7 +49,7 @@ func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	waitForScreen(t, c, "first-step")
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	// Negative wait: the Action's own watch samples on a ticker, so give it
 	// time to wrongly send the second prompt.
 	time.Sleep(actionWatchSettle)
@@ -61,7 +63,7 @@ func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
 func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	t.Parallel()
 	const timeout = 200 * time.Millisecond
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
 	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
@@ -69,7 +71,7 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	}
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	waitForScreen(t, c, "first-step")
-	raised := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.GxRaised })
+	raised := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised })
 	if want := "Action failed: step 0: prompt never went working"; raised.Actionable.Reason != want {
 		t.Errorf("reason = %q, want %q", raised.Actionable.Reason, want)
 	}
@@ -77,9 +79,9 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 		t.Errorf("action = %q, want both unsent steps", got)
 	}
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "done"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	// Negative wait: a few step timeouts for a wrong send to show up.
 	time.Sleep(3 * timeout)
 	if screenHas(t, c, "second-step") {
@@ -89,7 +91,7 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 
 func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = 200 * time.Millisecond })
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = 200 * time.Millisecond })
 	idleWithAction(ctx, t, h, evs, id, conv, "/clear", "/gx-design X")
 
 	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
@@ -104,7 +106,7 @@ func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
 // box, so a slash step has a real input to check.
 func startInputSession(t *testing.T, settle time.Duration) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	return startFakeSessionWith(t, server.CreateSessionRequest{}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1"), func(c *server.Config) {
+	return startFakeSessionWith(t, wire.CreateSessionRequest{}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1"), func(c *server.Config) {
 		c.ActionStepStartTimeout = time.Minute
 		c.ActionSlashSettle = settle
 	})
@@ -192,7 +194,7 @@ func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
 func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	t.Parallel()
 	const timeout = 200 * time.Millisecond
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
 	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
@@ -201,12 +203,12 @@ func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	waitForScreen(t, c, "first-step")
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
 	time.Sleep(actionWatchSettle) // negative wait: the Action's watch only samples on a ticker; no event shows it saw Blocked
 	report(t, conv, agentfake.Control{State: "done"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	// Negative wait: a few step timeouts for a wrong send to show up.
 	time.Sleep(3 * timeout)
 	if screenHas(t, c, "second-step") {
@@ -222,11 +224,11 @@ func TestRunAction_RefusedWhileWorkingKeepsActionable(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSession(t)
 	idleWithAction(ctx, t, h, evs, id, conv, "/review")
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 
 	res, err := h.Client.RunSessionAction(ctx, id)
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNotIdle {
-		t.Errorf("run while working = %+v, %v; want refused %s", res, err, server.ReasonSessionNotIdle)
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotIdle {
+		t.Errorf("run while working = %+v, %v; want refused %s", res, err, wire.ReasonSessionNotIdle)
 	}
 	if saved, _ := readMeta(t, h, id)["actionable"].(map[string]any); saved["reason"] != "ready" {
 		t.Errorf("saved actionable = %v, want it kept", saved)
@@ -237,16 +239,16 @@ func TestRunAction_RefusedWithNoAction(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || !res.Refused || res.Reason != server.ReasonSessionNoAction {
-		t.Errorf("run with no actionable = %+v, %v; want refused %s", res, err, server.ReasonSessionNoAction)
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoAction {
+		t.Errorf("run with no actionable = %+v, %v; want refused %s", res, err, wire.ReasonSessionNoAction)
 	}
 
-	if res, err := h.Client.MarkSessionActionable(ctx, server.MarkActionableRequest{ID: id, Reason: "ready"}); err != nil || res.Refused {
+	if res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready"}); err != nil || res.Refused {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
-	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || !res.Refused || res.Reason != server.ReasonSessionNoAction {
-		t.Errorf("run with no action = %+v, %v; want refused %s", res, err, server.ReasonSessionNoAction)
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNoAction {
+		t.Errorf("run with no action = %+v, %v; want refused %s", res, err, wire.ReasonSessionNoAction)
 	}
 	if saved, _ := readMeta(t, h, id)["actionable"].(map[string]any); saved["reason"] != "ready" {
 		t.Errorf("saved actionable = %v, want it kept", saved)
@@ -259,8 +261,8 @@ func TestRunAction_RunsWhileABackgroundTaskRuns(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startInputSession(t, time.Minute)
 	report(t, conv, agentfake.Control{State: "background"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.Background })
-	if res, err := h.Client.MarkSessionActionable(ctx, server.MarkActionableRequest{ID: id, Reason: "ready", Action: []string{agentfake.ProgramClearCommand, "next-step"}}); err != nil || res.Refused {
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.Background })
+	if res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready", Action: []string{agentfake.ProgramClearCommand, "next-step"}}); err != nil || res.Refused {
 		t.Fatalf("mark actionable = %+v, %v", res, err)
 	}
 

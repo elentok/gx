@@ -3,14 +3,16 @@ package server
 import (
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/harness"
 )
 
 func continueMeta(edit func(*sessionMeta)) sessionMeta {
 	m := sessionMeta{
 		Harness:    string(harness.Claude),
-		Status:     SessionStatus{State: SessionIdle},
-		Actionable: SessionActionable{Reason: "done", Action: []string{"/clear"}, Derived: true},
+		Status:     wire.SessionStatus{State: wire.SessionIdle},
+		Actionable: wire.SessionActionable{Reason: "done", Action: []string{"/clear"}, Derived: true},
 	}
 	if edit != nil {
 		edit(&m)
@@ -30,7 +32,7 @@ func TestCanAutoAdvance(t *testing.T) {
 		{"not derived", func(m *sessionMeta) { m.Actionable.Derived = false }, false},
 		{"grilling", func(m *sessionMeta) { m.Actionable.Grilling = true }, false},
 		{"no action", func(m *sessionMeta) { m.Actionable.Action = nil }, false},
-		{"not promptable", func(m *sessionMeta) { m.Status = SessionStatus{State: SessionWorking} }, false},
+		{"not promptable", func(m *sessionMeta) { m.Status = wire.SessionStatus{State: wire.SessionWorking} }, false},
 		{"codex", func(m *sessionMeta) { m.Harness = string(harness.Codex) }, true},
 	}
 	for _, tt := range tests {
@@ -44,7 +46,7 @@ func TestCanAutoAdvance(t *testing.T) {
 
 func TestDecideActionable(t *testing.T) {
 	t.Parallel()
-	cont := SessionActionable{Reason: "next", Action: []string{"/clear", "/gx-design x"}, Derived: true}
+	cont := wire.SessionActionable{Reason: "next", Action: []string{"/clear", "/gx-design x"}, Derived: true}
 	policy := actionablePolicy{Live: true, MaxAutoSends: 5}
 	tests := []struct {
 		name    string
@@ -54,11 +56,11 @@ func TestDecideActionable(t *testing.T) {
 		want    actionableOutcome
 		reason  string
 	}{
-		{"gx-raised kept", func(m *sessionMeta) { m.Actionable = SessionActionable{Reason: "gx", GxRaised: true} }, true, policy, actionableNone, "gx"},
+		{"gx-raised kept", func(m *sessionMeta) { m.Actionable = wire.SessionActionable{Reason: "gx", GxRaised: true} }, true, policy, actionableNone, "gx"},
 		{"derived cleared when unmatched", nil, false, policy, actionableCleared, ""},
 		{"agent-raised kept when unmatched", func(m *sessionMeta) { m.Actionable.Derived = false }, false, policy, actionableNone, "done"},
 		{"duplicate deduped", func(m *sessionMeta) { m.Actionable = cont }, true, policy, actionableNone, "next"},
-		{"not promptable untouched", func(m *sessionMeta) { m.Status = SessionStatus{State: SessionWorking} }, true, policy, actionableNone, "done"},
+		{"not promptable untouched", func(m *sessionMeta) { m.Status = wire.SessionStatus{State: wire.SessionWorking} }, true, policy, actionableNone, "done"},
 		{"advance", nil, true, policy, actionableAdvance, "next"},
 		{"raised when not live", nil, true, actionablePolicy{MaxAutoSends: 5}, actionableRaised, "next"},
 		{"raised with the switch off", func(m *sessionMeta) { m.AutoAdvanceOff = true }, true, policy, actionableRaised, "next"},

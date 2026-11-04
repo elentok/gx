@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/check"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -52,7 +53,7 @@ func workingQueueRow(t *testing.T) (*servertest.Harness, string) {
 	fake.SetState(resumeLabel, agentrunner.StateWorking, "")
 	servertest.WaitFor(t, 10*time.Second, "a working row", func() bool {
 		rows := queueRows(t, h)
-		return len(rows) == 1 && rows[0].Status.State == server.SessionWorking
+		return len(rows) == 1 && rows[0].Status.State == wire.SessionWorking
 	})
 	return h, queueRows(t, h)[0].Dir
 }

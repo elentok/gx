@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
@@ -30,7 +31,7 @@ func TestLastViewedFile_FollowsTheDirsStateDir(t *testing.T) {
 
 // openedModel opens the tab on sessions, remembering lastViewed (none when
 // empty) in a temp file.
-func openedModel(t *testing.T, f *fakeSessionClient, lastViewed string, sessions ...server.SessionInfo) Model {
+func openedModel(t *testing.T, f *fakeSessionClient, lastViewed string, sessions ...wire.SessionInfo) Model {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "last-viewed")
 	if lastViewed != "" {
@@ -65,11 +66,11 @@ func waitIdle(t *testing.T, r *focusReporter) {
 	}
 }
 
-func attentionSessions() []server.SessionInfo {
-	return []server.SessionInfo{
+func attentionSessions() []wire.SessionInfo {
+	return []wire.SessionInfo{
 		{ID: "a", Project: "gx", Status: idleStatus},
-		{ID: "b", Project: "gx", Status: idleStatus, Unread: server.SessionUnread{Unread: true}},
-		{ID: "c", Project: "gx", Status: server.SessionStatus{State: server.SessionBlocked}},
+		{ID: "b", Project: "gx", Status: idleStatus, Unread: wire.SessionUnread{Unread: true}},
+		{ID: "c", Project: "gx", Status: wire.SessionStatus{State: wire.SessionBlocked}},
 	}
 }
 
@@ -140,8 +141,8 @@ func TestFocus_TabMemoryKeepsFocusAndSession(t *testing.T) {
 func TestFocus_ReportsFocusBlurSessionAndTab(t *testing.T) {
 	f := &fakeSessionClient{}
 	m := openedModel(t, f, "", attentionSessions()[0], attentionSessions()[1])
-	report := func(focused bool, session string) server.FocusReport {
-		return server.FocusReport{Client: FocusClient, Focused: focused, Session: session, TermProgram: "iTerm.app"}
+	report := func(focused bool, session string) wire.FocusReport {
+		return wire.FocusReport{Client: FocusClient, Focused: focused, Session: session, TermProgram: "iTerm.app"}
 	}
 	f.waitReport(t, report(true, "b"))
 
@@ -163,13 +164,13 @@ func TestFocus_ReportsFocusBlurSessionAndTab(t *testing.T) {
 }
 
 func TestFocus_RefusedReportIsResent(t *testing.T) {
-	f := &fakeSessionClient{focusResult: server.SessionResult{Refused: true}}
+	f := &fakeSessionClient{focusResult: wire.SessionResult{Refused: true}}
 	m := openedModel(t, f, "", attentionSessions()[0])
-	want := server.FocusReport{Client: FocusClient, Focused: true, Session: "a", TermProgram: "iTerm.app"}
+	want := wire.FocusReport{Client: FocusClient, Focused: true, Session: "a", TermProgram: "iTerm.app"}
 	f.waitReport(t, want)
 
 	f.mu.Lock()
-	f.focusResult, f.reports = server.SessionResult{}, nil
+	f.focusResult, f.reports = wire.SessionResult{}, nil
 	f.mu.Unlock()
 	// The refusal is forgotten off the update loop; any later update resends.
 	deadline := time.Now().Add(2 * time.Second)
@@ -194,7 +195,7 @@ func TestFocus_SavesTheSessionOnScreen(t *testing.T) {
 	m := openedModel(t, f, "", attentionSessions()[0], attentionSessions()[1])
 	m = m.toggleFocus()
 	press(t, m, "k")
-	f.waitReport(t, server.FocusReport{Client: FocusClient, Focused: true, Session: "a", TermProgram: "iTerm.app"})
+	f.waitReport(t, wire.FocusReport{Client: FocusClient, Focused: true, Session: "a", TermProgram: "iTerm.app"})
 
 	waitIdle(t, m.reporter)
 	m.reporter.mu.Lock()

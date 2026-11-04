@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -15,10 +17,10 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-func actionSessions() []server.SessionInfo {
-	return []server.SessionInfo{
+func actionSessions() []wire.SessionInfo {
+	return []wire.SessionInfo{
 		{ID: "live", Project: "gx", Status: idleStatus},
-		{ID: "done", Project: "gx", Status: server.SessionStatus{State: server.SessionExited}},
+		{ID: "done", Project: "gx", Status: wire.SessionStatus{State: wire.SessionExited}},
 	}
 }
 
@@ -27,7 +29,7 @@ func actionModel(t *testing.T, f *fakeSessionClient, id string) Model {
 	t.Helper()
 	m := openedModel(t, f, "", actionSessions()...)
 	m.terminalFocused = false
-	m.cursor = slices.IndexFunc(m.sessions, func(s server.SessionInfo) bool { return s.ID == id })
+	m.cursor = slices.IndexFunc(m.sessions, func(s wire.SessionInfo) bool { return s.ID == id })
 	return m
 }
 
@@ -109,7 +111,7 @@ func TestActions_RemoveExitedAsksAndSends(t *testing.T) {
 }
 
 func TestActions_RemoveLiveShowsTheRefusal(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Refused: true, Message: "session live is live"}}
+	f := &fakeSessionClient{result: wire.SessionResult{Refused: true, Message: "session live is live"}}
 	m, note := act(t, actionModel(t, f, "live"), letter("d"))
 	if m.confirm.IsOpen {
 		t.Fatal("X on a live session asked")
@@ -120,7 +122,7 @@ func TestActions_RemoveLiveShowsTheRefusal(t *testing.T) {
 }
 
 func TestActions_ResumeReattachesTheNewHolder(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Session: &server.SessionInfo{ID: "done", Project: "gx", Status: idleStatus}}}
+	f := &fakeSessionClient{result: wire.SessionResult{Session: &wire.SessionInfo{ID: "done", Project: "gx", Status: idleStatus}}}
 	m := actionModel(t, f, "done")
 	for name, run := range map[string]func(Model) Model{
 		"sidebar": func(m Model) Model { m, _ = act(t, m, letter("r")); return m },
@@ -143,7 +145,7 @@ func TestActions_ResumeReattachesTheNewHolder(t *testing.T) {
 }
 
 func TestActions_ResumeRefusalShowsItsMessage(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Refused: true, Reason: server.ReasonSessionDirGone, Message: "dir is gone"}}
+	f := &fakeSessionClient{result: wire.SessionResult{Refused: true, Reason: wire.ReasonSessionDirGone, Message: "dir is gone"}}
 	m, note := act(t, actionModel(t, f, "done"), letter("r"))
 	if note != "dir is gone" {
 		t.Fatalf("footer = %q, want the refusal", note)
@@ -153,7 +155,7 @@ func TestActions_ResumeRefusalShowsItsMessage(t *testing.T) {
 	}
 }
 
-func withSession(m Model, id string, edit func(*server.SessionInfo)) Model {
+func withSession(m Model, id string, edit func(*wire.SessionInfo)) Model {
 	m.sessions = slices.Clone(m.sessions)
 	for i := range m.sessions {
 		if m.sessions[i].ID == id {
@@ -164,13 +166,13 @@ func withSession(m Model, id string, edit func(*server.SessionInfo)) Model {
 }
 
 func withAction(m Model, id string, action ...string) Model {
-	return withSession(m, id, func(s *server.SessionInfo) {
-		s.Actionable = server.SessionActionable{Reason: "review", Action: action}
+	return withSession(m, id, func(s *wire.SessionInfo) {
+		s.Actionable = wire.SessionActionable{Reason: "review", Action: action}
 	})
 }
 
 func withUnread(m Model, id string) Model {
-	return withSession(m, id, func(s *server.SessionInfo) { s.Unread.Unread = true })
+	return withSession(m, id, func(s *wire.SessionInfo) { s.Unread.Unread = true })
 }
 
 func TestActions_RunActionAsksFirstListingEveryStep(t *testing.T) {
@@ -231,8 +233,8 @@ func TestActions_RunActionEscSendsNothing(t *testing.T) {
 
 func TestActions_QueueActionListsTheQueue(t *testing.T) {
 	f := &fakeSessionClient{}
-	m := withSession(actionModel(t, f, "live"), "live", func(s *server.SessionInfo) {
-		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "gx:epic-impl"}
+	m := withSession(actionModel(t, f, "live"), "live", func(s *wire.SessionInfo) {
+		s.Actionable = wire.SessionActionable{Reason: "done", Kind: wire.SessionActionableQueue, Target: "gx:epic-impl"}
 	})
 	m, _ = act(t, m, letter("a"))
 	if view := m.confirm.View(80); !strings.Contains(view, "Queue `gx:epic-impl`") {
@@ -250,9 +252,9 @@ func confirmQueueAction(t *testing.T, f *fakeSessionClient) (Model, []tea.Msg) {
 		{Address: "gx:epic-impl/00", Status: "done"},
 		{Address: "gx:other/01", Status: "open"},
 	}}
-	m := withSession(actionModel(t, f, "live"), "live", func(s *server.SessionInfo) {
+	m := withSession(actionModel(t, f, "live"), "live", func(s *wire.SessionInfo) {
 		s.Project = "elsewhere" // the ticket lives in another project
-		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "gx:epic-impl"}
+		s.Actionable = wire.SessionActionable{Reason: "done", Kind: wire.SessionActionableQueue, Target: "gx:epic-impl"}
 	})
 	m, _ = act(t, m, letter("a"))
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -301,7 +303,7 @@ func TestActions_QueueActionRefusalWarnsAndStays(t *testing.T) {
 }
 
 func TestActions_RunActionRefusalShowsItsMessage(t *testing.T) {
-	f := &fakeSessionClient{result: server.SessionResult{Refused: true, Reason: server.ReasonSessionNotIdle, Message: "session live is working, not idle"}}
+	f := &fakeSessionClient{result: wire.SessionResult{Refused: true, Reason: wire.ReasonSessionNotIdle, Message: "session live is working, not idle"}}
 	m, _ := act(t, withAction(actionModel(t, f, "live"), "live", "go on"), letter("a"))
 	_, note := act(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if note != "session live is working, not idle" {
@@ -355,7 +357,7 @@ func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 				t.Fatal("m did not open the menu")
 			}
 			for label, hint := range tc.want {
-				i := slices.IndexFunc(m.menu.Items(), func(it contextmenu.Item[server.SessionInfo]) bool { return it.Label == label })
+				i := slices.IndexFunc(m.menu.Items(), func(it contextmenu.Item[wire.SessionInfo]) bool { return it.Label == label })
 				if i < 0 {
 					t.Fatalf("no %q item", label)
 				}
@@ -394,7 +396,7 @@ func TestActions_MenuItemsMakeTheirSessionCalls(t *testing.T) {
 		{"restore", "done", func(m Model) Model { return m }, "resume done"},
 		{"run", "live", func(m Model) Model { return withAction(m, "live", "go on") }, ""},
 		{"remove", "live", func(m Model) Model {
-			return withSession(m, "live", func(s *server.SessionInfo) { s.Status.State = server.SessionExited })
+			return withSession(m, "live", func(s *wire.SessionInfo) { s.Status.State = wire.SessionExited })
 		}, ""},
 	} {
 		t.Run(tc.filter, func(t *testing.T) {
@@ -466,8 +468,8 @@ func TestActions_WhichKeyListsThem(t *testing.T) {
 // and runs the call it starts.
 func pickMenuItem(t *testing.T, m Model, id, label string) {
 	t.Helper()
-	s := m.sessions[slices.IndexFunc(m.sessions, func(s server.SessionInfo) bool { return s.ID == id })]
-	i := slices.IndexFunc(sessionMenuItems(s), func(it contextmenu.Item[server.SessionInfo]) bool { return it.Label == label })
+	s := m.sessions[slices.IndexFunc(m.sessions, func(s wire.SessionInfo) bool { return s.ID == id })]
+	i := slices.IndexFunc(sessionMenuItems(s), func(it contextmenu.Item[wire.SessionInfo]) bool { return it.Label == label })
 	if i < 0 {
 		t.Fatalf("no menu item %q", label)
 	}
@@ -478,17 +480,17 @@ func pickMenuItem(t *testing.T, m Model, id, label string) {
 }
 
 func TestActions_AutoAdvanceItemIsForDesignSessionsOnly(t *testing.T) {
-	has := func(s server.SessionInfo) bool {
-		return slices.ContainsFunc(sessionMenuItems(s), func(it contextmenu.Item[server.SessionInfo]) bool {
+	has := func(s wire.SessionInfo) bool {
+		return slices.ContainsFunc(sessionMenuItems(s), func(it contextmenu.Item[wire.SessionInfo]) bool {
 			return strings.HasPrefix(it.Label, "Auto-advance")
 		})
 	}
 	for _, harness := range []string{"claude", "codex"} {
-		if !has(server.SessionInfo{ID: "d", Harness: harness, Design: true}) {
+		if !has(wire.SessionInfo{ID: "d", Harness: harness, Design: true}) {
 			t.Errorf("%s Design session lacks the item", harness)
 		}
 	}
-	if has(server.SessionInfo{ID: "p", Harness: "claude"}) {
+	if has(wire.SessionInfo{ID: "p", Harness: "claude"}) {
 		t.Error("plain session has the item")
 	}
 }
@@ -500,7 +502,7 @@ func TestActions_AutoAdvanceItemFlipsTheSwitch(t *testing.T) {
 		want  string
 	}{{true, "Auto-advance: on", "auto-advance d false"}, {false, "Auto-advance: off", "auto-advance d true"}} {
 		f := &fakeSessionClient{}
-		m := openedModel(t, f, "", server.SessionInfo{ID: "d", Project: "gx", Design: true, AutoAdvance: tc.on, Status: idleStatus})
+		m := openedModel(t, f, "", wire.SessionInfo{ID: "d", Project: "gx", Design: true, AutoAdvance: tc.on, Status: idleStatus})
 		pickMenuItem(t, m, "d", tc.label)
 		if got := calls(f); !slices.Equal(got, []string{tc.want}) {
 			t.Errorf("calls = %v, want %q", got, tc.want)
@@ -511,7 +513,7 @@ func TestActions_AutoAdvanceItemFlipsTheSwitch(t *testing.T) {
 func TestActions_CancelItemCancelsARunningCountdown(t *testing.T) {
 	at := time.Now().Add(5 * time.Second)
 	f := &fakeSessionClient{}
-	m := openedModel(t, f, "", server.SessionInfo{ID: "d", Project: "gx", Design: true, AutoAdvance: true, AutoAdvanceAt: &at, Status: idleStatus})
+	m := openedModel(t, f, "", wire.SessionInfo{ID: "d", Project: "gx", Design: true, AutoAdvance: true, AutoAdvanceAt: &at, Status: idleStatus})
 	pickMenuItem(t, m, "d", "Cancel auto-advance")
 	if got := calls(f); !slices.Equal(got, []string{"cancel-auto-advance d"}) {
 		t.Errorf("calls = %v", got)

@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/transcript"
 )
 
-func (r *running) sessionsOf(t *testing.T) []server.SessionInfo {
+func (r *running) sessionsOf(t *testing.T) []wire.SessionInfo {
 	t.Helper()
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 		t.Fatal(err)
 	}
@@ -32,14 +33,14 @@ const leanSessionCount = 9
 const commandSessionCount = 24
 
 // seededSessions is the list without the Queue agent, in creation order.
-func (r *running) seededSessions(t *testing.T) []server.SessionInfo {
+func (r *running) seededSessions(t *testing.T) []wire.SessionInfo {
 	t.Helper()
-	return slices.DeleteFunc(r.sessionsOf(t), func(s server.SessionInfo) bool { return s.Queue })
+	return slices.DeleteFunc(r.sessionsOf(t), func(s wire.SessionInfo) bool { return s.Queue })
 }
 
 func (r *running) commandNames(t *testing.T, args ...string) (names []string, degraded bool) {
 	t.Helper()
-	var res server.SessionCommandsResponse
+	var res wire.SessionCommandsResponse
 	out := r.gx(t, append([]string{"agents", "commands", "--json"}, args...)...)
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatalf("commands output %s: %v", out, err)
@@ -59,11 +60,11 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 	}
 	claude, codex, working, exited := list[0], list[4], list[5], list[6]
 	for i := 0; i < 4; i++ {
-		if list[i].Harness == "codex" || list[i].Status.State != server.SessionIdle {
+		if list[i].Harness == "codex" || list[i].Status.State != wire.SessionIdle {
 			t.Errorf("session %d = %s/%s, want an idle Claude session", i, list[i].Harness, list[i].Status.State)
 		}
 	}
-	if codex.Harness != "codex" || codex.Status.State != server.SessionIdle || working.Status.State != server.SessionWorking || exited.Status.State != server.SessionExited {
+	if codex.Harness != "codex" || codex.Status.State != wire.SessionIdle || working.Status.State != wire.SessionWorking || exited.Status.State != wire.SessionExited {
 		t.Errorf("new sessions = %s/%s, %s, %s", codex.Harness, codex.Status.State, working.Status.State, exited.Status.State)
 	}
 	if !list[7].Design || !list[8].Design || list[8].Harness != "codex" {
@@ -143,7 +144,7 @@ func TestBlockedScenario_BlockedSessionsSettleBlocked(t *testing.T) {
 		if harness == "" {
 			harness = "claude"
 		}
-		if harness != want || si.Status.State != server.SessionBlocked || si.Failure == nil || si.Failure.Kind != server.FailureKindBlocked {
+		if harness != want || si.Status.State != wire.SessionBlocked || si.Failure == nil || si.Failure.Kind != wire.FailureKindBlocked {
 			t.Errorf("session %d = %s/%s failure=%+v, want a Blocked %s session", 11+i, harness, si.Status.State, si.Failure, want)
 		}
 	}
@@ -157,21 +158,21 @@ func TestBlockedScenario_RemainingStatesExist(t *testing.T) {
 		t.Fatalf("%d sessions, want %d", len(list), commandSessionCount)
 	}
 	for i, want := range []struct{ state, label string }{
-		{server.SessionBlocked, "Agent hit an error"},
-		{server.SessionRateLimited, "Rate limited"},
-		{server.SessionWorking, ""},
+		{wire.SessionBlocked, "Agent hit an error"},
+		{wire.SessionRateLimited, "Rate limited"},
+		{wire.SessionWorking, ""},
 	} {
 		si := list[19+i]
 		if si.Status.State != want.state || (want.label != "" && (si.Failure == nil || si.Failure.Label != want.label)) {
 			t.Errorf("session %d = %s failure=%+v, want %s %q", 19+i, si.Status.State, si.Failure, want.state, want.label)
 		}
 	}
-	if list[1].Status.State != server.SessionWorking {
+	if list[1].Status.State != wire.SessionWorking {
 		t.Errorf("the first Working session = %s", list[7].Status.State)
 	}
-	var queue []server.SessionInfo
+	var queue []wire.SessionInfo
 	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
-		queue = slices.DeleteFunc(r.sessionsOf(t), func(s server.SessionInfo) bool { return !s.Queue })
+		queue = slices.DeleteFunc(r.sessionsOf(t), func(s wire.SessionInfo) bool { return !s.Queue })
 		return len(queue) == 1
 	}) {
 		t.Fatalf("queue agents = %+v, want one", queue)
@@ -189,7 +190,7 @@ func TestBlockedScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 	t.Parallel()
 	r := sharedBlocked(t)
 	list := r.seededSessions(t)
-	var chat server.SessionChatResponse
+	var chat wire.SessionChatResponse
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[8].ID, "--json")), &chat); err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func TestBlockedScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 	if outputs != 1 || !pills["/cost"] || !pills["/model"] {
 		t.Errorf("chat has outputs=%d pills=%v, want one output and the /cost and /model pills", outputs, pills)
 	}
-	var codexChat server.SessionChatResponse
+	var codexChat wire.SessionChatResponse
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[9].ID, "--json")), &codexChat); err != nil {
 		t.Fatal(err)
 	}

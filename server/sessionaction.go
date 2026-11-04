@@ -8,20 +8,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
 )
 
 // runSessionAction clears an Idle session's Actionable and sends its Action
 // in the background, so the run outlives the client that asked for it.
-func (s *Server) runSessionAction(req SessionRequest) (SessionResult, error) {
+func (s *Server) runSessionAction(req wire.SessionRequest) (wire.SessionResult, error) {
 	return s.sendSessionAction(req, false)
 }
 
 // sendSessionAction is runSessionAction; auto marks a send the server made
 // itself, which the runaway guard counts. Any other send is the person's input
 // and resets that count.
-func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult, error) {
+func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	dir, meta, res, err := s.sessionDir(req.ID)
@@ -29,16 +31,16 @@ func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult
 		return res, err
 	}
 	if st := meta.info().Status; !st.Promptable() {
-		return sessionRefusal(ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
+		return sessionRefusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
 	}
 	action := meta.Actionable.Action
 	if len(action) == 0 {
-		return sessionRefusal(ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
+		return sessionRefusal(wire.ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
 	}
 	if res, refused := s.handoffRefusal(meta, action); refused {
 		return res, nil
 	}
-	meta.Actionable = SessionActionable{}
+	meta.Actionable = wire.SessionActionable{}
 	if auto {
 		meta.AutoSends++
 	} else {
@@ -46,12 +48,12 @@ func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult
 		meta.AutoSends = 0
 	}
 	if err := writeSessionMeta(dir, meta); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
-	s.events.publish(EventSessionChanged, req.ID)
+	s.events.publish(wire.EventSessionChanged, req.ID)
 	s.startContinue(dir, meta, "Action", action)
 	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // actionRun follows the session's status on its own watch, not the saved
@@ -163,7 +165,7 @@ func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func
 	}()
 	run := &actionRun{
 		actionRunOpts: opts,
-		s:             s, dir: dir, holder: c, msgs: msgs, state: SessionIdle,
+		s:             s, dir: dir, holder: c, msgs: msgs, state: wire.SessionIdle,
 		started: cmp.Or(s.cfg.ActionStepStartTimeout, DefaultActionStepStartTimeout),
 		settle:  cmp.Or(s.cfg.ActionSlashSettle, DefaultActionSlashSettle),
 	}
@@ -263,7 +265,7 @@ func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal str
 		if err := r.apply(msg, ok); err != nil {
 			return false, "", err
 		}
-		if r.state == SessionBlocked {
+		if r.state == wire.SessionBlocked {
 			return false, "", errWentBlocked
 		}
 		return false, "", nil
@@ -328,13 +330,13 @@ func (r *actionRun) waitForSlash() (string, error) {
 // promptable reports whether the session waits for the person, as
 // SessionStatus.Promptable does.
 func (r *actionRun) promptable() bool {
-	return SessionStatus{State: r.state, Background: r.background}.Promptable()
+	return wire.SessionStatus{State: r.state, Background: r.background}.Promptable()
 }
 
 // turnRunning reports whether a turn is running: Working, but not a finished
 // turn that only left a background task.
 func (r *actionRun) turnRunning() bool {
-	return r.state == SessionWorking && !r.background
+	return r.state == wire.SessionWorking && !r.background
 }
 
 func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {

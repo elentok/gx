@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -51,7 +53,7 @@ func TestDesignsOpen_NewDesignJSON(t *testing.T) {
 	for name, tc := range map[string]struct {
 		slug   string
 		reason string
-	}{"started": {"fresh-idea", ""}, "bad slug": {"Bad Slug", server.ReasonSessionBadRequest}} {
+	}{"started": {"fresh-idea", ""}, "bad slug": {"Bad Slug", wire.ReasonSessionBadRequest}} {
 		req, err := designOpenRequest(tc.slug, "an idea", "proj", false)
 		if err != nil {
 			t.Fatal(err)
@@ -60,7 +62,7 @@ func TestDesignsOpen_NewDesignJSON(t *testing.T) {
 		if err := runDesignsOpen(context.Background(), h.Client, &out, true, req); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		var res server.SessionResult
+		var res wire.SessionResult
 		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 			t.Fatalf("%s: output %q: %v", name, out.String(), err)
 		}
@@ -157,8 +159,8 @@ func TestDesignsOpen_JSON(t *testing.T) {
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 
-	var first, second server.SessionResult
-	for _, res := range []*server.SessionResult{&first, &second} {
+	var first, second wire.SessionResult
+	for _, res := range []*wire.SessionResult{&first, &second} {
 		var out bytes.Buffer
 		if err := runDesignsOpen(context.Background(), h.Client, &out, true, server.DesignOpenRequest{Epic: "proj:map"}); err != nil {
 			t.Fatal(err)

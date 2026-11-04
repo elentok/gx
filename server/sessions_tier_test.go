@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestSessionCreate_TierDefaultsToWorker(t *testing.T) {
@@ -17,7 +17,7 @@ func TestSessionCreate_TierDefaultsToWorker(t *testing.T) {
 
 func TestSessionCreate_TierIsSavedAndResumeKeepsIt(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, _ := startFakeSessionWith(t, server.CreateSessionRequest{Tier: "strongest"})
+	h, ctx, evs, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{Tier: "strongest"})
 	if tier := readMeta(t, h, id)["tier"]; tier != "strongest" {
 		t.Fatalf("meta tier = %v, want strongest", tier)
 	}
@@ -33,8 +33,8 @@ func TestSessionCreate_TierIsSavedAndResumeKeepsIt(t *testing.T) {
 func TestSessionCreate_UnknownTierIsRefused(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Tier: "huge"})
-	if err != nil || !res.Refused || res.Reason != server.ReasonSessionBadRequest {
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Tier: "huge"})
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionBadRequest {
 		t.Errorf("create = %+v, %v; want a bad-request refusal", res, err)
 	}
 }

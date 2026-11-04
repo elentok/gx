@@ -11,9 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -24,11 +25,11 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	dir := t.TempDir()
 
 	var out bytes.Buffer
-	req := server.CreateSessionRequest{Project: "proj", Dir: dir, Name: "spike", Harness: string(agentfake.HarnessKind)}
+	req := wire.CreateSessionRequest{Project: "proj", Dir: dir, Name: "spike", Harness: string(agentfake.HarnessKind)}
 	if err := runAgentsCreate(ctx, h.Client, &out, true, req); err != nil {
 		t.Fatal(err)
 	}
-	var created server.SessionResult
+	var created wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &created); err != nil {
 		t.Fatalf("create output %q: %v", out.String(), err)
 	}
@@ -40,7 +41,7 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	if err := runAgentsList(ctx, h.Client, &out, true); err != nil {
 		t.Fatal(err)
 	}
-	var listed []server.SessionInfo
+	var listed []wire.SessionInfo
 	if err := json.Unmarshal(out.Bytes(), &listed); err != nil {
 		t.Fatalf("list output %q: %v", out.String(), err)
 	}
@@ -49,12 +50,12 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	}
 
 	out.Reset()
-	if err := runAgentsCreate(ctx, h.Client, &out, true, server.CreateSessionRequest{Dir: dir}); err != nil {
+	if err := runAgentsCreate(ctx, h.Client, &out, true, wire.CreateSessionRequest{Dir: dir}); err != nil {
 		t.Fatal(err)
 	}
-	var refused server.SessionResult
-	if err := json.Unmarshal(out.Bytes(), &refused); err != nil || !refused.Refused || refused.Reason != server.ReasonSessionBadRequest {
-		t.Errorf("create without project = %s, want refused %s", out.String(), server.ReasonSessionBadRequest)
+	var refused wire.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &refused); err != nil || !refused.Refused || refused.Reason != wire.ReasonSessionBadRequest {
+		t.Errorf("create without project = %s, want refused %s", out.String(), wire.ReasonSessionBadRequest)
 	}
 }
 
@@ -62,7 +63,7 @@ func TestAgentsChat_JSON(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -70,7 +71,7 @@ func TestAgentsChat_JSON(t *testing.T) {
 	if err := runAgentsChat(ctx, h.Client, &out, true, false, res.Session.ID); err != nil {
 		t.Fatal(err)
 	}
-	var chat server.SessionChatResponse
+	var chat wire.SessionChatResponse
 	if err := json.Unmarshal(out.Bytes(), &chat); err != nil {
 		t.Fatalf("chat output %q: %v", out.String(), err)
 	}
@@ -83,7 +84,7 @@ func TestAgentsScreen_JSON(t *testing.T) {
 	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -91,7 +92,7 @@ func TestAgentsScreen_JSON(t *testing.T) {
 	if err := runAgentsSessionScreen(ctx, h.Client, &out, true, res.Session.ID); err != nil {
 		t.Fatal(err)
 	}
-	var screen server.SessionScreenResponse
+	var screen wire.SessionScreenResponse
 	if err := json.Unmarshal(out.Bytes(), &screen); err != nil || screen.Rows == nil {
 		t.Errorf("screen output %q: rows %v, %v; want a rows array", out.String(), screen.Rows, err)
 	}
@@ -103,7 +104,7 @@ func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.CreateSessionRequest
+	var got wire.CreateSessionRequest
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/sessions/create" {
 			http.NotFound(w, r)
@@ -112,7 +113,7 @@ func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
 			t.Error(err)
 		}
-		_ = json.NewEncoder(w).Encode(server.SessionResult{Session: &server.SessionInfo{ID: "s1", Name: got.Worktree}})
+		_ = json.NewEncoder(w).Encode(wire.SessionResult{Session: &wire.SessionInfo{ID: "s1", Name: got.Worktree}})
 	})}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
@@ -127,7 +128,7 @@ func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
 	if got.Worktree != "feat" || got.Prompt != "fix the bug" || got.Dir != "" {
 		t.Errorf("request = %+v, want worktree and prompt with no dir", got)
 	}
-	var res server.SessionResult
+	var res wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.Session == nil || res.Session.ID != "s1" {
 		t.Errorf("output = %q, %v; want the created session as JSON", out.String(), err)
 	}
@@ -139,12 +140,12 @@ func TestAgentsCreateCmd_Tier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.CreateSessionRequest
+	var got wire.CreateSessionRequest
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
 			t.Error(err)
 		}
-		_ = json.NewEncoder(w).Encode(server.SessionResult{Session: &server.SessionInfo{ID: "s1"}})
+		_ = json.NewEncoder(w).Encode(wire.SessionResult{Session: &wire.SessionInfo{ID: "s1"}})
 	})}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
@@ -184,12 +185,12 @@ func TestAgentsCreateCmd_HarnessIsEmptyUnlessGiven(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got server.CreateSessionRequest
+	var got wire.CreateSessionRequest
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
 			t.Error(err)
 		}
-		_ = json.NewEncoder(w).Encode(server.SessionResult{Session: &server.SessionInfo{ID: "s1"}})
+		_ = json.NewEncoder(w).Encode(wire.SessionResult{Session: &wire.SessionInfo{ID: "s1"}})
 	})}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
@@ -214,18 +215,18 @@ func TestAgentsCreateCmd_HarnessIsEmptyUnlessGiven(t *testing.T) {
 func TestAgentActionable(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
-	created, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	created, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || created.Session == nil {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	client := func() (*apiclient.Client, error) { return h.Client, nil }
 
 	var out bytes.Buffer
-	req := server.MarkActionableRequest{ID: created.Session.ID, Reason: "review ready", Action: []string{"/review"}}
+	req := wire.MarkActionableRequest{ID: created.Session.ID, Reason: "review ready", Action: []string{"/review"}}
 	if err := runAgentActionable(ctx, client, &out, true, req); err != nil {
 		t.Fatal(err)
 	}
-	var res server.SessionResult
+	var res wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)
 	}
@@ -238,7 +239,7 @@ func TestAgentActionable(t *testing.T) {
 		t.Error("outside a session the server was called")
 		return h.Client, nil
 	}
-	if err := runAgentActionable(ctx, noServer, &out, false, server.MarkActionableRequest{Reason: "x"}); err != nil || out.Len() == 0 {
+	if err := runAgentActionable(ctx, noServer, &out, false, wire.MarkActionableRequest{Reason: "x"}); err != nil || out.Len() == 0 {
 		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
 	}
 }
@@ -246,7 +247,7 @@ func TestAgentActionable(t *testing.T) {
 func TestAgentActionable_NoServerInSession(t *testing.T) {
 	client := func() (*apiclient.Client, error) { return apiclient.New(filepath.Join(shortTempDir(t), "a.sock")), nil }
 	var out bytes.Buffer
-	req := server.MarkActionableRequest{ID: "s1", Reason: "x"}
+	req := wire.MarkActionableRequest{ID: "s1", Reason: "x"}
 	if err := runAgentActionable(context.Background(), client, &out, false, req); err != nil {
 		t.Errorf("no server = %q, %v; want success", out.String(), err)
 	}
@@ -255,17 +256,17 @@ func TestAgentActionable_NoServerInSession(t *testing.T) {
 func TestAgentLink(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
-	created, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	created, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || created.Session == nil {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	client := func() (*apiclient.Client, error) { return h.Client, nil }
 
 	var out bytes.Buffer
-	if err := runAgentLink(ctx, client, &out, true, server.LinkSessionRequest{ID: created.Session.ID, Ticket: "auth/03"}); err != nil {
+	if err := runAgentLink(ctx, client, &out, true, wire.LinkSessionRequest{ID: created.Session.ID, Ticket: "auth/03"}); err != nil {
 		t.Fatal(err)
 	}
-	var res server.SessionResult
+	var res wire.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)
 	}
@@ -278,14 +279,14 @@ func TestAgentLink(t *testing.T) {
 		t.Error("outside a session the server was called")
 		return h.Client, nil
 	}
-	if err := runAgentLink(ctx, noServer, &out, false, server.LinkSessionRequest{Ticket: "x"}); err != nil || out.Len() == 0 {
+	if err := runAgentLink(ctx, noServer, &out, false, wire.LinkSessionRequest{Ticket: "x"}); err != nil || out.Len() == 0 {
 		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
 	}
 }
 
 func TestPrintSessionResult_PrintsTheRebaseNoteOnlyWhenSet(t *testing.T) {
 	var out bytes.Buffer
-	res := server.SessionResult{Session: &server.SessionInfo{ID: "s1"}}
+	res := wire.SessionResult{Session: &wire.SessionInfo{ID: "s1"}}
 	if err := printSessionResult(&out, false, res, nil); err != nil || out.String() != "s1\n" {
 		t.Errorf("no note = %q, %v; want just the id", out.String(), err)
 	}
@@ -324,7 +325,7 @@ func TestAgentStep_OutsideASessionIsANote(t *testing.T) {
 		return nil, nil
 	}
 	var out bytes.Buffer
-	if err := runAgentStep(context.Background(), noServer, &out, false, server.ReportStepRequest{Step: "spec"}); err != nil || out.Len() == 0 {
+	if err := runAgentStep(context.Background(), noServer, &out, false, wire.ReportStepRequest{Step: "spec"}); err != nil || out.Len() == 0 {
 		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
 	}
 }
@@ -332,26 +333,26 @@ func TestAgentStep_OutsideASessionIsANote(t *testing.T) {
 func TestAgentsStopAndRemove_JSON(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
-	created, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	created, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || created.Session == nil {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	id := created.Session.ID
 
-	run := func(write sessionWriteFunc) server.SessionResult {
+	run := func(write sessionWriteFunc) wire.SessionResult {
 		t.Helper()
 		var out bytes.Buffer
 		if err := runAgentsSessionWrite(ctx, h.Client, &out, true, write, id); err != nil {
 			t.Fatal(err)
 		}
-		var res server.SessionResult
+		var res wire.SessionResult
 		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 			t.Fatalf("output %q: %v", out.String(), err)
 		}
 		return res
 	}
-	if res := run((*apiclient.Client).RemoveSession); !res.Refused || res.Reason != server.ReasonSessionLive {
-		t.Errorf("remove live = %+v, want refused %s", res, server.ReasonSessionLive)
+	if res := run((*apiclient.Client).RemoveSession); !res.Refused || res.Reason != wire.ReasonSessionLive {
+		t.Errorf("remove live = %+v, want refused %s", res, wire.ReasonSessionLive)
 	}
 	if res := run((*apiclient.Client).StopSession); res.Refused || res.Session == nil || !res.Session.Stopped {
 		t.Errorf("stop = %+v, want the stopped session", res)

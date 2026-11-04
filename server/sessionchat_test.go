@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -28,7 +30,7 @@ func startChatSession(t *testing.T, kind string) (*servertest.Harness, context.C
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: kind})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: kind})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -136,7 +138,7 @@ func TestSessionChat_OnlyTheNewestConversation(t *testing.T) {
 	if err := agentfake.SendProgramControl(readMeta(t, h, id)["conversation_id"].(string), agentfake.Control{Action: agentfake.ActionConversation, ConversationID: "conv-2"}); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(server.SessionInfo) bool { return readMeta(t, h, id)["conversation_id"] == "conv-2" })
+	waitForSession(ctx, t, h, evs, id, func(wire.SessionInfo) bool { return readMeta(t, h, id)["conversation_id"] == "conv-2" })
 	writeTranscript(t, filepath.Join(filepath.Dir(path), "conv-2.jsonl"),
 		`{"type":"assistant","uuid":"new","timestamp":"2026-01-01T10:01:00Z","message":{"content":[{"type":"text","text":"after clear"}]}}`)
 	got, err := h.Client.SessionChat(ctx, id)
@@ -168,7 +170,7 @@ func startCodexChatSession(t *testing.T) (*servertest.Harness, context.Context, 
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), servertest.WithChatPollInterval(chatPollTestInterval), servertest.WithEnv("CODEX_HOME="+codexHome))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

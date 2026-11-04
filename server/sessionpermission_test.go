@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
@@ -19,10 +21,10 @@ func (f promptFixture) permissionRead(t *testing.T, id string) (int, string) {
 	return webDoCookie(t, http.MethodGet, f.base+"/v1/sessions/permission?session="+id, f.ck)
 }
 
-func (f promptFixture) wantPermission(t *testing.T, want server.SessionPermissionResponse) {
+func (f promptFixture) wantPermission(t *testing.T, want wire.SessionPermissionResponse) {
 	t.Helper()
 	code, body := f.permissionRead(t, f.id)
-	var got server.SessionPermissionResponse
+	var got wire.SessionPermissionResponse
 	if err := json.Unmarshal([]byte(body), &got); err != nil || code != http.StatusOK {
 		t.Fatalf("permission = %d %q (%v)", code, body, err)
 	}
@@ -41,13 +43,13 @@ func TestSessionPermission_ClaudeDialogs(t *testing.T) {
 	bash := agentfake.BashPermissionDialog("ls")
 	for name, tc := range map[string]struct {
 		rows []string
-		want server.SessionPermissionResponse
+		want wire.SessionPermissionResponse
 	}{
-		"bash": {bash, server.SessionPermissionResponse{Kind: "prompt", Text: "Bash command\nls", RequestID: claudeui.ReadDialog(bash).ID}},
-		"plan": {plan, server.SessionPermissionResponse{Kind: "plan", Text: "Ready to code?\nthe plan", RequestID: claudeui.ReadDialog(plan).ID}},
+		"bash": {bash, wire.SessionPermissionResponse{Kind: "prompt", Text: "Bash command\nls", RequestID: claudeui.ReadDialog(bash).ID}},
+		"plan": {plan, wire.SessionPermissionResponse{Kind: "plan", Text: "Ready to code?\nthe plan", RequestID: claudeui.ReadDialog(plan).ID}},
 		"unreadable": {
 			[]string{"something no one can read"},
-			server.SessionPermissionResponse{Kind: "unreadable"},
+			wire.SessionPermissionResponse{Kind: "unreadable"},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -67,7 +69,7 @@ func TestSessionPermission_CodexHookRequestGivesItsText(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
-	f.wantPermission(t, server.SessionPermissionResponse{Kind: "prompt", Text: "rg foo", RequestID: "req-1"})
+	f.wantPermission(t, wire.SessionPermissionResponse{Kind: "prompt", Text: "rg foo", RequestID: "req-1"})
 }
 
 func TestSessionPermission_CodexScreenOnly(t *testing.T) {
@@ -75,7 +77,7 @@ func TestSessionPermission_CodexScreenOnly(t *testing.T) {
 	f := startCodexPermissionSession(t, true)
 	f.blockCodex(t, "rg foo")
 	code, body := f.permissionRead(t, f.id)
-	var got server.SessionPermissionResponse
+	var got wire.SessionPermissionResponse
 	if err := json.Unmarshal([]byte(body), &got); err != nil || code != http.StatusOK {
 		t.Fatalf("permission = %d %q (%v)", code, body, err)
 	}
@@ -87,11 +89,11 @@ func TestSessionPermission_CodexScreenOnly(t *testing.T) {
 func TestSessionPermission_Refusals(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	seedSession(t, f, "seeded-exited", server.SessionExited)
+	seedSession(t, f, "seeded-exited", wire.SessionExited)
 	for name, tc := range map[string]struct{ id, want string }{
 		"not blocked": {f.id, server.ReasonNotBlocked},
-		"exited":      {"seeded-exited", server.ReasonSessionNotLive},
-		"unknown":     {"nope", server.ReasonSessionUnknown},
+		"exited":      {"seeded-exited", wire.ReasonSessionNotLive},
+		"unknown":     {"nope", wire.ReasonSessionUnknown},
 	} {
 		t.Run(name, func(t *testing.T) {
 			code, body := f.permissionRead(t, tc.id)
@@ -106,7 +108,7 @@ func TestSessionPermission_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	code, body := f.permissionRead(t, "queue-agent-x")
-	if code == http.StatusOK || reasonOf(t, body) != server.ReasonSessionReadOnly {
-		t.Errorf("permission = %d %s, want refusal %s", code, body, server.ReasonSessionReadOnly)
+	if code == http.StatusOK || reasonOf(t, body) != wire.ReasonSessionReadOnly {
+		t.Errorf("permission = %d %s, want refusal %s", code, body, wire.ReasonSessionReadOnly)
 	}
 }

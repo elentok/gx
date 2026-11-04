@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -33,8 +35,8 @@ type FixAgentRequest struct {
 
 // FixAgentResult is the session result plus whether remote control was applied.
 type FixAgentResult struct {
-	SessionResult `tstype:",extends"`
-	RemoteControl bool `json:"remote_control"`
+	wire.SessionResult `tstype:",extends"`
+	RemoteControl      bool `json:"remote_control"`
 }
 
 func fixAgentRefusal(reason, msg string) FixAgentResult {
@@ -120,9 +122,9 @@ func (s *Server) startFixProjectAgent(project string) (FixAgentResult, error) {
 	}
 	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, project)
 	if checkout == "" {
-		return fixAgentRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", project)), nil
+		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", project)), nil
 	}
-	cs := CreateSessionRequest{
+	cs := wire.CreateSessionRequest{
 		Project:    project,
 		Dir:        checkout,
 		Name:       FixAgentName(project),
@@ -131,8 +133,8 @@ func (s *Server) startFixProjectAgent(project string) (FixAgentResult, error) {
 		Tier:       ralphloop.TierStrongest,
 	}
 	res, err := s.createSession(cs, sessionCtx{})
-	if res.Refused && res.Reason == ReasonSessionNameTaken {
-		return fixAgentRefusal(ReasonSessionNameTaken, "an agent is already fixing "+project), nil
+	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
+		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+project), nil
 	}
 	return FixAgentResult{SessionResult: res}, err
 }
@@ -149,7 +151,7 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 	}
 	ref, ok, err := s.findTicket(req.Address)
 	if err != nil {
-		return fixAgentRefusal(ReasonSessionBadRequest, err.Error()), nil
+		return fixAgentRefusal(wire.ReasonSessionBadRequest, err.Error()), nil
 	}
 	if !ok {
 		return fixAgentRefusal(ReasonFixUnknownTicket, fmt.Sprintf("no ticket %s", req.Address)), nil
@@ -177,10 +179,10 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 	}
 	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, ref.addr.Project)
 	if checkout == "" {
-		return fixAgentRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.addr.Project)), nil
+		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.addr.Project)), nil
 	}
 	settings := s.settings.Load()
-	cs := CreateSessionRequest{
+	cs := wire.CreateSessionRequest{
 		Project:    ref.addr.Project,
 		Dir:        checkout,
 		Name:       FixAgentName(addr),
@@ -194,8 +196,8 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 		sc.remoteControl = addr
 	}
 	res, err := s.createSession(cs, sc)
-	if res.Refused && res.Reason == ReasonSessionNameTaken {
-		return fixAgentRefusal(ReasonSessionNameTaken, "an agent is already fixing "+addr), nil
+	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
+		return fixAgentRefusal(wire.ReasonSessionNameTaken, "an agent is already fixing "+addr), nil
 	}
 	return FixAgentResult{SessionResult: res, RemoteControl: remote && !res.Refused && err == nil}, err
 }

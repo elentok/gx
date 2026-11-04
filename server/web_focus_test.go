@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -80,7 +82,7 @@ func (f *webFocus) report(t *testing.T, client string, focused bool, session str
 func (f *webFocus) reportOnceConnected(t *testing.T, client string, focused bool, session string) {
 	t.Helper()
 	waitFor(t, func() bool {
-		return !strings.Contains(f.report(t, client, focused, session), server.ReasonFocusNotConnected)
+		return !strings.Contains(f.report(t, client, focused, session), wire.ReasonFocusNotConnected)
 	})
 }
 
@@ -89,7 +91,7 @@ func TestWebFocus_VisibleTabSilencesBannerAndAFKChat(t *testing.T) {
 	f := startWebFocus(t)
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", true, f.id)
-	f.step(agentfake.Control{State: "done"}, server.SessionIdle)
+	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	if posts := f.chat.postsAfterAlert(f.h, f.started); len(posts) != 0 {
 		t.Errorf("chat posts = %q, want none", posts)
 	}
@@ -103,7 +105,7 @@ func TestWebFocus_HiddenTabSilencesNothing(t *testing.T) {
 	f := startWebFocus(t)
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", false, f.id)
-	f.step(agentfake.Control{State: "done"}, server.SessionIdle)
+	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	if posts := f.chat.postsAfterAlert(f.h, f.started); len(posts) != 1 {
 		t.Errorf("chat posts = %q, want one", posts)
 	}
@@ -117,8 +119,8 @@ func TestWebFocus_TUIStillSilencesBannerOnly(t *testing.T) {
 	f := startWebFocus(t)
 	ctx := t.Context()
 	openTUI(ctx, t, f.h, "tui-1")
-	reportFocus(ctx, t, f.h, server.FocusReport{Client: "tui-1", Focused: true, Session: f.id})
-	f.step(agentfake.Control{State: "done"}, server.SessionIdle)
+	reportFocus(ctx, t, f.h, wire.FocusReport{Client: "tui-1", Focused: true, Session: f.id})
+	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	if posts := f.chat.postsAfterAlert(f.h, f.started); len(posts) != 1 {
 		t.Errorf("chat posts = %q, want one", posts)
 	}
@@ -132,7 +134,7 @@ func TestWebFocus_ClickTargetStaysOnLastFocusedTUI(t *testing.T) {
 	f := startWebFocus(t)
 	ctx := t.Context()
 	openTUI(ctx, t, f.h, "tui-1")
-	reportFocus(ctx, t, f.h, server.FocusReport{Client: "tui-1", Focused: true})
+	reportFocus(ctx, t, f.h, wire.FocusReport{Client: "tui-1", Focused: true})
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", true, "")
 
@@ -140,7 +142,7 @@ func TestWebFocus_ClickTargetStaysOnLastFocusedTUI(t *testing.T) {
 	if err != nil || res.Refused || res.Client != "tui-1" {
 		t.Fatalf("focus = %+v, %v; want target tui-1", res, err)
 	}
-	f.step(agentfake.Control{State: "done"}, server.SessionIdle)
+	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	banners, _ := waitAlerts(f.h, 1)
 	if len(banners) != 1 || banners[0].Execute != "gx agents focus "+f.id {
 		t.Errorf("banners = %+v, want click to focus the TUI", banners)
@@ -150,8 +152,8 @@ func TestWebFocus_ClickTargetStaysOnLastFocusedTUI(t *testing.T) {
 func TestWebFocus_RefusedWithoutAnOpenStream(t *testing.T) {
 	t.Parallel()
 	f := startWebFocus(t)
-	if res := f.report(t, "web-1", true, f.id); !strings.Contains(res, server.ReasonFocusNotConnected) {
-		t.Errorf("result = %s, want %s", res, server.ReasonFocusNotConnected)
+	if res := f.report(t, "web-1", true, f.id); !strings.Contains(res, wire.ReasonFocusNotConnected) {
+		t.Errorf("result = %s, want %s", res, wire.ReasonFocusNotConnected)
 	}
 }
 
@@ -159,7 +161,7 @@ func TestWebFocus_FocusedReportMarksSessionRead(t *testing.T) {
 	t.Parallel()
 	f := startWebFocus(t)
 	ctx := t.Context()
-	f.step(agentfake.Control{State: "done"}, server.SessionIdle)
+	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
 	if !sessionUnread(ctx, t, f.h, f.id) {
 		t.Fatal("session not unread after done")
 	}

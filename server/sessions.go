@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
@@ -29,49 +31,12 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// EventSessionChanged announces a new or changed interactive session; its
-// Address is the session id.
-const EventSessionChanged = "session-changed"
-
-// Refusal reasons of the interactive-session writes.
-const (
-	ReasonSessionBadRequest     = "bad-request"
-	ReasonSessionUnknownHarness = "unknown-harness"
-	ReasonSessionHarnessMissing = "harness-missing"
-	ReasonSessionUnknown        = "unknown-session"
-	ReasonSessionLive           = "session-live"
-	ReasonSessionNotLive        = "session-not-live"
-	ReasonSessionNotIdle        = "session-not-idle"
-	ReasonSessionNoAction       = "no-action"
-	ReasonSessionDirGone        = "dir-gone"
-	ReasonSessionNoResume       = "no-resume"
-	ReasonSessionNotDesign      = "not-design-session"
-	ReasonSessionNameTaken      = "name-taken"
-	ReasonSessionQueue          = "queue-session"
-)
-
 // errSessionNameTaken is saveNewSession's refusal of a unique name that a live
 // session already has.
 var errSessionNameTaken = errors.New("a live session already has this name")
 
 // sessionMetaFile holds a session's meta in its state dir.
 const sessionMetaFile = "meta.json"
-
-// Session states, as SessionStatus.State.
-const (
-	SessionStarting    = "starting"
-	SessionWorking     = "working"
-	SessionIdle        = "idle"
-	SessionBlocked     = "blocked"
-	SessionRateLimited = "rate-limited"
-	SessionExited      = "exited"
-)
-
-// How an Exited session ended, as SessionInfo.Exit.
-const (
-	SessionExitClean   = "clean"
-	SessionExitCrashed = "crashed"
-)
 
 // holderDialTimeout bounds how long a new session's holder has to open its
 // socket before the session counts as crashed.
@@ -82,29 +47,29 @@ const holderDialTimeout = 10 * time.Second
 const sessionStopTimeout = 15 * time.Second
 
 // sessionStatusOf maps a Watch's status to a Session status.
-func sessionStatusOf(st harness.Status) SessionStatus {
-	out := SessionStatus{Kind: string(st.Blocked), Message: st.Message, Background: st.Background}
+func sessionStatusOf(st harness.Status) wire.SessionStatus {
+	out := wire.SessionStatus{Kind: string(st.Blocked), Message: st.Message, Background: st.Background}
 	switch st.State {
 	case harness.Working:
-		out.State = SessionWorking
+		out.State = wire.SessionWorking
 	case harness.Idle:
-		out.State = SessionIdle
+		out.State = wire.SessionIdle
 	case harness.Blocked:
-		out.State = SessionBlocked
+		out.State = wire.SessionBlocked
 	case harness.RateLimited:
-		out.State = SessionRateLimited
+		out.State = wire.SessionRateLimited
 	default:
-		out.State = SessionStarting
+		out.State = wire.SessionStarting
 	}
 	return out
 }
 
-func sessionRefusal(reason, msg string) SessionResult {
-	return SessionResult{Refused: true, Reason: reason, Message: msg}
+func sessionRefusal(reason, msg string) wire.SessionResult {
+	return wire.SessionResult{Refused: true, Reason: reason, Message: msg}
 }
 
 func (s *Server) sessionCreateWrite(w http.ResponseWriter, r *http.Request) {
-	var req CreateSessionRequest
+	var req wire.CreateSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -128,17 +93,17 @@ func (s *Server) sessionsRead(w http.ResponseWriter, _ *http.Request) {
 
 // createSession makes the session's state dir, writes its meta and starts its
 // holder. It writes no ticket status and takes no slot or permit.
-func (s *Server) createSession(req CreateSessionRequest, sc sessionCtx) (SessionResult, error) {
+func (s *Server) createSession(req wire.CreateSessionRequest, sc sessionCtx) (wire.SessionResult, error) {
 	if req.Project == "" || (req.Dir == "") == (req.Worktree == "") {
-		return sessionRefusal(ReasonSessionBadRequest, "a session needs a project and either a dir or a new worktree"), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, "a session needs a project and either a dir or a new worktree"), nil
 	}
 	if req.Worktree == "" {
 		if fi, err := os.Stat(req.Dir); err != nil || !fi.IsDir() {
-			return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s does not exist", req.Dir)), nil
+			return sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("dir %s does not exist", req.Dir)), nil
 		}
 	}
 	if req.Tier != "" && !req.Tier.Valid() {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("unknown tier %q (want light, worker or strongest)", req.Tier)), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("unknown tier %q (want light, worker or strongest)", req.Tier)), nil
 	}
 	from := "the request"
 	if req.Harness == "" {
@@ -146,19 +111,19 @@ func (s *Server) createSession(req CreateSessionRequest, sc sessionCtx) (Session
 		from = s.defaultHarnessSource(req.Project)
 	}
 	if _, err := harness.Lookup(agentrunner.Kind(req.Harness)); err != nil {
-		return sessionRefusal(ReasonSessionUnknownHarness, err.Error()), nil
+		return sessionRefusal(wire.ReasonSessionUnknownHarness, err.Error()), nil
 	}
 	if msg := s.interactiveMissingReason(req.Harness, from); msg != "" {
-		return sessionRefusal(ReasonSessionHarnessMissing, msg), nil
+		return sessionRefusal(wire.ReasonSessionHarnessMissing, msg), nil
 	}
 	conv, err := nativerunner.NewUUID()
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	if req.Worktree != "" {
 		dir, refusal := s.addSessionWorktree(req.Project, req.Worktree)
 		if refusal != "" {
-			return sessionRefusal(ReasonSessionBadRequest, refusal), nil
+			return sessionRefusal(wire.ReasonSessionBadRequest, refusal), nil
 		}
 		req.Dir = dir
 		if req.Name == "" {
@@ -187,10 +152,10 @@ func (s *Server) createSession(req CreateSessionRequest, sc sessionCtx) (Session
 	s.applyTier(&meta, tier)
 	dir, err := s.saveNewSession(&meta, req.UniqueName)
 	if errors.Is(err, errSessionNameTaken) {
-		return sessionRefusal(ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
+		return sessionRefusal(wire.ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
 	}
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	if meta.Design && meta.Ticket != "" {
 		// Cosmetic: a failed stamp must not fail the session.
@@ -207,12 +172,12 @@ func (s *Server) createSession(req CreateSessionRequest, sc sessionCtx) (Session
 	}
 	s.sessionWatches.metaMu.Unlock()
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	s.sessionWatches.start(func() { s.watchSession(dir, id, 0, time.Time{}, false) })
-	s.events.publish(EventSessionChanged, id)
+	s.events.publish(wire.EventSessionChanged, id)
 	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // applyTier sets the session's tier and the model and effort it resolves to for
@@ -304,8 +269,8 @@ func (s *Server) saveNewSession(meta *sessionMeta, unique bool) (string, error) 
 		}
 		if meta.Name == "" {
 			meta.Name, meta.AutoName = freeSessionName(meta.Project, list), true
-		} else if slices.ContainsFunc(list, func(si SessionInfo) bool {
-			return si.Name == meta.Name && si.Status.State != SessionExited
+		} else if slices.ContainsFunc(list, func(si wire.SessionInfo) bool {
+			return si.Name == meta.Name && si.Status.State != wire.SessionExited
 		}) {
 			return "", errSessionNameTaken
 		}
@@ -318,7 +283,7 @@ func (s *Server) saveNewSession(meta *sessionMeta, unique bool) (string, error) 
 	return dir, writeSessionMeta(dir, *meta)
 }
 
-func freeSessionName(project string, list []SessionInfo) string {
+func freeSessionName(project string, list []wire.SessionInfo) string {
 	taken := map[string]bool{}
 	for _, s := range list {
 		taken[s.Name] = true
@@ -474,12 +439,12 @@ func hasFlag(args []string, flag string) bool {
 // refuse it and the next server start would auto-resume a conversation that
 // never ran. The caller holds metaMu.
 func (s *Server) endFailedStart(dir string, meta *sessionMeta) {
-	s.recordSessionExit(meta, SessionExitCrashed)
+	s.recordSessionExit(meta, wire.SessionExitCrashed)
 	if err := writeSessionMeta(dir, *meta); err != nil {
 		s.log.Warn("save session meta", "session", meta.ID, "err", err)
 		return
 	}
-	s.events.publish(EventSessionChanged, meta.ID)
+	s.events.publish(wire.EventSessionChanged, meta.ID)
 }
 
 // trustFlag has the holder answer the trust dialog, only for a worktree gx
@@ -505,12 +470,12 @@ func writeSessionMeta(dir string, meta sessionMeta) error {
 
 // listSessions reads every session dir, oldest first. A dir without a
 // readable meta is skipped: it is a create still in flight or a torn one.
-func (s *Server) listSessions() ([]SessionInfo, error) {
+func (s *Server) listSessions() ([]wire.SessionInfo, error) {
 	metas, err := s.listSessionMetas()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]SessionInfo, len(metas))
+	out := make([]wire.SessionInfo, len(metas))
 	for i, m := range metas {
 		out[i] = s.sessionInfo(m)
 	}
@@ -628,7 +593,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 	}
 	recordExit := func(exit string) {
 		if time.Now().Before(crashUntil) {
-			exit = SessionExitCrashed
+			exit = wire.SessionExitCrashed
 		}
 		update(func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) })
 	}
@@ -691,7 +656,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
-				if m.Status.State == SessionExited {
+				if m.Status.State == wire.SessionExited {
 					return false
 				}
 				changed := false
@@ -733,7 +698,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 			})
 			first.noteState(st.State)
 			s.noteFailure(id)
-			chat.setActive(st.State == SessionStarting || st.State == SessionWorking)
+			chat.setActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			// Marked before the Design check reads the transcript.
 			mark, marked := turnMark{}, false
 			if idleEdge {
@@ -763,7 +728,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 					return changed
 				}
 				changed = changed || m.Actionable.Reason != ""
-				m.Actionable = SessionActionable{}
+				m.Actionable = wire.SessionActionable{}
 				return changed
 			})
 		case nativerunner.StreamExit:
@@ -788,9 +753,9 @@ func typeSessionPrompt(dir, prompt string) error {
 
 func sessionExitOf(code int) string {
 	if code == 0 {
-		return SessionExitClean
+		return wire.SessionExitClean
 	}
-	return SessionExitCrashed
+	return wire.SessionExitCrashed
 }
 
 // savedSessionExit is the exit the holder saved before its socket went, for
@@ -799,11 +764,11 @@ func sessionExitOf(code int) string {
 func savedSessionExit(dir string) string {
 	data, err := os.ReadFile(filepath.Join(dir, nativerunner.ExitCodeFile))
 	if err != nil {
-		return SessionExitCrashed
+		return wire.SessionExitCrashed
 	}
 	code, err := strconv.Atoi(strings.TrimSpace(string(data)))
 	if err != nil {
-		return SessionExitCrashed
+		return wire.SessionExitCrashed
 	}
 	return sessionExitOf(code)
 }
@@ -852,23 +817,23 @@ func (s *Server) dialNewHolder(dir string) (*nativerunner.HolderClient, error) {
 // recordSessionExit records the first exit seen and drops an untyped first
 // prompt; a stopped session exits clean whatever the signal left as its code.
 func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
-	if m.Status.State == SessionExited {
+	if m.Status.State == wire.SessionExited {
 		return false
 	}
 	if m.Stopped {
-		exit = SessionExitClean
+		exit = wire.SessionExitClean
 	} else {
 		s.raiseUnread(m)
 		// A Done Design exiting cleanly is expected: no banner.
-		if exit != SessionExitClean || !s.designDone(*m) {
+		if exit != wire.SessionExitClean || !s.designDone(*m) {
 			s.triggerBanner(m.ID, sound.Done, "")
 		}
 	}
 	s.saveConversationTotals(*m, m.ConversationID)
-	m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
-	m.RestoreCrashed = exit == SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < restoreCrashWindow
+	m.Status, m.StatusChangedAt, m.Exit = wire.SessionStatus{State: wire.SessionExited}, time.Now(), exit
+	m.RestoreCrashed = exit == wire.SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < restoreCrashWindow
 	m.FirstPrompt = ""
-	m.Actionable = SessionActionable{}
+	m.Actionable = wire.SessionActionable{}
 	return true
 }
 
@@ -880,9 +845,9 @@ func raisesUnread(from, to string, cancelled bool) bool {
 		return false
 	}
 	switch to {
-	case SessionIdle:
-		return !cancelled && from != SessionStarting
-	case SessionBlocked, SessionRateLimited:
+	case wire.SessionIdle:
+		return !cancelled && from != wire.SessionStarting
+	case wire.SessionBlocked, wire.SessionRateLimited:
 		return true
 	}
 	return false
@@ -897,13 +862,13 @@ func (s *Server) raiseUnread(m *sessionMeta) {
 
 // sessionWrite adapts a session verb to a POST handler. Refusals are results,
 // so they answer 200.
-func sessionWrite(do func(SessionRequest) (SessionResult, error)) http.HandlerFunc {
+func sessionWrite(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 	return sessionWriteAs(nil, do)
 }
 
-func sessionWriteAs(check func(SessionRequest) (SessionResult, error), do func(SessionRequest) (SessionResult, error)) http.HandlerFunc {
+func sessionWriteAs(check func(wire.SessionRequest) (wire.SessionResult, error), do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req SessionRequest
+		var req wire.SessionRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -930,22 +895,22 @@ func sessionWriteAs(check func(SessionRequest) (SessionResult, error), do func(S
 
 // sessionDir resolves a request's session to its state dir and meta, or the
 // refusal for an id that names none.
-func (s *Server) sessionDir(id string) (string, sessionMeta, SessionResult, error) {
+func (s *Server) sessionDir(id string) (string, sessionMeta, wire.SessionResult, error) {
 	if id == "" || filepath.Base(id) != id || strings.HasPrefix(id, ".") {
-		return "", sessionMeta{}, sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("bad session id %q", id)), nil
+		return "", sessionMeta{}, sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("bad session id %q", id)), nil
 	}
 	dir := filepath.Join(s.cfg.SessionsDir, id)
 	meta, err := readSessionMeta(dir)
 	if errors.Is(err, fs.ErrNotExist) {
-		return "", sessionMeta{}, sessionRefusal(ReasonSessionUnknown, fmt.Sprintf("no session %s", id)), nil
+		return "", sessionMeta{}, sessionRefusal(wire.ReasonSessionUnknown, fmt.Sprintf("no session %s", id)), nil
 	}
-	return dir, meta, SessionResult{}, err
+	return dir, meta, wire.SessionResult{}, err
 }
 
 // stopSession marks the session stopped by the person, then has its holder
 // end claude and waits for the holder to save its exit and last screen. It
 // leaves no Unread.
-func (s *Server) stopSession(req SessionRequest) (SessionResult, error) {
+func (s *Server) stopSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	dir, starting, res, err := s.markSessionStopped(req.ID)
 	if res.Refused || err != nil {
 		return res, err
@@ -960,37 +925,37 @@ func (s *Server) stopSession(req SessionRequest) (SessionResult, error) {
 	// below all the same.
 	if c, err := dial(dir); err == nil {
 		if err := c.Stop(); err != nil {
-			return SessionResult{}, fmt.Errorf("stop session %s: %w", req.ID, err)
+			return wire.SessionResult{}, fmt.Errorf("stop session %s: %w", req.ID, err)
 		}
 		waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
 	}
-	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, SessionExitClean) }); err != nil {
-		return SessionResult{}, err
+	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, wire.SessionExitClean) }); err != nil {
+		return wire.SessionResult{}, err
 	}
 	meta, err := readSessionMeta(dir)
 	if err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // markSessionStopped saves Stopped before the holder is asked to stop, so the
 // watch records the exit the stop causes as clean. starting reports the
 // session was still Starting.
-func (s *Server) markSessionStopped(id string) (dir string, starting bool, res SessionResult, err error) {
+func (s *Server) markSessionStopped(id string) (dir string, starting bool, res wire.SessionResult, err error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	dir, meta, res, err := s.sessionDir(id)
 	if res.Refused || err != nil {
 		return "", false, res, err
 	}
-	if meta.Status.State == SessionExited {
-		return "", false, sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has exited", id)), nil
+	if meta.Status.State == wire.SessionExited {
+		return "", false, sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", id)), nil
 	}
 	meta.Stopped = true
-	starting = meta.Status.State == "" || meta.Status.State == SessionStarting
-	return dir, starting, SessionResult{}, writeSessionMeta(dir, meta)
+	starting = meta.Status.State == "" || meta.Status.State == wire.SessionStarting
+	return dir, starting, wire.SessionResult{}, writeSessionMeta(dir, meta)
 }
 
 func waitForFile(path string, timeout time.Duration) {
@@ -1004,22 +969,22 @@ func waitForFile(path string, timeout time.Duration) {
 }
 
 // removeSession deletes an Exited session's state dir, never its Dir.
-func (s *Server) removeSession(req SessionRequest) (SessionResult, error) {
+func (s *Server) removeSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	dir, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if meta.Status.State != SessionExited {
-		return sessionRefusal(ReasonSessionLive, fmt.Sprintf("session %s is live; stop it first", req.ID)), nil
+	if meta.Status.State != wire.SessionExited {
+		return sessionRefusal(wire.ReasonSessionLive, fmt.Sprintf("session %s is live; stop it first", req.ID)), nil
 	}
 	if err := os.RemoveAll(dir); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
-	s.events.publish(EventSessionChanged, req.ID)
+	s.events.publish(wire.EventSessionChanged, req.ID)
 	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // updateSessionMeta applies change to the session's saved meta and, when it
@@ -1044,15 +1009,15 @@ func (s *Server) saveSessionMetaUpdate(dir, id string, change func(*sessionMeta)
 	if err != nil {
 		return meta, false, fmt.Errorf("read session %s meta: %w", id, err)
 	}
-	wasExited := meta.Status.State == SessionExited
+	wasExited := meta.Status.State == wire.SessionExited
 	if !change(&meta) {
 		return meta, false, nil
 	}
 	if err := writeSessionMeta(dir, meta); err != nil {
 		return meta, false, fmt.Errorf("save session %s meta: %w", id, err)
 	}
-	s.events.publish(EventSessionChanged, id)
-	return meta, meta.Design && !wasExited && meta.Status.State == SessionExited, nil
+	s.events.publish(wire.EventSessionChanged, id)
+	return meta, meta.Design && !wasExited && meta.Status.State == wire.SessionExited, nil
 }
 
 // updateSessionMetaOrWarn is updateSessionMeta for background callers, which

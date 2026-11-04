@@ -5,10 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -320,7 +321,7 @@ func TestSwitcher_Placement(t *testing.T) {
 func TestSwitcher_AgentsBadgeIsActionableCount(t *testing.T) {
 	t.Parallel()
 	m, _ := switcherApp(t)
-	m.stream.vm.Sessions = []server.SessionInfo{{ID: "a", Actionable: server.SessionActionable{Reason: "blocked"}}}
+	m.stream.vm.Sessions = []wire.SessionInfo{{ID: "a", Actionable: wire.SessionActionable{Reason: "blocked"}}}
 	m, _ = step(m, ctrlO)
 	if got := m.switcher.picker.Items[7].Badge; got != "1" {
 		t.Fatalf("agents badge = %q, want 1", got)
@@ -345,7 +346,7 @@ func TestSwitcher_Golden(t *testing.T) {
 		{"switcher_no_matches", "zzz"},
 	} {
 		m, _ := switcherApp(t)
-		m.stream.vm.Sessions = []server.SessionInfo{{ID: "a", Actionable: server.SessionActionable{Reason: "blocked"}}}
+		m.stream.vm.Sessions = []wire.SessionInfo{{ID: "a", Actionable: wire.SessionActionable{Reason: "blocked"}}}
 		m, _ = step(m, ctrlO)
 		m = typeText(m, tc.query)
 		assertGolden(t, tc.name, m.renderSwitcher()+"\n")

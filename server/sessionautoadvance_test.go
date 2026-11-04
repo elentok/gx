@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -44,13 +46,13 @@ func TestSessionAutoAdvance_FlipsTheSwitchOnADesignSession(t *testing.T) {
 func TestSessionAutoAdvance_RefusesAPlainAndAnUnknownSession(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	plain, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	plain, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || plain.Session == nil {
 		t.Fatalf("create = %+v, %v", plain, err)
 	}
 	for _, tc := range []struct{ name, id, want string }{
-		{"plain", plain.Session.ID, server.ReasonSessionNotDesign},
-		{"unknown", "nope", server.ReasonSessionUnknown},
+		{"plain", plain.Session.ID, wire.ReasonSessionNotDesign},
+		{"unknown", "nope", wire.ReasonSessionUnknown},
 	} {
 		res, err := f.h.Client.SetAutoAdvance(f.ctx, tc.id, false)
 		if err != nil || !res.Refused || res.Reason != tc.want {
@@ -65,7 +67,7 @@ func TestWebSessions_AutoAdvanceNeedsAFreshTokenOnADesignSession(t *testing.T) {
 	waitForHolder(t, h.SessionsDir+"/"+design)
 	for _, tc := range []struct{ name, id, state, want string }{
 		{"no token", design, "", server.ReasonStale},
-		{"plain session", plain, sessionToken(ctx, t, h, plain), server.ReasonSessionNotDesign},
+		{"plain session", plain, sessionToken(ctx, t, h, plain), wire.ReasonSessionNotDesign},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "auto-advance", tc.id, tc.state)
 		if code != http.StatusOK || reasonOf(t, body) != tc.want {

@@ -3,6 +3,8 @@ package tickets
 import (
 	"context"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
@@ -22,7 +24,7 @@ func investigateCmd(api ServerAPI, address string) tea.Cmd {
 		switch {
 		case err != nil:
 			return notify.Error("investigate: " + err.Error())()
-		case res.Refused && res.Reason == server.ReasonSessionNameTaken:
+		case res.Refused && res.Reason == wire.ReasonSessionNameTaken:
 			if id := fixAgentSession(ctx, api, address); id != "" {
 				return GoToSessionMsg{ID: id}
 			}
@@ -44,7 +46,7 @@ func fixAgentSession(ctx context.Context, api ServerAPI, address string) string 
 	}
 	name := server.FixAgentName(address)
 	for _, s := range snap.Sessions {
-		if s.Name == name && s.Status.State != server.SessionExited {
+		if s.Name == name && s.Status.State != wire.SessionExited {
 			return s.ID
 		}
 	}

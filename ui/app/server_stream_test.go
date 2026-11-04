@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -33,7 +35,7 @@ type streamFake struct {
 	snapshots int
 	streams   []*fakeStream
 	mode      server.QueueMode
-	sessions  []server.SessionInfo
+	sessions  []wire.SessionInfo
 	queue     []server.QueueItem
 	queueGets int
 }
@@ -265,9 +267,9 @@ func TestServerStream_SessionEventRefreshesSessionsOnAnyTab(t *testing.T) {
 
 			f.mu.Lock()
 			f.seq = 11
-			f.sessions = []server.SessionInfo{{ID: "s1", Actionable: server.SessionActionable{Reason: "blocked"}}}
+			f.sessions = []wire.SessionInfo{{ID: "s1", Actionable: wire.SessionActionable{Reason: "blocked"}}}
 			f.mu.Unlock()
-			f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventSessionChanged, Address: "s1"}
+			f.stream(0).ch <- server.Event{Seq: 11, Type: wire.EventSessionChanged, Address: "s1"}
 			h.pump()
 
 			if got := h.m.stream.vm.Sessions; len(got) != 1 || got[0].ID != "s1" {
@@ -291,14 +293,14 @@ func TestServerStream_SessionFocusShowsSessionInThisTUIOnly(t *testing.T) {
 		t.Run(tc.client, func(t *testing.T) {
 			h, f := newStreamHarness(t)
 			f.mu.Lock()
-			f.sessions = []server.SessionInfo{
-				{ID: "s1", Name: "alpha", Status: server.SessionStatus{State: server.SessionIdle}},
-				{ID: "s2", Name: "beta", Status: server.SessionStatus{State: server.SessionIdle}},
+			f.sessions = []wire.SessionInfo{
+				{ID: "s1", Name: "alpha", Status: wire.SessionStatus{State: wire.SessionIdle}},
+				{ID: "s2", Name: "beta", Status: wire.SessionStatus{State: wire.SessionIdle}},
 			}
 			f.mu.Unlock()
 			h.probeUp()
 
-			f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventSessionFocus, Address: "s2", Client: tc.client}
+			f.stream(0).ch <- server.Event{Seq: 11, Type: wire.EventSessionFocus, Address: "s2", Client: tc.client}
 			h.pump()
 
 			if got := h.m.navState.ActiveTab(); got != tc.want {
@@ -321,9 +323,9 @@ func TestServerStream_SessionFocusShowsSessionInThisTUIOnly(t *testing.T) {
 func TestGoToSession_ShowsAQueueAgentOnTheAgentsTab(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.mu.Lock()
-	f.sessions = []server.SessionInfo{
-		{ID: "s1", Name: "alpha", Status: server.SessionStatus{State: server.SessionIdle}},
-		{ID: "queue-q", Name: "gx-map-01", Queue: true, Status: server.SessionStatus{State: server.SessionIdle}},
+	f.sessions = []wire.SessionInfo{
+		{ID: "s1", Name: "alpha", Status: wire.SessionStatus{State: wire.SessionIdle}},
+		{ID: "queue-q", Name: "gx-map-01", Queue: true, Status: wire.SessionStatus{State: wire.SessionIdle}},
 	}
 	f.mu.Unlock()
 	h.probeUp()

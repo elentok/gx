@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
@@ -91,7 +93,7 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 		return err
 	}
 	if s.rejected {
-		return f.waitFor(id, "an Unknown command Actionable", func(si server.SessionInfo, _ server.SessionChatResponse) bool {
+		return f.waitFor(id, "an Unknown command Actionable", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
 			return si.Actionable.GxRaised && strings.Contains(si.Actionable.Reason, "Unknown command:")
 		})
 	}
@@ -101,17 +103,17 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 		if slow {
 			role = transcript.ChatRolePerson
 		}
-		if err := f.waitFor(id, "a "+role+" message", func(_ server.SessionInfo, chat server.SessionChatResponse) bool {
-			return slices.ContainsFunc(chat.Messages, func(m server.SessionChatMessage) bool { return m.Role == role })
+		if err := f.waitFor(id, "a "+role+" message", func(_ wire.SessionInfo, chat wire.SessionChatResponse) bool {
+			return slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool { return m.Role == role })
 		}); err != nil {
 			return err
 		}
 	}
-	state := server.SessionIdle
+	state := wire.SessionIdle
 	if slow {
-		state = server.SessionWorking
+		state = wire.SessionWorking
 	}
-	if err := f.waitFor(id, state, func(si server.SessionInfo, _ server.SessionChatResponse) bool { return si.Status.State == state }); err != nil {
+	if err := f.waitFor(id, state, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool { return si.Status.State == state }); err != nil {
 		return err
 	}
 	if s.link != "" {
@@ -164,14 +166,14 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 		}
 	}
 	if s.crash {
-		if err := f.waitFor(id, server.SessionExited, func(si server.SessionInfo, _ server.SessionChatResponse) bool {
-			return si.Status.State == server.SessionExited
+		if err := f.waitFor(id, wire.SessionExited, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
+			return si.Status.State == wire.SessionExited
 		}); err != nil {
 			return err
 		}
 	}
 	if s.failure != "" {
-		if err := f.waitFor(id, "failure "+s.failure, func(si server.SessionInfo, _ server.SessionChatResponse) bool {
+		if err := f.waitFor(id, "failure "+s.failure, func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
 			return si.Failure != nil && si.Failure.Kind == s.failure
 		}); err != nil {
 			return err
@@ -180,7 +182,7 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 	if s.read {
 		// The server raises Unread just after the state changes, so clearing it
 		// first would leave it raised.
-		if err := f.waitFor(id, "Unread", func(si server.SessionInfo, _ server.SessionChatResponse) bool { return si.Unread.Unread }); err != nil {
+		if err := f.waitFor(id, "Unread", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool { return si.Unread.Unread }); err != nil {
 			return err
 		}
 		if res, err := apiclient.New(server.SocketPath(f.stateD)).MarkSessionRead(context.Background(), id); err != nil || res.Refused {
@@ -209,12 +211,12 @@ func (f *fixture) prompt(id, text string) error {
 
 // promptAgain sends text as another chat turn and waits for its reply.
 func (f *fixture) promptAgain(id, text string) error {
-	agentMessages := func(chat server.SessionChatResponse) int {
-		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m server.SessionChatMessage) bool {
+	agentMessages := func(chat wire.SessionChatResponse) int {
+		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m wire.SessionChatMessage) bool {
 			return m.Role != transcript.ChatRoleAgent
 		}))
 	}
-	var before server.SessionChatResponse
+	var before wire.SessionChatResponse
 	if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
 		_ = json.Unmarshal(out, &before)
 	}
@@ -223,8 +225,8 @@ func (f *fixture) promptAgain(id, text string) error {
 	if err := f.prompt(id, text); err != nil {
 		return err
 	}
-	return f.waitFor(id, "a reply to "+text, func(si server.SessionInfo, chat server.SessionChatResponse) bool {
-		return si.Status.State == server.SessionIdle && agentMessages(chat) > agentMessages(before)
+	return f.waitFor(id, "a reply to "+text, func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
+		return si.Status.State == wire.SessionIdle && agentMessages(chat) > agentMessages(before)
 	})
 }
 
@@ -250,12 +252,12 @@ func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(age
 	if st.blocks {
 		return f.prompt(id, st.prompt)
 	}
-	count := func(chat server.SessionChatResponse, kind string) int {
-		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m server.SessionChatMessage) bool {
+	count := func(chat wire.SessionChatResponse, kind string) int {
+		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m wire.SessionChatMessage) bool {
 			return m.Kind != kind || (kind == transcript.ChatKindCommand && m.Text != st.prompt)
 		}))
 	}
-	var before server.SessionChatResponse
+	var before wire.SessionChatResponse
 	if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
 		_ = json.Unmarshal(out, &before)
 	}
@@ -263,8 +265,8 @@ func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(age
 		return err
 	}
 	wantOutput := st.output != nil && strings.TrimSpace(*st.output) != ""
-	return f.waitFor(id, "the "+st.prompt+" entries", func(si server.SessionInfo, chat server.SessionChatResponse) bool {
-		return si.Status.State == server.SessionIdle &&
+	return f.waitFor(id, "the "+st.prompt+" entries", func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
+		return si.Status.State == wire.SessionIdle &&
 			count(chat, transcript.ChatKindCommand) > count(before, transcript.ChatKindCommand) &&
 			(!wantOutput || count(chat, transcript.ChatKindOutput) > count(before, transcript.ChatKindOutput))
 	})
@@ -299,7 +301,7 @@ func (f *fixture) repoDir(sc scenario, project string) string {
 }
 
 // waitFor polls the session until ok accepts its list row and chat.
-func (f *fixture) waitFor(id, what string, ok func(server.SessionInfo, server.SessionChatResponse) bool) error {
+func (f *fixture) waitFor(id, what string, ok func(wire.SessionInfo, wire.SessionChatResponse) bool) error {
 	// In-process calls: this loop runs for every seeded session, and a spawned
 	// gx per poll dominated the scenario's start-up.
 	cl := apiclient.New(server.SocketPath(f.stateD))
@@ -309,7 +311,7 @@ func (f *fixture) waitFor(id, what string, ok func(server.SessionInfo, server.Se
 		if err != nil {
 			continue
 		}
-		i := slices.IndexFunc(list, func(si server.SessionInfo) bool { return si.ID == id })
+		i := slices.IndexFunc(list, func(si wire.SessionInfo) bool { return si.ID == id })
 		if i < 0 {
 			continue
 		}
@@ -354,12 +356,12 @@ func agentsFailuresScenario() scenario {
 		chat:           true,
 		stallThreshold: "3s",
 		sessions: []sessionSpec{
-			{project: project, prompt: agentfake.ChatSlowMarker + " a stuck turn", failure: server.FailureKindStalled},
-			{project: project, prompt: "hello", read: true, failure: server.FailureKindAuth,
+			{project: project, prompt: agentfake.ChatSlowMarker + " a stuck turn", failure: wire.FailureKindStalled},
+			{project: project, prompt: "hello", read: true, failure: wire.FailureKindAuth,
 				control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "authentication_error", Status: 401, Message: "Invalid API key"}},
-			{project: project, prompt: "hello", read: true, failure: server.FailureKindRateLimit,
+			{project: project, prompt: "hello", read: true, failure: wire.FailureKindRateLimit,
 				control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
-			{project: project, prompt: "hello", read: true, failure: server.FailureKindBlocked,
+			{project: project, prompt: "hello", read: true, failure: wire.FailureKindBlocked,
 				control: &agentfake.Control{Action: agentfake.ActionBlock}},
 		},
 	}

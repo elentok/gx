@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
 
 func (s *Server) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
-	var req LinkSessionRequest
+	var req wire.LinkSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -30,9 +32,9 @@ func (s *Server) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
 // with the session's project, and marks it Design when the ticket is on a
 // map epic. An existing Design flag stays: a new design session links to an
 // epic Chart has not written yet.
-func (s *Server) linkSession(req LinkSessionRequest) (SessionResult, error) {
+func (s *Server) linkSession(req wire.LinkSessionRequest) (wire.SessionResult, error) {
 	if req.Ticket == "" {
-		return sessionRefusal(ReasonSessionBadRequest, "a link needs a ticket address"), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, "a link needs a ticket address"), nil
 	}
 	dir, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
@@ -43,20 +45,20 @@ func (s *Server) linkSession(req LinkSessionRequest) (SessionResult, error) {
 		ticket = meta.Project + ":" + ticket
 	}
 	design := s.onMapEpic(ticket)
-	var info SessionInfo
+	var info wire.SessionInfo
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.Ticket, m.Design = ticket, m.Design || design
 		s.recordConversation(*m)
 		info = m.info()
 		return true
 	}); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 func (s *Server) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
-	var req ReportStepRequest
+	var req wire.ReportStepRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -71,26 +73,26 @@ func (s *Server) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
 
 // reportSessionStep saves the Design step an agent says it is running,
 // replacing any earlier report.
-func (s *Server) reportSessionStep(req ReportStepRequest) (SessionResult, error) {
+func (s *Server) reportSessionStep(req wire.ReportStepRequest) (wire.SessionResult, error) {
 	if req.Step == "" {
-		return sessionRefusal(ReasonSessionBadRequest, "a step report needs a step"), nil
+		return sessionRefusal(wire.ReasonSessionBadRequest, "a step report needs a step"), nil
 	}
 	dir, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if meta.Status.State == SessionExited {
-		return sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
+	if meta.Status.State == wire.SessionExited {
+		return sessionRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
-	var info SessionInfo
+	var info wire.SessionInfo
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.ReportedStep, m.ReportedTitle = req.Step, req.Title
 		info = m.info()
 		return true
 	}); err != nil {
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // stampDesignStart records the first design session on the map epic behind

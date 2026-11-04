@@ -4,11 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 )
 
-func sessionMarkerModel(t *testing.T, nerdFont bool, sessions ...server.SessionInfo) Model {
+func sessionMarkerModel(t *testing.T, nerdFont bool, sessions ...wire.SessionInfo) Model {
 	t.Helper()
 	m := newServerModel(t)
 	m.settings.UseNerdFontIcons = nerdFont
@@ -41,7 +43,7 @@ func renderedTicketRow(t *testing.T, m Model, address string) string {
 func TestSessionMarker_LiveLinkedSessionMarksItsRow(t *testing.T) {
 	for _, nerdFont := range []bool{false, true} {
 		marker := ui.Icons(nerdFont).SessionLive
-		live := server.SessionInfo{ID: "a", Ticket: "gx:map/01", Status: server.SessionStatus{State: server.SessionIdle}}
+		live := wire.SessionInfo{ID: "a", Ticket: "gx:map/01", Status: wire.SessionStatus{State: wire.SessionIdle}}
 		m := sessionMarkerModel(t, nerdFont, live)
 		if got := renderedTicketRow(t, m, "gx:map/01"); !strings.Contains(got, marker) {
 			t.Errorf("nerdFont=%v: linked row %q lacks marker %q", nerdFont, got, marker)
@@ -57,7 +59,7 @@ func TestSessionMarker_LiveLinkedSessionMarksItsRow(t *testing.T) {
 
 func TestSessionMarker_LiveSessionOnEpicMarksEpicRow(t *testing.T) {
 	marker := ui.Icons(false).SessionLive
-	m := sessionMarkerModel(t, false, server.SessionInfo{ID: "a", Ticket: "gx:map", Status: server.SessionStatus{State: server.SessionIdle}})
+	m := sessionMarkerModel(t, false, wire.SessionInfo{ID: "a", Ticket: "gx:map", Status: wire.SessionStatus{State: wire.SessionIdle}})
 	if got := m.renderEpicRow(m.epics[0]); !strings.Contains(got, marker) {
 		t.Errorf("epic row %q lacks marker %q", got, marker)
 	}
@@ -65,12 +67,12 @@ func TestSessionMarker_LiveSessionOnEpicMarksEpicRow(t *testing.T) {
 
 func TestSessionMarker_FollowsSessionExit(t *testing.T) {
 	marker := ui.Icons(false).SessionLive
-	live := server.SessionInfo{ID: "a", Ticket: "gx:map/01", Status: server.SessionStatus{State: server.SessionWorking}}
+	live := wire.SessionInfo{ID: "a", Ticket: "gx:map/01", Status: wire.SessionStatus{State: wire.SessionWorking}}
 	m := sessionMarkerModel(t, false, live)
-	live.Status.State = server.SessionExited
+	live.Status.State = wire.SessionExited
 	m = withState(m, server.Snapshot{
 		Tickets:  []server.TicketInfo{{Address: "gx:map/01", Title: "Open", Status: "open", EpicIsMap: true}},
-		Sessions: []server.SessionInfo{live},
+		Sessions: []wire.SessionInfo{live},
 	})
 	if got := renderedTicketRow(t, m, "gx:map/01"); strings.Contains(got, marker) {
 		t.Errorf("row %q still shows marker after the session exited", got)
@@ -80,8 +82,8 @@ func TestSessionMarker_FollowsSessionExit(t *testing.T) {
 func TestSessionMarker_ExitedSessionMarksNothing(t *testing.T) {
 	marker := ui.Icons(false).SessionLive
 	m := sessionMarkerModel(t, false,
-		server.SessionInfo{ID: "a", Ticket: "gx:map/01", Status: server.SessionStatus{State: server.SessionExited}},
-		server.SessionInfo{ID: "b", Ticket: "gx:map", Status: server.SessionStatus{State: server.SessionExited}},
+		wire.SessionInfo{ID: "a", Ticket: "gx:map/01", Status: wire.SessionStatus{State: wire.SessionExited}},
+		wire.SessionInfo{ID: "b", Ticket: "gx:map", Status: wire.SessionStatus{State: wire.SessionExited}},
 	)
 	if got := renderedTicketRow(t, m, "gx:map/01"); strings.Contains(got, marker) {
 		t.Errorf("row %q shows marker for an exited session", got)

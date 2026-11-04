@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -48,9 +50,9 @@ func titleModel(t *testing.T, nerd bool, width int, conn ServerConn, actionable 
 	m = next.(Model)
 	m.stream.vm.Sessions = nil
 	for i := range actionable {
-		m.stream.vm.Sessions = append(m.stream.vm.Sessions, server.SessionInfo{
+		m.stream.vm.Sessions = append(m.stream.vm.Sessions, wire.SessionInfo{
 			ID:         fmt.Sprintf("s%d", i),
-			Actionable: server.SessionActionable{Reason: "blocked"},
+			Actionable: wire.SessionActionable{Reason: "blocked"},
 		})
 	}
 	return m

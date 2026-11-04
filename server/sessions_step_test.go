@@ -3,7 +3,8 @@ package server_test
 import (
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -11,9 +12,9 @@ func TestReportSessionStep_StoredWhileBusyAndClearedOnIdle(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 
-	res, err := h.Client.ReportSessionStep(ctx, server.ReportStepRequest{ID: id, Step: "resolve-tickets", Title: "Add the cache"})
+	res, err := h.Client.ReportSessionStep(ctx, wire.ReportStepRequest{ID: id, Step: "resolve-tickets", Title: "Add the cache"})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("report step = %+v, %v", res, err)
 	}
@@ -25,7 +26,7 @@ func TestReportSessionStep_StoredWhileBusyAndClearedOnIdle(t *testing.T) {
 	}
 
 	report(t, conv, agentfake.Control{State: "done"})
-	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	if got.ReportedStep != "" || got.ReportedTitle != "" {
 		t.Errorf("after idle = step %q, title %q; want both cleared", got.ReportedStep, got.ReportedTitle)
 	}
@@ -35,11 +36,11 @@ func TestReportSessionStep_Refusals(t *testing.T) {
 	t.Parallel()
 	h, ctx, _, id, _ := startFakeSession(t)
 	for name, tc := range map[string]struct {
-		req    server.ReportStepRequest
+		req    wire.ReportStepRequest
 		reason string
 	}{
-		"no step":         {server.ReportStepRequest{ID: id}, server.ReasonSessionBadRequest},
-		"unknown session": {server.ReportStepRequest{ID: "abcdef", Step: "spec"}, server.ReasonSessionUnknown},
+		"no step":         {wire.ReportStepRequest{ID: id}, wire.ReasonSessionBadRequest},
+		"unknown session": {wire.ReportStepRequest{ID: "abcdef", Step: "spec"}, wire.ReasonSessionUnknown},
 	} {
 		res, err := h.Client.ReportSessionStep(ctx, tc.req)
 		if err != nil || !res.Refused || res.Reason != tc.reason {

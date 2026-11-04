@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/tickets"
@@ -16,39 +18,6 @@ import (
 // or bad.
 const roundBlockNote = "The options could not be read."
 
-// SessionRoundOption is one choice of an options card.
-type SessionRoundOption struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Consequence string `json:"consequence,omitempty"`
-}
-
-// SessionRoundCard is one question of a Grilling round. Kind is yes-no,
-// options or text; Note says why a card fell back to text.
-type SessionRoundCard struct {
-	Label       string               `json:"label"` // the header's question id without the Q: "8", or "8b"
-	Title       string               `json:"title"`
-	Body        string               `json:"body"`
-	Kind        string               `json:"kind"`
-	Yes         string               `json:"yes,omitempty"`
-	No          string               `json:"no,omitempty"`
-	Options     []SessionRoundOption `json:"options,omitempty"`
-	Recommended string               `json:"recommended,omitempty"`
-	Note        string               `json:"note,omitempty"`
-}
-
-// SessionNext is the Actionable a gx-design run-end line raises.
-type SessionNext struct {
-	Action SessionActionable `json:"action"`
-}
-
-// SessionBackgroundTask is a shell, Monitor or subagent still running.
-type SessionBackgroundTask struct {
-	Kind      string `json:"kind"` // transcript.BackgroundTaskShell, ...Monitor or ...Agent
-	Label     string `json:"label"`
-	StartedAt string `json:"started_at"`
-}
-
 var (
 	roundNumberRE = regexp.MustCompile(`Q(\d+)([a-z]?)`)
 	boldSpanRE    = regexp.MustCompile(`\*\*(.+?)\*\*`)
@@ -56,8 +25,8 @@ var (
 )
 
 // roundCards splits an agent message holding a Grilling round into cards.
-func roundCards(text string) []SessionRoundCard {
-	var cards []SessionRoundCard
+func roundCards(text string) []wire.SessionRoundCard {
+	var cards []wire.SessionRoundCard
 	for i, seg := range grillround.Segments(text) {
 		cards = append(cards, parseRoundSegment(i+1, seg).Card)
 	}
@@ -68,7 +37,7 @@ func roundCards(text string) []SessionRoundCard {
 // holds gx-question blocks that cannot be read (Raw is their text); a segment
 // with no block is plain text and has no Err.
 type parsedRound struct {
-	Card SessionRoundCard
+	Card wire.SessionRoundCard
 	Err  error
 	Raw  string
 }
@@ -79,7 +48,7 @@ type parsedRound struct {
 func parseRoundSegment(seq int, seg string) parsedRound {
 	body, blocks := grillround.SplitFences(seg)
 	header, rest, _ := strings.Cut(body, "\n")
-	card := SessionRoundCard{Label: strconv.Itoa(seq), Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
+	card := wire.SessionRoundCard{Label: strconv.Itoa(seq), Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
 	if m := roundNumberRE.FindStringSubmatch(header); m != nil {
 		card.Label = m[1] + m[2]
 	}
@@ -103,7 +72,7 @@ func parseRoundSegment(seq int, seg string) parsedRound {
 	c := &res.Card
 	c.Kind, c.Yes, c.No, c.Recommended = q.Kind, q.Yes, q.No, q.Recommended
 	for _, o := range q.Options {
-		c.Options = append(c.Options, SessionRoundOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
+		c.Options = append(c.Options, wire.SessionRoundOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
 	}
 	return res
 }
@@ -159,7 +128,7 @@ func trailingAgentTexts(msgs []transcript.ChatMessage) []string {
 }
 
 // chatRound is the round the agent's last turn ended with, or nil.
-func chatRound(msgs []transcript.ChatMessage) []SessionRoundCard {
+func chatRound(msgs []transcript.ChatMessage) []wire.SessionRoundCard {
 	for _, text := range trailingAgentTexts(msgs) {
 		if grillround.HasMarker(text) {
 			return roundCards(text)
@@ -169,10 +138,10 @@ func chatRound(msgs []transcript.ChatMessage) []SessionRoundCard {
 }
 
 // chatNext is the run-end line of the agent's last turn, or nil.
-func chatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ticket string, final bool) *SessionNext {
+func chatNext(msgs []transcript.ChatMessage, kind agentrunner.Kind, ticket string, final bool) *wire.SessionNext {
 	for _, text := range trailingAgentTexts(msgs) {
 		if a, ok := runEndNext(text, ticket, string(kind), final); ok {
-			return &SessionNext{Action: a}
+			return &wire.SessionNext{Action: a}
 		}
 	}
 	return nil

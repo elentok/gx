@@ -10,8 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 )
 
 // FocusClient names this TUI to the server: its event stream subscribes under
@@ -51,7 +52,7 @@ func (m Model) WithLastViewedFile(path string) Model {
 // on the first one needing attention; else the sidebar, which shows the
 // new-session hint when there are no sessions.
 func (m Model) open() Model {
-	i := slices.IndexFunc(m.sessions, func(s server.SessionInfo) bool { return s.ID == m.lastViewed })
+	i := slices.IndexFunc(m.sessions, func(s wire.SessionInfo) bool { return s.ID == m.lastViewed })
 	if i < 0 {
 		i = m.attentionFrom(0)
 	}
@@ -63,8 +64,8 @@ func (m Model) open() Model {
 	return m
 }
 
-func (m Model) focusReport() server.FocusReport {
-	r := server.FocusReport{Client: FocusClient, Focused: m.focused, TermProgram: m.termProgram}
+func (m Model) focusReport() wire.FocusReport {
+	r := wire.FocusReport{Client: FocusClient, Focused: m.focused, TermProgram: m.termProgram}
 	if m.lines() == nil {
 		r.Session = m.selectedID()
 	}
@@ -83,12 +84,12 @@ type focusReporter struct {
 	mu             sync.Mutex
 	lastViewedPath string
 	// last is the newest report; pending: it has not been sent yet.
-	last    server.FocusReport
+	last    wire.FocusReport
 	pending bool
 	sending bool
 }
 
-func (r *focusReporter) report(rep server.FocusReport) {
+func (r *focusReporter) report(rep wire.FocusReport) {
 	if r == nil {
 		return
 	}
@@ -119,7 +120,7 @@ func (r *focusReporter) flushPending() {
 	}
 }
 
-func (r *focusReporter) send(rep server.FocusReport, lastViewedPath string) {
+func (r *focusReporter) send(rep wire.FocusReport, lastViewedPath string) {
 	if rep.Session != "" && lastViewedPath != "" {
 		_ = os.MkdirAll(filepath.Dir(lastViewedPath), 0o755)
 		_ = os.WriteFile(lastViewedPath, []byte(rep.Session+"\n"), 0o644)
@@ -135,6 +136,6 @@ func (r *focusReporter) send(rep server.FocusReport, lastViewedPath string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.last == rep {
-		r.last = server.FocusReport{}
+		r.last = wire.FocusReport{}
 	}
 }

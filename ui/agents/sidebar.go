@@ -5,11 +5,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 )
 
@@ -49,11 +50,11 @@ type sidebarRow struct {
 // orderedSessions lists regular sessions, then Queue agents, then Design
 // agents; each part is grouped by project, projects in order of their first
 // session, keeping creation order inside each group so rows never jump.
-func orderedSessions(sessions []server.SessionInfo) []server.SessionInfo {
-	out := make([]server.SessionInfo, 0, len(sessions))
+func orderedSessions(sessions []wire.SessionInfo) []wire.SessionInfo {
+	out := make([]wire.SessionInfo, 0, len(sessions))
 	for _, g := range []agentGroup{groupRegular, groupQueue, groupDesign} {
 		var projects []string
-		byProject := map[string][]server.SessionInfo{}
+		byProject := map[string][]wire.SessionInfo{}
 		for _, s := range sessions {
 			if groupOf(s) != g {
 				continue
@@ -70,10 +71,10 @@ func orderedSessions(sessions []server.SessionInfo) []server.SessionInfo {
 	return out
 }
 
-func liveCount(sessions []server.SessionInfo) int {
+func liveCount(sessions []wire.SessionInfo) int {
 	n := 0
 	for _, s := range sessions {
-		if s.Status.State != server.SessionExited {
+		if s.Status.State != wire.SessionExited {
 			n++
 		}
 	}
@@ -90,7 +91,7 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 		rows = append(rows, sidebarRow{text: styleProjectHeader.Render(icons.FolderClosed + " " + text), session: -1})
 	}
 	// prev is the last session listed, to know when a header starts.
-	var prev *server.SessionInfo
+	var prev *wire.SessionInfo
 	for i, s := range m.sessions {
 		if !m.onSidebar(i) {
 			continue
@@ -238,20 +239,20 @@ func headerColors(active bool) (title, bg color.Color) {
 	return ui.ColorMauve, ui.ColorSurface
 }
 
-func (m Model) statusIcon(s server.SessionInfo, icons ui.IconSet) string {
+func (m Model) statusIcon(s wire.SessionInfo, icons ui.IconSet) string {
 	switch s.Status.State {
-	case server.SessionStarting:
+	case wire.SessionStarting:
 		return styleStarting.Render(icons.AgentStarting)
-	case server.SessionWorking:
+	case wire.SessionWorking:
 		return styleWorking.Render(m.spinner.View())
-	case server.SessionIdle:
+	case wire.SessionIdle:
 		return styleIdle.Render(icons.TicketOpen)
-	case server.SessionBlocked:
+	case wire.SessionBlocked:
 		return styleBlocked.Render(icons.TicketPausedAnswer)
-	case server.SessionRateLimited:
+	case wire.SessionRateLimited:
 		return styleRateLimited.Render(icons.TicketPaused)
-	case server.SessionExited:
-		if s.Exit == server.SessionExitCrashed {
+	case wire.SessionExited:
+		if s.Exit == wire.SessionExitCrashed {
 			return styleCrashed.Render(icons.TicketError)
 		}
 		return styleExited.Render(icons.AgentExited)
@@ -261,7 +262,7 @@ func (m Model) statusIcon(s server.SessionInfo, icons ui.IconSet) string {
 
 // sessionLabel is the Design mark, the name (bold when Unread), the teal +bg
 // while a background task runs, and the Session ticket.
-func sessionLabel(s server.SessionInfo, icons ui.IconSet) string {
+func sessionLabel(s wire.SessionInfo, icons ui.IconSet) string {
 	style := styleNameRead
 	if s.Unread.Unread {
 		style = styleNameUnread
@@ -270,7 +271,7 @@ func sessionLabel(s server.SessionInfo, icons ui.IconSet) string {
 	if s.Design {
 		label = styleDesign.Render(icons.DesignSession) + " " + label
 	}
-	if s.Status.State == server.SessionWorking && s.Status.Background {
+	if s.Status.State == wire.SessionWorking && s.Status.Background {
 		label += styleBackground.Render(" +bg")
 	}
 	if s.Ticket != "" {
@@ -281,7 +282,7 @@ func sessionLabel(s server.SessionInfo, icons ui.IconSet) string {
 
 // marks fills the Unread and Actionable slots; Queue and Design agents leave
 // them blank, their status mark is all a row shows.
-func marks(s server.SessionInfo, icons ui.IconSet) string {
+func marks(s wire.SessionInfo, icons ui.IconSet) string {
 	unread, actionable := " ", " "
 	if s.Queue || s.Design {
 		return unread + " " + actionable + " "
@@ -297,8 +298,8 @@ func marks(s server.SessionInfo, icons ui.IconSet) string {
 
 // isActionable: a Blocked session always waits on the person, with or
 // without a recorded reason.
-func isActionable(s server.SessionInfo) bool {
-	return s.Actionable.Reason != "" || s.Status.State == server.SessionBlocked
+func isActionable(s wire.SessionInfo) bool {
+	return s.Actionable.Reason != "" || s.Status.State == wire.SessionBlocked
 }
 
 // fit truncates or pads s to exactly w cells.

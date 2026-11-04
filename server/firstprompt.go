@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
@@ -72,7 +74,7 @@ func startStartClock(timeout time.Duration, onTimeout func()) *startClock {
 
 // track pauses the clock outside Starting and resumes it with what is left.
 func (c *startClock) track(state string) {
-	starting := state == SessionStarting || state == ""
+	starting := state == wire.SessionStarting || state == ""
 	switch {
 	case starting && c.since.IsZero():
 		c.since = time.Now()
@@ -104,7 +106,7 @@ func (f *firstPrompt) stop() { f.clock.stop() }
 func (f *firstPrompt) startTimedOut() {
 	var prompt string
 	f.s.updateSessionMetaOrWarn(f.dir, f.id, func(m *sessionMeta) bool {
-		starting := m.Status.State == "" || m.Status.State == SessionStarting
+		starting := m.Status.State == "" || m.Status.State == wire.SessionStarting
 		if m.Run != f.run || m.FirstPrompt == "" || !starting {
 			return false
 		}
@@ -188,11 +190,11 @@ func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
 // while Blocked.
 func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
 	switch {
-	case state == SessionBlocked:
+	case state == wire.SessionBlocked:
 		return ""
 	case ready != "":
 		return string(ready)
-	case state == SessionIdle:
+	case state == wire.SessionIdle:
 		return signalFirstIdle
 	}
 	return ""
@@ -202,7 +204,7 @@ func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
 // sees a turn start even where the holder's Turn counter does not move.
 func (f *firstPrompt) noteState(state string) {
 	f.clock.track(state)
-	if state == SessionWorking && f.typed.Load() {
+	if state == wire.SessionWorking && f.typed.Load() {
 		f.turnOnce.Do(func() { close(f.turnStarted) })
 	}
 }
@@ -292,7 +294,7 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 	if err := run.catchUp(); err != nil {
 		return err
 	}
-	if run.state == SessionBlocked {
+	if run.state == wire.SessionBlocked {
 		return errSessionBlocked
 	}
 	if err := run.step(0, prompt); err != nil {

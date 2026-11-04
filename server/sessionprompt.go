@@ -8,15 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-)
-
-// Refusal reasons of the session prompt route, beside the session ones.
-const (
-	ReasonPromptHarnessNotSupported = "harness-not-supported"
-	ReasonPromptPrefixNotAllowed    = "prefix-not-allowed"
-	ReasonPromptTextTooLong         = "text-too-long"
 )
 
 // maxSessionPromptBytes caps the text one send types.
@@ -25,14 +20,14 @@ const maxSessionPromptBytes = 32 * 1024
 // validatePromptText normalizes text typed into a session and refuses a
 // bang prefix and an oversized text. Empty text passes: each route
 // decides whether that is allowed. what names the text in refusal messages.
-func validatePromptText(text, what string) (string, *SessionResult) {
+func validatePromptText(text, what string) (string, *wire.SessionResult) {
 	text = strings.TrimSpace(normalizeAnswer(text))
 	switch {
 	case strings.HasPrefix(text, "!"):
-		res := sessionRefusal(ReasonPromptPrefixNotAllowed, what+" may not start with !")
+		res := sessionRefusal(wire.ReasonPromptPrefixNotAllowed, what+" may not start with !")
 		return text, &res
 	case len(text) > maxSessionPromptBytes:
-		res := sessionRefusal(ReasonPromptTextTooLong, fmt.Sprintf("%s is over %d bytes", what, maxSessionPromptBytes))
+		res := sessionRefusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("%s is over %d bytes", what, maxSessionPromptBytes))
 		return text, &res
 	}
 	return text, nil
@@ -44,17 +39,6 @@ const (
 	promptSourceCLI = "cli"
 )
 
-// SessionPromptRequest is the body of POST /v1/sessions/prompt. LastMessage is
-// the id of the last chat message the page saw; the web mux refuses a send once
-// the transcript has moved past it.
-type SessionPromptRequest struct {
-	ID          string `json:"id"`
-	Text        string `json:"text"`
-	LastMessage string `json:"last_message,omitempty"`
-	// Continue replaces Text: the server types /clear and /gx-design <epic>.
-	Continue bool `json:"continue,omitempty"`
-}
-
 func (s *Server) sessionPromptWrite(w http.ResponseWriter, r *http.Request) {
 	s.sessionPromptHandler(promptSourceCLI)(w, r)
 }
@@ -64,7 +48,7 @@ func (s *Server) sessionPromptWeb() http.HandlerFunc { return s.sessionPromptHan
 
 func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req SessionPromptRequest
+		var req wire.SessionPromptRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -82,7 +66,7 @@ func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 // background so the nudges outlive the request. Continue is for design
 // sessions only: it types /clear and /gx-design. It skips the draft guard:
 // gx.follow-ups/07 tracks that.
-func (s *Server) promptSession(req SessionPromptRequest, source string) (SessionResult, error) {
+func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	dir, meta, res, err := s.sessionDir(req.ID)
@@ -90,10 +74,10 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		return res, err
 	}
 	if req.Continue && !meta.Design {
-		return sessionRefusal(ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+		return sessionRefusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if !s.settings.Load().hasChatReader(meta.Harness) {
-		return sessionRefusal(ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
+		return sessionRefusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
 	text, refusal := validatePromptText(req.Text, "text")
 	if !req.Continue {
@@ -107,14 +91,14 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 	if source == promptSourceWeb {
 		last, err := s.lastChatMessageID(req.ID, meta)
 		if err != nil {
-			return SessionResult{}, err
+			return wire.SessionResult{}, err
 		}
 		if last != req.LastMessage {
 			return sessionRefusal(ReasonStale, "the conversation moved; review it first"), nil
 		}
 	}
 	if st := meta.info().Status; !st.Promptable() {
-		return sessionRefusal(ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
+		return sessionRefusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
 	}
 	ev := ralphloop.Event{
 		Time: time.Now(), Type: string(events.SessionPrompted),
@@ -128,12 +112,12 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 			return res, nil
 		}
 		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
-		meta.Actionable = SessionActionable{}
+		meta.Actionable = wire.SessionActionable{}
 		meta.AutoSends = 0
 		if err := writeSessionMeta(dir, meta); err != nil {
-			return SessionResult{}, err
+			return wire.SessionResult{}, err
 		}
-		s.events.publish(EventSessionChanged, req.ID)
+		s.events.publish(wire.EventSessionChanged, req.ID)
 		s.startContinue(dir, meta, "Continue", action)
 		ev.Action = "continue"
 		for _, a := range action {
@@ -146,19 +130,19 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 			// terminal title, so the Agents tab would keep the old one.
 			meta.Name, meta.AutoName = name, false
 			if err := writeSessionMeta(dir, meta); err != nil {
-				return SessionResult{}, err
+				return wire.SessionResult{}, err
 			}
-			s.events.publish(EventSessionChanged, req.ID)
+			s.events.publish(wire.EventSessionChanged, req.ID)
 		}
 		if err := s.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
-			return SessionResult{}, err
+			return wire.SessionResult{}, err
 		}
 	}
 	if err := ralphloop.AppendServerEvent(s.cfg.TicketStore, ev); err != nil {
 		s.log.Warn("logging session prompt", "session", req.ID, "err", err)
 	}
 	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // notePersonTyped records a person's input on a session: it stops a running
@@ -169,7 +153,7 @@ func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error
 	changed := meta.AutoSends != 0
 	meta.AutoSends = 0
 	if !stopped && !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
-		meta.Actionable = SessionActionable{}
+		meta.Actionable = wire.SessionActionable{}
 		changed = true
 	}
 	if !changed {
@@ -178,7 +162,7 @@ func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error
 	if err := writeSessionMeta(dir, meta); err != nil {
 		return err
 	}
-	s.events.publish(EventSessionChanged, meta.ID)
+	s.events.publish(wire.EventSessionChanged, meta.ID)
 	return nil
 }
 

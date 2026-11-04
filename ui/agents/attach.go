@@ -7,11 +7,12 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -66,7 +67,7 @@ type attachment struct {
 	size [2]int
 	// status is the session's status when the dial started; an attach that
 	// ended with an error redials once the session's status moves on.
-	status  server.SessionStatus
+	status  wire.SessionStatus
 	attempt int
 	// retrying: a failed dial waits for its next attempt.
 	retrying bool
@@ -142,7 +143,7 @@ func (m Model) attachTarget() string {
 	if m.client == nil || m.link == ticketsui.ServerLinkDown || !m.loaded || m.sessionsDir == "" || m.cursor >= len(m.sessions) {
 		return ""
 	}
-	if s := m.sessions[m.cursor]; s.Status.State != server.SessionExited {
+	if s := m.sessions[m.cursor]; s.Status.State != wire.SessionExited {
 		return s.ID
 	}
 	return ""
@@ -202,7 +203,7 @@ func (m Model) updateAttached(msg attachedMsg) (Model, tea.Cmd) {
 	}
 	if msg.err != nil || msg.stream == nil {
 		a.ended, a.err, a.rows = true, msg.err, msg.snapshot
-		if msg.err != nil && a.status.State == server.SessionStarting && a.attempt < maxAttachRetries {
+		if msg.err != nil && a.status.State == wire.SessionStarting && a.attempt < maxAttachRetries {
 			a.retrying = true
 			return m, tea.Tick(attachRetryBase<<a.attempt, func(time.Time) tea.Msg { return attachRetryMsg{a: a} })
 		}

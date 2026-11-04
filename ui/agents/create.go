@@ -7,13 +7,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
@@ -107,7 +108,7 @@ type formProjectsMsg struct {
 }
 
 type sessionCreatedMsg struct {
-	result server.SessionResult
+	result wire.SessionResult
 	err    error
 }
 
@@ -429,7 +430,7 @@ func (m Model) submitCreate() (tea.Model, tea.Cmd) {
 		f.err = "nothing matches " + strconv.Quote(f.query)
 		return m, nil
 	}
-	req := server.CreateSessionRequest{
+	req := wire.CreateSessionRequest{
 		Project: f.projects[e.project].Name,
 		Name:    strings.TrimSpace(f.name),
 		Prompt:  f.prompt,
@@ -486,7 +487,7 @@ func (m Model) updateSessionCreated(msg sessionCreatedMsg) (tea.Model, tea.Cmd) 
 // selectPending refreshes, first selecting and focusing the just-created
 // session when it is listed.
 func (m Model) selectPending() (tea.Model, tea.Cmd) {
-	i := slices.IndexFunc(m.sessions, func(s server.SessionInfo) bool { return s.ID == m.pendingSelect })
+	i := slices.IndexFunc(m.sessions, func(s wire.SessionInfo) bool { return s.ID == m.pendingSelect })
 	if m.pendingSelect == "" || i < 0 {
 		return m.refresh()
 	}
@@ -498,7 +499,7 @@ func (m Model) selectPending() (tea.Model, tea.Cmd) {
 func (m Model) dirSessions(dir string) int {
 	n := 0
 	for _, s := range m.sessions {
-		if s.Status.State != server.SessionExited && filepath.Clean(s.Dir) == filepath.Clean(dir) {
+		if s.Status.State != wire.SessionExited && filepath.Clean(s.Dir) == filepath.Clean(dir) {
 			n++
 		}
 	}

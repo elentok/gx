@@ -7,14 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-func (f designsFixture) webCreate(t *testing.T, body string) (int, server.SessionResult) {
+func (f designsFixture) webCreate(t *testing.T, body string) (int, wire.SessionResult) {
 	t.Helper()
 	code, out := webPostJSON(t, f.base+"/v1/sessions/create", body, f.ck, "", jsonPost(f.base))
-	var res server.SessionResult
+	var res wire.SessionResult
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatalf("body %q: %v", out, err)
 	}
@@ -66,15 +68,15 @@ func TestWebSessionCreate_Refusals(t *testing.T) {
 	f := startDesigns(t)
 	root := f.projectRoot(t)
 	for name, tc := range map[string]struct{ body, want string }{
-		"ticket":          {`{"project":"proj","dir":"` + root + `","ticket":"proj:map"}`, server.ReasonSessionBadRequest},
-		"harness":         {`{"project":"proj","dir":"` + root + `","harness":"claude"}`, server.ReasonSessionBadRequest},
-		"made worktree":   {`{"project":"proj","dir":"` + root + `","made_worktree":true}`, server.ReasonSessionBadRequest},
-		"not json":        {`nope`, server.ReasonSessionBadRequest},
-		"bang prompt":     {`{"project":"proj","dir":"` + root + `","prompt":" !ls"}`, server.ReasonPromptPrefixNotAllowed},
-		"long prompt":     {`{"project":"proj","dir":"` + root + `","prompt":"` + strings.Repeat("a", 32*1024+1) + `"}`, server.ReasonPromptTextTooLong},
-		"unknown project": {`{"project":"nope","dir":"` + root + `"}`, server.ReasonSessionBadRequest},
-		"foreign dir":     {`{"project":"proj","dir":"` + t.TempDir() + `"}`, server.ReasonSessionBadRequest},
-		"bad worktree":    {`{"project":"proj","worktree":"../escape"}`, server.ReasonSessionBadRequest},
+		"ticket":          {`{"project":"proj","dir":"` + root + `","ticket":"proj:map"}`, wire.ReasonSessionBadRequest},
+		"harness":         {`{"project":"proj","dir":"` + root + `","harness":"claude"}`, wire.ReasonSessionBadRequest},
+		"made worktree":   {`{"project":"proj","dir":"` + root + `","made_worktree":true}`, wire.ReasonSessionBadRequest},
+		"not json":        {`nope`, wire.ReasonSessionBadRequest},
+		"bang prompt":     {`{"project":"proj","dir":"` + root + `","prompt":" !ls"}`, wire.ReasonPromptPrefixNotAllowed},
+		"long prompt":     {`{"project":"proj","dir":"` + root + `","prompt":"` + strings.Repeat("a", 32*1024+1) + `"}`, wire.ReasonPromptTextTooLong},
+		"unknown project": {`{"project":"nope","dir":"` + root + `"}`, wire.ReasonSessionBadRequest},
+		"foreign dir":     {`{"project":"proj","dir":"` + t.TempDir() + `"}`, wire.ReasonSessionBadRequest},
+		"bad worktree":    {`{"project":"proj","worktree":"../escape"}`, wire.ReasonSessionBadRequest},
 	} {
 		code, res := f.webCreate(t, tc.body)
 		if code != http.StatusOK || !res.Refused || res.Reason != tc.want {
@@ -105,7 +107,7 @@ func TestWebSessionCreate_NewWorktreeRunsTheSessionThere(t *testing.T) {
 func TestSessionCreate_CliRouteStillAcceptsASlashPrompt(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Prompt: "/x"})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Prompt: "/x"})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Errorf("create = %+v, %v; want accepted", res, err)
 	}

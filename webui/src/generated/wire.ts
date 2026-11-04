@@ -392,3 +392,569 @@ export interface RestartCheckReport {
   instance: string;
   restart_log: string;
 }
+
+//////////
+// source: sessionautoadvance.go
+
+/**
+ * AutoAdvanceRequest is the body of POST /v1/sessions/auto-advance. State is
+ * the web's session state token. Off, not On, so a body without it leaves the
+ * switch on.
+ */
+export interface AutoAdvanceRequest {
+  id: string;
+  state?: string;
+  off?: boolean;
+}
+
+//////////
+// source: sessionchat.go
+
+/**
+ * SessionChatMessage is one visible message of a session's conversation. ID is
+ * the transcript line's uuid.
+ */
+export interface SessionChatMessage {
+  id: string;
+  role: string; // transcript.ChatRoleAgent or ChatRolePerson
+  kind: string; // text, prompt, command or output
+  text: string;
+  at: string;
+  /**
+   * ToolCount and LastTool describe a tools entry, which folds a run of tool
+   * calls and carries no Text.
+   */
+  tool_count?: number /* int */;
+  last_tool?: string;
+  /**
+   * Calls is one line per folded tool call: the tool and its command or target.
+   */
+  calls?: string[];
+}
+/**
+ * SessionChatResponse is the visible messages of a session's newest
+ * conversation. ConversationID changes after a /clear. Unsupported marks a
+ * session of a harness that has no chat; its Messages stay empty. Truncated
+ * says earlier messages were cut to fit maxChatMessages. Round holds the cards
+ * of a Grilling round the agent ended its last turn with and the person has not
+ * answered; Next is the run-end line of that turn; Background lists the shells,
+ * Monitors and subagents still running.
+ */
+export interface SessionChatResponse {
+  conversation_id: string;
+  messages: SessionChatMessage[];
+  unsupported?: boolean;
+  truncated?: boolean;
+  round: SessionRoundCard[] | null;
+  next?: SessionNext;
+  background: SessionBackgroundTask[];
+  /**
+   * Failure is the session's, as on its SessionInfo.
+   */
+  failure?: SessionFailure;
+  /**
+   * Unreadable marks a Codex conversation that has turns but no message gx
+   * could read; CodexVersion is the Codex that wrote it.
+   */
+  unreadable?: boolean;
+  codex_version?: string;
+  /**
+   * Archived marks a Codex conversation whose rollout is a .jsonl.zst: the
+   * messages stay empty until the archive route decodes it.
+   */
+  archived?: boolean;
+}
+
+//////////
+// source: sessioncommands.go
+
+/**
+ * SessionCommandEntry is one row of the command menu. Name has no leading
+ * "/" or "$".
+ */
+export interface SessionCommandEntry {
+  name: string;
+  arg_hint: string;
+  description: string;
+  source: string; // built-in, skill or mcp
+  aliases: string[];
+}
+/**
+ * SessionCommandsResponse is the menu for one session or project dir. Degraded
+ * means the harness did not answer and Entries are only the built-ins.
+ */
+export interface SessionCommandsResponse {
+  entries: SessionCommandEntry[];
+  degraded: boolean;
+}
+
+//////////
+// source: sessionfailure.go
+
+export const FailureKindCrashed = "crashed";
+export const FailureKindEnded = "ended";
+export const FailureKindAuth = "auth";
+export const FailureKindRateLimit = "rate-limit";
+export const FailureKindStalled = "stalled";
+export const FailureKindBlocked = "blocked";
+/**
+ * Kinds of SessionFailure. Not named SessionFailure*: tygo would read them as
+ * the struct's own enum.
+ */
+export type FailureKind = typeof FailureKindCrashed | typeof FailureKindEnded | typeof FailureKindAuth | typeof FailureKindRateLimit | typeof FailureKindStalled | typeof FailureKindBlocked;
+/**
+ * SessionFailure is why a session needs the person, derived from its status
+ * and, for auth and stalled, from its transcript. It clears with its
+ * condition. Recrashed marks a crashed session whose Restore crashed again
+ * within restoreCrashWindow, so the page can stop offering Restore.
+ */
+export interface SessionFailure {
+  kind: string;
+  /**
+   * Why says what a blocked session waits on: permission, dialog, question or
+   * error (a harness.BlockedKind).
+   */
+  why?: string;
+  label: string;
+  text?: string;
+  recrashed?: boolean;
+}
+
+//////////
+// source: sessionfocus.go
+
+/**
+ * ReasonFocusNotConnected refuses a focus report from a client with no open
+ * event stream: the report would never expire.
+ */
+export const ReasonFocusNotConnected = "not-connected";
+/**
+ * EventSessionFocus asks a TUI to show a session; its Address is the session
+ * id and its Client the TUI.
+ */
+export const EventSessionFocus = "session-focus";
+/**
+ * FocusReport is a TUI's terminal focus, the session it has on screen (empty
+ * for none) and its terminal app. Client names the TUI's event stream
+ * (/v1/events?client=); the report counts only while that stream is open.
+ */
+export interface FocusReport {
+  client: string;
+  focused?: boolean;
+  session?: string;
+  term_program?: string;
+}
+
+//////////
+// source: sessionkeys.go
+
+/**
+ * ReasonSessionReadOnly refuses input to a Queue agent: its loop owns it.
+ */
+export const ReasonSessionReadOnly = "session-read-only";
+/**
+ * ReasonKeysNotDelivered: a guarded send left the session Blocked.
+ */
+export const ReasonKeysNotDelivered = "not-delivered";
+/**
+ * SessionKeysRequest is the body of POST /v1/sessions/keys. Exactly one input
+ * is set: Key (a named key) or Text (typed without Enter). OnlyBlocked sends
+ * only while the session is Blocked, and waits for it to leave Blocked.
+ */
+export interface SessionKeysRequest {
+  id: string;
+  key?: string;
+  text?: string;
+  only_blocked?: boolean;
+  /**
+   * Permission ("allow" or "deny") answers the permission dialog the session
+   * is Blocked on, by the answer logic the Queue uses. RequestID, when set,
+   * must be the dialog on screen.
+   */
+  permission?: string;
+  request_id?: string;
+}
+
+//////////
+// source: sessionpermission.go
+
+export const PermissionKindPrompt = "prompt";
+export const PermissionKindPlan = "plan";
+export const PermissionKindUnreadable = "unreadable";
+/**
+ * Kinds of SessionPermissionResponse.
+ */
+export type PermissionKind = typeof PermissionKindPrompt | typeof PermissionKindPlan | typeof PermissionKindUnreadable;
+/**
+ * SessionPermissionResponse is the dialog a Blocked session waits on, read by
+ * the server so the page never parses a screen. RequestID is what a permission
+ * answer sends back; it is empty when Kind is unreadable.
+ */
+export interface SessionPermissionResponse {
+  kind: string;
+  text: string;
+  request_id: string;
+}
+
+//////////
+// source: sessionprompt.go
+
+export const ReasonPromptHarnessNotSupported = "harness-not-supported";
+export const ReasonPromptPrefixNotAllowed = "prefix-not-allowed";
+export const ReasonPromptTextTooLong = "text-too-long";
+/**
+ * Refusal reasons of the session prompt route, beside the session ones.
+ */
+export type ReasonPrompt = typeof ReasonPromptHarnessNotSupported | typeof ReasonPromptPrefixNotAllowed | typeof ReasonPromptTextTooLong;
+/**
+ * SessionPromptRequest is the body of POST /v1/sessions/prompt. LastMessage is
+ * the id of the last chat message the page saw; the web mux refuses a send once
+ * the transcript has moved past it.
+ */
+export interface SessionPromptRequest {
+  id: string;
+  text: string;
+  last_message?: string;
+  /**
+   * Continue replaces Text: the server types /clear and /gx-design <epic>.
+   */
+  continue?: boolean;
+}
+
+//////////
+// source: sessionround.go
+
+/**
+ * SessionRoundOption is one choice of an options card.
+ */
+export interface SessionRoundOption {
+  id: string;
+  label: string;
+  consequence?: string;
+}
+/**
+ * SessionRoundCard is one question of a Grilling round. Kind is yes-no,
+ * options or text; Note says why a card fell back to text.
+ */
+export interface SessionRoundCard {
+  label: string; // the header's question id without the Q: "8", or "8b"
+  title: string;
+  body: string;
+  kind: string;
+  yes?: string;
+  no?: string;
+  options?: SessionRoundOption[];
+  recommended?: string;
+  note?: string;
+}
+/**
+ * SessionNext is the Actionable a gx-design run-end line raises.
+ */
+export interface SessionNext {
+  action: SessionActionable;
+}
+/**
+ * SessionBackgroundTask is a shell, Monitor or subagent still running.
+ */
+export interface SessionBackgroundTask {
+  kind: string; // transcript.BackgroundTaskShell, ...Monitor or ...Agent
+  label: string;
+  started_at: string;
+}
+
+//////////
+// source: sessions.go
+
+/**
+ * EventSessionChanged announces a new or changed interactive session; its
+ * Address is the session id.
+ */
+export const EventSessionChanged = "session-changed";
+export const ReasonSessionBadRequest = "bad-request";
+export const ReasonSessionUnknownHarness = "unknown-harness";
+export const ReasonSessionHarnessMissing = "harness-missing";
+export const ReasonSessionUnknown = "unknown-session";
+export const ReasonSessionLive = "session-live";
+export const ReasonSessionNotLive = "session-not-live";
+export const ReasonSessionNotIdle = "session-not-idle";
+export const ReasonSessionNoAction = "no-action";
+export const ReasonSessionDirGone = "dir-gone";
+export const ReasonSessionNoResume = "no-resume";
+export const ReasonSessionNotDesign = "not-design-session";
+export const ReasonSessionNameTaken = "name-taken";
+export const ReasonSessionQueue = "queue-session";
+/**
+ * Refusal reasons of the interactive-session writes.
+ */
+export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue;
+export const SessionStarting = "starting";
+export const SessionWorking = "working";
+export const SessionIdle = "idle";
+export const SessionBlocked = "blocked";
+export const SessionRateLimited = "rate-limited";
+export const SessionExited = "exited";
+/**
+ * Session states, as SessionStatus.State.
+ */
+export type Session = typeof SessionStarting | typeof SessionWorking | typeof SessionIdle | typeof SessionBlocked | typeof SessionRateLimited | typeof SessionExited;
+export const SessionExitClean = "clean";
+export const SessionExitCrashed = "crashed";
+/**
+ * How an Exited session ended, as SessionInfo.Exit.
+ */
+export type SessionExitC = typeof SessionExitClean | typeof SessionExitCrashed;
+
+//////////
+// source: sessionscreen.go
+
+/**
+ * SessionScreenResponse is a session's screen as plain text rows, without
+ * colours: the live holder's, or the one saved when the session exited.
+ */
+export interface SessionScreenResponse {
+  rows: string[];
+}
+
+//////////
+// source: sessionstate.go
+
+/**
+ * SessionRequest names the session a stop or remove acts on. State is the
+ * token the web sends with a stop or Restore; see SessionStateToken. Only the
+ * web mux checks it (see checkDesignWrite): the plain mux ignores State, and on
+ * the web mux an empty State never matches a token, so it is refused as stale.
+ */
+export interface SessionRequest {
+  id: string;
+  state?: string;
+}
+
+//////////
+// source: sessiontypes.go
+
+/**
+ * SessionInfo is an interactive session on the wire: everything the Agents
+ * tab shows.
+ */
+export interface SessionInfo {
+  id: string;
+  name?: string;
+  project: string;
+  dir: string;
+  harness: string;
+  /**
+   * Ticket is the Session ticket's address.
+   */
+  ticket?: string;
+  /**
+   * Design marks a session whose ticket is on a map epic: a gx-design run.
+   */
+  design?: boolean;
+  /**
+   * Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
+   * no Unread or Actionable, and Holder is the agent dir the TUI opens the
+   * live panel from.
+   */
+  queue?: boolean;
+  holder?: string;
+  /**
+   * WaitingLabel is the Queue row's check-lock label (see checkWaitingLabel).
+   */
+  waiting_label?: string;
+  status: SessionStatus;
+  status_changed_at: string;
+  /**
+   * RunStartedAt is when the current run began: the last Restore, else the
+   * creation. Unlike StatusChangedAt it ignores Idle/Working flips.
+   */
+  run_started_at: string;
+  /**
+   * Exit is how an Exited session ended.
+   */
+  exit?: string;
+  /**
+   * Stopped marks a session the person stopped; it is never auto-resumed.
+   */
+  stopped?: boolean;
+  unread: SessionUnread;
+  actionable: SessionActionable;
+  /**
+   * AutoAdvance is the session's auto-advance switch; on unless the person
+   * turned it off.
+   */
+  auto_advance: boolean;
+  /**
+   * AutoAdvanceAt is when the running countdown sends the Continue; unset
+   * with none running.
+   */
+  auto_advance_at?: string;
+  /**
+   * ReportedStep is the Design step the agent says it is running, and
+   * ReportedTitle the ticket it is on during Resolve tickets. Both clear when
+   * the session goes idle.
+   */
+  reported_step?: string;
+  reported_title?: string;
+  /**
+   * Failure is set while the session is in one of the failure states.
+   */
+  failure?: SessionFailure;
+  /**
+   * RebaseNote says why a Design open did not rebase the design branch onto
+   * trunk; empty when it did.
+   */
+  rebase_note?: string;
+  /**
+   * Tier, Model and Effort are what the session launched under. For a Claude
+   * session Model is the one its newest reply reports, once there is a reply.
+   */
+  tier?: any /* ralphloop.Tier */;
+  model?: string;
+  effort?: string;
+  /**
+   * ModelSwitched is set when Model is not the one the launch tier chose, so
+   * the person switched it by hand. Never set for a launch with no explicit model.
+   */
+  model_switched?: boolean;
+}
+/**
+ * SessionStatus is a Session status.
+ */
+export interface SessionStatus {
+  state: string;
+  /**
+   * Kind and Message are what a Blocked session waits on.
+   */
+  kind?: string;
+  message?: string;
+  background?: boolean;
+}
+/**
+ * SessionUnread is a session's Unread; Resumed marks one raised by a resume.
+ */
+export interface SessionUnread {
+  unread?: boolean;
+  resumed?: boolean;
+}
+/**
+ * SessionActionable is set while Reason is; Action is its ordered prompts.
+ * Kind is the block's kind on one derived from Blocked, which wins over an
+ * agent-raised one while the block lasts. A "queue" Kind has no prompts: its
+ * Target is the epic whose queue the Action runs. GxRaised marks one gx raised
+ * itself: the person's input does not clear it.
+ */
+export interface SessionActionable {
+  kind?: string;
+  reason?: string;
+  action?: string[];
+  target?: string;
+  gx_raised?: boolean;
+  /**
+   * Grilling marks the Actionable of a gx-design grilling round, so clients
+   * do not match its Reason text.
+   */
+  grilling?: boolean;
+  /**
+   * Derived marks an Actionable the server computed from the last assistant
+   * turn of a Design session. The next idle recomputes it.
+   */
+  derived?: boolean;
+}
+/**
+ * SessionActionableQueue is the Kind of an Actionable whose Action is a queue
+ * action on Target, not prompts.
+ */
+export const SessionActionableQueue = "queue";
+/**
+ * MarkActionableRequest is the body of `gx agent actionable`: the caller's
+ * session, why it needs the person and its optional Action.
+ */
+export interface MarkActionableRequest {
+  id: string;
+  reason: string;
+  action?: string[];
+}
+/**
+ * LinkSessionRequest is the body of `gx agent link`: the caller's session
+ * and its Session ticket's address.
+ */
+export interface LinkSessionRequest {
+  id: string;
+  ticket: string;
+}
+/**
+ * ReportStepRequest is the body of `gx agent step`: the caller's session, the
+ * Design step it is running and, during Resolve tickets, the ticket's title.
+ */
+export interface ReportStepRequest {
+  id: string;
+  step: string;
+  title?: string;
+}
+/**
+ * CreateSessionRequest is the body of a session create. Cols and Rows are the
+ * creating client's terminal panel; zero means the loop default.
+ */
+export interface CreateSessionRequest {
+  project: string;
+  /**
+   * Dir is where the session runs; Worktree replaces it.
+   */
+  dir?: string;
+  /**
+   * Worktree names a new worktree, made from trunk by the Worktrees tab's
+   * path and branch rule, for the session to run in. gx never deletes it.
+   */
+  worktree?: string;
+  /**
+   * Name falls back to Worktree, then the harness's Display name, then
+   * `<project>-<n>`.
+   */
+  name?: string;
+  /**
+   * UniqueName refuses the create when a live session already has Name.
+   */
+  unique_name?: boolean;
+  ticket?: string;
+  /**
+   * Prompt is typed at the session's first Idle; empty starts it Idle.
+   */
+  prompt?: string;
+  /**
+   * Harness defaults to claude.
+   */
+  harness?: string;
+  cols?: number /* int */;
+  rows?: number /* int */;
+  /**
+   * MadeWorktree marks Dir as a worktree gx made, as Worktree does.
+   */
+  made_worktree?: boolean;
+  /**
+   * RebaseNote is saved in the meta as RebaseNote.
+   */
+  rebase_note?: string;
+  /**
+   * Tier is the model tier; empty means worker.
+   */
+  tier?: any /* ralphloop.Tier */;
+}
+/**
+ * SessionResult is a session write's outcome: the session, or a refusal.
+ */
+export interface SessionResult {
+  session?: SessionInfo;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+  /**
+   * Client is the TUI a focus request went to; empty with no TUI connected.
+   */
+  client?: string;
+  /**
+   * EpicCreated and StartError report a New Design open that wrote the map
+   * epic but whose session did not start: the Design exists, Refused is false.
+   */
+  epic_created?: boolean;
+  start_error?: string;
+}

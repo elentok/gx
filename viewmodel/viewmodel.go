@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 )
 
@@ -72,7 +74,7 @@ type State struct {
 	AFK bool
 	// Sessions is the interactive sessions, oldest first, as the last snapshot
 	// delivered them.
-	Sessions []server.SessionInfo
+	Sessions []wire.SessionInfo
 }
 
 // OlderServer reports a snapshot from a server that predates rendered status
@@ -227,7 +229,7 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 	case server.EventHerdrAvailable:
 		s.HerdrUnavailable, s.HerdrText = false, ""
 		return s, EffectNone
-	case server.EventSessionFocus:
+	case wire.EventSessionFocus:
 		return s, EffectNone
 	case server.EventQueueChanged:
 		return s, EffectResnapshot | EffectRefetchQueue

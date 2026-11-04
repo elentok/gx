@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -38,8 +40,8 @@ func (f *fakeServerClient) EventsAs(ctx context.Context, since uint64, _ string)
 }
 
 // ReportFocus is reached: the Agents tab reports on every update.
-func (f *fakeServerClient) ReportFocus(context.Context, server.FocusReport) (server.SessionResult, error) {
-	return server.SessionResult{}, nil
+func (f *fakeServerClient) ReportFocus(context.Context, wire.FocusReport) (wire.SessionResult, error) {
+	return wire.SessionResult{}, nil
 }
 
 // QueueAdd is on both embedded interfaces, so the fake picks one.

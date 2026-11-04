@@ -6,26 +6,11 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/harness"
 )
-
-// SessionCommandEntry is one row of the command menu. Name has no leading
-// "/" or "$".
-type SessionCommandEntry struct {
-	Name        string   `json:"name"`
-	ArgHint     string   `json:"arg_hint"`
-	Description string   `json:"description"`
-	Source      string   `json:"source"` // built-in, skill or mcp
-	Aliases     []string `json:"aliases"`
-}
-
-// SessionCommandsResponse is the menu for one session or project dir. Degraded
-// means the harness did not answer and Entries are only the built-ins.
-type SessionCommandsResponse struct {
-	Entries  []SessionCommandEntry `json:"entries"`
-	Degraded bool                  `json:"degraded"`
-}
 
 // sessionCommandsRead serves the command menu of a session (session=) or of a
 // First prompt in a project dir (project= and dir=), for kind "/" (default)
@@ -41,7 +26,7 @@ func (s *Server) sessionCommandsRead(w http.ResponseWriter, r *http.Request) {
 	bySession := id != "" && project == "" && dir == ""
 	byProject := id == "" && project != "" && dir != ""
 	if (kind != "/" && kind != "$") || bySession == byProject {
-		writeCommandsRefusal(w, sessionRefusal(ReasonSessionBadRequest, "want kind / or $, and either session or project with dir"))
+		writeCommandsRefusal(w, sessionRefusal(wire.ReasonSessionBadRequest, "want kind / or $, and either session or project with dir"))
 		return
 	}
 
@@ -55,7 +40,7 @@ func (s *Server) sessionCommandsRead(w http.ResponseWriter, r *http.Request) {
 		}
 		var ok bool
 		if name, ok = s.commandHarness(meta.Harness); !ok {
-			writeCommandsRefusal(w, sessionRefusal(ReasonPromptHarnessNotSupported, "this harness has no command list"))
+			writeCommandsRefusal(w, sessionRefusal(wire.ReasonPromptHarnessNotSupported, "this harness has no command list"))
 			return
 		}
 		dir = meta.Dir
@@ -66,7 +51,7 @@ func (s *Server) sessionCommandsRead(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			writeCommandsFailure(w, SessionResult{}, err)
+			writeCommandsFailure(w, wire.SessionResult{}, err)
 			return
 		}
 	}
@@ -88,7 +73,7 @@ func (s *Server) commandHarness(name string) (string, bool) {
 
 // commandList is the menu for harnessName in dir. Claude has only "/", and
 // Codex's "/" is its built-ins, so neither starts a probe for the other kind.
-func (s *Server) commandList(ctx context.Context, harnessName, kind, dir string) SessionCommandsResponse {
+func (s *Server) commandList(ctx context.Context, harnessName, kind, dir string) wire.SessionCommandsResponse {
 	var res commandlist.Result
 	switch {
 	case harnessName == string(harness.Claude) && kind == "/":
@@ -104,9 +89,9 @@ func (s *Server) commandList(ctx context.Context, harnessName, kind, dir string)
 	case harnessName == string(harness.Codex):
 		res.Entries = commandlist.BuiltinsFor(harnessName, runtime.GOOS).Entries
 	}
-	out := SessionCommandsResponse{Entries: make([]SessionCommandEntry, 0, len(res.Entries)), Degraded: res.Degraded}
+	out := wire.SessionCommandsResponse{Entries: make([]wire.SessionCommandEntry, 0, len(res.Entries)), Degraded: res.Degraded}
 	for _, e := range res.Entries {
-		out.Entries = append(out.Entries, SessionCommandEntry{
+		out.Entries = append(out.Entries, wire.SessionCommandEntry{
 			Name: e.Name, ArgHint: e.ArgHint, Description: e.Description,
 			Source: string(e.Source), Aliases: append([]string{}, e.Aliases...),
 		})
@@ -115,7 +100,7 @@ func (s *Server) commandList(ctx context.Context, harnessName, kind, dir string)
 }
 
 // writeCommandsFailure answers a refusal, or an internal error when err is set.
-func writeCommandsFailure(w http.ResponseWriter, res SessionResult, err error) {
+func writeCommandsFailure(w http.ResponseWriter, res wire.SessionResult, err error) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -125,9 +110,9 @@ func writeCommandsFailure(w http.ResponseWriter, res SessionResult, err error) {
 
 // writeCommandsRefusal answers with the refusal as JSON under a 4xx status, so
 // a caller can read its reason.
-func writeCommandsRefusal(w http.ResponseWriter, res SessionResult) {
+func writeCommandsRefusal(w http.ResponseWriter, res wire.SessionResult) {
 	status := http.StatusBadRequest
-	if res.Reason == ReasonSessionUnknown {
+	if res.Reason == wire.ReasonSessionUnknown {
 		status = http.StatusNotFound
 	}
 	w.Header().Set("Content-Type", "application/json")

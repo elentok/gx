@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
@@ -23,50 +25,50 @@ const resumeCrashWindow = 10 * time.Second
 // resumeSession runs the harness's Resume of an Exited session's newest
 // conversation in a new holder, in the same dir. The gx session carries on:
 // id, name, Unread, Actionable and Session ticket are kept.
-func (s *Server) resumeSession(req SessionRequest) (SessionResult, error) {
+func (s *Server) resumeSession(req wire.SessionRequest) (wire.SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	dir, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if meta.Status.State != SessionExited {
-		return sessionRefusal(ReasonSessionLive, fmt.Sprintf("session %s is live", req.ID)), nil
+	if meta.Status.State != wire.SessionExited {
+		return sessionRefusal(wire.ReasonSessionLive, fmt.Sprintf("session %s is live", req.ID)), nil
 	}
 	if res := s.resumeRefusal(meta); res.Refused {
 		return res, nil
 	}
 	meta.RestoredAt = time.Now()
-	if meta.HandoffTier && meta.Exit == SessionExitCrashed {
+	if meta.HandoffTier && meta.Exit == wire.SessionExitCrashed {
 		s.applyTier(&meta, meta.Tier)
 	}
 	if err := s.startResumedHolder(dir, &meta, time.Time{}); err != nil {
 		s.endFailedStart(dir, &meta)
-		return SessionResult{}, err
+		return wire.SessionResult{}, err
 	}
 	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	return wire.SessionResult{Session: &info}, nil
 }
 
 // resumeRefusal is why meta's session cannot be resumed, if it cannot.
-func (s *Server) resumeRefusal(meta sessionMeta) SessionResult {
+func (s *Server) resumeRefusal(meta sessionMeta) wire.SessionResult {
 	if fi, err := os.Stat(meta.Dir); err != nil || !fi.IsDir() {
-		return sessionRefusal(ReasonSessionDirGone, "dir is gone")
+		return sessionRefusal(wire.ReasonSessionDirGone, "dir is gone")
 	}
 	h, err := harness.Lookup(agentrunner.Kind(meta.Harness))
 	if err != nil {
-		return sessionRefusal(ReasonSessionUnknownHarness, err.Error())
+		return sessionRefusal(wire.ReasonSessionUnknownHarness, err.Error())
 	}
 	if _, ok := h.Resume(meta.ConversationID, harness.LaunchOptions{}); !ok {
-		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness))
+		return sessionRefusal(wire.ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness))
 	}
 	if agentrunner.Kind(meta.Harness) == harness.Codex && !s.codexRolloutExists(meta.Dir, meta.ConversationID) {
-		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("no Codex rollout for conversation %q in %s", meta.ConversationID, meta.Dir))
+		return sessionRefusal(wire.ReasonSessionNoResume, fmt.Sprintf("no Codex rollout for conversation %q in %s", meta.ConversationID, meta.Dir))
 	}
 	if msg := s.interactiveMissingReason(meta.Harness, "the session's harness"); msg != "" {
-		return sessionRefusal(ReasonSessionHarnessMissing, msg)
+		return sessionRefusal(wire.ReasonSessionHarnessMissing, msg)
 	}
-	return SessionResult{}
+	return wire.SessionResult{}
 }
 
 // startResumedHolder starts the session's next run on its saved
@@ -77,14 +79,14 @@ func (s *Server) startResumedHolder(dir string, meta *sessionMeta, crashUntil ti
 		return err
 	}
 	meta.Run++
-	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = SessionStatus{}, time.Now(), "", false
+	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = wire.SessionStatus{}, time.Now(), "", false
 	meta.RestoreCrashed = false
 	if err := s.startSessionHolder(dir, meta, 0, 0, true); err != nil {
 		return err
 	}
 	id, run := meta.ID, meta.Run
 	s.sessionWatches.start(func() { s.watchSession(dir, id, run, crashUntil, false) })
-	s.events.publish(EventSessionChanged, id)
+	s.events.publish(wire.EventSessionChanged, id)
 	return nil
 }
 
@@ -124,7 +126,7 @@ func (s *Server) restoreSessions() {
 	}
 	var dead []string
 	for _, info := range list {
-		if info.Status.State == SessionExited {
+		if info.Status.State == wire.SessionExited {
 			continue
 		}
 		dir := filepath.Join(s.cfg.SessionsDir, info.ID)
@@ -173,7 +175,7 @@ func (s *Server) autoResumeSession(id string) {
 		s.log.Warn("auto-resume session", "session", id, "err", err, "refusal", res.Message)
 		return
 	}
-	if meta.Status.State == SessionExited || meta.Stopped {
+	if meta.Status.State == wire.SessionExited || meta.Stopped {
 		return
 	}
 	reason := "auto-resume is off"
@@ -183,7 +185,7 @@ func (s *Server) autoResumeSession(id string) {
 	if reason == "" {
 		ended := meta
 		meta.RestoredAt = time.Time{}
-		if meta.Status.State == SessionWorking {
+		if meta.Status.State == wire.SessionWorking {
 			s.raiseUnread(&meta)
 			meta.Unread.Resumed = meta.Unread.Unread
 		}

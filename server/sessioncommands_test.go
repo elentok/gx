@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -62,11 +64,11 @@ func (f commandsFixture) probes(t *testing.T) int {
 }
 
 // get calls the route with query and decodes a 200 answer.
-func (f commandsFixture) get(t *testing.T, query url.Values) (int, server.SessionCommandsResponse, server.SessionResult) {
+func (f commandsFixture) get(t *testing.T, query url.Values) (int, wire.SessionCommandsResponse, wire.SessionResult) {
 	t.Helper()
 	code, body := webDoCookie(t, http.MethodGet, f.base+"/v1/sessions/commands?"+query.Encode(), f.ck)
-	var res server.SessionCommandsResponse
-	var refusal server.SessionResult
+	var res wire.SessionCommandsResponse
+	var refusal wire.SessionResult
 	if code == http.StatusOK {
 		if err := json.Unmarshal([]byte(body), &res); err != nil {
 			t.Fatalf("body %q: %v", body, err)
@@ -87,8 +89,8 @@ func (f commandsFixture) projectQuery(kind string) url.Values {
 	return q
 }
 
-func names(list server.SessionCommandsResponse) map[string]server.SessionCommandEntry {
-	out := map[string]server.SessionCommandEntry{}
+func names(list wire.SessionCommandsResponse) map[string]wire.SessionCommandEntry {
+	out := map[string]wire.SessionCommandEntry{}
 	for _, e := range list.Entries {
 		out[e.Name] = e
 	}
@@ -98,7 +100,7 @@ func names(list server.SessionCommandsResponse) map[string]server.SessionCommand
 // createSession starts a fake-harness session in a temp dir.
 func (f commandsFixture) createSession(t *testing.T, kind string) string {
 	t.Helper()
-	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: kind, Ticket: "proj:map"})
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: kind, Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -234,7 +236,7 @@ func TestSessionCommands_DirOutsideTheProjectIsRefused(t *testing.T) {
 	t.Parallel()
 	f := startCommands(t, agentfake.ProbeConfig{})
 	code, _, refusal := f.get(t, url.Values{"project": {"proj"}, "dir": {t.TempDir()}})
-	if code != http.StatusBadRequest || refusal.Reason != server.ReasonSessionBadRequest {
+	if code != http.StatusBadRequest || refusal.Reason != wire.ReasonSessionBadRequest {
 		t.Errorf("code %d, refusal %+v", code, refusal)
 	}
 	if f.probes(t) != 0 {
@@ -294,13 +296,13 @@ func TestSessionCommands_Refusals(t *testing.T) {
 		code   int
 		reason string
 	}{
-		{"unknown session", url.Values{"session": {"nope"}}, http.StatusNotFound, server.ReasonSessionUnknown},
-		{"harness without a list", url.Values{"session": {"other"}}, http.StatusBadRequest, server.ReasonPromptHarnessNotSupported},
-		{"bad id", url.Values{"session": {"../x"}}, http.StatusBadRequest, server.ReasonSessionBadRequest},
-		{"neither", url.Values{}, http.StatusBadRequest, server.ReasonSessionBadRequest},
-		{"both", url.Values{"session": {"other"}, "project": {"proj"}, "dir": {"/"}}, http.StatusBadRequest, server.ReasonSessionBadRequest},
-		{"project without dir", url.Values{"project": {"proj"}}, http.StatusBadRequest, server.ReasonSessionBadRequest},
-		{"bad kind", url.Values{"session": {"other"}, "kind": {"!"}}, http.StatusBadRequest, server.ReasonSessionBadRequest},
+		{"unknown session", url.Values{"session": {"nope"}}, http.StatusNotFound, wire.ReasonSessionUnknown},
+		{"harness without a list", url.Values{"session": {"other"}}, http.StatusBadRequest, wire.ReasonPromptHarnessNotSupported},
+		{"bad id", url.Values{"session": {"../x"}}, http.StatusBadRequest, wire.ReasonSessionBadRequest},
+		{"neither", url.Values{}, http.StatusBadRequest, wire.ReasonSessionBadRequest},
+		{"both", url.Values{"session": {"other"}, "project": {"proj"}, "dir": {"/"}}, http.StatusBadRequest, wire.ReasonSessionBadRequest},
+		{"project without dir", url.Values{"project": {"proj"}}, http.StatusBadRequest, wire.ReasonSessionBadRequest},
+		{"bad kind", url.Values{"session": {"other"}, "kind": {"!"}}, http.StatusBadRequest, wire.ReasonSessionBadRequest},
 	}
 	for _, c := range cases {
 		code, _, refusal := f.get(t, c.query)
@@ -315,7 +317,7 @@ func TestSessionCommands_NoResumeHarnessIsNotSupported(t *testing.T) {
 	f := startCommands(t, agentfake.ProbeConfig{}, servertest.WithTestHolder())
 	id := f.createSession(t, string(agentfake.NoResumeHarnessKind))
 	code, _, refusal := f.get(t, url.Values{"session": {id}})
-	if code != http.StatusBadRequest || refusal.Reason != server.ReasonPromptHarnessNotSupported {
+	if code != http.StatusBadRequest || refusal.Reason != wire.ReasonPromptHarnessNotSupported {
 		t.Errorf("code %d, refusal %+v", code, refusal)
 	}
 }

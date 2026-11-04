@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -61,7 +63,7 @@ func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) de
 	return designsFixture{h: h, ctx: ctx, evs: evs, repo: repo, base: hs.WebURL, ck: login(t, h.StateDir, hs.WebURL)}
 }
 
-func (f designsFixture) open(t *testing.T, epic string, isNew bool) server.SessionResult {
+func (f designsFixture) open(t *testing.T, epic string, isNew bool) wire.SessionResult {
 	t.Helper()
 	res, err := f.h.Client.OpenDesign(f.ctx, server.DesignOpenRequest{Epic: epic, New: isNew})
 	if err != nil {
@@ -70,15 +72,15 @@ func (f designsFixture) open(t *testing.T, epic string, isNew bool) server.Sessi
 	return res
 }
 
-func (f designsFixture) live(t *testing.T) []server.SessionInfo {
+func (f designsFixture) live(t *testing.T) []wire.SessionInfo {
 	t.Helper()
 	snap, err := f.h.Client.Snapshot(f.ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out []server.SessionInfo
+	var out []wire.SessionInfo
 	for _, s := range snap.Sessions {
-		if s.Status.State != server.SessionExited {
+		if s.Status.State != wire.SessionExited {
 			out = append(out, s)
 		}
 	}
@@ -169,7 +171,7 @@ func TestDesignsOpen_ImplEpicWithoutBranchStillUsesTheDesignWorktree(t *testing.
 
 // reopenAfterTrunkCommit opens the map, stops it, lets edit change the design
 // worktree, commits file=content on trunk, and opens again.
-func (f designsFixture) reopenAfterTrunkCommit(t *testing.T, file, content string, edit func(dir string)) (server.SessionResult, string) {
+func (f designsFixture) reopenAfterTrunkCommit(t *testing.T, file, content string, edit func(dir string)) (wire.SessionResult, string) {
 	t.Helper()
 	first := f.open(t, "proj:map", false)
 	dir, _ := readMeta(t, f.h, first.Session.ID)["dir"].(string)
@@ -238,7 +240,7 @@ func TestLinkSession_CarriesTheRebaseNote(t *testing.T) {
 		gitOut(t, dir, "add", "c.txt")
 		gitOut(t, dir, "commit", "-m", "design change")
 	})
-	linked, err := f.h.Client.LinkSession(f.ctx, server.LinkSessionRequest{ID: res.Session.ID, Ticket: "proj:map"})
+	linked, err := f.h.Client.LinkSession(f.ctx, wire.LinkSessionRequest{ID: res.Session.ID, Ticket: "proj:map"})
 	if err != nil || linked.Session == nil || linked.Session.RebaseNote != res.Session.RebaseNote || linked.Session.RebaseNote == "" {
 		t.Errorf("link = %+v, %v; want the open's note %q", linked.Session, err, res.Session.RebaseNote)
 	}
@@ -432,7 +434,7 @@ func TestDesignsWorktree_Refusals(t *testing.T) {
 		{"proj:plain", server.ReasonDesignNotMapEpic},
 		{"proj:nope", server.ReasonDesignUnknownEpic},
 		{"proj:map", server.ReasonDesignBranchClash},
-		{"proj", server.ReasonSessionBadRequest},
+		{"proj", wire.ReasonSessionBadRequest},
 	} {
 		if res := f.worktree(t, tc.epic, ""); !res.Refused || res.Reason != tc.reason || res.Path != "" {
 			t.Errorf("worktree %s = %+v, want %s", tc.epic, res, tc.reason)
@@ -460,7 +462,7 @@ func TestDesignsOpen_ReturnsTheNewestLiveSession(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	mk := func() string {
-		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+		res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}
@@ -477,7 +479,7 @@ func TestDesignsOpen_ARestoredSessionCountsFromItsRestore(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
 	mk := func() string {
-		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+		res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}
@@ -539,7 +541,7 @@ func TestDesignsOpen_NewStopsTheOldAndCreatesAnother(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, s := range snap.Sessions {
-		if s.ID == old.ID && s.Status.State != server.SessionExited {
+		if s.ID == old.ID && s.Status.State != wire.SessionExited {
 			t.Errorf("old session is %s, want Exited", s.Status.State)
 		}
 	}
@@ -571,8 +573,8 @@ func TestDesignsOpen_Refusals(t *testing.T) {
 		"proj:plain":   server.ReasonDesignNotMapEpic,
 		"proj:nope":    server.ReasonDesignUnknownEpic,
 		"nope:map":     server.ReasonDesignUnknownEpic,
-		"map":          server.ReasonSessionBadRequest,
-		"proj:map/abc": server.ReasonSessionBadRequest,
+		"map":          wire.ReasonSessionBadRequest,
+		"proj:map/abc": wire.ReasonSessionBadRequest,
 	} {
 		if res := f.open(t, epic, false); !res.Refused || res.Reason != want {
 			t.Errorf("open %s = %+v, want %s", epic, res, want)

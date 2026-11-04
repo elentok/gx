@@ -6,35 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
 )
-
-// Kinds of SessionFailure. Not named SessionFailure*: tygo would read them as
-// the struct's own enum.
-const (
-	FailureKindCrashed   = "crashed"
-	FailureKindEnded     = "ended"
-	FailureKindAuth      = "auth"
-	FailureKindRateLimit = "rate-limit"
-	FailureKindStalled   = "stalled"
-	FailureKindBlocked   = "blocked"
-)
-
-// SessionFailure is why a session needs the person, derived from its status
-// and, for auth and stalled, from its transcript. It clears with its
-// condition. Recrashed marks a crashed session whose Restore crashed again
-// within restoreCrashWindow, so the page can stop offering Restore.
-type SessionFailure struct {
-	Kind string `json:"kind"`
-	// Why says what a blocked session waits on: permission, dialog, question or
-	// error (a harness.BlockedKind).
-	Why       string `json:"why,omitempty"`
-	Label     string `json:"label"`
-	Text      string `json:"text,omitempty"`
-	Recrashed bool   `json:"recrashed,omitempty"`
-}
 
 // restoreCrashWindow is how soon after a Restore a crash counts as the
 // Restore failing. The auto-resume window, resumeCrashWindow, is another rule.
@@ -47,20 +24,20 @@ const defaultStallThreshold = 15 * time.Minute
 const stalledLabel = "No progress for 15 min"
 
 // statusFailure is the failure that status alone decides.
-func (m sessionMeta) statusFailure() *SessionFailure {
+func (m sessionMeta) statusFailure() *wire.SessionFailure {
 	switch m.Status.State {
-	case SessionExited:
-		if m.Exit == SessionExitCrashed {
-			return &SessionFailure{Kind: FailureKindCrashed, Label: "Agent crashed", Recrashed: m.RestoreCrashed}
+	case wire.SessionExited:
+		if m.Exit == wire.SessionExitCrashed {
+			return &wire.SessionFailure{Kind: wire.FailureKindCrashed, Label: "Agent crashed", Recrashed: m.RestoreCrashed}
 		}
-		return &SessionFailure{Kind: FailureKindEnded, Label: "Session ended"}
-	case SessionRateLimited:
-		return &SessionFailure{Kind: FailureKindRateLimit, Label: "Rate limited", Text: m.Status.Message}
-	case SessionBlocked:
+		return &wire.SessionFailure{Kind: wire.FailureKindEnded, Label: "Session ended"}
+	case wire.SessionRateLimited:
+		return &wire.SessionFailure{Kind: wire.FailureKindRateLimit, Label: "Rate limited", Text: m.Status.Message}
+	case wire.SessionBlocked:
 		if m.Status.Kind == string(harness.BlockedError) {
-			return &SessionFailure{Kind: FailureKindBlocked, Why: m.Status.Kind, Label: "Agent hit an error", Text: m.Status.Message}
+			return &wire.SessionFailure{Kind: wire.FailureKindBlocked, Why: m.Status.Kind, Label: "Agent hit an error", Text: m.Status.Message}
 		}
-		return &SessionFailure{Kind: FailureKindBlocked, Why: m.Status.Kind, Label: "Waiting at a prompt in the terminal"}
+		return &wire.SessionFailure{Kind: wire.FailureKindBlocked, Why: m.Status.Kind, Label: "Waiting at a prompt in the terminal"}
 	}
 	return nil
 }
@@ -123,7 +100,7 @@ func modelSwitched(launched, shown string) bool {
 
 // sessionInfo is m.info() plus the failure that needs a transcript read, the
 // reported model and the running countdown.
-func (s *Server) sessionInfo(m sessionMeta) SessionInfo {
+func (s *Server) sessionInfo(m sessionMeta) wire.SessionInfo {
 	info := m.info()
 	info.Model = s.reportedModel(m)
 	info.ModelSwitched = modelSwitched(m.Model, info.Model)
@@ -143,9 +120,9 @@ func (s *Server) sessionInfo(m sessionMeta) SessionInfo {
 // transcriptFailure is the auth or stalled failure of a session on the Claude
 // transcript format (Claude, or the chat-harness test seam). Codex errors and
 // stalls are read elsewhere.
-func (s *Server) transcriptFailure(m sessionMeta) *SessionFailure {
+func (s *Server) transcriptFailure(m sessionMeta) *wire.SessionFailure {
 	state := m.Status.State
-	if state != SessionIdle && state != SessionWorking || m.Harness == string(harness.Codex) || !s.settings.Load().hasChatReader(m.Harness) {
+	if state != wire.SessionIdle && state != wire.SessionWorking || m.Harness == string(harness.Codex) || !s.settings.Load().hasChatReader(m.Harness) {
 		return nil
 	}
 	path, ok := s.claudeTranscript(m.ID, m)
@@ -153,21 +130,21 @@ func (s *Server) transcriptFailure(m sessionMeta) *SessionFailure {
 		return nil
 	}
 	switch state {
-	case SessionIdle:
+	case wire.SessionIdle:
 		auth, err := s.authFailures.read(path, func(p string) (bool, error) {
 			e, ok, err := transcript.LastAPIError(p)
 			return ok && (e.Status == 401 || e.Error == "authentication_error"), err
 		})
 		if err == nil && auth {
-			return &SessionFailure{Kind: FailureKindAuth, Label: "Claude login needed", Text: "Run `claude /login` on this computer, then Retry."}
+			return &wire.SessionFailure{Kind: wire.FailureKindAuth, Label: "Claude login needed", Text: "Run `claude /login` on this computer, then Retry."}
 		}
-	case SessionWorking:
+	case wire.SessionWorking:
 		// A background task outlives the turn; the session waits, it is not stalled.
 		if m.Status.Background {
 			break
 		}
 		if fi, err := os.Stat(path); err == nil && time.Since(fi.ModTime()) >= s.cfg.StallThreshold {
-			return &SessionFailure{Kind: FailureKindStalled, Label: stalledLabel}
+			return &wire.SessionFailure{Kind: wire.FailureKindStalled, Label: stalledLabel}
 		}
 	}
 	return nil

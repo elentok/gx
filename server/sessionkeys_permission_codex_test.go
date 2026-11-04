@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -31,7 +33,7 @@ func startCodexPermissionSession(t *testing.T, withDialog bool) promptFixture {
 		if res := f.prompt(t, "run it"); res.Refused {
 			t.Fatalf("prompt = %+v", res)
 		}
-		waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+		waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	}
 	return f
 }
@@ -49,10 +51,10 @@ func TestSessionKeys_CodexScreenDialogTakesYAndEsc(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
 		decision string
-		want     func(server.SessionInfo) bool
+		want     func(wire.SessionInfo) bool
 	}{
-		"allow": {"allow", func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking }},
-		"deny":  {"deny", func(s server.SessionInfo) bool { return s.Status.State != server.SessionBlocked }},
+		"allow": {"allow", func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking }},
+		"deny":  {"deny", func(s wire.SessionInfo) bool { return s.Status.State != wire.SessionBlocked }},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -77,7 +79,7 @@ func TestSessionKeys_CodexUnreadableScreenDeniesButNeverApproves(t *testing.T) {
 		t.Fatalf("allow = %+v, want %s", res, server.ReasonNotApprovable)
 	}
 	// The refused Allow sent no y: the fake is still blocked, and Esc ends it.
-	if got := sessionSnapshotOf(t, f.designsFixture, f.id).Status.State; got != server.SessionBlocked {
+	if got := sessionSnapshotOf(t, f.designsFixture, f.id).Status.State; got != wire.SessionBlocked {
 		t.Fatalf("state after the refusal = %s, want blocked", got)
 	}
 	if res := f.permission(t, "deny", ""); res.Refused {
@@ -103,8 +105,8 @@ func TestSessionKeys_CodexHookRequestIsAnsweredByTheDecisionFile(t *testing.T) {
 
 	// Nothing here plays the hook, which would read the file and let the agent
 	// go on, so the session stays Blocked: the answer is written, not delivered.
-	if res := f.permission(t, "allow", "req-1"); !res.Refused || res.Reason != server.ReasonKeysNotDelivered {
-		t.Fatalf("allow = %+v, want %s", res, server.ReasonKeysNotDelivered)
+	if res := f.permission(t, "allow", "req-1"); !res.Refused || res.Reason != wire.ReasonKeysNotDelivered {
+		t.Fatalf("allow = %+v, want %s", res, wire.ReasonKeysNotDelivered)
 	}
 	d, ok, err := nativerunner.ReadPermissionDecision(dir)
 	if err != nil || !ok || d.ID != "req-1" || !d.Allow {

@@ -10,6 +10,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -187,7 +189,7 @@ func (f *fixture) liveTranscripts(ctx context.Context) (map[string]string, error
 	if err != nil {
 		return nil, fmt.Errorf("list sessions: %w\n%s", err, raw)
 	}
-	var list []server.SessionInfo
+	var list []wire.SessionInfo
 	if err := json.Unmarshal(raw, &list); err != nil {
 		return nil, err
 	}
@@ -203,7 +205,7 @@ func (f *fixture) liveTranscripts(ctx context.Context) (map[string]string, error
 		if err != nil {
 			return nil, fmt.Errorf("chat %s: %w\n%s", si.ID, err, raw)
 		}
-		var chat server.SessionChatResponse
+		var chat wire.SessionChatResponse
 		if err := json.Unmarshal(raw, &chat); err != nil || chat.ConversationID == "" {
 			return nil, fmt.Errorf("session %s has no conversation id in %s", si.ID, raw)
 		}

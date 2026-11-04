@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
@@ -46,7 +48,7 @@ func startGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*se
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
+	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -106,21 +108,21 @@ func TestGrilling_DetectedOnIdleForDesignSessions(t *testing.T) {
 			h, ctx, evs, id, conv, path := startGrillingSession(t, tc.ticket)
 			writeAssistantMessage(t, path, tc.text)
 			report(t, conv, agentfake.Control{State: "working"})
-			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+			waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 			report(t, conv, agentfake.Control{State: "idle"})
-			got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+			got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 			if tc.raised {
-				got = waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+				got = waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 				if got.Actionable.Reason != "Grilling: waiting for your answers" {
 					t.Fatalf("actionable = %+v, want the grilling reason", got.Actionable)
 				}
 				clearByInput(t, h, id)
-				waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason == "" })
+				waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason == "" })
 				return
 			}
 			// A later status change orders the check after the detection ran.
 			report(t, conv, agentfake.Control{State: "working"})
-			got = waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+			got = waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 			if got.Actionable.Reason != "" {
 				t.Errorf("actionable = %+v, want none", got.Actionable)
 			}
@@ -135,9 +137,9 @@ func TestGrilling_DetectedWhenTheTurnLandsAfterIdle(t *testing.T) {
 	h, ctx, evs, id, conv, path := startGrillingSession(t, "proj:map")
 	writeAssistantMessage(t, path, "Reading the code.")
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	line, err := json.Marshal(map[string]any{
 		"type":    "assistant",
 		"message": map[string]any{"content": []map[string]any{{"type": "text", "text": "❓ **Q1** Which store?"}}},
@@ -146,7 +148,7 @@ func TestGrilling_DetectedWhenTheTurnLandsAfterIdle(t *testing.T) {
 		t.Fatal(err)
 	}
 	appendLines(t, path, string(line), turnDurationLine)
-	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 	if !got.Actionable.Grilling {
 		t.Fatalf("actionable = %+v, want the grilling round", got.Actionable)
 	}
@@ -171,18 +173,18 @@ func TestRunEnd_DetectedOnIdleForDesignSessions(t *testing.T) {
 			h, ctx, evs, id, conv, path := startGrillingSession(t, "proj:map")
 			writeAssistantMessage(t, path, tc.text)
 			report(t, conv, agentfake.Control{State: "working"})
-			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+			waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 			report(t, conv, agentfake.Control{State: "idle"})
-			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+			waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 			if !tc.wantAction {
 				report(t, conv, agentfake.Control{State: "working"})
-				got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+				got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 				if got.Actionable.Reason != "" {
 					t.Errorf("actionable = %+v, want none", got.Actionable)
 				}
 				return
 			}
-			got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" }).Actionable
+			got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" }).Actionable
 			if got.Reason != tc.reason || got.Kind != tc.kind || got.Target != tc.target || !slices.Equal(got.Action, tc.action) {
 				t.Errorf("actionable = %+v, want reason %q kind %q target %q action %v", got, tc.reason, tc.kind, tc.target, tc.action)
 			}
@@ -206,9 +208,9 @@ func TestRunEnd_NoContinueAtBranchAndDone(t *testing.T) {
 			h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", storeWithMapStep(t, tc.step))
 			writeAssistantMessage(t, path, line)
 			report(t, conv, agentfake.Control{State: "working"})
-			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+			waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 			report(t, conv, agentfake.Control{State: "idle"})
-			got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" }).Actionable
+			got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" }).Actionable
 			if got.Reason != line || (len(got.Action) > 0) != tc.wantAction {
 				t.Errorf("actionable = %+v, want reason %q, action present = %v", got, line, tc.wantAction)
 			}

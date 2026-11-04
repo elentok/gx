@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -24,7 +26,7 @@ func clearFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, 
 		t.Fatal(err)
 	}
 	report(t, oldConv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(server.SessionInfo) bool { return readMeta(t, h, id)["conversation_id"] == newConv })
+	waitForSession(ctx, t, h, evs, id, func(wire.SessionInfo) bool { return readMeta(t, h, id)["conversation_id"] == newConv })
 }
 
 func recordsByID(t *testing.T, root string) map[string]conversations.Record {
@@ -42,7 +44,7 @@ func recordsByID(t *testing.T, root string) map[string]conversations.Record {
 
 func TestSessionConversations_LinkedSessionKeepsEveryConversation(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Ticket: "proj:epic/01"})
 	newer := conv + "-cleared"
 	clearFakeSession(ctx, t, h, evs, id, conv, newer)
 
@@ -63,11 +65,11 @@ func TestSessionConversations_LinkedSessionKeepsEveryConversation(t *testing.T) 
 
 func TestSessionConversations_ReLinkMovesTheRunningConversation(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Ticket: "proj:epic/01"})
 	newer := conv + "-cleared"
 	clearFakeSession(ctx, t, h, evs, id, conv, newer)
 
-	if res, err := h.Client.LinkSession(ctx, server.LinkSessionRequest{ID: id, Ticket: "proj:epic/02"}); err != nil || res.Refused {
+	if res, err := h.Client.LinkSession(ctx, wire.LinkSessionRequest{ID: id, Ticket: "proj:epic/02"}); err != nil || res.Refused {
 		t.Fatalf("link = %+v, %v", res, err)
 	}
 	recs := recordsByID(t, h.ConversationsDir)
@@ -81,7 +83,7 @@ func TestSessionConversations_ReLinkMovesTheRunningConversation(t *testing.T) {
 
 func TestSessionConversations_SurviveRemoveAndSkipUnlinked(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Ticket: "proj:epic/01"})
 	stopFakeSession(ctx, t, h, evs, id)
 	if res, err := h.Client.RemoveSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
@@ -119,7 +121,7 @@ func writeTranscriptTurns(t *testing.T, h *servertest.Harness, dir, conv string,
 
 func TestSessionConversations_TotalsSavedWhenAConversationEnds(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Ticket: "proj:epic/01"})
 	dir, _ := readMeta(t, h, id)["dir"].(string)
 	newer := conv + "-cleared"
 	writeTranscriptTurns(t, h, dir, conv, 100, 200)
@@ -144,7 +146,7 @@ func TestSessionConversations_TotalsSavedWhenAConversationEnds(t *testing.T) {
 
 func TestSessionConversations_NoTranscriptLeavesNoTotals(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Ticket: "proj:epic/01"})
 	stopFakeSession(ctx, t, h, evs, id)
 	if r := recordsByID(t, h.ConversationsDir)[conv]; r.Totals != nil {
 		t.Errorf("totals = %+v; want none without a transcript", r.Totals)

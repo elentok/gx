@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
 )
 
 func autoSends(t *testing.T, f *grillingFixture) int {
@@ -19,8 +19,8 @@ func autoSends(t *testing.T, f *grillingFixture) int {
 func autoSendOnce(t *testing.T, f *grillingFixture) {
 	t.Helper()
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
 }
 
 func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
@@ -59,7 +59,7 @@ func TestAutoAdvance_InputAndSwitchFlipResetTheCount(t *testing.T) {
 			writeAssistantMessage(t, f.path, runEndText)
 			autoSendOnce(t, f)
 			endTurn(t, f)
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 			if n := autoSends(t, f); n != 1 {
 				t.Fatalf("auto sends = %d before the input, want 1", n)
 			}
@@ -83,14 +83,14 @@ func TestAutoAdvance_SwitchingOnOverARaisedContinueStartsTheCountdown(t *testing
 	setSwitch(t, f, false)
 	writeAssistantMessage(t, f.path, runEndText)
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 	if screenHas(t, c, "/clear") || sessionSnapshot(t, f).AutoAdvanceAt != nil {
 		t.Fatal("a countdown ran with the switch off")
 	}
 
 	setSwitch(t, f, true)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 	waitForScreen(t, c, "/clear")
 	waitForScreen(t, c, "/gx-design map")
 }

@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 )
 
 func TestSessionScreen_LiveReturnsHolderRows(t *testing.T) {
@@ -36,7 +37,7 @@ func TestSessionScreen_ExitedReturnsSavedScreen(t *testing.T) {
 	if _, err := h.Client.StopSession(ctx, id); err != nil {
 		t.Fatal(err)
 	}
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if err := os.WriteFile(filepath.Join(dir, nativerunner.ScreenFile), []byte("saved one\nsaved two\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

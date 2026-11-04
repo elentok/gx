@@ -11,6 +11,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 )
@@ -230,7 +232,7 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 	if err != nil {
 		return fmt.Errorf("open design %s: %w\n%s", addr, err, out)
 	}
-	var res server.SessionResult
+	var res wire.SessionResult
 	if err := json.Unmarshal(out, &res); err != nil || res.Session == nil {
 		return fmt.Errorf("open design %s: no session in %s", addr, out)
 	}
@@ -243,8 +245,8 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 	}
 	// The opening prompt is still running when `designs open` returns. A control the test sends
 	// meanwhile (Block) is overwritten when that turn ends.
-	if err := f.waitFor(res.Session.ID, "past its opening turn", func(si server.SessionInfo, _ server.SessionChatResponse) bool {
-		return si.Status.State != server.SessionStarting && si.Status.State != server.SessionWorking
+	if err := f.waitFor(res.Session.ID, "past its opening turn", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
+		return si.Status.State != wire.SessionStarting && si.Status.State != wire.SessionWorking
 	}); err != nil {
 		return fmt.Errorf("open design %s: %w", addr, err)
 	}

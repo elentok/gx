@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -26,12 +28,12 @@ func startFailureSession(t *testing.T, chat bool, stall time.Duration) (*servert
 	if chat {
 		opts = append(opts, servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 	}
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, opts...)
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, opts...)
 	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl")
 }
 
 // failureNow is the failure on /v1/sessions and on the chat route.
-func failureNow(ctx context.Context, t *testing.T, h *servertest.Harness, id string) (list, chat *server.SessionFailure) {
+func failureNow(ctx context.Context, t *testing.T, h *servertest.Harness, id string) (list, chat *wire.SessionFailure) {
 	t.Helper()
 	sessions, err := h.Client.Sessions(ctx)
 	if err != nil {
@@ -51,9 +53,9 @@ func failureNow(ctx context.Context, t *testing.T, h *servertest.Harness, id str
 
 // waitForFailure polls until the session's failure has kind ("" for none) on
 // both routes and returns it.
-func waitForFailure(ctx context.Context, t *testing.T, h *servertest.Harness, id, kind string) *server.SessionFailure {
+func waitForFailure(ctx context.Context, t *testing.T, h *servertest.Harness, id, kind string) *wire.SessionFailure {
 	t.Helper()
-	var list, chat *server.SessionFailure
+	var list, chat *wire.SessionFailure
 	for {
 		list, chat = failureNow(ctx, t, h, id)
 		if kindOf(list) == kind && kindOf(chat) == kind {
@@ -70,7 +72,7 @@ func waitForFailure(ctx context.Context, t *testing.T, h *servertest.Harness, id
 	}
 }
 
-func kindOf(f *server.SessionFailure) string {
+func kindOf(f *wire.SessionFailure) string {
 	if f == nil {
 		return ""
 	}
@@ -82,28 +84,28 @@ func TestSessionFailure_Kinds(t *testing.T) {
 	tests := []struct {
 		name  string
 		drive func(t *testing.T, conv string)
-		want  server.SessionFailure
+		want  wire.SessionFailure
 	}{
-		{"crashed", func(t *testing.T, conv string) { exitFake(t, conv, 1) }, server.SessionFailure{Kind: "crashed", Label: "Agent crashed"}},
-		{"ended", func(t *testing.T, conv string) { exitFake(t, conv, 0) }, server.SessionFailure{Kind: "ended", Label: "Session ended"}},
+		{"crashed", func(t *testing.T, conv string) { exitFake(t, conv, 1) }, wire.SessionFailure{Kind: "crashed", Label: "Agent crashed"}},
+		{"ended", func(t *testing.T, conv string) { exitFake(t, conv, 0) }, wire.SessionFailure{Kind: "ended", Label: "Session ended"}},
 		{"rate-limit", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "ratelimited", Message: "resets at 5pm"})
-		}, server.SessionFailure{Kind: "rate-limit", Label: "Rate limited", Text: "resets at 5pm"}},
+		}, wire.SessionFailure{Kind: "rate-limit", Label: "Rate limited", Text: "resets at 5pm"}},
 		{"rate-limit without a message", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "ratelimited"})
-		}, server.SessionFailure{Kind: "rate-limit", Label: "Rate limited"}},
+		}, wire.SessionFailure{Kind: "rate-limit", Label: "Rate limited"}},
 		{"blocked", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
-		}, server.SessionFailure{Kind: "blocked", Why: "permission", Label: "Waiting at a prompt in the terminal"}},
+		}, wire.SessionFailure{Kind: "blocked", Why: "permission", Label: "Waiting at a prompt in the terminal"}},
 		{"blocked on a dialog", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "blocked", Kind: "dialog"})
-		}, server.SessionFailure{Kind: "blocked", Why: "dialog", Label: "Waiting at a prompt in the terminal"}},
+		}, wire.SessionFailure{Kind: "blocked", Why: "dialog", Label: "Waiting at a prompt in the terminal"}},
 		{"blocked on a question", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "blocked", Kind: "question"})
-		}, server.SessionFailure{Kind: "blocked", Why: "question", Label: "Waiting at a prompt in the terminal"}},
+		}, wire.SessionFailure{Kind: "blocked", Why: "question", Label: "Waiting at a prompt in the terminal"}},
 		{"agent error", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "error", Message: "model gone"})
-		}, server.SessionFailure{Kind: "blocked", Why: "error", Label: "Agent hit an error", Text: "model gone"}},
+		}, wire.SessionFailure{Kind: "blocked", Why: "error", Label: "Agent hit an error", Text: "model gone"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -138,7 +140,7 @@ func TestSessionFailure_AuthFromTheLastAPIErrorWhileIdle(t *testing.T) {
 	writeTranscript(t, path, apiError401)
 	report(t, conv, agentfake.Control{State: "done"})
 	got := waitForFailure(ctx, t, h, id, "auth")
-	want := server.SessionFailure{Kind: "auth", Label: "Claude login needed", Text: "Run `claude /login` on this computer, then Retry."}
+	want := wire.SessionFailure{Kind: "auth", Label: "Claude login needed", Text: "Run `claude /login` on this computer, then Retry."}
 	if *got != want {
 		t.Errorf("failure = %+v, want %+v", *got, want)
 	}
@@ -151,7 +153,7 @@ func TestSessionFailure_StalledWhenTheTranscriptIsOldWhileWorking(t *testing.T) 
 	h, ctx, evs, id, conv, path := startFailureSession(t, true, time.Minute)
 	writeTranscript(t, path, reply)
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	if list, chat := failureNow(ctx, t, h, id); list != nil || chat != nil {
 		t.Fatalf("failure = %+v / %+v, want none while the transcript is fresh", list, chat)
 	}
@@ -160,7 +162,7 @@ func TestSessionFailure_StalledWhenTheTranscriptIsOldWhileWorking(t *testing.T) 
 		t.Fatal(err)
 	}
 	got := waitForFailure(ctx, t, h, id, "stalled")
-	if want := (server.SessionFailure{Kind: "stalled", Label: "No progress for 15 min"}); *got != want {
+	if want := (wire.SessionFailure{Kind: "stalled", Label: "No progress for 15 min"}); *got != want {
 		t.Errorf("failure = %+v, want %+v", *got, want)
 	}
 	writeTranscript(t, path, reply, reply)
@@ -190,7 +192,7 @@ func TestSessionFailure_NonChatHarnessNeverGetsAuthOrStalled(t *testing.T) {
 	h, ctx, evs, id, conv, path := startFailureSession(t, false, time.Minute)
 	writeTranscript(t, path, apiError401)
 	report(t, conv, agentfake.Control{State: "done"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	if list, chat := failureNow(ctx, t, h, id); list != nil || chat != nil {
 		t.Errorf("idle failure = %+v / %+v, want none", list, chat)
 	}
@@ -201,7 +203,7 @@ func TestSessionFailure_NonChatHarnessNeverGetsAuthOrStalled(t *testing.T) {
 		t.Fatal(err)
 	}
 	report(t, conv, agentfake.Control{State: "working"})
-	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	if list, chat := failureNow(ctx, t, h, id); list != nil || chat != nil {
 		t.Errorf("working failure = %+v / %+v, want none", list, chat)
 	}

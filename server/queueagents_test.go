@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -16,13 +17,13 @@ import (
 
 const queueRowTicket = "proj:epic-a/01"
 
-func queueRows(t *testing.T, h *servertest.Harness) []server.SessionInfo {
+func queueRows(t *testing.T, h *servertest.Harness) []wire.SessionInfo {
 	t.Helper()
 	list, err := h.Client.Sessions(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return slices.DeleteFunc(list, func(si server.SessionInfo) bool { return !si.Queue })
+	return slices.DeleteFunc(list, func(si wire.SessionInfo) bool { return !si.Queue })
 }
 
 func startQueueRows(t *testing.T, runner string) (*servertest.Harness, namedFake) {
@@ -47,10 +48,10 @@ func TestQueueAgentRows_PtyRunListsAWorkingRowWithoutUnreadOrActionable(t *testi
 
 	servertest.WaitFor(t, 10*time.Second, "a working row", func() bool {
 		rows := queueRows(t, h)
-		return len(rows) == 1 && rows[0].Status.State == server.SessionWorking
+		return len(rows) == 1 && rows[0].Status.State == wire.SessionWorking
 	})
 	row := queueRows(t, h)[0]
-	if row.Ticket != queueRowTicket || row.Holder == "" || row.Unread != (server.SessionUnread{}) || row.Actionable.Reason != "" {
+	if row.Ticket != queueRowTicket || row.Holder == "" || row.Unread != (wire.SessionUnread{}) || row.Actionable.Reason != "" {
 		t.Errorf("row = %+v, want the ticket, a holder dir and no Unread or Actionable", row)
 	}
 	snap, err := h.Client.Snapshot(context.Background())
@@ -83,7 +84,7 @@ func TestQueueAgentRows_HeldRunShowsRateLimited(t *testing.T) {
 
 	servertest.WaitFor(t, 10*time.Second, "a rate-limited row", func() bool {
 		rows := queueRows(t, h)
-		return len(rows) == 1 && rows[0].Status.State == server.SessionRateLimited
+		return len(rows) == 1 && rows[0].Status.State == wire.SessionRateLimited
 	})
 }
 
@@ -94,7 +95,7 @@ func TestQueueAgentRows_BlockedAgentKeepsItsRow(t *testing.T) {
 
 	servertest.WaitFor(t, 10*time.Second, "a blocked row", func() bool {
 		rows := queueRows(t, h)
-		return len(rows) == 1 && rows[0].Status.State == server.SessionBlocked
+		return len(rows) == 1 && rows[0].Status.State == wire.SessionBlocked
 	})
 }
 
@@ -110,7 +111,7 @@ func TestQueueAgentRows_RowLeavesWhenTheRunFinishes(t *testing.T) {
 // startQueueChat queues the ticket on the default PTY runner and holds its
 // turn open after the agent wrote text to its transcript. The returned
 // release ends the turn.
-func startQueueChat(t *testing.T, text string) (*servertest.Harness, server.SessionInfo, func()) {
+func startQueueChat(t *testing.T, text string) (*servertest.Harness, wire.SessionInfo, func()) {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -143,7 +144,7 @@ func TestQueueAgentChat_LivePtyAgentServesItsChatAndScreen(t *testing.T) {
 
 	servertest.WaitFor(t, 10*time.Second, "the agent's message in the chat", func() bool {
 		chat, err := h.Client.SessionChat(ctx, row.ID)
-		return err == nil && slices.ContainsFunc(chat.Messages, func(m server.SessionChatMessage) bool {
+		return err == nil && slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool {
 			return strings.Contains(m.Text, "queue agent says hi")
 		})
 	})
@@ -174,16 +175,16 @@ func TestQueueAgentChat_WriteRoutesRefuseAQueueAgentAsUnknown(t *testing.T) {
 	defer release()
 	ctx := context.Background()
 
-	for name, call := range map[string]func() (server.SessionResult, error){
-		"stop":      func() (server.SessionResult, error) { return h.Client.StopSession(ctx, row.ID) },
-		"interrupt": func() (server.SessionResult, error) { return h.Client.InterruptSession(ctx, row.ID) },
-		"remove":    func() (server.SessionResult, error) { return h.Client.RemoveSession(ctx, row.ID) },
-		"prompt": func() (server.SessionResult, error) {
-			return h.Client.PromptSession(ctx, server.SessionPromptRequest{ID: row.ID, Text: "hi"})
+	for name, call := range map[string]func() (wire.SessionResult, error){
+		"stop":      func() (wire.SessionResult, error) { return h.Client.StopSession(ctx, row.ID) },
+		"interrupt": func() (wire.SessionResult, error) { return h.Client.InterruptSession(ctx, row.ID) },
+		"remove":    func() (wire.SessionResult, error) { return h.Client.RemoveSession(ctx, row.ID) },
+		"prompt": func() (wire.SessionResult, error) {
+			return h.Client.PromptSession(ctx, wire.SessionPromptRequest{ID: row.ID, Text: "hi"})
 		},
 	} {
 		res, err := call()
-		if err != nil || !res.Refused || res.Reason != server.ReasonSessionUnknown {
+		if err != nil || !res.Refused || res.Reason != wire.ReasonSessionUnknown {
 			t.Errorf("%s = %+v, %v; want a refusal as unknown session", name, res, err)
 		}
 	}

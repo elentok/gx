@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
@@ -54,14 +56,14 @@ func newAgentsAutoAdvanceCmd(d deps) *cobra.Command {
 }
 
 func runAgentsAutoAdvance(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string, on bool) error {
-	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
 		return cl.SetAutoAdvance(ctx, id, on)
 	})
 }
 
 // runAgentsSessionCall runs a session write and prints its outcome. It is the
 // one place a nil command context becomes Background.
-func runAgentsSessionCall(ctx context.Context, w io.Writer, jsonOut bool, call func(context.Context) (server.SessionResult, error)) error {
+func runAgentsSessionCall(ctx context.Context, w io.Writer, jsonOut bool, call func(context.Context) (wire.SessionResult, error)) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -70,15 +72,15 @@ func runAgentsSessionCall(ctx context.Context, w io.Writer, jsonOut bool, call f
 }
 
 // runAgentsPrompt never starts the server: a dead socket is a refusal.
-func runAgentsPrompt(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.SessionPromptRequest) error {
-	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+func runAgentsPrompt(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.SessionPromptRequest) error {
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
 		return cl.PromptSession(ctx, req)
 	})
 }
 
 func newAgentsPromptCmd(d deps) *cobra.Command {
 	var jsonOut bool
-	var req server.SessionPromptRequest
+	var req wire.SessionPromptRequest
 	cmd := &cobra.Command{
 		Use:   "prompt <id> <text>",
 		Short: "type text into an Idle Claude session",
@@ -106,7 +108,7 @@ func newAgentActionableCmd(d deps) *cobra.Command {
 		Short: "mark this gx session Actionable until the person's next input; outside one, do nothing",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			req := server.MarkActionableRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Reason: args[0], Action: action}
+			req := wire.MarkActionableRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Reason: args[0], Action: action}
 			ctx := c.Context()
 			if ctx == nil {
 				ctx = context.Background()
@@ -121,8 +123,8 @@ func newAgentActionableCmd(d deps) *cobra.Command {
 
 // runAgentActionable sends req, or, with no session id or no server, prints a
 // note and succeeds, so skills can call it unconditionally.
-func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.MarkActionableRequest) error {
-	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "marked", func(cl *apiclient.Client) (server.SessionResult, error) {
+func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req wire.MarkActionableRequest) error {
+	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "marked", func(cl *apiclient.Client) (wire.SessionResult, error) {
 		return cl.MarkSessionActionable(ctx, req)
 	})
 }
@@ -136,7 +138,7 @@ func newAgentLinkCmd(d deps) *cobra.Command {
 		Short: "set this gx session's ticket (a map epic's marks it a design session); outside one, do nothing",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			req := server.LinkSessionRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Ticket: args[0]}
+			req := wire.LinkSessionRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Ticket: args[0]}
 			ctx := c.Context()
 			if ctx == nil {
 				ctx = context.Background()
@@ -150,8 +152,8 @@ func newAgentLinkCmd(d deps) *cobra.Command {
 
 // runAgentLink sends req, or, with no session id or no server, prints a note
 // and succeeds, so skills can call it unconditionally.
-func runAgentLink(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.LinkSessionRequest) error {
-	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "linked", func(cl *apiclient.Client) (server.SessionResult, error) {
+func runAgentLink(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req wire.LinkSessionRequest) error {
+	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "linked", func(cl *apiclient.Client) (wire.SessionResult, error) {
 		return cl.LinkSession(ctx, req)
 	})
 }
@@ -166,7 +168,7 @@ func newAgentStepCmd(d deps) *cobra.Command {
 		Short: "report the Design step this gx session is running; outside one, do nothing",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			req := server.ReportStepRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Step: args[0], Title: title}
+			req := wire.ReportStepRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Step: args[0], Title: title}
 			ctx := c.Context()
 			if ctx == nil {
 				ctx = context.Background()
@@ -181,15 +183,15 @@ func newAgentStepCmd(d deps) *cobra.Command {
 
 // runAgentStep sends req, or, with no session id or no server, prints a note
 // and succeeds, so skills can call it unconditionally.
-func runAgentStep(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.ReportStepRequest) error {
-	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "reported", func(cl *apiclient.Client) (server.SessionResult, error) {
+func runAgentStep(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req wire.ReportStepRequest) error {
+	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "reported", func(cl *apiclient.Client) (wire.SessionResult, error) {
 		return cl.ReportSessionStep(ctx, req)
 	})
 }
 
 // runAgentSelfWrite is a write an agent makes on its own session id; with no
 // id or no server it prints "nothing <done>" and succeeds.
-func runAgentSelfWrite(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, id, done string, write func(*apiclient.Client) (server.SessionResult, error)) error {
+func runAgentSelfWrite(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, id, done string, write func(*apiclient.Client) (wire.SessionResult, error)) error {
 	if id == "" {
 		_, err := fmt.Fprintf(w, "not in a gx session (%s unset); nothing %s\n", nativerunner.AgentSessionEnv, done)
 		return err
@@ -208,7 +210,7 @@ func runAgentSelfWrite(ctx context.Context, client func() (*apiclient.Client, er
 
 func newAgentsReportFocusCmd(d deps) *cobra.Command {
 	var jsonOut bool
-	var req server.FocusReport
+	var req wire.FocusReport
 	cmd := &cobra.Command{
 		Use:   "report-focus --client <id> [--focused] [--session <id>]",
 		Short: "report a TUI's terminal focus and the session on screen (counts while the client's event stream is open)",
@@ -238,7 +240,7 @@ func newAgentsReportFocusCmd(d deps) *cobra.Command {
 func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command {
 	var jsonOut bool
 	var tier string
-	var req server.CreateSessionRequest
+	var req wire.CreateSessionRequest
 	cmd := &cobra.Command{
 		Use:   "create --project <name> [--dir <dir> | --worktree <name>] [--prompt <text>]",
 		Short: "start an interactive session (prints its id)",
@@ -280,7 +282,7 @@ func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command
 	return cmd
 }
 
-type sessionWriteFunc func(*apiclient.Client, context.Context, string) (server.SessionResult, error)
+type sessionWriteFunc func(*apiclient.Client, context.Context, string) (wire.SessionResult, error)
 
 // newAgentsSessionCmd is a session write that takes only the session's id.
 func newAgentsSessionCmd(d deps, verb, short string, write sessionWriteFunc) *cobra.Command {
@@ -302,24 +304,24 @@ func newAgentsSessionCmd(d deps, verb, short string, write sessionWriteFunc) *co
 }
 
 func runAgentsSessionWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, write sessionWriteFunc, id string) error {
-	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
 		return write(cl, ctx, id)
 	})
 }
 
 // runAgentsCreate never starts the server: a dead socket is a refusal.
-func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.CreateSessionRequest) error {
-	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.CreateSessionRequest) error {
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
 		return cl.CreateSession(ctx, req)
 	})
 }
 
 // printSessionResult prints a session write's outcome, its session's id when
 // human.
-func printSessionResult(w io.Writer, jsonOut bool, res server.SessionResult, err error) error {
+func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err error) error {
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.SessionResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		res = wire.SessionResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

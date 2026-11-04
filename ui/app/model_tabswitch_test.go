@@ -3,8 +3,9 @@ package app
 import (
 	"testing"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
 
@@ -307,7 +308,7 @@ func TestGAMnemonicSwitchesToAgentsTab(t *testing.T) {
 func TestAgentsTabLabelNeverCarriesTheCount(t *testing.T) {
 	t.Parallel()
 	m, _ := newAppModel(t)
-	m.stream.vm.Sessions = []server.SessionInfo{{ID: "s1", Actionable: server.SessionActionable{Reason: "blocked"}}}
+	m.stream.vm.Sessions = []wire.SessionInfo{{ID: "s1", Actionable: wire.SessionActionable{Reason: "blocked"}}}
 
 	for _, spec := range m.tabSpecs() {
 		if spec.id == nav.TabAgents && spec.label != "agents" {
