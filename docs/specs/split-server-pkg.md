@@ -255,13 +255,13 @@ Per story:
 14. `gx --help` lists the same commands and groups as before (diff against the before output recorded in the epic). No command package has an `init()` that registers a command.
 15. `gx tickets --help` lists the same verbs as before (diff against the recorded before output), including `ask` and `answer`. `gx tickets add`, `show` and `close` run on the same `gxfixture` scenario and a temporary store with the same output and exit codes as the before record in the epic.
 16. `TestRouteTableHasCLIVerbs` passes from the `cmd` root.
-17. The deleted `Run` cluster has no symbol left (`rg` for `RunOptions` and `Permit` finds nothing). The 31 ported tests are present and pass. The `ralphloop` test count drop is about the 220 tests of the deleted cluster, and the list of deleted test names is recorded in the epic by the `Run` deletion ticket itself (the diff of `go test -list` before and after its own change).
+17. The deleted `Run` cluster has no symbol left (`rg` for `RunOptions` and `Permit` in `ralphloop`, `cmd`, `server` and `ui` finds nothing; `git.RunOptions` is live and stays). The 31 ported tests are present and pass. The `ralphloop` test count drop is about the 220 tests of the deleted cluster, and the list of deleted test names is recorded in the epic by the `Run` deletion ticket itself (the diff of `go test -list` before and after its own change).
 18. `go list ./ralphloop/...` lists the eleven subpackages. The guardrail passes for `ralphloop` and every subpackage. A ralph-loop run on a fixture epic reaches done (the ralph-loop flows in the guardrail ticket's flow-catalog run pass).
 19. `ralphloop/internal/fixture` and `ralphloop/internal/fakes` exist. No test helper is duplicated across packages (reviewed in the ticket).
 20. `apiclient.Client` has at most 50 methods. Callers use sub-clients (`rg` finds no call on the old flat methods). Fake size is the method count plus the line count per fake (`SessionClient`, `ServerAPI`, `ServerClient` fakes). It passes when each fake's method count is lower than the size recorded in the epic.
 21. The guardrail reports no `ui/*` model over 50 methods.
 22. `ui/tickets` and each child pass the guardrail. The `View()` snapshot tests pass unchanged before and after the render move. The tickets tab flows in the catalog pass (in the guardrail ticket's run).
-23. `ui/gitops` and `ui/commitops` exist and are imported by `ui/status`, `ui/log` and `ui/commit`.
+23. `ui/gitops` and `ui/commitops` exist and are imported by `ui/status` and `ui/log` (`ui/gitops`) and by `ui/log` and `ui/commit` (`ui/commitops`); `ui/commit` has no bump, push or pull code.
 24. `nativerunner.Pty` has at most 50 methods. `go test -race ./nativerunner/...` passes. The guardrail passes for `nativerunner` and `nativerunner/holder`, and `race_pkgs` in `scripts/test.sh` lists `./nativerunner/holder`.
 25. `tickets`, `git` and `testutil/agentfake` and their new packages pass the guardrail.
 26. The guardrail reports no file over 1000 lines anywhere in the repo.
@@ -302,6 +302,13 @@ These were decided while writing the spec and in the first review. The git run h
 - Why a 100-line limit for `run()` and its helpers? `run()` is the one function the epic refactors on purpose. A fixed, countable limit makes the check objective, and 100 lines fits one screen of parse code.
 - Why "about 10 methods" per back-interface? It is a size where a reader sees the whole need and a fake stays short. It is a guide, not a guardrail rule, so a subsystem that needs 12 is not blocked.
 - How does `tui` reach `liveProbe`? Export it as `serverctl.LiveProbe` and let `tui` import `serverctl`. Putting it in `cmdbase.Env` would break the 9-common-fields rule, and a copy in `tui` would duplicate the probe.
+- Found while breaking the spec into tickets (the ticket bodies carry the details):
+  - `wire` is moved in the order health and disk, sessions, limits and stats, other, tickets, because the tickets group uses types of the others. About 38 wire types and 150 constants sit in 49 files that `tygo.yaml` does not list; four extra `wire-rest-*` tickets move them. `Route` and `WriteJSON` live in `wire` (`srv-route-type`). `tygo` writes one file per package, so in the middle of the chain `wire.ts` is generated and `server.ts` re-exports it; the last wire ticket returns to one byte-identical `server.ts`. The base `server.ts` already holds one `any`, so the check compares the count of `any`.
+  - `git/internal/run` cannot import `git`, so the whole run mechanism moves there and `git/run.go` keeps a type alias and thin forwarders for `Run`, `RunError` and `RunOptions`. This is the one alias exception; the ticket logs it.
+  - `checkFinishedGuard` stays in `cmd/tickets` (core `tickets set` calls it) and `resolveEpicArg` goes to `ticketref`. `cmdbase.Env` has 7 fields plus `Dirs()` and `Dial()` and an injected server-client factory. The root `deps` embeds `cmdbase.Env` only in `cmd-final`, to keep about 323 test literals compiling. The `herdr` importers grow to `cmd/doctor` and `cmd/serverctl`.
+  - `apiclient` has about 900 flat-call sites in about 250 files, not about 100 (most are `server` tests), so it runs as six rewrite tickets; `api-queue-add` touches about 71 files and lifts the 60-file guide.
+  - The `.ai/index.md` package map for `ui` is written by `ui-tickets-final` and `ui-final` to avoid conflicts between parallel chains.
+  - The ralphloop tests in `runlog`, `ticketops` and `deps` stay in the root until `ralphloop/internal/fakes` exists.
 
 ## Out of Scope
 
