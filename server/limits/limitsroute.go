@@ -1,4 +1,4 @@
-package server
+package limits
 
 import (
 	"encoding/json"
@@ -25,7 +25,7 @@ func validLimitWindow(name string, w *wire.LimitWindow) error {
 	return nil
 }
 
-func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
+func (l *Limits) reportWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.LimitsReport
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -36,23 +36,23 @@ func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
 		win  *wire.LimitWindow
 	}{{"five_hour", req.FiveHour}, {"seven_day", req.SevenDay}} {
 		if err := validLimitWindow(c.name, c.win); err != nil {
-			writeJSON(w, wire.LimitsReportResult{Refused: true, Reason: wire.ReasonInvalidReport, Message: err.Error()})
+			wire.WriteJSON(w, wire.LimitsReportResult{Refused: true, Reason: wire.ReasonInvalidReport, Message: err.Error()})
 			return
 		}
 	}
 	now := time.Now().Unix()
-	res, err := s.limits.apply(req, now)
+	res, err := l.store.apply(req, now)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := s.limitHistory.recordClaude(req, res, now); err != nil {
+	if err := l.history.recordClaude(req, res, now); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if limitsVisiblyChanged(res.FiveHour, now) || limitsVisiblyChanged(res.SevenDay, now) {
-		s.limitsEvents.Trigger()
+		l.throttle.Trigger()
 	}
-	stored := s.limits.read()
-	writeJSON(w, wire.LimitsReportResult{FiveHour: stored.FiveHour, SevenDay: stored.SevenDay})
+	stored := l.store.read()
+	wire.WriteJSON(w, wire.LimitsReportResult{FiveHour: stored.FiveHour, SevenDay: stored.SevenDay})
 }

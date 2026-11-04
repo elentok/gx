@@ -1,4 +1,4 @@
-package server
+package limits
 
 import (
 	"time"
@@ -10,7 +10,8 @@ func newStatsLimitBurn(n int) wire.StatsLimitBurn {
 	return wire.StatsLimitBurn{Days: make([]wire.LimitBurnDay, n)}
 }
 
-func newStatsLimitBurns(n int) wire.StatsLimitBurns {
+// NewStatsLimitBurns is the all-zero burn of every limit over n days.
+func NewStatsLimitBurns(n int) wire.StatsLimitBurns {
 	return wire.StatsLimitBurns{
 		Claude5h: newStatsLimitBurn(n), ClaudeWeekly: newStatsLimitBurn(n),
 		Codex5h: newStatsLimitBurn(n), CodexWeekly: newStatsLimitBurn(n),
@@ -40,10 +41,11 @@ func buildLimitBurn(samples []wire.LimitSample, latest wire.LimitSample, hasLate
 	return out
 }
 
-func (s *Server) buildLimitBurns(n int, now time.Time) wire.StatsLimitBurns {
+// BurnStats is the burn of each limit over the last n days.
+func (l *Limits) BurnStats(n int, now time.Time) wire.StatsLimitBurns {
 	build := func(id string, weekly bool) wire.StatsLimitBurn {
-		latest, ok := s.limitHistory.Latest(id)
-		return buildLimitBurn(s.limitHistory.Samples(id), latest, ok, weekly, n, now)
+		latest, ok := l.history.Latest(id)
+		return buildLimitBurn(l.history.Samples(id), latest, ok, weekly, n, now)
 	}
 	return wire.StatsLimitBurns{
 		Claude5h:     build(wire.LimitIDClaude5h, false),

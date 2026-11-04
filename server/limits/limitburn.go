@@ -1,4 +1,4 @@
-package server
+package limits
 
 import (
 	"math"
@@ -23,7 +23,7 @@ type limitBurnSeries struct {
 }
 
 func limitDayKey(epoch int64) string {
-	return time.Unix(epoch, 0).In(time.Local).Format(statsDayLayout)
+	return time.Unix(epoch, 0).In(time.Local).Format(DayLayout)
 }
 
 // newLimitBurnSeries walks samples (oldest first). A rise inside a window is
@@ -68,7 +68,7 @@ func (s limitBurnSeries) fullDay(now time.Time, daysAgo int) bool {
 }
 
 func (s limitBurnSeries) dayBurn(now time.Time, daysAgo int) float64 {
-	return s.burn[limitDayStart(now, daysAgo).Format(statsDayLayout)]
+	return s.burn[limitDayStart(now, daysAgo).Format(DayLayout)]
 }
 
 // fullDays is the number of full local days before today, capped at limitPaceDays.
@@ -83,14 +83,14 @@ func (s limitBurnSeries) fullDays(now time.Time) int {
 // limitBurnDays is the burn of each of the last n local days, ending today.
 func limitBurnDays(samples []wire.LimitSample, n int, now time.Time) []wire.LimitBurnDay {
 	s := newLimitBurnSeries(samples)
-	win := newStatsWindow(n, now)
+	win := NewStatsWindow(n, now)
 	out := make([]wire.LimitBurnDay, n)
-	for i, day := range win.days {
-		key := day.Format(statsDayLayout)
+	for i, day := range win.Days {
+		key := day.Format(DayLayout)
 		out[i] = wire.LimitBurnDay{
 			Date:     key,
 			Burn:     s.burn[key],
-			NoData:   !s.ok || key < s.first.In(time.Local).Format(statsDayLayout),
+			NoData:   !s.ok || key < s.first.In(time.Local).Format(DayLayout),
 			ResetDay: s.resets[key],
 		}
 	}

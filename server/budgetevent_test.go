@@ -67,7 +67,7 @@ func (f *budgetEventFixture) spend(total float64) {
 
 func (f *budgetEventFixture) stream(t *testing.T) <-chan wire.Event {
 	t.Helper()
-	return limitsEventStream(t, f.h)
+	return servertest.EventStream(t, f.h)
 }
 
 // budgetEvents counts the budget-changed events on ch until it is quiet.

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tokenledger"
 )
@@ -39,9 +40,9 @@ type costLedger struct {
 
 // costLedger reads the in-memory ledger for the window's days. It never reads
 // transcripts.
-func (s *Server) costLedger(win statsWindow) (costLedger, error) {
+func (s *Server) costLedger(win limits.StatsWindow) (costLedger, error) {
 	var out costLedger
-	for _, day := range win.labels() {
+	for _, day := range win.Labels() {
 		rows, err := s.tokens.Day(day)
 		if err != nil {
 			return out, err

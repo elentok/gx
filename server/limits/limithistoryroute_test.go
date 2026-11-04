@@ -1,4 +1,4 @@
-package server_test
+package limits_test
 
 import (
 	"encoding/json"

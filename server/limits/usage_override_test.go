@@ -1,4 +1,4 @@
-package server
+package limits
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestUsageOverride_HoldsUntilResetsAtThenGatesAgain(t *testing.T) {
 	now := time.Unix(1_000_000, 0)
 	resets := now.Add(time.Hour)
 	gated := func(at time.Time) bool {
-		_, held := s.usageGate(ralphloop.AgentClaude, at)
+		_, held := s.UsageGate(ralphloop.AgentClaude, at)
 		return held
 	}
 

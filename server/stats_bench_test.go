@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -87,7 +88,7 @@ func BenchmarkStats_Grilling(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		buildGrilling(recs, func(string) bool { return true }, newStatsWindow(90, now), "")
+		buildGrilling(recs, func(string) bool { return true }, limits.NewStatsWindow(90, now), "")
 		if took := time.Since(start); took > statsBuildBudget {
 			b.Errorf("grilling build took %v, budget %v", took, statsBuildBudget)
 		}

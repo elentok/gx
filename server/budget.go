@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/runs"
 	"maps"
 	"net/http"
@@ -26,7 +27,7 @@ const (
 	ledgerFileName         = "budget-ledger.json"
 	defaultBudgetPoll      = 30 * time.Second
 	ledgerSeenRetention    = 48 * time.Hour
-	budgetDayLayout        = "2006-01-02"
+	budgetDayLayout        = limits.DayLayout
 )
 
 // seenCost is an iteration's cumulative cost at its last poll. It is persisted so
@@ -70,6 +71,14 @@ type budgetLatch struct {
 	Override float64 `json:"override,omitempty"`
 	// Notified is the highest level (1 soft, 2 hard) already announced.
 	Notified int `json:"notified,omitempty"`
+}
+
+// daysCopy returns a copy of the per-day totals, safe to read without the lock.
+// It stays here because the ledger does; limits receives it as SpendDays.
+func (l *budgetLedger) daysCopy() map[string]float64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return maps.Clone(l.Days)
 }
 
 func openLedger(stateDir string, soft, hard float64) (*budgetLedger, error) {
@@ -444,7 +453,7 @@ func (s *Server) pollBudget(now time.Time) {
 			continue
 		}
 		// The ledger is dollars, and only a Claude run has a dollar cost.
-		if run, found := s.registry.RunOf(t.Address); found && isCodexRun(run) {
+		if run, found := s.registry.RunOf(t.Address); found && limits.IsCodexRun(run) {
 			continue
 		}
 		it, ok := s.budgetIteration(t.Address)
@@ -470,13 +479,6 @@ func (s *Server) pollBudget(now time.Time) {
 	}
 }
 
-// isCodexRun reports a run on a harness other than Claude (today only Codex).
-// Only Claude has a dollar cost for the budget to count. An unset agent counts
-// as Claude.
-func isCodexRun(r runs.Run) bool {
-	return r.Agent != "" && r.Agent != string(ralphloop.AgentClaude)
-}
-
 // budgetSoftReached holds new starts back; the hard limit implies it.
 func (s *Server) budgetSoftReached(now time.Time) bool { return s.budgetLatches(now).Soft }
 
@@ -497,7 +499,7 @@ func (s *Server) killableRuns() []runs.TrackedRun {
 	var live []runs.TrackedRun
 	for _, t := range s.registry.List() {
 		// A launch has no session to interrupt yet; a later check stops it once it runs.
-		if t.State != runs.Launching && !isCodexRun(t.Run) {
+		if t.State != runs.Launching && !limits.IsCodexRun(t.Run) {
 			live = append(live, t)
 		}
 	}

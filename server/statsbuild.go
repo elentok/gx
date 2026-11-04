@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -12,47 +13,9 @@ import (
 
 const (
 	followUpsEpic   = "follow-ups"
-	statsDayLayout  = "2006-01-02"
 	statsTopReasons = 5
 	statsOtherLabel = "other"
 )
-
-// statsWindow maps instants onto the range's local days, ending today.
-type statsWindow struct {
-	days  []time.Time // local midnight of each day, oldest first
-	index map[string]int
-}
-
-func newStatsWindow(n int, now time.Time) statsWindow {
-	w := statsWindow{index: map[string]int{}}
-	for i := n - 1; i >= 0; i-- {
-		day := time.Date(now.Year(), now.Month(), now.Day()-i, 0, 0, 0, 0, time.Local)
-		w.index[day.Format(statsDayLayout)] = len(w.days)
-		w.days = append(w.days, day)
-	}
-	return w
-}
-
-func (w statsWindow) labels() []string {
-	out := make([]string, len(w.days))
-	for i, d := range w.days {
-		out[i] = d.Format(statsDayLayout)
-	}
-	return out
-}
-
-// bucket is the day index of t in the server's local time zone, or -1 when t is
-// unset or outside the range.
-func (w statsWindow) bucket(t time.Time) int {
-	if t.IsZero() {
-		return -1
-	}
-	i, ok := w.index[t.In(time.Local).Format(statsDayLayout)]
-	if !ok {
-		return -1
-	}
-	return i
-}
 
 func emptyCounts(n int) []map[string]int {
 	out := make([]map[string]int, n)
@@ -78,14 +41,14 @@ func newStats(n int) wire.Stats {
 			PausesByReason: emptyCounts(n), RunEvents: emptyCounts(n), PauseEndings: emptyCounts(n),
 		},
 		Grilling:  newStatsGrilling(n),
-		LimitBurn: newStatsLimitBurns(n),
+		LimitBurn: limits.NewStatsLimitBurns(n),
 	}
 }
 
 func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time, led costLedger) wire.Stats {
-	win := newStatsWindow(n, now)
+	win := limits.NewStatsWindow(n, now)
 	out := newStats(n)
-	out.Project, out.Days = project, win.labels()
+	out.Project, out.Days = project, win.Labels()
 	b := statsBuilder{
 		win: win, tp: &out.Throughput,
 		design: make(costSeries, n), impl: make(costSeries, n),
@@ -109,7 +72,7 @@ func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time, l
 
 // statsBuilder sums every series while the epics are walked once.
 type statsBuilder struct {
-	win      statsWindow
+	win      limits.StatsWindow
 	tp       *wire.StatsThroughput
 	design   costSeries
 	impl     costSeries
@@ -124,10 +87,10 @@ func (b *statsBuilder) addEpic(e tickets.Epic) {
 		b.addWaiting(e)
 		// A map's merged_at is copied from its impl epic, so a map counts once,
 		// as a completed design, and not again as a merged epic.
-		if i := b.win.bucket(e.CompletedAt); i >= 0 {
+		if i := b.win.Bucket(e.CompletedAt); i >= 0 {
 			b.tp.DesignsCompleted[i]++
 		}
-	} else if i := b.win.bucket(e.MergedAt); i >= 0 {
+	} else if i := b.win.Bucket(e.MergedAt); i >= 0 {
 		b.tp.EpicsMerged[i]++
 		if e.LinesAdded != nil {
 			b.tp.LinesAdded[i] += *e.LinesAdded
@@ -147,18 +110,18 @@ func (b *statsBuilder) addEpic(e tickets.Epic) {
 // tickets are design work, not merged tickets.
 func (b *statsBuilder) addTicket(e tickets.Epic, tk tickets.Ticket, cost costSeries) {
 	if tk.IsDone() {
-		if i := b.win.bucket(tk.DoneAt); i >= 0 {
+		if i := b.win.Bucket(tk.DoneAt); i >= 0 {
 			cost[i].add(tk.TotalTokens, tk.ActualCost)
 			if !e.IsMap {
 				b.tp.TicketsMerged[i]++
 			}
 		}
 	}
-	finished := b.win.bucket(tk.FinishedAt())
+	finished := b.win.Bucket(tk.FinishedAt())
 	b.friction.addTicket(finished, tk)
 	if originalEpic(tk, e.Name) == followUpsEpic {
 		// A move finishes nothing: it sets neither done_at nor cancelled_at.
-		if i := b.win.bucket(tk.CreatedAt); i >= 0 {
+		if i := b.win.Bucket(tk.CreatedAt); i >= 0 {
 			b.tp.FollowUpsCreated[i]++
 		}
 		if finished >= 0 {
@@ -173,7 +136,7 @@ func (b *statsBuilder) addWaiting(e tickets.Epic) {
 	if e.CreatedAt.IsZero() || e.Status == string(schema.StatusDraft) {
 		return
 	}
-	for i, start := range b.win.days {
+	for i, start := range b.win.Days {
 		end := start.AddDate(0, 0, 1)
 		if e.CreatedAt.Before(end) && (e.CompletedAt.IsZero() || !e.CompletedAt.Before(end)) {
 			b.tp.WaitingForDesign[i]++
@@ -205,8 +168,8 @@ type costSeries []costDay
 // addMapRemainder counts a completed map epic on its stamp day: the epic's
 // stamp minus its tickets' stamps, which the tickets already count. An
 // unstamped map still finishes an item that day.
-func (c costSeries) addMapRemainder(win statsWindow, e tickets.Epic) {
-	i := win.bucket(e.CompletedAt)
+func (c costSeries) addMapRemainder(win limits.StatsWindow, e tickets.Epic) {
+	i := win.Bucket(e.CompletedAt)
 	if i < 0 {
 		return
 	}

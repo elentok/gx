@@ -1,29 +1,18 @@
-package server
+package limits
 
 import (
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 const codexEventInterval = 20 * time.Millisecond
 
-func (r *codexUsageRig) serverWithEvents() *Server {
-	r.t.Helper()
-	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: r.stateDir, TicketStore: r.store,
-		Env:                 []string{"HOME=" + r.t.TempDir(), "CODEX_HOME=" + r.codexHome},
-		LimitsEventInterval: codexEventInterval})
-	if err != nil {
-		r.t.Fatal(err)
-	}
-	r.t.Cleanup(func() { s.limitsEvents.Stop() })
-	return s
-}
+func (r *codexUsageRig) serverWithEvents() *Limits { return r.limits(r.env(), codexEventInterval) }
 
 // limitsEventsSince counts limits-changed events published after seq.
-func limitsEventsSince(t *testing.T, s *Server, seq uint64) int {
+func limitsEventsSince(t *testing.T, s *Limits, seq uint64) int {
 	t.Helper()
 	time.Sleep(10 * codexEventInterval)
 	ch, cancel, err := s.events.Subscribe(seq)
@@ -44,7 +33,7 @@ func limitsEventsSince(t *testing.T, s *Server, seq uint64) int {
 	}
 }
 
-func codexSamples(s *Server, id string) []wire.LimitSample { return s.limitHistory.Samples(id) }
+func codexSamples(s *Limits, id string) []wire.LimitSample { return s.history.Samples(id) }
 
 func TestLimitHistoryCodex_LaterResetWinsThenHighestPercentage(t *testing.T) {
 	t.Parallel()
@@ -118,18 +107,18 @@ func TestLimitHistoryCodex_UnchangedNewerReadingRefreshesLatestOnly(t *testing.T
 	resets := base.Add(5 * time.Hour)
 	r.writeCodexAgent("a", base, codexWindowJSON(20, 300, resets), "")
 	s.scanUsage()
-	first, _ := s.limitHistory.Latest(wire.LimitIDCodex5h)
+	first, _ := s.history.Latest(wire.LimitIDCodex5h)
 
 	// An idle Codex, rescanned: latest does not move.
 	s.scanUsage()
-	if again, _ := s.limitHistory.Latest(wire.LimitIDCodex5h); again != first {
+	if again, _ := s.history.Latest(wire.LimitIDCodex5h); again != first {
 		t.Fatalf("idle rescan moved latest: %+v -> %+v", first, again)
 	}
 
 	time.Sleep(1100 * time.Millisecond) // received-at has second granularity
 	r.writeCodexAgent("a", base.Add(time.Minute), codexWindowJSON(20, 300, resets), "")
 	s.scanUsage()
-	latest, _ := s.limitHistory.Latest(wire.LimitIDCodex5h)
+	latest, _ := s.history.Latest(wire.LimitIDCodex5h)
 	if latest.ReceivedAt <= first.ReceivedAt {
 		t.Fatalf("newer unchanged reading did not refresh latest: %d -> %d", first.ReceivedAt, latest.ReceivedAt)
 	}
@@ -161,7 +150,6 @@ func TestLimitHistoryCodex_RestartKeepsSamples(t *testing.T) {
 	now := time.Now()
 	r.writeCodexAgent("a", now, codexWindowJSON(20, 300, now.Add(time.Hour)), "")
 	s.scanUsage()
-	s.lock.release() // New was never Run, so nothing else frees the state-dir lock
 	again := r.server()
 	if got := codexSamples(again, wire.LimitIDCodex5h); len(got) != 1 || got[0].UsedPercentage != 20 {
 		t.Fatalf("after restart: %+v", got)

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
 	"github.com/elentok/gx/transcript"
@@ -73,7 +74,7 @@ func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
 	label, _, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.projects.WorktreeDir(a.Project))
 	agentDir := filepath.Join(nativerunner.AgentsRoot(s.cfg.StateDir, a.Project), label)
 	run, _ := s.registry.RunOf(address)
-	codex := isCodexRun(run)
+	codex := limits.IsCodexRun(run)
 	if d, err := nativerunner.OpenDir(agentDir); err == nil && agentrunner.Kind(d.Meta.Harness) == harness.Codex {
 		codex = true
 	}

@@ -242,7 +242,7 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.Queue
 			return res, nil
 		}
 		if qc.Actor != "" {
-			if v, held := s.usageGate(agent, time.Now()); held {
+			if v, held := s.limits.UsageGate(agent, time.Now()); held {
 				return queue.Refusal(wire.ReasonUsageLimit, v), nil
 			}
 		}

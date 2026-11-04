@@ -131,6 +131,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   implements `Host`; `cmd` and `testutil/gxfixture` import it too);
   `server/disk/` holds disk watching: free-space status, the watch loop, the hold, the clean-now
   flow and the temp sweep (the root sets its `HealthSink`; `cmd` imports it for `FileFreeSpace`);
+  `server/limits/` holds usage limits: the Claude limit store, limit history, per-harness usage
+  samples with their gate and override, the usage summary and the burn stats (the root passes
+  `SpendDays`, since the budget ledger stays in the root; token polling is still in the root);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

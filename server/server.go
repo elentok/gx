@@ -36,6 +36,7 @@ import (
 	"github.com/elentok/gx/server/disk"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webauth"
@@ -149,12 +150,8 @@ type Server struct {
 	ledger       *budgetLedger
 	tokens       *tokenledger.Ledger
 	tokenPoll    tokenPoller
-	usage        *usageSamples // Claude's
-	limits       *limitsStore
-	limitHistory *limitHistory
-	limitsEvents *broker.Throttle
+	limits       *limits.Limits
 	budgetEvents *budgetEvents
-	usageCodex   *usageSamples
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
 	extraUsage   extraUsageNotes
@@ -351,12 +348,7 @@ func New(cfg Config) (*Server, error) {
 		viMode:       viMode,
 		ledger:       ledger,
 		tokens:       tokens,
-		usage:        openUsageSamples(cfg.StateDir),
-		limits:       openLimitsStore(cfg.StateDir),
-		limitHistory: openLimitHistory(cfg.StateDir),
-		limitsEvents: broker.NewThrottle(broker.LimitsInterval(cfg.LimitsEventInterval), func() { events.Publish(wire.EventLimitsChanged, "") }),
 		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.Publish(wire.EventBudgetChanged, "") }),
-		usageCodex:   openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
 		costOf:       iterationCostIn(cfg.Env),
 		mergeInto:    git.MergeBranchInto,
 		mergedProbe:  git.IsAncestor,
@@ -419,6 +411,14 @@ func New(cfg Config) (*Server, error) {
 		Settings: &s.settings, Projects: s.projects, Events: events, Chat: s.chat, Guards: s.guards, Log: log,
 		HealthSink: s.observeDiskHealth,
 	})
+	s.limits = limits.New(limits.Deps{
+		Config: limits.Config{
+			StateDir: cfg.StateDir, TicketStore: cfg.TicketStore,
+			UsagePollInterval: cfg.UsagePollInterval, LimitsEventInterval: cfg.LimitsEventInterval,
+		},
+		Settings: &s.settings, Projects: s.projects, Events: events, Guards: s.guards, Log: log,
+		SpendDays: s.ledger.daysCopy,
+	})
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
@@ -458,10 +458,7 @@ var routeTable = []struct {
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
-	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
-	{"POST /v1/usage/report", (*Server).limitsReportWrite},
 	{"GET /v1/health", (*Server).healthRead},
-	{"GET /v1/usage/summary", (*Server).usageSummaryRead},
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
 	{"POST /v1/restart", (*Server).restartWrite},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
@@ -762,7 +759,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	healthDone := make(chan struct{})
 	go func() { defer close(healthDone); s.keepHealthWatched(freshCtx) }()
 	usageDone := make(chan struct{})
-	go func() { defer close(usageDone); s.keepUsageScanned(freshCtx) }()
+	go func() { defer close(usageDone); s.limits.Run(freshCtx) }()
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
 	s.fileStartIncident(time.Now())
@@ -785,7 +782,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	recordShutdown("stop-fresh")
 	stopFresh()
 	recordShutdown("limits-events-stop")
-	s.limitsEvents.Stop()
+	s.limits.Stop()
 	recordShutdown("budget-events-stop")
 	s.budgetEvents.stop()
 	recordShutdown("session-watches-close")

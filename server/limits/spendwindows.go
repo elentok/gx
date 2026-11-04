@@ -1,4 +1,4 @@
-package server
+package limits
 
 import "time"
 
@@ -18,25 +18,14 @@ type spendWindows struct {
 	Month spendWindow // since the 1st of the month
 }
 
-// daysCopy returns a copy of the per-day totals, safe to read without the lock.
-func (l *budgetLedger) daysCopy() map[string]float64 {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	out := make(map[string]float64, len(l.Days))
-	for k, v := range l.Days {
-		out[k] = v
-	}
-	return out
-}
-
-// computeSpendWindows sums the ledger's day keys (budgetDayLayout, in now's
+// computeSpendWindows sums the ledger's day keys (DayLayout, in now's
 // zone) from each window's start day through today. Keys are fixed-width
 // dates, so string order is date order. Window starts use calendar
 // arithmetic, never a 24h subtraction, so a daylight-saving week is exact.
 func computeSpendWindows(now time.Time, days map[string]float64) spendWindows {
 	y, m, d := now.Date()
 	loc := now.Location()
-	key := func(t time.Time) string { return t.Format(budgetDayLayout) }
+	key := func(t time.Time) string { return t.Format(DayLayout) }
 
 	today := key(now)
 	weekStart := key(time.Date(y, m, d-int(now.Weekday()), 0, 0, 0, 0, loc))

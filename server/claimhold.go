@@ -33,7 +33,7 @@ func (s *Server) claimHold(project string, t tickets.Ticket, rh harnesschoice.Re
 		return claimHold{Verdict: rateLimitVerdict(limited.RateLimitReset)}, true
 	}
 	if answeredSession(t) == "" {
-		if v, held := s.usageGate(agent, time.Now()); held {
+		if v, held := s.limits.UsageGate(agent, time.Now()); held {
 			return claimHold{Verdict: v}, true
 		}
 	}

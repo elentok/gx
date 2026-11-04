@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -34,13 +35,13 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now().In(time.Local)
-	led, err := s.costLedger(newStatsWindow(n, now))
+	led, err := s.costLedger(limits.NewStatsWindow(n, now))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	out := buildStats(all, n, project, now, led)
-	out.Grilling = buildGrilling(recs, s.onMapEpic, newStatsWindow(n, now), project)
-	out.LimitBurn = s.buildLimitBurns(n, now)
+	out.Grilling = buildGrilling(recs, s.onMapEpic, limits.NewStatsWindow(n, now), project)
+	out.LimitBurn = s.limits.BurnStats(n, now)
 	writeJSON(w, out)
 }

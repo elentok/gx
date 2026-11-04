@@ -1,19 +1,19 @@
-package server
+package limits
 
 import (
 	"encoding/json"
-	harnesschoice "github.com/elentok/gx/server/harness"
-	"github.com/elentok/gx/server/runs"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/settings"
 )
 
 type usageRig struct {
@@ -40,16 +40,24 @@ func newUsageRig(t *testing.T) *usageRig {
 	return r
 }
 
-func (r *usageRig) server() *Server {
+// limits builds the owner over the rig's dirs. env is the server env (Codex's
+// home comes from it); eventInterval spaces limits-changed events.
+func (r *usageRig) limits(env []string, eventInterval time.Duration) *Limits {
 	r.t.Helper()
-	// Its own claude: the host may have none, as on CI.
-	lookPath := func(file string) (string, error) { return "/fake/bin/" + file, nil }
-	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: r.stateDir, TicketStore: r.store, LookPath: lookPath})
-	if err != nil {
-		r.t.Fatal(err)
-	}
-	return s
+	set := &settings.Holder{}
+	set.Store(&settings.Settings{})
+	reg := projects.NewRegistry(func() projects.Env { return projects.Env{Env: env} }, slog.New(slog.NewTextHandler(io.Discard, nil)), nil, set, nil, nil)
+	l := New(Deps{
+		Config:   Config{StateDir: r.stateDir, TicketStore: r.store, LimitsEventInterval: eventInterval},
+		Settings: set, Projects: reg, Events: broker.New(64), Guards: runs.NewGuards(),
+		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		SpendDays: func() map[string]float64 { return nil },
+	})
+	r.t.Cleanup(l.Stop)
+	return l
 }
+
+func (r *usageRig) server() *Limits { return r.limits(nil, 0) }
 
 func (r *usageRig) write(agent string, rec nativerunner.UsageRecord) {
 	r.t.Helper()
@@ -153,28 +161,6 @@ func TestUsageSample_SevenDayWindowCounts(t *testing.T) {
 	}
 }
 
-func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
-	t.Parallel()
-	r := newUsageRig(t)
-	s := r.server()
-	now := time.Now()
-	r.write("a", usageRecord(now, 99, now.Add(time.Hour)))
-	s.scanUsage()
-
-	h, held := s.claimHold("proj", tickets.Ticket{}, harnesschoice.ResolvedHarness{Harness: ralphloop.AgentClaude})
-	if !held || !strings.HasPrefix(h.Verdict, "Claude usage: 99% of the 5-hour limit") {
-		t.Fatalf("gate alone = %+v, %v", h, held)
-	}
-
-	reset := now.Add(2 * time.Hour)
-	s.registry.Put(runs.TrackedRun{Run: runs.Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}})
-	s.registry.MarkRateLimit("proj:e/01", true, reset)
-	h, held = s.claimHold("proj", tickets.Ticket{}, harnesschoice.ResolvedHarness{Harness: ralphloop.AgentClaude})
-	if !held || h.Verdict != rateLimitVerdict(reset) {
-		t.Errorf("hold and gate = %+v, %v; want the hold's verdict", h, held)
-	}
-}
-
 func TestUsageSample_SurvivesRestart(t *testing.T) {
 	t.Parallel()
 	r := newUsageRig(t)
@@ -187,8 +173,7 @@ func TestUsageSample_SurvivesRestart(t *testing.T) {
 	if err := os.RemoveAll(nativerunner.AgentsRoot(r.stateDir, "proj")); err != nil {
 		t.Fatal(err)
 	}
-	// A second Server on the same state dir would fail on the lock, so reopen
-	// the store as New does.
+	// Reopen the store as New does.
 	if _, _, ok := openUsageSamples(r.stateDir).limitWindow(now); !ok {
 		t.Fatal("sample lost across restart")
 	}

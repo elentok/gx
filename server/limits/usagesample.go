@@ -1,4 +1,4 @@
-package server
+package limits
 
 import (
 	"context"
@@ -196,21 +196,21 @@ func (u *usageSamples) lift(now time.Time) ([]string, time.Time, error) {
 
 // usageFor is the sample and verdict prefix of a harness; nil for a harness
 // with no usage gate.
-func (s *Server) usageFor(agent ralphloop.AgentKind) (*usageSamples, string) {
+func (l *Limits) usageFor(agent ralphloop.AgentKind) (*usageSamples, string) {
 	switch agent {
 	case ralphloop.AgentClaude:
-		return s.usage, wire.VerdictUsagePrefixClaude
+		return l.usage, wire.VerdictUsagePrefixClaude
 	case ralphloop.AgentCodex:
-		return s.usageCodex, wire.VerdictUsagePrefixCodex
+		return l.usageCodex, wire.VerdictUsagePrefixCodex
 	}
 	return nil, ""
 }
 
-// usageGate holds a new claim of a harness while one of that harness's usage
+// UsageGate holds a new claim of a harness while one of that harness's usage
 // windows is at its limit. Extra usage does not lift it. The verdict is the
 // whole phrase, like rateLimitVerdict.
-func (s *Server) usageGate(agent ralphloop.AgentKind, now time.Time) (string, bool) {
-	samples, prefix := s.usageFor(agent)
+func (l *Limits) UsageGate(agent ralphloop.AgentKind, now time.Time) (string, bool) {
+	samples, prefix := l.usageFor(agent)
 	if samples == nil {
 		return "", false
 	}
@@ -224,8 +224,8 @@ func (s *Server) usageGate(agent ralphloop.AgentKind, now time.Time) (string, bo
 
 // usageOverride lets new claims of a harness start until its gating windows
 // reset. It lifts that harness only.
-func (s *Server) usageOverride(now time.Time, agent ralphloop.AgentKind) (wire.UsageOverrideResult, error) {
-	samples, prefix := s.usageFor(agent)
+func (l *Limits) usageOverride(now time.Time, agent ralphloop.AgentKind) (wire.UsageOverrideResult, error) {
+	samples, prefix := l.usageFor(agent)
 	var names []string
 	var until time.Time
 	if samples != nil {
@@ -238,45 +238,48 @@ func (s *Server) usageOverride(now time.Time, agent ralphloop.AgentKind) (wire.U
 		return wire.UsageOverrideResult{Refused: true, Reason: wire.ReasonNotGated,
 			Message: fmt.Sprintf("no %s usage window is at its limit", strings.TrimSuffix(prefix, " usage: "))}, nil
 	}
-	s.events.Publish(wire.EventQueueChanged, "")
-	s.guards.Kick()
+	l.events.Publish(wire.EventQueueChanged, "")
+	l.guards.Kick()
 	return wire.UsageOverrideResult{Windows: names, Until: until}, nil
 }
 
-func (s *Server) usageOverrideWrite(w http.ResponseWriter, r *http.Request) {
+func (l *Limits) overrideWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.UsageOverrideRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	agent := harnesschoice.DefaultOrClaude(s.settings.Load().AgentsDefaultHarness)
+	agent := harnesschoice.DefaultOrClaude(l.settings.Load().AgentsDefaultHarness)
 	if req.Harness != "" {
 		agent = ralphloop.AgentKind(req.Harness)
-		if samples, _ := s.usageFor(agent); samples == nil {
+		if samples, _ := l.usageFor(agent); samples == nil {
 			http.Error(w, fmt.Sprintf("harness %q has no usage gate", req.Harness), http.StatusBadRequest)
 			return
 		}
 	}
-	res, err := s.usageOverride(time.Now(), agent)
+	res, err := l.usageOverride(time.Now(), agent)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
+
+// ScanUsage is one scan, for tests.
+func (l *Limits) ScanUsage() { l.scanUsage() }
 
 // scanUsage offers every project's PTY agent records to the samples of their
 // harness.
-func (s *Server) scanUsage() {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+func (l *Limits) scanUsage() {
+	dirs, err := tickets.ProjectDirs(l.cfg.TicketStore)
 	if err != nil {
-		s.log.Warn("scan usage", "err", err)
+		l.log.Warn("scan usage", "err", err)
 		return
 	}
 	// The gate keeps only the newest record; the history merges every agent's.
 	var codexSamples []codexsession.UsageSample
 	readCodex := func(agentDir string) (nativerunner.UsageRecord, bool) {
-		sample, ok := s.readCodexSample(agentDir)
+		sample, ok := l.readCodexSample(agentDir)
 		if !ok {
 			return nativerunner.UsageRecord{}, false
 		}
@@ -284,31 +287,31 @@ func (s *Server) scanUsage() {
 		return codexUsageRecord(sample), true
 	}
 	for _, dir := range dirs {
-		root := nativerunner.AgentsRoot(s.cfg.StateDir, tickets.ProjectName(dir))
-		if err := s.usage.scan(root, readUsageRecord); err != nil {
-			s.log.Warn("scan usage", "root", root, "err", err)
+		root := nativerunner.AgentsRoot(l.cfg.StateDir, tickets.ProjectName(dir))
+		if err := l.usage.scan(root, readUsageRecord); err != nil {
+			l.log.Warn("scan usage", "root", root, "err", err)
 		}
-		if err := s.usageCodex.scan(root, readCodex); err != nil {
-			s.log.Warn("scan codex usage", "root", root, "err", err)
+		if err := l.usageCodex.scan(root, readCodex); err != nil {
+			l.log.Warn("scan codex usage", "root", root, "err", err)
 		}
 	}
-	saved, err := s.limitHistory.recordCodex(codexSamples, time.Now().Unix())
+	saved, err := l.history.recordCodex(codexSamples, time.Now().Unix())
 	if err != nil {
-		s.log.Warn("save codex limit history", "err", err)
+		l.log.Warn("save codex limit history", "err", err)
 	}
 	if saved {
-		s.limitsEvents.Trigger()
+		l.throttle.Trigger()
 	}
 }
 
 // readCodexSample is the usage sample of a Codex agent dir, read from its
 // rollout; Codex agents write no usage.json. A dir of another harness has none.
-func (s *Server) readCodexSample(agentDir string) (codexsession.UsageSample, bool) {
+func (l *Limits) readCodexSample(agentDir string) (codexsession.UsageSample, bool) {
 	d, err := nativerunner.OpenDir(agentDir)
 	if err != nil || agentrunner.Kind(d.Meta.Harness) != harness.Codex {
 		return codexsession.UsageSample{}, false
 	}
-	home, err := s.projects.CodexHome()
+	home, err := l.projects.CodexHome()
 	if err != nil {
 		return codexsession.UsageSample{}, false
 	}
@@ -357,13 +360,13 @@ func codexWindowName(minutes int) string {
 	return fmt.Sprintf("%d-minute", minutes)
 }
 
-// keepUsageScanned reads the agent records on a slow timer until ctx ends.
-func (s *Server) keepUsageScanned(ctx context.Context) {
-	interval := s.cfg.UsagePollInterval
+// Run reads the agent records on a slow timer until ctx ends.
+func (l *Limits) Run(ctx context.Context) {
+	interval := l.cfg.UsagePollInterval
 	if interval <= 0 {
 		interval = defaultUsagePoll
 	}
-	s.scanUsage()
+	l.scanUsage()
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {
@@ -371,7 +374,7 @@ func (s *Server) keepUsageScanned(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			s.scanUsage()
+			l.scanUsage()
 		}
 	}
 }

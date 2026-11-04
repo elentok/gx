@@ -1,4 +1,4 @@
-package server
+package limits
 
 import (
 	"testing"
@@ -158,31 +158,5 @@ func TestSpendWindows(t *testing.T) {
 				t.Fatalf("got %+v, want %+v", got, tc.want)
 			}
 		})
-	}
-}
-
-func TestSpendWindows_DayKeysAroundMidnight(t *testing.T) {
-	l := &budgetLedger{Days: map[string]float64{}}
-	late := time.Date(2026, 10, 14, 23, 59, 0, 0, time.UTC)
-	early := time.Date(2026, 10, 15, 0, 1, 0, 0, time.UTC)
-	l.Days[late.Format(budgetDayLayout)] += 1
-	l.Days[early.Format(budgetDayLayout)] += 2
-
-	got := computeSpendWindows(early, l.daysCopy())
-	if got.Today.Total != 2 {
-		t.Fatalf("today at 00:01 = %v, want 2", got.Today.Total)
-	}
-	got = computeSpendWindows(late, l.daysCopy())
-	if got.Today.Total != 1 {
-		t.Fatalf("today at 23:59 = %v, want 1", got.Today.Total)
-	}
-}
-
-func TestSpendWindows_DaysCopyIsIndependent(t *testing.T) {
-	l := &budgetLedger{Days: map[string]float64{"2026-10-14": 1}}
-	cp := l.daysCopy()
-	cp["2026-10-14"] = 99
-	if l.Days["2026-10-14"] != 1 {
-		t.Fatal("daysCopy aliases the ledger map")
 	}
 }
