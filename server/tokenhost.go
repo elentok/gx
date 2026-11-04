@@ -13,7 +13,7 @@ func (h tokenHost) Snapshot() wire.Snapshot { return h.s.idx.Snapshot() }
 func (h tokenHost) OnMapEpic(address string) bool { return h.s.onMapEpic(address) }
 
 func (h tokenHost) BudgetIteration(address string) (wire.IterationInfo, bool) {
-	return h.s.budgetIteration(address)
+	return h.s.budget.Iteration(address)
 }
 
 func (h tokenHost) MigrationsDone() <-chan struct{} { return h.s.migrator.Done() }

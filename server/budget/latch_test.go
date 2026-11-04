@@ -1,4 +1,4 @@
-package server_test
+package budget_test
 
 import (
 	"context"
@@ -21,11 +21,11 @@ func startLatchServer(t *testing.T) *servertest.Harness {
 func TestBudgetLatch_SurvivesRestartAndOverrideLiftsIt(t *testing.T) {
 	t.Parallel()
 	h := startLatchServer(t)
-	h.Server.RecordSpend("spent", 6)
-	h.Server.PollBudget()
+	h.Server.Budget().RecordSpend("spent", 6)
+	h.Server.Budget().PollBudget()
 	h.Restart(t)
 
-	if !h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	if !h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Fatal("latch lost across restart")
 	}
 	ctx := context.Background()
@@ -37,16 +37,16 @@ func TestBudgetLatch_SurvivesRestartAndOverrideLiftsIt(t *testing.T) {
 		t.Error("override left the budget pause on")
 	}
 	h.Restart(t)
-	if h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	if h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Error("override did not persist")
 	}
 	// The override point is sticky: only spend beyond it counts toward the limit.
-	h.Server.RecordSpend("more", 4)
-	if h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	h.Server.Budget().RecordSpend("more", 4)
+	if h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Error("spend below the fresh allowance latched again")
 	}
-	h.Server.RecordSpend("more2", 2)
-	if !h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	h.Server.Budget().RecordSpend("more2", 2)
+	if !h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Error("spend past the fresh allowance did not latch")
 	}
 }
@@ -54,12 +54,12 @@ func TestBudgetLatch_SurvivesRestartAndOverrideLiftsIt(t *testing.T) {
 func TestBudgetLatch_ResetsAtMidnight(t *testing.T) {
 	t.Parallel()
 	h := startLatchServer(t)
-	h.Server.RecordSpend("spent", 6)
+	h.Server.Budget().RecordSpend("spent", 6)
 	now := time.Now()
-	if !h.Server.BudgetStatusAt(now).BudgetPaused {
+	if !h.Server.Budget().Status(now).BudgetPaused {
 		t.Fatal("not latched")
 	}
-	if h.Server.BudgetStatusAt(now.Add(24 * time.Hour)).BudgetPaused {
+	if h.Server.Budget().Status(now.Add(24 * time.Hour)).BudgetPaused {
 		t.Error("latch survived midnight")
 	}
 }
@@ -80,7 +80,7 @@ func TestBudgetLatch_IsIndependentOfUserPause(t *testing.T) {
 	if _, err := h.Client.QueuePause(ctx); err != nil {
 		t.Fatal(err)
 	}
-	h.Server.RecordSpend("spent", 6)
+	h.Server.Budget().RecordSpend("spent", 6)
 	if res, err := h.Client.BudgetOverride(ctx); err != nil || res.Refused {
 		t.Fatalf("override: %+v, %v", res, err)
 	}
@@ -93,8 +93,8 @@ func TestBudgetLatch_IsIndependentOfUserPause(t *testing.T) {
 func TestBudgetStatus_ReportsOverridePoint(t *testing.T) {
 	t.Parallel()
 	h := startLatchServer(t)
-	h.Server.RecordSpend("spent", 6)
-	if got := h.Server.BudgetStatusAt(time.Now()).Override; got != 0 {
+	h.Server.Budget().RecordSpend("spent", 6)
+	if got := h.Server.Budget().Status(time.Now()).Override; got != 0 {
 		t.Fatalf("override = %v before any override, want 0", got)
 	}
 	res, err := h.Client.BudgetOverride(context.Background())
@@ -109,8 +109,8 @@ func TestBudgetStatus_ReportsOverridePoint(t *testing.T) {
 func TestBudgetIncrease_LiftsLatchWithoutMovingOverride(t *testing.T) {
 	t.Parallel()
 	h := startLatchServer(t)
-	h.Server.RecordSpend("spent", 6)
-	if !h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	h.Server.Budget().RecordSpend("spent", 6)
+	if !h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Fatal("not latched")
 	}
 	soft := 10.0
@@ -122,8 +122,8 @@ func TestBudgetIncrease_LiftsLatchWithoutMovingOverride(t *testing.T) {
 		t.Fatalf("after increase = %+v; want unpaused, soft 10, no override", *res.Budget)
 	}
 	// The full day's spend still counts: 6 + 5 crosses the raised limit.
-	h.Server.RecordSpend("more", 5)
-	if !h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	h.Server.Budget().RecordSpend("more", 5)
+	if !h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Error("spend past the raised limit did not latch")
 	}
 }
@@ -131,7 +131,7 @@ func TestBudgetIncrease_LiftsLatchWithoutMovingOverride(t *testing.T) {
 func TestBudgetIncrease_KeepsLatchWhenStillReached(t *testing.T) {
 	t.Parallel()
 	h := startLatchServer(t)
-	h.Server.RecordSpend("spent", 9)
+	h.Server.Budget().RecordSpend("spent", 9)
 	soft := 8.0
 	res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
 	if err != nil || res.Refused {

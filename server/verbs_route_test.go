@@ -72,9 +72,9 @@ func TestBudget_KillStopsTheSessionThroughTheRunsRunner(t *testing.T) {
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour
 	})
-	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return 6, true })
+	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { return 6, true })
 	if !servertest.Poll(10*time.Second, func() bool {
-		h.Server.PollBudget()
+		h.Server.Budget().PollBudget()
 		tk, err := schema.ParseTicket(ticketPath)
 		return err == nil && tk.PausedClass() == schema.PauseClassRepair
 	}) {

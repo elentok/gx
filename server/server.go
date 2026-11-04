@@ -33,6 +33,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/disk"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
@@ -54,6 +55,9 @@ const (
 	lockFileName   = "server.lock"
 	socketFileName = "server.sock"
 )
+
+// NoticeServerStarted is the chat notice kind sent when Serve begins.
+const NoticeServerStarted = "server-started"
 
 // SocketPath is where the server listens inside stateDir.
 func SocketPath(stateDir string) string { return filepath.Join(stateDir, socketFileName) }
@@ -147,14 +151,10 @@ type Server struct {
 	afk          *queue.AFK
 	viMode       *queue.ViMode
 	oneOffs      *queue.OneOffs
-	ledger       *budgetLedger
+	budget       *budget.Budget
 	tokens       *tokenledger.Ledger
 	limits       *limits.Limits
-	budgetEvents *budgetEvents
-	budgetNotes  budgetNotes
-	hardGrace    hardGrace
 	extraUsage   extraUsageNotes
-	costOf       func(wire.IterationInfo) (float64, bool) // swapped in tests
 	events       *broker.Broker
 	herdr        herdrWatch
 	pauseFold    pauseFold
@@ -274,11 +274,6 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, fmt.Errorf("load vi mode: %w", err)
 	}
-	ledger, err := openLedger(cfg.StateDir, cfg.BudgetSoftLimit, cfg.BudgetHardLimit)
-	if err != nil {
-		lock.release()
-		return nil, fmt.Errorf("load budget ledger: %w", err)
-	}
 	tokens, err := tokenledger.Open(cfg.StateDir)
 	if err != nil {
 		lock.release()
@@ -342,17 +337,14 @@ func New(cfg Config) (*Server, error) {
 
 		instanceID: newInstanceID(),
 
-		queue:        q,
-		afk:          afk,
-		viMode:       viMode,
-		ledger:       ledger,
-		tokens:       tokens,
-		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.Publish(wire.EventBudgetChanged, "") }),
-		costOf:       iterationCostIn(cfg.Env),
-		mergeInto:    git.MergeBranchInto,
-		mergedProbe:  git.IsAncestor,
-		events:       events,
-		guards:       runs.NewGuards(),
+		queue:       q,
+		afk:         afk,
+		viMode:      viMode,
+		tokens:      tokens,
+		mergeInto:   git.MergeBranchInto,
+		mergedProbe: git.IsAncestor,
+		events:      events,
+		guards:      runs.NewGuards(),
 
 		sessionWatches: newSessionWatches(),
 		focus:          newFocusReports(),
@@ -365,6 +357,25 @@ func New(cfg Config) (*Server, error) {
 		},
 		Host: s, Log: log, Index: idx, Projects: s.projects, Queue: q, Registry: registry, Settings: &s.settings,
 	})
+	// The ledger loads here, after the listeners, so a failure releases them as a runs failure does.
+	s.budget, err = budget.New(budget.Deps{
+		Config: budget.Config{
+			StateDir: cfg.StateDir, SoftLimit: cfg.BudgetSoftLimit, HardLimit: cfg.BudgetHardLimit,
+			KillGrace: cfg.BudgetKillGrace, PollInterval: cfg.BudgetPollInterval,
+			HardLimitGrace: cfg.HardLimitGrace, EventInterval: cfg.BudgetEventInterval, Env: cfg.Env,
+		},
+		Settings: &s.settings, Projects: s.projects, Index: idx, Registry: registry, Harness: s.harness,
+		Events: events, Guards: s.guards, Chat: s.chat, Log: log, Host: budgetHost{s},
+	})
+	if err != nil {
+		ln.Close()
+		if tcp != nil {
+			tcp.Close()
+		}
+		_ = logf.Close()
+		lock.release()
+		return nil, fmt.Errorf("load budget ledger: %w", err)
+	}
 	host := queueHost{s, s.harness}
 	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: host})
 	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: host, TicketStore: cfg.TicketStore})
@@ -390,12 +401,7 @@ func New(cfg Config) (*Server, error) {
 		Log:           log,
 		Events:        events,
 		Env:           cfg.Env,
-		HardStopAt: func() time.Time {
-			if s.ledger.held() {
-				return s.hardGrace.deadline()
-			}
-			return time.Time{}
-		},
+		HardStopAt:    s.budget.HardStopAt,
 	})
 	s.settings.Store(&cfg.Settings)
 	s.settings.SetAppliers(s.reloadAppliers())
@@ -418,7 +424,7 @@ func New(cfg Config) (*Server, error) {
 		},
 		Settings: &s.settings, Projects: s.projects, Events: events, Guards: s.guards, Log: log,
 		Registry: s.registry, Tokens: s.tokens, TokenHost: tokenHost{s},
-		SpendDays: s.ledger.daysCopy,
+		SpendDays: s.budget.DaysCopy,
 	})
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
@@ -457,12 +463,9 @@ var routeTable = []struct {
 	{"POST /v1/web/set-password", (*Server).webSetPasswordCLI},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
-	{"GET /v1/budget", (*Server).budget},
-	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"GET /v1/health", (*Server).healthRead},
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
 	{"POST /v1/restart", (*Server).restartWrite},
-	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/tickets/detail", (*Server).detail},
 	{"GET /v1/epics", (*Server).epicList},
@@ -577,7 +580,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Instance = s.instanceID
 	snap.MigrationFailures = s.MigrationFailures()
 	snap.Migrating = s.migrator.Migrating()
-	snap.Budget = s.budgetStatus(time.Now())
+	snap.Budget = s.budget.Status(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Disks = s.disks.Listed()
 	snap.Health = s.currentHealth()
@@ -693,7 +696,7 @@ const DefaultMergeStopTimeout = 30 * time.Second
 // Serve blocks until ctx is cancelled, then shuts down and releases the lock.
 func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
-	s.seedBudgetNotes(time.Now())
+	s.budget.SeedNotes(time.Now())
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
 	s.startExtraUsageCheck(time.Now())
 	freshCtx, stopFresh := context.WithCancel(ctx)
@@ -746,7 +749,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	pruneDone := make(chan struct{})
 	go func() { defer close(pruneDone); s.keepPruned(freshCtx) }()
 	budgetDone := make(chan struct{})
-	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
+	go func() { defer close(budgetDone); s.budget.KeepPolled(freshCtx) }()
 	tokensDone := make(chan struct{})
 	go func() { defer close(tokensDone); s.limits.KeepTokensPolled(freshCtx) }()
 	gatesDone := make(chan struct{})
@@ -785,7 +788,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	recordShutdown("limits-events-stop")
 	s.limits.Stop()
 	recordShutdown("budget-events-stop")
-	s.budgetEvents.stop()
+	s.budget.StopEvents()
 	recordShutdown("session-watches-close")
 	s.sessionWatches.close()
 	for _, w := range []struct {
@@ -813,7 +816,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	recordShutdown("config-watch-wait")
 	s.settings.WaitConfigWatch()
 	recordShutdown("stop-hard-grace")
-	s.stopHardGrace()
+	s.budget.StopHardGrace()
 	timeout := s.cfg.MergeStopTimeout
 	if timeout <= 0 {
 		timeout = DefaultMergeStopTimeout

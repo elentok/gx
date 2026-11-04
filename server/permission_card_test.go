@@ -86,7 +86,7 @@ func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*ser
 	// A block raised while the launch still waits for the session to be ready fails
 	// the launch instead of showing the card.
 	servertest.WaitFor(t, time.Minute, "the launch finishes", func() bool {
-		return len(h.Server.Runs()) == 1 && h.Server.LaunchingRuns() == 0
+		return len(h.Server.Runs()) == 1 && h.Server.Budget().LaunchingRuns() == 0
 	})
 	fake.SetPending("epic-a-iter-01", p)
 	return h, fake

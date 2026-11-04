@@ -1,4 +1,4 @@
-package server_test
+package budget_test
 
 import (
 	"context"
@@ -41,7 +41,7 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
-	h.Server.RecordSpend("spent", 6)
+	h.Server.Budget().RecordSpend("spent", 6)
 
 	if res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false); err != nil || !res.Refused || res.Reason != wire.ReasonBudgetLimit || !strings.Contains(res.Message, "budget") {
 		t.Errorf("retry = %+v, %v; want refusal %s naming the budget", res, err, wire.ReasonBudgetLimit)
@@ -78,7 +78,7 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 	}
 	var mu sync.Mutex
 	cost := 0.0
-	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { mu.Lock(); defer mu.Unlock(); cost += 3; return cost, true })
+	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { mu.Lock(); defer mu.Unlock(); cost += 3; return cost, true })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -89,7 +89,7 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 		t.Fatalf("runs = %+v, want the nudged pane tracked", runs)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the hard limit to stop the nudged pane", func() bool {
-		h.Server.PollBudget()
+		h.Server.Budget().PollBudget()
 		return len(h.Server.Runs()) == 0
 	})
 	if _, found, err := fake.Find(label); err != nil || found {
@@ -111,7 +111,7 @@ func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 		c.BudgetSoftLimit = 5
 	})
 	servertest.RegisterTurn(h)
-	h.Server.RecordSpend("spent", 6)
+	h.Server.Budget().RecordSpend("spent", 6)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -135,8 +135,8 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 		c.BudgetSoftLimit = 5
 	})
 	servertest.RegisterTurn(h)
-	h.Server.RecordProjectSpend("proj-a", "a", 3)
-	h.Server.RecordProjectSpend("proj-b", "b", 3)
+	h.Server.Budget().RecordProjectSpend("proj-a", "a", 3)
+	h.Server.Budget().RecordProjectSpend("proj-b", "b", 3)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -240,7 +240,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 	})
 	// Cost rises on every read, so the pane never goes quiet after ctrl+c.
 	cost := 0.0
-	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { cost += 3; return cost, true })
+	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { cost += 3; return cost, true })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -250,7 +250,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 	servertest.WaitFor(t, 10*time.Second, "a live run", func() bool { return len(h.Server.Runs()) > 0 })
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	servertest.WaitFor(t, 10*time.Second, "the ticket to be budget-killed", func() bool {
-		h.Server.PollBudget()
+		h.Server.Budget().PollBudget()
 		data, _ := os.ReadFile(path)
 		return strings.Contains(string(data), "budget-killed")
 	})
@@ -281,6 +281,11 @@ func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
 func TestBudget_HardLimitPausesAQuietRunBudgetKilledToo(t *testing.T) {
 	t.Parallel()
 	testBudgetKillPausesBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{})
+}
+
+func TestMergeFinish_BudgetKillPausesBudgetKilled(t *testing.T) {
+	t.Parallel()
+	testBudgetKillPausesBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{Type: "merge"})
 }
 
 func testBudgetKillPausesBudgetKilled(t *testing.T, cost func() float64, ticket servertest.TicketOpts) {
@@ -335,7 +340,7 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 		c.BudgetKillGrace = 50 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
 	})
-	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return cost(), true })
+	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { return cost(), true })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -346,7 +351,7 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 	// Poll until the run has settled, and judge the ticket only then: the
 	// run's own finish is what used to overwrite the budget pause.
 	servertest.WaitFor(t, 10*time.Second, "the run to settle", func() bool {
-		h.Server.PollBudget()
+		h.Server.Budget().PollBudget()
 		return len(h.Server.Runs()) == 0
 	})
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
@@ -387,7 +392,7 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 		c.MaxAgents = n
 	})
 	var over atomic.Bool
-	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) {
+	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) {
 		if over.Load() {
 			return 6, true
 		}
@@ -418,7 +423,7 @@ func TestBudget_HardLimitInterruptsRunInParallelInsideGrace(t *testing.T) {
 	}
 	over.Store(true)
 	start := time.Now()
-	h.Server.PollBudget()
+	h.Server.Budget().PollBudget()
 	elapsed := time.Since(start)
 	// Wall time has no upper bound: load stretches it. Overlap shows in when the
 	// Interrupts began: serial ones begin a full delay apart.
@@ -464,7 +469,7 @@ func TestBudget_CodexRunIsNotMeteredOrKilled(t *testing.T) {
 		c.MaxAgents = 2
 	})
 	var claudeCost atomic.Int64
-	h.Server.SetCostOf(func(it wire.IterationInfo) (float64, bool) {
+	h.Server.Budget().SetCostOf(func(it wire.IterationInfo) (float64, bool) {
 		if strings.HasPrefix(it.Address, "proj:epic-b/") {
 			return 100, true
 		}
@@ -484,7 +489,7 @@ func TestBudget_CodexRunIsNotMeteredOrKilled(t *testing.T) {
 	})
 
 	claudeCost.Store(2)
-	h.Server.PollBudget()
+	h.Server.Budget().PollBudget()
 	status, err := h.Client.Budget(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -494,7 +499,7 @@ func TestBudget_CodexRunIsNotMeteredOrKilled(t *testing.T) {
 	}
 
 	claudeCost.Store(6)
-	h.Server.PollBudget()
+	h.Server.Budget().PollBudget()
 	servertest.WaitFor(t, 5*time.Second, "the Claude session stopped", func() bool {
 		live, _ := fake.List("epic-a")
 		return len(live) == 0
@@ -514,7 +519,7 @@ func TestBudget_HardLimitStopWaitsForSlowInterrupts(t *testing.T) {
 	}
 	over.Store(true)
 	start := time.Now()
-	h.Server.PollBudget()
+	h.Server.Budget().PollBudget()
 	if elapsed := time.Since(start); elapsed < 300*time.Millisecond {
 		t.Errorf("stop took %v, want it to wait for the 300ms Interrupts", elapsed)
 	}
@@ -529,7 +534,7 @@ func TestBudget_HardLimitStopsDespiteInterruptError(t *testing.T) {
 	fake.SetInterruptErr(labels[0], agentrunner.ErrNotReady)
 	fake.SetInterruptErr(labels[1], errors.New("boom"))
 	over.Store(true)
-	h.Server.PollBudget()
+	h.Server.Budget().PollBudget()
 	assertNoLiveSessions(t, fake)
 }
 

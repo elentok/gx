@@ -132,8 +132,12 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/disk/` holds disk watching: free-space status, the watch loop, the hold, the clean-now
   flow and the temp sweep (the root sets its `HealthSink`; `cmd` imports it for `FileFreeSpace`);
   `server/limits/` holds usage limits: the Claude limit store, limit history, per-harness usage
-  samples with their gate and override, the usage summary and the burn stats (the root passes
-  `SpendDays`, since the budget ledger stays in the root; token polling is still in the root);
+  samples with their gate and override, the usage summary, the burn stats and the token poll (the
+  root passes `SpendDays`, from the budget ledger);
+  `server/budget/` holds the daily spend budget: the ledger, the soft and hard latches, override and
+  increase, the poll, the budget kill, the hard-limit grace countdown, the notices and the
+  budget-changed events (imports `limits`; the root implements `Host.PauseTicket`; the extra-usage
+  check and the long-ticket check stay in the root);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

@@ -19,9 +19,8 @@ import (
 )
 
 var (
-	RecoveryState  = recoveryState
-	GuardRailStop  = guardRailStop
-	HardGraceTitle = hardGraceTitle
+	RecoveryState = recoveryState
+	GuardRailStop = guardRailStop
 )
 
 // ServeAsset is serveAsset over a fake build, so a test can name hashed assets
@@ -43,15 +42,6 @@ func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string 
 	return s.rebaseDesign(project, epic, worktree, excludeID)
 }
 
-// LaunchingRuns counts runs whose agent has no session yet, which a budget
-// stop skips.
-func (s *Server) LaunchingRuns() int {
-	return len(s.registry.List()) - len(s.killableRuns())
-}
-
-// HardGraceRunning reports whether a hard-limit countdown is running.
-func (s *Server) HardGraceRunning() bool { return !s.hardGrace.deadline().IsZero() }
-
 // ClaimTicket claims and launches one ticket the way a claim pass would, but
 // without asking the frontier, and reports whether an iteration launched.
 func (s *Server) ClaimTicket(address, agent string) (bool, error) {
@@ -69,9 +59,6 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 	}
 	return s.claimAndLaunch(queue.RootOf(addr), addr, ref.ticket, ref.repo, ralphloop.AgentKind(agent), epics)
 }
-
-// SetCostOf swaps how an iteration's cost is read.
-func (s *Server) SetCostOf(f func(wire.IterationInfo) (float64, bool)) { s.costOf = f }
 
 // SetMergeInto swaps the merge core a root merge calls.
 func (s *Server) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error)) {
@@ -97,20 +84,6 @@ func (s *Server) StartOverAsWeb(req wire.RepairRequest) (wire.RepairResult, erro
 func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairResult, error) {
 	return s.repairResume(req, repairCtx{origin: origin})
 }
-
-// PollBudget runs one budget poll now.
-func (s *Server) PollBudget() { s.pollBudget(time.Now()) }
-
-// BudgetStatusAt is the budget status as of now.
-func (s *Server) BudgetStatusAt(now time.Time) wire.BudgetStatus { return s.budgetStatus(now) }
-
-// RecordProjectSpend adds spend attributed to a project to today's ledger.
-func (s *Server) RecordProjectSpend(project, key string, cost float64) {
-	s.ledger.record(project, key, cost, time.Now())
-}
-
-// RecordSpend adds spend to today's ledger.
-func (s *Server) RecordSpend(key string, cost float64) { s.ledger.record("", key, cost, time.Now()) }
 
 // AgentWaiting reports whether the run's agent is not working (idle or done).
 func (s *Server) AgentWaiting(project, epic, id string) bool {

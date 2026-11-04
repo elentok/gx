@@ -70,10 +70,10 @@ var allowed = map[string]int{
 	"ralphloop/resumeticket_test.go":                1,
 	"ralphloop/slack_transport_test.go":             4, // 15 renamed slack_eventsink_test.go and dropped its entry by mistake
 	"ralphloop/telegram_transport_test.go":          7, // same rename as slack_transport_test.go
-	"server/budget_limits_test.go":                  2,
+	"server/budget/grace_test.go":                   5,
+	"server/budget/limits_test.go":                  2,
 	"server/claimhold_test.go":                      1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":              2,
-	"server/configreload_grace_test.go":             5,
 	"server/configreload_test.go":                   2,
 	"server/deadlock_test.go":                       2,
 	"server/disk/diskhealth_test.go":                1, // negative wait: failed readings never leave the waiting state

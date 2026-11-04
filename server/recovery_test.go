@@ -251,7 +251,7 @@ func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (a
 	// The hook records the turn before the agent shows busy, and a wait that
 	// saw that idle instant would type the finish-up prompt, so wait for busy.
 	servertest.WaitFor(t, time.Minute, "the launch turn is held", func() bool {
-		return len(sent()) == 1 && len(h.Server.Runs()) == 1 && h.Server.LaunchingRuns() == 0 &&
+		return len(sent()) == 1 && len(h.Server.Runs()) == 1 && h.Server.Budget().LaunchingRuns() == 0 &&
 			!h.Server.AgentWaiting("proj", "epic-a", "01")
 	})
 	dir := filepath.Join(store, "proj")

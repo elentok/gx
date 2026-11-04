@@ -115,14 +115,14 @@ func TestServerNotices_BudgetLimitLatchesOncePerDay(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 10, 20)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	s.seedBudgetNotes(now)
+	s.budget.SeedNotes(now)
 
-	s.ledger.record("", "a", 11, now)
-	s.notifyBudget(now)
-	s.ledger.record("", "a", 12, now.Add(time.Minute))
-	s.notifyBudget(now.Add(time.Minute)) // still over the soft limit: no repeat
-	s.ledger.record("", "a", 21, now.Add(2*time.Minute))
-	s.notifyBudget(now.Add(2 * time.Minute))
+	s.budget.RecordSpendAt("a", 11, now)
+	s.budget.NotifyAt(now)
+	s.budget.RecordSpendAt("a", 12, now.Add(time.Minute))
+	s.budget.NotifyAt(now.Add(time.Minute)) // still over the soft limit: no repeat
+	s.budget.RecordSpendAt("a", 21, now.Add(2*time.Minute))
+	s.budget.NotifyAt(now.Add(2 * time.Minute))
 
 	s.chat.Close()
 	got := wait(-1)
@@ -138,9 +138,9 @@ func TestServerNotices_BudgetAlreadyOverAtStartIsNotAnnounced(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 10, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	s.ledger.record("", "a", 11, now)
-	s.seedBudgetNotes(now)
-	s.notifyBudget(now)
+	s.budget.RecordSpendAt("a", 11, now)
+	s.budget.SeedNotes(now)
+	s.budget.NotifyAt(now)
 
 	s.chat.Close()
 	if got := wait(-1); len(got) != 0 {
@@ -152,19 +152,19 @@ func TestServerNotices_BudgetLimitsCountSpendBeyondOverride(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 20, 50)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	s.seedBudgetNotes(now)
+	s.budget.SeedNotes(now)
 
-	s.ledger.record("", "a", 30, now)
-	s.notifyBudget(now)
-	if _, err := s.budgetOverride(now); err != nil {
+	s.budget.RecordSpendAt("a", 30, now)
+	s.budget.NotifyAt(now)
+	if _, err := s.budget.OverrideAt(now); err != nil {
 		t.Fatal(err)
 	}
-	s.ledger.record("", "a", 45, now.Add(time.Minute))
-	s.notifyBudget(now.Add(time.Minute)) // 15 beyond the override: nothing
-	s.ledger.record("", "a", 55, now.Add(2*time.Minute))
-	s.notifyBudget(now.Add(2 * time.Minute)) // 25 beyond: soft again, not hard
-	s.ledger.record("", "a", 85, now.Add(3*time.Minute))
-	s.notifyBudget(now.Add(3 * time.Minute)) // 55 beyond: hard
+	s.budget.RecordSpendAt("a", 45, now.Add(time.Minute))
+	s.budget.NotifyAt(now.Add(time.Minute)) // 15 beyond the override: nothing
+	s.budget.RecordSpendAt("a", 55, now.Add(2*time.Minute))
+	s.budget.NotifyAt(now.Add(2 * time.Minute)) // 25 beyond: soft again, not hard
+	s.budget.RecordSpendAt("a", 85, now.Add(3*time.Minute))
+	s.budget.NotifyAt(now.Add(3 * time.Minute)) // 55 beyond: hard
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
@@ -185,15 +185,15 @@ func TestServerNotices_RestartAfterOverrideSeedsFromSpendBeyondIt(t *testing.T) 
 	t.Parallel()
 	s, wait := chatServer(t, 20, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	s.ledger.record("", "a", 30, now)
-	if _, err := s.budgetOverride(now); err != nil {
+	s.budget.RecordSpendAt("a", 30, now)
+	if _, err := s.budget.OverrideAt(now); err != nil {
 		t.Fatal(err)
 	}
-	s.ledger.record("", "a", 45, now.Add(time.Minute))
-	s.seedBudgetNotes(now.Add(time.Minute)) // restart: 15 beyond, not yet crossed
-	s.notifyBudget(now.Add(time.Minute))
-	s.ledger.record("", "a", 55, now.Add(2*time.Minute))
-	s.notifyBudget(now.Add(2 * time.Minute))
+	s.budget.RecordSpendAt("a", 45, now.Add(time.Minute))
+	s.budget.SeedNotes(now.Add(time.Minute)) // restart: 15 beyond, not yet crossed
+	s.budget.NotifyAt(now.Add(time.Minute))
+	s.budget.RecordSpendAt("a", 55, now.Add(2*time.Minute))
+	s.budget.NotifyAt(now.Add(2 * time.Minute))
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
@@ -206,19 +206,19 @@ func TestServerNotices_IncreaseRearmsAgainstSpendBeyondOverride(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 20, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	s.seedBudgetNotes(now)
-	s.ledger.record("", "a", 30, now)
-	if _, err := s.budgetOverride(now); err != nil {
+	s.budget.SeedNotes(now)
+	s.budget.RecordSpendAt("a", 30, now)
+	if _, err := s.budget.OverrideAt(now); err != nil {
 		t.Fatal(err)
 	}
-	s.ledger.record("", "a", 55, now.Add(time.Minute))
-	s.notifyBudget(now.Add(time.Minute)) // 25 beyond: soft
+	s.budget.RecordSpendAt("a", 55, now.Add(time.Minute))
+	s.budget.NotifyAt(now.Add(time.Minute)) // 25 beyond: soft
 	soft := 30.0
-	if _, err := s.budgetIncrease(now.Add(time.Minute), wire.BudgetIncreaseRequest{Soft: &soft}); err != nil {
+	if _, err := s.budget.IncreaseAt(now.Add(time.Minute), wire.BudgetIncreaseRequest{Soft: &soft}); err != nil {
 		t.Fatal(err)
 	}
-	s.ledger.record("", "a", 62, now.Add(2*time.Minute))
-	s.notifyBudget(now.Add(2 * time.Minute)) // 32 beyond the raised 30: soft again
+	s.budget.RecordSpendAt("a", 62, now.Add(2*time.Minute))
+	s.budget.NotifyAt(now.Add(2 * time.Minute)) // 32 beyond the raised 30: soft again
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
@@ -231,11 +231,11 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	now := time.Date(2026, 10, 6, 23, 59, 0, 0, time.Local)
-	s.seedBudgetNotes(now)
-	s.ledger.record("", "a", 4, now)
-	s.notifyBudget(now) // same day: nothing
+	s.budget.SeedNotes(now)
+	s.budget.RecordSpendAt("a", 4, now)
+	s.budget.NotifyAt(now) // same day: nothing
 
-	s.notifyBudget(now.Add(2 * time.Minute))
+	s.budget.NotifyAt(now.Add(2 * time.Minute))
 	s.chat.Close()
 	got := wait(-1)
 	if len(got) != 1 || !strings.Contains(got[0], "daily summary") || !strings.Contains(got[0], "2026-10-06") {

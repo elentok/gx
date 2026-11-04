@@ -1,11 +1,11 @@
-package server
+package budget
 
 import (
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -31,30 +31,30 @@ func (g *hardGrace) deadline() time.Time {
 
 // startHardGrace starts the countdown and announces it, unless one already
 // runs: a further lowering reload does not buy more time.
-func (s *Server) startHardGrace(now time.Time, limit, spent float64) {
-	g := &s.hardGrace
+func (b *Budget) startHardGrace(now time.Time, limit, spent float64) {
+	g := &b.grace
 	g.mu.Lock()
 	if g.timer != nil {
 		g.mu.Unlock()
 		return
 	}
-	grace := s.cfg.HardLimitGrace
+	grace := b.cfg.HardLimitGrace
 	if grace <= 0 {
 		grace = defaultHardLimitGrace
 	}
 	g.gen++
 	gen := g.gen
 	g.until = now.Add(grace)
-	g.timer = time.AfterFunc(grace, func() { s.endHardGrace(gen) })
+	g.timer = time.AfterFunc(grace, func() { b.endHardGrace(gen) })
 	g.mu.Unlock()
-	s.banner(wire.EventLevelWarning, hardGraceTitle(grace), fmt.Sprintf(
+	b.settings.Banner(wire.EventLevelWarning, HardGraceTitle(grace), fmt.Sprintf(
 		"New hard budget limit (%s) is below today's spend (%s). %d agents will stop. Raise the limit in config.json or run `gx budget increase` to cancel.",
-		tickets.FormatCost(limit), tickets.FormatCost(spent), len(s.registry.List())))
+		tickets.FormatCost(limit), tickets.FormatCost(spent), len(b.registry.List())))
 }
 
-// hardGraceTitle counts whole-second durations in seconds, as the spec's
+// HardGraceTitle counts whole-second durations in seconds, as the spec's
 // "60s", where Duration.String would say "1m0s".
-func hardGraceTitle(grace time.Duration) string {
+func HardGraceTitle(grace time.Duration) string {
 	if grace%time.Second == 0 {
 		return fmt.Sprintf("gx: agents stop in %ds", int(grace/time.Second))
 	}
@@ -62,17 +62,17 @@ func hardGraceTitle(grace time.Duration) string {
 }
 
 // cancelHardGrace ends a running countdown once a raise has lifted the hold.
-func (s *Server) cancelHardGrace() {
-	if s.ledger.held() || !s.stopHardGrace() {
+func (b *Budget) cancelHardGrace() {
+	if b.ledger.held() || !b.StopHardGrace() {
 		return
 	}
-	s.guards.Kick()
-	s.banner(wire.EventLevelSuccess, "gx: agent stop cancelled — hard budget limit raised.", "")
+	b.guards.Kick()
+	b.settings.Banner(wire.EventLevelSuccess, "gx: agent stop cancelled — hard budget limit raised.", "")
 }
 
-// stopHardGrace stops the countdown and reports whether one was running.
-func (s *Server) stopHardGrace() bool {
-	g := &s.hardGrace
+// StopHardGrace stops the countdown and reports whether one was running.
+func (b *Budget) StopHardGrace() bool {
+	g := &b.grace
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.timer == nil {
@@ -87,13 +87,13 @@ func (s *Server) stopHardGrace() bool {
 // latches it and stops agents the way spend crossing it does. The reload lock
 // keeps a lowering reload from starting a new countdown between the generation
 // check and the latch; it is let go before the stop, which sleeps.
-func (s *Server) endHardGrace(gen int) {
-	s.settings.Lock()
-	g := &s.hardGrace
+func (b *Budget) endHardGrace(gen int) {
+	b.settings.Lock()
+	g := &b.grace
 	g.mu.Lock()
 	if g.timer == nil || g.gen != gen {
 		g.mu.Unlock()
-		s.settings.Unlock()
+		b.settings.Unlock()
 		return
 	}
 	g.timer, g.until = nil, time.Time{}
@@ -102,25 +102,25 @@ func (s *Server) endHardGrace(gen int) {
 	now := time.Now()
 	// While held nothing is latched, so no budget poll has killed a run yet. Once
 	// the hold lifts one may stop and settle a run before this stop looks.
-	runs := s.killableRuns()
+	live := b.KillableRuns()
 	// The banners below are this stop's report, so the hard notice is marked
 	// sent before the hold lifts: a budget poll in between must not send one.
-	s.budgetNotes.markHard()
-	s.ledger.releaseHold()
-	hard := s.budgetLatches(now).Hard
+	b.notes.markHard()
+	b.ledger.releaseHold()
+	hard := b.ledger.latches(now).Hard
 	if hard {
-		if err := s.ledger.save(now); err != nil {
-			s.log.Error("save budget ledger", "err", err)
+		if err := b.ledger.save(now); err != nil {
+			b.log.Error("save budget ledger", "err", err)
 		}
 	} else {
-		s.rearmBudgetNotes(s.budgetStatus(now))
+		b.rearmNotes(b.Status(now))
 	}
-	s.settings.Unlock()
-	s.events.Publish(wire.EventQueueChanged, "")
+	b.settings.Unlock()
+	b.events.Publish(wire.EventQueueChanged, "")
 	if !hard {
-		s.guards.Kick()
+		b.guards.Kick()
 		return
 	}
-	n := s.killRuns(now, runs)
-	s.banner(wire.EventLevelError, fmt.Sprintf("gx: %d agents stopped — hard budget limit reached.", n), "")
+	n := b.killRuns(now, live)
+	b.settings.Banner(wire.EventLevelError, fmt.Sprintf("gx: %d agents stopped — hard budget limit reached.", n), "")
 }

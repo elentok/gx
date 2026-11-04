@@ -1,16 +1,9 @@
-package server
+package budget
 
 import (
-	"encoding/json"
 	"math"
-	"net/http/httptest"
-	"os"
-	"reflect"
 	"testing"
 	"time"
-
-	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func near(t *testing.T, got, want float64) {
@@ -18,41 +11,6 @@ func near(t *testing.T, got, want float64) {
 	if math.Abs(got-want) > 1e-9 {
 		t.Fatalf("got %v, want %v", got, want)
 	}
-}
-
-func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
-	t.Parallel()
-	// A short path: the test name would push the unix socket path past its limit.
-	stateDir, err := os.MkdirTemp("", "gx")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: 300, BudgetHardLimit: 350}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.ledger.record("", "a", 4.25, time.Now())
-
-	var snap wire.Snapshot
-	rec := httptest.NewRecorder()
-	s.snapshot(rec, httptest.NewRequest("GET", "/v1/snapshot", nil))
-	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
-		t.Fatal(err)
-	}
-	var status wire.BudgetStatus
-	rec = httptest.NewRecorder()
-	s.budget(rec, httptest.NewRequest("GET", "/v1/budget", nil))
-	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(snap.Budget, status) {
-		t.Fatalf("snapshot budget %+v != budget route %+v", snap.Budget, status)
-	}
-	near(t, status.Total, 4.25)
-	near(t, status.SoftLimit, 300)
-	near(t, status.HardLimit, 350)
 }
 
 func TestLedger_PollsAddDeltasToToday(t *testing.T) {
@@ -79,7 +37,7 @@ func TestLedger_SplitsTodayPerRoot(t *testing.T) {
 	l.recordRoot("gx", "gx:beta", "b", 2.0, now)
 	l.recordRoot("gx", "gx:alpha", "a", 1.5, now.Add(30*time.Second))
 
-	roots := l.byRoot(now.Format(budgetDayLayout))
+	roots := l.byRoot(now.Format(dayLayout))
 	near(t, roots["gx:alpha"], 1.5)
 	near(t, roots["gx:beta"], 2.0)
 }

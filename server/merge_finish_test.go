@@ -205,8 +205,3 @@ func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
 		t.Errorf("history has late-finish-adopted: %s", reason)
 	}
 }
-
-func TestMergeFinish_BudgetKillPausesBudgetKilled(t *testing.T) {
-	t.Parallel()
-	testBudgetKillPausesBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{Type: "merge"})
-}

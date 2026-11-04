@@ -117,7 +117,7 @@ func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	h.Server.RecordSpend("spent", 6)
+	h.Server.Budget().RecordSpend("spent", 6)
 	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Reason != wire.ReasonBudgetLimit {
 		t.Fatalf("answer = %+v, %v; want %s", res, err, wire.ReasonBudgetLimit)
@@ -194,7 +194,7 @@ func TestAnswer_GoneAgentQueues(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	h.Server.RecordSpend("spent", 6)
+	h.Server.Budget().RecordSpend("spent", 6)
 	sess, ok, err := fake.Find("epic-a-iter-01")
 	if err != nil || !ok {
 		t.Fatalf("Find = %v, %v", ok, err)

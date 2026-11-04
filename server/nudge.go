@@ -125,7 +125,7 @@ func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
 			}
 		}
 		if stopping, first := s.registry.ClaimBudgetStop(t.Address); stopping && first {
-			if perr := s.pauseBudgetKilled(t); perr != nil {
+			if perr := s.budget.PauseKilled(t); perr != nil {
 				s.log.Error("budget kill", "ticket", t.Address, "err", perr)
 			}
 		}

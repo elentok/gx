@@ -1,4 +1,4 @@
-package server_test
+package budget_test
 
 import (
 	"context"
@@ -37,7 +37,7 @@ func newBudgetEventFixture(t *testing.T) *budgetEventFixture {
 		c.BudgetEventInterval = budgetEventInterval
 	})
 	f := &budgetEventFixture{h: h}
-	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) {
+	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		return f.cost, true
@@ -62,7 +62,7 @@ func (f *budgetEventFixture) spend(total float64) {
 	f.mu.Lock()
 	f.cost = total
 	f.mu.Unlock()
-	f.h.Server.PollBudget()
+	f.h.Server.Budget().PollBudget()
 }
 
 func (f *budgetEventFixture) stream(t *testing.T) <-chan wire.Event {

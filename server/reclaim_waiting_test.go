@@ -98,8 +98,8 @@ func TestReclaim_BudgetHardLimitStopsAWaitingRun(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := startWaitingRestart(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return 6, true })
-	h.Server.PollBudget()
+	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { return 6, true })
+	h.Server.Budget().PollBudget()
 	waitFor(t, func() bool {
 		data, _ := os.ReadFile(ticketPath)
 		return strings.Contains(string(data), "budget-killed")

@@ -1,4 +1,4 @@
-package server_test
+package budget_test
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -39,7 +40,7 @@ func TestHardLimitGrace_StartTitleShowsGrace(t *testing.T) {
 		90 * time.Second:       "gx: agents stop in 90s",
 		600 * time.Millisecond: "gx: agents stop in 600ms",
 	} {
-		if got := server.HardGraceTitle(grace); got != want {
+		if got := budget.HardGraceTitle(grace); got != want {
 			t.Errorf("title(%v) = %q, want %q", grace, got, want)
 		}
 	}
@@ -61,7 +62,7 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 		c.HardLimitGrace = grace
 	}}, opts...)
 	h := servertest.StartWithStore(t, store, opts...)
-	h.Server.RecordSpend("spent", 8)
+	h.Server.Budget().RecordSpend("spent", 8)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
@@ -70,7 +71,7 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 	waitRuns(ctx, t, h, 1)
 	// A launching run has no session yet, so the stop would skip it and report
 	// zero agents stopped.
-	servertest.WaitFor(t, 10*time.Second, "no launching runs", func() bool { return h.Server.LaunchingRuns() == 0 })
+	servertest.WaitFor(t, 10*time.Second, "no launching runs", func() bool { return h.Server.Budget().LaunchingRuns() == 0 })
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +80,7 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 	if err != nil {
 		t.Fatal(err)
 	}
-	return graceFixture{h: h, path: path, store: store, evs: evs, ctx: ctx, startTitle: server.HardGraceTitle(grace)}
+	return graceFixture{h: h, path: path, store: store, evs: evs, ctx: ctx, startTitle: budget.HardGraceTitle(grace)}
 }
 
 // lowerBelowSpend reloads a $6 hard limit and checks the reports: the start
@@ -159,7 +160,7 @@ func (f graceFixture) expectHeld(t *testing.T) {
 	if runs := f.h.Server.Runs(); len(runs) != 1 {
 		t.Fatalf("runs = %+v, want only the running agent during the grace period", runs)
 	}
-	st := f.h.Server.BudgetStatusAt(time.Now())
+	st := f.h.Server.Budget().Status(time.Now())
 	if st.HardLatched || !st.BudgetPaused || f.h.Server.Settings().HardStopAt().IsZero() {
 		t.Errorf("status = %+v, want paused, unlatched, with a stop time", st)
 	}
@@ -173,7 +174,7 @@ func (f graceFixture) expectCancelled(t *testing.T) {
 		t.Fatalf("banners = %+v, want the cancel banner", f.h.Banners.Sent())
 	}
 	waitRuns(f.ctx, t, f.h, 2) // starts resume
-	if st := f.h.Server.BudgetStatusAt(time.Now()); st.BudgetPaused || !f.h.Server.Settings().HardStopAt().IsZero() {
+	if st := f.h.Server.Budget().Status(time.Now()); st.BudgetPaused || !f.h.Server.Settings().HardStopAt().IsZero() {
 		t.Errorf("status = %+v, want unpaused with no stop time", st)
 	}
 	if kind := f.pauseKind(t); kind != "" {
@@ -206,7 +207,7 @@ func TestHardLimitGrace_ExpiryStopsAgents(t *testing.T) {
 	if kind := f.pauseKind(t); kind != string(events.BudgetKilled) {
 		t.Errorf("pause kind = %q, want budget-killed", kind)
 	}
-	if !f.h.Server.BudgetStatusAt(time.Now()).HardLatched {
+	if !f.h.Server.Budget().Status(time.Now()).HardLatched {
 		t.Error("hard limit not latched after the grace period")
 	}
 }
@@ -250,13 +251,13 @@ func TestHardLimitGrace_OverrideCancels(t *testing.T) {
 		t.Fatalf("override = %+v, %v", res, err)
 	}
 	f.expectCancelled(t)
-	if f.h.Server.HardGraceRunning() {
+	if f.h.Server.Budget().HardGraceRunning() {
 		t.Fatal("countdown still running after the override")
 	}
 
 	// Spend since the override stays under the $6 limit, so only the reload
 	// lowering it to $5 reaches it.
-	f.h.Server.RecordSpend("more", 5.5)
+	f.h.Server.Budget().RecordSpend("more", 5.5)
 	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 5))
 	reload(t, f.h)
 	if n := f.waitBanners(f.startTitle, 2); n != 2 {
@@ -285,7 +286,7 @@ func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL,
 			GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 20 * time.Millisecond}
 	})
-	f.h.Server.SetCostOf(func(wire.IterationInfo) (float64, bool) { return 0, false })
+	f.h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { return 0, false })
 	f.lowerBelowSpend(t)
 
 	const done = "gx: 1 agents stopped — hard budget limit reached."
@@ -326,7 +327,7 @@ func TestHardLimitGrace_ShutdownStopsCountdownAfterWatcher(t *testing.T) {
 	if err := <-stopped; err != nil {
 		t.Fatal(err)
 	}
-	if f.h.Server.HardGraceRunning() {
+	if f.h.Server.Budget().HardGraceRunning() {
 		t.Error("countdown still running after shutdown")
 	}
 }
@@ -354,8 +355,8 @@ func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
 func TestHardLimitGrace_SpendCrossingStillLatchesAtOnce(t *testing.T) {
 	t.Parallel()
 	f := startGraceServer(t, time.Hour)
-	f.h.Server.RecordSpend("more", 15)
-	if st := f.h.Server.BudgetStatusAt(time.Now()); !st.HardLatched || !f.h.Server.Settings().HardStopAt().IsZero() {
+	f.h.Server.Budget().RecordSpend("more", 15)
+	if st := f.h.Server.Budget().Status(time.Now()); !st.HardLatched || !f.h.Server.Settings().HardStopAt().IsZero() {
 		t.Errorf("status = %+v, want latched at once with no countdown", st)
 	}
 }

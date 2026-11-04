@@ -25,7 +25,7 @@ import (
 // budgetRefusal refuses new agent work past the daily soft limit; ok is
 // false when there is nothing to refuse.
 func (s *Server) budgetRefusal() (wire.QueueResult, bool) {
-	if !s.budgetSoftReached(time.Now()) {
+	if !s.budget.SoftReached(time.Now()) {
 		return wire.QueueResult{}, false
 	}
 	return queue.Refusal(wire.ReasonBudgetLimit, "the daily budget limit is reached; raise it with `gx budget override`"), true

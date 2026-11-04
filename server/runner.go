@@ -75,7 +75,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 // frontier tickets of each queued root, up to its per-root cap, until the concurrency limit is reached.
 // claimRoot skips a ticket the claim hold names: a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
-	if s.migrator.Migrating() || s.queue.Blocked() || s.budgetSoftReached(time.Now()) {
+	if s.migrator.Migrating() || s.queue.Blocked() || s.budget.SoftReached(time.Now()) {
 		return
 	}
 	limit := s.concurrencyLimit()
@@ -627,7 +627,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	// for its own reason: the first of it and the kill pauses it budget-killed.
 	if stopping, first := s.registry.ClaimBudgetStop(ticketAddr); stopping {
 		if t, ok := s.registry.Tracked(ticketAddr); ok && first {
-			if perr := s.pauseBudgetKilled(t); perr != nil {
+			if perr := s.budget.PauseKilled(t); perr != nil {
 				s.log.Error("budget kill", "ticket", ticketAddr, "err", perr)
 			}
 		}

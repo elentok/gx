@@ -1,4 +1,4 @@
-package server_test
+package budget_test
 
 import (
 	"context"
@@ -32,8 +32,8 @@ func startBudgetReloadServer(t *testing.T, soft, hard float64) (*servertest.Harn
 func TestConfigReload_RaisedBudgetLimitsLiftLatches(t *testing.T) {
 	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 5, 7)
-	h.Server.RecordSpend("spent", 8)
-	if st := h.Server.BudgetStatusAt(time.Now()); !st.HardLatched {
+	h.Server.Budget().RecordSpend("spent", 8)
+	if st := h.Server.Budget().Status(time.Now()); !st.HardLatched {
 		t.Fatalf("status = %+v, want hard latched", st)
 	}
 
@@ -42,14 +42,14 @@ func TestConfigReload_RaisedBudgetLimitsLiftLatches(t *testing.T) {
 	if res.Refused || !slices.Contains(res.Changed, "budget.hard-limit") || slices.Contains(res.Changed, "budget.soft-limit") {
 		t.Fatalf("reload = %+v, want budget.hard-limit changed and soft-limit not", res)
 	}
-	st := h.Server.BudgetStatusAt(time.Now())
+	st := h.Server.Budget().Status(time.Now())
 	if st.HardLimit != 20 || st.HardLatched || !st.BudgetPaused {
 		t.Fatalf("after hard raise = %+v, want hard 20 unlatched, soft still latched", st)
 	}
 
 	servertest.WriteConfig(t, path, store, budgetLimits(10, 20))
 	reload(t, h)
-	if st := h.Server.BudgetStatusAt(time.Now()); st.SoftLimit != 10 || st.BudgetPaused {
+	if st := h.Server.Budget().Status(time.Now()); st.SoftLimit != 10 || st.BudgetPaused {
 		t.Errorf("after soft raise = %+v, want soft 10 unpaused", st)
 	}
 }
@@ -66,7 +66,7 @@ func TestConfigReload_KeepsIncreaseOnUneditedField(t *testing.T) {
 
 	servertest.WriteConfig(t, path, store, budgetLimits(5, 30))
 	reload(t, h)
-	if st := h.Server.BudgetStatusAt(time.Now()); st.SoftLimit != 10 || st.HardLimit != 30 {
+	if st := h.Server.Budget().Status(time.Now()); st.SoftLimit != 10 || st.HardLimit != 30 {
 		t.Errorf("status = %+v, want soft 10 (kept increase), hard 30", st)
 	}
 }
@@ -75,14 +75,14 @@ func TestConfigReload_KeepsIncreaseOnUneditedField(t *testing.T) {
 func TestConfigReload_LoweredSoftLimitLatchesAtNextCheck(t *testing.T) {
 	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 10, 0)
-	h.Server.RecordSpend("spent", 6)
-	if h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	h.Server.Budget().RecordSpend("spent", 6)
+	if h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Fatal("latched before the reload")
 	}
 
 	servertest.WriteConfig(t, path, store, budgetLimits(5, 0))
 	reload(t, h)
-	if !h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
+	if !h.Server.Budget().Status(time.Now()).BudgetPaused {
 		t.Error("lowered soft limit below spend did not latch")
 	}
 }
@@ -92,15 +92,15 @@ func TestConfigReload_LoweredSoftLimitLatchesAtNextCheck(t *testing.T) {
 func TestConfigReload_LoweredHardLimitBelowSpendDoesNotLatch(t *testing.T) {
 	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 5, 20)
-	h.Server.RecordSpend("spent", 8)
+	h.Server.Budget().RecordSpend("spent", 8)
 
 	servertest.WriteConfig(t, path, store, budgetLimits(5, 6))
 	res := reload(t, h)
 	if res.Refused || len(res.Warnings) != 0 || !slices.Contains(res.Changed, "budget.hard-limit") {
 		t.Fatalf("reload = %+v, want budget.hard-limit changed with no warnings", res)
 	}
-	h.Server.PollBudget()
-	if st := h.Server.BudgetStatusAt(time.Now()); st.HardLimit != 6 || st.HardLatched {
+	h.Server.Budget().PollBudget()
+	if st := h.Server.Budget().Status(time.Now()); st.HardLimit != 6 || st.HardLatched {
 		t.Errorf("status = %+v, want hard 6 unlatched", st)
 	}
 
@@ -109,8 +109,8 @@ func TestConfigReload_LoweredHardLimitBelowSpendDoesNotLatch(t *testing.T) {
 	if res := reload(t, h); len(res.Warnings) != 0 {
 		t.Fatalf("raise = %+v, want no warning", res)
 	}
-	h.Server.RecordSpend("more", 10)
-	if !h.Server.BudgetStatusAt(time.Now()).HardLatched {
+	h.Server.Budget().RecordSpend("more", 10)
+	if !h.Server.Budget().Status(time.Now()).HardLatched {
 		t.Error("spend past the raised hard limit did not latch")
 	}
 }
