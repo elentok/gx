@@ -122,13 +122,22 @@ type QueueRequest struct {
 	Note   string `json:"note,omitempty"`
 	State  string `json:"state,omitempty"`
 	Source string `json:"source,omitempty"`
+}
 
+// queueCtx is what the server knows about a queue write that the body does not
+// carry. It travels beside the QueueRequest, never inside it.
+type queueCtx struct {
 	// actor is set only by the server's own recovery calls, never decoded from a
 	// client: a pause made by recovery must not trigger recovery again.
 	actor string
 	// investigator is the claimed investigate ticket whose agent made the call,
 	// from InvestigateHeader. Verbs that honour it verify the ticket.
 	investigator string
+}
+
+// ignoreCtx adapts a queue write that needs no queueCtx.
+func ignoreCtx(do func(QueueRequest) (QueueResult, error)) func(QueueRequest, queueCtx) (QueueResult, error) {
+	return func(req QueueRequest, _ queueCtx) (QueueResult, error) { return do(req) }
 }
 
 // queueStore is the server-wide queue. It lives in a state-dir file, never in a
@@ -568,16 +577,21 @@ func (s *Server) queueItems(w http.ResponseWriter, _ *http.Request) {
 // queueWrite adapts a queue write to a POST handler. Refusals are results, so
 // they answer 200; only a failure to persist is an HTTP error.
 func (s *Server) queueWrite(do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
+	return queueWriteAs(false, ignoreCtx(do))
+}
+
+// queueWriteCtx is queueWrite for a write that reads the queueCtx.
+func (s *Server) queueWriteCtx(do func(QueueRequest, queueCtx) (QueueResult, error)) http.HandlerFunc {
 	return queueWriteAs(false, do)
 }
 
 // queueWriteWeb is queueWrite for the web mux: a request without a state token
 // is refused as stale before anything runs.
 func (s *Server) queueWriteWeb(do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
-	return queueWriteAs(true, do)
+	return queueWriteAs(true, ignoreCtx(do))
 }
 
-func queueWriteAs(web bool, do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
+func queueWriteAs(web bool, do func(QueueRequest, queueCtx) (QueueResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueueRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -589,10 +603,11 @@ func queueWriteAs(web bool, do func(QueueRequest) (QueueResult, error)) http.Han
 			return
 		}
 		req.Source = requestOrigin(r, web)
+		var qc queueCtx
 		if !web {
-			req.investigator = r.Header.Get(InvestigateHeader)
+			qc.investigator = r.Header.Get(InvestigateHeader)
 		}
-		res, err := do(req)
+		res, err := do(req, qc)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

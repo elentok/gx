@@ -158,17 +158,23 @@ type CreateSessionRequest struct {
 	Cols    int    `json:"cols,omitempty"`
 	Rows    int    `json:"rows,omitempty"`
 
-	// design marks the session Design although Ticket has no map epic yet.
-	design bool
 	// MadeWorktree marks Dir as a worktree gx made, as Worktree does.
 	MadeWorktree bool `json:"made_worktree,omitempty"`
 	// RebaseNote is saved in the meta as RebaseNote.
 	RebaseNote string `json:"rebase_note,omitempty"`
+	// Tier is the model tier; empty means worker.
+	Tier ralphloop.Tier `json:"tier,omitempty"`
+}
+
+// sessionCtx is what the server's own callers set on a session create that the
+// body does not carry. It travels beside the CreateSessionRequest, never
+// inside it.
+type sessionCtx struct {
+	// design marks the session Design although Ticket has no map epic yet.
+	design bool
 	// remoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
 	remoteControl string
-	// Tier is the model tier; empty means worker.
-	Tier ralphloop.Tier `json:"tier,omitempty"`
 	// launchDesign marks a launch by a design path (Start design, New Design):
 	// the tier follows the map's step, and the meta saves LaunchDesign.
 	launchDesign bool

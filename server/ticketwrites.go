@@ -222,19 +222,19 @@ func (s *Server) promptsOnRetry(address string) bool {
 // leftover pane is left to the launch, which closes a stale label holder. A
 // person's relaunch logs human-relaunch, which resets the recovery budget. A
 // late finish is adopted instead, with no launch.
-func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
+func (s *Server) ticketRelaunch(req QueueRequest, qc queueCtx) (QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		var applied *recovery.Failure
-		if req.investigator != "" {
-			f, res, ok := s.investigateRetryFailure(req, ref)
+		if qc.investigator != "" {
+			f, res, ok := s.investigateRetryFailure(qc, ref)
 			if !ok {
 				return res, nil
 			}
 			applied = &f
-			req.actor = recovery.ActorInvestigate
+			qc.actor = recovery.ActorInvestigate
 		}
 		if req.State != "" {
 			stale, err := ticketPauseStale(ref.ticket.Path, req.State)
@@ -255,7 +255,7 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
 		}
-		if req.actor != "" {
+		if qc.actor != "" {
 			if v, held := s.usageGate(agent, time.Now()); held {
 				return refusal(ReasonUsageLimit, v), nil
 			}
@@ -267,13 +267,13 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 			return res, err
 		}
 		source := req.Source
-		if req.actor != "" {
+		if qc.actor != "" {
 			source = tickets.SourceGx
 		}
 		if err := tickets.EndOpenRound(ref.ticket.Path, source, tickets.HowRelaunch, ralphloop.CloseRelaunch); err != nil {
 			return QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
 		}
-		if req.actor == "" {
+		if qc.actor == "" {
 			if err := s.cancelInvestigateChild(ref, req.Source); err != nil {
 				return QueueResult{}, err
 			}
@@ -294,7 +294,7 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if applied != nil {
 			s.appendRecoveryEvent(ref, *applied, ralphloop.Event{
 				Type: string(events.RecoveryApplied), Ticket: ref.addr.ID, Kind: string(applied.Kind),
-				Reason: investigateRetryEntry, Outcome: "ok", Text: req.investigator,
+				Reason: investigateRetryEntry, Outcome: "ok", Text: qc.investigator,
 			})
 		}
 		return QueueResult{}, nil

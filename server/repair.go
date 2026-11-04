@@ -46,9 +46,14 @@ type RepairRequest struct {
 	// Tier is a one-time tier (light, worker or strongest) for the ticket's next
 	// launch; empty leaves the launch as it was.
 	Tier string `json:"tier,omitempty"`
+}
+
+// repairCtx is what the server knows about a repair write that the body does
+// not carry. It travels beside the RepairRequest, never inside it.
+type repairCtx struct {
 	// RequireState is set by the web mux, never by a client: the resume then
 	// needs a State token that still matches the pause round.
-	RequireState bool `json:"-"`
+	RequireState bool
 	// origin is web, tui or cli, set by repairWriteAs from the request.
 	origin string
 	// investigator is the investigate ticket whose agent made the call, from
@@ -100,7 +105,7 @@ const ViaDirect = "direct"
 func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult, error) {
 	s := &Server{cfg: Config{TicketStore: ticketStore}}
 	s.settings.Store(&Settings{})
-	var do func(RepairRequest) (RepairResult, error)
+	var do func(RepairRequest, repairCtx) (RepairResult, error)
 	switch verb {
 	case "merge":
 		do = s.repairMerge
@@ -113,7 +118,7 @@ func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult,
 	default:
 		return RepairResult{}, fmt.Errorf("unknown repair verb %q", verb)
 	}
-	res, err := do(req)
+	res, err := do(req, repairCtx{})
 	res.Via = ViaDirect
 	return res, err
 }
@@ -167,7 +172,7 @@ func (s *Server) epicTarget(req RepairRequest, needID, preferProject bool) (epic
 	return "", "", "", &repair.RefusalError{Reason: ReasonUnknownTicket, Message: "no project " + project + " in the ticket store"}
 }
 
-func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
+func (s *Server) repairMerge(req RepairRequest, rc repairCtx) (RepairResult, error) {
 	if repair.IsGuardedBranch(req.Branch) {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonRalphLoopCwd, Message: fmt.Sprintf("refusing to merge from a ralph-loop/* working directory (%s); run from outside the iteration worktree", req.Branch)}), nil
 	}
@@ -175,14 +180,14 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if req.RequireState {
+	if rc.RequireState {
 		if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
 			return res, err
 		}
 	}
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
-		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: req.origin, Cwd: cwd,
+		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: rc.origin, Cwd: cwd,
 	}, s.hostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
@@ -193,16 +198,16 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 // mergeInQueue is the server's merge. A ticket of a queued root may be the
 // one a merging paused, so once it merges the root completes as if its
 // iteration had settled. A direct merge has no queue.
-func (s *Server) mergeInQueue(req RepairRequest) (RepairResult, error) {
+func (s *Server) mergeInQueue(req RepairRequest, rc repairCtx) (RepairResult, error) {
 	addr, err := tickets.ParseAddress(req.Address, tickets.AddressContext{})
 	if err != nil {
-		return s.repairMerge(req)
+		return s.repairMerge(req, rc)
 	}
-	res, err := s.repairMerge(req)
+	res, err := s.repairMerge(req, rc)
 	if err != nil || res.Refused {
 		return res, err
 	}
-	if err := s.cancelInvestigateUnlessSelf(req); err != nil {
+	if err := s.cancelInvestigateUnlessSelf(req, rc); err != nil {
 		return RepairResult{}, err
 	}
 	if !s.rootQueued(rootOf(addr)) {
@@ -241,12 +246,12 @@ func (s *Server) freshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket
 // startOverInQueue is the server's start-over: a person's, so it also cancels
 // the ticket's open investigate child. A direct start-over has no server to
 // stop an agent.
-func (s *Server) startOverInQueue(req RepairRequest) (RepairResult, error) {
-	res, err := s.repairStartOver(req)
+func (s *Server) startOverInQueue(req RepairRequest, rc repairCtx) (RepairResult, error) {
+	res, err := s.repairStartOver(req, rc)
 	if err != nil || res.Refused {
 		return res, err
 	}
-	if err := s.cancelInvestigateUnlessSelf(req); err != nil {
+	if err := s.cancelInvestigateUnlessSelf(req, rc); err != nil {
 		return RepairResult{}, err
 	}
 	return res, nil
@@ -254,36 +259,36 @@ func (s *Server) startOverInQueue(req RepairRequest) (RepairResult, error) {
 
 // cancelInvestigateUnlessSelf cancels the ticket's investigate child, except
 // when that investigate agent is the caller.
-func (s *Server) cancelInvestigateUnlessSelf(req RepairRequest) error {
-	if req.investigator != "" {
+func (s *Server) cancelInvestigateUnlessSelf(req RepairRequest, rc repairCtx) error {
+	if rc.investigator != "" {
 		return nil
 	}
-	return s.cancelInvestigateOf(req.Address, req.origin)
+	return s.cancelInvestigateOf(req.Address, rc.origin)
 }
 
-func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
+func (s *Server) repairStartOver(req RepairRequest, rc repairCtx) (RepairResult, error) {
 	// The web has no --reason flag to name; the CLI refusal text stays in repair.
-	if req.RequireState && strings.TrimSpace(req.Reason) == "" {
+	if rc.RequireState && strings.TrimSpace(req.Reason) == "" {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "a reason is required to start over"}), nil
 	}
 	epicPath, id, cwd, err := s.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if req.RequireState {
+	if rc.RequireState {
 		if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
 			return res, err
 		}
 	}
 	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
 		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
-		return s.startOverTrunkConflict(req, addr, t)
+		return s.startOverTrunkConflict(req, rc, addr, t)
 	}
 	// The web never deletes the branch, whatever the body says.
-	deleteBranch := req.DeleteBranch && !req.RequireState
+	deleteBranch := req.DeleteBranch && !rc.RequireState
 	res, err := repair.StartOver(repair.StartOverInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
-		DeleteBranch: deleteBranch, Source: req.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
+		DeleteBranch: deleteBranch, Source: rc.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
 	}, s.hostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
@@ -308,7 +313,7 @@ func epicTicketAddress(epicPath, id string) tickets.Address {
 	return tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
 }
 
-func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
+func (s *Server) repairResume(req RepairRequest, rc repairCtx) (RepairResult, error) {
 	epicPath, id, _, err := s.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
@@ -332,7 +337,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	paused := perr == nil && tk.PausedAsking()
 	zeroCommit := paused && tk.PauseReason == schema.PauseZeroCommit
 	// Every refusal runs before the first state change.
-	if perr == nil && tk.PausedClass() != "" && req.RequireState {
+	if perr == nil && tk.PausedClass() != "" && rc.RequireState {
 		res, refused, err := webStale(t.Path, req)
 		if err != nil {
 			return RepairResult{}, err
@@ -354,7 +359,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 		}
 		return repairOK(res)
 	}
-	if res, refused, err := s.resumeSelfReported(epicPath, id, req.origin); refused || err != nil {
+	if res, refused, err := s.resumeSelfReported(epicPath, id, rc.origin); refused || err != nil {
 		return res, err
 	}
 	if prompt, ok := retryPrompts[tk.PauseReason]; paused && ok {
@@ -363,14 +368,14 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			return repairRefusal(err), nil
 		}
 		if prompted {
-			if err := tickets.PromptOpenRound(t.Path, req.origin); err != nil {
+			if err := tickets.PromptOpenRound(t.Path, rc.origin); err != nil {
 				return RepairResult{}, fmt.Errorf("log prompt of %s: %w", addr, err)
 			}
 			ev := ralphloop.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: prompt}
 			if err := ralphloop.AppendEvent(dir, addr.Epic, ev); err != nil {
 				s.log.Warn("logging pause prompt", "ticket", addr.String(), "err", err)
 			}
-			s.log.Info("prompted the live agent of a paused ticket", "ticket", addr.String(), "origin", req.origin)
+			s.log.Info("prompted the live agent of a paused ticket", "ticket", addr.String(), "origin", rc.origin)
 			return repairOK(repair.ResumeResult{Ticket: id, Status: repair.ResumePrompted, Message: repair.MessagePrompted})
 		}
 	}
@@ -382,9 +387,9 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 		}
 	}
 	var res repair.ResumeResult
-	if paused && req.RequireState && tk.PauseReason != schema.PauseSelfReported {
+	if paused && rc.RequireState && tk.PauseReason != schema.PauseSelfReported {
 		var refused *RepairResult
-		res, refused, err = resumeAnswered(t.Path, id, req)
+		res, refused, err = resumeAnswered(t.Path, id, req, rc.origin)
 		if refused != nil || err != nil {
 			clearTierOverride(t.Path, req.Tier)
 		}
@@ -400,7 +405,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			clearTierOverride(t.Path, req.Tier)
 			return repairRefusal(err), nil
 		}
-		if err := tickets.EndOpenRound(t.Path, req.origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+		if err := tickets.EndOpenRound(t.Path, rc.origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
 			return RepairResult{}, fmt.Errorf("end pause round of %s: %w", addr, err)
 		}
 	}
@@ -437,7 +442,7 @@ func takeTierOverride(ticketPath string) ralphloop.Tier {
 
 // webStale refuses a web verb whose token no longer names the ticket's open
 // pause round and class; a pause without an open round has nothing to name.
-// Callers check req.RequireState first.
+// Callers check repairCtx.RequireState first.
 func webStale(ticketPath string, req RepairRequest) (RepairResult, bool, error) {
 	stale, err := ticketPauseStale(ticketPath, req.State)
 	if err != nil || !stale {
@@ -469,7 +474,7 @@ func (e resumeRefused) Error() string { return "resume refused" }
 // and reopens the ticket under one ticket lock. The state token is checked
 // again under the lock, and a refusal or a failed reopen appends nothing, so a
 // failure never leaves an answered question on a paused ticket.
-func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.ResumeResult, *RepairResult, error) {
+func resumeAnswered(ticketPath, id string, req RepairRequest, origin string) (repair.ResumeResult, *RepairResult, error) {
 	_, err := tickets.AppendLogFrom(ticketPath, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
 		t, err := schema.ParseTicket(ticketPath)
 		if err != nil {
@@ -483,7 +488,7 @@ func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.ResumeResu
 			return tickets.LogEvent{}, resumeRefused{repairRefusal(err)}
 		}
 		return tickets.LogEvent{
-			Type: tickets.EventPauseAnswer, Source: req.origin, How: tickets.HowResume, Question: open.Seq, Choice: "unpark", Base: req.Base,
+			Type: tickets.EventPauseAnswer, Source: origin, How: tickets.HowResume, Question: open.Seq, Choice: "unpark", Base: req.Base,
 		}, nil
 	})
 	var refused resumeRefused
@@ -622,7 +627,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (RepairResult, 
 	return RepairResult{}, false, nil
 }
 
-func (s *Server) repairVerify(req RepairRequest) (RepairResult, error) {
+func (s *Server) repairVerify(req RepairRequest, _ repairCtx) (RepairResult, error) {
 	epicPath, id, cwd, err := s.epicTarget(req, false, false)
 	if err != nil {
 		return repairRefusal(err), nil
@@ -644,32 +649,31 @@ func (s *Server) repairVerify(req RepairRequest) (RepairResult, error) {
 
 // repairWrite adapts a repair verb to a POST handler. Refusals are results, so
 // they answer 200; only a malformed body or a failure to encode is an HTTP error.
-func repairWrite(do func(RepairRequest) (RepairResult, error)) http.HandlerFunc {
+func repairWrite(do func(RepairRequest, repairCtx) (RepairResult, error)) http.HandlerFunc {
 	return repairWriteAs(false, do)
 }
 
 // repairWriteWeb is repairWrite for the web mux: the request needs a state token.
-func repairWriteWeb(do func(RepairRequest) (RepairResult, error)) http.HandlerFunc {
+func repairWriteWeb(do func(RepairRequest, repairCtx) (RepairResult, error)) http.HandlerFunc {
 	return repairWriteAs(true, do)
 }
 
-func repairWriteAs(web bool, do func(RepairRequest) (RepairResult, error)) http.HandlerFunc {
+func repairWriteAs(web bool, do func(RepairRequest, repairCtx) (RepairResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RepairRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		req.RequireState = web
-		req.origin = requestOrigin(r, web)
+		rc := repairCtx{RequireState: web, origin: requestOrigin(r, web)}
 		if !web {
-			req.investigator = r.Header.Get(InvestigateHeader)
+			rc.investigator = r.Header.Get(InvestigateHeader)
 		}
 		if web && req.State == "" {
 			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "a state token is required; review the current pause"}))
 			return
 		}
-		res, err := do(req)
+		res, err := do(req, rc)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

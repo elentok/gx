@@ -15,17 +15,17 @@ const ReasonVerbNotOffered = "verb-not-offered"
 // on the paused ticket it was forked from. Only that ticket's own investigate
 // child may call it, so an epic-level (deadlock) investigation, which has no
 // parent, can never write one. The verb must be one detail offers right now.
-func (s *Server) ticketRecommend(req QueueRequest) (QueueResult, error) {
+func (s *Server) ticketRecommend(req QueueRequest, qc queueCtx) (QueueResult, error) {
 	verb := strings.TrimSpace(req.Verb)
 	diagnosis := strings.TrimSpace(req.Text)
 	if verb == "" || diagnosis == "" {
 		return refusal(ReasonTextRequired, "a verb and a diagnosis are required"), nil
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
-		inv, ok, err := s.findTicket(req.investigator)
+		inv, ok, err := s.findTicket(qc.investigator)
 		if err != nil || !ok || inv.ticket.Type != string(schema.TypeInvestigate) ||
 			inv.addr.Epic != ref.addr.Epic || inv.ticket.Parent == nil || *inv.ticket.Parent != ref.addr.ID {
-			return refusal(ReasonInvestigateStop, req.investigator+" is not the investigate ticket of "+ref.addr.String()), nil
+			return refusal(ReasonInvestigateStop, qc.investigator+" is not the investigate ticket of "+ref.addr.String()), nil
 		}
 		t, err := schema.ParseTicket(ref.ticket.Path)
 		if err != nil {

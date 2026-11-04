@@ -386,8 +386,7 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		Ticket:       epicAddr,
 		Prompt:       prompt,
 		RebaseNote:   d.Note,
-		launchDesign: true,
-	})
+	}, sessionCtx{launchDesign: true})
 }
 
 // mapEpicDir returns the project dir of a map epic, or the refusal reason and
@@ -539,8 +538,7 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) Sessio
 		Ticket:       addr,
 		Prompt:       harness.SkillCommand(s.launchHarness(project), "gx-design", addr),
 		RebaseNote:   rebaseNote,
-		launchDesign: true,
-	})
+	}, sessionCtx{launchDesign: true})
 	switch {
 	case err != nil:
 		return SessionResult{EpicCreated: true, StartError: err.Error()}

@@ -128,22 +128,17 @@ func (s *Server) SetMergedProbe(f func(repo, ancestor, descendant string) (bool,
 
 // ResumeAsWeb is the resume the web mux serves: it needs a state token.
 func (s *Server) ResumeAsWeb(req RepairRequest) (RepairResult, error) {
-	req.RequireState = true
-	req.origin = OriginWeb
-	return s.repairResume(req)
+	return s.repairResume(req, repairCtx{RequireState: true, origin: OriginWeb})
 }
 
 // StartOverAsWeb is the start-over the web mux serves.
 func (s *Server) StartOverAsWeb(req RepairRequest) (RepairResult, error) {
-	req.RequireState = true
-	req.origin = OriginWeb
-	return s.repairStartOver(req)
+	return s.repairStartOver(req, repairCtx{RequireState: true, origin: OriginWeb})
 }
 
 // ResumeAs is the resume a client of the given origin sends over the socket.
 func (s *Server) ResumeAs(req RepairRequest, origin string) (RepairResult, error) {
-	req.origin = origin
-	return s.repairResume(req)
+	return s.repairResume(req, repairCtx{origin: origin})
 }
 
 // Rescan rescans the store now, as a ping or the watch would.

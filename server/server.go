@@ -652,14 +652,14 @@ var routeTable = []struct {
 	{"POST /v1/tickets/park", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPause)(w, r) }},
 	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketUnmute)(w, r) }},
 	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketCancel)(w, r) }},
-	{"POST /v1/tickets/recommend", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketRecommend)(w, r) }},
+	{"POST /v1/tickets/recommend", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWriteCtx(s.ticketRecommend)(w, r) }},
 	{"POST /v1/tickets/nudge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketNudge)(w, r) }},
 	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketAnswer)(w, r) }},
 	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/approve", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketApprove)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
 	// relaunch is the old name of retry, kept for one release.
-	{"POST /v1/tickets/relaunch", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketRelaunch)(w, r) }},
+	{"POST /v1/tickets/relaunch", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWriteCtx(s.ticketRelaunch)(w, r) }},
 	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.epicMerge)(w, r) }},
 	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.epicStashMerge)(w, r) }},
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentPrompt)(w, r) }},
@@ -732,11 +732,11 @@ func (s *Server) TCPAddr() string {
 
 func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	snap := s.idx.snapshot()
+	snap, agents := s.idx.snapshotAgents()
 	snap.HerdrText, snap.HerdrUnavailable = s.herdrBanner()
 	for i, t := range snap.Tickets {
 		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
-			snap.Tickets[i].HarnessLabel = s.harnessLabelFor(addr, t.agent, cmp.Or(t.RenderedStatus, t.Status))
+			snap.Tickets[i].HarnessLabel = s.harnessLabelFor(addr, agents[i], cmp.Or(t.RenderedStatus, t.Status))
 		}
 		switch t.Status {
 		case string(schema.StatusClaimed):

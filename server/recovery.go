@@ -385,10 +385,10 @@ const investigateRetryEntry = "investigate-retry"
 // returns the failure the retry answers. Unattended, it may retry any repair
 // pause and a zero-commit one, within the guard rail; every other pause
 // (blocked-pane included) is for a person.
-func (s *Server) investigateRetryFailure(req QueueRequest, ref ticketRef) (recovery.Failure, QueueResult, bool) {
-	inv, ok, err := s.findTicket(req.investigator)
+func (s *Server) investigateRetryFailure(qc queueCtx, ref ticketRef) (recovery.Failure, QueueResult, bool) {
+	inv, ok, err := s.findTicket(qc.investigator)
 	if err != nil || !ok || inv.ticket.Type != string(schema.TypeInvestigate) {
-		return recovery.Failure{}, refusal(ReasonInvestigateStop, req.investigator+" is not an investigate ticket"), false
+		return recovery.Failure{}, refusal(ReasonInvestigateStop, qc.investigator+" is not an investigate ticket"), false
 	}
 	t, err := schema.ParseTicket(ref.ticket.Path)
 	if err != nil {
@@ -538,14 +538,16 @@ func (s *Server) appendRecoveryEvent(ref ticketRef, f recovery.Failure, ev ralph
 type recoveryVerbs struct{ s *Server }
 
 // recoveryVerbHandlers are the server's verbs by name; each takes the request
-// a call makes, already stamped actor recovery.
+// a call makes. A verb that reads the actor gets recoveryCtx.
+var recoveryCtx = queueCtx{actor: recovery.ActorRecovery}
+
 var recoveryVerbHandlers = map[string]func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error){
 	recovery.VerbPause: func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error) {
 		req.PauseReason = c.Text
 		return s.ticketPause(req)
 	},
 	recovery.VerbRelaunch: func(s *Server, req QueueRequest, _ recovery.Call) (QueueResult, error) {
-		return s.ticketRelaunch(req)
+		return s.ticketRelaunch(req, recoveryCtx)
 	},
 	recovery.VerbCommitlessDone: func(s *Server, req QueueRequest, _ recovery.Call) (QueueResult, error) {
 		return s.ticketCommitlessDone(req)
@@ -566,7 +568,7 @@ func (v recoveryVerbs) Do(c recovery.Call) (recovery.Result, error) {
 	if !ok {
 		return recovery.Result{}, fmt.Errorf("unknown recovery verb %q", c.Verb)
 	}
-	res, err := h(v.s, QueueRequest{Address: c.Address, actor: recovery.ActorRecovery}, c)
+	res, err := h(v.s, QueueRequest{Address: c.Address}, c)
 	return recoveryResult(res), err
 }
 

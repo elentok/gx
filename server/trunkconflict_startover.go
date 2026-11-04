@@ -15,7 +15,7 @@ import (
 // branch to reset: the backed-up files go back into the target's checkout, the
 // ticket is done and the backup ref goes, so the epic can land. Any clash the
 // restore leaves is the person's to fix by hand.
-func (s *Server) startOverTrunkConflict(req RepairRequest, addr tickets.Address, t tickets.Ticket) (RepairResult, error) {
+func (s *Server) startOverTrunkConflict(req RepairRequest, rc repairCtx, addr tickets.Address, t tickets.Ticket) (RepairResult, error) {
 	if strings.TrimSpace(req.Reason) == "" {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "--reason is required"}), nil
 	}
@@ -34,7 +34,7 @@ func (s *Server) startOverTrunkConflict(req RepairRequest, addr tickets.Address,
 	if err := git.RestoreFromTree(dir, e.TrunkConflictBackup, e.TrunkConflictFiles); err != nil {
 		return RepairResult{}, fmt.Errorf("restoring %s from %s: %w", listFiles(e.TrunkConflictFiles), e.TrunkConflictBackup, err)
 	}
-	if err := tickets.EndOpenRound(t.Path, req.origin, tickets.HowStartOver, "start-over"); err != nil {
+	if err := tickets.EndOpenRound(t.Path, rc.origin, tickets.HowStartOver, "start-over"); err != nil {
 		return RepairResult{}, err
 	}
 	if err := ralphloop.MarkDone(t.Path); err != nil {

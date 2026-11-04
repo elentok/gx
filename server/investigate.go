@@ -76,7 +76,7 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		return "", fmt.Errorf("refresh after writing %s: %w", path, err)
 	}
-	res, err := s.queueAdd(QueueRequest{Address: child.String(), Front: true, actor: recovery.ActorRecovery})
+	res, err := s.queueAdd(QueueRequest{Address: child.String(), Front: true})
 	if err != nil {
 		return "", err
 	}

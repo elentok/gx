@@ -52,11 +52,8 @@ type TicketInfo struct {
 
 	// HarnessLabel is filled by the snapshot handler for open, blocked and claimed tickets.
 	HarnessLabel `tstype:",extends"`
-	// agent is the ticket's frontmatter `agent:`, the resolver's top input.
-	agent string
-
-	Category   string    `json:"category,omitempty"`
-	ExportedAt time.Time `json:"exported_at,omitzero"`
+	Category     string    `json:"category,omitempty"`
+	ExportedAt   time.Time `json:"exported_at,omitzero"`
 	// Mutes is what the Context menu's "Unmute & Reopen" keys off.
 	Mutes []schema.MuteRecord `json:"mutes,omitempty"`
 
@@ -72,9 +69,16 @@ type TicketInfo struct {
 	// EpicMergeTarget is the branch an epic merge merges on; filled in by the
 	// snapshot handler, empty when the project has no repo or trunk.
 	EpicMergeTarget string `json:"epic_merge_target,omitempty"`
+}
 
+// indexedTicket is a TicketInfo plus what the index keeps but the API does not
+// carry.
+type indexedTicket struct {
+	TicketInfo
+	// agent is the ticket's frontmatter `agent:`, the resolver's top input.
+	agent string
 	// sum fingerprints the file the index read, so a claim can tell the file
-	// moved on since. Unexported: it is not part of the API.
+	// moved on since.
 	sum string
 }
 
@@ -149,7 +153,7 @@ type Snapshot struct {
 type index struct {
 	mu     sync.RWMutex
 	events *broker
-	list   []TicketInfo
+	list   []indexedTicket
 	// loaded is each project's epics as the last scan read them, by project
 	// dir. Treated as read-only: readers share it until the next scan.
 	loaded map[string][]tickets.Epic
@@ -157,8 +161,8 @@ type index struct {
 
 // scanStore reads every project in the ticket store. Always a full read of the
 // files: the index never merges, so the file wins on every rescan.
-func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error) {
-	list := []TicketInfo{}
+func scanStore(storePath string) ([]indexedTicket, map[string][]tickets.Epic, error) {
+	list := []indexedTicket{}
 	loaded := map[string][]tickets.Epic{}
 	if storePath == "" {
 		return list, loaded, nil
@@ -195,7 +199,7 @@ func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error
 func buildIndex(storePath string, events *broker) (*index, error) {
 	list, loaded, err := scanStore(storePath)
 	if err != nil {
-		return &index{list: []TicketInfo{}, loaded: map[string][]tickets.Epic{}, events: events}, nil
+		return &index{list: []indexedTicket{}, loaded: map[string][]tickets.Epic{}, events: events}, nil
 	}
 	return &index{list: list, loaded: loaded, events: events}, nil
 }
@@ -288,8 +292,8 @@ func (i *index) projectEpics(project string) (dir string, epics []tickets.Epic, 
 
 // changedAddresses lists, in address order, tickets added, removed or edited
 // between two address-sorted lists.
-func changedAddresses(old, next []TicketInfo) []string {
-	byAddr := make(map[string]TicketInfo, len(old))
+func changedAddresses(old, next []indexedTicket) []string {
+	byAddr := make(map[string]indexedTicket, len(old))
 	for _, t := range old {
 		byAddr[t.Address] = t
 	}
@@ -308,7 +312,7 @@ func changedAddresses(old, next []TicketInfo) []string {
 	return changed
 }
 
-func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
+func ticketInfo(project, epic string, t tickets.Ticket) indexedTicket {
 	addr := func(id string) string { return tickets.Address{Project: project, Epic: epic, ID: id}.String() }
 	info := TicketInfo{
 		Address:   addr(t.DisplayNumber()),
@@ -331,13 +335,12 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		Category:   t.Category,
 		ExportedAt: t.ExportedAt,
 		Mutes:      t.Mutes,
-		agent:      t.Agent,
 	}
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)
 	}
-	info.sum, _ = fileSum(t.Path)
-	return info
+	sum, _ := fileSum(t.Path)
+	return indexedTicket{TicketInfo: info, agent: t.Agent, sum: sum}
 }
 
 // fileSum fingerprints a ticket file's bytes. An unreadable file has no sum,
@@ -363,7 +366,19 @@ func (i *index) sumOf(addr string) (string, bool) {
 }
 
 func (i *index) snapshot() Snapshot {
+	snap, _ := i.snapshotAgents()
+	return snap
+}
+
+// snapshotAgents is snapshot plus each ticket's frontmatter agent, parallel to
+// Snapshot.Tickets.
+func (i *index) snapshotAgents() (Snapshot, []string) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	return Snapshot{Seq: i.events.currentSeq(), Tickets: append([]TicketInfo{}, i.list...)}
+	infos := make([]TicketInfo, len(i.list))
+	agents := make([]string, len(i.list))
+	for n, t := range i.list {
+		infos[n], agents[n] = t.TicketInfo, t.agent
+	}
+	return Snapshot{Seq: i.events.currentSeq(), Tickets: infos}, agents
 }

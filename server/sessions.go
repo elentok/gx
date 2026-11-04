@@ -109,7 +109,7 @@ func (s *Server) sessionCreateWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.createSession(req)
+	res, err := s.createSession(req, sessionCtx{})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -128,7 +128,7 @@ func (s *Server) sessionsRead(w http.ResponseWriter, _ *http.Request) {
 
 // createSession makes the session's state dir, writes its meta and starts its
 // holder. It writes no ticket status and takes no slot or permit.
-func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) {
+func (s *Server) createSession(req CreateSessionRequest, sc sessionCtx) (SessionResult, error) {
 	if req.Project == "" || (req.Dir == "") == (req.Worktree == "") {
 		return sessionRefusal(ReasonSessionBadRequest, "a session needs a project and either a dir or a new worktree"), nil
 	}
@@ -166,7 +166,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		}
 	}
 	tier := cmp.Or(req.Tier, ralphloop.TierWorker)
-	if req.launchDesign {
+	if sc.launchDesign {
 		tier = s.designLaunchTier(req.Ticket)
 	}
 	meta := sessionMeta{
@@ -176,10 +176,10 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		MadeWorktree:   req.Worktree != "" || req.MadeWorktree,
 		Name:           req.Name,
 		Ticket:         req.Ticket,
-		LaunchDesign:   req.launchDesign,
-		Design:         req.design || (req.Ticket != "" && s.onMapEpic(req.Ticket)),
+		LaunchDesign:   sc.launchDesign,
+		Design:         sc.design || (req.Ticket != "" && s.onMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
-		RemoteControl:  req.remoteControl,
+		RemoteControl:  sc.remoteControl,
 		RebaseNote:     req.RebaseNote,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),

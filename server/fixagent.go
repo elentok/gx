@@ -130,7 +130,7 @@ func (s *Server) startFixProjectAgent(project string) (FixAgentResult, error) {
 		Prompt:     fixProjectPrompt(s.launchHarness(project), *failure),
 		Tier:       ralphloop.TierStrongest,
 	}
-	res, err := s.createSession(cs)
+	res, err := s.createSession(cs, sessionCtx{})
 	if res.Refused && res.Reason == ReasonSessionNameTaken {
 		return fixAgentRefusal(ReasonSessionNameTaken, "an agent is already fixing "+project), nil
 	}
@@ -189,10 +189,11 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 		Tier:       ralphloop.TierStrongest,
 	}
 	remote := settings.AgentsFixAgentRemoteControl && s.launchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
+	var sc sessionCtx
 	if remote {
-		cs.remoteControl = addr
+		sc.remoteControl = addr
 	}
-	res, err := s.createSession(cs)
+	res, err := s.createSession(cs, sc)
 	if res.Refused && res.Reason == ReasonSessionNameTaken {
 		return fixAgentRefusal(ReasonSessionNameTaken, "an agent is already fixing "+addr), nil
 	}
