@@ -1,4 +1,4 @@
-package server
+package harness
 
 import (
 	"log/slog"
@@ -14,16 +14,16 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// HarnessHost is what the harness choice needs from the rest of the server: the
-// back edges to sessions and to the ticket reader. The root implements it;
-// tests use a fake.
-type HarnessHost interface {
+// Host is what the harness choice needs from the rest of the server: the back
+// edges to sessions and to the ticket reader. The root implements it; tests use
+// a fake.
+type Host interface {
 	ListSessions() ([]wire.SessionInfo, error)
 	FreshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool)
 }
 
-// HarnessConfig is the part of Config the harness choice reads.
-type HarnessConfig struct {
+// Config is the part of the server Config the harness choice reads.
+type Config struct {
 	Env         []string
 	LookPath    func(program string) (string, error)
 	Runner      agentrunner.Runner
@@ -32,21 +32,10 @@ type HarnessConfig struct {
 	ConfigPath  string
 }
 
-// queueHost is queue.Host: the harness methods the queue reads, and the rest
-// from the root.
-type queueHost struct {
-	*Server
-	*Harness
-}
-
-// Harness is the server's harness choice. Tests outside the package read it
-// through here.
-func (s *Server) Harness() *Harness { return s.harness }
-
-// Harness owns the harness and runner choice. The HTTP handlers stay on Server.
+// Harness owns the harness and runner choice. Its HTTP handlers are Routes.
 type Harness struct {
-	cfg      HarnessConfig
-	host     HarnessHost
+	cfg      Config
+	host     Host
 	log      *slog.Logger
 	idx      *index.Index
 	projects *projects.Registry
@@ -54,16 +43,16 @@ type Harness struct {
 	registry *runs.Registry
 	settings *settings.Holder
 
-	// logGiven serializes giveLog.
+	// logGiven serializes GiveLog.
 	logGiven sync.Mutex
 	// recorded caches sessionRecorded, which globs every Claude project dir.
 	recorded recordedCache
 }
 
-// HarnessDeps is what NewHarness needs.
-type HarnessDeps struct {
-	Config   HarnessConfig
-	Host     HarnessHost
+// Deps is what New needs.
+type Deps struct {
+	Config   Config
+	Host     Host
 	Log      *slog.Logger
 	Index    *index.Index
 	Projects *projects.Registry
@@ -72,8 +61,8 @@ type HarnessDeps struct {
 	Settings *settings.Holder
 }
 
-// NewHarness is the harness choice: which harness and runner a ticket or
-// session launches under, and the Default harness setting.
-func NewHarness(d HarnessDeps) *Harness {
+// New is the harness choice: which harness and runner a ticket or session
+// launches under, and the Default harness setting.
+func New(d Deps) *Harness {
 	return &Harness{cfg: d.Config, host: d.Host, log: d.Log, idx: d.Index, projects: d.Projects, queue: d.Queue, registry: d.Registry, settings: d.Settings}
 }

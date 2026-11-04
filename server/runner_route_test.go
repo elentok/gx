@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
+	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -17,7 +18,7 @@ type namedRunner struct {
 
 func (r *namedRunner) Name() string { return r.name }
 
-// fakeHarnessHost is a HarnessHost with no sessions and no tickets on disk.
+// fakeHarnessHost is a harnesschoice.Host with no sessions and no tickets on disk.
 type fakeHarnessHost struct{}
 
 func (fakeHarnessHost) ListSessions() ([]wire.SessionInfo, error) { return nil, nil }
@@ -27,10 +28,10 @@ func (fakeHarnessHost) FreshTicket(tickets.Address) (tickets.Epic, tickets.Ticke
 
 // routingServer is configured with headless and can also build herdr and pty;
 // RunnerFor hands out one runner per (runner, project) pair.
-func routingServer() (*Harness, *namedRunner) {
+func routingServer(adjust ...func(*harnesschoice.Config)) (*harnesschoice.Harness, *namedRunner) {
 	built := map[[2]string]*namedRunner{}
 	configured := &namedRunner{Runner: runnerfake.NewRunner(), name: "headless", project: "_default"}
-	return NewHarness(HarnessDeps{Host: fakeHarnessHost{}, Config: HarnessConfig{
+	cfg := harnesschoice.Config{
 		Runner: configured,
 		RunnerFor: func(runner, project string) agentrunner.Runner {
 			if runner != "herdr" && runner != "headless" && runner != "pty" {
@@ -42,7 +43,11 @@ func routingServer() (*Harness, *namedRunner) {
 			}
 			return built[key]
 		},
-	}}), configured
+	}
+	for _, f := range adjust {
+		f(&cfg)
+	}
+	return harnesschoice.New(harnesschoice.Deps{Host: fakeHarnessHost{}, Config: cfg}), configured
 }
 
 func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
@@ -83,8 +88,7 @@ func TestRunnerFor_LaunchesStillUseTheConfiguredRunner(t *testing.T) {
 
 func TestRunnerForRun_FallsBackToTheConfiguredRunnerByName(t *testing.T) {
 	t.Parallel()
-	s, configured := routingServer()
-	s.cfg.RunnerFor = nil
+	s, configured := routingServer(func(c *harnesschoice.Config) { c.RunnerFor = nil })
 	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "headless"}); r != agentrunner.Runner(configured) {
 		t.Errorf("got %v, want the configured runner", r)
 	}

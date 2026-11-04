@@ -151,8 +151,6 @@ func (s *Server) webHandler() http.Handler {
 			s.epicDetail(w, r)
 		case r.URL.Path == "/v1/stats":
 			s.stats(w, r)
-		case r.URL.Path == "/v1/settings/agents":
-			s.defaultHarnessRead(w, r)
 		case r.URL.Path == "/v1/health":
 			s.healthRead(w, r)
 		case r.URL.Path == "/v1/usage/summary":
@@ -204,7 +202,6 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/usage/override":    func(s *Server) http.HandlerFunc { return s.usageOverrideWrite },
 	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
 	"POST /v1/restart":           func(s *Server) http.HandlerFunc { return s.restartWrite },
-	"POST /v1/settings/agents":   func(s *Server) http.HandlerFunc { return s.defaultHarnessWrite },
 	"POST /v1/client-errors":     func(s *Server) http.HandlerFunc { return s.clientErrorReport },
 
 	"POST " + webAuthPathSetupStart:    func(s *Server) http.HandlerFunc { return s.webSetupStart },

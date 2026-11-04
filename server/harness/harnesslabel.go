@@ -1,4 +1,4 @@
-package server
+package harness
 
 import (
 	"github.com/elentok/gx/ralphloop"

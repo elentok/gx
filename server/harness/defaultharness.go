@@ -1,11 +1,10 @@
-package server
+package harness
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -27,15 +26,6 @@ func refuseDefaultHarness(reason, msg string) (wire.SetDefaultHarnessResult, err
 	return wire.SetDefaultHarnessResult{Refused: true, Reason: reason, Message: msg}, nil
 }
 
-func (s *Server) defaultHarnessRead(w http.ResponseWriter, _ *http.Request) {
-	st, err := s.harness.Status()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, st)
-}
-
 // Status is the Default harness, the configured runner and every project's own
 // override.
 func (h *Harness) Status() (wire.DefaultHarnessStatus, error) {
@@ -44,7 +34,7 @@ func (h *Harness) Status() (wire.DefaultHarnessStatus, error) {
 		return wire.DefaultHarnessStatus{}, err
 	}
 	st := wire.DefaultHarnessStatus{
-		Default:  string(defaultOrClaude(h.settings.Load().AgentsDefaultHarness)),
+		Default:  string(DefaultOrClaude(h.settings.Load().AgentsDefaultHarness)),
 		Runner:   h.cfg.AgentRunner,
 		Projects: []wire.ProjectDefaultHarness{},
 	}
@@ -66,20 +56,6 @@ func (h *Harness) projectOverride(project string) string {
 		return ""
 	}
 	return pf.Agents.DefaultHarness
-}
-
-func (s *Server) defaultHarnessWrite(w http.ResponseWriter, r *http.Request) {
-	var req wire.SetDefaultHarnessRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	res, err := s.harness.SetDefault(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, res)
 }
 
 // SetDefault writes the Default harness of a scope and reports what the switch
@@ -138,7 +114,7 @@ func (h *Harness) SetDefault(req wire.SetDefaultHarnessRequest) (wire.SetDefault
 // one when project is empty.
 func (h *Harness) effectiveDefault(project string) ralphloop.AgentKind {
 	if project == "" {
-		return defaultOrClaude(h.settings.Load().AgentsDefaultHarness)
+		return DefaultOrClaude(h.settings.Load().AgentsDefaultHarness)
 	}
 	return h.DefaultHarness(project)
 }

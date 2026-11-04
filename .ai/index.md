@@ -136,7 +136,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `wire`; `cmd` imports it too); `server/queue/` holds the queue and its pause gate, the Queue agent
   rows, AFK and vi mode, and the one-offs (submit, sweep, `IsOneOffEpic`), with their routes
   (imports `index`, `projects`, `runs`, `broker` and `wire`; the root implements `Host`; `cmd`
-  imports it too)
+  imports it too); `server/harness/` holds the harness and runner choice (resolution order, Default
+  harness, labels, missing-program checks, runner selection) and the `/v1/settings/agents` routes
+  (imports `index`, `projects`, `queue`, `runs`, `settings` and `wire`; the root implements `Host`
+  and imports it as `harnesschoice`, since the top-level `harness/` clashes)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

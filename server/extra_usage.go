@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
+	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/subscription"
 )
 
@@ -44,7 +45,7 @@ func (s *Server) extraUsageOn() bool {
 // startExtraUsageCheck is the server-start check. No item is enqueued, so it
 // runs only when the global Default harness is Claude.
 func (s *Server) startExtraUsageCheck(now time.Time) {
-	if defaultOrClaude(s.settings.Load().AgentsDefaultHarness) == ralphloop.AgentClaude {
+	if harnesschoice.DefaultOrClaude(s.settings.Load().AgentsDefaultHarness) == ralphloop.AgentClaude {
 		s.CheckExtraUsage(now)
 	}
 }

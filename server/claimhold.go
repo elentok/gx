@@ -1,6 +1,7 @@
 package server
 
 import (
+	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"time"
@@ -20,7 +21,7 @@ type claimHold struct {
 // claimRoot and scheduleVerdict both ask it, so a rule added here holds the
 // ticket and explains the wait. The usage gate comes last, so a rate-limit
 // hold's reason wins; a handoff restart (an answered ticket) is never gated.
-func (s *Server) claimHold(project string, t tickets.Ticket, rh ResolvedHarness) (claimHold, bool) {
+func (s *Server) claimHold(project string, t tickets.Ticket, rh harnesschoice.ResolvedHarness) (claimHold, bool) {
 	agent := rh.Harness
 	if reason := s.harness.QueueMissingReason(project, rh); reason != "" {
 		return claimHold{Verdict: wire.VerdictHarnessMissing, Reason: reason}, true

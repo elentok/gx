@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -248,7 +249,7 @@ func (s *Server) usageOverrideWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	agent := defaultOrClaude(s.settings.Load().AgentsDefaultHarness)
+	agent := harnesschoice.DefaultOrClaude(s.settings.Load().AgentsDefaultHarness)
 	if req.Harness != "" {
 		agent = ralphloop.AgentKind(req.Harness)
 		if samples, _ := s.usageFor(agent); samples == nil {

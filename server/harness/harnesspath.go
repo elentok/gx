@@ -1,4 +1,4 @@
-package server
+package harness
 
 import (
 	"fmt"
@@ -6,11 +6,11 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/harness"
+	agentharness "github.com/elentok/gx/harness"
 )
 
-// defaultLookPath looks program up over env's PATH, never the process env.
-func defaultLookPath(env []string) func(string) (string, error) {
+// DefaultLookPath looks program up over env's PATH, never the process env.
+func DefaultLookPath(env []string) func(string) (string, error) {
 	return func(program string) (string, error) { return brief.LookPath(env, program) }
 }
 
@@ -18,11 +18,11 @@ func defaultLookPath(env []string) func(string) (string, error) {
 // the server's PATH. An unregistered kind is not missing: its own refusal
 // names it.
 func (h *Harness) MissingProgram(kind string) (program string, missing bool) {
-	hr, err := harness.Lookup(agentrunner.Kind(kind))
+	hr, err := agentharness.Lookup(agentrunner.Kind(kind))
 	if err != nil {
 		return "", false
 	}
-	program = hr.Launch(harness.LaunchOptions{Env: h.cfg.Env}).Name
+	program = hr.Launch(agentharness.LaunchOptions{Env: h.cfg.Env}).Name
 	_, err = h.cfg.LookPath(program)
 	return program, err != nil
 }

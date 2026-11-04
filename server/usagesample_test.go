@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
@@ -160,7 +161,7 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	r.write("a", usageRecord(now, 99, now.Add(time.Hour)))
 	s.scanUsage()
 
-	h, held := s.claimHold("proj", tickets.Ticket{}, ResolvedHarness{Harness: ralphloop.AgentClaude})
+	h, held := s.claimHold("proj", tickets.Ticket{}, harnesschoice.ResolvedHarness{Harness: ralphloop.AgentClaude})
 	if !held || !strings.HasPrefix(h.Verdict, "Claude usage: 99% of the 5-hour limit") {
 		t.Fatalf("gate alone = %+v, %v", h, held)
 	}
@@ -168,7 +169,7 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	reset := now.Add(2 * time.Hour)
 	s.registry.Put(runs.TrackedRun{Run: runs.Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}})
 	s.registry.MarkRateLimit("proj:e/01", true, reset)
-	h, held = s.claimHold("proj", tickets.Ticket{}, ResolvedHarness{Harness: ralphloop.AgentClaude})
+	h, held = s.claimHold("proj", tickets.Ticket{}, harnesschoice.ResolvedHarness{Harness: ralphloop.AgentClaude})
 	if !held || h.Verdict != rateLimitVerdict(reset) {
 		t.Errorf("hold and gate = %+v, %v; want the hold's verdict", h, held)
 	}

@@ -33,6 +33,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
+	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/settings"
@@ -136,7 +137,7 @@ type Server struct {
 	logf           *rotatingFile
 	log            *slog.Logger
 	idx            *index.Index
-	harness        *Harness
+	harness        *harnesschoice.Harness
 	projects       *projects.Registry
 	migrator       *projects.Migrator
 	checks         *projects.Checks
@@ -193,7 +194,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.Env = os.Environ()
 	}
 	if cfg.LookPath == nil {
-		cfg.LookPath = defaultLookPath(cfg.Env)
+		cfg.LookPath = harnesschoice.DefaultLookPath(cfg.Env)
 	}
 	if cfg.Runner == nil {
 		return nil, errors.New("server: Config.Runner is required: the server builds no default runner")
@@ -366,8 +367,8 @@ func New(cfg Config) (*Server, error) {
 		focus:          newFocusReports(),
 	}
 	s.initProjects()
-	s.harness = NewHarness(HarnessDeps{
-		Config: HarnessConfig{
+	s.harness = harnesschoice.New(harnesschoice.Deps{
+		Config: harnesschoice.Config{
 			Env: cfg.Env, LookPath: cfg.LookPath, Runner: cfg.Runner, RunnerFor: cfg.RunnerFor,
 			AgentRunner: cfg.AgentRunner, ConfigPath: cfg.ConfigPath,
 		},
@@ -512,8 +513,6 @@ var routeTable = []struct {
 	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
 	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
 	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
-	{"GET /v1/settings/agents", (*Server).defaultHarnessRead},
-	{"POST /v1/settings/agents", (*Server).defaultHarnessWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

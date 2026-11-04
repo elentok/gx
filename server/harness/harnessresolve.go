@@ -1,4 +1,4 @@
-package server
+package harness
 
 import (
 	"time"
@@ -20,9 +20,9 @@ const (
 	HarnessFromDefault     HarnessSource = "default"
 )
 
-// harnessInputs are the four levels, highest first. An empty or unknown value
-// at a level is skipped.
-type harnessInputs struct {
+// Inputs are the four levels, highest first. An empty or unknown value at a
+// level is skipped.
+type Inputs struct {
 	Frontmatter string // the ticket's `agent:`
 	QueueItem   string // the queue item's agent, applies to every ticket of its root
 	EarlierRun  string // harness of the ticket's earlier run; empty when it never ran
@@ -42,9 +42,9 @@ func (r ResolvedHarness) DiffersFromEarlierRun(earlierRun string) bool {
 		ralphloop.AgentKind(earlierRun) != r.Harness
 }
 
-// resolveHarness decides a ticket's harness: frontmatter > queue item >
-// earlier run > default.
-func resolveHarness(in harnessInputs) ResolvedHarness {
+// Resolve decides a ticket's harness: frontmatter > queue item > earlier run >
+// default.
+func Resolve(in Inputs) ResolvedHarness {
 	levels := []struct {
 		value  string
 		source HarnessSource
@@ -58,10 +58,11 @@ func resolveHarness(in harnessInputs) ResolvedHarness {
 			return ResolvedHarness{Harness: ralphloop.AgentKind(l.value), Source: l.source}
 		}
 	}
-	return ResolvedHarness{Harness: defaultOrClaude(in.Default), Source: HarnessFromDefault}
+	return ResolvedHarness{Harness: DefaultOrClaude(in.Default), Source: HarnessFromDefault}
 }
 
-func defaultOrClaude(name string) ralphloop.AgentKind {
+// DefaultOrClaude is name as a harness, claude when it is empty or unknown.
+func DefaultOrClaude(name string) ralphloop.AgentKind {
 	if name != "" && ralphloop.ValidateAgentKind(ralphloop.AgentKind(name)) == nil {
 		return ralphloop.AgentKind(name)
 	}
@@ -71,29 +72,29 @@ func defaultOrClaude(name string) ralphloop.AgentKind {
 // DefaultHarness is the Default harness for project: its agents.default-harness
 // over the global one, claude when neither is set.
 func (h *Harness) DefaultHarness(project string) ralphloop.AgentKind {
-	return defaultOrClaude(h.projects.AgentsConfig(project).DefaultHarness)
+	return DefaultOrClaude(h.projects.AgentsConfig(project).DefaultHarness)
 }
 
-// ticketHarness is a ticket's resolved harness and the harness of its earlier
+// TicketHarness is a ticket's resolved harness and the harness of its earlier
 // run ("" when it never ran).
-type ticketHarness struct {
+type TicketHarness struct {
 	ResolvedHarness
 	EarlierRun string
 }
 
 // DiffersFromEarlierRun reports that the ticket starts under another harness
 // than its earlier run, so it starts from the Handoff.
-func (h ticketHarness) DiffersFromEarlierRun() bool {
+func (h TicketHarness) DiffersFromEarlierRun() bool {
 	return h.ResolvedHarness.DiffersFromEarlierRun(h.EarlierRun)
 }
 
 // ResolveTicket gathers the resolver's inputs for the ticket at addr: its
 // frontmatter agent, the queue item of its root, its earlier run and the
 // Default harness. Every site that picks a harness for a ticket calls it.
-func (h *Harness) ResolveTicket(addr tickets.Address, t tickets.Ticket) ticketHarness {
+func (h *Harness) ResolveTicket(addr tickets.Address, t tickets.Ticket) TicketHarness {
 	earlier := h.EarlierRunHarness(addr)
-	return ticketHarness{
-		ResolvedHarness: resolveHarness(harnessInputs{
+	return TicketHarness{
+		ResolvedHarness: Resolve(Inputs{
 			Frontmatter: t.Agent,
 			QueueItem:   h.queueItemAgent(addr),
 			EarlierRun:  earlier,
