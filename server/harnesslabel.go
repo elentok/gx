@@ -29,7 +29,7 @@ func (s *Server) harnessLabelFor(addr tickets.Address, agent string, status stri
 			return wire.HarnessLabel{}
 		}
 		kind := ralphloop.AgentKind(run.Agent)
-		model, effort := s.runAgentConfig(addr.Project, kind, run)
+		model, effort := s.projects.RunAgentConfig(addr.Project, kind, run)
 		return wire.HarnessLabel{Harness: run.Agent, Tier: string(ralphloop.TierWorker), Model: model, Effort: effort}
 	case tickets.StatusOpen.Word(), tickets.StatusBlocked.Word():
 		r := s.resolveTicket(addr, tickets.Ticket{Agent: agent})

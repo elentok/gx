@@ -39,7 +39,7 @@ func (s *Server) harnessMissingStem(kind, from string) string {
 
 // defaultHarnessSource names where project's Default harness comes from.
 func (s *Server) defaultHarnessSource(project string) string {
-	if dir, err := s.projectDir(project); err == nil {
+	if dir, err := s.projects.Dir(project); err == nil {
 		if pf, err := config.ReadProjectFile(dir); err == nil && pf.Agents != nil && pf.Agents.DefaultHarness != "" {
 			return "the project default"
 		}

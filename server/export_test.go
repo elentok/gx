@@ -169,7 +169,7 @@ func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason 
 func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.pruneBackups(repoRoot, now) }
 
 // StartupDone closes once the startup steps, the first rescan among them, ended.
-func (s *Server) StartupDone() <-chan struct{} { return s.startupDone }
+func (s *Server) StartupDone() <-chan struct{} { return s.migrator.startupDone }
 
 // SetShutdownRecorder makes Serve report each shutdown step to rec; nil clears it.
 func SetShutdownRecorder(rec func(step string)) {
@@ -207,7 +207,7 @@ func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
 func (s *Server) PauseStuckFinishedClaims(now time.Time) { s.pauseStuckFinishedClaims(now) }
 
 // WorktreeDir is where the project's iteration worktrees live.
-func (s *Server) WorktreeDir(project string) string { return s.worktreeDir(project) }
+func (s *Server) WorktreeDir(project string) string { return s.projects.WorktreeDir(project) }
 
 // RecoveredCount is recoveredCount for tests.
 func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }
@@ -215,7 +215,7 @@ func RecoveredCount(projectDir, epic string) int { return recoveredCount(project
 // HoldTrunkLock takes the project's trunk lock the way a merge does, until
 // release runs.
 func (s *Server) HoldTrunkLock(project, trunk string) (release func(), err error) {
-	_, repo, err := s.projectOf(project)
+	_, repo, err := s.projects.Of(project)
 	if err != nil {
 		return nil, err
 	}

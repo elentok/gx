@@ -70,7 +70,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		list.Projects = append(list.Projects, project)
-		epics, err := s.projectEpics(project)
+		epics, err := s.projects.Epics(project)
 		if err != nil {
 			continue
 		}

@@ -177,7 +177,7 @@ func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func
 
 // typeStep types one prompt and presses its Enter, without waiting.
 func (r *actionRun) typeStep(i int, prompt string) error {
-	if !r.s.typing().ReadyToType(r.s.typingIO(r.dir, r.holder, "action-step")) {
+	if !r.s.projects.Typing().ReadyToType(r.s.projects.TypingIO(r.dir, r.holder, "action-step")) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
 	if err := r.s.clearDraft(r.dir, r.holder); err != nil {

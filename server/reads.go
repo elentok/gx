@@ -30,30 +30,11 @@ func (s *Server) explain(w http.ResponseWriter, r *http.Request) {
 // explainTicket gives the stored ticket's verdict: the scheduler's own, then
 // the server's queue and slot state for a ticket nothing else holds back.
 func (s *Server) explainTicket(addr tickets.Address) (wire.Explanation, error) {
-	epics, err := s.projectEpics(addr.Project)
+	epics, err := s.projects.Epics(addr.Project)
 	if err != nil {
 		return wire.Explanation{}, err
 	}
 	return s.explainIn(epics, addr)
-}
-
-// projectEpics is the named project's epics as of the last store scan; a
-// project the scan has not seen yet is read from disk.
-func (s *Server) projectEpics(project string) ([]tickets.Epic, error) {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
-	if err != nil {
-		return nil, err
-	}
-	for _, dir := range dirs {
-		if tickets.ProjectName(dir) != project {
-			continue
-		}
-		if epics, ok := s.idx.EpicsOf(dir); ok {
-			return epics, nil
-		}
-		return tickets.LoadResolved(project, dir)
-	}
-	return nil, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: "no project " + project}
 }
 
 // explainIn is explainTicket's lookup inside one project's epics.

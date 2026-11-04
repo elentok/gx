@@ -93,7 +93,7 @@ func (s *Server) herdrWaiting() []string {
 			continue
 		}
 		seen[rootOf(addr).String()] = true
-		t, ok := s.nextQueuedTicket(addr, s.projectEpics)
+		t, ok := s.nextQueuedTicket(addr, s.projects.Epics)
 		if !ok {
 			continue
 		}

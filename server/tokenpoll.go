@@ -54,8 +54,8 @@ func (s *Server) readTokens(ref ralphloop.SessionRef) (int64, float64, error) {
 		return f(ref)
 	}
 	var homes ralphloop.SessionHomes
-	homes.Claude, _ = s.envHome()
-	homes.Codex, _ = s.codexHome()
+	homes.Claude, _ = s.projects.EnvHome()
+	homes.Codex, _ = s.projects.CodexHome()
 	return ralphloop.SessionsTotals(homes, []ralphloop.SessionRef{ref})
 }
 
@@ -70,7 +70,7 @@ func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
 	if a.Epic == tickets.OneOffsEpic {
 		group = tokenledger.GroupOneOff
 	}
-	label, _, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
+	label, _, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.projects.WorktreeDir(a.Project))
 	agentDir := filepath.Join(nativerunner.AgentsRoot(s.cfg.StateDir, a.Project), label)
 	run, _ := s.registry.RunOf(address)
 	codex := isCodexRun(run)
@@ -80,7 +80,7 @@ func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
 	ts := tokenSession{project: a.Project, group: group}
 	if codex {
 		id := harness.ReadCodexSessionID(agentDir)
-		home, err := s.codexHome()
+		home, err := s.projects.CodexHome()
 		if id == "" || err != nil {
 			return tokenSession{}, false
 		}
@@ -92,7 +92,7 @@ func (s *Server) tokenSessionOf(address string) (tokenSession, bool) {
 		ts.ref = ralphloop.SessionRef{Agent: ralphloop.AgentCodex, Cwd: worktree, SessionID: id}
 	} else {
 		it, ok := s.budgetIteration(address)
-		home, err := s.envHome()
+		home, err := s.projects.EnvHome()
 		if !ok || it.Session == "" || err != nil {
 			return tokenSession{}, false
 		}
@@ -212,7 +212,7 @@ func (s *Server) interactiveTokenSession(m sessionMeta) (tokenSession, bool) {
 		ref:     ralphloop.SessionRef{Agent: ralphloop.AgentFor(m.Harness), Cwd: m.Dir, SessionID: m.ConversationID},
 	}
 	if agentrunner.Kind(m.Harness) == harness.Codex {
-		home, err := s.codexHome()
+		home, err := s.projects.CodexHome()
 		if err != nil {
 			return tokenSession{}, false
 		}
@@ -222,7 +222,7 @@ func (s *Server) interactiveTokenSession(m sessionMeta) (tokenSession, bool) {
 		}
 		ts.path = path
 	} else {
-		home, err := s.envHome()
+		home, err := s.projects.EnvHome()
 		if err != nil {
 			return tokenSession{}, false
 		}
@@ -260,7 +260,7 @@ func (p *tokenPoller) groupOf(key string, compute func() string) string {
 // day that makes the step skip days.
 func (s *Server) keepTokensPolled(ctx context.Context) {
 	select {
-	case <-s.migrationsDone:
+	case <-s.migrator.done:
 	case <-ctx.Done():
 		return
 	}

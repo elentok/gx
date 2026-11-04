@@ -21,7 +21,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 	return slices.Concat(
 		webtls.Routes(func() *x509.Certificate { return s.webCerts.Root() }),
 		settings.Routes(func() *settings.Holder { return s.Settings() }),
-		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrationsDone }),
+		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrator.done }),
 	)
 }
 

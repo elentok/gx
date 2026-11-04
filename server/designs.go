@@ -43,7 +43,7 @@ type designCtx struct {
 }
 
 func (s *Server) designCtxOf(project, epic string) (designCtx, error) {
-	projectDir, repoDir, err := s.projectOf(project)
+	projectDir, repoDir, err := s.projects.Of(project)
 	if err != nil {
 		return designCtx{}, err
 	}
@@ -369,7 +369,7 @@ func (s *Server) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionR
 // mapEpicDir returns the project dir of a map epic, or the refusal reason and
 // message when the project or epic is unknown or the epic is not a map.
 func (s *Server) mapEpicDir(project, epic string) (dir, reason, msg string) {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return "", wire.ReasonDesignUnknownEpic, err.Error()
 	}
@@ -442,7 +442,7 @@ func (s *Server) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult, 
 	case len(idea) > maxSessionPromptBytes:
 		return sessionRefusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
 	}
-	dir, err := s.projectDir(req.Project)
+	dir, err := s.projects.Dir(req.Project)
 	if err != nil {
 		return sessionRefusal(wire.ReasonSessionBadRequest, err.Error()), nil
 	}
@@ -535,7 +535,7 @@ func (s *Server) deleteDesign(req wire.DesignDeleteRequest) (wire.SessionResult,
 	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
 		return sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
 	}
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return sessionRefusal(wire.ReasonDesignUnknownEpic, err.Error()), nil
 	}

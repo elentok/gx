@@ -35,7 +35,7 @@ func rootRefsFixture(t *testing.T) (*Server, string) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return &Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))}, repo
+	return withProjects(&Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))}), repo
 }
 
 func runGit(t *testing.T, dir string, args ...string) {

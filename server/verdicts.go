@@ -38,7 +38,7 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 	case ralphloop.DecisionStalled:
 		return wire.Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // asking, stuck or draft
 	case ralphloop.DecisionUnclaimed:
-		if path, missing := s.unavailablePath(addr.Project); missing {
+		if path, missing := s.projects.UnavailablePath(addr.Project); missing {
 			return wire.Explanation{Address: addr.String(), Verdict: wire.VerdictProjectUnavailable, Reason: path + " does not exist"}
 		}
 		return s.scheduleVerdict(e, t, addr)
@@ -198,7 +198,7 @@ func (s *Server) pendingRows() []wire.PendingRow {
 		if r, ok := byProject[project]; ok {
 			return r.epics, r.err
 		}
-		epics, err := s.projectEpics(project)
+		epics, err := s.projects.Epics(project)
 		byProject[project] = loadResult{epics, err}
 		return epics, err
 	}

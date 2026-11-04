@@ -184,7 +184,7 @@ func (s *Server) createSession(req wire.CreateSessionRequest, sc sessionCtx) (wi
 // the session's harness and project.
 func (s *Server) applyTier(meta *sessionMeta, tier ralphloop.Tier) {
 	meta.Tier = tier
-	meta.Model, meta.Effort = ralphloop.ResolveTier(s.agentsConfig(meta.Project), ralphloop.AgentFor(meta.Harness), tier)
+	meta.Model, meta.Effort = ralphloop.ResolveTier(s.projects.AgentsConfig(meta.Project), ralphloop.AgentFor(meta.Harness), tier)
 }
 
 // recordConversation keeps the session's current conversation on the record,
@@ -210,12 +210,12 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 		return
 	}
 	agent := ralphloop.AgentFor(m.Harness)
-	home, err := s.envHome()
+	home, err := s.projects.EnvHome()
 	if err != nil {
 		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 		return
 	}
-	codexHome, _ := s.codexHome()
+	codexHome, _ := s.projects.CodexHome()
 	tokens, cost, err := ralphloop.SessionsTotals(ralphloop.SessionHomes{Claude: home, Codex: codexHome}, []ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
 	if err != nil {
 		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
@@ -236,7 +236,7 @@ func (s *Server) addSessionWorktree(project, name string) (string, string) {
 	if !filepath.IsLocal(name) {
 		return "", fmt.Sprintf("bad worktree name %q", name)
 	}
-	projectDir, repoDir, err := s.projectOf(project)
+	projectDir, repoDir, err := s.projects.Of(project)
 	if err != nil {
 		return "", err.Error()
 	}
@@ -421,7 +421,7 @@ func (s *Server) codexRoots(meta *sessionMeta) []string {
 		return nil
 	}
 	var extra []string
-	if d, err := s.projectDir(meta.Project); err == nil {
+	if d, err := s.projects.Dir(meta.Project); err == nil {
 		extra = append(extra, d)
 	}
 	return harness.CodexWritableRoots(meta.Dir, extra...)

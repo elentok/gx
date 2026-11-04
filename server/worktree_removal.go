@@ -25,11 +25,11 @@ func (s *Server) removeMergedWorktree(root rootRef) {
 		return
 	}
 	project := root.Project
-	dir, repoDir, err := s.projectOf(project)
+	dir, repoDir, err := s.projects.Of(project)
 	if err != nil {
 		return
 	}
-	base := s.worktreeDir(project)
+	base := s.projects.WorktreeDir(project)
 	if base == "" {
 		return
 	}

@@ -73,7 +73,7 @@ func (s *Server) targetCheckout(addr tickets.Address) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, repo, err := s.projectOf(addr.Project)
+	_, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +102,7 @@ func checkoutDirFor(repoDir, target string) (git.Repo, string, error) {
 // projectHasNoVCS: a commitless ticket in a vcs: none project has no repository
 // to check out, so it runs in a scratch subdir.
 func (s *Server) projectHasNoVCS(project string) bool {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return false
 	}

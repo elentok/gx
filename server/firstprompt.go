@@ -258,7 +258,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 	}
 	// Before the draft clear: vim NORMAL has to reach INSERT first. The nudge
 	// runs the same step again, which presses nothing once in INSERT.
-	if !f.typing().ReadyToType(f.s.typingIO(f.dir, c, "first-prompt")) {
+	if !f.typing().ReadyToType(f.s.projects.TypingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
 	if err := f.s.clearDraft(f.dir, c); err != nil {
@@ -321,7 +321,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	if err != nil {
 		cwd = meta.Dir
 	}
-	path, err := f.s.transcriptPath(cwd, meta.ConversationID)
+	path, err := f.s.projects.TranscriptPath(cwd, meta.ConversationID)
 	if err != nil {
 		f.log.Warn("first prompt proof skipped", "err", err)
 		return nil
@@ -456,11 +456,11 @@ type firstPrompter struct {
 
 // typing is the typing rules of the session's harness.
 func (f *firstPrompt) typing() harness.Typing {
-	return f.s.sessionTyping(f.dir)
+	return f.s.projects.SessionTyping(f.dir)
 }
 
 func (f *firstPrompt) prompter(c *nativerunner.HolderClient, turn int) *firstPrompter {
-	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.s.typingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
+	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.s.projects.TypingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
 }
 
 func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {

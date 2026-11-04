@@ -13,7 +13,7 @@ import (
 )
 
 func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
-	list, err := s.listProjectWorktrees()
+	list, err := s.projects.ListWorktrees()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -23,9 +23,9 @@ func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
 
 // tierModels resolves each tier's model for the harness a web-created session
 // launches.
-func (s *Server) tierModels(project string) map[string]string {
-	agents := s.agentsConfig(project)
-	agent := ralphloop.AgentFor(s.launchHarness(project))
+func (p *Registry) TierModels(project string) map[string]string {
+	agents := p.AgentsConfig(project)
+	agent := ralphloop.AgentFor(p.back.launchHarness(project))
 	out := map[string]string{}
 	for _, t := range ralphloop.AllTiers {
 		out[string(t)], _ = ralphloop.ResolveTier(agents, agent, t)
@@ -34,8 +34,8 @@ func (s *Server) tierModels(project string) map[string]string {
 }
 
 // listProjectWorktrees lists each project that has a repo in project.json.
-func (s *Server) listProjectWorktrees() ([]wire.ProjectWorktrees, error) {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+func (p *Registry) ListWorktrees() ([]wire.ProjectWorktrees, error) {
+	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (s *Server) listProjectWorktrees() ([]wire.ProjectWorktrees, error) {
 			continue
 		}
 		name := tickets.ProjectName(dir)
-		p := wire.ProjectWorktrees{Project: name, Root: repo.Root, Worktrees: []string{}, Tiers: s.tierModels(name)}
+		p := wire.ProjectWorktrees{Project: name, Root: repo.Root, Worktrees: []string{}, Tiers: p.TierModels(name)}
 		wts, _ := git.ListWorktrees(*repo)
 		for _, wt := range wts {
 			if filepath.Clean(wt.Path) != filepath.Clean(repo.Root) {

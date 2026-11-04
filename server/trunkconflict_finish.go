@@ -36,7 +36,7 @@ func (s *Server) dropTrunkConflictBackup(addr tickets.Address) {
 	if !ok || e.TrunkConflictBackup == "" {
 		return
 	}
-	_, repo, err := s.projectOf(addr.Project)
+	_, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
 		s.log.Warn("delete trunk-conflict backup", "ticket", addr, "err", err)
 		return

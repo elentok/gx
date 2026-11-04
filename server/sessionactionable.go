@@ -86,7 +86,7 @@ func runEndNext(text, ticket, agent string, final bool) (wire.SessionActionable,
 func (s *Server) designFinal(ticket string) bool {
 	addr := epicAddress(ticket)
 	project, name, _ := strings.Cut(addr, ":")
-	epics, err := s.projectEpics(project)
+	epics, err := s.projects.Epics(project)
 	if err != nil {
 		s.log.Warn("design step: read map", "ticket", ticket, "err", err)
 		return false
@@ -172,7 +172,7 @@ func (s *Server) claudeTranscript(id string, meta sessionMeta) (string, bool) {
 // transcript, or from its codex rollout.
 func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
 	if meta.Harness == string(harness.Codex) {
-		text, ok, err := s.lastCodexText(meta.ConversationID)
+		text, ok, err := s.projects.LastCodexText(meta.ConversationID)
 		if err != nil {
 			s.log.Warn("design actionable: read codex rollout", "session", id, "err", err)
 		}

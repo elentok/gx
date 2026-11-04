@@ -73,7 +73,7 @@ func (s *Server) watchGates(now time.Time) {
 // heldGate is the newest gate-held event of the ticket's latest iteration
 // whose task is still held.
 func (s *Server) heldGate(addr tickets.Address) (ralphloop.Event, bool) {
-	dir, _, err := s.projectOf(addr.Project)
+	dir, _, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return ralphloop.Event{}, false
 	}

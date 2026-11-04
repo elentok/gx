@@ -128,7 +128,7 @@ func (s *Server) codexArchive(id string, meta sessionMeta) (string, bool) {
 	if meta.Harness != string(harness.Codex) || meta.ConversationID == "" {
 		return "", false
 	}
-	home, err := s.codexHome()
+	home, err := s.projects.CodexHome()
 	if err != nil {
 		s.log.Warn("codex home", "session", id, "err", err)
 		return "", false
@@ -206,7 +206,7 @@ func (s *Server) codexRollout(id string, meta sessionMeta) (string, bool) {
 		return "", false
 	}
 	return s.transcripts.resolve(meta.ConversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
-		home, err := s.codexHome()
+		home, err := s.projects.CodexHome()
 		if err != nil {
 			s.log.Warn("codex home", "session", id, "err", err)
 			return "", false

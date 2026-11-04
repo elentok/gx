@@ -113,7 +113,7 @@ func (s *Server) epicDir(address string) (dir string, ok bool, err error) {
 	if !found || epic == "" {
 		return "", false, nil
 	}
-	projectDir, err := s.projectDir(project)
+	projectDir, err := s.projects.Dir(project)
 	if err != nil {
 		return "", false, err
 	}

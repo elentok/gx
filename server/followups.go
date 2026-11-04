@@ -74,7 +74,7 @@ func (s *Server) fileFollowUp(addr tickets.Address, ticketPath string) {
 		s.log.Warn("follow-ups project missing, proposal goes to the escalation only", "ticket", addr.String(), "err", err)
 		if !tk.Notify {
 			dir := filepath.Dir(filepath.Dir(filepath.Dir(ticketPath)))
-			s.chat.Result(addr.Project, s.chatOverride(addr.Project), dir, addr.Epic, addr.String(), result)
+			s.chat.Result(addr.Project, s.projects.ChatOverride(addr.Project), dir, addr.Epic, addr.String(), result)
 		}
 		return
 	}
@@ -114,7 +114,7 @@ func (s *Server) followUpsEpicPath(fromProject string) (string, error) {
 	if !ok {
 		project, epic = fromProject, target
 	}
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return "", fmt.Errorf("%w %s: %v", errNoFollowUpProject, project, err)
 	}

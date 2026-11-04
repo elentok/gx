@@ -71,14 +71,14 @@ func defaultOrClaude(name string) ralphloop.AgentKind {
 // defaultHarness is the Default harness for project: its agents.default-harness
 // over the global one, claude when neither is set.
 func (s *Server) defaultHarness(project string) ralphloop.AgentKind {
-	return defaultOrClaude(s.agentsConfig(project).DefaultHarness)
+	return defaultOrClaude(s.projects.AgentsConfig(project).DefaultHarness)
 }
 
 // launchHarness is the harness a new interactive session in project starts on
 // when its request names none. Unlike defaultHarness it keeps an unregistered
 // name, so createSession refuses it instead of silently running Claude.
 func (s *Server) launchHarness(project string) string {
-	return cmp.Or(s.agentsConfig(project).DefaultHarness, string(ralphloop.AgentClaude))
+	return cmp.Or(s.projects.AgentsConfig(project).DefaultHarness, string(ralphloop.AgentClaude))
 }
 
 // ticketHarness is a ticket's resolved harness and the harness of its earlier
@@ -125,7 +125,7 @@ func (s *Server) queueItemAgent(addr tickets.Address) string {
 // a transcript (Claude) or a rollout (Codex). A run that died before its first
 // prompt left neither, so it does not count and the ticket is never-run.
 func (s *Server) earlierRunHarness(addr tickets.Address) string {
-	dir, err := s.projectDir(addr.Project)
+	dir, err := s.projects.Dir(addr.Project)
 	if err != nil {
 		return ""
 	}
@@ -155,14 +155,14 @@ func (s *Server) sessionRecorded(r ralphloop.IterationSession) bool {
 func (s *Server) sessionRecordedUncached(r ralphloop.IterationSession) bool {
 	switch r.Agent {
 	case ralphloop.AgentClaude:
-		home, err := s.envHome()
+		home, err := s.projects.EnvHome()
 		if err != nil {
 			return false
 		}
 		found, err := transcript.FindByID(home, r.Session)
 		return err == nil && len(found) > 0
 	case ralphloop.AgentCodex:
-		home, err := s.codexHome()
+		home, err := s.projects.CodexHome()
 		if err != nil {
 			return false
 		}

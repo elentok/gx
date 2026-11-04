@@ -113,7 +113,7 @@ func (s *Server) epicTarget(req wire.RepairRequest, needID, preferProject bool) 
 		}
 		cwd = req.Cwd
 		if cwd == "" || preferProject {
-			if _, repo, err := s.projectOf(project); err == nil {
+			if _, repo, err := s.projects.Of(project); err == nil {
 				cwd = repo
 			}
 		}
@@ -251,12 +251,12 @@ func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Rep
 // no server runner, so there is no agent to ask and the defaults stand.
 func (s *Server) hostingDeps(addr tickets.Address) ralphloop.Deps {
 	if s.cfg.Runner == nil {
-		return s.defaultDeps()
+		return s.projects.DefaultDeps()
 	}
 	// An unavailable runner is nil, which reports no session, as for an
 	// unreachable host.
 	runner, _ := s.iterationRunner(addr)
-	return s.depsWith(runner)
+	return s.projects.DepsWith(runner)
 }
 
 func epicTicketAddress(epicPath, id string) tickets.Address {
@@ -454,7 +454,7 @@ func resumeAnswered(ticketPath, id string, req wire.RepairRequest, origin string
 // ambiguousBlockers lists the blockers a ticket paused on an ambiguous base
 // has to choose between, recomputed from the epics; none when it is not ambiguous.
 func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
-	dir, err := s.projectDir(addr.Project)
+	dir, err := s.projects.Dir(addr.Project)
 	if err != nil {
 		return nil
 	}
@@ -505,7 +505,7 @@ func (s *Server) iterationSession(dir string, addr tickets.Address) (agentrunner
 	if s.registry == nil {
 		return nil, agentrunner.Session{}, false, nil
 	}
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
+	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.projects.WorktreeDir(addr.Project))
 	runner := s.runnerFor(addr.Project)
 	if pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
 		if pause.Label != "" {
@@ -586,7 +586,7 @@ func (s *Server) repairVerify(req wire.RepairRequest, _ repairCtx) (wire.RepairR
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if run.MergeLockStateDir, err = s.lockStateDir(); err != nil {
+	if run.MergeLockStateDir, err = s.projects.LockStateDir(); err != nil {
 		return repairRefusal(err), nil
 	}
 	run.ID = id

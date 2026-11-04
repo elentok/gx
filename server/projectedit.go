@@ -17,19 +17,14 @@ func refuseProject(reason, msg string) (wire.ProjectResult, error) {
 }
 
 // projectBusy reports a queued or running ticket of project.
-func (s *Server) projectBusy(project string) (address string, busy bool) {
+func (p *Registry) Busy(project string) (address string, busy bool) {
 	inProject := func(addr string) bool {
 		a, err := parseQueuedAddress(addr)
 		return err == nil && a.Project == project
 	}
-	for _, it := range s.queued.list() {
-		if inProject(it.Address) {
-			return it.Address, true
-		}
-	}
-	for _, r := range s.registry.List() {
-		if inProject(r.Address) {
-			return r.Address, true
+	for _, addr := range p.back.busyAddresses() {
+		if inProject(addr) {
+			return addr, true
 		}
 	}
 	return "", false
@@ -37,17 +32,17 @@ func (s *Server) projectBusy(project string) (address string, busy bool) {
 
 // removeProject unregisters a project by deleting its project.json. Its
 // tickets stay in the store, so adding the path again picks them back up.
-func (s *Server) removeProject(req wire.ProjectRequest) (wire.ProjectResult, error) {
+func (p *Registry) Remove(req wire.ProjectRequest) (wire.ProjectResult, error) {
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
 	if req.Name == ScratchProject {
 		return refuseProject(wire.ReasonReservedName, "\""+ScratchProject+"\" is built in and cannot be removed")
 	}
-	dir, err := s.projectDir(req.Name)
+	dir, err := p.Dir(req.Name)
 	if err != nil {
 		return refuseProject(wire.ReasonUnknownProject, "no project named "+req.Name)
 	}
-	if addr, busy := s.projectBusy(req.Name); busy {
+	if addr, busy := p.Busy(req.Name); busy {
 		return refuseProject(wire.ReasonProjectBusy, addr+" is queued or running; remove it from the queue first")
 	}
 	if err := os.Remove(filepath.Join(dir, config.ProjectFileName)); err != nil {
@@ -57,10 +52,10 @@ func (s *Server) removeProject(req wire.ProjectRequest) (wire.ProjectResult, err
 }
 
 // setProjectPath points an existing project at another repo.
-func (s *Server) setProjectPath(req wire.ProjectRequest) (wire.ProjectResult, error) {
+func (p *Registry) SetPath(req wire.ProjectRequest) (wire.ProjectResult, error) {
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
-	dir, err := s.projectDir(req.Name)
+	dir, err := p.Dir(req.Name)
 	if err != nil {
 		return refuseProject(wire.ReasonUnknownProject, "no project named "+req.Name)
 	}
@@ -77,7 +72,7 @@ func (s *Server) setProjectPath(req wire.ProjectRequest) (wire.ProjectResult, er
 	} else if pf.VCS == nil || *pf.VCS != config.VCSNone {
 		return refuseProject(wire.ReasonNotRepo, req.Path+" is not a git repo")
 	}
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
 	if err != nil {
 		return wire.ProjectResult{}, err
 	}

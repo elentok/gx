@@ -52,8 +52,8 @@ func missingPath(dir string) (string, bool) {
 }
 
 // unavailablePath reports whether project's path is missing, and what it was.
-func (s *Server) unavailablePath(project string) (string, bool) {
-	dir, err := s.projectDir(project)
+func (p *Registry) UnavailablePath(project string) (string, bool) {
+	dir, err := p.Dir(project)
 	if err != nil {
 		return "", false
 	}
@@ -63,8 +63,8 @@ func (s *Server) unavailablePath(project string) (string, bool) {
 // checkProjects looks at every registered project's path: at start and on every
 // poll. The first poll that finds one missing sends the one notification; the
 // claim and explain paths read the path themselves, so they never lag it.
-func (s *Server) checkProjects() {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+func (p *Registry) Check() {
+	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
 	if err != nil {
 		return
 	}
@@ -72,12 +72,12 @@ func (s *Server) checkProjects() {
 		name := tickets.ProjectName(dir)
 		path, missing := missingPath(dir)
 		if !missing {
-			s.unavailable.clear(name)
+			p.unavailable.clear(name)
 			continue
 		}
-		if s.unavailable.mark(name) {
-			s.log.Warn("project unavailable", "project", name, "path", path)
-			s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeProjectUnavailable, Emoji: "📁", Title: "project " + name + " unavailable",
+		if p.unavailable.mark(name) {
+			p.log.Warn("project unavailable", "project", name, "path", path)
+			p.chat.Notice(ralphloop.ServerNotice{Kind: NoticeProjectUnavailable, Emoji: "📁", Title: "project " + name + " unavailable",
 				Detail: path + " does not exist; its tickets will not run. Fix it with gx project set-path " + name + " <path>"})
 		}
 	}

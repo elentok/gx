@@ -31,7 +31,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		return
 	}
 	project := root.Project
-	dir, repo, err := s.projectOf(project)
+	dir, repo, err := s.projects.Of(project)
 	if err != nil {
 		s.log.Warn("complete root", "root", root, "err", err)
 		return
@@ -250,7 +250,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 // epic's iteration worktree may hold a running agent. A failure is logged: the
 // merge already happened.
 func (s *Server) removeLeftoverWorktrees(repo string, e tickets.Epic) {
-	d := s.defaultDeps()
+	d := s.projects.DefaultDeps()
 	for _, t := range e.Tickets {
 		if err := ralphloop.RemoveIterationWorktree(d, repo, e.Name, t.Identifier); err != nil {
 			s.log.Warn("remove leftover iteration worktree", "epic", e.Name, "ticket", t.Identifier, "err", err)
@@ -286,7 +286,7 @@ func (s *Server) pauseRoot(root rootRef, one ralphloop.OneIteration, dir string,
 		return
 	}
 	if s.chat.Enabled() {
-		s.chat.Pause(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), events.Kind(kind), reason, ralphloop.CountsOf(e))
+		s.chat.Pause(project, s.projects.ChatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), events.Kind(kind), reason, ralphloop.CountsOf(e))
 	}
 	// Only a needs-rebase pause is the epic's outcome; any other pause waits on
 	// a person's fix and then merges.
@@ -304,7 +304,7 @@ func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 	elapsed, cost := ralphloop.EpicTotals(e)
 	counts := ralphloop.CountsOf(e)
 	counts.Recovered = recoveredCount(dir, one.Epic)
-	s.chat.EpicComplete(project, s.chatOverride(project), one.Epic, counts, elapsed, cost, merged)
+	s.chat.EpicComplete(project, s.projects.ChatOverride(project), one.Epic, counts, elapsed, cost, merged)
 }
 
 // submitRetro files the evolve one-off for a completed loop epic. It runs at
@@ -330,7 +330,7 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic) {
 	}
 	// A maintainer's retro writes to the gx project; without one it has nowhere to go.
 	if mode == config.EvolveMaintainer {
-		if _, err := s.projectDir("gx"); err != nil {
+		if _, err := s.projects.Dir("gx"); err != nil {
 			s.log.Warn("retro hook: maintainer mode needs a gx project, not submitting", "root", root, "err", err)
 			return
 		}

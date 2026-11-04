@@ -32,7 +32,7 @@ func (s *Server) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, ta
 	if err != nil {
 		return landed, err
 	}
-	if pdir, err := s.projectDir(project); err == nil {
+	if pdir, err := s.projects.Dir(project); err == nil {
 		_ = ralphloop.AppendEvent(pdir, epic, ralphloop.Event{
 			Time: now, Type: string(events.DirtyTrunkLanded), Reason: strings.Join(clashing, ", "), BackupRef: ref,
 		})

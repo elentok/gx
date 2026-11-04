@@ -507,7 +507,7 @@ func TestProjectEpics_CrossEpicBlockerReadsAsDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	epics, err := s.projectEpics("p")
+	epics, err := s.projects.Epics("p")
 	if err != nil {
 		t.Fatal(err)
 	}

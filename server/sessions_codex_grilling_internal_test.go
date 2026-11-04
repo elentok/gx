@@ -16,7 +16,7 @@ func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 	codexHome := t.TempDir()
 	root := t.TempDir()
 	m := sessionMeta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
-	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{ConversationsDir: root, Env: []string{"HOME=" + home, "CODEX_HOME=" + codexHome}}}
+	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{ConversationsDir: root, Env: []string{"HOME=" + home, "CODEX_HOME=" + codexHome}}})
 	s.recordConversation(m)
 
 	dir := filepath.Join(codexHome, "sessions", "2026", "01", "02")

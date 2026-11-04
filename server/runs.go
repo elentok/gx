@@ -72,7 +72,7 @@ func (s *Server) pauseUnreclaimed(t runs.TrackedRun, cause error) {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err == nil {
 		var dir string
-		if dir, _, err = s.projectOf(addr.Project); err == nil {
+		if dir, _, err = s.projects.Of(addr.Project); err == nil {
 			err = s.pauseTicket(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error(), t.Run)
 		}
 	}
@@ -107,7 +107,7 @@ func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) e
 		if reopened, err := s.reopenEmptyClaim(t); err != nil || reopened {
 			return err
 		}
-		dir, _, err := s.projectOf(addr.Project)
+		dir, _, err := s.projects.Of(addr.Project)
 		if err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) e
 	t.State = ""
 	s.registry.Put(t)
 	s.events.Publish(wire.EventReclaimed, t.Address)
-	deps := s.depsWith(runner)
+	deps := s.projects.DepsWith(runner)
 	deps.GateReleased = s.registry.GateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished || reportedFinished(t.TicketPath) {
 		s.guards.GoSettle(func() { s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil) })
@@ -209,7 +209,7 @@ func (s *Server) reclaim(t runs.TrackedRun) error {
 	t.State = ""
 	s.registry.Put(t)
 	s.events.Publish(wire.EventReclaimed, t.Address)
-	deps := s.depsWith(runner)
+	deps := s.projects.DepsWith(runner)
 	deps.GateReleased = s.registry.GateReleased(t.Address)
 	rc := runContext{deps, root, mode, one, wt, t.Run, t.Address}
 	if reportedFinished(t.TicketPath) {
@@ -264,11 +264,11 @@ func (s *Server) reopenEmptyClaim(t runs.TrackedRun) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	dir, _, err := s.projectOf(addr.Project)
+	dir, _, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return false, err
 	}
-	if err := mode.discard(s.defaultDeps(), one, wt); err != nil {
+	if err := mode.discard(s.projects.DefaultDeps(), one, wt); err != nil {
 		return false, err
 	}
 	const reason = "agent gone, no commits, no edits"
@@ -321,7 +321,7 @@ func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloo
 	if err != nil {
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}
-	dir, _, err := s.projectOf(addr.Project)
+	dir, _, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}
@@ -345,6 +345,6 @@ func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloo
 	}
 	one.Sink = s.finishSink(addr, one.Ticket.Path)
 	mode := s.iterationModeFor(addr, one.Ticket)
-	wt, err := mode.resume(s.defaultDeps(), one, t.Base)
+	wt, err := mode.resume(s.projects.DefaultDeps(), one, t.Base)
 	return one, wt, mode, err
 }

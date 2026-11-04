@@ -38,7 +38,7 @@ func (s *Server) fileStartIncident(now time.Time) {
 		s.log.Info("start incident: not filed, needs evolve maintainer mode", "note", path)
 		return
 	}
-	if _, err := s.projectDir(OutboxProject); err != nil {
+	if _, err := s.projects.Dir(OutboxProject); err != nil {
 		s.log.Info("start incident: not filed, needs a gx project", "err", err)
 		return
 	}

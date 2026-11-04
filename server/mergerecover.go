@@ -36,7 +36,7 @@ func (s *Server) recoverMerges() {
 }
 
 func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
-	lockDir, err := s.mergeLockDir(epicPath)
+	lockDir, err := s.projects.MergeLockDir(epicPath)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 	}
 
 	project := tickets.ProjectName(projectDir)
-	_, repo, err := s.projectOf(project)
+	_, repo, err := s.projects.Of(project)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 	if err != nil {
 		return err
 	}
-	if run.MergeLockStateDir, err = s.lockStateDir(); err != nil {
+	if run.MergeLockStateDir, err = s.projects.LockStateDir(); err != nil {
 		return err
 	}
 	run.ID = owner.Ticket
@@ -104,7 +104,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 
 // abortHalfPick drops a cherry-pick the crashed merge left in progress.
 func (s *Server) abortHalfPick(featureWorktree string) error {
-	d := s.defaultDeps()
+	d := s.projects.DefaultDeps()
 	inProgress, err := d.CherryPickInProgress(featureWorktree)
 	if err != nil || !inProgress {
 		return err

@@ -53,7 +53,7 @@ func (s *Server) stampHandMerged() {
 // the only notice. A held lock skips this tick: a poll never queues behind a
 // merge, and the next tick checks again.
 func (s *Server) stampIfMerged(root rootRef, epics []tickets.Epic, e tickets.Epic) {
-	dir, repo, err := s.projectOf(root.Project)
+	dir, repo, err := s.projects.Of(root.Project)
 	if err != nil {
 		return
 	}

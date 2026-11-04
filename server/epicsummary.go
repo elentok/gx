@@ -25,7 +25,7 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 			continue
 		}
 		seen[root] = true
-		epics, err := s.projectEpics(root.Project)
+		epics, err := s.projects.Epics(root.Project)
 		if err != nil {
 			continue
 		}

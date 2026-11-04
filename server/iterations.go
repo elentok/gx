@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
@@ -56,7 +55,7 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 	if sess.SessionID == "" {
 		sess.SessionID = st.SessionID
 	}
-	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
+	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.projects.WorktreeDir(a.Project))
 	it := wire.IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
 	if runner.Name() == runnerPTY {
 		it.QueueAgent = queueAgentIDPrefix + runs.IterationLabel(address)
@@ -77,24 +76,11 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 		it.Base = base
 	}
 	if sess.SessionID != "" {
-		if p, err := s.transcriptPath(worktree, sess.SessionID); err == nil {
+		if p, err := s.projects.TranscriptPath(worktree, sess.SessionID); err == nil {
 			it.Transcript = p
 		}
 	}
 	return liveIter{info: it, runner: runner, session: sess}, true
-}
-
-// worktreeDir is where the project's repo keeps its linked worktrees.
-func (s *Server) worktreeDir(project string) string {
-	pf, err := config.ReadProjectFile(filepath.Join(s.cfg.TicketStore, project))
-	if err != nil || pf.Repo == nil {
-		return ""
-	}
-	repo, err := git.FindRepo(*pf.Repo)
-	if err != nil {
-		return ""
-	}
-	return repo.LinkedWorktreeDir()
 }
 
 func (s *Server) queue(w http.ResponseWriter, _ *http.Request) {

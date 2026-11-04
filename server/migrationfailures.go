@@ -16,10 +16,10 @@ const (
 	defaultMigrationFailurePoll = 2 * time.Second
 )
 
-// MigrationFailures reads the saved failed migrations of the projects now in
-// the ticket store. The CLI writes the record, so each call reads the file.
-func (s *Server) MigrationFailures() []wire.MigrationFailure {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+// Failures reads the saved failed migrations of the projects now in the ticket
+// store. The CLI writes the record, so each call reads the file.
+func (m *Migrator) Failures() []wire.MigrationFailure {
+	dirs, err := tickets.ProjectDirs(m.cfg.TicketStore)
 	if err != nil {
 		return nil
 	}
@@ -30,9 +30,9 @@ func (s *Server) MigrationFailures() []wire.MigrationFailure {
 		names = append(names, name)
 		dirOf[name] = d
 	}
-	recorded, err := migratefail.Read(s.cfg.StateDir, names)
+	recorded, err := migratefail.Read(m.cfg.StateDir, names)
 	if err != nil {
-		s.log.Warn("read migration failures", "err", err)
+		m.log.Warn("read migration failures", "err", err)
 		return nil
 	}
 	out := make([]wire.MigrationFailure, 0, len(recorded))
@@ -42,8 +42,8 @@ func (s *Server) MigrationFailures() []wire.MigrationFailure {
 	return out
 }
 
-func (s *Server) readMigrationFailureFile() []byte {
-	data, _ := os.ReadFile(migratefail.Path(s.cfg.StateDir))
+func (m *Migrator) readFailureFile() []byte {
+	data, _ := os.ReadFile(migratefail.Path(m.cfg.StateDir))
 	return data
 }
 
@@ -52,12 +52,12 @@ func (s *Server) readMigrationFailureFile() []byte {
 // the watcher's start would be taken as the baseline and never announced, and
 // a record that already exists costs one harmless event. It polls: the writers
 // are other processes, and a rename over the file is the only change they make.
-func (s *Server) keepMigrationFailuresWatched(ctx context.Context) {
-	interval := s.cfg.MigrationFailurePollInterval
+func (m *Migrator) KeepFailuresWatched(ctx context.Context) {
+	interval := m.cfg.MigrationFailurePollInterval
 	if interval <= 0 {
 		interval = defaultMigrationFailurePoll
 	}
-	read := s.readMigrationFailureFile
+	read := m.readFailureFile
 	var last []byte
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
@@ -68,8 +68,7 @@ func (s *Server) keepMigrationFailuresWatched(ctx context.Context) {
 		case <-tick.C:
 			if cur := read(); !bytes.Equal(cur, last) {
 				last = cur
-				s.events.Publish(wire.EventMigrationFailuresChanged, "")
-				s.guards.Kick() // a clear ends a Migration block: claim now, not at the next tick
+				m.back.failuresChanged()
 			}
 		}
 	}

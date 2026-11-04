@@ -8,11 +8,11 @@ import (
 // grillingHomes are the harness homes a conversation is found under. The Codex
 // home may be unset; a Codex lookup then finds nothing.
 func (s *Server) grillingHomes() (grillround.Homes, error) {
-	claude, err := s.envHome()
+	claude, err := s.projects.EnvHome()
 	if err != nil {
 		return grillround.Homes{}, err
 	}
-	codex, _ := s.codexHome()
+	codex, _ := s.projects.CodexHome()
 	return grillround.Homes{Claude: claude, Codex: codex}, nil
 }
 

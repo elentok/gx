@@ -117,7 +117,7 @@ func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) 
 	if err != nil {
 		return recoveryPlan{}, false
 	}
-	projectDir, repo, err := s.projectOf(root.Project)
+	projectDir, repo, err := s.projects.Of(root.Project)
 	if err != nil {
 		return recoveryPlan{}, false
 	}
@@ -135,9 +135,9 @@ func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) 
 // While the start-up migrations run, it waits for them first: planning reads
 // tickets and recovery starts agents, and neither may happen before they end.
 func (s *Server) recoverAsync(f recovery.Failure) {
-	if s.migrating() {
+	if s.migrator.Migrating() {
 		s.guards.GoSettle(func() {
-			<-s.migrationsDone
+			<-s.migrator.done
 			s.recoverAsync(f)
 		})
 		return
@@ -214,7 +214,7 @@ func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome
 		report = filepath.Join(ref.projectDir, ref.addr.Epic)
 	}
 	detail := fmt.Sprintf("%s: %s\n%s\nentry: %s\nreport: %s", f.Kind, f.Reason, why, entry, report)
-	s.chat.Escalated(ref.addr.Project, s.chatOverride(ref.addr.Project), ref.addr.Epic, ref.ticket.Path, ref.addr.ID, detail)
+	s.chat.Escalated(ref.addr.Project, s.projects.ChatOverride(ref.addr.Project), ref.addr.Epic, ref.ticket.Path, ref.addr.ID, detail)
 }
 
 // holdPauseForRecovery starts whatever recovery the pause gets and, when a rule
@@ -499,7 +499,7 @@ func (s *Server) failureSequence(log []ralphloop.Event, f recovery.Failure) []re
 // agent that died before its first prompt has no rollout, which also reads "".
 func (s *Server) lastLoggedAssistantText(ev ralphloop.Event) string {
 	if ev.AgentSession != "" && ev.Agent == ralphloop.AgentCodex {
-		home, err := s.codexHome()
+		home, err := s.projects.CodexHome()
 		if err != nil {
 			return ""
 		}
@@ -509,7 +509,7 @@ func (s *Server) lastLoggedAssistantText(ev ralphloop.Event) string {
 	if ev.AgentSession == "" || ev.Cwd == "" || (ev.Agent != "" && ev.Agent != ralphloop.AgentClaude) {
 		return ""
 	}
-	path, err := s.transcriptPath(ev.Cwd, ev.AgentSession)
+	path, err := s.projects.TranscriptPath(ev.Cwd, ev.AgentSession)
 	if err != nil {
 		return ""
 	}
@@ -635,7 +635,7 @@ func (s *Server) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call) (wi
 		if !idle {
 			return refusal(wire.ReasonAgentBusy, ref.addr.String()+" agent is "+string(state)), nil
 		}
-		_, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, s.worktreeDir(ref.addr.Project))
+		_, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, s.projects.WorktreeDir(ref.addr.Project))
 		ahead, err := git.CommitsAhead(worktree, run.Base, "HEAD")
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("commits ahead in %s: %w", worktree, err)

@@ -127,7 +127,7 @@ func (s *Server) inMapEpic(address string) bool {
 	if err != nil {
 		return false
 	}
-	dir, err := s.projectDir(a.Project)
+	dir, err := s.projects.Dir(a.Project)
 	if err != nil {
 		return false
 	}
@@ -219,7 +219,7 @@ func (s *Server) refusal(t queueTarget) *wire.QueueResult {
 		}
 		return s.mapEpicRefusal(t.address)
 	}
-	epics, err := s.projectEpics(t.project)
+	epics, err := s.projects.Epics(t.project)
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == t.epic })
 	if err != nil || i < 0 {
 		r := refusal(wire.ReasonUnknownTicket, "no epic "+t.address)
@@ -290,7 +290,7 @@ func (s *Server) stampQueuedAt(t queueTarget) {
 		}
 		epic = a.Epic
 	}
-	dir, err := s.projectDir(t.project)
+	dir, err := s.projects.Dir(t.project)
 	if err != nil {
 		return
 	}

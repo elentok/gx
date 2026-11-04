@@ -8,12 +8,20 @@ import (
 
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
+// Checks reads and saves a project's check configuration.
+type Checks struct {
+	cfg      *Config // the Server's own, so a later change to it shows here
+	projects *Registry
+	guards   *runs.Guards
+}
+
 func (s *Server) checksStatusRead(w http.ResponseWriter, r *http.Request) {
-	st, err := s.checksStatus(r.URL.Query().Get("project"))
+	st, err := s.checks.Status(r.URL.Query().Get("project"))
 	if err != nil {
 		code := http.StatusInternalServerError
 		var ae *tickets.AddressError
@@ -28,28 +36,28 @@ func (s *Server) checksStatusRead(w http.ResponseWriter, r *http.Request) {
 
 // checksStatus answers for one project, or for every registered project when
 // project is empty.
-func (s *Server) checksStatus(project string) (wire.ChecksStatus, error) {
+func (c *Checks) Status(project string) (wire.ChecksStatus, error) {
 	st := wire.ChecksStatus{Projects: []wire.ProjectChecks{}}
 	var dirs []string
 	if project != "" {
-		dir, err := tickets.ProjectDirByName(s.cfg.TicketStore, project)
+		dir, err := tickets.ProjectDirByName(c.cfg.TicketStore, project)
 		if err != nil {
 			return st, err
 		}
 		dirs = []string{dir}
 	} else {
 		var err error
-		if dirs, err = tickets.ProjectDirs(s.cfg.TicketStore); err != nil {
+		if dirs, err = tickets.ProjectDirs(c.cfg.TicketStore); err != nil {
 			return st, err
 		}
 	}
 	for _, dir := range dirs {
-		st.Projects = append(st.Projects, s.projectChecks(dir))
+		st.Projects = append(st.Projects, c.Project(dir))
 	}
 	return st, nil
 }
 
-func (s *Server) projectChecks(dir string) wire.ProjectChecks {
+func (c *Checks) Project(dir string) wire.ProjectChecks {
 	name := tickets.ProjectName(dir)
 	pf, err := config.ReadProjectFile(dir)
 	pc := wire.ProjectChecks{Project: name, SaveTargets: []string{wire.SaveTargetRepo, wire.SaveTargetProjectJSON}, Kinds: []wire.KindCheck{}}
@@ -60,8 +68,8 @@ func (s *Server) projectChecks(dir string) wire.ProjectChecks {
 	if vcsNone {
 		pc.SaveTargets = []string{wire.SaveTargetProjectJSON}
 	}
-	root := tickets.TrunkCheckout(s.cfg.TicketStore, name)
-	if repo := tickets.ProjectRepoRoot(s.cfg.TicketStore, name); repo != "" {
+	root := tickets.TrunkCheckout(c.cfg.TicketStore, name)
+	if repo := tickets.ProjectRepoRoot(c.cfg.TicketStore, name); repo != "" {
 		pc.Trunk, _ = tickets.Trunk(dir, repo)
 	}
 

@@ -29,7 +29,7 @@ func refuseAdd(reason, msg string) (wire.AddProjectResult, error) {
 	return wire.AddProjectResult{Refused: true, Reason: reason, Message: msg}, nil
 }
 
-func (s *Server) addProject(req wire.AddProjectRequest) (wire.AddProjectResult, error) {
+func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error) {
 	if req.VCS != "" && req.VCS != config.VCSNone {
 		return refuseAdd(wire.ReasonBadVCS, "--vcs only accepts \""+config.VCSNone+"\"")
 	}
@@ -60,7 +60,7 @@ func (s *Server) addProject(req wire.AddProjectRequest) (wire.AddProjectResult, 
 
 	projectAddMu.Lock()
 	defer projectAddMu.Unlock()
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	dirs, err := tickets.ProjectDirs(p.cfg.TicketStore)
 	if err != nil {
 		return wire.AddProjectResult{}, err
 	}
@@ -83,7 +83,7 @@ func (s *Server) addProject(req wire.AddProjectRequest) (wire.AddProjectResult, 
 	if req.VCS != "" {
 		pf.VCS = &req.VCS
 	}
-	projectDir := filepath.Join(s.cfg.TicketStore, name)
+	projectDir := filepath.Join(p.cfg.TicketStore, name)
 	if err := tickets.WriteProjectFile(projectDir, pf); err != nil {
 		return wire.AddProjectResult{}, err
 	}
@@ -111,7 +111,7 @@ func (s *Server) projectAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.addProject(req)
+	res, err := s.projects.Add(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -307,7 +307,7 @@ func (s *Server) readCodexSample(agentDir string) (codexsession.UsageSample, boo
 	if err != nil || agentrunner.Kind(d.Meta.Harness) != harness.Codex {
 		return codexsession.UsageSample{}, false
 	}
-	home, err := s.codexHome()
+	home, err := s.projects.CodexHome()
 	if err != nil {
 		return codexsession.UsageSample{}, false
 	}

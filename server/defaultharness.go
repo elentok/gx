@@ -53,7 +53,7 @@ func (s *Server) defaultHarnessStatus() (wire.DefaultHarnessStatus, error) {
 // projectOverride is project's own agents.default-harness, "" when it follows
 // the global default.
 func (s *Server) projectOverride(project string) string {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return ""
 	}
@@ -93,7 +93,7 @@ func (s *Server) setDefaultHarness(req wire.SetDefaultHarnessRequest) (wire.SetD
 		}
 		path = s.cfg.ConfigPath
 	case wire.DefaultHarnessProject:
-		dir, err := s.projectDir(req.Project)
+		dir, err := s.projects.Dir(req.Project)
 		if err != nil {
 			return refuseDefaultHarness(wire.ReasonUnknownProject, "no project named "+req.Project)
 		}
@@ -221,7 +221,7 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 // waitingOnDefault counts the open or blocked tickets of epic's root whose
 // harness comes from the Default: no pin and never ran.
 func (s *Server) waitingOnDefault(epic tickets.Address) int {
-	epics, err := s.projectEpics(epic.Project)
+	epics, err := s.projects.Epics(epic.Project)
 	if err != nil {
 		return 0
 	}

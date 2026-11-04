@@ -124,7 +124,7 @@ func TestClaudeTranscript_StatsTheExpectedSlugDirBeforeGlobbing(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}
+	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}})
 	got, ok := s.claudeTranscript("s1", sessionMeta{Dir: cwd, ConversationID: "conv"})
 	if !ok || got != want {
 		t.Fatalf("claudeTranscript = %q, %v, want %q", got, ok, want)
@@ -142,7 +142,7 @@ func TestClaudeTranscript_ReadsTheConfigDirFromTheServerEnv(t *testing.T) {
 	if err := os.WriteFile(want, []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}
+	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}})
 	got, ok := s.claudeTranscript("s1", sessionMeta{Dir: cwd, ConversationID: "conv"})
 	if !ok || got != want {
 		t.Fatalf("claudeTranscript = %q, %v, want %q", got, ok, want)

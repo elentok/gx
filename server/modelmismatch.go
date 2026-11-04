@@ -57,9 +57,9 @@ func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralp
 func (s *Server) launchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) (model, effort string, ok bool) {
 	var tierRun runs.Run
 	if tier := takeTierOverride(t.Path); tier != "" {
-		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.agentsConfig(addr.Project), agent, tier)
+		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.projects.AgentsConfig(addr.Project), agent, tier)
 	}
-	model, effort = s.runAgentConfig(addr.Project, agent, tierRun)
+	model, effort = s.projects.RunAgentConfig(addr.Project, agent, tierRun)
 	if model == "" && ralphloop.IsImplementType(t.Type) {
 		s.refuseEmptyModel(scratchDir, t.Path, addr)
 		return "", "", false

@@ -240,7 +240,7 @@ func (s *Server) heldDiskOf(project string) (wire.DiskStatus, bool) {
 // cache disk) and returns the first one that is held. A project with no repo
 // path has no disk to read.
 func (s *Server) freshHeldDisk(project string) (wire.DiskStatus, bool) {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return wire.DiskStatus{}, false
 	}

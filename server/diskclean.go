@@ -49,7 +49,7 @@ func (s *Server) cleanWork(projects []string) []cleanCmd {
 	var work []cleanCmd
 	seen := map[string]bool{}
 	for _, name := range projects {
-		dir, err := s.projectDir(name)
+		dir, err := s.projects.Dir(name)
 		if err != nil {
 			continue
 		}

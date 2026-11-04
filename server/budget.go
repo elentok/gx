@@ -423,7 +423,7 @@ func (s *Server) budgetIteration(address string) (wire.IterationInfo, bool) {
 	if err != nil {
 		return wire.IterationInfo{}, false
 	}
-	_, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
+	_, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.projects.WorktreeDir(a.Project))
 	r, sess, found, err := s.liveSession(a)
 	if err != nil || !found {
 		return wire.IterationInfo{}, false
@@ -547,7 +547,7 @@ func (s *Server) pauseBudgetKilled(t runs.TrackedRun) error {
 	if err != nil {
 		return err
 	}
-	dir, _, err := s.projectOf(addr.Project)
+	dir, _, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return err
 	}

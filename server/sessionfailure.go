@@ -70,7 +70,7 @@ func (s *Server) reportedModel(m sessionMeta) string {
 // session's rollout, or the saved ones while there is no rollout or turn.
 func (s *Server) reportedCodexTurn(m sessionMeta) codexsession.TurnModel {
 	saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
-	home, err := s.codexHome()
+	home, err := s.projects.CodexHome()
 	if err != nil {
 		return saved
 	}

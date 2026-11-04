@@ -46,7 +46,7 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 	if err != nil {
 		return ticketRef{}, false, err
 	}
-	projectDir, repo, err := s.projectOf(addr.Project)
+	projectDir, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return ticketRef{}, false, nil
 	}
@@ -193,7 +193,7 @@ func (s *Server) promptsOnRetry(address string) bool {
 	if _, ok := retryPrompts[tk.PauseReason]; !ok {
 		return false
 	}
-	dir, err := s.projectDir(addr.Project)
+	dir, err := s.projects.Dir(addr.Project)
 	if err != nil {
 		return false
 	}
@@ -333,7 +333,7 @@ func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) e
 	// The branch stays: it holds the commits.
 	if ref.repo != "" && s.awaitRunSettled(ref.address(t)) {
 		// The epic merge removes leftovers later, so a failed removal must not stop the cancel.
-		if err := ralphloop.RemoveIterationWorktree(s.defaultDeps(), ref.repo, ref.addr.Epic, t.Identifier); err != nil {
+		if err := ralphloop.RemoveIterationWorktree(s.projects.DefaultDeps(), ref.repo, ref.addr.Epic, t.Identifier); err != nil {
 			s.log.Warn("remove cancelled worktree", "ticket", ref.address(t), "err", err)
 		}
 	}

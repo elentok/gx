@@ -9,7 +9,7 @@ import (
 // fail. Until then no code may read or change tickets.
 func (s *Server) migrationsEnded() bool {
 	select {
-	case <-s.migrationsDone:
+	case <-s.migrator.done:
 		return true
 	default:
 		return false
@@ -19,7 +19,7 @@ func (s *Server) migrationsEnded() bool {
 // Rescan rescans the store now, as a ping or the watch would, once the
 // migrations have ended: a rescan reads nothing until then.
 func (s *Server) Rescan() {
-	<-s.migrationsDone
+	<-s.migrator.done
 	s.idx.Rescan()
 }
 
@@ -27,9 +27,9 @@ func (s *Server) Rescan() {
 // read tickets. It reports false when ctx ended first. A project whose migration
 // failed is scanned and recovered like the rest.
 func (s *Server) startAfterMigrations(ctx context.Context) bool {
-	defer close(s.startupDone)
+	defer close(s.migrator.startupDone)
 	select {
-	case <-s.migrationsDone:
+	case <-s.migrator.done:
 	case <-ctx.Done():
 		return false
 	}

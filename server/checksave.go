@@ -25,7 +25,7 @@ func (s *Server) checksSaveWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.saveChecks(req)
+	res, err := s.checks.Save(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -33,8 +33,8 @@ func (s *Server) checksSaveWrite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
-func (s *Server) saveChecks(req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
-	dir, err := s.projectDir(req.Project)
+func (c *Checks) Save(req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
+	dir, err := c.projects.Dir(req.Project)
 	if err != nil {
 		return refuseSave(wire.ReasonUnknownProject, "no project named "+req.Project)
 	}
@@ -55,7 +55,7 @@ func (s *Server) saveChecks(req wire.SaveChecksRequest) (wire.SaveChecksResult, 
 		if pf.VCS != nil && *pf.VCS == config.VCSNone {
 			return refuseSave(wire.ReasonVCSNone, req.Project+" has no VCS; save to project.json")
 		}
-		return s.saveChecksToRepo(dir, req)
+		return c.SaveToRepo(dir, req)
 	}
 	return refuseSave(wire.ReasonBadTarget, "target must be "+wire.SaveTargetRepo+" or "+wire.SaveTargetProjectJSON)
 }
@@ -68,9 +68,9 @@ func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req wire.SaveChe
 	return wire.SaveChecksResult{Project: req.Project, Target: req.Target, Path: filepath.Join(dir, config.ProjectFileName)}, nil
 }
 
-func (s *Server) saveChecksToRepo(dir string, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
-	root := tickets.TrunkCheckout(s.cfg.TicketStore, req.Project)
-	repo := tickets.ProjectRepoRoot(s.cfg.TicketStore, req.Project)
+func (c *Checks) SaveToRepo(dir string, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
+	root := tickets.TrunkCheckout(c.cfg.TicketStore, req.Project)
+	repo := tickets.ProjectRepoRoot(c.cfg.TicketStore, req.Project)
 	if root == "" || repo == "" {
 		return refuseSave(wire.ReasonNoTrunk, req.Project+" has no trunk checkout")
 	}
@@ -78,7 +78,7 @@ func (s *Server) saveChecksToRepo(dir string, req wire.SaveChecksRequest) (wire.
 	if err != nil {
 		return refuseSave(wire.ReasonNoTrunk, err.Error())
 	}
-	defer s.guards.Trunks.Lock(repo, trunk)()
+	defer c.guards.Trunks.Lock(repo, trunk)()
 
 	branch, err := git.CurrentBranch(root)
 	if err != nil {

@@ -354,7 +354,7 @@ func (s *Server) notifyResult(addr tickets.Address, ticketPath string) {
 		return
 	}
 	dir := filepath.Dir(filepath.Dir(filepath.Dir(ticketPath))) // project/epic/issues/file
-	s.chat.Result(addr.Project, s.chatOverride(addr.Project), dir, addr.Epic, addr.String(), schema.Section(schema.ParseBody(string(raw)), "Result"))
+	s.chat.Result(addr.Project, s.projects.ChatOverride(addr.Project), dir, addr.Epic, addr.String(), schema.Section(schema.ParseBody(string(raw)), "Result"))
 }
 
 // oneOffOptionsRefusal checks the submit options before anything is written. A

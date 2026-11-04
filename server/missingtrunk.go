@@ -117,7 +117,7 @@ func (s *Server) migrationBlock(project string) (string, bool) {
 // project that is not found, has no repo or no VCS, or whose path is gone is
 // not Missing trunk: it has no trunk, or some other state covers it.
 func (s *Server) trunkProblem(project string) (string, bool) {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		// An unreadable project.json fails the whole store scan, so its project
 		// can't be found by name; its directory is still named after it.

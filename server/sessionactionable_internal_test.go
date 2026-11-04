@@ -51,7 +51,7 @@ func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
 	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}
+	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
 	meta := sessionMeta{Harness: "codex", ConversationID: "conv"}
 
 	text, ok := s.lastAssistantText("s1", meta)
@@ -79,7 +79,7 @@ func TestLastAssistantText_CodexTurnKeepsARoundFromAnEarlierMessage(t *testing.T
 	if err := os.WriteFile(path, []byte(rollout), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}
+	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
 
 	text, ok := s.lastAssistantText("s1", sessionMeta{Harness: "codex", ConversationID: "conv"})
 	if !ok || !grillround.HasMarker(text) || strings.Contains(text, "old turn") {
@@ -97,7 +97,7 @@ func modelTestServer(t *testing.T, cwd string, lines ...string) *Server {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}
+	return withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}})
 }
 
 func replyWithModel(model string) string {
@@ -184,7 +184,7 @@ func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "rollout-conv.jsonl"), []byte(rollout), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}
+	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
 	info := s.sessionInfo(sessionMeta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
 	if info.Model != "gpt-6.1-terra" || info.Effort != "high" || !info.ModelSwitched {
 		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-6.1-terra/high/true", info.Model, info.Effort, info.ModelSwitched)

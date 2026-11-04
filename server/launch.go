@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -70,31 +69,10 @@ func (s *Server) evolveDirs(ticket tickets.Address) []string {
 	if d, err := s.followUpsEpicPath(ticket.Project); err == nil {
 		dirs = append(dirs, d)
 	}
-	if d, err := s.projectDir("gx"); err == nil {
+	if d, err := s.projects.Dir("gx"); err == nil {
 		dirs = append(dirs, d)
 	}
 	return dirs
-}
-
-// agentsConfig is config agents.* for project, with the project's overrides on
-// top.
-func (s *Server) agentsConfig(project string) config.AgentsConfig {
-	set := s.settings.Load()
-	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex, DefaultHarness: set.AgentsDefaultHarness}}
-	if dir, err := s.projectDir(project); err == nil {
-		if pf, err := config.ReadProjectFile(dir); err == nil {
-			cfg = cfg.WithProject(pf)
-		}
-	}
-	return cfg.Agents
-}
-
-// runAgentConfig is the model and effort run's agent launched under, else
-// the project's agents.* config. Every launch, finish and adoption resolves
-// them here.
-func (s *Server) runAgentConfig(project string, agent ralphloop.AgentKind, run runs.Run) (model, effort string) {
-	model, effort = ralphloop.ResolveTier(s.agentsConfig(project), agent, ralphloop.TierWorker)
-	return cmp.Or(run.Model, model), cmp.Or(run.Effort, effort)
 }
 
 // agentEnv is the tab env, plus the run's agent (see AgentEnv) and, for an
@@ -187,7 +165,7 @@ func (s *Server) codexRolloutExists(cwd, id string) bool {
 	if id == "" {
 		return false
 	}
-	home, err := s.codexHome()
+	home, err := s.projects.CodexHome()
 	if err != nil {
 		return false
 	}
@@ -212,7 +190,7 @@ func answeredSession(t tickets.Ticket) string {
 
 // logEvent appends ev to ticket's run log, best effort.
 func (s *Server) logEvent(ticket tickets.Address, ev ralphloop.Event) {
-	dir, err := s.projectDir(ticket.Project)
+	dir, err := s.projects.Dir(ticket.Project)
 	if err != nil {
 		return
 	}

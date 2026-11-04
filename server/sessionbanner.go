@@ -116,7 +116,7 @@ func (s *Server) designDone(m sessionMeta) bool {
 	if err != nil {
 		return false
 	}
-	epics, err := s.projectEpics(addr.Project)
+	epics, err := s.projects.Epics(addr.Project)
 	if err != nil {
 		return false
 	}
@@ -175,7 +175,7 @@ func (s *Server) fireBanner(id string) {
 		if link != "" {
 			chatBody += "\n" + link
 		}
-		s.chat.SessionAlert(info.Project, s.chatOverride(info.Project), title, chatBody)
+		s.chat.SessionAlert(info.Project, s.projects.ChatOverride(info.Project), title, chatBody)
 	}
 	if onScreen {
 		return

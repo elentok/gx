@@ -136,15 +136,9 @@ type Server struct {
 	log            *slog.Logger
 	logGiven       sync.Mutex // see giveLog
 	idx            *index.Index
-	// migrationsDone closes when the start-up migration run ends.
-	migrationsDone chan struct{}
-	// migratingNow counts the migration runs in flight per project name (the
-	// start-up run and Retry); Retry is refused while a project's count is above zero.
-	migratingMu  sync.Mutex
-	migratingNow map[string]int
-	// startupDone closes when the steps that run after the migrations (the
-	// first scan, merge recovery, run reclaim) have ended; claiming waits for it.
-	startupDone chan struct{}
+	projects       *Registry
+	migrator       *Migrator
+	checks         *Checks
 
 	queued       *queueStore
 	pause        *pauseState
@@ -184,7 +178,6 @@ type Server struct {
 	mergedProbe    func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts       verdictLog
 	nudges         nudgeLimiter
-	unavailable    unavailableNotes
 	trunkMissing   missingTrunks
 	sessionWatches *sessionWatches
 	designOpens    sync.Map // epic address -> *sync.Mutex, serializing designs open
@@ -342,16 +335,14 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("load runs: %w", err)
 	}
 	s := &Server{
-		migrationsDone: make(chan struct{}),
-		startupDone:    make(chan struct{}),
-		cfg:            cfg,
-		commandLists:   commandlist.NewCache(cfg.CommandListAge, nil),
-		lock:           lock,
-		ln:             ln,
-		tcp:            tcp,
-		logf:           logf,
-		log:            log,
-		idx:            idx,
+		cfg:          cfg,
+		commandLists: commandlist.NewCache(cfg.CommandListAge, nil),
+		lock:         lock,
+		ln:           ln,
+		tcp:          tcp,
+		logf:         logf,
+		log:          log,
+		idx:          idx,
 
 		chat:      ralphloop.NewServerChat(cfg.Chat),
 		registry:  registry,
@@ -380,6 +371,7 @@ func New(cfg Config) (*Server, error) {
 		sessionWatches: newSessionWatches(),
 		focus:          newFocusReports(),
 	}
+	s.initProjects()
 	s.giveLog(cfg.Runner)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessionFinished
@@ -450,8 +442,8 @@ var routeTable = []struct {
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects/worktrees", (*Server).projectWorktrees},
 	{"POST /v1/projects/add", (*Server).projectAdd},
-	{"POST /v1/projects/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.removeProject)(w, r) }},
-	{"POST /v1/projects/set-path", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.setProjectPath)(w, r) }},
+	{"POST /v1/projects/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.projects.Remove)(w, r) }},
+	{"POST /v1/projects/set-path", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.projects.SetPath)(w, r) }},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
@@ -592,7 +584,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Build = s.cfg.Build
 	snap.Instance = s.instanceID
 	snap.MigrationFailures = s.MigrationFailures()
-	snap.Migrating = s.migrating()
+	snap.Migrating = s.migrator.Migrating()
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Disks = s.listedDisks()
@@ -693,7 +685,7 @@ func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr}
 	h.HerdrText, h.HerdrUnavailable = s.herdrBanner()
-	h.Migrating = s.migrating()
+	h.Migrating = s.migrator.Migrating()
 	if s.web != nil {
 		var err error
 		if h.WebSetupPending, _, err = s.webAuth.SetupState(); err != nil {
@@ -735,7 +727,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		lns = append(lns, s.web)
 		go func() { errc <- s.webHTTP.Serve(s.web) }()
 	}
-	go s.migrateAll(ctx)
+	go s.migrator.MigrateAll(ctx)
 	// recoverMerges, reclaimRuns, the log prune and the first scan run in
 	// keepFresh once the migrations end.
 	stopCommits := func() {}
@@ -772,7 +764,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	disksDone := make(chan struct{})
 	go func() { defer close(disksDone); s.keepDisksWatched(freshCtx) }()
 	migFailDone := make(chan struct{})
-	go func() { defer close(migFailDone); s.keepMigrationFailuresWatched(freshCtx) }()
+	go func() { defer close(migFailDone); s.migrator.KeepFailuresWatched(freshCtx) }()
 	healthDone := make(chan struct{})
 	go func() { defer close(healthDone); s.keepHealthWatched(freshCtx) }()
 	usageDone := make(chan struct{})

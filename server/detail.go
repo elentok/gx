@@ -75,7 +75,7 @@ func (s *Server) ticketDetail(ref ticketRef) (wire.TicketDetail, error) {
 			return wire.TicketDetail{}, err
 		}
 	}
-	epics, err := s.projectEpics(ref.addr.Project)
+	epics, err := s.projects.Epics(ref.addr.Project)
 	if err != nil {
 		return wire.TicketDetail{}, err
 	}

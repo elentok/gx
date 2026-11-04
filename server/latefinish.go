@@ -139,7 +139,7 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 // a later rescan retries after a person fixes the epic.
 func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	addr := lf.addr
-	label, branch, worktree := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
+	label, branch, worktree := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.projects.WorktreeDir(addr.Project))
 	if lf.pause.Label != "" {
 		label = lf.pause.Label
 	}
@@ -153,7 +153,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		s.log.Warn("late finish: runner unavailable", "ticket", addr, "runner", lf.pause.Runner)
 		return false
 	}
-	_, repo, err := s.projectOf(addr.Project)
+	_, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
 		return false
@@ -168,7 +168,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	if mode.feature != (lf.pause.Kind == string(events.MergeUnreported)) {
 		return false
 	}
-	deps := s.depsWith(runner)
+	deps := s.projects.DepsWith(runner)
 	ahead := 0
 	if !mode.commitless && !mode.feature {
 		if ahead, err = deps.CommitsAhead(wt.Path, wt.Base(), wt.Branch); err != nil || (ahead == 0 && !lf.commitless) {
@@ -213,7 +213,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		}
 	}
 	defer unlock()
-	one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
+	one.Model, one.Effort = s.projects.RunAgentConfig(addr.Project, one.Agent, run)
 	if err := tickets.EndOpenRound(lf.path, tickets.SourceGx, tickets.HowAuto, "adopted"); err != nil {
 		s.log.Warn("late finish: close question", "ticket", addr, "err", err)
 		return false

@@ -61,7 +61,7 @@ func (s *Server) notifyPause(addr tickets.Address, ticketPath string, kind event
 // sendPause sends the one chat message for a pause.
 func (s *Server) sendPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
 	status := ralphloop.PauseStatus(kind)
-	s.chat.Pause(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, pauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
+	s.chat.Pause(addr.Project, s.projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, pauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
 }
 
 // pauseChatDetail is the chat line for a pause. A self-reported pause shows the
@@ -81,7 +81,7 @@ func pauseChatDetail(ticketPath string, kind events.Kind, reason string) string 
 // finishSink carries the finish path's chat-worthy events the outcome cannot
 // show: a merge conflict's resolution starting, and its child pausing.
 func (s *Server) finishSink(addr tickets.Address, ticketPath string) ralphloop.EventSink {
-	return s.chat.FinishSink(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() ralphloop.EpicCounts {
+	return s.chat.FinishSink(addr.Project, s.projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() ralphloop.EpicCounts {
 		return s.epicCounts(addr.Project, addr.Epic)
 	})
 }
@@ -98,7 +98,7 @@ func (s *Server) epicCounts(project, epic string) ralphloop.EpicCounts {
 
 // freshEpic loads one epic straight from its project's directory.
 func (s *Server) freshEpic(project, epic string) (tickets.Epic, bool) {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return tickets.Epic{}, false
 	}

@@ -22,7 +22,7 @@ func TestLastLoggedAssistantText_Codex(t *testing.T) {
 		t.Fatal(err)
 	}
 	var logs bytes.Buffer
-	s := &Server{log: slog.New(slog.NewTextHandler(&logs, nil)), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}
+	s := withProjects(&Server{log: slog.New(slog.NewTextHandler(&logs, nil)), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
 
 	for _, tc := range []struct{ name, session, want string }{
 		{"rollout", "c1", "all done here"},

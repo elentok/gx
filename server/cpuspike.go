@@ -59,7 +59,7 @@ func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) wire.CPUSpikeResult 
 	if set.Evolve != config.EvolveMaintainer {
 		return wire.CPUSpikeResult{Message: "filing a ticket needs evolve maintainer mode"}
 	}
-	if _, err := s.projectDir(OutboxProject); err != nil {
+	if _, err := s.projects.Dir(OutboxProject); err != nil {
 		return wire.CPUSpikeResult{Message: "filing a ticket needs a gx project: " + err.Error()}
 	}
 	s.cpuSpikes.mu.Lock()

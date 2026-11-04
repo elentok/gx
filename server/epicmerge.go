@@ -87,7 +87,7 @@ func (s *Server) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
 	}
 	root := rootRef{Project: project, Epic: epic}
-	dir, repo, err := s.projectOf(project)
+	dir, repo, err := s.projects.Of(project)
 	if err != nil {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonUnknownTicket, "no epic "+root.String())
 	}
@@ -321,7 +321,7 @@ func pendingMerge(e tickets.Epic, t tickets.Ticket) bool {
 // when a person removed it. The post-merge removal (removeMergedWorktree) is the
 // one place the server removes it again.
 func (s *Server) ensureFeatureWorktree(project, epic, repo string) error {
-	path := filepath.Join(s.worktreeDir(project), epic)
+	path := filepath.Join(s.projects.WorktreeDir(project), epic)
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		return err
 	}

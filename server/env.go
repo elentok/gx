@@ -17,19 +17,19 @@ import (
 
 // envHome is the home dir the server reads: HOME of Config.Env, which New
 // fills from the process env when the caller leaves it nil.
-func (s *Server) envHome() (string, error) {
-	if home := harness.LookupEnv(s.cfg.Env, "HOME"); home != "" {
+func (p *Registry) EnvHome() (string, error) {
+	if home := harness.LookupEnv(p.cfg.Env, "HOME"); home != "" {
 		return home, nil
 	}
 	return "", errors.New("HOME is not set in the server env")
 }
 
 // codexHome is the resolved codex dir of Config.Env.
-func (s *Server) codexHome() (string, error) {
-	if dir := harness.LookupEnv(s.cfg.Env, "CODEX_HOME"); dir != "" {
+func (p *Registry) CodexHome() (string, error) {
+	if dir := harness.LookupEnv(p.cfg.Env, "CODEX_HOME"); dir != "" {
 		return dir, nil
 	}
-	home, err := s.envHome()
+	home, err := p.EnvHome()
 	if err != nil {
 		return "", err
 	}
@@ -40,8 +40,8 @@ func (s *Server) codexHome() (string, error) {
 // every agent message after the person's last one, oldest first. A Codex turn
 // can hold several messages, so a round in an earlier one still counts. Without
 // a turn it is the last assistant text of the rollout.
-func (s *Server) lastCodexText(id string) (string, bool, error) {
-	home, err := s.codexHome()
+func (p *Registry) LastCodexText(id string) (string, bool, error) {
+	home, err := p.CodexHome()
 	if err != nil {
 		return "", false, err
 	}
@@ -62,8 +62,8 @@ func (s *Server) lastCodexText(id string) (string, bool, error) {
 }
 
 // transcriptPath is the claude transcript path of a session run in cwd.
-func (s *Server) transcriptPath(cwd, sessionID string) (string, error) {
-	home, err := s.envHome()
+func (p *Registry) TranscriptPath(cwd, sessionID string) (string, error) {
+	home, err := p.EnvHome()
 	if err != nil {
 		return "", err
 	}
@@ -71,20 +71,20 @@ func (s *Server) transcriptPath(cwd, sessionID string) (string, error) {
 }
 
 // defaultDeps is ralphloop's default deps reading Config.Env's home dirs.
-func (s *Server) defaultDeps() ralphloop.Deps {
-	o := ralphloop.DepsOverrides{RunnerWait: s.cfg.RunnerWait, Finished: s.sessionFinished, RateLimitResetBuffer: s.cfg.RateLimitResetBuffer, GuardPoll: s.cfg.GuardPoll}
-	o.Home, _ = s.envHome()
-	o.CodexHome, _ = s.codexHome()
-	o.StateDir, _ = s.lockStateDir()
+func (p *Registry) DefaultDeps() ralphloop.Deps {
+	o := ralphloop.DepsOverrides{RunnerWait: p.cfg.RunnerWait, Finished: p.back.sessionFinished, RateLimitResetBuffer: p.cfg.RateLimitResetBuffer, GuardPoll: p.cfg.GuardPoll}
+	o.Home, _ = p.EnvHome()
+	o.CodexHome, _ = p.CodexHome()
+	o.StateDir, _ = p.LockStateDir()
 	return ralphloop.DefaultDepsWithOverrides(o)
 }
 
 // lockStateDir is the gx state dir of Config.Env that merge locks live under.
-func (s *Server) lockStateDir() (string, error) {
-	if dir := harness.LookupEnv(s.cfg.Env, "XDG_STATE_HOME"); dir != "" {
+func (p *Registry) LockStateDir() (string, error) {
+	if dir := harness.LookupEnv(p.cfg.Env, "XDG_STATE_HOME"); dir != "" {
 		return filepath.Join(dir, "gx"), nil
 	}
-	home, err := s.envHome()
+	home, err := p.EnvHome()
 	if err != nil {
 		return "", err
 	}
@@ -92,8 +92,8 @@ func (s *Server) lockStateDir() (string, error) {
 }
 
 // mergeLockDir is the merge lock dir of the epic at epicPath.
-func (s *Server) mergeLockDir(epicPath string) (string, error) {
-	stateDir, err := s.lockStateDir()
+func (p *Registry) MergeLockDir(epicPath string) (string, error) {
+	stateDir, err := p.LockStateDir()
 	if err != nil {
 		return "", err
 	}
@@ -102,38 +102,38 @@ func (s *Server) mergeLockDir(epicPath string) (string, error) {
 
 // typing is the typing rules for the claude sessions this server runs, reading
 // claude's config from Config.Env.
-func (s *Server) typing() harness.Typing { return harness.ClaudeTypingIn(s.cfg.Env) }
+func (p *Registry) Typing() harness.Typing { return harness.ClaudeTypingIn(p.cfg.Env) }
 
 // typingIO is the ready-to-type step's view of the session in dir. It carries
 // the session id the probe keys its memory by, the server logger and the
 // caller's label, so the probe's decisions reach server.log.
-func (s *Server) typingIO(dir string, c *nativerunner.HolderClient, caller string) harness.TypingIO {
+func (p *Registry) TypingIO(dir string, c *nativerunner.HolderClient, caller string) harness.TypingIO {
 	io := nativerunner.HolderTypingIO(c)
 	if meta, err := readSessionMeta(dir); err == nil {
 		io.Session = meta.ConversationID
 	}
-	io.Log = s.log.With("gx_session", filepath.Base(dir))
+	io.Log = p.log.With("gx_session", filepath.Base(dir))
 	io.Caller = caller
 	return io
 }
 
 // sessionTyping is the typing rules of the session in dir, claude's when its
 // meta can't be read.
-func (s *Server) sessionTyping(dir string) harness.Typing {
+func (p *Registry) SessionTyping(dir string) harness.Typing {
 	meta, err := readSessionMeta(dir)
 	if err != nil {
-		return s.typing()
+		return p.Typing()
 	}
-	return s.typingFor(meta.Harness)
+	return p.TypingFor(meta.Harness)
 }
 
 // typingFor is the typing rules of a session's harness kind; an empty or
 // unknown kind types as claude.
-func (s *Server) typingFor(kind string) harness.Typing {
+func (p *Registry) TypingFor(kind string) harness.Typing {
 	if kind != "" && kind != string(harness.Claude) {
 		if t, err := harness.LookupTyping(agentrunner.Kind(kind)); err == nil {
 			return t
 		}
 	}
-	return s.typing()
+	return p.Typing()
 }

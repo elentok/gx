@@ -42,7 +42,7 @@ func (s *Server) WaitSettled(timeout time.Duration) bool {
 func (s *Server) keepClaiming(ctx context.Context) {
 	// Reclaim sets holds a claim must see, and the index is empty until then.
 	select {
-	case <-s.startupDone:
+	case <-s.migrator.startupDone:
 	case <-ctx.Done():
 		return
 	}
@@ -53,7 +53,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
 	for {
-		s.checkProjects()
+		s.projects.Check()
 		s.checkTrunks()
 		s.stampHandMerged()
 		s.releaseWaitingSlots(time.Now())
@@ -73,7 +73,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 // frontier tickets of each queued root, up to its per-root cap, until the concurrency limit is reached.
 // claimRoot skips a ticket the claim hold names: a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
-	if s.migrating() || s.pause.blocked() || s.budgetSoftReached(time.Now()) {
+	if s.migrator.Migrating() || s.pause.blocked() || s.budgetSoftReached(time.Now()) {
 		return
 	}
 	limit := s.concurrencyLimit()
@@ -146,7 +146,7 @@ func (s *Server) perRootLimit(root rootRef) int {
 // cap is read from project.json on every call, so an edit applies at the next
 // decision; an absent, unreadable or non-positive cap means no project cap.
 func (s *Server) projectAtCap(project string) (running, limit int, atCap bool) {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return 0, 0, false
 	}
@@ -179,7 +179,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	if _, _, atCap := s.projectAtCap(addr.Project); atCap {
 		return false, nil
 	}
-	if _, missing := s.unavailablePath(addr.Project); missing {
+	if _, missing := s.projects.UnavailablePath(addr.Project); missing {
 		return false, nil
 	}
 	if _, held := s.freshHeldDisk(addr.Project); held {
@@ -191,13 +191,13 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	if _, blocked := s.migrationBlock(addr.Project); blocked {
 		return false, nil
 	}
-	projectDir, repo, err := s.projectOf(addr.Project)
+	projectDir, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return false, err
 	}
 	// The epics of the last scan, not a fresh load: this runs every poll tick for
 	// every queued root. The sum check below catches a file the scan has not seen.
-	loaded, err := s.projectEpics(addr.Project)
+	loaded, err := s.projects.Epics(addr.Project)
 	if err != nil {
 		return false, err
 	}
@@ -266,57 +266,6 @@ func (s *Server) nextUntracked(project string, e tickets.Epic) (tickets.Ticket, 
 	return tickets.Ticket{}, false
 }
 
-// projectOf finds the project's directory in the store and the repo its
-// agents run in.
-func (s *Server) projectOf(project string) (dir, repo string, err error) {
-	d, err := s.projectDir(project)
-	if err != nil {
-		return "", "", err
-	}
-	pf, err := config.ReadProjectFile(d)
-	if err != nil {
-		return "", "", err
-	}
-	if pf.Repo == nil {
-		return "", "", fmt.Errorf("project %s has no repo", project)
-	}
-	return d, *pf.Repo, nil
-}
-
-// chatOverride is the project's own notification block from project.json, nil
-// when it has none (or is unreadable) so its notifications use the global one.
-func (s *Server) chatOverride(project string) *ralphloop.ServerChatConfig {
-	dir, err := s.projectDir(project)
-	if err != nil {
-		return nil
-	}
-	pf, err := config.ReadProjectFile(dir)
-	if err != nil || pf.Notifications == nil {
-		return nil
-	}
-	n := pf.Notifications
-	return &ralphloop.ServerChatConfig{
-		TelegramBotToken: n.Telegram.BotToken,
-		TelegramChatID:   n.Telegram.ChatID,
-		SlackWebhookURL:  n.Slack.WebhookURL,
-		GateStatePath:    s.cfg.Chat.GateStatePath,
-	}
-}
-
-// projectDir finds the project's directory in the store.
-func (s *Server) projectDir(project string) (string, error) {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
-	if err != nil {
-		return "", err
-	}
-	for _, d := range dirs {
-		if tickets.ProjectName(d) == project {
-			return d, nil
-		}
-	}
-	return "", fmt.Errorf("no project %s in the ticket store", project)
-}
-
 // claimAndLaunch writes the claim to the ticket file first, so markdown stays
 // the truth and nothing streams before it is on disk. A failed launch pauses the
 // ticket stuck rather than leaving a claim with no agent behind it.
@@ -327,7 +276,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	ticketAddr := ticket.String()
 	// The project dir, not the store root: the run log, merge lock and
 	// conflict-resolution tickets all live under <project>/<epic>.
-	dir, err := s.projectDir(queued.Project)
+	dir, err := s.projects.Dir(queued.Project)
 	if err != nil {
 		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
@@ -361,7 +310,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),
 	}
-	deps := s.depsWith(s.launchRunner(ticket.Project, agent))
+	deps := s.projects.DepsWith(s.launchRunner(ticket.Project, agent))
 	deps.GateReleased = s.registry.GateReleased(ticketAddr)
 	// Only Claude and Codex on the pty runner resume; every other claim starts
 	// cold, and so does one under another harness than the answered session's:
@@ -453,7 +402,7 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 // mergingOnMerged reports whether the project uses the on-merged merging policy.
 // An unreadable project file falls back to the default policy.
 func (s *Server) mergingOnMerged(project string) bool {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return true
 	}
@@ -464,7 +413,7 @@ func (s *Server) mergingOnMerged(project string) bool {
 // autoFFMerge reports whether the project opted in to automatic ff-only merges,
 // read live. An unreadable project file means off: never merge on a guess.
 func (s *Server) autoFFMerge(project string) bool {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return false
 	}
@@ -478,7 +427,7 @@ func (s *Server) autoFFMerge(project string) bool {
 // An explicit base: moves only the start; a derived stacked root also merges
 // on its blocker's branch until that branch reaches trunk.
 func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (base, target string, err error) {
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return "", "", err
 	}
@@ -517,7 +466,7 @@ func (s *Server) epicRefs(project string, epics []tickets.Epic, epic, repo strin
 
 // mergeTarget is the target of the root epic addr belongs to.
 func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
-	dir, repo, err := s.projectOf(addr.Project)
+	dir, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
 		return "", err
 	}
@@ -711,7 +660,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			return
 		}
 		defer s.guards.Merges.End()
-		one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
+		one.Model, one.Effort = s.projects.RunAgentConfig(addr.Project, one.Agent, run)
 		one.KeepAskedAgent = !s.cfg.DropAskedAgent && keepsAskedAgent(run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 		// The finish path wrote the merge or the pause; the store watch is only a hint.
@@ -773,19 +722,6 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 		return
 	}
 	if e, t, ok := s.freshTicket(addr); ok && !IsOneOffEpic(e) {
-		s.chat.TicketDone(addr.Project, s.chatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
+		s.chat.TicketDone(addr.Project, s.projects.ChatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
 	}
-}
-
-// depsWith is the default deps talking to runner.
-func (s *Server) depsWith(runner agentrunner.Runner) ralphloop.Deps {
-	deps := s.defaultDeps()
-	deps.Runner = runner
-	if s.cfg.Sleep != nil {
-		deps.Sleep = s.cfg.Sleep
-	}
-	if s.cfg.InstallDeps != nil {
-		deps.InstallDeps = s.cfg.InstallDeps
-	}
-	return deps
 }

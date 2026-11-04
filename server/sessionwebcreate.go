@@ -49,7 +49,7 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 // checkProjectDir returns a refusal when project is not configured or a
 // non-empty dir is neither its root nor one of its worktrees; nil means ok.
 func (s *Server) checkProjectDir(project, dir string) (*wire.SessionResult, error) {
-	list, err := s.listProjectWorktrees()
+	list, err := s.projects.ListWorktrees()
 	if err != nil {
 		return nil, err
 	}

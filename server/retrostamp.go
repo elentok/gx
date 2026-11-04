@@ -18,7 +18,7 @@ func (s *Server) stampFinished(addr tickets.Address, ticketPath string, cancelle
 }
 
 func (s *Server) stampFriction(addr tickets.Address, ticketPath string) {
-	dir, err := s.projectDir(addr.Project)
+	dir, err := s.projects.Dir(addr.Project)
 	if err == nil {
 		err = ralphloop.StampFriction(dir, addr.Epic, addr.ID, ticketPath)
 	}
@@ -48,7 +48,7 @@ func (s *Server) stampRetro(addr tickets.Address, ticketPath string, cancelled b
 	if !ok {
 		return
 	}
-	dir, err := s.projectDir(project)
+	dir, err := s.projects.Dir(project)
 	if err != nil {
 		s.log.Warn("stamp retro", "ticket", addr.String(), "err", err)
 		return

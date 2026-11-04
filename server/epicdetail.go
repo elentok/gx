@@ -38,7 +38,7 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	epics, err := s.projectEpics(root.Project)
+	epics, err := s.projects.Epics(root.Project)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) {
 		http.Error(w, "no epic "+address, http.StatusNotFound)

@@ -49,7 +49,7 @@ func retroFixture(t *testing.T, epicFM string) (store string, addr tickets.Addre
 }
 
 func retroServer(store string) *Server {
-	s := &Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	s := withProjects(&Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	s.settings.Store(&Settings{})
 	return s
 }
