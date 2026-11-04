@@ -55,7 +55,7 @@ func (s *Server) leaveBlocked(address string) error {
 	if err := s.resettleWaiting(run); err != nil {
 		return fmt.Errorf("settle %s: %w", address, err)
 	}
-	s.rescan()
+	s.idx.Rescan()
 	return nil
 }
 

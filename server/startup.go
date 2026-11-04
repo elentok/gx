@@ -16,6 +16,13 @@ func (s *Server) migrationsEnded() bool {
 	}
 }
 
+// Rescan rescans the store now, as a ping or the watch would, once the
+// migrations have ended: a rescan reads nothing until then.
+func (s *Server) Rescan() {
+	<-s.migrationsDone
+	s.idx.Rescan()
+}
+
 // startAfterMigrations waits for the migrations to end, then runs the steps that
 // read tickets. It reports false when ctx ended first. A project whose migration
 // failed is scanned and recovered like the rest.
@@ -31,7 +38,7 @@ func (s *Server) startAfterMigrations(ctx context.Context) bool {
 	}
 	// The first scan comes first: it fills the index the steps below read, and
 	// it also raises the parent defects.
-	s.startupStep("first-rescan", s.rescan)
+	s.startupStep("first-rescan", s.idx.Rescan)
 	s.startupStep("recover-merges", s.recoverMerges)
 	// Running agents stay invisible to a restart, only a little later.
 	s.startupStep("reclaim-runs", s.reclaimRuns)

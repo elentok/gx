@@ -35,7 +35,7 @@ func (s *Server) defaultHarnessRead(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) defaultHarnessStatus() (wire.DefaultHarnessStatus, error) {
-	projects, err := s.listProjects()
+	projects, err := s.idx.ListProjects()
 	if err != nil {
 		return wire.DefaultHarnessStatus{}, err
 	}

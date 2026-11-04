@@ -74,7 +74,7 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 	}
 	child := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: id}
 	// queueAdd checks the index, so it must see the new ticket first.
-	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+	if err := s.idx.Refresh(); err != nil {
 		return "", fmt.Errorf("refresh after writing %s: %w", path, err)
 	}
 	res, err := s.queueAdd(wire.QueueRequest{Address: child.String(), Front: true})

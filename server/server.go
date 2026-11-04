@@ -31,6 +31,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -134,7 +135,7 @@ type Server struct {
 	logf           *rotatingFile
 	log            *slog.Logger
 	logGiven       sync.Mutex // see giveLog
-	idx            *index
+	idx            *index.Index
 	// migrationsDone closes when the start-up migration run ends.
 	migrationsDone chan struct{}
 	// migratingNow counts the migration runs in flight per project name (the
@@ -170,9 +171,8 @@ type Server struct {
 	lateFinishes inFlight
 	designSteps  sync.Map // map address -> design step at the last rescan
 	deadlocks    deadlocks
-	gatesRaised  map[gateHold]bool      // touched only by the gate watchdog
-	rewatch      atomic.Pointer[func()] // set by keepFresh when the watch is active; read by every rescan caller
-	sweepMu      sync.Mutex             // one archive sweep at a time; the move's own writes wake the watcher
+	gatesRaised  map[gateHold]bool // touched only by the gate watchdog
+	sweepMu      sync.Mutex        // one archive sweep at a time; the move's own writes wake the watcher
 
 	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry       *runs.Registry
@@ -269,11 +269,6 @@ func New(cfg Config) (*Server, error) {
 		}
 	}
 	events := broker.New(cfg.SubscriberBuffer)
-	idx, err := buildIndex(cfg.TicketStore, events)
-	if err != nil {
-		lock.release()
-		return nil, fmt.Errorf("index ticket store: %w", err)
-	}
 	queued, err := openQueue(cfg.StateDir)
 	if err != nil {
 		lock.release()
@@ -335,6 +330,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: cfg.LogLevel}))
+	idx := index.New(cfg.TicketStore, events, log)
 	registry, savedRuns, err := runs.Open(cfg.StateDir, log)
 	if err != nil {
 		ln.Close()
@@ -419,6 +415,12 @@ func New(cfg Config) (*Server, error) {
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
 	}
+	// The rescan steps run in this order after every store scan.
+	s.idx.OnRescan(s.scanParentDefects)
+	s.idx.OnRescan(s.scanLateFinishes)
+	s.idx.OnRescan(s.sweepOneOffs)
+	s.idx.OnRescan(s.scanDesignCleanups)
+	s.idx.SetReady(s.migrationsEnded)
 	s.routes = subsystemRoutes(s)
 	registerRoutes(mux, s.routes)
 	s.http = &http.Server{Handler: mux}
@@ -446,12 +448,10 @@ var routeTable = []struct {
 	{"POST /v1/web/set-password", (*Server).webSetPasswordCLI},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
-	{"GET /v1/projects", (*Server).projects},
 	{"GET /v1/projects/worktrees", (*Server).projectWorktrees},
 	{"POST /v1/projects/add", (*Server).projectAdd},
 	{"POST /v1/projects/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.removeProject)(w, r) }},
 	{"POST /v1/projects/set-path", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.setProjectPath)(w, r) }},
-	{"GET /v1/locks", (*Server).locks},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
@@ -464,14 +464,12 @@ var routeTable = []struct {
 	{"POST /v1/disk/clean", (*Server).diskCleanWrite},
 	{"GET /v1/checks/status", (*Server).checksStatusRead},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
-	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/tickets/detail", (*Server).detail},
 	{"GET /v1/epics", (*Server).epicList},
 	{"GET /v1/epics/detail", (*Server).epicDetail},
 	{"GET /v1/stats", (*Server).stats},
 	{"GET /v1/iterations", (*Server).iterations},
-	{"POST /v1/tickets/changed", (*Server).ticketChanged},
 	{"GET /v1/queue", (*Server).queue},
 	{"GET /v1/queue/items", (*Server).queueItems},
 	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueAdd)(w, r) }},
@@ -577,7 +575,7 @@ func (s *Server) TCPAddr() string {
 
 func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	snap, agents := s.idx.snapshotAgents()
+	snap, agents := s.idx.SnapshotAgents()
 	snap.HerdrText, snap.HerdrUnavailable = s.herdrBanner()
 	for i, t := range snap.Tickets {
 		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
@@ -601,7 +599,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Health = s.currentHealth()
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
-	snap.RecentlyFinished = s.idx.recentlyFinished(s.settings.Load().RecentlyFinished)
+	snap.RecentlyFinished = recentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
 	snap.Mode = s.pause.currentMode()
 	snap.AFK = s.afk.isOn()
 	snap.ViMode = s.viMode.isOn()
@@ -747,7 +745,14 @@ func (s *Server) Serve(ctx context.Context) error {
 		stopCommits = stop
 	}
 	freshDone := make(chan struct{})
-	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
+	go func() {
+		defer close(freshDone)
+		s.idx.KeepFresh(freshCtx, index.WatchConfig{
+			PollInterval: s.cfg.PollInterval,
+			DisableWatch: s.cfg.DisableWatch,
+			Start:        s.startAfterMigrations,
+		})
+	}()
 	herdrDone := make(chan struct{})
 	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
 	// A claim must not see a low disk before the watcher has recorded its projects.

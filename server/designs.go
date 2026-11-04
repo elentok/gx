@@ -176,7 +176,7 @@ func (s *Server) scanDesignCleanups() {
 		return
 	}
 	for _, dir := range dirs {
-		epics, _ := s.idx.epicsOf(dir)
+		epics, _ := s.idx.EpicsOf(dir)
 		for _, e := range epics {
 			if !e.IsMap {
 				continue

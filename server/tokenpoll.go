@@ -149,7 +149,7 @@ func (p *tokenPoller) changed(ts tokenSession) bool {
 // only stores its total.
 func (s *Server) pollTokens(now time.Time) {
 	day := now.Format(tokenledger.DayLayout)
-	for _, t := range s.idx.snapshot().Tickets {
+	for _, t := range s.idx.Snapshot().Tickets {
 		if t.Status != "claimed" && !s.registry.Has(t.Address) {
 			continue
 		}

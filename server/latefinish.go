@@ -95,7 +95,7 @@ func (s *Server) scanLateFinishes() {
 		return
 	}
 	for _, dir := range dirs {
-		epics, _ := s.idx.epicsOf(dir)
+		epics, _ := s.idx.EpicsOf(dir)
 		for _, e := range epics {
 			for _, t := range e.Tickets {
 				if !adoptablePause(schema.Status(t.Status), t.PauseReason) {

@@ -13,7 +13,7 @@ import (
 // epic names are hashed), so it is matched against every indexed ticket, and
 // the status is read from the file: the index may lag the agent's own report.
 func (s *Server) sessionFinished(sess agentrunner.Session) bool {
-	for _, epics := range s.idx.allEpics() {
+	for _, epics := range s.idx.AllEpics() {
 		for _, e := range epics {
 			epic := filepath.Base(e.Path)
 			for _, t := range e.Tickets {

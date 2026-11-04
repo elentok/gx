@@ -145,7 +145,7 @@ func (s *Server) ticketUnmute(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err := tickets.EndOpenRound(ref.ticket.Path, req.Source, tickets.HowResume, ralphloop.CloseResumed); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
 		}
-		s.rescan()
+		s.idx.Rescan()
 		return wire.QueueResult{}, nil
 	})
 }
@@ -314,7 +314,7 @@ func (s *Server) ticketCancel(req wire.QueueRequest) (wire.QueueResult, error) {
 			}
 		}
 		if ref.addr.Epic == OneOffsEpic {
-			s.rescan()
+			s.idx.Rescan()
 		}
 		return wire.QueueResult{}, nil
 	})

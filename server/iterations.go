@@ -17,7 +17,7 @@ import (
 
 func (s *Server) iterations(w http.ResponseWriter, _ *http.Request) {
 	list := []wire.IterationInfo{}
-	for _, t := range s.idx.snapshot().Tickets {
+	for _, t := range s.idx.Snapshot().Tickets {
 		if t.Status != "claimed" {
 			continue
 		}

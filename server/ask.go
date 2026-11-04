@@ -50,7 +50,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("ask %s: setting iteration_status: %w", ref.addr, err)
 		}
-		s.rescan()
+		s.idx.Rescan()
 		return wire.QueueResult{}, nil
 	})
 }

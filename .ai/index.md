@@ -128,7 +128,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
-  (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root)
+  (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds
+  the ticket index, the store watch and the poll/watch loop, and the project, lock and history
+  reads (imports `wire` and `broker`; the root registers the `OnRescan` steps and the migration gate)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

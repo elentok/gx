@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -47,7 +48,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	}
 	poll := s.cfg.PollInterval
 	if poll <= 0 {
-		poll = defaultPollInterval
+		poll = index.DefaultPollInterval
 	}
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
@@ -216,11 +217,11 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 		ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
 		// A missed watch event can leave the index behind the file; claiming
 		// on that view could schedule the wrong thing, so wait for the index.
-		onDisk, err := fileSum(t.Path)
+		onDisk, err := index.FileSum(t.Path)
 		if err != nil {
 			return false, err
 		}
-		if seen, _ := s.idx.sumOf(ticketAddr); seen != onDisk {
+		if seen, _ := s.idx.SumOf(ticketAddr); seen != onDisk {
 			s.guards.Refused.Set(ticketAddr, true)
 			return false, nil
 		}
@@ -346,7 +347,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	if err := ralphloop.ClaimWithBase(t.Path, resolvedBase); err != nil {
 		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
-	s.rescan() // the claim must show now, not when the backstop poll comes
+	s.idx.Rescan() // the claim must show now, not when the backstop poll comes
 	s.events.Publish(wire.EventTicketClaimed, ticketAddr)
 
 	if err := clearLongTicketMark(t.Path); err != nil {
@@ -667,7 +668,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			s.registry.Delete(ticketAddr)
 			// The sweep skips a tracked run, so this is the earliest it can archive it.
 			if a, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}); err == nil && a.Epic == OneOffsEpic {
-				s.rescan()
+				s.idx.Rescan()
 			}
 		}
 	}()
@@ -714,7 +715,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		one.KeepAskedAgent = !s.cfg.DropAskedAgent && keepsAskedAgent(run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 		// The finish path wrote the merge or the pause; the store watch is only a hint.
-		s.rescan()
+		s.idx.Rescan()
 	}
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)

@@ -135,7 +135,7 @@ func (s *Server) inMapEpic(address string) bool {
 }
 
 func (s *Server) hasTicket(address string) bool {
-	for _, t := range s.idx.snapshot().Tickets {
+	for _, t := range s.idx.Snapshot().Tickets {
 		if t.Address == address {
 			return true
 		}
@@ -406,7 +406,7 @@ func indexOfAddr(items []wire.QueueItem, addr string) int {
 
 // subtree is addr plus every ticket forked from it, directly or not.
 func (s *Server) subtree(addr string) map[string]bool {
-	all := s.idx.snapshot().Tickets
+	all := s.idx.Snapshot().Tickets
 	in := map[string]bool{addr: true}
 	for grew := true; grew; {
 		grew = false

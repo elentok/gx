@@ -1,4 +1,4 @@
-package server
+package index
 
 import (
 	"os"
@@ -39,10 +39,7 @@ func TestBuildIndex_OldShapeTicketGivesEmptyIndex(t *testing.T) {
 	if _, _, err := scanStore(store); err == nil {
 		t.Fatal("strict scan accepted the old-shape ticket; fix the fixture")
 	}
-	idx, err := buildIndex(store, broker.New(1))
-	if err != nil {
-		t.Fatalf("buildIndex: %v", err)
-	}
+	idx := New(store, broker.New(1), nil)
 	if len(idx.list) != 0 {
 		t.Errorf("list = %v, want empty", idx.list)
 	}

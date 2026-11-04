@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -65,7 +65,7 @@ func ScratchDir(store, worktreeRoot string) string { return scratchDirFor(store,
 // WatchStore signals (debounced) on every change under dir. stop ends the
 // watch and closes the channel.
 func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
-	w, err := server.NewStoreWatch(dir)
+	w, err := index.NewStoreWatch(dir)
 	if err != nil {
 		return nil, nil, err
 	}

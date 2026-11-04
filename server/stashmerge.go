@@ -119,7 +119,7 @@ func (s *Server) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration,
 	}
 	// The poller must not read the old index: it still shows the epic completed
 	// and, with main now at its tip, merged by hand.
-	s.rescan()
+	s.idx.Rescan()
 	if err := s.ensureRootQueued(root, one.Ticket); err != nil {
 		s.log.Warn("queue root after stash-merge", "root", root, "err", err)
 	}

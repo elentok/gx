@@ -503,7 +503,7 @@ func TestProjectEpics_CrossEpicBlockerReadsAsDone(t *testing.T) {
 	t.Parallel()
 	s, _ := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
-	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+	if err := s.idx.Refresh(); err != nil {
 		t.Fatal(err)
 	}
 

@@ -233,7 +233,7 @@ func (s *Server) oneOffEnqueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult
 		if rmErr := os.Remove(w.path); rmErr != nil {
 			s.log.Warn("remove unqueued one-off", "ticket", w.addr.String(), "err", rmErr)
 		}
-		if refreshErr := s.idx.refresh(s.cfg.TicketStore); refreshErr != nil {
+		if refreshErr := s.idx.Refresh(); refreshErr != nil {
 			s.log.Warn("refresh after one-off cleanup", "err", refreshErr)
 		}
 		return res, err
@@ -248,7 +248,7 @@ func (s *Server) oneOffEnqueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult
 
 func (s *Server) oneOffQueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult, error) {
 	// queueAdd checks the index, so it must see the new ticket first.
-	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+	if err := s.idx.Refresh(); err != nil {
 		return wire.OneOffResult{}, err
 	}
 	q, err := s.queueRoot(w.addr, p.agent, p.front)
@@ -370,7 +370,7 @@ func (s *Server) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *w
 	if len(req.BlockedBy) == 0 {
 		return nil
 	}
-	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+	if err := s.idx.Refresh(); err != nil {
 		r := oneOffRefusal(wire.ReasonBadBlocker, err.Error())
 		return &r
 	}

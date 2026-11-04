@@ -50,7 +50,7 @@ func (s *Server) ticketRecommend(req wire.QueueRequest, qc queueCtx) (wire.Queue
 		if !written {
 			return refusal(wire.ReasonNotPaused, ref.addr.String()+" has no open pause round"), nil
 		}
-		s.rescan()
+		s.idx.Rescan()
 		return wire.QueueResult{}, nil
 	})
 }

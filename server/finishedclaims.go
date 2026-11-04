@@ -33,7 +33,7 @@ func (s *Server) pauseStuckFinishedClaims(now time.Time) {
 		return
 	}
 	for _, dir := range dirs {
-		epics, _ := s.idx.epicsOf(dir)
+		epics, _ := s.idx.EpicsOf(dir)
 		for _, e := range epics {
 			for _, it := range e.Tickets {
 				if schema.Status(it.Status) != schema.StatusClaimed {

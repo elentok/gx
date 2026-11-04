@@ -181,7 +181,7 @@ func (s *Server) fillEpicMergeTargets(list []wire.TicketInfo) {
 func (s *Server) epicMergeTarget(a tickets.Address) string {
 	// The cheap epic checks come from the index and run before projectOf, which
 	// reads project.json: most epics are not mergeable.
-	dir, epics, ok := s.idx.projectEpics(a.Project)
+	dir, epics, ok := s.idx.ProjectEpics(a.Project)
 	if !ok {
 		return ""
 	}

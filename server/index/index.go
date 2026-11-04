@@ -1,14 +1,18 @@
-package server
+// Package index is the server's in-memory view of the ticket store: the scan,
+// the poll and watch loop that keeps it fresh, and the store reads.
+package index
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
@@ -26,15 +30,32 @@ type indexedTicket struct {
 	sum string
 }
 
-// index is the server's in-memory view of the ticket store.
-type index struct {
-	mu     sync.RWMutex
-	events *broker.Broker
-	list   []indexedTicket
+// Index is the server's in-memory view of the ticket store.
+type Index struct {
+	mu        sync.RWMutex
+	events    *broker.Broker
+	storePath string
+	log       *slog.Logger
+	list      []indexedTicket
 	// loaded is each project's epics as the last scan read them, by project
 	// dir. Treated as read-only: readers share it until the next scan.
 	loaded map[string][]tickets.Epic
+
+	// rewatch is set by KeepFresh while the watch is armed; Rescan reads it.
+	rewatch atomic.Pointer[func()]
+	// onRescan and ready are set once, before KeepFresh runs.
+	onRescan []func()
+	ready    func() bool
 }
+
+// OnRescan registers a step that runs after every store rescan, in
+// registration order. Call it before KeepFresh starts.
+func (i *Index) OnRescan(step func()) { i.onRescan = append(i.onRescan, step) }
+
+// SetReady sets the gate a rescan waits on: while ready reports false (the
+// start-up migrations are rewriting tickets) a rescan reads nothing. With no
+// gate set a rescan always runs. Call it before KeepFresh starts.
+func (i *Index) SetReady(ready func() bool) { i.ready = ready }
 
 // scanStore reads every project in the ticket store. Always a full read of the
 // files: the index never merges, so the file wins on every rescan.
@@ -70,22 +91,37 @@ func scanStore(storePath string) ([]indexedTicket, map[string][]tickets.Epic, er
 	return list, loaded, nil
 }
 
-// buildIndex does the initial scan. A store the strict scan cannot read yet
-// (old-shape tickets a migration is about to rewrite) gives an empty index and
-// no error: the scan is deferred to the first rescan after the migrations end.
-func buildIndex(storePath string, events *broker.Broker) (*index, error) {
+// New does the initial scan. A store the strict scan cannot read yet
+// (old-shape tickets a migration is about to rewrite) gives an empty index:
+// the scan is deferred to the first rescan after the migrations end. A nil log
+// logs to the default logger.
+func New(storePath string, events *broker.Broker, log *slog.Logger) *Index {
+	if log == nil {
+		log = slog.Default()
+	}
+	i := &Index{events: events, storePath: storePath, log: log}
 	list, loaded, err := scanStore(storePath)
 	if err != nil {
-		return &index{list: []indexedTicket{}, loaded: map[string][]tickets.Epic{}, events: events}, nil
+		list, loaded = []indexedTicket{}, map[string][]tickets.Epic{}
 	}
-	return &index{list: list, loaded: loaded, events: events}, nil
+	i.list, i.loaded = list, loaded
+	return i
 }
 
-// refresh rescans the store and replaces the index, publishing one
+// Seed sets one project's epics without a scan, for tests that need an index
+// no store backs.
+func (i *Index) Seed(dir string, epics []tickets.Epic) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.loaded[dir] = epics
+}
+
+// Refresh rescans the store and replaces the index, publishing one
 // ticket-changed event per ticket that differs. Publishing happens under the
-// lock so a snapshot's seq always matches the list it carries.
-func (i *index) refresh(storePath string) error {
-	list, loaded, err := scanStore(storePath)
+// lock so a snapshot's seq always matches the list it carries. Unlike Rescan
+// it ignores the migration gate and runs no OnRescan step.
+func (i *Index) Refresh() error {
+	list, loaded, err := scanStore(i.storePath)
 	if err != nil {
 		return err
 	}
@@ -135,16 +171,24 @@ func changedEpicMeta(old, next map[string][]tickets.Epic) []string {
 	return changed
 }
 
-// epicsOf is the project's epics as of the last scan.
-func (i *index) epicsOf(dir string) ([]tickets.Epic, bool) {
+// EpicsOf is the project's epics as of the last scan.
+func (i *Index) EpicsOf(dir string) ([]tickets.Epic, bool) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	epics, ok := i.loaded[dir]
 	return epics, ok
 }
 
-// allEpics is every project's epics as of the last scan.
-func (i *index) allEpics() [][]tickets.Epic {
+// Loaded is each project's epics by project dir as of the last scan. The map
+// is shared and read-only: the next scan replaces it, never edits it.
+func (i *Index) Loaded() map[string][]tickets.Epic {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	return i.loaded
+}
+
+// AllEpics is every project's epics as of the last scan.
+func (i *Index) AllEpics() [][]tickets.Epic {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	out := make([][]tickets.Epic, 0, len(i.loaded))
@@ -154,9 +198,9 @@ func (i *index) allEpics() [][]tickets.Epic {
 	return out
 }
 
-// projectEpics is the named project's directory and epics as of the last scan,
+// ProjectEpics is the named project's directory and epics as of the last scan,
 // with no store read. ok is false for a project the scan has not seen.
-func (i *index) projectEpics(project string) (dir string, epics []tickets.Epic, ok bool) {
+func (i *Index) ProjectEpics(project string) (dir string, epics []tickets.Epic, ok bool) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	for d, es := range i.loaded {
@@ -216,13 +260,13 @@ func ticketInfo(project, epic string, t tickets.Ticket) indexedTicket {
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)
 	}
-	sum, _ := fileSum(t.Path)
+	sum, _ := FileSum(t.Path)
 	return indexedTicket{TicketInfo: info, agent: t.Agent, sum: sum}
 }
 
-// fileSum fingerprints a ticket file's bytes. An unreadable file has no sum,
+// FileSum fingerprints a ticket file's bytes. An unreadable file has no sum,
 // which never equals a readable one's.
-func fileSum(path string) (string, error) {
+func FileSum(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -231,8 +275,8 @@ func fileSum(path string) (string, error) {
 	return hex.EncodeToString(h[:]), nil
 }
 
-// sumOf is the fingerprint the index holds for addr.
-func (i *index) sumOf(addr string) (string, bool) {
+// SumOf is the fingerprint the index holds for addr.
+func (i *Index) SumOf(addr string) (string, bool) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	n := sort.Search(len(i.list), func(n int) bool { return i.list[n].Address >= addr })
@@ -242,14 +286,15 @@ func (i *index) sumOf(addr string) (string, bool) {
 	return "", false
 }
 
-func (i *index) snapshot() wire.Snapshot {
-	snap, _ := i.snapshotAgents()
+// Snapshot is every indexed ticket with the event seq it is current to.
+func (i *Index) Snapshot() wire.Snapshot {
+	snap, _ := i.SnapshotAgents()
 	return snap
 }
 
-// snapshotAgents is snapshot plus each ticket's frontmatter agent, parallel to
+// SnapshotAgents is Snapshot plus each ticket's frontmatter agent, parallel to
 // Snapshot.Tickets.
-func (i *index) snapshotAgents() (wire.Snapshot, []string) {
+func (i *Index) SnapshotAgents() (wire.Snapshot, []string) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	infos := make([]wire.TicketInfo, len(i.list))

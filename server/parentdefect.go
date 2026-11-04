@@ -32,7 +32,7 @@ func (s *Server) scanParentDefects() {
 		return
 	}
 	for _, dir := range dirs {
-		epics, _ := s.idx.epicsOf(dir)
+		epics, _ := s.idx.EpicsOf(dir)
 		for _, e := range epics {
 			if e.Status == string(schema.StatusDraft) {
 				continue

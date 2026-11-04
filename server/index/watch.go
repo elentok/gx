@@ -1,4 +1,4 @@
-package server
+package index
 
 import (
 	"context"
@@ -15,38 +15,51 @@ import (
 )
 
 const (
-	defaultPollInterval = 2 * time.Second
+	// DefaultPollInterval is the poll when WatchConfig.PollInterval is unset
+	// and there is no live watch.
+	DefaultPollInterval = 2 * time.Second
 	// watchedPollInterval is the backstop poll while fsnotify is working.
 	watchedPollInterval = 15 * time.Second
 	// A burst of writes (an editor's save, a gx command) becomes one rescan.
 	watchDebounce = 50 * time.Millisecond
 )
 
-// keepFresh rescans the store on every poll tick and, unless the watch is
+// WatchConfig is what KeepFresh needs from the server.
+type WatchConfig struct {
+	// PollInterval is the rescan period; zero picks the default, and a live
+	// watch stretches the default to a backstop.
+	PollInterval time.Duration
+	DisableWatch bool
+	// Start runs once after the watch is armed, or at once when there is no
+	// store. It reports false when ctx ended first, which ends KeepFresh.
+	Start func(ctx context.Context) bool
+}
+
+// KeepFresh rescans the store on every poll tick and, unless the watch is
 // disabled or unavailable, whenever the store changes. The poll is the
 // guarantee; the watch only makes updates arrive sooner.
-func (s *Server) keepFresh(ctx context.Context) {
-	if s.cfg.TicketStore == "" {
-		s.startAfterMigrations(ctx)
+func (i *Index) KeepFresh(ctx context.Context, cfg WatchConfig) {
+	if i.storePath == "" {
+		cfg.Start(ctx)
 		return
 	}
-	poll := s.cfg.PollInterval
+	poll := cfg.PollInterval
 	if poll <= 0 {
-		poll = defaultPollInterval
+		poll = DefaultPollInterval
 	}
-	pollUnset := s.cfg.PollInterval <= 0
+	pollUnset := cfg.PollInterval <= 0
 	var events <-chan fsnotify.Event
-	if !s.cfg.DisableWatch {
-		w, err := NewStoreWatch(s.cfg.TicketStore)
+	if !cfg.DisableWatch {
+		w, err := NewStoreWatch(i.storePath)
 		if err != nil {
-			s.log.Warn("store watch unavailable, polling only", "err", err)
+			i.log.Warn("store watch unavailable, polling only", "err", err)
 		} else {
 			defer w.Close()
 			events = w.Events
 			rewatch := w.Rewatch
-			s.rewatch.Store(&rewatch)
+			i.rewatch.Store(&rewatch)
 			// The watcher closes on return; a late rescan must not touch it.
-			defer s.rewatch.Store(nil)
+			defer i.rewatch.Store(nil)
 		}
 	}
 
@@ -57,8 +70,8 @@ func (s *Server) keepFresh(ctx context.Context) {
 	}
 
 	// Edits made before the watch was armed produced no event; the first scan
-	// (inside) picks them up once the migrations end.
-	if !s.startAfterMigrations(ctx) {
+	// (inside Start) picks them up once the migrations end.
+	if !cfg.Start(ctx) {
 		return
 	}
 
@@ -71,7 +84,7 @@ func (s *Server) keepFresh(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.rescan()
+			i.Rescan()
 		case ev := <-events:
 			relevant, dir := storeEventKind(ev)
 			if !relevant {
@@ -83,7 +96,7 @@ func (s *Server) keepFresh(ctx context.Context) {
 			}
 		case <-debounce:
 			debounce = nil
-			s.rescanTree(walk)
+			i.rescanTree(walk)
 			walk = false
 		}
 	}
@@ -110,45 +123,49 @@ func storeEventKind(ev fsnotify.Event) (relevant, newDir bool) {
 
 // ticketChanged answers a direct write's ping with an immediate rescan, so the
 // stream doesn't wait for the watch or the poll. The file stays the truth: the
-// address is informational, the rescan reads every file.
-func (s *Server) ticketChanged(w http.ResponseWriter, r *http.Request) {
-	var req wire.ChangedRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+// address is informational, the rescan reads every file. migrated closes when
+// the start-up migrations end.
+func (i *Index) ticketChanged(migrated func() <-chan struct{}) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req wire.ChangedRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// Until the migrations end a rescan reads nothing, so the caller would
+		// not see its own write. The wait ends with the request.
+		select {
+		case <-migrated():
+		case <-r.Context().Done():
+			return
+		}
+		i.Rescan()
+		w.WriteHeader(http.StatusNoContent)
 	}
-	// Until the migrations end a rescan reads nothing, so the caller would
-	// not see its own write. The wait ends with the request.
-	select {
-	case <-s.migrationsDone:
-	case <-r.Context().Done():
-		return
-	}
-	s.rescan()
-	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) rescan() {
-	s.rescanTree(true)
+// Rescan re-reads the store, as a ping or the watch would, then runs the
+// OnRescan steps. It is the only entry for a rescan.
+func (i *Index) Rescan() {
+	i.rescanTree(true)
 }
 
 // rescanTree re-reads the store; walk also re-adds directories to the watch,
 // which only a directory creation or the backstop poll needs.
-func (s *Server) rescanTree(walk bool) {
+func (i *Index) rescanTree(walk bool) {
 	// A migration is rewriting tickets; the first scan after it ends reads them.
-	if !s.migrationsEnded() {
+	if i.ready != nil && !i.ready() {
 		return
 	}
-	if rewatch := s.rewatch.Load(); walk && rewatch != nil {
+	if rewatch := i.rewatch.Load(); walk && rewatch != nil {
 		(*rewatch)() // pick up directories created since the last scan
 	}
-	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
-		s.log.Warn("rescan ticket store", "err", err)
+	if err := i.Refresh(); err != nil {
+		i.log.Warn("rescan ticket store", "err", err)
 	}
-	s.scanParentDefects()
-	s.scanLateFinishes()
-	s.sweepOneOffs()
-	s.scanDesignCleanups()
+	for _, step := range i.onRescan {
+		step()
+	}
 }
 
 // WatchTree adds every directory under root. fsnotify is not recursive, and

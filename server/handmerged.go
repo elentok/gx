@@ -24,7 +24,7 @@ func (s *Server) stampHandMerged() {
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
-		epics, ok := s.idx.epicsOf(dir)
+		epics, ok := s.idx.EpicsOf(dir)
 		if !ok {
 			continue
 		}

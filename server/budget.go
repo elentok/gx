@@ -439,7 +439,7 @@ func (s *Server) budgetIteration(address string) (wire.IterationInfo, bool) {
 // tickets, and paused ones whose pane a nudge set working (a watched run). All
 // ticket kinds count.
 func (s *Server) pollBudget(now time.Time) {
-	for _, t := range s.idx.snapshot().Tickets {
+	for _, t := range s.idx.Snapshot().Tickets {
 		if t.Status != "claimed" && !s.registry.Has(t.Address) {
 			continue
 		}

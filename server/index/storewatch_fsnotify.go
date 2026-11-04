@@ -1,4 +1,4 @@
-package server
+package index
 
 import "github.com/fsnotify/fsnotify"
 

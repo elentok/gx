@@ -1,6 +1,6 @@
 //go:build darwin && cgo
 
-package server
+package index
 
 import (
 	"time"

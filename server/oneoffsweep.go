@@ -50,7 +50,7 @@ func (s *Server) sweepOneOffs() {
 		}
 	}
 	if moved {
-		if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+		if err := s.idx.Refresh(); err != nil {
 			s.log.Warn("refresh after one-off sweep", "err", err)
 		}
 	}

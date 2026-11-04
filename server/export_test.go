@@ -121,12 +121,6 @@ func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairRes
 	return s.repairResume(req, repairCtx{origin: origin})
 }
 
-// Rescan rescans the store now, as a ping or the watch would.
-func (s *Server) Rescan() {
-	<-s.migrationsDone // a rescan reads nothing until the migrations end
-	s.rescan()
-}
-
 // SetTokensOf swaps how a session's cumulative tokens and cost are read.
 func (s *Server) SetTokensOf(f TokenReader) { s.tokenPoll.read = f }
 

@@ -43,11 +43,9 @@ func finishedOneOffs(project string, e tickets.Epic) []wire.FinishedEpic {
 // recentlyFinished lists the last limit completed loop epics, newest first. It
 // reads the completed_at stamps of the last scan, so it needs no storage of its
 // own and a restart rebuilds the same list. A map epic never counts.
-func (i *index) recentlyFinished(limit int) []wire.FinishedEpic {
-	i.mu.RLock()
-	defer i.mu.RUnlock()
+func recentlyFinished(loaded map[string][]tickets.Epic, limit int) []wire.FinishedEpic {
 	out := []wire.FinishedEpic{}
-	for dir, epics := range i.loaded {
+	for dir, epics := range loaded {
 		project := tickets.ProjectName(dir)
 		for _, e := range epics {
 			if e.IsMap || e.CompletedAt.IsZero() || isOneOffsEpicName(filepath.Base(e.Path)) {

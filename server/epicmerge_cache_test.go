@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -14,12 +16,12 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 		return tickets.Epic{Name: name, Path: "/store/proj/" + name, BlockedBy: blockedBy,
 			Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
 	}
-	s.idx = &index{loaded: map[string][]tickets.Epic{}}
+	s.idx = index.New("", broker.New(1), nil)
 	dir, _, err := s.projectOf("proj")
 	if err != nil {
 		t.Fatal(err)
 	}
-	load := func(epics ...tickets.Epic) { s.idx.loaded[dir] = epics }
+	load := func(epics ...tickets.Epic) { s.idx.Seed(dir, epics) }
 	load(done("a"), done("b", "a/01"))
 
 	calls := 0

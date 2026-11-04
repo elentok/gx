@@ -218,7 +218,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			if err := ralphloop.ResumeTicket(ref.ticket.Path, time.Now()); err != nil {
 				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
 			}
-			s.rescan()
+			s.idx.Rescan()
 			return wire.QueueResult{Outcome: wire.OutcomeQueued}, nil
 		}
 		if err := ralphloop.Claim(ref.ticket.Path); err != nil {
@@ -227,7 +227,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err := s.resettleWaiting(run); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("settle %s: %w", ref.addr, err)
 		}
-		s.rescan()
+		s.idx.Rescan()
 		return wire.QueueResult{Outcome: wire.OutcomeDelivered}, nil
 	})
 }
