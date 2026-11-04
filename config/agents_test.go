@@ -1,9 +1,12 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseAgentsSessionKeysDefaultWhenAbsent(t *testing.T) {
@@ -127,6 +130,188 @@ func TestParseAgentsLeaderKey(t *testing.T) {
 			}
 			if !slices.Equal(cfg.Agents.LeaderKey, tc.want) {
 				t.Errorf("LeaderKey = %v, want %v", cfg.Agents.LeaderKey, tc.want)
+			}
+		})
+	}
+}
+
+func TestDefaultAgentsConfig(t *testing.T) {
+	cfg := DefaultAgentsConfig()
+	want := map[string]struct {
+		got  AgentConfig
+		want AgentConfig
+	}{
+		"claude": {cfg.Claude, AgentConfig{
+			Model: "sonnet", Effort: "medium",
+			Light:     TierConfig{Model: "haiku"},
+			Strongest: TierConfig{Model: "opus", Effort: "high"},
+		}},
+		"codex": {cfg.Codex, AgentConfig{
+			Model: "gpt-6.1-sol", Effort: "medium",
+			Light:     TierConfig{Model: "gpt-6-luna", Effort: "medium"},
+			Strongest: TierConfig{Model: "gpt-6-astra", Effort: "high"},
+		}},
+	}
+	for name, c := range want {
+		if c.got != c.want {
+			t.Errorf("%s = %+v, want %+v", name, c.got, c.want)
+		}
+	}
+}
+
+func TestLoadAgentsConfigTiers(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	body := `{"agents":{"claude":{"strongest":{"model":" fable ","effort":"max"},"light":{"effort":""}}}}`
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got, want := cfg.Agents.Claude.Strongest, (TierConfig{Model: "fable", Effort: "max"}); got != want {
+		t.Errorf("Strongest = %+v, want %+v", got, want)
+	}
+	if got, want := cfg.Agents.Claude.Light, (TierConfig{Model: "haiku"}); got != want {
+		t.Errorf("Light = %+v, want untouched default %+v", got, want)
+	}
+	if cfg.Agents.Claude.Model != "sonnet" {
+		t.Errorf("worker Model = %q, want default sonnet", cfg.Agents.Claude.Model)
+	}
+}
+
+func TestLoadAgentsConfigDefaultsWhenBlockAbsent(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Claude.Model != "sonnet" || cfg.Agents.Claude.Effort != "medium" {
+		t.Fatalf("Agents.Claude = %+v, want sonnet/medium", cfg.Agents.Claude)
+	}
+	if cfg.Agents.Codex.Model != "gpt-6.1-sol" || cfg.Agents.Codex.Effort != "medium" {
+		t.Fatalf("Agents.Codex = %+v, want gpt-6.1-sol/medium", cfg.Agents.Codex)
+	}
+}
+
+func TestLoadAgentsConfigPartialFillsMissingKeysFromDefaults(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	body := `{"agents":{"claude":{"model":"opus"}}}`
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Claude.Model != "opus" {
+		t.Fatalf("Agents.Claude.Model = %q, want opus", cfg.Agents.Claude.Model)
+	}
+	if cfg.Agents.Claude.Effort != "medium" {
+		t.Fatalf("Agents.Claude.Effort = %q, want default medium", cfg.Agents.Claude.Effort)
+	}
+	if cfg.Agents.Codex.Model != "gpt-6.1-sol" || cfg.Agents.Codex.Effort != "medium" {
+		t.Fatalf("Agents.Codex = %+v, want untouched defaults", cfg.Agents.Codex)
+	}
+}
+
+func TestLoadAgentsConfigExplicitEmptyStringMeansInherit(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	body := `{"agents":{"claude":{"model":"","effort":""}}}`
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Claude.Model != "" {
+		t.Fatalf("Agents.Claude.Model = %q, want empty (inherit)", cfg.Agents.Claude.Model)
+	}
+	if cfg.Agents.Claude.Effort != "" {
+		t.Fatalf("Agents.Claude.Effort = %q, want empty (inherit)", cfg.Agents.Claude.Effort)
+	}
+}
+
+func TestLoadAgentsConfigTrimsWhitespace(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	path := filepath.Join(dir, "config.json")
+	body := `{"agents":{"codex":{"model":"  gpt-5.6-sol  ","effort":" high "}}}`
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Agents.Codex.Model != "gpt-5.6-sol" {
+		t.Fatalf("Agents.Codex.Model = %q, want trimmed gpt-5.6-sol", cfg.Agents.Codex.Model)
+	}
+	if cfg.Agents.Codex.Effort != "high" {
+		t.Fatalf("Agents.Codex.Effort = %q, want trimmed high", cfg.Agents.Codex.Effort)
+	}
+}
+
+func TestParseRunnerWait(t *testing.T) {
+	for name, tc := range map[string]struct {
+		json string
+		want time.Duration
+	}{
+		"default":    {`{}`, 5 * time.Second},
+		"overridden": {`{"runner-wait":"12s"}`, 12 * time.Second},
+		"unparsable": {`{"runner-wait":"soon"}`, 5 * time.Second},
+		"zero":       {`{"runner-wait":"0s"}`, 5 * time.Second},
+		"negative":   {`{"runner-wait":"-3s"}`, 5 * time.Second},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := Parse([]byte(tc.json))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if cfg.RunnerWait != tc.want {
+				t.Fatalf("RunnerWait = %s, want %s", cfg.RunnerWait, tc.want)
 			}
 		})
 	}
