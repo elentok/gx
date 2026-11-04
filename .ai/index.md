@@ -95,7 +95,7 @@ A new route needs all of these. A missing one fails a test, not the build:
 - The web mux in `server/web.go` when the browser calls it (`webWrites` for writes).
 - The allowlist in `TestWeb_EverythingElseIs404` (`server/web_test.go`).
 
-Server tests: build fixtures with `servertest.WriteTicketWith` (`server/servertest/servertest.go`)
+Server tests: build fixtures with `servertest.WriteTicketWith` (`server/servertest/store.go`)
 instead of hand-written helpers. A web test that needs a project repo also needs
 `SetProjectRepoNoAutoMerge`; `newFFFixture` does not provide one.
 
