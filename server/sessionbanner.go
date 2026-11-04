@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/osnotify"
@@ -143,7 +144,7 @@ func (s *Server) designLink(m sessionMeta) string {
 	if err != nil {
 		return ""
 	}
-	return base + "/#/d/" + rootOf(addr).String()
+	return base + "/#/d/" + queue.RootOf(addr).String()
 }
 
 func (s *Server) fireBanner(id string) {

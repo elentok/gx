@@ -2,13 +2,15 @@ package server_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/runs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/ralphloop"
 
@@ -400,8 +402,8 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 func TestCancel_OldOneOffAddressResolvesTheArchivedTicket(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsArchivedEpic, "01", "a", servertest.TicketOpts{Status: "cancelled"})
-	path := filepath.Join(store, "proj", server.OneOffsArchivedEpic, "issues", "01-a.md")
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsArchivedEpic, "01", "a", servertest.TicketOpts{Status: "cancelled"})
+	path := filepath.Join(store, "proj", queue.OneOffsArchivedEpic, "issues", "01-a.md")
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)

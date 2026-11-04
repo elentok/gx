@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -18,10 +19,10 @@ const askAuthorAgent = "agent"
 func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 	q, err := tickets.ParseQuestionStrict(req.Text)
 	if err != nil {
-		return refusal(wire.ReasonInvalidQuestion, err.Error()), nil
+		return queue.Refusal(wire.ReasonInvalidQuestion, err.Error()), nil
 	}
 	if strings.TrimSpace(q.Handoff) == "" {
-		return refusal(wire.ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
+		return queue.Refusal(wire.ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		ev := tickets.LogEvent{
@@ -39,7 +40,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 			return nil
 		})
 		if err == errQuestionOpen {
-			return refusal(wire.ReasonQuestionOpen, ref.addr.String()+" already has an open question"), nil
+			return queue.Refusal(wire.ReasonQuestionOpen, ref.addr.String()+" already has an open question"), nil
 		}
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("ask %s: %w", ref.addr, err)

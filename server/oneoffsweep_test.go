@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -36,14 +37,14 @@ func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
 	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "paused", "04": "open"} {
-		servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
+		servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
 	}
 	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{BlockedBy: []string{"one-offs/01"}})
 	startSweep(t, store)
 
-	archived := filepath.Join(proj, server.OneOffsArchivedEpic, "issues")
-	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "01-t01.md"), false)
-	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "02-t02.md"), false)
+	archived := filepath.Join(proj, queue.OneOffsArchivedEpic, "issues")
+	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-t01.md"), false)
+	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "02-t02.md"), false)
 
 	done := readFile(t, filepath.Join(archived, "01-t01.md"))
 	if !strings.Contains(done, "completed_at:") {
@@ -60,7 +61,7 @@ func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 		t.Errorf("cancelled one-off does not name its original address:\n%s", cancelled)
 	}
 	for _, name := range []string{"03-t03.md", "04-t04.md"} {
-		if _, err := os.Stat(filepath.Join(proj, server.OneOffsEpic, "issues", name)); err != nil {
+		if _, err := os.Stat(filepath.Join(proj, queue.OneOffsEpic, "issues", name)); err != nil {
 			t.Errorf("%s left one-offs: %v", name, err)
 		}
 	}
@@ -73,17 +74,17 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsArchivedEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
-	archivedCopy := filepath.Join(proj, server.OneOffsArchivedEpic, "issues", "01-a.md")
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsArchivedEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
+	archivedCopy := filepath.Join(proj, queue.OneOffsArchivedEpic, "issues", "01-a.md")
 	if err := os.WriteFile(archivedCopy, []byte(readFile(t, archivedCopy)+"\n## Resolution\n\n- original: proj:one-offs/01\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{BlockedBy: []string{"one-offs/01"}})
 	startSweep(t, store)
 
-	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "01-a.md"), false)
-	entries, err := os.ReadDir(filepath.Join(proj, server.OneOffsArchivedEpic, "issues"))
+	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-a.md"), false)
+	entries, err := os.ReadDir(filepath.Join(proj, queue.OneOffsArchivedEpic, "issues"))
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("archive holds %d files (err %v), want 1", len(entries), err)
 	}
@@ -97,14 +98,14 @@ func TestSweep_DependentOfAnArchivedOneOffIsUnblockedLikeAnyTerminalBlocker(t *t
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
 	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "open"} {
-		servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
+		servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
 	}
 	for id, blocker := range map[string]string{"01": "one-offs/01", "02": "one-offs/02", "03": "one-offs/03"} {
 		servertest.WriteTicketWith(t, store, "proj", "feature", id, "after", servertest.TicketOpts{BlockedBy: []string{blocker}})
 	}
 	h := startSweep(t, store)
-	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "01-t01.md"), false)
-	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "02-t02.md"), false)
+	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-t01.md"), false)
+	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "02-t02.md"), false)
 
 	// "blocked" is the scheduler's word for a ticket with an unresolved blocker;
 	// an unblocked one falls through to the queue verdicts.
@@ -126,7 +127,7 @@ func oneOffsQueued(t *testing.T, h *servertest.Harness) bool {
 		t.Fatal(err)
 	}
 	for _, it := range q {
-		if strings.HasPrefix(it.Address, "proj:"+server.OneOffsEpic+"/") {
+		if strings.HasPrefix(it.Address, "proj:"+queue.OneOffsEpic+"/") {
 			return true
 		}
 	}
@@ -172,7 +173,7 @@ func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
 	for _, status := range []string{"paused", "failed"} {
 		t.Run(status, func(t *testing.T) {
 			store := t.TempDir()
-			servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: status})
+			servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: status})
 			h := startSweep(t, store)
 			ctx := context.Background()
 			if _, err := h.Client.QueuePause(ctx); err != nil {
@@ -226,7 +227,7 @@ func TestSweep_CancelArchivesTheOneOff(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
 	h := startSweep(t, store)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -242,8 +243,8 @@ func TestSweep_CancelArchivesTheOneOff(t *testing.T) {
 		}
 		return false
 	})
-	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "01-a.md"), false)
-	got := readFile(t, filepath.Join(proj, server.OneOffsArchivedEpic, "issues", "01-a.md"))
+	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-a.md"), false)
+	got := readFile(t, filepath.Join(proj, queue.OneOffsArchivedEpic, "issues", "01-a.md"))
 	if !strings.Contains(got, "status: cancelled") || strings.Contains(got, "completed_at:") {
 		t.Errorf("archived cancel:\n%s", got)
 	}

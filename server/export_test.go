@@ -2,11 +2,13 @@ package server
 
 import (
 	"errors"
-	"github.com/elentok/gx/server/runs"
 	"io/fs"
 	"net/http"
 	"path/filepath"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -73,7 +75,7 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return s.claimAndLaunch(rootOf(addr), addr, ref.ticket, ref.repo, ralphloop.AgentKind(agent), epics)
+	return s.claimAndLaunch(queue.RootOf(addr), addr, ref.ticket, ref.repo, ralphloop.AgentKind(agent), epics)
 }
 
 // PauseAs pauses a ticket as the given kind the way the server's own pauses do,
@@ -224,14 +226,14 @@ func (s *Server) CompleteRootIfDone(address string) error {
 	if !ok {
 		return errors.New("no ticket " + address)
 	}
-	s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
+	s.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	return nil
 }
 
 // RemoveMergedWorktree starts the post-merge worktree removal the way stampEpic
 // does, on the settle group.
 func (s *Server) RemoveMergedWorktree(project, epic string) {
-	root := rootRef{Project: project, Epic: epic}
+	root := queue.RootRef{Project: project, Epic: epic}
 	s.guards.GoSettle(func() { s.removeMergedWorktree(root) })
 }
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -13,7 +14,7 @@ import (
 // call sessionDir and so refuse a Queue agent id as an unknown session.
 func (s *Server) readableSession(id string) (string, sessionMeta, wire.SessionResult, error) {
 	dir, meta, res, err := s.SessionDir(id)
-	if !res.Refused || res.Reason != wire.ReasonSessionUnknown || !strings.HasPrefix(id, queueAgentIDPrefix) {
+	if !res.Refused || res.Reason != wire.ReasonSessionUnknown || !strings.HasPrefix(id, queue.AgentIDPrefix) {
 		return dir, meta, res, err
 	}
 	for _, row := range s.queue.AgentRows() {

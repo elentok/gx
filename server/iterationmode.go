@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -59,7 +60,7 @@ func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterat
 		}
 		return m
 	}
-	m := iterationMode{commitless: addr.Project == projects.ScratchProject || addr.Epic == OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
+	m := iterationMode{commitless: addr.Project == projects.ScratchProject || addr.Epic == queue.OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
 	if m.commitless && (addr.Project == projects.ScratchProject || s.projectHasNoVCS(addr.Project)) {
 		m.scratchDir = projects.ScratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}

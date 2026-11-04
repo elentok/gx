@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/settings"
 	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/settings"
 
 	"github.com/elentok/gx/server/wire"
 
@@ -195,13 +197,13 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 		}
 		return s.projectOverride(p) == ""
 	}
-	seen := map[rootRef]bool{}
+	seen := map[queue.RootRef]bool{}
 	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
-		if err != nil || !inScope(addr.Project) || seen[rootOf(addr)] {
+		if err != nil || !inScope(addr.Project) || seen[queue.RootOf(addr)] {
 			continue
 		}
-		seen[rootOf(addr)] = true
+		seen[queue.RootOf(addr)] = true
 		waiting += s.waitingOnDefault(addr)
 	}
 	for _, t := range s.registry.List() {

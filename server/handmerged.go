@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -12,10 +13,10 @@ import (
 // as unmerged epics pile up under auto-ff-merge off. It reads the index, not
 // the disk, so an out-of-scope epic costs no I/O at all.
 func (s *Server) stampHandMerged() {
-	queued := map[rootRef]bool{}
+	queued := map[queue.RootRef]bool{}
 	for _, item := range s.queue.List() {
 		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil {
-			queued[rootOf(addr)] = true
+			queued[queue.RootOf(addr)] = true
 		}
 	}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
@@ -33,7 +34,7 @@ func (s *Server) stampHandMerged() {
 			if e.IsMap || e.CompletedAt.IsZero() || !e.MergedAt.IsZero() {
 				continue
 			}
-			root := rootRef{Project: project, Epic: e.Name}
+			root := queue.RootRef{Project: project, Epic: e.Name}
 			if !queued[root] {
 				if waited == nil {
 					waited = tickets.EpicsWaitedOn(project, epics)
@@ -52,7 +53,7 @@ func (s *Server) stampHandMerged() {
 // re-reads the stamp under the trunk's lock, so a server merge racing it sends
 // the only notice. A held lock skips this tick: a poll never queues behind a
 // merge, and the next tick checks again.
-func (s *Server) stampIfMerged(root rootRef, epics []tickets.Epic, e tickets.Epic) {
+func (s *Server) stampIfMerged(root queue.RootRef, epics []tickets.Epic, e tickets.Epic) {
 	dir, repo, err := s.projects.Of(root.Project)
 	if err != nil {
 		return
@@ -74,7 +75,7 @@ func (s *Server) stampIfMerged(root rootRef, epics []tickets.Epic, e tickets.Epi
 
 // stampMerged is stampIfMerged under the trunk lock. It reports whether it
 // dequeued the root, the one case that sends a notice.
-func (s *Server) stampMerged(root rootRef, e tickets.Epic, repo, target string) (removed bool) {
+func (s *Server) stampMerged(root queue.RootRef, e tickets.Epic, repo, target string) (removed bool) {
 	// Read fresh: a stash-merge may have cleared completed_at since the poll's
 	// snapshot, and its epic is not merged until the trunk-conflict ticket is done.
 	if fresh := tickets.LoadEpicTicketMD(e.Path); !fresh.MergedAt.IsZero() || fresh.CompletedAt.IsZero() {

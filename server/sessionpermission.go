@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -30,7 +31,7 @@ func (s *Server) sessionPermissionRead(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) readSessionPermission(id string) (wire.SessionResult, wire.SessionPermissionResponse, error) {
 	var out wire.SessionPermissionResponse
-	if strings.HasPrefix(id, queueAgentIDPrefix) {
+	if strings.HasPrefix(id, queue.AgentIDPrefix) {
 		return sessionRefusal(wire.ReasonSessionReadOnly, fmt.Sprintf("%s is a Queue agent; its loop owns it", id)), out, nil
 	}
 	dir, meta, res, err := s.SessionDir(id)

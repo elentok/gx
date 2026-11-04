@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
@@ -81,10 +83,10 @@ func (s *Server) claimNext() {
 	seen := map[string]bool{}
 	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
-		if err != nil || seen[rootOf(addr).String()] {
+		if err != nil || seen[queue.RootOf(addr).String()] {
 			continue
 		}
-		seen[rootOf(addr).String()] = true
+		seen[queue.RootOf(addr).String()] = true
 		// One root fills its own slots before the next root in the queue gets a turn.
 		for running < limit {
 			launched, err := s.claimRootAfterAdoption(item)
@@ -129,8 +131,8 @@ func (s *Server) claimRootAfterAdoption(item wire.QueueItem) (bool, error) {
 // perRootLimit is how many agents one root may run at once. The one-offs root
 // uses the one-off cap instead of the per-root one; old single-ticket one-off
 // epics are roots of their own and keep the per-root cap.
-func (s *Server) perRootLimit(root rootRef) int {
-	if root.Epic == OneOffsEpic {
+func (s *Server) perRootLimit(root queue.RootRef) int {
+	if root.Epic == queue.OneOffsEpic {
 		if n := s.settings.Load().MaxOneOffAgents; n > 0 {
 			return n
 		}
@@ -172,7 +174,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	root := rootOf(addr)
+	root := queue.RootOf(addr)
 	if s.registry.CountRoot(root.String()) >= s.perRootLimit(root) {
 		return false, nil
 	}
@@ -271,7 +273,7 @@ func (s *Server) nextUntracked(project string, e tickets.Epic) (tickets.Ticket, 
 // ticket stuck rather than leaving a claim with no agent behind it.
 // launched is false when the ticket paused on an ambiguous base: no agent runs.
 // epics is the project's loaded epics, for the base derivation.
-func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
+func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
 	ticket := tickets.Address{Project: queued.Project, Epic: queued.Epic, ID: t.Identifier}
 	ticketAddr := ticket.String()
 	// The project dir, not the store root: the run log, merge lock and
@@ -597,7 +599,7 @@ func (s *Server) watchBlocked(r agentrunner.Runner, sess agentrunner.Session, ad
 // runContext is everything settling one claimed iteration needs.
 type runContext struct {
 	deps       ralphloop.Deps
-	root       rootRef
+	root       queue.RootRef
 	mode       iterationMode
 	one        ralphloop.OneIteration
 	wt         ralphloop.IterationWorktree
@@ -616,7 +618,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		if !keepRun {
 			s.registry.Delete(ticketAddr)
 			// The sweep skips a tracked run, so this is the earliest it can archive it.
-			if a, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}); err == nil && a.Epic == OneOffsEpic {
+			if a, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}); err == nil && a.Epic == queue.OneOffsEpic {
 				s.idx.Rescan()
 			}
 		}
@@ -718,10 +720,10 @@ func keepsAskedAgent(run runs.Run) bool {
 // notifyDone tells chat a ticket merged. A one-off stays silent: it speaks
 // only through notifyResult, when its submit asked for it.
 func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
-	if !s.chat.Enabled() || isOneOffTicket(ticketPath) {
+	if !s.chat.Enabled() || queue.IsOneOffTicket(ticketPath) {
 		return
 	}
-	if e, t, ok := s.freshTicket(addr); ok && !IsOneOffEpic(e) {
+	if e, t, ok := s.freshTicket(addr); ok && !queue.IsOneOffEpic(e) {
 		s.chat.TicketDone(addr.Project, s.projects.ChatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
 	}
 }

@@ -2,12 +2,14 @@ package server_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -99,10 +101,10 @@ func TestSnapshot_RecentlyFinishedMixesOneOffsWithEpics(t *testing.T) {
 	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	writeFinishedEpic(t, store, "e1", base.Add(1*time.Hour))
 	writeFinishedEpic(t, store, "e2", base.Add(4*time.Hour))
-	writeOneOff(t, store, server.OneOffsArchivedEpic, "01", "done", base.Add(3*time.Hour), true)
-	writeOneOff(t, store, server.OneOffsArchivedEpic, "02", "cancelled", base.Add(9*time.Hour), false)
-	writeOneOff(t, store, server.OneOffsEpic, "03", "done", base.Add(2*time.Hour), false)
-	writeOneOff(t, store, server.OneOffsEpic, "04", "open", base.Add(8*time.Hour), false)
+	writeOneOff(t, store, queue.OneOffsArchivedEpic, "01", "done", base.Add(3*time.Hour), true)
+	writeOneOff(t, store, queue.OneOffsArchivedEpic, "02", "cancelled", base.Add(9*time.Hour), false)
+	writeOneOff(t, store, queue.OneOffsEpic, "03", "done", base.Add(2*time.Hour), false)
+	writeOneOff(t, store, queue.OneOffsEpic, "04", "open", base.Add(8*time.Hour), false)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.RecentlyFinished = 4 })
 
 	got := finishedNames(t, h)
@@ -111,8 +113,8 @@ func TestSnapshot_RecentlyFinishedMixesOneOffsWithEpics(t *testing.T) {
 		oneOff bool
 	}{
 		{"proj:e2", false},
-		{"proj:" + server.OneOffsArchivedEpic + "/01", true},
-		{"proj:" + server.OneOffsEpic + "/03", true},
+		{"proj:" + queue.OneOffsArchivedEpic + "/01", true},
+		{"proj:" + queue.OneOffsEpic + "/03", true},
 		{"proj:e1", false},
 	}
 	if len(got) != len(want) {

@@ -2,12 +2,14 @@ package server_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
@@ -28,7 +30,7 @@ func (f *schedFixture) completeEpic(t *testing.T) []string {
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
-	retros, err := filepath.Glob(filepath.Join(f.store, "proj", server.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
+	retros, err := filepath.Glob(filepath.Join(f.store, "proj", queue.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +135,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 	var retros []string
 	servertest.Poll(10*time.Second, func() bool {
 		var err error
-		retros, err = filepath.Glob(filepath.Join(f.store, "proj", server.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
+		retros, err = filepath.Glob(filepath.Join(f.store, "proj", queue.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 		if err != nil {
 			t.Fatal(err)
 		}

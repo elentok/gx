@@ -1,4 +1,4 @@
-package server
+package queue
 
 import (
 	"encoding/json"
@@ -22,7 +22,8 @@ type AFK struct {
 	events *broker.Broker
 }
 
-func openAFK(stateDir string, events *broker.Broker) (*AFK, error) {
+// OpenAFK loads the persisted AFK mode from stateDir.
+func OpenAFK(stateDir string, events *broker.Broker) (*AFK, error) {
 	a := &AFK{path: filepath.Join(stateDir, afkFileName), events: events}
 	data, err := os.ReadFile(a.path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -80,16 +81,16 @@ func (a *AFK) Set(req wire.AFKRequest) (wire.AFKResult, error) {
 	return wire.AFKResult{AFK: a.on}, nil
 }
 
-func (s *Server) afkWrite(w http.ResponseWriter, r *http.Request) {
+func (a *AFK) write(w http.ResponseWriter, r *http.Request) {
 	var req wire.AFKRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.afk.Set(req)
+	res, err := a.Set(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }

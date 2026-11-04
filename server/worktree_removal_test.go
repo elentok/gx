@@ -2,12 +2,14 @@ package server_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
@@ -222,11 +224,11 @@ func TestWorktreeRemoval_OpenTicketKeepsTheWorktree(t *testing.T) {
 func TestWorktreeRemoval_OneOffsRootKeepsItsWorktree(t *testing.T) {
 	t.Parallel()
 	f := newFFFixture(t)
-	wt := filepath.Join(f.h.Server.WorktreeDir("proj"), server.OneOffsEpic)
+	wt := filepath.Join(f.h.Server.WorktreeDir("proj"), queue.OneOffsEpic)
 	f.git(t, "branch", "oneoffs-branch")
 	f.git(t, "worktree", "add", "-q", wt, "oneoffs-branch")
 
-	f.h.Server.RemoveMergedWorktree("proj", server.OneOffsEpic)
+	f.h.Server.RemoveMergedWorktree("proj", queue.OneOffsEpic)
 
 	f.settle(t)
 	if _, err := os.Stat(wt); err != nil {

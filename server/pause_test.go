@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -114,13 +115,13 @@ func TestSnapshot_ReportsQueueMode(t *testing.T) {
 func TestQueuePaused(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if paused, err := server.QueuePaused(dir); err != nil || paused {
+	if paused, err := queue.QueuePaused(dir); err != nil || paused {
 		t.Fatalf("no file: paused = %v, err = %v; want false, nil", paused, err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "queue-mode.json"), []byte(`{"paused":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if paused, err := server.QueuePaused(dir); err != nil || !paused {
+	if paused, err := queue.QueuePaused(dir); err != nil || !paused {
 		t.Fatalf("paused file: paused = %v, err = %v; want true, nil", paused, err)
 	}
 }

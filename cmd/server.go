@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
@@ -371,7 +372,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		if serr != nil {
 			return serr
 		}
-		paused, perr := server.QueuePaused(stateDir)
+		paused, perr := queue.QueuePaused(stateDir)
 		if perr != nil {
 			return perr
 		}

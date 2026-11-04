@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -13,14 +14,14 @@ import (
 // Merged epic and a map epic have no card.
 func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 	out := []wire.EpicSummary{}
-	seen := map[rootRef]bool{}
+	seen := map[queue.RootRef]bool{}
 	recoveryOf := func(addr string) string { return recoveryState(s.pauseHold.state(addr), addr, all) }
 	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil {
 			continue
 		}
-		root := rootOf(addr)
+		root := queue.RootOf(addr)
 		if seen[root] {
 			continue
 		}
@@ -73,7 +74,7 @@ func answeredLatest(evs []tickets.LogEvent) bool {
 
 // summarizeEpic applies the state rules, first match wins. A claimed ticket
 // counts as runnable, but only one with a server claim time counts as running.
-func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) wire.EpicSummary {
+func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) wire.EpicSummary {
 	sum := wire.EpicSummary{
 		Address: root.String(), Name: e.Name, Project: root.Project, Done: e.DoneCount(), Total: e.TotalCount(),
 		Active: []wire.SummaryTicket{}, Paused: []wire.SummaryTicket{},
@@ -107,7 +108,7 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		}
 	}
 	// The one-offs root has no end to merge and no total to count towards.
-	oneOffs := root.Epic == OneOffsEpic
+	oneOffs := root.Epic == queue.OneOffsEpic
 	if oneOffs {
 		sum.Done, sum.Total = 0, 0
 	}
@@ -135,8 +136,8 @@ func showsActive(state wire.EpicState) bool {
 }
 
 // isMergeableEpic reports whether root can ever merge; the one-offs inbox never does.
-func isMergeableEpic(root rootRef) bool {
-	return root.Epic != OneOffsEpic
+func isMergeableEpic(root queue.RootRef) bool {
+	return root.Epic != queue.OneOffsEpic
 }
 
 // pausedEpicReason is the reason of the first paused ticket in e's ticket
@@ -183,7 +184,7 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 
 // epicStateFor is the one place that decides an epic's state. Running needs a
 // claimed, non-paused ticket that has a server claim time.
-func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) wire.EpicState {
+func epicStateFor(root queue.RootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) wire.EpicState {
 	switch epicStateOf(e) {
 	case epicDone:
 		if !isMergeableEpic(root) {

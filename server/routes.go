@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -24,6 +25,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		settings.Routes(func() *settings.Holder { return s.Settings() }),
 		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrator.Done() }),
 		projects.Routes(func() *projects.Registry { return s.projects }, func() *projects.Migrator { return s.migrator }, func() *projects.Checks { return s.checks }),
+		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }, func() *queue.ViMode { return s.viMode }),
 	)
 }
 

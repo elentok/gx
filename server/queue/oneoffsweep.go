@@ -1,10 +1,10 @@
-package server
+package queue
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -65,7 +65,7 @@ func (o *OneOffs) Sweep() {
 // either sees that ticket (root stays) or the submit finds the root gone and
 // queues it afresh.
 func (o *OneOffs) dequeueIdleOneOffs(dir string) {
-	root := rootRef{Project: tickets.ProjectName(dir), Epic: OneOffsEpic}
+	root := RootRef{Project: tickets.ProjectName(dir), Epic: OneOffsEpic}
 	removed, err := o.Queue.removeRootIf(root, func() bool {
 		return !o.oneOffsLive(dir, root)
 	})
@@ -78,7 +78,7 @@ func (o *OneOffs) dequeueIdleOneOffs(dir string) {
 
 // oneOffsLive reports whether a one-off is still pending, or its run is tracked.
 // Failed, paused and needs-* tickets are not terminal, so they count.
-func (o *OneOffs) oneOffsLive(dir string, root rootRef) bool {
+func (o *OneOffs) oneOffsLive(dir string, root RootRef) bool {
 	live, _, err := tickets.LoadOneOffs(dir)
 	if err != nil {
 		return true

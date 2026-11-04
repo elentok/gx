@@ -1,11 +1,13 @@
 package server
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -16,14 +18,14 @@ import (
 // time. A cancelled one-off carries no stamp and never counts.
 func finishedOneOffs(project string, e tickets.Epic) []wire.FinishedEpic {
 	epic := filepath.Base(e.Path)
-	if !isOneOffsEpicName(epic) {
+	if !queue.IsOneOffsEpicName(epic) {
 		return nil
 	}
 	var out []wire.FinishedEpic
 	for _, t := range e.Tickets {
 		at := t.CompletedAt
 		if at.IsZero() {
-			if epic != OneOffsEpic || t.Status != string(schema.StatusDone) {
+			if epic != queue.OneOffsEpic || t.Status != string(schema.StatusDone) {
 				continue
 			}
 			info, err := os.Stat(t.FilePath())
@@ -48,11 +50,11 @@ func recentlyFinished(loaded map[string][]tickets.Epic, limit int) []wire.Finish
 	for dir, epics := range loaded {
 		project := tickets.ProjectName(dir)
 		for _, e := range epics {
-			if e.IsMap || e.CompletedAt.IsZero() || isOneOffsEpicName(filepath.Base(e.Path)) {
+			if e.IsMap || e.CompletedAt.IsZero() || queue.IsOneOffsEpicName(filepath.Base(e.Path)) {
 				continue
 			}
 			f := wire.FinishedEpic{
-				Address: rootRef{Project: project, Epic: e.Name}.String(),
+				Address: queue.RootRef{Project: project, Epic: e.Name}.String(),
 				Name:    e.Name, Project: project, Done: e.DoneCount(), Total: e.TotalCount(), CompletedAt: e.CompletedAt,
 			}
 			out = append(out, f)

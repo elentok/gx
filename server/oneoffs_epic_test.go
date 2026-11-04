@@ -3,11 +3,13 @@ package server_test
 import (
 	"context"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
@@ -64,7 +66,7 @@ func TestRunner_OneOffsEpicUsesTheOneOffCapNotThePerRootCap(t *testing.T) {
 		starts          bool
 	}{{3, 2, true}, {2, 2, false}} {
 		store, repo := t.TempDir(), testutil.TempRepo(t)
-		servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
+		servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
 		servertest.SetProjectRepo(t, store, "proj", repo)
 		h := servertest.StartWithStore(t, store, func(c *server.Config) {
 			c.MaxAgentsPerRoot = 1
@@ -112,8 +114,8 @@ func startOneOffsHarness(t *testing.T, store string, opts ...func(*server.Config
 func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "claude"})
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "codex"})
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "claude"})
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "codex"})
 	fake := runnerfake.NewRunner()
 	h := startOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -134,8 +136,8 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
 	fake := runnerfake.NewRunner()
 	h := startOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -185,7 +187,7 @@ func TestRunner_UnpinnedOneOffAndRetroClaimOnTheDefaultHarness(t *testing.T) {
 func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
+	servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
 	h := startOneOffsHarness(t, store)
 	start, _, _ := registerTurn(h)
 	merged := false
@@ -193,7 +195,7 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 		merged = true
 		return git.MergeOutcome{}, nil
 	})
-	epicMD := filepath.Join(store, "proj", server.OneOffsEpic, "ticket.md")
+	epicMD := filepath.Join(store, "proj", queue.OneOffsEpic, "ticket.md")
 	before, err := os.ReadFile(epicMD)
 	if err != nil {
 		t.Fatal(err)
@@ -226,12 +228,12 @@ func TestIsOneOffEpic_ByNameAndLegacyFile(t *testing.T) {
 		{"/store/proj/one-offs-archived", true},
 		{"/store/proj/ordinary", false},
 	} {
-		if got := server.IsOneOffEpic(tickets.Epic{Path: tc.path}); got != tc.want {
+		if got := queue.IsOneOffEpic(tickets.Epic{Path: tc.path}); got != tc.want {
 			t.Errorf("IsOneOffEpic(%s) = %v, want %v", tc.path, got, tc.want)
 		}
 	}
 	legacy := tickets.Epic{Path: "/store/proj/old", Tickets: []tickets.Ticket{{Path: "/store/proj/old/issues/01-one-off.md"}}}
-	if !server.IsOneOffEpic(legacy) {
+	if !queue.IsOneOffEpic(legacy) {
 		t.Error("old single-ticket one-off epic is not detected")
 	}
 }

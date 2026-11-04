@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
@@ -381,7 +382,7 @@ func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
 	}
 	merged := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement})
 	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeImplement})
-	oneOff := write("cron", oneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt})
+	oneOff := write("cron", queue.OneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt})
 
 	s.notifyDone(tickets.Address{Project: "p", Epic: "cron", ID: "01"}, oneOff)
 	s.notifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, merged)
@@ -434,7 +435,7 @@ func TestCompleteRootIfDone_ResolvedCrossEpicBlockersCompleteTheEpic(t *testing.
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
 
-	s.completeRootIfDone(rootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
+	s.completeRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
 	s.chat.Close()
 	got := wait(1)
 	if len(got) != 1 || !strings.Contains(got[0], "epic complete") || !strings.Contains(got[0], "2 done · 2 total") {
@@ -461,7 +462,7 @@ func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testin
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/99")
 
-	s.completeRootIfDone(rootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
+	s.completeRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
 	s.chat.Close()
 	if got := wait(-1); len(got) != 0 {
 		t.Fatalf("sends = %v, want none", got)

@@ -133,7 +133,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   reads (imports `wire` and `broker`; the root registers the `OnRescan` steps and the migration gate);
   `server/projects/` holds the project `Registry`, the start-up `Migrator` and `Checks`, with their
   routes, the scratch and outbox projects and `AgentEnv` (imports `index`, `runs`, `settings` and
-  `wire`; `cmd` imports it too)
+  `wire`; `cmd` imports it too); `server/queue/` holds the queue and its pause gate, the Queue agent
+  rows, AFK and vi mode, and the one-offs (submit, sweep, `IsOneOffEpic`), with their routes
+  (imports `index`, `projects`, `runs`, `broker` and `wire`; the root implements `Host`; `cmd`
+  imports it too)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

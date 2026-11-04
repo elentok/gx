@@ -3,10 +3,12 @@ package server
 import (
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -53,13 +55,13 @@ func (l *nudgeLimiter) allow(address string, now time.Time) bool {
 func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
-		return refusal(wire.ReasonTextRequired, "text to type into the pane is required"), nil
+		return queue.Refusal(wire.ReasonTextRequired, "text to type into the pane is required"), nil
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		address := ref.addr.String()
 		if r, err := s.iterationRunner(ref.addr); err == nil {
 			if reason, held := s.herdrHolds(r); held {
-				return refusal(wire.ReasonHerdrUnavailable, reason), nil
+				return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
 			}
 		}
 		if res, refused := s.budgetRefusal(); refused {
@@ -67,15 +69,15 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		it, live := s.liveIteration(address)
 		if !live {
-			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+address), nil
+			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+address), nil
 		}
 		now := time.Now()
 		if !s.nudges.allow(address, now) {
-			return refusal(wire.ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", nudgeLimit, address, nudgeWindow)), nil
+			return queue.Refusal(wire.ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", nudgeLimit, address, nudgeWindow)), nil
 		}
 		if err := it.runner.Prompt(it.session, text); err != nil {
 			if errors.Is(err, agentrunner.ErrNotReady) {
-				return refusal(wire.ReasonAgentNotReady, err.Error()), nil
+				return queue.Refusal(wire.ReasonAgentNotReady, err.Error()), nil
 			}
 			return wire.QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
 		}

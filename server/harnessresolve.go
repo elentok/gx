@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -114,7 +115,7 @@ func (s *Server) resolveTicket(addr tickets.Address, t tickets.Ticket) ticketHar
 // names one.
 func (s *Server) queueItemAgent(addr tickets.Address) string {
 	for _, item := range s.queue.List() {
-		if a, err := tickets.ParseQueuedAddress(item.Address); err == nil && rootOf(a) == rootOf(addr) && item.Agent != "" {
+		if a, err := tickets.ParseQueuedAddress(item.Address); err == nil && queue.RootOf(a) == queue.RootOf(addr) && item.Agent != "" {
 			return item.Agent
 		}
 	}

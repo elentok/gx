@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"errors"
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/wire"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
@@ -89,10 +91,10 @@ func (s *Server) herdrWaiting() []string {
 	seen := map[string]bool{}
 	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
-		if err != nil || seen[rootOf(addr).String()] {
+		if err != nil || seen[queue.RootOf(addr).String()] {
 			continue
 		}
-		seen[rootOf(addr).String()] = true
+		seen[queue.RootOf(addr).String()] = true
 		t, ok := s.nextQueuedTicket(addr, s.projects.Epics)
 		if !ok {
 			continue

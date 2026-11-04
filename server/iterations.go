@@ -1,10 +1,12 @@
 package server
 
 import (
-	"github.com/elentok/gx/server/runs"
 	"net/http"
 	"path/filepath"
 	"sort"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
@@ -57,8 +59,8 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 	}
 	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.projects.WorktreeDir(a.Project))
 	it := wire.IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
-	if runner.Name() == runnerPTY {
-		it.QueueAgent = queueAgentIDPrefix + runs.IterationLabel(address)
+	if runner.Name() == queue.RunnerPTY {
+		it.QueueAgent = queue.AgentIDPrefix + runs.IterationLabel(address)
 	}
 	if runner.Name() == runs.RunnerHerdr {
 		it.Pane = sess.ID

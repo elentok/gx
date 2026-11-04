@@ -2,11 +2,13 @@ package server
 
 import (
 	"fmt"
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -248,7 +250,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	s.cancelUnstartedInvestigations(lf.dir, addr)
 	unlock()
 	// The adopted ticket may be the epic's last; settleRun would have completed it.
-	s.completeRootIfDone(rootOf(addr), one)
+	s.completeRootIfDone(queue.RootOf(addr), one)
 	s.guards.Kick()
 	return true
 }

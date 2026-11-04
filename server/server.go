@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
 	"io"
 	"log/slog"
 	"net"
@@ -20,6 +19,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/brief"
@@ -141,10 +143,10 @@ type Server struct {
 	migrator       *projects.Migrator
 	checks         *projects.Checks
 
-	queue        *Queue
-	afk          *AFK
-	viMode       *ViMode
-	oneOffs      *OneOffs
+	queue        *queue.Queue
+	afk          *queue.AFK
+	viMode       *queue.ViMode
+	oneOffs      *queue.OneOffs
 	ledger       *budgetLedger
 	tokens       *tokenledger.Ledger
 	tokenPoll    tokenPoller
@@ -262,21 +264,17 @@ func New(cfg Config) (*Server, error) {
 		}
 	}
 	events := broker.New(cfg.SubscriberBuffer)
-	queue, err := openQueue(cfg.StateDir)
+	q, err := queue.OpenQueue(cfg.StateDir)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load queue: %w", err)
 	}
-	if queue.pause, err = openPause(cfg.StateDir); err != nil {
-		lock.release()
-		return nil, fmt.Errorf("load queue pause: %w", err)
-	}
-	afk, err := openAFK(cfg.StateDir, events)
+	afk, err := queue.OpenAFK(cfg.StateDir, events)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load afk mode: %w", err)
 	}
-	viMode, err := openViMode(cfg.StateDir, events)
+	viMode, err := queue.OpenViMode(cfg.StateDir, events)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load vi mode: %w", err)
@@ -349,7 +347,7 @@ func New(cfg Config) (*Server, error) {
 
 		instanceID: newInstanceID(),
 
-		queue:        queue,
+		queue:        q,
 		afk:          afk,
 		viMode:       viMode,
 		ledger:       ledger,
@@ -370,8 +368,8 @@ func New(cfg Config) (*Server, error) {
 		focus:          newFocusReports(),
 	}
 	s.initProjects()
-	s.queue.Attach(QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: s})
-	s.oneOffs = NewOneOffs(OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: s, TicketStore: cfg.TicketStore})
+	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: s})
+	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: s, TicketStore: cfg.TicketStore})
 	s.giveLog(cfg.Runner)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.SessionFinished
@@ -458,38 +456,29 @@ var routeTable = []struct {
 	{"GET /v1/stats", (*Server).stats},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"GET /v1/queue", (*Server).queueView},
-	{"GET /v1/queue/items", (*Server).queueItems},
-	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Add)(w, r) }},
-	{"POST /v1/oneoff", (*Server).oneOffHandler},
 	{"POST /v1/cpu-spike", (*Server).cpuSpikeWrite},
-	{"POST /v1/queue/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Remove)(w, r) }},
-	{"POST /v1/queue/move", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Move)(w, r) }},
-	{"POST /v1/queue/replace", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queue.Replace)(w, r) }},
-	{"POST /v1/queue/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queue.Pause)(w, r) }},
-	{"POST /v1/queue/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queue.Resume)(w, r) }},
-	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queue.Flush)(w, r) }},
 	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.mergeInQueue)(w, r) }},
 	{"POST /v1/tickets/start-over", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.startOverInQueue)(w, r) }},
 	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/verify", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairVerify)(w, r) }},
-	{"POST /v1/tickets/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPause)(w, r) }},
-	{"POST /v1/tickets/park", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPause)(w, r) }},
-	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketUnmute)(w, r) }},
-	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketCancel)(w, r) }},
-	{"POST /v1/tickets/recommend", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWriteCtx(s.ticketRecommend)(w, r) }},
-	{"POST /v1/tickets/nudge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketNudge)(w, r) }},
-	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketAnswer)(w, r) }},
-	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketAsk)(w, r) }},
-	{"POST /v1/tickets/approve", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketApprove)(w, r) }},
+	{"POST /v1/tickets/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketPause)(w, r) }},
+	{"POST /v1/tickets/park", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketPause)(w, r) }},
+	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketUnmute)(w, r) }},
+	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketCancel)(w, r) }},
+	{"POST /v1/tickets/recommend", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.HandlerCtx(s.ticketRecommend)(w, r) }},
+	{"POST /v1/tickets/nudge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketNudge)(w, r) }},
+	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAnswer)(w, r) }},
+	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
+	{"POST /v1/tickets/approve", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketApprove)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
 	// relaunch is the old name of retry, kept for one release.
-	{"POST /v1/tickets/relaunch", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWriteCtx(s.ticketRelaunch)(w, r) }},
-	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.epicMerge)(w, r) }},
-	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.epicStashMerge)(w, r) }},
-	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentPrompt)(w, r) }},
-	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentInterrupt)(w, r) }},
-	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentAnswer)(w, r) }},
+	{"POST /v1/tickets/relaunch", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.HandlerCtx(s.ticketRelaunch)(w, r) }},
+	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicMerge)(w, r) }},
+	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicStashMerge)(w, r) }},
+	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},
+	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
+	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},
 	// Interactive sessions; /v1/agents/* is the loop agents'.
 	{"GET /v1/sessions", (*Server).sessionsRead},
 	{"GET /v1/sessions/chat", (*Server).sessionChatRead},
@@ -517,8 +506,6 @@ var routeTable = []struct {
 	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
 	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
 	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
-	{"POST /v1/afk", (*Server).afkWrite},
-	{"POST /v1/vimode", (*Server).viModeWrite},
 	{"GET /v1/settings/agents", (*Server).defaultHarnessRead},
 	{"POST /v1/settings/agents", (*Server).defaultHarnessWrite},
 }

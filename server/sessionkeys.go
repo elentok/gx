@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
@@ -61,7 +62,7 @@ func (s *Server) sessionKeysHandler(source string) http.HandlerFunc {
 // own nudges, because the holder counts it as a person's input.
 func (s *Server) keysSession(req wire.SessionKeysRequest, source string) (wire.SessionResult, error) {
 	seq, n, refusal := validateSessionKeys(req)
-	if strings.HasPrefix(req.ID, queueAgentIDPrefix) {
+	if strings.HasPrefix(req.ID, queue.AgentIDPrefix) {
 		return sessionRefusal(wire.ReasonSessionReadOnly, fmt.Sprintf("%s is a Queue agent; its loop owns it", req.ID)), nil
 	}
 	if req.Permission != "" && refusal == nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
 )
 
 func TestStartIncident_MaintainerStartFilesATicketAndRemovesTheNote(t *testing.T) {
@@ -27,7 +28,7 @@ func TestStartIncident_MaintainerStartFilesATicketAndRemovesTheNote(t *testing.T
 	var issues []string
 	deadline := time.Now().Add(5 * time.Second)
 	for len(issues) == 0 && time.Now().Before(deadline) {
-		issues, _ = filepath.Glob(filepath.Join(store, projects.OutboxProject, server.OneOffsEpic, "issues", "*-server-start-*.md"))
+		issues, _ = filepath.Glob(filepath.Join(store, projects.OutboxProject, queue.OneOffsEpic, "issues", "*-server-start-*.md"))
 		time.Sleep(20 * time.Millisecond)
 	}
 	if len(issues) != 1 {
@@ -57,7 +58,7 @@ func TestStartIncident_OutsideMaintainerModeKeepsTheNote(t *testing.T) {
 
 	_, store := cpuSpikeServer(t, func(c *server.Config) { c.StateDir = state })
 
-	if issues, _ := filepath.Glob(filepath.Join(store, projects.OutboxProject, server.OneOffsEpic, "issues", "*-server-start-*.md")); len(issues) != 0 {
+	if issues, _ := filepath.Glob(filepath.Join(store, projects.OutboxProject, queue.OneOffsEpic, "issues", "*-server-start-*.md")); len(issues) != 0 {
 		t.Errorf("filed %v outside maintainer mode", issues)
 	}
 	if _, err := os.Stat(note); err != nil {

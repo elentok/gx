@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -47,7 +48,7 @@ func TestCPUSpike_MaintainerFilesOneTicketThenCoolsDown(t *testing.T) {
 	if err != nil || res.Address == "" {
 		t.Fatalf("CPUSpike = %+v, %v; want a filed ticket", res, err)
 	}
-	issues, _ := filepath.Glob(filepath.Join(store, projects.OutboxProject, server.OneOffsEpic, "issues", "*-cpu-spike-tui-*.md"))
+	issues, _ := filepath.Glob(filepath.Join(store, projects.OutboxProject, queue.OneOffsEpic, "issues", "*-cpu-spike-tui-*.md"))
 	if len(issues) != 1 {
 		t.Fatalf("issues = %v, want one", issues)
 	}
@@ -76,7 +77,7 @@ func TestCPUSpike_OnlyLoggedOutsideMaintainerMode(t *testing.T) {
 			if err != nil || res.Address != "" || res.Message == "" {
 				t.Fatalf("CPUSpike = %+v, %v; want no ticket and a reason", res, err)
 			}
-			if issues, _ := filepath.Glob(filepath.Join(store, projects.OutboxProject, server.OneOffsEpic, "issues", "*cpu-spike-*")); len(issues) != 0 {
+			if issues, _ := filepath.Glob(filepath.Join(store, projects.OutboxProject, queue.OneOffsEpic, "issues", "*cpu-spike-*")); len(issues) != 0 {
 				t.Fatalf("cpu-spike tickets = %v, want none", issues)
 			}
 		})

@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -44,7 +45,7 @@ func (s *Server) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, ad
 	s.dropTrunkConflictBackup(addr)
 	if _, fresh, ok := s.freshTicket(addr); ok && s.guards.Merges.Begin() {
 		defer s.guards.Merges.End()
-		s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: fresh})
+		s.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: fresh})
 	}
 	return repairOK(repair.StartOverResult{Ticket: addr.ID, Status: string(schema.StatusDone)})
 }

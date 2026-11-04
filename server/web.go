@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/webui"
@@ -174,16 +175,15 @@ func (s *Server) webHandler() http.Handler {
 // read-only GETs, each with the handler the web mux uses: the web variants
 // require a state token. There is deliberately no withdraw or undo route.
 var webWrites = map[string]func(*Server) http.HandlerFunc{
-	"POST /v1/tickets/answer":     func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.ticketAnswer) },
+	"POST /v1/tickets/answer":     func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.ticketAnswer) },
 	"POST /v1/tickets/resume":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
 	"POST /v1/tickets/unpark":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
 	"POST /v1/tickets/retry":      func(s *Server) http.HandlerFunc { return s.retryWrite(true) },
 	"POST /v1/tickets/merge":      func(s *Server) http.HandlerFunc { return repairWriteWeb(s.mergeInQueue) },
 	"POST /v1/tickets/start-over": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.startOverInQueue) },
-	"POST /v1/queue/add":          func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.queue.Add) },
-	"POST /v1/epics/merge":        func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.epicMerge) },
-	"POST /v1/epics/stash-merge":  func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.epicStashMerge) },
-	"POST /v1/agents/answer":      func(s *Server) http.HandlerFunc { return s.queueWrite(s.agentAnswerWeb) },
+	"POST /v1/epics/merge":        func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.epicMerge) },
+	"POST /v1/epics/stash-merge":  func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.epicStashMerge) },
+	"POST /v1/agents/answer":      func(s *Server) http.HandlerFunc { return queue.Handler(s.agentAnswerWeb) },
 	"POST /v1/sessions/stop":      func(s *Server) http.HandlerFunc { return s.sessionWriteAgentWeb(s.stopSession) },
 	"POST /v1/sessions/remove":    func(s *Server) http.HandlerFunc { return s.sessionWriteAgentWeb(s.removeSession) },
 	"POST /v1/sessions/resume":    func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.resumeSession) },
@@ -201,8 +201,6 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/designs/delete":    func(s *Server) http.HandlerFunc { return s.designDeleteWrite },
 	"POST /v1/tickets/fix-agent": func(s *Server) http.HandlerFunc { return s.fixAgentWeb() },
 	"POST /v1/sessions/focus":    func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
-	"POST /v1/afk":               func(s *Server) http.HandlerFunc { return s.afkWrite },
-	"POST /v1/vimode":            func(s *Server) http.HandlerFunc { return s.viModeWrite },
 	"POST /v1/usage/override":    func(s *Server) http.HandlerFunc { return s.usageOverrideWrite },
 	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
 	"POST /v1/restart":           func(s *Server) http.HandlerFunc { return s.restartWrite },

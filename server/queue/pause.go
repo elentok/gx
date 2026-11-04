@@ -1,4 +1,4 @@
-package server
+package queue
 
 import (
 	"encoding/json"
@@ -114,13 +114,13 @@ func (q *Queue) Resume() (wire.QueueResult, error) { return q.setMode(false) }
 func (q *Queue) Flush() (wire.QueueResult, error) { return q.Pause() }
 
 // modeWrite adapts a mode change to a POST handler.
-func (s *Server) modeWrite(do func() (wire.QueueResult, error)) http.HandlerFunc {
+func modeWrite(do func() (wire.QueueResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		res, err := do()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }

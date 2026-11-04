@@ -3,10 +3,12 @@ package server
 import (
 	"cmp"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -14,8 +16,8 @@ import (
 
 // oneOffCards lists the cards of e's one-off tickets, none when e holds none. A
 // done or archived one-off gets a Finished card; capFinishedOneOffs trims those.
-func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) []wire.EpicListRow {
-	if !IsOneOffEpic(e) {
+func (s *Server) oneOffCards(project string, e tickets.Epic, qidx queueIndex) []wire.EpicListRow {
+	if !queue.IsOneOffEpic(e) {
 		return nil
 	}
 	var rows []wire.EpicListRow
@@ -25,10 +27,10 @@ func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) [
 		setCardTime(&row, cardTimeSources{})
 		rows = append(rows, row)
 	}
-	if filepath.Base(e.Path) == OneOffsArchivedEpic {
+	if filepath.Base(e.Path) == queue.OneOffsArchivedEpic {
 		return rows
 	}
-	root := rootRef{Project: project, Epic: e.Name}
+	root := queue.RootRef{Project: project, Epic: e.Name}
 	for _, t := range e.Tickets {
 		addr := tickets.Address{Project: project, Epic: e.Name, ID: t.DisplayNumber()}
 		row := oneOffRow(addr.String(), t.Title, project)
@@ -38,13 +40,13 @@ func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) [
 			row.WaitingSince = cmp.Or(n.Since, t.ClaimedAt, lastActivity(e))
 		} else if e.RenderedStatus(t) == tickets.StatusClaimed {
 			row.State, row.Section = wire.EpicListRunning, wire.SectionImplementing
-		} else if slot := queue.slot(addr.String()); slot > 0 {
+		} else if slot := qidx.slot(addr.String()); slot > 0 {
 			row.State, row.Section = wire.EpicListQueued, wire.SectionImplementing
 			row.QueueSlot, row.StatusWords = slot, fmt.Sprintf("Queued #%d", slot)
 		} else {
 			continue
 		}
-		setCardTime(&row, cardTimeSources{startedAt: t.ClaimedAt, enqueuedAt: queue.enqueuedAt(addr.String())})
+		setCardTime(&row, cardTimeSources{startedAt: t.ClaimedAt, enqueuedAt: qidx.enqueuedAt(addr.String())})
 		rows = append(rows, row)
 	}
 	return rows
@@ -100,7 +102,7 @@ func followUpsCard(project string, e tickets.Epic) (wire.EpicListRow, bool) {
 	if bugs+ideas+other == 0 {
 		return wire.EpicListRow{}, false
 	}
-	address := rootRef{Project: project, Epic: followUpsEpicName}.String()
+	address := queue.RootRef{Project: project, Epic: followUpsEpicName}.String()
 	return wire.EpicListRow{
 		Address: address, Project: project, Name: followUpsEpicName, Kind: wire.EpicKindLoop,
 		State: wire.EpicListFollowUps, Addresses: []string{address}, CardKind: wire.CardKindFollowUps,

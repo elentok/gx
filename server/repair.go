@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
 	"net/http"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -161,12 +163,12 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	if err := s.cancelInvestigateUnlessSelf(req, rc); err != nil {
 		return wire.RepairResult{}, err
 	}
-	if !s.queue.RootQueued(rootOf(addr)) {
+	if !s.queue.RootQueued(queue.RootOf(addr)) {
 		return res, nil
 	}
 	if _, t, ok := s.freshTicket(addr); ok && s.guards.Merges.Begin() {
 		defer s.guards.Merges.End()
-		s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
+		s.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	}
 	return res, nil
 }
@@ -607,7 +609,7 @@ func repairWriteAs(web bool, do func(wire.RepairRequest, repairCtx) (wire.Repair
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		rc := repairCtx{RequireState: web, origin: requestOrigin(r, web)}
+		rc := repairCtx{RequireState: web, origin: wire.RequestOrigin(r, web)}
 		if !web {
 			rc.investigator = r.Header.Get(wire.InvestigateHeader)
 		}

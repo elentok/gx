@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -117,7 +118,7 @@ func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) e
 	if err != nil {
 		return err
 	}
-	root, err := parseRootRef(t.Root)
+	root, err := queue.ParseRootRef(t.Root)
 	if err != nil {
 		return err
 	}
@@ -200,7 +201,7 @@ func (s *Server) reclaim(t runs.TrackedRun) error {
 	if err != nil {
 		return err
 	}
-	root, err := parseRootRef(t.Root)
+	root, err := queue.ParseRootRef(t.Root)
 	if err != nil {
 		return err
 	}

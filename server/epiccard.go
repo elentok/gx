@@ -3,9 +3,11 @@ package server
 import (
 	"cmp"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"slices"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -70,10 +72,10 @@ func decorateLoopCard(row *wire.EpicListRow, position int) {
 // queueKey is the queue slot key of an item address: its epic root, or the
 // ticket itself for a one-off.
 func queueKey(a tickets.Address) string {
-	if isOneOffsEpicName(a.Epic) {
+	if queue.IsOneOffsEpicName(a.Epic) {
 		return a.String()
 	}
-	return rootOf(a).String()
+	return queue.RootOf(a).String()
 }
 
 // queueIndex maps queue keys (see queueKey) to their slot and earliest enqueue

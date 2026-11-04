@@ -1,4 +1,4 @@
-package server
+package queue
 
 import (
 	"encoding/json"
@@ -31,20 +31,6 @@ import (
 const oneOffNameWords = 4
 
 var nonSlugRe = regexp.MustCompile(`[^a-z0-9]+`)
-
-// RetroSubmit is the one-off a retro of epic runs as: a commitless evolve ticket
-// in the epic's own project. The dedupe key refuses a second live retro of the
-// same epic; the timestamped name keeps a --force re-run from hitting a taken one.
-func RetroSubmit(project, epic string, now time.Time) wire.OneOffRequest {
-	return wire.OneOffRequest{
-		Prompt:  "Retro of epic " + project + ":" + epic,
-		Project: project,
-		Name:    "evolve-" + epic + "-" + now.Format("20060102-1504"),
-		Type:    string(schema.TypeEvolve),
-		Unique:  "evolve:" + project + "/" + epic,
-		Notify:  true,
-	}
-}
 
 // oneOffFileFrontmatter is the subset of a payload file's frontmatter a submit
 // understands.
@@ -292,30 +278,30 @@ func (o *OneOffs) oneOffQueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResult,
 // queueRoot queues the root of addr. The shared epic is queued once, as a root:
 // a later submit only moves it.
 func (q *Queue) queueRoot(addr tickets.Address, agent string, front bool) (wire.QueueResult, error) {
-	root := rootOf(addr)
+	root := RootOf(addr)
 	if !q.RootQueued(root) {
 		return q.Add(wire.QueueRequest{Address: addr.String(), Agent: agent, Front: front})
 	}
 	res, err := q.queueRaise(root, front)
 	var agents []string
 	for _, it := range q.List() {
-		if a, perr := tickets.ParseAddress(it.Address, tickets.AddressContext{}); perr == nil && rootOf(a) == root {
+		if a, perr := tickets.ParseAddress(it.Address, tickets.AddressContext{}); perr == nil && RootOf(a) == root {
 			agents = append(agents, it.Agent)
 		}
 	}
-	return q.withExtraUsage(root.Project, agents, res, err)
+	return q.WithExtraUsage(root.Project, agents, res, err)
 }
 
 // queueRaise moves every queued item of root to the head, keeping their order.
 // Without front the queue is left as it is.
-func (q *Queue) queueRaise(root rootRef, front bool) (wire.QueueResult, error) {
+func (q *Queue) queueRaise(root RootRef, front bool) (wire.QueueResult, error) {
 	return q.Write(root.String(), func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		if !front {
 			return items, nil
 		}
 		var head, rest []wire.QueueItem
 		for _, it := range items {
-			if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && rootOf(a) == root {
+			if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && RootOf(a) == root {
 				head = append(head, it)
 			} else {
 				rest = append(rest, it)
@@ -481,8 +467,8 @@ func defaultOneOffName(prompt string) string {
 	return slug
 }
 
-// oneOffFile is the name of a one-off's single ticket; nothing else writes it.
-const oneOffFile = "01-one-off.md"
+// OneOffFile is the name of a one-off's single ticket; nothing else writes it.
+const OneOffFile = "01-one-off.md"
 
 // The epics holding one-off tickets: every ticket in OneOffsEpic is a one-off,
 // whoever wrote it. OneOffsArchivedEpic is where finished ones are moved.
@@ -491,26 +477,26 @@ const (
 	OneOffsArchivedEpic = tickets.ArchivedOneOffsEpic
 )
 
-func isOneOffsEpicName(name string) bool {
+func IsOneOffsEpicName(name string) bool {
 	return name == OneOffsEpic || name == OneOffsArchivedEpic
 }
 
-// isOneOffTicket reports whether ticketPath (project/epic/issues/file) is a
+// IsOneOffTicket reports whether ticketPath (project/epic/issues/file) is a
 // one-off's ticket: in a one-offs epic, or the single ticket of an old
 // one-epic-per-one-off submit.
-func isOneOffTicket(ticketPath string) bool {
+func IsOneOffTicket(ticketPath string) bool {
 	epic := filepath.Base(filepath.Dir(filepath.Dir(ticketPath)))
-	return isOneOffsEpicName(epic) || filepath.Base(ticketPath) == oneOffFile
+	return IsOneOffsEpicName(epic) || filepath.Base(ticketPath) == OneOffFile
 }
 
 // IsOneOffEpic reports whether e is a one-off epic: one of the one-offs epics,
 // or an old single-ticket epic whose ticket is the one writeOneOffTicket wrote.
 func IsOneOffEpic(e tickets.Epic) bool {
-	if isOneOffsEpicName(filepath.Base(e.Path)) {
+	if IsOneOffsEpicName(filepath.Base(e.Path)) {
 		return true
 	}
 	for _, t := range e.Tickets {
-		if isOneOffTicket(t.FilePath()) {
+		if IsOneOffTicket(t.FilePath()) {
 			return true
 		}
 	}
@@ -570,16 +556,16 @@ func (o *OneOffs) writeOneOffTicket(projectDir, slug string, tk schema.Ticket, p
 	return path, id, nil
 }
 
-func (s *Server) oneOffHandler(w http.ResponseWriter, r *http.Request) {
+func (o *OneOffs) handle(w http.ResponseWriter, r *http.Request) {
 	var req wire.OneOffRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.oneOffs.Submit(req)
+	res, err := o.Submit(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }

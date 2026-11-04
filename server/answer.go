@@ -3,11 +3,13 @@ package server
 import (
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
 	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
@@ -98,7 +100,7 @@ func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note str
 	case tickets.QuestionText:
 		answer, note = strings.TrimSpace(normalizeAnswer(req.Text)), ""
 		if req.Choice != "" {
-			r := refusal(wire.ReasonBadChoice, "this question takes free text, not a choice")
+			r := queue.Refusal(wire.ReasonBadChoice, "this question takes free text, not a choice")
 			return "", "", &r
 		}
 	default:
@@ -111,16 +113,16 @@ func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note str
 			}
 		}
 		if answer != "" && !slices.Contains(valid, answer) {
-			r := refusal(wire.ReasonBadChoice, fmt.Sprintf("choice %q is not one of %s", answer, strings.Join(valid, ", ")))
+			r := queue.Refusal(wire.ReasonBadChoice, fmt.Sprintf("choice %q is not one of %s", answer, strings.Join(valid, ", ")))
 			return "", "", &r
 		}
 	}
 	if answer == "" {
-		r := refusal(wire.ReasonEmptyAnswer, "an answer is required")
+		r := queue.Refusal(wire.ReasonEmptyAnswer, "an answer is required")
 		return "", "", &r
 	}
 	if utf8.RuneCountInString(answer) > maxAnswerChars || utf8.RuneCountInString(note) > maxAnswerChars {
-		r := refusal(wire.ReasonTooLong, fmt.Sprintf("an answer or note is limited to %d characters", maxAnswerChars))
+		r := queue.Refusal(wire.ReasonTooLong, fmt.Sprintf("an answer or note is limited to %d characters", maxAnswerChars))
 		return "", "", &r
 	}
 	return answer, note, nil
@@ -150,15 +152,15 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			open := tickets.OpenQuestion(evs)
 			switch {
 			case t.PausedClass() == "":
-				return refuse(refusal(wire.ReasonNotPaused, address+" is not paused"))
+				return refuse(queue.Refusal(wire.ReasonNotPaused, address+" is not paused"))
 			case t.PausedClass() == schema.PauseClassRepair || t.PauseReason != schema.PauseSelfReported:
-				return refuse(refusal(wire.ReasonNotAnswerable, address+" was not paused by a question; use resume"))
+				return refuse(queue.Refusal(wire.ReasonNotAnswerable, address+" was not paused by a question; use resume"))
 			case open == nil:
-				return refuse(refusal(wire.ReasonNotPaused, address+" has no open question"))
+				return refuse(queue.Refusal(wire.ReasonNotPaused, address+" has no open question"))
 			}
 			state := answerState(*open, t.PausedClass())
 			if req.State != "" && req.State != state {
-				res := refusal(wire.ReasonStale, "the question changed; answer the current one")
+				res := queue.Refusal(wire.ReasonStale, "the question changed; answer the current one")
 				res.Question, res.State = open, state
 				return refuse(res)
 			}
@@ -184,7 +186,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 				err = runner.Prompt(run.Session, answerFrame(open.Seq, answer, note))
 				switch {
 				case errors.Is(err, agentrunner.ErrNotReady):
-					return refuse(refusal(wire.ReasonAgentNotReady, err.Error()))
+					return refuse(queue.Refusal(wire.ReasonAgentNotReady, err.Error()))
 				case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
 					queued = true
 				case err != nil:
@@ -261,7 +263,7 @@ func (s *Server) resettleWaiting(t runs.TrackedRun) error {
 	if err != nil {
 		return err
 	}
-	root, err := parseRootRef(t.Root)
+	root, err := queue.ParseRootRef(t.Root)
 	if err != nil {
 		return err
 	}

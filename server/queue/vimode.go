@@ -1,4 +1,4 @@
-package server
+package queue
 
 import (
 	"encoding/json"
@@ -22,7 +22,8 @@ type ViMode struct {
 	events *broker.Broker
 }
 
-func openViMode(stateDir string, events *broker.Broker) (*ViMode, error) {
+// OpenViMode loads the persisted vi mode from stateDir.
+func OpenViMode(stateDir string, events *broker.Broker) (*ViMode, error) {
 	v := &ViMode{path: filepath.Join(stateDir, viModeFileName), events: events}
 	data, err := os.ReadFile(v.path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -80,16 +81,16 @@ func (v *ViMode) Set(req wire.ViModeRequest) (wire.ViModeResult, error) {
 	return wire.ViModeResult{ViMode: v.on}, nil
 }
 
-func (s *Server) viModeWrite(w http.ResponseWriter, r *http.Request) {
+func (v *ViMode) write(w http.ResponseWriter, r *http.Request) {
 	var req wire.ViModeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.viMode.Set(req)
+	res, err := v.Set(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }

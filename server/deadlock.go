@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -15,24 +16,24 @@ import (
 // entry rather than on every claim pass.
 type deadlocks struct {
 	mu    sync.Mutex
-	roots map[rootRef]bool
+	roots map[queue.RootRef]bool
 }
 
 // enter reports whether root was not already in deadlock.
-func (d *deadlocks) enter(root rootRef) bool {
+func (d *deadlocks) enter(root queue.RootRef) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.roots[root] {
 		return false
 	}
 	if d.roots == nil {
-		d.roots = map[rootRef]bool{}
+		d.roots = map[queue.RootRef]bool{}
 	}
 	d.roots[root] = true
 	return true
 }
 
-func (d *deadlocks) leave(root rootRef) {
+func (d *deadlocks) leave(root queue.RootRef) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	delete(d.roots, root)
@@ -103,14 +104,16 @@ func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 
 // deadlockReason names what holds e: the paused tickets for all-paused, and for
 // a blocked cycle each waiting ticket with what it waits on.
-func deadlockReason(root rootRef, e tickets.Epic, kind events.Kind) string {
+func deadlockReason(root queue.RootRef, e tickets.Epic, kind events.Kind) string {
 	if kind == events.AllPaused {
 		return pausedReason(root, e)
 	}
 	return cycleReason(root, e)
 }
 
-func ticketAddr(root rootRef, t tickets.Ticket) string { return root.String() + "/" + t.Identifier }
+func ticketAddr(root queue.RootRef, t tickets.Ticket) string {
+	return root.String() + "/" + t.Identifier
+}
 
 func pausedTickets(e tickets.Epic) []tickets.Ticket {
 	var out []tickets.Ticket
@@ -122,7 +125,7 @@ func pausedTickets(e tickets.Epic) []tickets.Ticket {
 	return out
 }
 
-func pausedReason(root rootRef, e tickets.Epic) string {
+func pausedReason(root queue.RootRef, e tickets.Epic) string {
 	var parts []string
 	for _, t := range pausedTickets(e) {
 		parts = append(parts, ticketAddr(root, t))
@@ -130,7 +133,7 @@ func pausedReason(root rootRef, e tickets.Epic) string {
 	return "every remaining ticket is paused: " + strings.Join(parts, ", ")
 }
 
-func cycleReason(root rootRef, e tickets.Epic) string {
+func cycleReason(root queue.RootRef, e tickets.Epic) string {
 	ctx := tickets.AddressContext{Project: root.Project, Epic: root.Epic}
 	var parts []string
 	for _, t := range e.Tickets {
@@ -155,7 +158,7 @@ func cycleReason(root rootRef, e tickets.Epic) string {
 
 // checkDeadlock logs deadlocked when root's epic enters deadlock and starts its
 // recovery; it forgets the deadlock once the epic can move again.
-func (s *Server) checkDeadlock(root rootRef, projectDir string, e tickets.Epic) {
+func (s *Server) checkDeadlock(root queue.RootRef, projectDir string, e tickets.Epic) {
 	kind, stuck := deadlockKind(e)
 	if !stuck || s.registry.CountRoot(root.String()) > 0 {
 		s.deadlocks.leave(root)

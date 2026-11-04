@@ -11,7 +11,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -52,7 +52,7 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 	servertest.WriteTicketWith(t, f.store, "proj", "open", "01", "t", servertest.TicketOpts{})
 	// The stored reason of a refused merge must survive it byte for byte.
 	testutil.WriteFile(t, filepath.Join(f.store, "proj", "open"), "ticket.md", "---\nland_block_kind: dirty-trunk\nland_block_reason: trunk dirty\n---\n# Open\n")
-	servertest.WriteTicketWith(t, f.store, "proj", server.OneOffsEpic, "01", "t", servertest.TicketOpts{})
+	servertest.WriteTicketWith(t, f.store, "proj", queue.OneOffsEpic, "01", "t", servertest.TicketOpts{})
 	for _, branch := range []string{"map-epic", "merged", "pending", "open"} {
 		gitOut(t, f.repo, "branch", branch)
 	}
@@ -60,16 +60,16 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 	before := ticketFiles(t, f.store)
 
 	for addr, want := range map[string]string{
-		"proj:" + schedEpic + "/01":  wire.ReasonInvalidAddress,
-		"::":                         wire.ReasonInvalidAddress,
-		"proj:nope":                  wire.ReasonUnknownTicket,
-		"nope:" + schedEpic:          wire.ReasonUnknownTicket,
-		"proj:map-epic":              wire.ReasonMapEpic,
-		"proj:" + server.OneOffsEpic: wire.ReasonOneOffsEpic,
-		"proj:merged":                wire.ReasonAlreadyMerged,
-		"proj:pending":               wire.ReasonMergePending,
-		"proj:open":                  wire.ReasonNotComplete,
-		"proj:" + schedEpic:          wire.ReasonBranchMissing,
+		"proj:" + schedEpic + "/01": wire.ReasonInvalidAddress,
+		"::":                        wire.ReasonInvalidAddress,
+		"proj:nope":                 wire.ReasonUnknownTicket,
+		"nope:" + schedEpic:         wire.ReasonUnknownTicket,
+		"proj:map-epic":             wire.ReasonMapEpic,
+		"proj:" + queue.OneOffsEpic: wire.ReasonOneOffsEpic,
+		"proj:merged":               wire.ReasonAlreadyMerged,
+		"proj:pending":              wire.ReasonMergePending,
+		"proj:open":                 wire.ReasonNotComplete,
+		"proj:" + schedEpic:         wire.ReasonBranchMissing,
 	} {
 		res, err := f.h.Client.EpicMerge(context.Background(), addr)
 		if err != nil || !res.Refused || res.Reason != want {

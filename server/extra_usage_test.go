@@ -15,7 +15,7 @@ func TestExtraUsage_EnqueueWarnsAndNotifiesOncePerDay(t *testing.T) {
 	s.cfg.ExtraUsageCheck = func() subscription.State { return subscription.StateEnabled }
 
 	for i := 0; i < 2; i++ {
-		res, err := s.queue.withExtraUsage("gx", []string{"claude"}, wire.QueueResult{}, nil)
+		res, err := s.queue.WithExtraUsage("gx", []string{"claude"}, wire.QueueResult{}, nil)
 		if err != nil || res.Refused {
 			t.Fatalf("replace = %+v, %v", res, err)
 		}
@@ -76,7 +76,7 @@ func TestExtraUsage_OnlyClaudeItemsWarn(t *testing.T) {
 			s, wait := chatServer(t, 0, 0)
 			s.cfg.ExtraUsageCheck = func() subscription.State { return subscription.StateEnabled }
 			s.settings.Store(&Settings{AgentsDefaultHarness: tc.def})
-			res, err := s.queue.withExtraUsage("gx", tc.agents, wire.QueueResult{}, nil)
+			res, err := s.queue.WithExtraUsage("gx", tc.agents, wire.QueueResult{}, nil)
 			if err != nil || res.ExtraUsage != tc.warning {
 				t.Fatalf("ExtraUsage = %v, %v; want %v", res.ExtraUsage, err, tc.warning)
 			}

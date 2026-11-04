@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -19,7 +20,7 @@ func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, ag
 			return wire.QueueResult{}, err
 		}
 		if !ok {
-			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
 		return do(runner, sess)
 	})
@@ -28,12 +29,12 @@ func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, ag
 func (s *Server) agentPrompt(req wire.QueueRequest) (wire.QueueResult, error) {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
-		return refusal(wire.ReasonTextRequired, "text to send is required"), nil
+		return queue.Refusal(wire.ReasonTextRequired, "text to send is required"), nil
 	}
 	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
 		err := r.Prompt(sess, text)
 		if errors.Is(err, agentrunner.ErrNotReady) {
-			return refusal(wire.ReasonAgentNotReady, err.Error()), nil
+			return queue.Refusal(wire.ReasonAgentNotReady, err.Error()), nil
 		}
 		return wire.QueueResult{}, err
 	})
@@ -43,7 +44,7 @@ func (s *Server) agentInterrupt(req wire.QueueRequest) (wire.QueueResult, error)
 	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
 		err := r.Interrupt(sess)
 		if errors.Is(err, agentrunner.ErrNotReady) {
-			return refusal(wire.ReasonAgentNotReady, err.Error()), nil
+			return queue.Refusal(wire.ReasonAgentNotReady, err.Error()), nil
 		}
 		return wire.QueueResult{}, err
 	})
@@ -56,7 +57,7 @@ func (s *Server) agentInterrupt(req wire.QueueRequest) (wire.QueueResult, error)
 func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 	decision := agentrunner.Decision(req.Decision)
 	if decision != agentrunner.DecisionAllow && decision != agentrunner.DecisionDeny {
-		return refusal(wire.ReasonBadDecision, "decision must be allow or deny"), nil
+		return queue.Refusal(wire.ReasonBadDecision, "decision must be allow or deny"), nil
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		runner, sess, ok, err := s.liveSession(ref.addr)
@@ -65,9 +66,9 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		if !ok {
 			if req.RequestID != "" {
-				return refusal(wire.ReasonAgentGone, "the agent is gone; a lost prompt cannot be resumed"), nil
+				return queue.Refusal(wire.ReasonAgentGone, "the agent is gone; a lost prompt cannot be resumed"), nil
 			}
-			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
 		answer := agentrunner.Answer{Decision: decision, RequestID: req.RequestID}
 		var note string
@@ -76,7 +77,7 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			answer.Text = note
 		}
 		if req.RequestID != "" && runner.Name() == string(agentrunner.ChoiceHerdr) {
-			return refusal(wire.ReasonNotApprovable, "a herdr-hosted agent has no approval card"), nil
+			return queue.Refusal(wire.ReasonNotApprovable, "a herdr-hosted agent has no approval card"), nil
 		}
 		st, statusErr := runner.Status(sess)
 		if req.RequestID != "" {
@@ -107,7 +108,7 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 // the request must name the prompt they saw.
 func (s *Server) agentAnswerWeb(req wire.QueueRequest) (wire.QueueResult, error) {
 	if req.RequestID == "" {
-		return refusal(wire.ReasonRequestIDRequired, "a request ID is required; review the current prompt"), nil
+		return queue.Refusal(wire.ReasonRequestIDRequired, "a request ID is required; review the current prompt"), nil
 	}
 	return s.agentAnswer(req)
 }
@@ -116,15 +117,15 @@ func (s *Server) agentAnswerWeb(req wire.QueueRequest) (wire.QueueResult, error)
 func checkOpenRequest(st agentrunner.Status, statusErr error, id string) (wire.QueueResult, bool) {
 	switch {
 	case errors.Is(statusErr, agentrunner.ErrNotFound), errors.Is(statusErr, agentrunner.ErrSessionDied):
-		return refusal(wire.ReasonAgentGone, statusErr.Error()), true
+		return queue.Refusal(wire.ReasonAgentGone, statusErr.Error()), true
 	case statusErr != nil:
-		return refusal(wire.ReasonNotBlocked, statusErr.Error()), true
+		return queue.Refusal(wire.ReasonNotBlocked, statusErr.Error()), true
 	case st.State != agentrunner.StateBlocked:
-		return refusal(wire.ReasonNotBlocked, "the agent is not waiting on a request"), true
+		return queue.Refusal(wire.ReasonNotBlocked, "the agent is not waiting on a request"), true
 	case st.Pending == nil || st.Pending.ID != id:
-		return refusal(wire.ReasonRequestChanged, "the open request is not "+id), true
+		return queue.Refusal(wire.ReasonRequestChanged, "the open request is not "+id), true
 	case st.Pending.NotApprovable:
-		return refusal(wire.ReasonNotApprovable, st.Pending.Tool+" needs a real answer, not an approval"), true
+		return queue.Refusal(wire.ReasonNotApprovable, st.Pending.Tool+" needs a real answer, not an approval"), true
 	}
 	return wire.QueueResult{}, false
 }
@@ -133,15 +134,15 @@ func checkOpenRequest(st agentrunner.Status, statusErr error, id string) (wire.Q
 func answerRefusal(err error) (wire.QueueResult, error) {
 	switch {
 	case errors.Is(err, agentrunner.ErrRequestMismatch):
-		return refusal(wire.ReasonRequestChanged, err.Error()), nil
+		return queue.Refusal(wire.ReasonRequestChanged, err.Error()), nil
 	case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
-		return refusal(wire.ReasonAgentGone, err.Error()), nil
+		return queue.Refusal(wire.ReasonAgentGone, err.Error()), nil
 	case errors.Is(err, agentrunner.ErrNotDelivered):
-		return refusal(wire.ReasonNotDelivered, err.Error()), nil
+		return queue.Refusal(wire.ReasonNotDelivered, err.Error()), nil
 	case errors.Is(err, agentrunner.ErrNotReady):
-		return refusal(wire.ReasonNotBlocked, "the agent is not waiting on a request"), nil
+		return queue.Refusal(wire.ReasonNotBlocked, "the agent is not waiting on a request"), nil
 	case errors.Is(err, agentrunner.ErrInvalidDecision):
-		return refusal(wire.ReasonBadDecision, "not a permission prompt; deny cancels it"), nil
+		return queue.Refusal(wire.ReasonBadDecision, "not a permission prompt; deny cancels it"), nil
 	}
 	return wire.QueueResult{}, err
 }

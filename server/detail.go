@@ -1,9 +1,11 @@
 package server
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
@@ -148,7 +150,7 @@ func brokenDetail(ref ticketRef, parseErr error) wire.TicketDetail {
 // alone gives, with every list empty rather than null.
 func newTicketDetail(ref ticketRef) wire.TicketDetail {
 	return wire.TicketDetail{
-		Address: ref.addr.String(), Title: ref.ticket.Title, Epic: rootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
+		Address: ref.addr.String(), Title: ref.ticket.Title, Epic: queue.RootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
 		Related: []wire.RelatedTicket{}, Rounds: []wire.DetailRound{}, Chat: []wire.ChatMessage{}, Actions: []string{}, Runs: []wire.DetailRun{},
 	}
 }

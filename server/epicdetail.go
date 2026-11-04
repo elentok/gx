@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -24,7 +25,7 @@ func mergeBlockActions(kind string) []string {
 
 func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
-	root, err := parseRootRef(address)
+	root, err := queue.ParseRootRef(address)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -47,14 +48,14 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.buildEpicDetail(root, epics, epics[i], time.Now()))
 }
 
-func (s *Server) buildEpicDetail(root rootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
+func (s *Server) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
 	if e.IsMap {
 		return s.buildMapDetail(root, epics, e, now)
 	}
 	return s.buildLoopDetail(root, e, now)
 }
 
-func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
+func (s *Server) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
 	byName := map[string]tickets.Epic{}
 	for _, other := range epics {
 		byName[other.Name] = other
@@ -63,7 +64,7 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: EpicQueueable(e, queued), Queued: queued,
+		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
 	}
 	if deletable, err := s.designUncharted(root.String(), e); err != nil {
 		s.log.Warn("design deletable check", "epic", root.String(), "err", err)
@@ -76,7 +77,7 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 	d.RingProgress = designPercent(e, step)
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
-		d.ImplAddress = rootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()
+		d.ImplAddress = queue.RootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()
 	}
 	current, blocked := mapTicketFlags(e)
 	for _, t := range e.Tickets {
@@ -95,13 +96,13 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 	return d
 }
 
-func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
+func (s *Server) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
 	queued := s.queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
 		State: epicStateFor(root, e, s.registry.StartedAtOf),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
-		Queueable: EpicQueueable(e, queued), Queued: queued,
+		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),
 	}
 	if epicMergeBlocked(e) {
@@ -171,7 +172,7 @@ func webShare(endings map[string]int) *float64 {
 }
 
 // baseRow is the part of a row both epic kinds share; status is e.RenderedStatus(t).
-func baseRow(root rootRef, e tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) wire.EpicDetailRow {
+func baseRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) wire.EpicDetailRow {
 	return wire.EpicDetailRow{
 		Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
 		Type: t.Type, Blockers: e.UnresolvedBlockers(t), ClosedAt: t.FinishedAt(), HadCodex: t.HadCodex,
@@ -179,7 +180,7 @@ func baseRow(root rootRef, e tickets.Epic, t tickets.Ticket, status tickets.Rend
 }
 
 // rowFor builds a loop epic's full row for t.
-func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
+func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
 	status := e.RenderedStatus(t)
 	row := baseRow(root, e, t, status)
 	row.Elapsed, row.Cost = t.ElapsedTime, t.ActualCost
@@ -207,6 +208,6 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) wire.Epi
 	return row
 }
 
-func ticketAddress(root rootRef, id string) string {
+func ticketAddress(root queue.RootRef, id string) string {
 	return tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()
 }

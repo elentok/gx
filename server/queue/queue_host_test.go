@@ -1,4 +1,4 @@
-package server
+package queue
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ func (f *fakeHost) Runs() []runs.Run                          { return f.live }
 func (f *fakeHost) CheckWaitingLabel(string) string           { return "" }
 func (f *fakeHost) ListSessions() ([]wire.SessionInfo, error) { return nil, nil }
 func (f *fakeHost) EnsureDraftEpic(string) error              { return nil }
-func (f *fakeHost) StampEpic(rootRef, string, ...string)      {}
+func (f *fakeHost) StampEpic(RootRef, string, ...string)      {}
 func (f *fakeHost) CheckExtraUsage(time.Time) bool {
 	f.extraChecks++
 	return f.extraUsage
@@ -48,7 +48,7 @@ func TestQueue_ExtraUsageAsksTheHostOnlyForClaudeItems(t *testing.T) {
 			t.Parallel()
 			host := &fakeHost{harness: tc.harness, extraUsage: true}
 			q := &Queue{host: host}
-			res, err := q.withExtraUsage("gx", tc.agents, wire.QueueResult{}, nil)
+			res, err := q.WithExtraUsage("gx", tc.agents, wire.QueueResult{}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

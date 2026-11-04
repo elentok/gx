@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -114,7 +115,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	}
 	// Every full cap is named, not just the first one hit.
 	var full []string
-	rootCap := s.perRootLimit(rootOf(addr))
+	rootCap := s.perRootLimit(queue.RootOf(addr))
 	if n, limit := s.registry.CountRoot(root), rootCap; n >= limit {
 		full = append(full, fmt.Sprintf("epic cap %d/%d", n, limit))
 	}

@@ -1,9 +1,11 @@
 package server
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -51,7 +53,7 @@ func blockerEntry(ref ticketRef, epics []tickets.Epic, token string) wire.Relate
 		name := epicNameOf(token)
 		for _, e := range epics {
 			if e.Name == name {
-				entry.Address = rootRef{Project: ref.addr.Project, Epic: name}.String()
+				entry.Address = queue.RootRef{Project: ref.addr.Project, Epic: name}.String()
 				entry.Linkable = true
 				entry.Title, entry.Status = e.Name, tickets.StatusOpen.Word()
 				if !e.MergedAt.IsZero() {

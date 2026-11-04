@@ -3,8 +3,10 @@ package server
 import (
 	"cmp"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"slices"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -46,7 +48,7 @@ func hasManualMergeTicket(e tickets.Epic) bool {
 // forkMergeTicket forks a merge ticket into e for its non-ff onto target and
 // returns its id. At the cap, or when the write fails, it forks none and the
 // caller pauses the root. A manual ticket, the manual trigger's, skips the cap.
-func (s *Server) forkMergeTicket(root rootRef, e tickets.Epic, target string, manual bool) string {
+func (s *Server) forkMergeTicket(root queue.RootRef, e tickets.Epic, target string, manual bool) string {
 	if !manual && mergeTicketsThisRun(e) >= maxMergeTickets {
 		return ""
 	}

@@ -1,4 +1,4 @@
-package server
+package queue
 
 import (
 	"path/filepath"
@@ -11,11 +11,11 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// runnerPTY is the Runner of a run hosted in a gx agent-holder pty.
-const runnerPTY = "pty"
+// RunnerPTY is the Runner of a run hosted in a gx agent-holder pty.
+const RunnerPTY = "pty"
 
-// queueAgentIDPrefix keeps a Queue agent row's id apart from sessions-dir ids.
-const queueAgentIDPrefix = "queue-"
+// AgentIDPrefix keeps a Queue agent row's id apart from sessions-dir ids.
+const AgentIDPrefix = "queue-"
 
 // listSessionsWithQueue is listSessions plus a row per PTY Queue agent. Only
 // the snapshot and the sessions route show Queue rows; every other caller
@@ -31,7 +31,7 @@ func (q *Queue) ListSessionsWithQueue() ([]wire.SessionInfo, error) {
 func (q *Queue) AgentRows() []wire.SessionInfo {
 	var rows []wire.SessionInfo
 	for _, t := range q.registry.List() {
-		if t.Runner != runnerPTY || t.Watched {
+		if t.Runner != RunnerPTY || t.Watched {
 			continue
 		}
 		if row, ok := q.queueAgentRow(t); ok {
@@ -56,7 +56,7 @@ func (q *Queue) queueAgentRow(t runs.TrackedRun) (wire.SessionInfo, bool) {
 	}
 	label := runs.IterationLabel(t.Address)
 	info := wire.SessionInfo{
-		ID:              queueAgentIDPrefix + label,
+		ID:              AgentIDPrefix + label,
 		Name:            label,
 		Project:         addr.Project,
 		Dir:             t.Cwd,

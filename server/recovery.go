@@ -4,12 +4,14 @@ import (
 	"cmp"
 	"crypto/sha256"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
@@ -113,7 +115,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 // names the entry the investigation is told about. Its run-log events are the
 // epic's own, with no ticket.
 func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) (recoveryPlan, bool) {
-	root, err := parseRootRef(f.Address)
+	root, err := queue.ParseRootRef(f.Address)
 	if err != nil {
 		return recoveryPlan{}, false
 	}
@@ -325,14 +327,14 @@ func (s *Server) ticketApprove(req wire.QueueRequest) (wire.QueueResult, error) 
 			}
 		}
 		if proposal == nil {
-			return refusal(wire.ReasonNoProposal, "no recovery proposal for "+f.Address), nil
+			return queue.Refusal(wire.ReasonNoProposal, "no recovery proposal for "+f.Address), nil
 		}
 		fingerprint, err := fileFingerprint(ref.ticket.Path)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
 		if fingerprint != proposal.Fingerprint {
-			return refusal(wire.ReasonProposalStale, f.Address+" changed since the proposal was made"), nil
+			return queue.Refusal(wire.ReasonProposalStale, f.Address+" changed since the proposal was made"), nil
 		}
 		calls, err := recovery.ParseCalls(proposal.Text)
 		if err != nil {
@@ -345,7 +347,7 @@ func (s *Server) ticketApprove(req wire.QueueRequest) (wire.QueueResult, error) 
 		}
 		s.recordRecovery(ref, events.RecoveryApplied, f, proposal.Reason, outcome)
 		if outcome != "ok" {
-			return refusal(wire.ReasonRemedyFailed, outcome), nil
+			return queue.Refusal(wire.ReasonRemedyFailed, outcome), nil
 		}
 		// Retired into Comments rather than deleted, so the ticket keeps what ran.
 		err = schema.UpdateTicketWithBody(ref.ticket.Path, func(_ *schema.Ticket, b *string) {
@@ -380,20 +382,20 @@ const investigateRetryEntry = "investigate-retry"
 // returns the failure the retry answers. Unattended, it may retry any repair
 // pause and a zero-commit one, within the guard rail; every other pause
 // (blocked-pane included) is for a person.
-func (s *Server) investigateRetryFailure(qc queueCtx, ref ticketRef) (recovery.Failure, wire.QueueResult, bool) {
-	inv, ok, err := s.findTicket(qc.investigator)
+func (s *Server) investigateRetryFailure(qc queue.Ctx, ref ticketRef) (recovery.Failure, wire.QueueResult, bool) {
+	inv, ok, err := s.findTicket(qc.Investigator)
 	if err != nil || !ok || inv.ticket.Type != string(schema.TypeInvestigate) {
-		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, qc.investigator+" is not an investigate ticket"), false
+		return recovery.Failure{}, queue.Refusal(wire.ReasonInvestigateStop, qc.Investigator+" is not an investigate ticket"), false
 	}
 	t, err := schema.ParseTicket(ref.ticket.Path)
 	if err != nil {
-		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, "cannot read "+ref.addr.String()+": "+err.Error()), false
+		return recovery.Failure{}, queue.Refusal(wire.ReasonInvestigateStop, "cannot read "+ref.addr.String()+": "+err.Error()), false
 	}
 	reason := t.EffectiveReason()
 	row, hasRow := reason.Row()
 	if t.PausedClass() == "" || !hasRow || !slices.Contains(row.Verbs, schema.VerbRetry) ||
 		(t.PausedClass() != schema.PauseClassRepair && reason != schema.PauseZeroCommit) {
-		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, ref.addr.String()+" is "+t.Describe()+"; only a person retries it"), false
+		return recovery.Failure{}, queue.Refusal(wire.ReasonInvestigateStop, ref.addr.String()+" is "+t.Describe()+"; only a person retries it"), false
 	}
 	f := recovery.Failure{Address: ref.addr.String(), Type: events.Paused, Kind: events.Kind(reason)}
 	// The fork is the investigation itself, not a remedy the agent's one retry
@@ -405,7 +407,7 @@ func (s *Server) investigateRetryFailure(qc queueCtx, ref ticketRef) (recovery.F
 		}
 	}
 	if why := guardRailStop(log, f); why != "" {
-		return recovery.Failure{}, refusal(wire.ReasonInvestigateStop, why), false
+		return recovery.Failure{}, queue.Refusal(wire.ReasonInvestigateStop, why), false
 	}
 	return f, wire.QueueResult{}, true
 }
@@ -534,7 +536,7 @@ type recoveryVerbs struct{ s *Server }
 
 // recoveryVerbHandlers are the server's verbs by name; each takes the request
 // a call makes. A verb that reads the actor gets recoveryCtx.
-var recoveryCtx = queueCtx{actor: recovery.ActorRecovery}
+var recoveryCtx = queue.Ctx{Actor: recovery.ActorRecovery}
 
 var recoveryVerbHandlers = map[string]func(s *Server, req wire.QueueRequest, c recovery.Call) (wire.QueueResult, error){
 	recovery.VerbPause: func(s *Server, req wire.QueueRequest, c recovery.Call) (wire.QueueResult, error) {
@@ -591,7 +593,7 @@ func (s *Server) recoveryWait(req wire.QueueRequest, _ recovery.Call) (wire.Queu
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		it, live := s.liveIteration(ref.addr.String())
 		if !live {
-			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
 		timeout := s.cfg.CompactRewaitTimeout
 		if timeout == 0 {
@@ -626,14 +628,14 @@ func (s *Server) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call) (wi
 	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
 		run, ok := s.registry.Tracked(ref.addr.String())
 		if !ok {
-			return refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
 		state, idle, err := s.agentState(ref.addr)
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("read agent of %s: %w", ref.addr, err)
 		}
 		if !idle {
-			return refusal(wire.ReasonAgentBusy, ref.addr.String()+" agent is "+string(state)), nil
+			return queue.Refusal(wire.ReasonAgentBusy, ref.addr.String()+" agent is "+string(state)), nil
 		}
 		_, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, s.projects.WorktreeDir(ref.addr.Project))
 		ahead, err := git.CommitsAhead(worktree, run.Base, "HEAD")
@@ -687,7 +689,7 @@ var finishPoll = time.Second
 // needs it.
 func (s *Server) recoveryFinish(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
 	if !s.registry.WaitGone(req.Address, finishWaitTimeout, finishPoll) {
-		return refusal(wire.ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
+		return queue.Refusal(wire.ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
 	}
 	return wire.QueueResult{}, nil
 }
@@ -705,15 +707,15 @@ func (s *Server) recoverySetParent(req wire.QueueRequest, c recovery.Call) (wire
 		defer unlock()
 		i := slices.IndexFunc(epic.Tickets, func(t tickets.Ticket) bool { return t.Identifier == ref.addr.ID })
 		if i < 0 {
-			return refusal(wire.ReasonUnknownTicket, "no ticket "+address), nil
+			return queue.Refusal(wire.ReasonUnknownTicket, "no ticket "+address), nil
 		}
 		target := &epic.Tickets[i]
 		if _, defect := recovery.ParentDefect(target.Identifier, target.Parent); !defect {
-			return refusal(wire.ReasonParentChanged, address+" has a parent its ID allows"), nil
+			return queue.Refusal(wire.ReasonParentChanged, address+" has a parent its ID allows"), nil
 		}
 		target.Parent = &parent
 		if err := epic.ValidateParentGraph(); err != nil {
-			return refusal(wire.ReasonInvalidParent, err.Error()), nil
+			return queue.Refusal(wire.ReasonInvalidParent, err.Error()), nil
 		}
 		err = schema.UpdateTicket(target.Path, func(t *schema.Ticket) {
 			id := schema.TicketID(parent)

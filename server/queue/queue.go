@@ -1,8 +1,9 @@
-package server
+package queue
 
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,24 +25,25 @@ import (
 
 const queueFileName = projects.QueueFileName
 
-func refusal(reason, msg string) wire.QueueResult {
+// Refusal is a queue write the server declines: a result, not an error.
+func Refusal(reason, msg string) wire.QueueResult {
 	return wire.QueueResult{Refused: true, Reason: reason, Message: msg}
 }
 
-// queueCtx is what the server knows about a queue write that the body does not
+// Ctx is what the server knows about a queue write that the body does not
 // carry. It travels beside the wire.QueueRequest, never inside it.
-type queueCtx struct {
-	// actor is set only by the server's own recovery calls, never decoded from a
+type Ctx struct {
+	// Actor is set only by the server's own recovery calls, never decoded from a
 	// client: a pause made by recovery must not trigger recovery again.
-	actor string
-	// investigator is the claimed investigate ticket whose agent made the call,
+	Actor string
+	// Investigator is the claimed investigate ticket whose agent made the call,
 	// from InvestigateHeader. Verbs that honour it verify the ticket.
-	investigator string
+	Investigator string
 }
 
-// ignoreCtx adapts a queue write that needs no queueCtx.
-func ignoreCtx(do func(wire.QueueRequest) (wire.QueueResult, error)) func(wire.QueueRequest, queueCtx) (wire.QueueResult, error) {
-	return func(req wire.QueueRequest, _ queueCtx) (wire.QueueResult, error) { return do(req) }
+// ignoreCtx adapts a queue write that needs no Ctx.
+func ignoreCtx(do func(wire.QueueRequest) (wire.QueueResult, error)) func(wire.QueueRequest, Ctx) (wire.QueueResult, error) {
+	return func(req wire.QueueRequest, _ Ctx) (wire.QueueResult, error) { return do(req) }
 }
 
 // Host is what the queue, the Queue agent rows and the one-offs need from the
@@ -54,7 +56,7 @@ type Host interface {
 	CheckWaitingLabel(address string) string
 	ListSessions() ([]wire.SessionInfo, error)
 	CheckExtraUsage(now time.Time) bool
-	StampEpic(root rootRef, epicPath string, keys ...string)
+	StampEpic(root RootRef, epicPath string, keys ...string)
 	EnsureDraftEpic(epicPath string) error
 }
 
@@ -102,7 +104,19 @@ func EpicQueueable(e tickets.Epic, queued bool) bool {
 	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return t.Status == string(schema.StatusOpen) })
 }
 
-func openQueue(stateDir string) (*Queue, error) {
+// OpenQueue loads the queue and its pause flag from stateDir.
+func OpenQueue(stateDir string) (*Queue, error) {
+	q, err := openItems(stateDir)
+	if err != nil {
+		return nil, err
+	}
+	if q.pause, err = openPause(stateDir); err != nil {
+		return nil, fmt.Errorf("load queue pause: %w", err)
+	}
+	return q, nil
+}
+
+func openItems(stateDir string) (*Queue, error) {
 	q := &Queue{path: filepath.Join(stateDir, queueFileName), items: []wire.QueueItem{}, stateDir: stateDir}
 	data, err := os.ReadFile(q.path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -172,7 +186,7 @@ func (q *Queue) mapEpicRefusal(address string) *wire.QueueResult {
 	if !q.inMapEpic(address) {
 		return nil
 	}
-	r := refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
+	r := Refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
 	return &r
 }
 
@@ -198,21 +212,21 @@ func (q *Queue) hasTicket(address string) bool {
 	return false
 }
 
-// canonical normalises a request's address, or returns the refusal for it.
-func canonical(raw string) (string, *wire.QueueResult) {
+// Canonical normalises a request's address, or returns the refusal for it.
+func Canonical(raw string) (string, *wire.QueueResult) {
 	a, err := tickets.ParseAddress(raw, tickets.AddressContext{})
 	if err != nil {
-		r := refusal(wire.ReasonInvalidAddress, err.Error())
+		r := Refusal(wire.ReasonInvalidAddress, err.Error())
 		return "", &r
 	}
 	return a.String(), nil
 }
 
-// withExtraUsage runs the extra-usage check for an enqueue and puts the warning
+// WithExtraUsage runs the extra-usage check for an enqueue and puts the warning
 // on an accepted result. Extra usage is a Claude account matter, so the check
 // runs only when an enqueued agent runs on Claude. An empty agent follows the
 // project's Default harness.
-func (q *Queue) withExtraUsage(project string, agents []string, res wire.QueueResult, err error) (wire.QueueResult, error) {
+func (q *Queue) WithExtraUsage(project string, agents []string, res wire.QueueResult, err error) (wire.QueueResult, error) {
 	if err != nil || res.Refused {
 		return res, err
 	}
@@ -228,7 +242,7 @@ func (q *Queue) withExtraUsage(project string, agents []string, res wire.QueueRe
 // Add queues req.Address (a ticket, or a whole epic).
 func (q *Queue) Add(req wire.QueueRequest) (wire.QueueResult, error) {
 	res, err := q.addItem(req)
-	return q.withExtraUsage(projectOfAddress(req.Address), []string{req.Agent}, res, err)
+	return q.WithExtraUsage(projectOfAddress(req.Address), []string{req.Agent}, res, err)
 }
 
 // resolveAgent keeps an empty agent empty (it follows the Default harness) and
@@ -239,7 +253,7 @@ func resolveAgent(name string) (ralphloop.AgentKind, *wire.QueueResult) {
 		return "", nil
 	}
 	if err := ralphloop.ValidateAgentKind(agent); err != nil {
-		r := refusal(wire.ReasonInvalidAgent, err.Error())
+		r := Refusal(wire.ReasonInvalidAgent, err.Error())
 		return "", &r
 	}
 	return agent, nil
@@ -259,7 +273,7 @@ func parseQueueTarget(raw string) (queueTarget, *wire.QueueResult) {
 	if project, epic, ok := tickets.ParseEpicAddress(raw); ok {
 		return queueTarget{address: raw, project: project, epic: epic}, nil
 	}
-	addr, bad := canonical(raw)
+	addr, bad := Canonical(raw)
 	if bad != nil {
 		return queueTarget{}, bad
 	}
@@ -270,7 +284,7 @@ func parseQueueTarget(raw string) (queueTarget, *wire.QueueResult) {
 func (q *Queue) refusal(t queueTarget) *wire.QueueResult {
 	if !t.isEpic() {
 		if !q.hasTicket(t.address) {
-			r := refusal(wire.ReasonUnknownTicket, "no ticket "+t.address)
+			r := Refusal(wire.ReasonUnknownTicket, "no ticket "+t.address)
 			return &r
 		}
 		return q.mapEpicRefusal(t.address)
@@ -278,24 +292,24 @@ func (q *Queue) refusal(t queueTarget) *wire.QueueResult {
 	epics, err := q.projects.Epics(t.project)
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == t.epic })
 	if err != nil || i < 0 {
-		r := refusal(wire.ReasonUnknownTicket, "no epic "+t.address)
+		r := Refusal(wire.ReasonUnknownTicket, "no epic "+t.address)
 		return &r
 	}
 	e := epics[i]
 	var r wire.QueueResult
 	switch {
 	case e.IsMap:
-		r = refusal(wire.ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
+		r = Refusal(wire.ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
 	case !e.MergedAt.IsZero():
-		r = refusal(wire.ReasonAlreadyMerged, t.address+" is already merged")
+		r = Refusal(wire.ReasonAlreadyMerged, t.address+" is already merged")
 	case e.QueueRefusal() == tickets.QueueRefusalFollowUps:
-		r = refusal(wire.ReasonFollowUpsEpic, t.address+" is a follow-ups epic; a follow-up is not schedulable work")
+		r = Refusal(wire.ReasonFollowUpsEpic, t.address+" is a follow-ups epic; a follow-up is not schedulable work")
 	case e.Status == string(schema.StatusDraft):
-		r = refusal(wire.ReasonEpicDraft, t.address+" is a draft; its tickets are still being created")
+		r = Refusal(wire.ReasonEpicDraft, t.address+" is a draft; its tickets are still being created")
 	case e.QueueRefusal() == tickets.QueueRefusalNotOpen:
-		r = refusal(wire.ReasonEpicNotOpen, t.address+" is "+e.Status+", not open")
+		r = Refusal(wire.ReasonEpicNotOpen, t.address+" is "+e.Status+", not open")
 	case !EpicQueueable(e, false):
-		r = refusal(wire.ReasonNoOpenTickets, t.address+" has no open ticket")
+		r = Refusal(wire.ReasonNoOpenTickets, t.address+" has no open ticket")
 	default:
 		return nil
 	}
@@ -318,11 +332,11 @@ func (q *Queue) addItem(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		for _, it := range items {
 			if it.Address == addr {
-				r := refusal(wire.ReasonAlreadyQueued, addr+" is already queued")
+				r := Refusal(wire.ReasonAlreadyQueued, addr+" is already queued")
 				return nil, &r
 			}
 		}
-		item := newQueueItem(addr, agent)
+		item := NewItem(addr, agent)
 		if req.Front {
 			return append([]wire.QueueItem{item}, items...), nil
 		}
@@ -350,7 +364,7 @@ func (q *Queue) stampQueuedAt(t queueTarget) {
 	if err != nil {
 		return
 	}
-	q.host.StampEpic(rootRef{Project: t.project, Epic: epic}, filepath.Join(dir, epic), "queued_at")
+	q.host.StampEpic(RootRef{Project: t.project, Epic: epic}, filepath.Join(dir, epic), "queued_at")
 }
 
 // Remove takes req.Address and everything forked from it off the queue.
@@ -362,12 +376,12 @@ func (q *Queue) Remove(req wire.QueueRequest) (wire.QueueResult, error) {
 	addr := target.address
 	return q.Write(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		if indexOfAddr(items, addr) < 0 {
-			r := refusal(wire.ReasonNotQueued, addr+" is not queued")
+			r := Refusal(wire.ReasonNotQueued, addr+" is not queued")
 			return nil, &r
 		}
 		subtree := q.subtree(addr)
 		if live := q.liveIn(subtree); live != "" {
-			r := refusal(wire.ReasonTicketLive, live+" has a live iteration")
+			r := Refusal(wire.ReasonTicketLive, live+" has a live iteration")
 			return nil, &r
 		}
 		return dropAddresses(items, subtree), nil
@@ -382,14 +396,14 @@ func (q *Queue) Replace(req wire.QueueRequest) (wire.QueueResult, error) {
 	for i, it := range req.Items {
 		agents[i] = it.Agent
 	}
-	return q.withExtraUsage(req.Project, agents, res, err)
+	return q.WithExtraUsage(req.Project, agents, res, err)
 }
 
 func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 	items := make([]wire.QueueItem, 0, len(req.Items))
 	seen := map[string]bool{}
 	for _, it := range req.Items {
-		addr, bad := canonical(it.Address)
+		addr, bad := Canonical(it.Address)
 		if bad != nil {
 			return *bad, nil
 		}
@@ -398,18 +412,18 @@ func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 			return *badAgent, nil
 		}
 		if projectOfAddress(addr) != req.Project {
-			return refusal(wire.ReasonInvalidAddress, addr+" is not in project "+req.Project), nil
+			return Refusal(wire.ReasonInvalidAddress, addr+" is not in project "+req.Project), nil
 		}
 		if seen[addr] {
-			return refusal(wire.ReasonAlreadyQueued, addr+" is listed twice"), nil
+			return Refusal(wire.ReasonAlreadyQueued, addr+" is listed twice"), nil
 		}
 		seen[addr] = true
-		items = append(items, newQueueItem(addr, agent))
+		items = append(items, NewItem(addr, agent))
 	}
 	return q.Write("", func(cur []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {
 			if !q.hasTicket(it.Address) {
-				r := refusal(wire.ReasonUnknownTicket, "no ticket "+it.Address)
+				r := Refusal(wire.ReasonUnknownTicket, "no ticket "+it.Address)
 				return nil, &r
 			}
 			if r := q.mapEpicRefusal(it.Address); r != nil {
@@ -425,7 +439,7 @@ func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 			// A dropped entry must not have a live run under it.
 			if !seen[it.Address] {
 				if live := q.liveIn(q.subtree(it.Address)); live != "" {
-					r := refusal(wire.ReasonTicketLive, live+" has a live iteration")
+					r := Refusal(wire.ReasonTicketLive, live+" has a live iteration")
 					return nil, &r
 				}
 			}
@@ -442,8 +456,8 @@ func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 	})
 }
 
-// newQueueItem is the one place an enqueue time is stamped.
-func newQueueItem(addr string, agent ralphloop.AgentKind) wire.QueueItem {
+// NewItem is the one place an enqueue time is stamped.
+func NewItem(addr string, agent ralphloop.AgentKind) wire.QueueItem {
 	return wire.QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()}
 }
 
@@ -512,11 +526,11 @@ func (q *Queue) Move(req wire.QueueRequest) (wire.QueueResult, error) {
 			}
 		}
 		if from < 0 {
-			r := refusal(wire.ReasonNotQueued, addr+" is not queued")
+			r := Refusal(wire.ReasonNotQueued, addr+" is not queued")
 			return nil, &r
 		}
 		if req.Position < 1 || req.Position > len(items) {
-			r := refusal(wire.ReasonBadPosition, "position must be between 1 and the queue length")
+			r := Refusal(wire.ReasonBadPosition, "position must be between 1 and the queue length")
 			return nil, &r
 		}
 		it := items[from]
@@ -527,28 +541,25 @@ func (q *Queue) Move(req wire.QueueRequest) (wire.QueueResult, error) {
 	})
 }
 
-func (s *Server) queueItems(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, s.queue.List())
-}
-
-// queueWrite adapts a queue write to a POST handler. Refusals are results, so
+// Handler adapts a queue write to a POST handler. Refusals are results, so
 // they answer 200; only a failure to persist is an HTTP error.
-func (s *Server) queueWrite(do func(wire.QueueRequest) (wire.QueueResult, error)) http.HandlerFunc {
-	return queueWriteAs(false, ignoreCtx(do))
+func Handler(do func(wire.QueueRequest) (wire.QueueResult, error)) http.HandlerFunc {
+	return HandlerAs(false, ignoreCtx(do))
 }
 
-// queueWriteCtx is queueWrite for a write that reads the queueCtx.
-func (s *Server) queueWriteCtx(do func(wire.QueueRequest, queueCtx) (wire.QueueResult, error)) http.HandlerFunc {
-	return queueWriteAs(false, do)
+// HandlerCtx is Handler for a write that reads the Ctx.
+func HandlerCtx(do func(wire.QueueRequest, Ctx) (wire.QueueResult, error)) http.HandlerFunc {
+	return HandlerAs(false, do)
 }
 
-// queueWriteWeb is queueWrite for the web mux: a request without a state token
+// HandlerWeb is Handler for the web mux: a request without a state token
 // is refused as stale before anything runs.
-func (s *Server) queueWriteWeb(do func(wire.QueueRequest) (wire.QueueResult, error)) http.HandlerFunc {
-	return queueWriteAs(true, ignoreCtx(do))
+func HandlerWeb(do func(wire.QueueRequest) (wire.QueueResult, error)) http.HandlerFunc {
+	return HandlerAs(true, ignoreCtx(do))
 }
 
-func queueWriteAs(web bool, do func(wire.QueueRequest, queueCtx) (wire.QueueResult, error)) http.HandlerFunc {
+// HandlerAs is the shared body of Handler, HandlerCtx and HandlerWeb.
+func HandlerAs(web bool, do func(wire.QueueRequest, Ctx) (wire.QueueResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req wire.QueueRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -556,19 +567,19 @@ func queueWriteAs(web bool, do func(wire.QueueRequest, queueCtx) (wire.QueueResu
 			return
 		}
 		if web && req.State == "" {
-			writeJSON(w, refusal(wire.ReasonStale, "a state token is required; review the current question"))
+			wire.WriteJSON(w, Refusal(wire.ReasonStale, "a state token is required; review the current question"))
 			return
 		}
-		req.Source = requestOrigin(r, web)
-		var qc queueCtx
+		req.Source = wire.RequestOrigin(r, web)
+		var qc Ctx
 		if !web {
-			qc.investigator = r.Header.Get(wire.InvestigateHeader)
+			qc.Investigator = r.Header.Get(wire.InvestigateHeader)
 		}
 		res, err := do(req, qc)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }
