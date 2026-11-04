@@ -1,11 +1,37 @@
-package server_test
+package budget_test
 
 import (
+	"encoding/json"
+	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
+
+func fetchDetail(t *testing.T, h *servertest.Harness, base, address string) wire.TicketDetail {
+	t.Helper()
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address="+address)
+	if code != http.StatusOK {
+		t.Fatalf("status %d: %s", code, body)
+	}
+	var d wire.TicketDetail
+	if err := json.Unmarshal([]byte(body), &d); err != nil {
+		t.Fatalf("body %q: %v", body, err)
+	}
+	return d
+}
+
+// withRepo gives the project a repo; findTicket refuses a project without one.
+func withRepo(t *testing.T, store string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(`{"name":"proj","repo":"/x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // The Long-running badge reads the mark and the current threshold from the epic row and the ticket
 // detail; an unmarked ticket carries neither. (The alert that writes the mark is in servertest.)
@@ -28,11 +54,11 @@ func TestLongTicketMark_ReachesTheEpicRowAndTheTicketDetail(t *testing.T) {
 	}
 	base := hs.WebURL
 
-	_, epic, _ := getEpicDetail(t, h, base, "proj:work")
-	if r := rowOf(t, epic, "proj:work/01"); r.LongTicketTurns != 120 || r.LongTicketThreshold != 100 {
+	_, epic, _ := servertest.GetEpicDetail(t, h, base, "proj:work")
+	if r := servertest.RowOf(t, epic, "proj:work/01"); r.LongTicketTurns != 120 || r.LongTicketThreshold != 100 {
 		t.Errorf("marked row = %d turns, threshold %d, want 120 and 100", r.LongTicketTurns, r.LongTicketThreshold)
 	}
-	if r := rowOf(t, epic, "proj:work/02"); r.LongTicketTurns != 0 || r.LongTicketThreshold != 0 {
+	if r := servertest.RowOf(t, epic, "proj:work/02"); r.LongTicketTurns != 0 || r.LongTicketThreshold != 0 {
 		t.Errorf("plain row = %d turns, threshold %d, want none", r.LongTicketTurns, r.LongTicketThreshold)
 	}
 

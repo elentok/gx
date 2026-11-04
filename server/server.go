@@ -154,7 +154,6 @@ type Server struct {
 	budget       *budget.Budget
 	tokens       *tokenledger.Ledger
 	limits       *limits.Limits
-	extraUsage   extraUsageNotes
 	events       *broker.Broker
 	herdr        herdrWatch
 	pauseFold    pauseFold
@@ -363,6 +362,7 @@ func New(cfg Config) (*Server, error) {
 			StateDir: cfg.StateDir, SoftLimit: cfg.BudgetSoftLimit, HardLimit: cfg.BudgetHardLimit,
 			KillGrace: cfg.BudgetKillGrace, PollInterval: cfg.BudgetPollInterval,
 			HardLimitGrace: cfg.HardLimitGrace, EventInterval: cfg.BudgetEventInterval, Env: cfg.Env,
+			ExtraUsageCheck: cfg.ExtraUsageCheck,
 		},
 		Settings: &s.settings, Projects: s.projects, Index: idx, Registry: registry, Harness: s.harness,
 		Events: events, Guards: s.guards, Chat: s.chat, Log: log, Host: budgetHost{s},
@@ -581,7 +581,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.MigrationFailures = s.MigrationFailures()
 	snap.Migrating = s.migrator.Migrating()
 	snap.Budget = s.budget.Status(time.Now())
-	snap.ExtraUsage = s.extraUsageOn()
+	snap.ExtraUsage = s.budget.ExtraUsageOn()
 	snap.Disks = s.disks.Listed()
 	snap.Health = s.currentHealth()
 	snap.Pending = s.pendingRows()
@@ -698,7 +698,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
 	s.budget.SeedNotes(time.Now())
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
-	s.startExtraUsageCheck(time.Now())
+	s.budget.StartExtraUsageCheck(time.Now())
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	// Armed before the socket serves, so no save after startup goes unseen.
 	s.settings.StartConfigWatch(freshCtx)

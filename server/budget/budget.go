@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -43,12 +44,16 @@ type Config struct {
 	// EventInterval is the throttle window of budget-changed; zero means DefaultEventInterval.
 	EventInterval time.Duration
 	Env           []string
+	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
+	ExtraUsageCheck func() subscription.State
 }
 
 // Host is what the budget needs from the root.
 type Host interface {
 	// PauseTicket pauses the ticket with a kind and reason (the root's one way to pause).
 	PauseTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run runs.Run) error
+	// WriteFollowUp files the follow-up, or adds an occurrence line to the open draft with the same key.
+	WriteFollowUp(from tickets.Address, f FollowUp) (string, error)
 }
 
 // Deps is what the budget needs from the root.
@@ -83,8 +88,10 @@ type Budget struct {
 	ledger *ledger
 	notes  notes
 	grace  hardGrace
-	evs    *eventFeed
-	costOf func(wire.IterationInfo) (float64, bool) // swapped in tests
+
+	extraUsage extraUsageNotes
+	evs        *eventFeed
+	costOf     func(wire.IterationInfo) (float64, bool) // swapped in tests
 }
 
 // New loads the ledger from the state dir.

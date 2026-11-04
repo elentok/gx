@@ -1,4 +1,4 @@
-package server
+package budget
 
 import (
 	"sync"
@@ -29,36 +29,36 @@ func (n *extraUsageNotes) firstToday(day string) bool {
 	return true
 }
 
-// extraUsageOn re-reads the subscription state; a suppressed warning counts as off.
-func (s *Server) extraUsageOn() bool {
-	if s.settings.Load().SuppressExtraUsageWarning {
+// ExtraUsageOn re-reads the subscription state; a suppressed warning counts as off.
+func (b *Budget) ExtraUsageOn() bool {
+	if b.settings.Load().SuppressExtraUsageWarning {
 		return false
 	}
-	check := s.cfg.ExtraUsageCheck
+	check := b.cfg.ExtraUsageCheck
 	if check == nil {
-		home := harness.LookupEnv(s.cfg.Env, "HOME")
+		home := harness.LookupEnv(b.cfg.Env, "HOME")
 		check = func() subscription.State { return subscription.CheckFresh(home) }
 	}
 	return check() == subscription.StateEnabled
 }
 
-// startExtraUsageCheck is the server-start check. No item is enqueued, so it
+// StartExtraUsageCheck is the server-start check. No item is enqueued, so it
 // runs only when the global Default harness is Claude.
-func (s *Server) startExtraUsageCheck(now time.Time) {
-	if harnesschoice.DefaultOrClaude(s.settings.Load().AgentsDefaultHarness) == ralphloop.AgentClaude {
-		s.CheckExtraUsage(now)
+func (b *Budget) StartExtraUsageCheck(now time.Time) {
+	if harnesschoice.DefaultOrClaude(b.settings.Load().AgentsDefaultHarness) == ralphloop.AgentClaude {
+		b.CheckExtraUsage(now)
 	}
 }
 
 // CheckExtraUsage runs at server start and on every enqueue. When extra usage
 // is on it sends at most one chat notice per day, and reports the state so the
 // caller can hand the client its warning.
-func (s *Server) CheckExtraUsage(now time.Time) bool {
-	if !s.extraUsageOn() {
+func (b *Budget) CheckExtraUsage(now time.Time) bool {
+	if !b.ExtraUsageOn() {
 		return false
 	}
-	if s.extraUsage.firstToday(now.Format(time.DateOnly)) {
-		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeExtraUsage, Emoji: "⚠️", Title: "extra usage is on",
+	if b.extraUsage.firstToday(now.Format(time.DateOnly)) {
+		b.chat.Notice(ralphloop.ServerNotice{Kind: NoticeExtraUsage, Emoji: "⚠️", Title: "extra usage is on",
 			Detail: "Your Claude account will auto-purchase extra usage once included usage runs out."})
 	}
 	return true

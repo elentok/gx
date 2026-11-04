@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 
@@ -301,7 +302,7 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 	s.idx.Rescan() // the claim must show now, not when the backstop poll comes
 	s.events.Publish(wire.EventTicketClaimed, ticketAddr)
 
-	if err := clearLongTicketMark(t.Path); err != nil {
+	if err := budget.ClearLongTicketMark(t.Path); err != nil {
 		s.log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
 	}
 	model, effort, ok := s.launchModel(dir, t, ticket, agent)
@@ -553,7 +554,7 @@ func (s *Server) finishRun(rc runContext) {
 		s.registry.MarkRateLimit(rc.ticketAddr, limited, resetAt)
 	}
 	addr, _ := tickets.ParseAddress(rc.ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	s.guardCallbacks(addr, &rc.one)
+	s.budget.GuardCallbacks(addr, &rc.one)
 	stop := make(chan struct{})
 	if !rc.one.PausesAtOnce() {
 		go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
