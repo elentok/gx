@@ -78,13 +78,13 @@ func newForkFixtureWith(t *testing.T, opts map[string]servertest.TicketOpts, mer
 			commitWork(t, p, "other")
 		case !isMergeTurn(p):
 			commitWork(t, p, id)
-			moveMain(t, f.repo, id)
+			moveMain(t, f.Repo, id)
 		default:
 			gitOut(t, p.Cwd, "rebase", "-q", "main")
 			if n := int(ff.merges.Add(1)); merged != nil {
 				merged(ff, n)
 			}
-			reportIteration(t, f.ticketFile(t, id), "finished")
+			reportIteration(t, f.TicketFile(t, id), "finished")
 		}
 	})
 	return ff
@@ -92,7 +92,7 @@ func newForkFixtureWith(t *testing.T, opts map[string]servertest.TicketOpts, mer
 
 func (f *schedFixture) mergeTicketFiles(t *testing.T) []string {
 	t.Helper()
-	files, err := filepath.Glob(filepath.Join(f.issues, "*-merge.md"))
+	files, err := filepath.Glob(filepath.Join(f.Issues, "*-merge.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func (f *schedFixture) mergeTicketFiles(t *testing.T) []string {
 
 func (f *schedFixture) rootQueued(t *testing.T) bool {
 	t.Helper()
-	q, err := f.h.Client.QueueItems(context.Background())
+	q, err := f.H.Client.QueueItems(context.Background())
 	if err != nil {
 		t.Error(err)
 		return false
@@ -115,7 +115,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 		if !f.rootQueued(t) {
 			t.Error("root dequeued while its merge ticket runs")
 		}
-		q, err := f.h.Client.QueueItems(context.Background())
+		q, err := f.H.Client.QueueItems(context.Background())
 		if err != nil {
 			t.Error(err)
 		}
@@ -131,14 +131,14 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 			t.Errorf("whole-epic dependent launched %d times before the merge", n)
 		}
 	})
-	servertest.WriteTicketWith(t, f.store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{schedEpic}})
-	f.h.Server.Rescan()
+	servertest.WriteTicketWith(t, f.Store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{schedEpic}})
+	f.H.Server.Rescan()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if res, err := f.h.Client.QueueAdd(ctx, "proj:dep/01", "claude"); err != nil || res.Refused {
+	if res, err := f.H.Client.QueueAdd(ctx, "proj:dep/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add dep: %+v, %v", res, err)
 	}
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
 	if got := f.merges.Load(); got != 1 {
@@ -157,7 +157,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 	if !strings.Contains(body, "created_at:") || !strings.Contains(body, wantAddr) {
 		t.Errorf("merge ticket lacks created_at or %q:\n%s", wantAddr, body)
 	}
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
 	if f.rootQueued(t) {
@@ -172,9 +172,9 @@ func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 	// Trunk moves between each merge ticket's finish and its merge: moving it
 	// inside the agent's turn would fail the finish check instead.
 	var merges atomic.Int32
-	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
 		if n := merges.Add(1); n > 1 {
-			moveMain(t, f.repo, fmt.Sprint("land-", n))
+			moveMain(t, f.Repo, fmt.Sprint("land-", n))
 		}
 		return git.MergeBranchInto(repo, wts, branch, target)
 	})
@@ -204,7 +204,7 @@ func TestMergeFork_DirtyTrunkAfterAMergeTicketPausesWithoutAnother(t *testing.T)
 	t.Parallel()
 	f := newForkFixture(t, func(f *forkFixture, _ int) {
 		// An untracked file in main's checkout that the merge would overwrite.
-		testutil.WriteFile(t, f.repo, "01.txt", "local")
+		testutil.WriteFile(t, f.Repo, "01.txt", "local")
 	})
 
 	ev := f.pauseRoot(t)

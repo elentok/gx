@@ -47,7 +47,7 @@ func holdWorktreeLock(t *testing.T) (release func()) {
 
 func (f *schedFixture) settle(t *testing.T) {
 	t.Helper()
-	if !f.h.Server.WaitSettled(settleTimeout) {
+	if !f.H.Server.WaitSettled(settleTimeout) {
 		t.Fatal("background work never settled")
 	}
 }
@@ -60,17 +60,17 @@ func (f *schedFixture) assertWorktreeRemoved(t *testing.T) {
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Errorf("feature worktree still on disk (err %v)", err)
 	}
-	if list := f.git(t, "worktree", "list"); strings.Contains(list, filepath.Base(wt)) {
+	if list := f.Git(t, "worktree", "list"); strings.Contains(list, filepath.Base(wt)) {
 		t.Errorf("git still lists the worktree:\n%s", list)
 	}
-	if strings.TrimSpace(f.git(t, "branch", "--list", schedEpic)) == "" {
+	if strings.TrimSpace(f.Git(t, "branch", "--list", schedEpic)) == "" {
 		t.Errorf("branch %s was deleted", schedEpic)
 	}
 }
 
 func (f *schedFixture) serverLog(t *testing.T) string {
 	t.Helper()
-	log, err := os.ReadFile(server.LogPath(f.h.StateDir))
+	log, err := os.ReadFile(server.LogPath(f.H.StateDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func (f *schedFixture) assertKeptLogged(t *testing.T, want string) {
 func (f *schedFixture) stampMergedByHand(t *testing.T) {
 	t.Helper()
 	fields := map[string]any{"merged_at": time.Now().UTC()}
-	if err := tickets.StampEpicFields(filepath.Join(f.store, "proj", schedEpic), fields); err != nil {
+	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", schedEpic), fields); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -109,7 +109,7 @@ func TestWorktreeRemoval_FastForwardMergeRemovesTheWorktreeAndKeepsTheBranch(t *
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	f.assertStamps(t, true)
 
@@ -124,7 +124,7 @@ func TestWorktreeRemoval_NothingToMergeRemovesTheWorktree(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	f.assertStamps(t, true)
 
@@ -149,8 +149,8 @@ func TestWorktreeRemoval_HandMergeRemovesTheWorktree(t *testing.T) {
 		_, err := os.Stat(wt)
 		return os.IsNotExist(err)
 	})
-	f := schedFixture{repo: repo}
-	if strings.TrimSpace(f.git(t, "branch", "--list", "blocker")) == "" {
+	f := servertest.SchedFixture{Repo: repo}
+	if strings.TrimSpace(f.Git(t, "branch", "--list", "blocker")) == "" {
 		t.Error("branch blocker was deleted")
 	}
 }
@@ -163,7 +163,7 @@ func TestWorktreeRemoval_ManualMergeRouteRemovesTheWorktree(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	f.assertFeatureKept(t, "completion without a merge")
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 
@@ -179,7 +179,7 @@ func TestWorktreeRemoval_UntrackedFileKeepsTheWorktreeAndLogsWhy(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	testutil.WriteFile(t, f.featureWorktree(t), "scratch.txt", "keep me")
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 
@@ -192,13 +192,13 @@ func TestWorktreeRemoval_QueuedRootKeepsTheWorktree(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
-		testutil.WriteFile(t, f.repo, id+".txt", "local")
+		testutil.WriteFile(t, f.Repo, id+".txt", "local")
 	})
 	f.pauseRoot(t)
 	f.assertRootQueued(t)
 	f.stampMergedByHand(t)
 
-	f.h.Server.RemoveMergedWorktree("proj", schedEpic)
+	f.H.Server.RemoveMergedWorktree("proj", schedEpic)
 
 	f.settle(t)
 	f.assertFeatureKept(t, "the removal")
@@ -211,10 +211,10 @@ func TestWorktreeRemoval_OpenTicketKeepsTheWorktree(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	completedUnmerged(ctx, t, f)
-	servertest.WriteTicketWith(t, f.store, "proj", schedEpic, "02", "late", servertest.TicketOpts{})
+	servertest.WriteTicketWith(t, f.Store, "proj", schedEpic, "02", "late", servertest.TicketOpts{})
 	f.stampMergedByHand(t)
 
-	f.h.Server.RemoveMergedWorktree("proj", schedEpic)
+	f.H.Server.RemoveMergedWorktree("proj", schedEpic)
 
 	f.settle(t)
 	f.assertFeatureKept(t, "the removal")
@@ -224,11 +224,11 @@ func TestWorktreeRemoval_OpenTicketKeepsTheWorktree(t *testing.T) {
 func TestWorktreeRemoval_OneOffsRootKeepsItsWorktree(t *testing.T) {
 	t.Parallel()
 	f := newFFFixture(t)
-	wt := filepath.Join(f.h.Server.WorktreeDir("proj"), queue.OneOffsEpic)
-	f.git(t, "branch", "oneoffs-branch")
-	f.git(t, "worktree", "add", "-q", wt, "oneoffs-branch")
+	wt := filepath.Join(f.H.Server.WorktreeDir("proj"), queue.OneOffsEpic)
+	f.Git(t, "branch", "oneoffs-branch")
+	f.Git(t, "worktree", "add", "-q", wt, "oneoffs-branch")
 
-	f.h.Server.RemoveMergedWorktree("proj", queue.OneOffsEpic)
+	f.H.Server.RemoveMergedWorktree("proj", queue.OneOffsEpic)
 
 	f.settle(t)
 	if _, err := os.Stat(wt); err != nil {
@@ -256,7 +256,7 @@ func TestWorktreeRemoval_WaitsForTheWorktreeLockAfterTheMergeDequeuedTheRoot(t *
 	completedUnmerged(ctx, t, f)
 	release := holdWorktreeLock(t)
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	if f.rootQueued(t) {

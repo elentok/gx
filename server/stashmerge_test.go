@@ -41,11 +41,11 @@ func stashMergeFixtureWith(t *testing.T, conflictTurn func(f *schedFixture, p *s
 		testutil.WriteFile(t, p.Cwd, "same.txt", "branch")
 		testutil.WriteFile(t, p.Cwd, "late.txt", "branch")
 		testutil.CommitAll(t, p.Cwd, "work")
-		testutil.WriteFile(t, f.repo, "same.txt", "local")
+		testutil.WriteFile(t, f.Repo, "same.txt", "local")
 	}, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	servertest.WriteTicketWith(t, f.store, "proj", "waiter", "01", "t", servertest.TicketOpts{})
+	servertest.WriteTicketWith(t, f.Store, "proj", "waiter", "01", "t", servertest.TicketOpts{})
 	waiterMD := "---\nstatus: open\nblocked_by: [" + schedEpic + "]\n---\n"
-	if err := os.WriteFile(filepath.Join(f.store, "proj", "waiter", "ticket.md"), []byte(waiterMD), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.Store, "proj", "waiter", "ticket.md"), []byte(waiterMD), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	f.pauseRoot(t)
@@ -54,11 +54,11 @@ func stashMergeFixtureWith(t *testing.T, conflictTurn func(f *schedFixture, p *s
 
 func (f *schedFixture) webStashMerge(t *testing.T, state string) (int, string) {
 	t.Helper()
-	hs, err := f.h.Client.Handshake(t.Context())
+	hs, err := f.H.Client.Handshake(t.Context())
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	cookie := servertest.Login(t, f.h.StateDir, hs.WebURL)
+	cookie := servertest.Login(t, f.H.StateDir, hs.WebURL)
 	body := `{"address":"proj:` + schedEpic + `","state":"` + state + `"}`
 	return servertest.WebPostJSON(t, hs.WebURL+"/v1/epics/stash-merge", body, cookie, "", servertest.JSONPost(hs.WebURL))
 }
@@ -66,14 +66,14 @@ func (f *schedFixture) webStashMerge(t *testing.T, state string) (int, string) {
 func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
 	t.Parallel()
 	f := stashMergeFixture(t)
-	main := f.git(t, "rev-parse", "main")
+	main := f.Git(t, "rev-parse", "main")
 
 	code, body := f.webStashMerge(t, string(wire.EpicStateRunning))
 
 	if code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("stale state = %d %s, want the stale refusal", code, body)
 	}
-	if got := f.git(t, "rev-parse", "main"); got != main {
+	if got := f.Git(t, "rev-parse", "main"); got != main {
 		t.Errorf("main moved to %s", got)
 	}
 	if got := f.read(t, "same.txt"); got != "local" {
@@ -101,14 +101,14 @@ func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTim
 	t.Parallel()
 	f := stashMergeFixture(t)
 	// Dirty only now: the pause did not list it.
-	testutil.WriteFile(t, f.repo, "late.txt", "local late")
+	testutil.WriteFile(t, f.Repo, "late.txt", "local late")
 
 	code, body := f.webStashMerge(t, string(wire.EpicStatePaused))
 
 	if code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("stash-merge = %d %s", code, body)
 	}
-	if got, want := f.git(t, "rev-parse", "main"), f.git(t, "rev-parse", schedEpic); got != want {
+	if got, want := f.Git(t, "rev-parse", "main"), f.Git(t, "rev-parse", schedEpic); got != want {
 		t.Errorf("main at %s, want the feature branch tip %s", got, want)
 	}
 	for _, name := range []string{"same.txt", "late.txt"} {
@@ -116,22 +116,22 @@ func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTim
 			t.Errorf("%s = %q, want conflict markers", name, got)
 		}
 	}
-	if got := f.git(t, "log", "--format=%s", "-1", "main"); strings.Contains(got, "gx backup") {
+	if got := f.Git(t, "log", "--format=%s", "-1", "main"); strings.Contains(got, "gx backup") {
 		t.Errorf("main's tip is the backup commit: %q", got)
 	}
 	refs := f.backupRefs(t)
 	if len(refs) != 1 {
 		t.Fatalf("backup refs = %v, want one", refs)
 	}
-	if got := f.git(t, "show", refs[0]+":late.txt"); got != "local late" {
+	if got := f.Git(t, "show", refs[0]+":late.txt"); got != "local late" {
 		t.Errorf("backup late.txt = %q, want the local content", got)
 	}
-	if got := f.git(t, "show", refs[0]+":same.txt"); got != "local" {
+	if got := f.Git(t, "show", refs[0]+":same.txt"); got != "local" {
 		t.Errorf("backup same.txt = %q, want the local content", got)
 	}
 
 	// A top-level trunk-conflict ticket in the root epic names the ref and files.
-	ticket := f.ticketFile(t, "02")
+	ticket := f.TicketFile(t, "02")
 	md := servertest.ReadFile(t, ticket)
 	// Not "status: open": the queue may have claimed the ticket by the time it is read.
 	for _, want := range []string{"type: trunk-conflict", refs[0], "same.txt", "late.txt"} {
@@ -151,7 +151,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	t.Parallel()
 	f := stashMergeFixture(t)
 
-	res, err := f.h.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
@@ -160,7 +160,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	if len(refs) != 1 {
 		t.Fatalf("backup refs = %v, want one", refs)
 	}
-	epic := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	epic := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
 	if epic.TrunkConflictBackup != refs[0] || !slices.Equal(epic.TrunkConflictFiles, []string{"same.txt"}) || epic.TrunkFastForwardedAt.IsZero() {
 		t.Errorf("epic fields = %q %v %v", epic.TrunkConflictBackup, epic.TrunkConflictFiles, epic.TrunkFastForwardedAt)
 	}
@@ -172,7 +172,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	}
 	f.assertRootQueued(t)
 
-	log, _, err := ralphloop.ReadEvents(filepath.Join(f.store, "proj"), schedEpic)
+	log, _, err := ralphloop.ReadEvents(filepath.Join(f.Store, "proj"), schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	}
 
 	// The dependent epic still waits for the merge.
-	list, err := f.h.Client.Epics(context.Background())
+	list, err := f.H.Client.Epics(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestStashMerge_RefusesAnEpicThatIsNotPausedOnADirtyTrunk(t *testing.T) {
 	})
 	f.runEpic(t, wire.EventRootCompleted)
 
-	res, err := f.h.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
 
 	if err != nil || res.Reason != wire.ReasonNotDirtyTrunk {
 		t.Errorf("stash-merge = %+v, %v, want the not-dirty-trunk refusal", res, err)

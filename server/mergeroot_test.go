@@ -21,13 +21,13 @@ func TestMergeRoot_FastForwardMergesOntoTheTarget(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip", got)
 	}
-	if got := f.git(t, "show", "main:01.txt"); got != "01" {
+	if got := f.Git(t, "show", "main:01.txt"); got != "01" {
 		t.Errorf("main:01.txt = %q", got)
 	}
 }
@@ -37,13 +37,13 @@ func TestMergeRoot_AutoFFMergeOffLeavesTheBranchAndDequeuesTheRoot(t *testing.T)
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo) // read live, so after Start is fine
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo) // read live, so after Start is fine
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
+	if out := f.Git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
 		t.Errorf("main contains the feature branch: %q", out)
 	}
 }
@@ -58,42 +58,42 @@ func TestMergeRoot_OpenCodeReviewTicketHoldsTheMergeUntilItIsDone(t *testing.T) 
 	}, func(f *schedFixture, p *servertest.Turn, id string) {
 		if id == "02" {
 			// 01 has merged on the feature branch; 02 is still open and running.
-			out := f.git(t, "branch", "--contains", schedEpic, "--list", "main")
+			out := f.Git(t, "branch", "--contains", schedEpic, "--list", "main")
 			mergedDuringReview.Store(strings.TrimSpace(out) != "")
 		}
 		commitWork(t, p, id)
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if mergedDuringReview.Load() {
 		t.Error("main contained the feature branch while the code-review ticket was open")
 	}
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip once the review is done", got)
 	}
-	f.assertMerged(t, "01", "02")
+	f.AssertMerged(t, "01", "02")
 }
 
 func TestMergeRoot_NeedsRebasePausesTheRootWithoutRebasing(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
-		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
-		testutil.CommitAll(t, f.repo, "main moves on")
+		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
+		testutil.CommitAll(t, f.Repo, "main moves on")
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
-	main := strings.TrimSpace(f.git(t, "rev-parse", "main"))
-	if got := strings.TrimSpace(f.git(t, "log", "-1", "--format=%s", "main")); got != "main moves on" {
+	main := strings.TrimSpace(f.Git(t, "rev-parse", "main"))
+	if got := strings.TrimSpace(f.Git(t, "log", "-1", "--format=%s", "main")); got != "main moves on" {
 		t.Errorf("main head = %q (%s), want it untouched", got, main)
 	}
-	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
+	if out := f.Git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
 		t.Errorf("main contains the feature branch: %q", out)
 	}
 }
@@ -101,7 +101,7 @@ func TestMergeRoot_NeedsRebasePausesTheRootWithoutRebasing(t *testing.T) {
 // epicMD is the epic's ticket.md, read after the root settled.
 func (f *schedFixture) epicMD(t *testing.T) string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(f.store, "proj", schedEpic, "ticket.md"))
+	raw, err := os.ReadFile(filepath.Join(f.Store, "proj", schedEpic, "ticket.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,10 +128,10 @@ func TestMergeRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	f.assertStamps(t, false)
@@ -144,7 +144,7 @@ func TestMergeRoot_StampsMergedAtAndCompletedAtWhenTheEpicMerges(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	f.assertStamps(t, true)
@@ -153,7 +153,7 @@ func TestMergeRoot_StampsMergedAtAndCompletedAtWhenTheEpicMerges(t *testing.T) {
 // finishCommitless is the agent's turn for a ticket that needs no commit.
 func (f *schedFixture) finishCommitless(t *testing.T, id string) {
 	t.Helper()
-	path := f.ticketFile(t, id)
+	path := f.TicketFile(t, id)
 	body := strings.Replace(servertest.ReadFile(t, path), "---\n", "---\ncommitless: true\niteration_status: finished\n", 1)
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), body)
 }
@@ -166,16 +166,16 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 				f.finishCommitless(t, id)
 			})
 			if !autoMerge {
-				servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+				servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 			}
-			main := f.git(t, "rev-parse", "main")
+			main := f.Git(t, "rev-parse", "main")
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			evs := f.queueEpic(ctx, t, "01")
+			evs := f.QueueEpic(ctx, t, "01")
 			servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 			f.assertStamps(t, true)
-			if got := f.git(t, "rev-parse", "main"); got != main {
+			if got := f.Git(t, "rev-parse", "main"); got != main {
 				t.Errorf("main moved to %s, want it untouched at %s", got, main)
 			}
 		})
@@ -186,12 +186,12 @@ func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
-		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
-		testutil.CommitAll(t, f.repo, "main moves on")
+		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
+		testutil.CommitAll(t, f.Repo, "main moves on")
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
 	f.assertStamps(t, false)

@@ -44,7 +44,7 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 			seen = append(seen, mergeTurn{
 				prompt:          p,
 				branch:          gitOut(t, p.Cwd, "branch", "--show-current"),
-				iterationBranch: strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")),
+				iterationBranch: strings.TrimSpace(f.Git(t, "branch", "--list", "ralph-loop/*")),
 			})
 			n := len(seen)
 			mu.Unlock()
@@ -52,14 +52,14 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 			if report == "" {
 				return
 			}
-			reportIteration(t, f.ticketFile(t, "01"), report)
+			reportIteration(t, f.TicketFile(t, "01"), report)
 		}
 	}
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: "merge"}}, agentTurn, cfgOpts...)
 	// One commit of its own, so the epic completes unmerged and keeps its worktree.
-	commitOnBranch(t, f.repo, schedEpic)
+	commitOnBranch(t, f.Repo, schedEpic)
 	// Merging the epic is not this ticket's concern.
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	return f, func() []mergeTurn {
 		mu.Lock()
 		defer mu.Unlock()
@@ -78,7 +78,7 @@ func reportIteration(t *testing.T, path, status string) {
 
 func (f *schedFixture) featureWorktree(t *testing.T) string {
 	t.Helper()
-	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(f.repo)
+	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(f.Repo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func (f *schedFixture) assertFeatureKept(t *testing.T, when string) {
 	if _, err := os.Stat(f.featureWorktree(t)); err != nil {
 		t.Errorf("feature worktree gone after %s: %v", when, err)
 	}
-	if strings.TrimSpace(f.git(t, "branch", "--list", schedEpic)) == "" {
+	if strings.TrimSpace(f.Git(t, "branch", "--list", schedEpic)) == "" {
 		t.Errorf("branch %s gone after %s", schedEpic, when)
 	}
 }
@@ -101,7 +101,7 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 	f, turns := newMergeFixture(t, func(int) string { return "finished" })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	got := turns()
@@ -120,7 +120,7 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 	if got[0].iterationBranch != "" {
 		t.Errorf("iteration branch created for a merge ticket: %s", got[0].iterationBranch)
 	}
-	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
+	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket not done:\n%s", body)
 	}
 	f.assertFeatureKept(t, "finish")
@@ -136,12 +136,12 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/01")
 	f.assertFeatureKept(t, "pause")
 
 	// The server holds the paused PTY run, so the resume goes through it.
-	if res, err := f.h.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:" + schedEpic + "/01"}); err != nil || res.Refused {
+	if res, err := f.H.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:" + schedEpic + "/01"}); err != nil || res.Refused {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
@@ -163,7 +163,7 @@ func TestMergeTicket_FailedLaunchKeepsTheFeatureWorktree(t *testing.T) {
 	f, _ := newMergeFixtureWith(t, nil, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:"+schedEpic+"/01")
 
 	f.assertFeatureKept(t, "discard")

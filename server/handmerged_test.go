@@ -39,8 +39,8 @@ func commitOnBranch(t *testing.T, repo, branch string) {
 
 func runGitIn(t *testing.T, repo string, args ...string) {
 	t.Helper()
-	f := schedFixture{repo: repo}
-	f.git(t, args...)
+	f := servertest.SchedFixture{Repo: repo}
+	f.Git(t, args...)
 }
 
 func waitUntil(t *testing.T, what string, cond func() bool) {
@@ -90,17 +90,17 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, "a.txt")
-		testutil.WriteFile(t, f.repo, "a.txt", "local")
+		testutil.WriteFile(t, f.Repo, "a.txt", "local")
 	}, chat)
 	f.pauseRoot(t)
 
-	if err := os.Remove(filepath.Join(f.repo, "a.txt")); err != nil {
+	if err := os.Remove(filepath.Join(f.Repo, "a.txt")); err != nil {
 		t.Fatal(err)
 	}
-	f.git(t, "merge", "-q", "--ff-only", schedEpic)
+	f.Git(t, "merge", "-q", "--ff-only", schedEpic)
 
 	waitUntil(t, "the root to leave the queue", func() bool {
-		q, err := f.h.Client.QueueItems(context.Background())
+		q, err := f.H.Client.QueueItems(context.Background())
 		return err == nil && !slices.ContainsFunc(q, func(e wire.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
 	})
 	f.assertStamps(t, true)

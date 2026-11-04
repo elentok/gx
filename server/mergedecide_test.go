@@ -60,16 +60,16 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
 	f := retroFixture(t, withEvolve(config.EvolveContributor), chat)
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Fatalf("%q sent %d times, want once", epicNotMergedText, got)
 	}
 
-	if err := f.h.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
+	if err := f.H.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
@@ -91,8 +91,8 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 			return
 		}
 		commitWork(t, p, id)
-		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
-		testutil.CommitAll(t, f.repo, "main moves on")
+		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
+		testutil.CommitAll(t, f.Repo, "main moves on")
 	}, withEvolve(config.EvolveContributor), chat)
 	f.pauseRoot(t)
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
@@ -102,8 +102,8 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.subscribe(ctx, t)
-	if err := f.h.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
+	evs := f.Subscribe(ctx, t)
+	if err := f.H.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")

@@ -31,7 +31,7 @@ func appendPauseRound(t *testing.T, ticketPath string, close bool) {
 func TestFrictionStamp_MergedTicketCarriesItsPause(t *testing.T) {
 	t.Parallel()
 	f, tk := runMergeTicket(t, func(f *schedFixture, cwd string) string {
-		appendPauseRound(t, f.ticketFile(t, "01"), true)
+		appendPauseRound(t, f.TicketFile(t, "01"), true)
 		testutil.WriteFile(t, cwd, "fix.txt", "fix")
 		testutil.CommitAll(t, cwd, "epic: Fix typecheck/lint after rebase onto main")
 		return "finished"
@@ -42,7 +42,7 @@ func TestFrictionStamp_MergedTicketCarriesItsPause(t *testing.T) {
 	// The stamp lands just after the done event, so wait for it.
 	servertest.Poll(5*time.Second, func() bool {
 		var err error
-		if tk, err = schema.ParseTicket(f.ticketFile(t, "01")); err != nil {
+		if tk, err = schema.ParseTicket(f.TicketFile(t, "01")); err != nil {
 			t.Fatal(err)
 		}
 		return tk.Friction != nil

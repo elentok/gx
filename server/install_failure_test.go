@@ -24,18 +24,18 @@ func runFailingInstall(t *testing.T, typ string) (f *schedFixture, starts func()
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: typ}},
 		func(*schedFixture, *servertest.Turn, string) {},
 		func(c *server.Config) { c.InstallDeps = installFailure })
-	gitOut(t, f.repo, "branch", schedEpic)
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	gitOut(t, f.Repo, "branch", schedEpic)
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:"+schedEpic+"/01")
-	return f, f.h.Starts
+	return f, f.H.Starts
 }
 
 func assertPausedOnInstallFailure(t *testing.T, f *schedFixture, starts func() []servertest.AgentStart) {
 	t.Helper()
-	body := servertest.ReadFile(t, f.ticketFile(t, "01"))
+	body := servertest.ReadFile(t, f.TicketFile(t, "01"))
 	if !strings.Contains(body, "status: paused") {
 		t.Errorf("ticket not paused:\n%s", body)
 	}
@@ -52,10 +52,10 @@ func TestInstallFailure_PausesAndDiscardsTheIterationWorktree(t *testing.T) {
 	f, starts := runFailingInstall(t, "implement")
 
 	assertPausedOnInstallFailure(t, f, starts)
-	if out := strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")); out != "" {
+	if out := strings.TrimSpace(f.Git(t, "branch", "--list", "ralph-loop/*")); out != "" {
 		t.Errorf("iteration branch left behind: %s", out)
 	}
-	if out := f.git(t, "worktree", "list"); strings.Count(strings.TrimSpace(out), "\n") != 1 {
+	if out := f.Git(t, "worktree", "list"); strings.Count(strings.TrimSpace(out), "\n") != 1 {
 		t.Errorf("want only the repo and the feature worktree, got:\n%s", out)
 	}
 	f.assertFeatureKept(t, "install failure")

@@ -18,25 +18,25 @@ func TestTrunkConflict_MarkersLeftPauseTheTicketAndKeepTheBackup(t *testing.T) {
 	t.Parallel()
 	var f *schedFixture
 	f = stashMergeFixtureWith(t, func(_ *schedFixture, _ *servertest.Turn) {
-		reportIteration(t, f.ticketFile(t, "02"), "finished") // the markers are still there
+		reportIteration(t, f.TicketFile(t, "02"), "finished") // the markers are still there
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.subscribe(ctx, t)
-	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	evs := f.Subscribe(ctx, t)
+	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 
-	md := servertest.ReadFile(t, f.ticketFile(t, "02"))
+	md := servertest.ReadFile(t, f.TicketFile(t, "02"))
 	if !strings.Contains(md, "status: paused") || !strings.Contains(md, "pause_reason: conflict-markers") {
 		t.Errorf("ticket not paused conflict-markers:\n%s", md)
 	}
 	if refs := f.backupRefs(t); len(refs) != 1 {
 		t.Errorf("backup refs = %v, want the ref kept while the ticket is open", refs)
 	}
-	if merged := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic)).MergedAt; !merged.IsZero() {
+	if merged := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic)).MergedAt; !merged.IsZero() {
 		t.Errorf("root merged_at = %v while markers are left", merged)
 	}
 }
@@ -46,24 +46,24 @@ func TestTrunkConflict_NoMarkersLeftMakesTheTicketDoneDeletesTheBackupAndLandsTh
 	var f *schedFixture
 	f = stashMergeFixtureWith(t, func(_ *schedFixture, p *servertest.Turn) {
 		testutil.WriteFile(t, p.Cwd, "same.txt", "resolved")
-		reportIteration(t, f.ticketFile(t, "02"), "finished")
+		reportIteration(t, f.TicketFile(t, "02"), "finished")
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.subscribe(ctx, t)
-	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	evs := f.Subscribe(ctx, t)
+	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 
-	if md := servertest.ReadFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
+	if md := servertest.ReadFile(t, f.TicketFile(t, "02")); !strings.Contains(md, "status: done") {
 		t.Errorf("ticket not done:\n%s", md)
 	}
 	if refs := f.backupRefs(t); len(refs) != 0 {
 		t.Errorf("backup refs = %v, want the ref deleted once the ticket is done", refs)
 	}
-	if merged := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic)).MergedAt; merged.IsZero() {
+	if merged := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic)).MergedAt; merged.IsZero() {
 		t.Error("root has no merged_at")
 	}
 }
@@ -74,8 +74,8 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 	f := stashMergeFixtureWith(t, func(*schedFixture, *servertest.Turn) {})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.subscribe(ctx, t)
-	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	evs := f.Subscribe(ctx, t)
+	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
@@ -83,7 +83,7 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 		t.Fatalf("same.txt = %q, want conflict markers", got)
 	}
 
-	res, err := f.h.Client.Repair(ctx, "start-over", wire.RepairRequest{Address: "proj:" + schedEpic + "/02", Reason: "give up"})
+	res, err := f.H.Client.Repair(ctx, "start-over", wire.RepairRequest{Address: "proj:" + schedEpic + "/02", Reason: "give up"})
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v", res, err)
 	}
@@ -92,13 +92,13 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 	if got := f.read(t, "same.txt"); got != "local" {
 		t.Errorf("same.txt = %q, want the backed-up local edit", got)
 	}
-	if md := servertest.ReadFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
+	if md := servertest.ReadFile(t, f.TicketFile(t, "02")); !strings.Contains(md, "status: done") {
 		t.Errorf("ticket not done:\n%s", md)
 	}
 	if refs := f.backupRefs(t); len(refs) != 0 {
 		t.Errorf("backup refs = %v, want the ref deleted", refs)
 	}
-	if merged := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic)).MergedAt; merged.IsZero() {
+	if merged := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic)).MergedAt; merged.IsZero() {
 		t.Error("root has no merged_at")
 	}
 }
@@ -109,24 +109,24 @@ func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
 	f := stashMergeFixtureWith(t, func(*schedFixture, *servertest.Turn) {})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.subscribe(ctx, t)
-	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	evs := f.Subscribe(ctx, t)
+	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 	late := time.Now().Add(90 * 24 * time.Hour)
 
-	f.h.Server.PruneBackups(f.repo, late)
+	f.H.Server.PruneBackups(f.Repo, late)
 	if refs := f.backupRefs(t); len(refs) != 1 {
 		t.Fatalf("backup refs = %v, want the open ticket's ref kept", refs)
 	}
 
-	path := f.ticketFile(t, "02")
+	path := f.TicketFile(t, "02")
 	body := strings.Replace(servertest.ReadFile(t, path), "status: paused\n", "status: done\n", 1)
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	f.h.Server.PruneBackups(f.repo, late)
+	f.H.Server.PruneBackups(f.Repo, late)
 	if refs := f.backupRefs(t); len(refs) != 0 {
 		t.Errorf("backup refs = %v, want the old ref pruned once the ticket is done", refs)
 	}

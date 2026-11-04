@@ -21,7 +21,7 @@ func (f *schedFixture) pauseRoot(t *testing.T) wire.Event {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	for {
 		select {
 		case ev, open := <-evs:
@@ -43,7 +43,7 @@ func (f *schedFixture) pauseRoot(t *testing.T) wire.Event {
 // assertRootQueued checks the paused root was not dequeued.
 func (f *schedFixture) assertRootQueued(t *testing.T) {
 	t.Helper()
-	q, err := f.h.Client.QueueItems(context.Background())
+	q, err := f.H.Client.QueueItems(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,10 +72,10 @@ func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 		commitFiles(t, p, files...)
 		// Untracked files in main's checkout that the merge would overwrite.
 		for _, n := range files {
-			testutil.WriteFile(t, f.repo, n, "local "+n)
+			testutil.WriteFile(t, f.Repo, n, "local "+n)
 		}
 	}, chat)
-	main := f.git(t, "rev-parse", "main")
+	main := f.Git(t, "rev-parse", "main")
 
 	ev := f.pauseRoot(t)
 
@@ -83,11 +83,11 @@ func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.DirtyTrunk)
 	}
 	want := fmt.Sprintf("uncommitted changes on main (%s) clash with a.txt, b.txt, c.txt, d.txt, e.txt +2 more; "+
-		"commit or discard them, then merge again", f.repo)
+		"commit or discard them, then merge again", f.Repo)
 	if ev.Message != want {
 		t.Errorf("reason =\n%q\nwant\n%q", ev.Message, want)
 	}
-	if got := f.git(t, "rev-parse", "main"); got != main {
+	if got := f.Git(t, "rev-parse", "main"); got != main {
 		t.Errorf("main moved to %s", got)
 	}
 	f.assertRootQueued(t)
@@ -104,13 +104,13 @@ func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, "clash.txt")
-		testutil.WriteFile(t, f.repo, "clash.txt", "local")
-		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
+		testutil.WriteFile(t, f.Repo, "clash.txt", "local")
+		testutil.WriteFile(t, f.Repo, "unrelated.txt", "local")
 	})
 
 	ev := f.pauseRoot(t)
 
-	want := fmt.Sprintf("uncommitted changes on main (%s) clash with clash.txt; commit or discard them, then merge again", f.repo)
+	want := fmt.Sprintf("uncommitted changes on main (%s) clash with clash.txt; commit or discard them, then merge again", f.Repo)
 	if ev.Kind != string(events.DirtyTrunk) || ev.Message != want {
 		t.Errorf("pause = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
 	}
@@ -121,7 +121,7 @@ func TestMergeError_DirtyTrunkListsNewDirectoryFilesAndBothRenamePaths(t *testin
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		testutil.WriteFile(t, p.Cwd, "old.txt", "old")
 		testutil.CommitAll(t, p.Cwd, "add old")
-		for _, root := range []string{p.Cwd, f.repo} {
+		for _, root := range []string{p.Cwd, f.Repo} {
 			if err := os.Mkdir(filepath.Join(root, "newdir"), 0o755); err != nil && !os.IsExist(err) {
 				t.Fatal(err)
 			}
@@ -131,13 +131,13 @@ func TestMergeError_DirtyTrunkListsNewDirectoryFilesAndBothRenamePaths(t *testin
 		testutil.CommitAll(t, p.Cwd, "work")
 
 		// Main's checkout holds the same paths locally.
-		testutil.WriteFile(t, f.repo, "newdir/x.txt", "local")
-		testutil.WriteFile(t, f.repo, "new.txt", "local")
+		testutil.WriteFile(t, f.Repo, "newdir/x.txt", "local")
+		testutil.WriteFile(t, f.Repo, "new.txt", "local")
 	})
 
 	ev := f.pauseRoot(t)
 
-	want := fmt.Sprintf("uncommitted changes on main (%s) clash with new.txt, newdir/x.txt; commit or discard them, then merge again", f.repo)
+	want := fmt.Sprintf("uncommitted changes on main (%s) clash with new.txt, newdir/x.txt; commit or discard them, then merge again", f.Repo)
 	if ev.Message != want {
 		t.Errorf("reason =\n%q\nwant\n%q", ev.Message, want)
 	}
@@ -150,10 +150,10 @@ func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		turns++
 		commitFiles(t, p, fmt.Sprintf("a%d.txt", turns), "a.txt")
-		testutil.WriteFile(t, f.repo, "a.txt", "local")
+		testutil.WriteFile(t, f.Repo, "a.txt", "local")
 	})
 	return f, func() {
-		if err := os.Remove(filepath.Join(f.repo, "a.txt")); err != nil {
+		if err := os.Remove(filepath.Join(f.Repo, "a.txt")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -173,7 +173,7 @@ func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testin
 	}
 
 	clean()
-	res, err := f.h.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
@@ -188,7 +188,7 @@ func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *te
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, files...)
 		for _, n := range files {
-			testutil.WriteFile(t, f.repo, n, "local "+n)
+			testutil.WriteFile(t, f.Repo, n, "local "+n)
 		}
 	})
 	f.pauseRoot(t)
@@ -200,11 +200,11 @@ func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *te
 		}
 	}
 	for _, n := range files {
-		if got := servertest.ReadFile(t, filepath.Join(f.repo, n)); got != "local "+n {
+		if got := servertest.ReadFile(t, filepath.Join(f.Repo, n)); got != "local "+n {
 			t.Errorf("%s = %q, want the local content untouched", n, got)
 		}
 	}
-	entries, err := os.ReadDir(f.issues)
+	entries, err := os.ReadDir(f.Issues)
 	if err != nil || len(entries) != 1 {
 		t.Errorf("epic issues = %v, %v; want only ticket 01 (no investigation)", entries, err)
 	}
@@ -215,7 +215,7 @@ func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.
 	f, clean := dirtyTrunkFixture(t)
 	f.pauseRoot(t)
 
-	res, err := f.h.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || !res.Paused || res.PauseKind != string(events.DirtyTrunk) {
 		t.Fatalf("merge again = %+v, %v; want a dirty-trunk pause", res, err)
 	}
@@ -224,7 +224,7 @@ func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.
 	}
 
 	clean()
-	res, err = f.h.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	res, err = f.H.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || !res.Merged {
 		t.Fatalf("merge after cleaning = %+v, %v", res, err)
 	}
@@ -238,17 +238,17 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	f, _ := dirtyTrunkFixture(t)
 	f.pauseRoot(t)
 
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if _, err := f.h.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil {
+	if _, err := f.H.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil {
 		t.Fatal(err)
 	}
 	// Reopen the ticket, so its second finish runs the merge step again.
-	path := f.ticketFile(t, "01")
+	path := f.TicketFile(t, "01")
 	reopened := strings.Replace(servertest.ReadFile(t, path), "status: done", "status: open", 1)
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), reopened)
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if md := f.epicMD(t); strings.Contains(md, "land_block") {
@@ -260,11 +260,11 @@ func TestMergeError_NonOverlappingLocalChangeDoesNotBlockTheMerge(t *testing.T) 
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
-		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
+		testutil.WriteFile(t, f.Repo, "unrelated.txt", "local")
 	})
 	f.runEpic(t, wire.EventRootCompleted)
 
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip", got)
 	}
 }
@@ -274,7 +274,7 @@ func TestMergeError_OtherGitFailurePausesMergeFailed(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		// A stale index lock fails the merge without any local change.
-		if err := os.WriteFile(filepath.Join(f.repo, ".git", "index.lock"), nil, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(f.Repo, ".git", "index.lock"), nil, 0o644); err != nil {
 			t.Error(err)
 		}
 	})

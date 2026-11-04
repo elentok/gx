@@ -1,4 +1,4 @@
-package server_test
+package harness_test
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 
 // liveAgentFixture runs ticket 01 on the PTY runner with an agent that keeps
 // working until the test ends, so the ticket stays claimed with a live session.
-func liveAgentFixture(t *testing.T) (*schedFixture, context.Context) {
+func liveAgentFixture(t *testing.T) (*servertest.SchedFixture, context.Context) {
 	t.Helper()
 	started := make(chan struct{}, 1)
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, _ string) {
+	f := servertest.NewSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *servertest.SchedFixture, p *servertest.Turn, _ string) {
 		p.Stall()
 		select {
 		case started <- struct{}{}:
@@ -25,7 +25,7 @@ func liveAgentFixture(t *testing.T) (*schedFixture, context.Context) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
-	f.queueEpic(ctx, t, "01")
+	f.QueueEpic(ctx, t, "01")
 	select {
 	case <-started:
 	case <-ctx.Done():
@@ -37,15 +37,15 @@ func liveAgentFixture(t *testing.T) (*schedFixture, context.Context) {
 func TestRepairMerge_LiveAgentOnPTYRefusesUnlessIgnored(t *testing.T) {
 	t.Parallel()
 	f, ctx := liveAgentFixture(t)
-	req := wire.RepairRequest{Address: "proj:" + schedEpic + "/01"}
+	req := wire.RepairRequest{Address: "proj:" + servertest.SchedEpic + "/01"}
 
-	res, err := f.h.Client.Repair(ctx, "merge", req)
+	res, err := f.H.Client.Repair(ctx, "merge", req)
 	if err != nil || !res.Refused || res.Reason != repair.ReasonLiveAgentOnTab {
 		t.Fatalf("merge = %+v, %v; want %s refusal", res, err, repair.ReasonLiveAgentOnTab)
 	}
 
 	req.IgnoreLiveTab = true
-	res, err = f.h.Client.Repair(ctx, "merge", req)
+	res, err = f.H.Client.Repair(ctx, "merge", req)
 	if err != nil || res.Reason == repair.ReasonLiveAgentOnTab {
 		t.Errorf("merge --ignore-live-tab = %+v, %v; want the live-agent guard skipped", res, err)
 	}
@@ -55,7 +55,7 @@ func TestRepairVerify_ReportsAPTYLeftoverSession(t *testing.T) {
 	t.Parallel()
 	f, ctx := liveAgentFixture(t)
 
-	res, err := f.h.Client.Repair(ctx, "verify", wire.RepairRequest{Address: "proj:" + schedEpic + "/01"})
+	res, err := f.H.Client.Repair(ctx, "verify", wire.RepairRequest{Address: "proj:" + servertest.SchedEpic + "/01"})
 	if err != nil || res.Refused {
 		t.Fatalf("verify = %+v, %v", res, err)
 	}

@@ -28,9 +28,9 @@ func (f *schedFixture) completeEpic(t *testing.T) []string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
-	retros, err := filepath.Glob(filepath.Join(f.store, "proj", queue.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
+	retros, err := filepath.Glob(filepath.Join(f.Store, "proj", queue.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestRetroHook_NothingWhenEvolveIsOff(t *testing.T) {
 func TestRetroHook_NothingWhenTheProjectOptedOut(t *testing.T) {
 	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
-	dir := filepath.Join(f.store, "proj")
+	dir := filepath.Join(f.Store, "proj")
 	pf, err := config.ReadProjectFile(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestRetroHook_NothingWhenTheProjectOptedOut(t *testing.T) {
 func TestRetroHook_NothingWhenTheEpicWasAlreadyEvolved(t *testing.T) {
 	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
-	if err := tickets.StampEpicFields(filepath.Join(f.store, "proj", schedEpic), map[string]any{"evolved_at": time.Now().UTC()}); err != nil {
+	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", schedEpic), map[string]any{"evolved_at": time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.completeEpic(t); len(got) != 0 {
@@ -107,7 +107,7 @@ func TestRetroHook_ContributorCreatesTheOutboxProject(t *testing.T) {
 	if got := f.completeEpic(t); len(got) != 1 {
 		t.Fatalf("retros = %v, want one", got)
 	}
-	pf, err := config.ReadProjectFile(filepath.Join(f.store, "gx"))
+	pf, err := config.ReadProjectFile(filepath.Join(f.Store, "gx"))
 	if err != nil {
 		t.Fatalf("outbox project not created: %v", err)
 	}
@@ -119,10 +119,10 @@ func TestRetroHook_ContributorCreatesTheOutboxProject(t *testing.T) {
 func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveMaintainer))
-	if err := os.MkdirAll(filepath.Join(f.store, "gx"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(f.Store, "gx"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	servertest.SetProjectRepo(t, f.store, "gx", f.repo)
+	servertest.SetProjectRepo(t, f.Store, "gx", f.Repo)
 	if got := f.completeEpic(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
@@ -135,7 +135,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 	var retros []string
 	servertest.Poll(10*time.Second, func() bool {
 		var err error
-		retros, err = filepath.Glob(filepath.Join(f.store, "proj", queue.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
+		retros, err = filepath.Glob(filepath.Join(f.Store, "proj", queue.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -151,12 +151,12 @@ func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 			return
 		}
 		commitWork(t, p, id)
-		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
-		testutil.CommitAll(t, f.repo, "main moves on")
+		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
+		testutil.CommitAll(t, f.Repo, "main moves on")
 	}, withEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
@@ -167,10 +167,10 @@ func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
@@ -187,11 +187,11 @@ func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
 		}
 		commitWork(t, p, id)
 		// An untracked file the fast-forward would overwrite fails the merge.
-		testutil.WriteFile(t, f.repo, "01.txt", "untracked")
+		testutil.WriteFile(t, f.Repo, "01.txt", "untracked")
 	}, withEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {

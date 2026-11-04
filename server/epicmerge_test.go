@@ -43,21 +43,21 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 		t.Error("a refused merge launched an agent")
 	})
 	done := servertest.TicketOpts{Status: "done"}
-	servertest.WriteTicketWith(t, f.store, "proj", "map-epic", "01", "t", done)
-	testutil.WriteFile(t, filepath.Join(f.store, "proj", "map-epic"), "ticket.md", "---\nkind: map\nstatus: open\n---\n# Map\n")
-	servertest.WriteTicketWith(t, f.store, "proj", "merged", "01", "t", done)
-	testutil.WriteFile(t, filepath.Join(f.store, "proj", "merged"), "ticket.md", "---\nstatus: done\nmerged_at: 2026-01-02T03:04:05Z\n---\n# Merged\n")
-	servertest.WriteTicketWith(t, f.store, "proj", "pending", "01", "t", done)
-	servertest.WriteTicketWith(t, f.store, "proj", "pending", "02", "merge", servertest.TicketOpts{Type: "merge"})
-	servertest.WriteTicketWith(t, f.store, "proj", "open", "01", "t", servertest.TicketOpts{})
+	servertest.WriteTicketWith(t, f.Store, "proj", "map-epic", "01", "t", done)
+	testutil.WriteFile(t, filepath.Join(f.Store, "proj", "map-epic"), "ticket.md", "---\nkind: map\nstatus: open\n---\n# Map\n")
+	servertest.WriteTicketWith(t, f.Store, "proj", "merged", "01", "t", done)
+	testutil.WriteFile(t, filepath.Join(f.Store, "proj", "merged"), "ticket.md", "---\nstatus: done\nmerged_at: 2026-01-02T03:04:05Z\n---\n# Merged\n")
+	servertest.WriteTicketWith(t, f.Store, "proj", "pending", "01", "t", done)
+	servertest.WriteTicketWith(t, f.Store, "proj", "pending", "02", "merge", servertest.TicketOpts{Type: "merge"})
+	servertest.WriteTicketWith(t, f.Store, "proj", "open", "01", "t", servertest.TicketOpts{})
 	// The stored reason of a refused merge must survive it byte for byte.
-	testutil.WriteFile(t, filepath.Join(f.store, "proj", "open"), "ticket.md", "---\nland_block_kind: dirty-trunk\nland_block_reason: trunk dirty\n---\n# Open\n")
-	servertest.WriteTicketWith(t, f.store, "proj", queue.OneOffsEpic, "01", "t", servertest.TicketOpts{})
+	testutil.WriteFile(t, filepath.Join(f.Store, "proj", "open"), "ticket.md", "---\nland_block_kind: dirty-trunk\nland_block_reason: trunk dirty\n---\n# Open\n")
+	servertest.WriteTicketWith(t, f.Store, "proj", queue.OneOffsEpic, "01", "t", servertest.TicketOpts{})
 	for _, branch := range []string{"map-epic", "merged", "pending", "open"} {
-		gitOut(t, f.repo, "branch", branch)
+		gitOut(t, f.Repo, "branch", branch)
 	}
-	f.h.Server.Rescan()
-	before := ticketFiles(t, f.store)
+	f.H.Server.Rescan()
+	before := ticketFiles(t, f.Store)
 
 	for addr, want := range map[string]string{
 		"proj:" + schedEpic + "/01": wire.ReasonInvalidAddress,
@@ -71,16 +71,16 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 		"proj:open":                 wire.ReasonNotComplete,
 		"proj:" + schedEpic:         wire.ReasonBranchMissing,
 	} {
-		res, err := f.h.Client.EpicMerge(context.Background(), addr)
+		res, err := f.H.Client.EpicMerge(context.Background(), addr)
 		if err != nil || !res.Refused || res.Reason != want {
 			t.Errorf("merge %s = %+v, %v, want refusal %s", addr, res, err, want)
 		}
 	}
 
-	if q, err := f.h.Client.QueueItems(context.Background()); err != nil || len(q) != 0 {
+	if q, err := f.H.Client.QueueItems(context.Background()); err != nil || len(q) != 0 {
 		t.Errorf("queue = %+v, %v, want empty", q, err)
 	}
-	after := ticketFiles(t, f.store)
+	after := ticketFiles(t, f.Store)
 	for path, body := range after {
 		if before[path] != body {
 			t.Errorf("%s written by a refused merge:\n%s", path, body)
@@ -94,14 +94,14 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, *servertest.Turn, string) {})
-	servertest.WriteTicketWith(t, f.store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
-	f.h.Server.Rescan()
+	servertest.WriteTicketWith(t, f.Store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
+	f.H.Server.Rescan()
 
-	res, err := f.h.Client.EpicMerge(context.Background(), "proj:research")
+	res, err := f.H.Client.EpicMerge(context.Background(), "proj:research")
 	if err != nil || res.Refused || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want merged", res, err)
 	}
-	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", "research"))
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", "research"))
 	if md.MergedAt.IsZero() {
 		t.Error("epic has no merged_at")
 	}
@@ -114,8 +114,8 @@ func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
 // returning the event stream.
 func completedUnmerged(ctx context.Context, t *testing.T, f *schedFixture) <-chan wire.Event {
 	t.Helper()
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
-	evs := f.queueEpic(ctx, t, "01")
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
 	f.assertStamps(t, false)
 	if f.rootQueued(t) {
@@ -138,11 +138,11 @@ func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
 	defer cancel()
 	completedUnmerged(ctx, t, f)
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil || !res.Merged || res.Refused || res.MergeTicket != "" {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip", got)
 	}
 	f.assertStamps(t, true)
@@ -160,9 +160,9 @@ func TestEpicMerge_RemovesLeftoverIterationWorktrees(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	completedUnmerged(ctx, t, f)
-	wt := keepWorktree(t, f.repo, schedEpic, "01")
+	wt := keepWorktree(t, f.Repo, schedEpic, "01")
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
 	f.settle(t)
@@ -176,14 +176,14 @@ func TestEpicMerge_RemovesLeftoverIterationWorktrees(t *testing.T) {
 func TestEpicMerge_KeepsAnotherEpicsIterationWorktree(t *testing.T) {
 	t.Parallel()
 	f := newFFFixture(t)
-	servertest.WriteTicket(t, f.store, "proj", "other-epic", "01", "t", "")
+	servertest.WriteTicket(t, f.Store, "proj", "other-epic", "01", "t", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	completedUnmerged(ctx, t, f)
-	mine := keepWorktree(t, f.repo, schedEpic, "01")
-	other := keepWorktree(t, f.repo, "other-epic", "01")
+	mine := keepWorktree(t, f.Repo, schedEpic, "01")
+	other := keepWorktree(t, f.Repo, "other-epic", "01")
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
 	f.settle(t)
@@ -206,10 +206,10 @@ func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T
 	defer cancel()
 	completedUnmerged(ctx, t, f)
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
-	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
 	if md.LinesAdded == nil || *md.LinesAdded != 3 || md.LinesRemoved == nil || *md.LinesRemoved != 1 {
 		t.Errorf("lines = %v/%v, want 3/1", md.LinesAdded, md.LinesRemoved)
 	}
@@ -219,7 +219,7 @@ func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T
 // stamp, which lands just after the done event, is on it.
 func stampTicket(t *testing.T, f *schedFixture, mutate func(*schema.Ticket)) {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join(f.store, "proj", schedEpic, "issues", "01-*.md"))
+	paths, err := filepath.Glob(filepath.Join(f.Store, "proj", schedEpic, "issues", "01-*.md"))
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("ticket 01 files = %v, %v", paths, err)
 	}
@@ -247,10 +247,10 @@ func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) 
 		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
 	})
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
-	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
 	if md.TotalTokens == nil || *md.TotalTokens != 1200 || md.ActualCost != 1.5 || !md.HadCodex {
 		t.Errorf("tokens/cost/codex = %v/%v/%v, want 1200/1.5/true", md.TotalTokens, md.ActualCost, md.HadCodex)
 	}
@@ -271,14 +271,14 @@ func TestEpicMerge_FrictionIncludesACancelledTicket(t *testing.T) {
 		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
 	})
 	gone := "---\nid: \"99\"\nstatus: cancelled\ntype: implement\nfriction:\n  total_paused_secs: 12\n---\nBody.\n"
-	if err := os.WriteFile(filepath.Join(f.store, "proj", schedEpic, "issues", "99-gone.md"), []byte(gone), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.Store, "proj", schedEpic, "issues", "99-gone.md"), []byte(gone), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
-	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
 	if md.Friction == nil || md.Friction.TotalPausedSecs != 42 {
 		t.Errorf("friction = %+v, want 42 paused secs", md.Friction)
 	}
@@ -298,10 +298,10 @@ func TestEpicMerge_UnstampedDoneTicketLeavesTokensAndCostOffButKeepsFriction(t *
 		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
 	})
 
-	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
-	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
 	if md.TotalTokens != nil || md.ActualCost != 0 {
 		t.Errorf("tokens/cost = %v/%v, want unstamped", md.TotalTokens, md.ActualCost)
 	}
@@ -320,11 +320,11 @@ func TestEpicMerge_RecreatesARemovedFeatureWorktree(t *testing.T) {
 	if _, err := os.Stat(wt); err != nil {
 		t.Fatalf("no feature worktree to remove: %v", err)
 	}
-	f.git(t, "worktree", "remove", "--force", wt)
+	f.Git(t, "worktree", "remove", "--force", wt)
 	// The merge's background removal would delete the recreated worktree.
 	holdWorktreeLock(t)
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
@@ -340,9 +340,9 @@ func TestEpicMerge_DirtyTrunkPausesTheRootAndLeavesItQueued(t *testing.T) {
 	defer cancel()
 	evs := completedUnmerged(ctx, t, f)
 	// An untracked file in main's checkout that the merge would overwrite.
-	testutil.WriteFile(t, f.repo, "01.txt", "local")
+	testutil.WriteFile(t, f.Repo, "01.txt", "local")
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,11 +367,11 @@ func TestEpicMerge_RequeuedRootHasNoAgent(t *testing.T) {
 	defer cancel()
 	completedUnmerged(ctx, t, f)
 	root := "proj:" + schedEpic + "/01"
-	testutil.WriteFile(t, f.repo, "01.txt", "local")
-	if _, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil {
+	testutil.WriteFile(t, f.Repo, "01.txt", "local")
+	if _, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil {
 		t.Fatal(err)
 	}
-	q, err := f.h.Client.QueueItems(ctx)
+	q, err := f.H.Client.QueueItems(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,9 +393,9 @@ func TestEpicMerge_MergeErrorReturnsAMergeErrorPause(t *testing.T) {
 	defer cancel()
 	completedUnmerged(ctx, t, f)
 	// A stale index lock fails the merge without any local change.
-	testutil.WriteFile(t, filepath.Join(f.repo, ".git"), "index.lock", "")
+	testutil.WriteFile(t, filepath.Join(f.Repo, ".git"), "index.lock", "")
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -421,9 +421,9 @@ func raceTrunk(t *testing.T, f *forkFixture) {
 	t.Helper()
 	gitOut(t, f.featureWorktree(t), "rebase", "-q", "main")
 	var merges atomic.Int32
-	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
 		if merges.Add(1) == 1 {
-			moveMain(t, f.repo, "race")
+			moveMain(t, f.Repo, "race")
 		}
 		return git.MergeBranchInto(repo, wts, branch, target)
 	})
@@ -437,11 +437,11 @@ func TestEpicMerge_TrunkMovingDuringTheMergeForksANormalTicket(t *testing.T) {
 	evs := completedUnmerged(ctx, t, f.schedFixture)
 	raceTrunk(t, f)
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil || res.Refused || res.Merged || res.Paused || res.MergeTicket != "proj:"+schedEpic+"/02" {
 		t.Fatalf("merge = %+v, %v, want merge ticket 02", res, err)
 	}
-	if body := servertest.ReadFile(t, f.ticketFile(t, "02")); strings.Contains(body, "manual:") {
+	if body := servertest.ReadFile(t, f.TicketFile(t, "02")); strings.Contains(body, "manual:") {
 		t.Errorf("race-forked ticket is manual:\n%s", body)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
@@ -455,7 +455,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeAtTheCapPauses(t *testing.T) {
 	completedUnmerged(ctx, t, f.schedFixture)
 	raceTrunk(t, f)
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,7 +472,7 @@ func (f *schedFixture) assertManualTicket(t *testing.T, res wire.QueueResult, wa
 	if res.Refused || res.Merged || res.MergeTicket != "proj:"+schedEpic+"/"+wantID {
 		t.Fatalf("merge = %+v, want merge ticket %s", res, wantID)
 	}
-	if body := servertest.ReadFile(t, f.ticketFile(t, wantID)); !strings.Contains(body, "manual: true") || !strings.Contains(body, "type: merge") {
+	if body := servertest.ReadFile(t, f.TicketFile(t, wantID)); !strings.Contains(body, "manual: true") || !strings.Contains(body, "type: merge") {
 		t.Errorf("ticket %s is not a manual merge ticket:\n%s", wantID, body)
 	}
 }
@@ -488,7 +488,7 @@ func TestEpicMerge_NonFFForksAManualTicketWhoseFinishMergesTheEpic(t *testing.T)
 	defer cancel()
 	evs := completedUnmerged(ctx, t, f.schedFixture)
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +498,7 @@ func TestEpicMerge_NonFFForksAManualTicketWhoseFinishMergesTheEpic(t *testing.T)
 	if got := f.merges.Load(); got != 1 {
 		t.Errorf("merge turns = %d, want 1", got)
 	}
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
 	f.assertStamps(t, true)
@@ -514,11 +514,11 @@ func TestEpicMerge_ForkingAManualTicketClearsTheStoredBlock(t *testing.T) {
 	defer cancel()
 	completedUnmerged(ctx, t, f.schedFixture)
 	block := map[string]any{"land_block_kind": "dirty-trunk", "land_block_reason": "trunk dirty"}
-	if err := tickets.StampEpicFields(filepath.Join(f.store, "proj", schedEpic), block); err != nil {
+	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", schedEpic), block); err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -536,14 +536,14 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 	evs := completedUnmerged(ctx, t, f.schedFixture)
 	// Trunk moves once more before the manual ticket's merge, so a retry follows it.
 	var merges atomic.Int32
-	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+	f.H.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
 		if merges.Add(1) == 1 {
-			moveMain(t, f.repo, "manual-merge")
+			moveMain(t, f.Repo, "manual-merge")
 		}
 		return git.MergeBranchInto(repo, wts, branch, target)
 	})
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,10 +553,10 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 	if got := f.merges.Load(); got != 2 {
 		t.Errorf("merge turns = %d, want 2", got)
 	}
-	if body := servertest.ReadFile(t, f.ticketFile(t, "03")); strings.Contains(body, "manual:") {
+	if body := servertest.ReadFile(t, f.TicketFile(t, "03")); strings.Contains(body, "manual:") {
 		t.Errorf("retry ticket is manual:\n%s", body)
 	}
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
 	f.assertStamps(t, true)
@@ -571,9 +571,9 @@ func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.subscribe(ctx, t)
+	evs := f.Subscribe(ctx, t)
 
-	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -583,7 +583,7 @@ func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 	if got := f.merges.Load(); got != 1 {
 		t.Errorf("merge turns = %d, want 1", got)
 	}
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
 	f.assertStamps(t, true)

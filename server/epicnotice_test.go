@@ -74,7 +74,7 @@ func TestEpicNotice_AutoFFMergeOffSendsNotMerged(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	}, chat)
-	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	f.runEpic(t, wire.EventRootCompleted)
 
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
@@ -90,8 +90,8 @@ func TestEpicNotice_NeedsRebasePauseSendsNotMerged(t *testing.T) {
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
-		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
-		testutil.CommitAll(t, f.repo, "main moves on")
+		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
+		testutil.CommitAll(t, f.Repo, "main moves on")
 	}, chat)
 	f.runEpic(t, wire.EventRootPaused)
 

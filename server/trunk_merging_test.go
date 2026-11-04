@@ -16,21 +16,21 @@ import (
 func trunkFixture(t *testing.T, opts servertest.TicketOpts, agentTurn func(f *schedFixture, p *servertest.Turn, id string)) *schedFixture {
 	t.Helper()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": opts}, agentTurn)
-	f.git(t, "branch", "develop")
-	servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
+	f.Git(t, "branch", "develop")
+	servertest.SetProjectTrunk(t, f.Store, "proj", f.Repo, "develop")
 	return f
 }
 
 func (f *schedFixture) rev(t *testing.T, ref string) string {
 	t.Helper()
-	return strings.TrimSpace(f.git(t, "rev-parse", ref))
+	return strings.TrimSpace(f.Git(t, "rev-parse", ref))
 }
 
 func (f *schedFixture) runEpic(t *testing.T, wait string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	servertest.WaitForEvent(ctx, t, f.queueEpic(ctx, t, "01"), wait, "")
+	servertest.WaitForEvent(ctx, t, f.QueueEpic(ctx, t, "01"), wait, "")
 }
 
 func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
@@ -41,7 +41,7 @@ func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 
 	f.runEpic(t, wire.EventRootCompleted)
 
-	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: develop@"+develop) {
+	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, "resolved_base: develop@"+develop) {
 		t.Errorf("ticket lacks resolved_base develop@%s:\n%s", develop, body)
 	}
 	if got := f.rev(t, "develop"); got != f.rev(t, schedEpic) {
@@ -55,12 +55,12 @@ func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 	t.Parallel()
 	f := trunkFixture(t, servertest.TicketOpts{Base: "release-1.2"}, func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
-	f.git(t, "branch", "release-1.2")
+	f.Git(t, "branch", "release-1.2")
 	release := f.rev(t, "release-1.2")
 
 	f.runEpic(t, wire.EventRootCompleted)
 
-	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "resolved_base: release-1.2@"+release) {
+	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, "resolved_base: release-1.2@"+release) {
 		t.Errorf("ticket lacks resolved_base release-1.2@%s:\n%s", release, body)
 	}
 	if got := f.rev(t, "develop"); got != f.rev(t, schedEpic) {
@@ -75,8 +75,8 @@ func TestTrunk_EditedBetweenClaimAndMergingMergesOnTheNewTrunk(t *testing.T) {
 	t.Parallel()
 	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
-		f.git(t, "branch", "next", "develop")
-		servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "next")
+		f.Git(t, "branch", "next", "develop")
+		servertest.SetProjectTrunk(t, f.Store, "proj", f.Repo, "next")
 	})
 	develop := f.rev(t, "develop")
 
@@ -96,18 +96,18 @@ func TestTrunk_DivergedNewTrunkNeedsRebase(t *testing.T) {
 		commitWork(t, p, id)
 		// Past the cap, the non-ff pauses the root rather than forking a merge ticket.
 		for _, mid := range []string{"02", "03", "04"} {
-			servertest.WriteTicketWith(t, f.store, "proj", schedEpic, mid, "t", servertest.TicketOpts{Type: "merge", Status: "done"})
+			servertest.WriteTicketWith(t, f.Store, "proj", schedEpic, mid, "t", servertest.TicketOpts{Type: "merge", Status: "done"})
 		}
-		f.git(t, "checkout", "-q", "-b", "next", "develop")
-		testutil.WriteFile(t, f.repo, "next.txt", "next")
-		testutil.CommitAll(t, f.repo, "next moves on")
-		f.git(t, "checkout", "-q", "main")
-		servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "next")
+		f.Git(t, "checkout", "-q", "-b", "next", "develop")
+		testutil.WriteFile(t, f.Repo, "next.txt", "next")
+		testutil.CommitAll(t, f.Repo, "next moves on")
+		f.Git(t, "checkout", "-q", "main")
+		servertest.SetProjectTrunk(t, f.Store, "proj", f.Repo, "next")
 	})
 
 	f.runEpic(t, wire.EventRootPaused)
 
-	if got := strings.TrimSpace(f.git(t, "log", "-1", "--format=%s", "next")); got != "next moves on" {
+	if got := strings.TrimSpace(f.Git(t, "log", "-1", "--format=%s", "next")); got != "next moves on" {
 		t.Errorf("next head = %q, want it untouched", got)
 	}
 }

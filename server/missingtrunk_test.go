@@ -21,20 +21,20 @@ import (
 func TestMissingTrunk_UnknownBranchStopsClaimsUntilCreated(t *testing.T) {
 	t.Parallel()
 	missingTrunkCase(t, `trunk "develop" from project.json is not a local branch`,
-		func(f *schedFixture) { servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop") },
-		func(f *schedFixture) { f.git(t, "branch", "develop") })
+		func(f *schedFixture) { servertest.SetProjectTrunk(t, f.Store, "proj", f.Repo, "develop") },
+		func(f *schedFixture) { f.Git(t, "branch", "develop") })
 }
 
 func TestMissingTrunk_UnreadableProjectFileStopsClaimsUntilFixed(t *testing.T) {
 	t.Parallel()
-	projectFile := func(f *schedFixture) string { return filepath.Join(f.store, "proj", "project.json") }
+	projectFile := func(f *schedFixture) string { return filepath.Join(f.Store, "proj", "project.json") }
 	missingTrunkCase(t, "unreadable project.json",
 		func(f *schedFixture) {
 			if err := os.WriteFile(projectFile(f), []byte("{"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		},
-		func(f *schedFixture) { servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "main") })
+		func(f *schedFixture) { servertest.SetProjectTrunk(t, f.Store, "proj", f.Repo, "main") })
 }
 
 // missingTrunkCase queues a one-ticket epic with its trunk broken, checks the
@@ -65,21 +65,21 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	counts := map[string]int{}
 	next := func(want string) { t.Helper(); countUntil(ctx, t, evs, counts, want) }
 	next(wire.EventTrunkMissing)
 	servertest.Poll(10*time.Second, func() bool { return chatCount("proj: trunk missing") > 0 })
 	time.Sleep(300 * time.Millisecond) // many polls pass; the state must stay announced once
 
-	snap, err := f.h.Client.Snapshot(ctx)
+	snap, err := f.H.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(snap.Pending) != 1 || snap.Pending[0].Verdict != wire.VerdictTrunkMissing || !strings.Contains(snap.Pending[0].Reason, wantReason) {
 		t.Fatalf("queue rows = %+v, want one %q naming %q", snap.Pending, wire.VerdictTrunkMissing, wantReason)
 	}
-	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: open") {
+	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, "status: open") {
 		t.Fatalf("ticket claimed or paused while trunk missing:\n%s", body)
 	}
 	if n := chatCount("proj: trunk missing"); n != 1 {
@@ -124,20 +124,20 @@ func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}},
 		func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
-	servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
+	servertest.SetProjectTrunk(t, f.Store, "proj", f.Repo, "develop")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	counts := map[string]int{}
 	countUntil(ctx, t, evs, counts, wire.EventTrunkMissing)
-	if res, err := f.h.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
+	if res, err := f.H.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
 	time.Sleep(300 * time.Millisecond) // many polls pass with nothing queued
 
-	f.git(t, "branch", "develop")
-	if res, err := f.h.Client.QueueAdd(ctx, "proj:"+schedEpic+"/01", "claude"); err != nil || res.Refused {
+	f.Git(t, "branch", "develop")
+	if res, err := f.H.Client.QueueAdd(ctx, "proj:"+schedEpic+"/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("re-add: %+v, %v", res, err)
 	}
 	countUntil(ctx, t, evs, counts, wire.EventRootCompleted)

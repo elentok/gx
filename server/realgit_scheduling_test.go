@@ -6,9 +6,6 @@ package server_test
 import (
 	"context"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -17,120 +14,28 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-const schedEpic = "epic"
+const schedEpic = servertest.SchedEpic
 
-// schedFixture is one project with one epic, a server over it, and an agent
-// whose turns are recorded in order. turn runs after the agent's commit.
+var commitWork = servertest.CommitWork
+
+// schedFixture adds the root-only helpers (other files' methods) to the shared
+// servertest.SchedFixture. Its callbacks receive the wrapper.
 type schedFixture struct {
-	store, repo string
-	h           *servertest.Harness
-	issues      string
-	mu          sync.Mutex
-	order       []string
+	*servertest.SchedFixture
 }
 
 func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, agentTurn func(f *schedFixture, p *servertest.Turn, id string), cfgOpts ...func(*server.Config)) *schedFixture {
 	t.Helper()
-	f := &schedFixture{store: t.TempDir(), repo: testutil.TempRepo(t)}
-	for id, opts := range tickets {
-		servertest.WriteTicketWith(t, f.store, "proj", schedEpic, id, "t", opts)
+	f := &schedFixture{}
+	var inner func(*servertest.SchedFixture, *servertest.Turn, string)
+	if agentTurn != nil {
+		inner = func(_ *servertest.SchedFixture, p *servertest.Turn, id string) { agentTurn(f, p, id) }
 	}
-	servertest.SetProjectRepo(t, f.store, "proj", f.repo)
-	f.issues = filepath.Join(f.store, "proj", schedEpic, "issues")
-	f.h = servertest.StartWithStore(t, f.store, func(c *server.Config) {
-		c.PollInterval = 50 * time.Millisecond
-		c.MaxAgentsPerRoot = 1 // these scenarios pin the sequential order
-		for _, o := range cfgOpts {
-			o(c)
-		}
-	})
-	if agentTurn == nil { // a runner of its own: no agent ever takes a turn
-		return f
-	}
-	f.h.OnTurn(func(p *servertest.Turn) {
-		_, id, _ := strings.Cut(p.Address, "/")
-		f.mu.Lock()
-		f.order = append(f.order, id)
-		f.mu.Unlock()
-		agentTurn(f, p, id)
-	})
+	f.SchedFixture = servertest.NewSchedFixture(t, tickets, inner, cfgOpts...)
 	return f
-}
-
-// commitWork is the agent's turn: one commit named after the ticket, in its worktree.
-func commitWork(t *testing.T, p *servertest.Turn, name string) {
-	t.Helper()
-	testutil.WriteFile(t, p.Cwd, name+".txt", name)
-	testutil.CommitAll(t, p.Cwd, "work "+name)
-}
-
-func (f *schedFixture) turns() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return slices.Clone(f.order)
-}
-
-// subscribe returns the event stream from now on.
-func (f *schedFixture) subscribe(ctx context.Context, t *testing.T) <-chan wire.Event {
-	t.Helper()
-	snap, err := f.h.Client.Snapshot(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	evs, err := f.h.Client.Events(ctx, snap.Seq)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return evs
-}
-
-// queueEpic queues the epic and returns the event stream from before the add.
-func (f *schedFixture) queueEpic(ctx context.Context, t *testing.T, firstID string) <-chan wire.Event {
-	t.Helper()
-	evs := f.subscribe(ctx, t)
-	if res, err := f.h.Client.QueueAdd(ctx, "proj:"+schedEpic+"/"+firstID, "claude"); err != nil || res.Refused {
-		t.Fatalf("add: %+v, %v", res, err)
-	}
-	return evs
-}
-
-func (f *schedFixture) ticketFile(t *testing.T, id string) string {
-	t.Helper()
-	matches, err := filepath.Glob(filepath.Join(f.issues, id+"-*.md"))
-	if err != nil || len(matches) != 1 {
-		t.Fatalf("ticket %s files = %v, %v", id, matches, err)
-	}
-	return matches[0]
-}
-
-func (f *schedFixture) git(t *testing.T, args ...string) string {
-	t.Helper()
-	out, err := exec.Command("git", append([]string{"-C", f.repo}, args...)...).CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
-}
-
-// assertMerged checks each ticket is done, its commit is on the feature branch
-// and no iteration branch is left behind.
-func (f *schedFixture) assertMerged(t *testing.T, ids ...string) {
-	t.Helper()
-	for _, id := range ids {
-		if body := servertest.ReadFile(t, f.ticketFile(t, id)); !strings.Contains(body, "status: done") {
-			t.Errorf("ticket %s not done:\n%s", id, body)
-		}
-		if got := f.git(t, "show", schedEpic+":"+id+".txt"); got != id {
-			t.Errorf("feature branch %s:%s.txt = %q", schedEpic, id, got)
-		}
-	}
-	if left := strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")); left != "" {
-		t.Errorf("iteration branches left behind:\n%s", left)
-	}
 }
 
 func TestSchedulingPort_TicketCreatesSubticketsAndTheRootWaitsForThem(t *testing.T) {
@@ -143,20 +48,20 @@ func TestSchedulingPort_TicketCreatesSubticketsAndTheRootWaitsForThem(t *testing
 		}
 		once.Do(func() {
 			for _, child := range []string{"01a", "01b"} {
-				servertest.WriteTicketWith(t, f.store, "proj", schedEpic, child, "child", servertest.TicketOpts{Parent: "01"})
+				servertest.WriteTicketWith(t, f.Store, "proj", schedEpic, child, "child", servertest.TicketOpts{Parent: "01"})
 			}
 		})
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	order := f.turns()
+	order := f.Turns()
 	if len(order) != 3 || order[0] != "01" {
 		t.Errorf("turns = %v, want 01 first then each child exactly once", order)
 	}
-	f.assertMerged(t, "01", "01a", "01b")
+	f.AssertMerged(t, "01", "01a", "01b")
 }
 
 func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
@@ -172,20 +77,20 @@ func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 		}
 		once.Do(func() {
 			for _, child := range []string{"02a", "02b"} {
-				servertest.WriteTicketWith(t, f.store, "proj", schedEpic, child, "child", servertest.TicketOpts{Parent: "02"})
+				servertest.WriteTicketWith(t, f.Store, "proj", schedEpic, child, "child", servertest.TicketOpts{Parent: "02"})
 			}
 		})
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	order := f.turns()
+	order := f.Turns()
 	if len(order) != 4 || order[0] != "01" || order[1] != "02" {
 		t.Errorf("turns = %v, want 01, then the review 02, then its findings", order)
 	}
-	f.assertMerged(t, "01", "02", "02a", "02b")
+	f.AssertMerged(t, "01", "02", "02a", "02b")
 }
 
 // The per-root cap is pinned to 1 here, so this pins the sequential order and the single merging per ticket.
@@ -198,14 +103,14 @@ func TestSchedulingPort_ABlocksBAndCAndTheyMergeInOrder(t *testing.T) {
 	}, func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	if order := f.turns(); len(order) != 3 || order[0] != "01" {
+	if order := f.Turns(); len(order) != 3 || order[0] != "01" {
 		t.Errorf("turns = %v, want 01 before 02 and 03", order)
 	}
-	f.assertMerged(t, "01", "02", "03")
-	if n := strings.Count(f.git(t, "log", "--format=%s", schedEpic), "work "); n != 3 {
+	f.AssertMerged(t, "01", "02", "03")
+	if n := strings.Count(f.Git(t, "log", "--format=%s", schedEpic), "work "); n != 3 {
 		t.Errorf("feature branch has %d work commits, want exactly 3", n)
 	}
 }
@@ -232,10 +137,10 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 		}
 		commitWork(t, p, "post")
 	})
-	ticketPath = f.ticketFile(t, "01")
+	ticketPath = f.TicketFile(t, "01")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:epic/01")
 
 	tk, err := schema.ParseTicket(ticketPath)
@@ -246,31 +151,31 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 	if t.Failed() {
 		t.FailNow()
 	}
-	if left := strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")); left == "" {
+	if left := strings.TrimSpace(f.Git(t, "branch", "--list", "ralph-loop/*")); left == "" {
 		t.Error("iteration branch gone after pause, want it kept for the resume")
 	}
-	if got := strings.TrimSpace(f.git(t, "log", "--format=%s", schedEpic)); strings.Contains(got, "work pre") {
+	if got := strings.TrimSpace(f.Git(t, "log", "--format=%s", schedEpic)); strings.Contains(got, "work pre") {
 		t.Errorf("a paused iteration merged: %s", got)
 	}
 
 	// A person answers and the ticket is picked back up.
 	// The PTY agent waits idle for the answer, so the answer is what resumes it.
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := f.h.Client.TicketAnswer(ctx, wire.QueueRequest{Address: "proj:" + schedEpic + "/01", State: state, Choice: "a"})
+	res, err := f.H.Client.TicketAnswer(ctx, wire.QueueRequest{Address: "proj:" + schedEpic + "/01", State: state, Choice: "a"})
 	if err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
 	for _, name := range []string{"pre", "post"} {
-		if got := f.git(t, "show", schedEpic+":"+name+".txt"); got != name {
+		if got := f.Git(t, "show", schedEpic+":"+name+".txt"); got != name {
 			t.Errorf("feature branch lacks %s.txt (got %q)", name, got)
 		}
 	}
-	if n := strings.Count(f.git(t, "log", "--format=%s", schedEpic), "work "); n != 2 {
+	if n := strings.Count(f.Git(t, "log", "--format=%s", schedEpic), "work "); n != 2 {
 		t.Errorf("feature branch has %d work commits, want pre and post exactly once", n)
 	}
-	if left := strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")); left != "" {
+	if left := strings.TrimSpace(f.Git(t, "branch", "--list", "ralph-loop/*")); left != "" {
 		t.Errorf("iteration branch left after merging:\n%s", left)
 	}
 }

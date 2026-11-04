@@ -22,7 +22,7 @@ func runMergeTicket(t *testing.T, turn func(f *schedFixture, cwd string) string)
 	f, _ := newMergeFixtureWith(t, func(f *schedFixture, cwd string, _ int) string { return turn(f, cwd) })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	evs := f.queueEpic(ctx, t, "01")
+	evs := f.QueueEpic(ctx, t, "01")
 	for {
 		select {
 		case <-ctx.Done():
@@ -31,7 +31,7 @@ func runMergeTicket(t *testing.T, turn func(f *schedFixture, cwd string) string)
 			if ev.Type != wire.EventTicketDone && ev.Type != wire.EventIterationPaused {
 				continue
 			}
-			tk, err := schema.ParseTicket(f.ticketFile(t, "01"))
+			tk, err := schema.ParseTicket(f.TicketFile(t, "01"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -44,17 +44,17 @@ func runMergeTicket(t *testing.T, turn func(f *schedFixture, cwd string) string)
 // advanceTrunk commits name on the repo's own checkout, the trunk.
 func advanceTrunk(t *testing.T, f *schedFixture, name, content string) {
 	t.Helper()
-	testutil.WriteFile(t, f.repo, name, content)
-	testutil.CommitAll(t, f.repo, "trunk "+name)
+	testutil.WriteFile(t, f.Repo, name, content)
+	testutil.CommitAll(t, f.Repo, "trunk "+name)
 }
 
 func assertFixturePaused(t *testing.T, f *schedFixture, tk schema.Ticket, status schema.Status, kind events.Kind, reason string) {
 	t.Helper()
 	assertPaused(t, tk, legacyClass(status), schema.ParsePauseReason(string(kind)))
 	if t.Failed() {
-		t.Fatalf("ticket:\n%s", servertest.ReadFile(t, f.ticketFile(t, "01")))
+		t.Fatalf("ticket:\n%s", servertest.ReadFile(t, f.TicketFile(t, "01")))
 	}
-	if body := servertest.ReadFile(t, f.ticketFile(t, "01")); !strings.Contains(body, reason) {
+	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, reason) {
 		t.Errorf("ticket lacks reason %q:\n%s", reason, body)
 	}
 }
@@ -105,7 +105,7 @@ func TestMergeFinish_RebaseInProgressPausesStuck(t *testing.T) {
 		testutil.WriteFile(t, cwd, "x.txt", "epic")
 		testutil.CommitAll(t, cwd, "epic x")
 		advanceTrunk(t, f, "x.txt", "trunk")
-		trunk := gitOut(t, f.repo, "branch", "--show-current")
+		trunk := gitOut(t, f.Repo, "branch", "--show-current")
 		if out, err := exec.Command("git", "-C", cwd, "rebase", trunk).CombinedOutput(); err == nil {
 			t.Fatalf("rebase did not stop on a conflict:\n%s", out)
 		}
@@ -133,23 +133,23 @@ func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
 	var pause ralphloop.Event
 	waitFor(t, func() bool {
 		var ok bool
-		pause, ok = ralphloop.LatestPauseEvent(filepath.Join(f.store, "proj"), schedEpic, "01")
+		pause, ok = ralphloop.LatestPauseEvent(filepath.Join(f.Store, "proj"), schedEpic, "01")
 		return ok
 	})
-	if err := schema.UpdateTicket(f.ticketFile(t, "01"), func(tk *schema.Ticket) {
+	if err := schema.UpdateTicket(f.TicketFile(t, "01"), func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
 		tk.IterationFinishedAt = pause.Time.Add(time.Second)
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.h.Client.TicketChanged(context.Background(), "proj:"+schedEpic+"/01"); err != nil {
+	if err := f.H.Client.TicketChanged(context.Background(), "proj:"+schedEpic+"/01"); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func lateFinishReason(t *testing.T, f *schedFixture) (string, bool) {
 	t.Helper()
-	hist, err := f.h.Client.History(context.Background(), "proj:"+schedEpic+"/01")
+	hist, err := f.H.Client.History(context.Background(), "proj:"+schedEpic+"/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestLateFinish_MergeUnreportedClosesDoneOnceChecksPass(t *testing.T) {
 	t.Parallel()
 	f, _ := runMergeTicket(t, func(*schedFixture, string) string { return "" })
 	reportMergeFinishedLate(t, f)
-	waitStatus(t, f.ticketFile(t, "01"), schema.StatusDone)
+	waitStatus(t, f.TicketFile(t, "01"), schema.StatusDone)
 	var reason string
 	waitFor(t, func() bool {
 		var ok bool
@@ -185,7 +185,7 @@ func TestLateFinish_TrunkMovedPastTheClaimTipStillClosesDone(t *testing.T) {
 		return ""
 	})
 	reportMergeFinishedLate(t, f)
-	waitStatus(t, f.ticketFile(t, "01"), schema.StatusDone)
+	waitStatus(t, f.TicketFile(t, "01"), schema.StatusDone)
 }
 
 func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
@@ -196,7 +196,7 @@ func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
 	})
 	reportMergeFinishedLate(t, f)
 	time.Sleep(300 * time.Millisecond) // negative wait: a done status would land within a few polls
-	tk, err := schema.ParseTicket(f.ticketFile(t, "01"))
+	tk, err := schema.ParseTicket(f.TicketFile(t, "01"))
 	if err != nil {
 		t.Fatal(err)
 	}
