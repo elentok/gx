@@ -2,13 +2,14 @@ package server_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
@@ -57,9 +58,9 @@ func (f *schedFixture) webStashMerge(t *testing.T, state string) (int, string) {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	cookie := login(t, f.h.StateDir, hs.WebURL)
+	cookie := servertest.Login(t, f.h.StateDir, hs.WebURL)
 	body := `{"address":"proj:` + schedEpic + `","state":"` + state + `"}`
-	return webPostJSON(t, hs.WebURL+"/v1/epics/stash-merge", body, cookie, "", jsonPost(hs.WebURL))
+	return servertest.WebPostJSON(t, hs.WebURL+"/v1/epics/stash-merge", body, cookie, "", servertest.JSONPost(hs.WebURL))
 }
 
 func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
@@ -69,7 +70,7 @@ func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
 
 	code, body := f.webStashMerge(t, string(wire.EpicStateRunning))
 
-	if code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("stale state = %d %s, want the stale refusal", code, body)
 	}
 	if got := f.git(t, "rev-parse", "main"); got != main {
@@ -91,7 +92,7 @@ func TestStashMerge_AcceptsTheCardsMergeBlockedState(t *testing.T) {
 
 	code, body := f.webStashMerge(t, string(wire.EpicListMergeBlocked))
 
-	if code != http.StatusOK || reasonOf(t, body) != "" {
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Errorf("stash-merge from a card = %d %s, want it accepted", code, body)
 	}
 }
@@ -104,7 +105,7 @@ func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTim
 
 	code, body := f.webStashMerge(t, string(wire.EpicStatePaused))
 
-	if code != http.StatusOK || reasonOf(t, body) != "" {
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("stash-merge = %d %s", code, body)
 	}
 	if got, want := f.git(t, "rev-parse", "main"), f.git(t, "rev-parse", schedEpic); got != want {

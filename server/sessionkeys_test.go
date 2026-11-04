@@ -39,11 +39,11 @@ func (f promptFixture) keysWeb(t *testing.T, req wire.SessionKeysRequest) string
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, out := webPostJSON(t, f.base+"/v1/sessions/keys", string(body), f.ck, "", jsonPost(f.base))
+	code, out := servertest.WebPostJSON(t, f.base+"/v1/sessions/keys", string(body), f.ck, "", servertest.JSONPost(f.base))
 	if code != 200 {
 		t.Fatalf("web keys = %d %s", code, out)
 	}
-	return reasonOf(t, out)
+	return servertest.ReasonOf(t, out)
 }
 
 // seedSession writes a session record with no holder behind it.
@@ -112,7 +112,7 @@ func TestSessionKeys_StartingSessionRefusesKeys(t *testing.T) {
 
 func TestSessionKeys_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
-	h, row, release := startQueueChat(t, "hello")
+	h, row, release := servertest.StartQueueChat(t, "hello")
 	defer release()
 	res, err := h.Client.KeysSession(context.Background(), wire.SessionKeysRequest{ID: row.ID, Key: "Esc"})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionReadOnly {

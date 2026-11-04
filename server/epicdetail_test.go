@@ -2,60 +2,22 @@ package server_test
 
 import (
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// writeEpicFiles writes <store>/proj/<epic>/ticket.md and one issue file per
-// entry of issues (file name to whole file content).
-func writeEpicFiles(t *testing.T, store, epic, ticketMD string, issues map[string]string) {
-	t.Helper()
-	dir := filepath.Join(store, "proj", epic)
-	if err := os.MkdirAll(filepath.Join(dir, "issues"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(`{"name":"proj"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte(ticketMD), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	for name, content := range issues {
-		if err := os.WriteFile(filepath.Join(dir, "issues", name), []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func issueMD(id, status, extra, title string) string {
-	return "---\nid: \"" + id + "\"\nstatus: " + status + "\ntype: implement\n" + extra + "---\n\n# " + title + "\n"
-}
-
-func startEpicDetail(t *testing.T, setup func(store string)) (*servertest.Harness, string) {
-	t.Helper()
-	store := t.TempDir()
-	setup(store)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	hs, err := h.Client.Handshake(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return h, hs.WebURL
-}
-
 func getEpicDetail(t *testing.T, h *servertest.Harness, base, address string) (int, wire.EpicDetail, string) {
 	t.Helper()
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics/detail?address="+address)
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics/detail?address="+address)
 	var d wire.EpicDetail
 	if code == http.StatusOK {
 		if err := json.Unmarshal([]byte(body), &d); err != nil {
@@ -79,20 +41,22 @@ func rowOf(t *testing.T, d wire.EpicDetail, address string) wire.EpicDetailRow {
 func TestEpicDetail_LoopEpic(t *testing.T) {
 	t.Parallel()
 	var question string
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work",
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work",
 			"---\nstatus: open\nstarted_at: 2026-01-01T10:00:00Z\ncompleted_at: 2026-01-01T11:00:00Z\n---\n\n## Summary\n\nDoes the thing.\n",
 			map[string]string{
-				"01-a.md": issueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\n", "A"),
-				"02-b.md": issueMD("02", "done", "parent: \"01\"\nelapsed_time: 30\nactual_cost: 0.5\n", "B"),
-				"03-c.md": issueMD("03", "cancelled", "", "C"),
-				"04-d.md": issueMD("04", "open", "blocked_by: [\"other/06\"]\n", "D"),
-				"05-e.md": issueMD("05", "open", "blocked_by: [\"04\"]\n", "E"),
-				"06-f.md": issueMD("06", "open", "", "F"),
+				"01-a.md": servertest.IssueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\n", "A"),
+				"02-b.md": servertest.IssueMD("02", "done", "parent: \"01\"\nelapsed_time: 30\nactual_cost: 0.5\n", "B"),
+				"03-c.md": servertest.IssueMD("03", "cancelled", "", "C"),
+				"04-d.md": servertest.IssueMD("04", "open", "blocked_by: [\"other/06\"]\n", "D"),
+				"05-e.md": servertest.IssueMD("05", "open", "blocked_by: [\"04\"]\n", "E"),
+				"06-f.md": servertest.IssueMD("06", "open", "", "F"),
 			})
-		writeEpicFiles(t, store, "other", "---\nstatus: open\n---\n", map[string]string{
-			"06-x.md": issueMD("06", "open", "", "X"),
+
+		servertest.WriteEpicFiles(t, store, "other", "---\nstatus: open\n---\n", map[string]string{
+			"06-x.md": servertest.IssueMD("06", "open", "", "X"),
 		})
+
 		path := filepath.Join(store, "proj", "work", "issues", "06-f.md")
 		if err := schema.UpdateTicket(path, func(tk *schema.Ticket) {
 			tk.Status, tk.PauseKind = schema.StatusLegacyAnswer, schema.PauseKindSelfReported
@@ -104,6 +68,7 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+
 	code, d, body := getEpicDetail(t, h, base, "proj:work")
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
@@ -159,11 +124,12 @@ func rowAddresses(d wire.EpicDetail) []string {
 
 func TestEpicDetail_FinishedVersusAwaitingMerge(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
-		writeEpicFiles(t, store, "merged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+		servertest.WriteEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
+		servertest.WriteEpicFiles(t, store, "merged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
 	})
+
 	for epic, want := range map[string]wire.EpicState{"unmerged": wire.EpicStateAwaitingMerge, "merged": wire.EpicStateFinished} {
 		code, d, body := getEpicDetail(t, h, base, "proj:"+epic)
 		if code != http.StatusOK || d.State != want {
@@ -174,11 +140,12 @@ func TestEpicDetail_FinishedVersusAwaitingMerge(t *testing.T) {
 
 func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-		writeEpicFiles(t, store, "blocked", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict in main.go\n---\n", done)
-		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+		servertest.WriteEpicFiles(t, store, "blocked", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict in main.go\n---\n", done)
+		servertest.WriteEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
 	})
+
 	code, d, body := getEpicDetail(t, h, base, "proj:blocked")
 	if code != http.StatusOK || d.State != wire.EpicStatePaused ||
 		d.MergeBlockKind != "self-reported" || d.MergeBlockReason != "conflict in main.go" {
@@ -198,17 +165,18 @@ func TestEpicDetail_MergeBlockedActionsFollowTheVerbTable(t *testing.T) {
 		"trunk-missing": {"merge"},
 		"needs-rebase":  {"merge"},
 	}
-	h, base := startEpicDetail(t, func(store string) {
-		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
 		for kind := range want {
 			files := ""
 			if kind == "dirty-trunk" {
 				files = "land_block_files:\n  - a.txt\n  - b.txt\n  - c.txt\n  - d.txt\n  - e.txt\n  - f.txt\n"
 			}
-			writeEpicFiles(t, store, kind, "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: "+kind+"\nland_block_reason: why\n"+files+"---\n", done)
+			servertest.WriteEpicFiles(t, store, kind, "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: "+kind+"\nland_block_reason: why\n"+files+"---\n", done)
 		}
-		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
+		servertest.WriteEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
 	})
+
 	for kind, actions := range want {
 		_, d, body := getEpicDetail(t, h, base, "proj:"+kind)
 		if !slices.Equal(d.Actions, actions) {
@@ -225,10 +193,11 @@ func TestEpicDetail_MergeBlockedActionsFollowTheVerbTable(t *testing.T) {
 
 func TestEpicDetail_StoredReasonWithoutKindReadsAsNeedsRebase(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-		writeEpicFiles(t, store, "legacy", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_reason: needs rebase of legacy onto main\n---\n", done)
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+		servertest.WriteEpicFiles(t, store, "legacy", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_reason: needs rebase of legacy onto main\n---\n", done)
 	})
+
 	_, d, body := getEpicDetail(t, h, base, "proj:legacy")
 	if d.MergeBlockKind != "needs-rebase" {
 		t.Errorf("kind = %q, want needs-rebase (%s)", d.MergeBlockKind, body)
@@ -237,19 +206,20 @@ func TestEpicDetail_StoredReasonWithoutKindReadsAsNeedsRebase(t *testing.T) {
 
 func TestEpicDetail_Queueable(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
-		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-		writeEpicFiles(t, store, "ready", "---\nstatus: open\n---\n", open)
-		writeEpicFiles(t, store, "queued", "---\nstatus: open\n---\n", open)
-		writeEpicFiles(t, store, "merged", "---\nstatus: open\nmerged_at: 2026-01-02T11:00:00Z\n---\n", open)
-		writeEpicFiles(t, store, "noopen", "---\nstatus: open\n---\n", done)
-		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n", open)
-		writeEpicFiles(t, store, "follow-ups", "---\nstatus: open\n---\n", open)
-		writeEpicFiles(t, store, "follow-ups-archived", "---\nstatus: open\n---\n", open)
-		writeEpicFiles(t, store, "drafting", "---\nstatus: draft\n---\n", open)
-		writeEpicFiles(t, store, "cancelled", "---\nstatus: cancelled\n---\n", open)
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		open := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
+		done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+		servertest.WriteEpicFiles(t, store, "ready", "---\nstatus: open\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "queued", "---\nstatus: open\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "merged", "---\nstatus: open\nmerged_at: 2026-01-02T11:00:00Z\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "noopen", "---\nstatus: open\n---\n", done)
+		servertest.WriteEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "follow-ups", "---\nstatus: open\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "follow-ups-archived", "---\nstatus: open\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "drafting", "---\nstatus: draft\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "cancelled", "---\nstatus: cancelled\n---\n", open)
 	})
+
 	if res, err := h.Client.QueueAdd(t.Context(), "proj:queued", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
@@ -269,13 +239,14 @@ func TestEpicDetail_Queueable(t *testing.T) {
 
 func TestEpicDetail_MapEpic(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\nstarted_at: 2026-01-01T10:00:00Z\n---\n\n## Destination\n\nReach the sea.\n",
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\nstarted_at: 2026-01-01T10:00:00Z\n---\n\n## Destination\n\nReach the sea.\n",
 			map[string]string{
-				"01-a.md": issueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\n", "A"),
-				"02-b.md": issueMD("02", "open", "blocked_by: [\"01\"]\n", "B"),
-				"03-c.md": issueMD("03", "open", "", "C"),
+				"01-a.md": servertest.IssueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\n", "A"),
+				"02-b.md": servertest.IssueMD("02", "open", "blocked_by: [\"01\"]\n", "B"),
+				"03-c.md": servertest.IssueMD("03", "open", "", "C"),
 			})
+
 		path := filepath.Join(store, "proj", "atlas", "issues", "03-c.md")
 		if err := schema.UpdateTicket(path, func(tk *schema.Ticket) {
 			tk.Status, tk.PauseKind = schema.StatusLegacyAnswer, schema.PauseKindSelfReported
@@ -283,6 +254,7 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+
 	code, d, body := getEpicDetail(t, h, base, "proj:atlas")
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
@@ -306,16 +278,18 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 
 func TestEpicDetail_MapRowsCarryRedesignFields(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n\n## Destination\n\nReach the sea.\n",
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n\n## Destination\n\nReach the sea.\n",
 			map[string]string{
-				"01-a.md": issueMD("01", "done", "claimed_at: 2026-01-01T10:00:00Z\ndone_at: 2026-01-01T10:05:00Z\n", "A"),
-				"02-b.md": issueMD("02", "done", "done_at: 2026-01-01T11:00:00Z\n", "B"),
-				"03-c.md": issueMD("03", "claimed", "claimed_at: 2026-01-01T12:00:00Z\n", "C"),
-				"04-d.md": issueMD("04", "open", "blocked_by: [\"03\"]\n", "D"),
-				"05-e.md": issueMD("05", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "E"),
+				"01-a.md": servertest.IssueMD("01", "done", "claimed_at: 2026-01-01T10:00:00Z\ndone_at: 2026-01-01T10:05:00Z\n", "A"),
+				"02-b.md": servertest.IssueMD("02", "done", "done_at: 2026-01-01T11:00:00Z\n", "B"),
+				"03-c.md": servertest.IssueMD("03", "claimed", "claimed_at: 2026-01-01T12:00:00Z\n", "C"),
+				"04-d.md": servertest.IssueMD("04", "open", "blocked_by: [\"03\"]\n", "D"),
+				"05-e.md": servertest.IssueMD("05", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "E"),
 			})
+
 	})
+
 	_, d, body := getEpicDetail(t, h, base, "proj:atlas")
 	r1 := rowOf(t, d, "proj:atlas/01")
 	if r1.Elapsed != 300 || r1.ClosedAt.Format("15:04") != "10:05" {
@@ -338,13 +312,15 @@ func TestEpicDetail_MapRowsCarryRedesignFields(t *testing.T) {
 
 func TestEpicDetail_LoopRowsCarryCloseTime(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": issueMD("01", "done", "done_at: 2026-01-01T10:05:00Z\n", "A"),
-			"02-b.md": issueMD("02", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "B"),
-			"03-c.md": issueMD("03", "open", "", "C"),
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": servertest.IssueMD("01", "done", "done_at: 2026-01-01T10:05:00Z\n", "A"),
+			"02-b.md": servertest.IssueMD("02", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "B"),
+			"03-c.md": servertest.IssueMD("03", "open", "", "C"),
 		})
+
 	})
+
 	_, d, _ := getEpicDetail(t, h, base, "proj:work")
 	if got := rowOf(t, d, "proj:work/01").ClosedAt.Format("15:04"); got != "10:05" {
 		t.Errorf("done closed = %s, want 10:05", got)
@@ -376,12 +352,14 @@ func TestEpicDetail_MapRingProgress(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			h, base := startEpicDetail(t, func(store string) {
-				writeEpicFiles(t, store, "atlas", c.epic, map[string]string{
-					"01-a.md": issueMD("01", "done", "", "A"),
-					"02-b.md": issueMD("02", "open", "", "B"),
+			h, base := servertest.StartEpicDetail(t, func(store string) {
+				servertest.WriteEpicFiles(t, store, "atlas", c.epic, map[string]string{
+					"01-a.md": servertest.IssueMD("01", "done", "", "A"),
+					"02-b.md": servertest.IssueMD("02", "open", "", "B"),
 				})
+
 			})
+
 			_, d, body := getEpicDetail(t, h, base, "proj:atlas")
 			c.check(t, d.RingProgress)
 			if !strings.Contains(body, `"ring_progress"`) {
@@ -393,9 +371,10 @@ func TestEpicDetail_MapRingProgress(t *testing.T) {
 
 func TestEpicDetail_LoopEpicWithoutCostKeepsZeroTotals(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
 	})
+
 	code, _, body := getEpicDetail(t, h, base, "proj:work")
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
@@ -427,9 +406,10 @@ friction:
 
 func TestEpicDetail_MergedLoopEpicCarriesEveryStamp(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")})
 	})
+
 	code, d, body := getEpicDetail(t, h, base, "proj:work")
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
@@ -468,9 +448,10 @@ func TestEpicDetail_WebShareCountsPersonEndingsOnly(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fm := "status: open\ncreated_at: 2026-01-01T00:00:00Z\nmerged_at: 2026-01-01T01:00:00Z\nfriction:\n  total_paused_secs: 1\n  pause_endings:\n" + c.endings
-			h, base := startEpicDetail(t, func(store string) {
-				writeEpicFiles(t, store, "work", "---\n"+fm+"---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+			h, base := servertest.StartEpicDetail(t, func(store string) {
+				servertest.WriteEpicFiles(t, store, "work", "---\n"+fm+"---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")})
 			})
+
 			code, d, body := getEpicDetail(t, h, base, "proj:work")
 			if code != http.StatusOK {
 				t.Fatalf("status %d: %s", code, body)
@@ -491,9 +472,10 @@ func TestEpicDetail_WebShareCountsPersonEndingsOnly(t *testing.T) {
 
 func TestEpicDetail_UnmergedLoopEpicShowsOnlyLeadTimeSoFar(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\ncreated_at: 2026-01-01T00:00:00Z\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\ncreated_at: 2026-01-01T00:00:00Z\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
 	})
+
 	_, d, _ := getEpicDetail(t, h, base, "proj:work")
 	st := d.Stats
 	if st.LeadTime == nil || *st.LeadTime <= 0 || !st.LeadTimeSoFar {
@@ -506,9 +488,10 @@ func TestEpicDetail_UnmergedLoopEpicShowsOnlyLeadTimeSoFar(t *testing.T) {
 
 func TestEpicDetail_CodexDropsCost(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"had_codex: true\n---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"had_codex: true\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")})
 	})
+
 	_, d, _ := getEpicDetail(t, h, base, "proj:work")
 	if d.Stats.Cost != nil || d.Stats.TotalTokens == nil {
 		t.Errorf("cost/tokens = %v/%v, want no cost and tokens kept", d.Stats.Cost, d.Stats.TotalTokens)
@@ -519,12 +502,14 @@ func TestEpicDetail_CodexDropsCost(t *testing.T) {
 // cost total, and the Claude ticket beside it still counts.
 func TestEpicDetail_CodexTicketAddsTokensNotDollars(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-claude.md": issueMD("01", "done", "actual_cost: 2\ntotal_tokens: 100\n", "Claude"),
-			"02-codex.md":  issueMD("02", "done", "had_codex: true\ntotal_tokens: 900\n", "Codex"),
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-claude.md": servertest.IssueMD("01", "done", "actual_cost: 2\ntotal_tokens: 100\n", "Claude"),
+			"02-codex.md":  servertest.IssueMD("02", "done", "had_codex: true\ntotal_tokens: 900\n", "Codex"),
 		})
+
 	})
+
 	_, d, _ := getEpicDetail(t, h, base, "proj:work")
 	if d.CostTotal != 2 {
 		t.Errorf("cost_total = %v, want only the Claude ticket's 2", d.CostTotal)
@@ -544,10 +529,11 @@ func TestEpicDetail_MapEpicStats(t *testing.T) {
 	t.Parallel()
 	stamped := "---\nstatus: open\nkind: map\ncreated_at: 2026-01-01T00:00:00Z\ncompleted_at: 2026-01-01T02:00:00Z\ntotal_tokens: 900\nactual_cost: 0.5\n---\n"
 	unstamped := "---\nstatus: open\nkind: map\ncreated_at: 2026-01-01T00:00:00Z\n---\n"
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "atlas", stamped, map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
-		writeEpicFiles(t, store, "bare", unstamped, map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "atlas", stamped, map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
+		servertest.WriteEpicFiles(t, store, "bare", unstamped, map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
 	})
+
 	_, d, _ := getEpicDetail(t, h, base, "proj:atlas")
 	st := d.Stats
 	if st.TotalTokens == nil || *st.TotalTokens != 900 || st.Cost == nil || *st.Cost != 0.5 {
@@ -565,9 +551,10 @@ func TestEpicDetail_MapEpicStats(t *testing.T) {
 
 func TestEpicDetail_UnknownAddress(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
 	})
+
 	for _, address := range []string{"proj:nope", "nope:work", "nocolon", ""} {
 		if code, _, body := getEpicDetail(t, h, base, address); code != http.StatusNotFound {
 			t.Errorf("%s = %d (%s), want 404", address, code, body)
@@ -577,10 +564,11 @@ func TestEpicDetail_UnknownAddress(t *testing.T) {
 
 func TestEpicDetail_RepairRowCarriesTheStateToken(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
+	h, base := servertest.StartEpicDetail(t, func(store string) {
 		servertest.WriteTicketWith(t, store, "proj", "work", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
 		servertest.WriteTicketWith(t, store, "proj", "work", "02", "fine", servertest.TicketOpts{})
 	})
+
 	_, d, body := getEpicDetail(t, h, base, "proj:work")
 	if len(d.Rows) != 2 {
 		t.Fatalf("rows = %s", body)

@@ -60,7 +60,7 @@ func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) de
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	return designsFixture{h: h, ctx: ctx, evs: evs, repo: repo, base: hs.WebURL, ck: login(t, h.StateDir, hs.WebURL)}
+	return designsFixture{h: h, ctx: ctx, evs: evs, repo: repo, base: hs.WebURL, ck: servertest.Login(t, h.StateDir, hs.WebURL)}
 }
 
 func (f designsFixture) open(t *testing.T, epic string, isNew bool) wire.SessionResult {
@@ -588,22 +588,22 @@ func TestWebDesigns_NewNeedsAFreshToken(t *testing.T) {
 	live := f.open(t, "proj:map", false).Session
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, live.ID))
 	post := func(body string) (int, string) {
-		return webPostJSON(t, f.base+"/v1/designs/open", body, f.ck, "", jsonPost(f.base))
+		return servertest.WebPostJSON(t, f.base+"/v1/designs/open", body, f.ck, "", servertest.JSONPost(f.base))
 	}
 
 	for name, body := range map[string]string{
 		"no token":  `{"epic":"proj:map","new":true}`,
 		"old token": fmt.Sprintf(`{"epic":"proj:map","new":true,"state":%q}`, live.ID+":starting:1"),
 	} {
-		if code, out := post(body); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
+		if code, out := post(body); code != http.StatusOK || servertest.ReasonOf(t, out) != wire.ReasonStale {
 			t.Errorf("new with %s = %d %s, want stale", name, code, out)
 		}
 	}
-	if code, out := post(`{"epic":"proj:map"}`); code != http.StatusOK || reasonOf(t, out) != "" {
+	if code, out := post(`{"epic":"proj:map"}`); code != http.StatusOK || servertest.ReasonOf(t, out) != "" {
 		t.Errorf("plain call = %d %s, want it to need no token", code, out)
 	}
 	fresh := fmt.Sprintf(`{"epic":"proj:map","new":true,"state":%q}`, sessionToken(f.ctx, t, f.h, live.ID))
-	if code, out := post(fresh); code != http.StatusOK || reasonOf(t, out) != "" {
+	if code, out := post(fresh); code != http.StatusOK || servertest.ReasonOf(t, out) != "" {
 		t.Errorf("new with a fresh token = %d %s, want it to succeed", code, out)
 	}
 }

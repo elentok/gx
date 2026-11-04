@@ -92,8 +92,8 @@ func TestFixAgent_WebRefusesAnAnswerPausedTicket(t *testing.T) {
 		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "asking", servertest.TicketOpts{PauseReason: "manual"})
 	})
 	body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/03", State: "0:answer"})
-	code, out := webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base))
-	if code != http.StatusOK || reasonOf(t, out) != wire.ReasonFixNotRepair {
+	code, out := servertest.WebPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", servertest.JSONPost(f.base))
+	if code != http.StatusOK || servertest.ReasonOf(t, out) != wire.ReasonFixNotRepair {
 		t.Errorf("web fix = %d %s, want %s", code, out, wire.ReasonFixNotRepair)
 	}
 }
@@ -240,17 +240,17 @@ func TestFixAgent_WebNeedsTheStateToken(t *testing.T) {
 	f := startFixAgent(t, nil)
 	post := func(state string) (int, string) {
 		body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: state})
-		return webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base))
+		return servertest.WebPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", servertest.JSONPost(f.base))
 	}
 	for _, state := range []string{"", "5:repair", "0:answer"} {
-		if code, out := post(state); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
+		if code, out := post(state); code != http.StatusOK || servertest.ReasonOf(t, out) != wire.ReasonStale {
 			t.Errorf("state %q = %d %s, want stale", state, code, out)
 		}
 	}
 	if n := len(f.live(t)); n != 0 {
 		t.Fatalf("%d live sessions after stale tokens", n)
 	}
-	if code, out := post(repairToken); code != http.StatusOK || reasonOf(t, out) != "" {
+	if code, out := post(repairToken); code != http.StatusOK || servertest.ReasonOf(t, out) != "" {
 		t.Errorf("current token = %d %s", code, out)
 	}
 }

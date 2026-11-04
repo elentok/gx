@@ -3,7 +3,6 @@ package server_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
@@ -263,7 +264,7 @@ func TestPermissionCard_NoCardWhenNotBlocked(t *testing.T) {
 
 func TestWeb_AgentAnswerNeedsRequestIDAndOrigin(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	js := map[string]string{"Origin": base, "Content-Type": "application/json"}
 	post := func(headers map[string]string, body string) (int, string) {
 		t.Helper()
@@ -271,11 +272,11 @@ func TestWeb_AgentAnswerNeedsRequestIDAndOrigin(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		req.AddCookie(login(t, h.StateDir, base))
+		req.AddCookie(servertest.Login(t, h.StateDir, base))
 		for k, v := range headers {
 			req.Header.Set(k, v)
 		}
-		resp, err := webClient().Do(req)
+		resp, err := servertest.WebClient().Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -3,13 +3,14 @@ package server_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/servertest"
@@ -26,13 +27,14 @@ func writeQuestionLog(t *testing.T, store, epic, file, ts, summary string) {
 
 func TestEpicList_DirtyTrunkCardHasBothActions(t *testing.T) {
 	t.Parallel()
-	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "dirty", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: dirty-trunk\nland_block_reason: uncommitted changes on main clash with a.txt\n---\n", done)
+	done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "dirty", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: dirty-trunk\nland_block_reason: uncommitted changes on main clash with a.txt\n---\n", done)
 	})
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	var row wire.EpicListRow
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		if r.Address == "proj:dirty" {
 			row = r
 		}
@@ -49,29 +51,30 @@ func TestEpicList_DirtyTrunkCardHasBothActions(t *testing.T) {
 func TestEpicList_NeedsYouReasons(t *testing.T) {
 	t.Parallel()
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
-	asking := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\n", "A")}
-	repair := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: zero-commit\n", "A")}
-	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+	asking := map[string]string{"01-a.md": servertest.IssueMD("01", "paused", "pause_reason: self-reported\n", "A")}
+	repair := map[string]string{"01-a.md": servertest.IssueMD("01", "paused", "pause_reason: zero-commit\n", "A")}
+	done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
 	cycle := map[string]string{
-		"01-a.md": issueMD("01", "cancelled", "", "A"),
-		"02-b.md": issueMD("02", "open", "parent: \"01\"\n", "B"),
+		"01-a.md": servertest.IssueMD("01", "cancelled", "", "A"),
+		"02-b.md": servertest.IssueMD("02", "open", "parent: \"01\"\n", "B"),
 	}
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "asking", loop, asking)
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "asking", loop, asking)
 		writeQuestionLog(t, store, "asking", "01-a.jsonl", "2026-03-01T10:00:00Z", "Which store?")
-		writeEpicFiles(t, store, "repair", loop, repair)
-		writeEpicFiles(t, store, "cycle", loop, cycle)
-		writeEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict\n---\n", done)
-		writeEpicFiles(t, store, "awaiting", loop, done)
-		writeEpicFiles(t, store, "ready", loop, map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+		servertest.WriteEpicFiles(t, store, "repair", loop, repair)
+		servertest.WriteEpicFiles(t, store, "cycle", loop, cycle)
+		servertest.WriteEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict\n---\n", done)
+		servertest.WriteEpicFiles(t, store, "awaiting", loop, done)
+		servertest.WriteEpicFiles(t, store, "ready", loop, map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
 		writeProjectEpic(t, store, "auto", "awaiting", loop, done)
 		if err := servertest.WriteProjectRepo(store, "auto", t.TempDir(), `,"auto-ff-merge":true`); err != nil {
 			t.Fatal(err)
 		}
 	})
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	got := map[string]wire.EpicListRow{}
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		got[r.Address] = r
 	}
 
@@ -118,18 +121,19 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 func TestEpicList_NeedsYouSortsOldestWaitFirst(t *testing.T) {
 	t.Parallel()
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
-	ask := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\n", "A")}
-	h, base := startEpicDetail(t, func(store string) {
+	ask := map[string]string{"01-a.md": servertest.IssueMD("01", "paused", "pause_reason: self-reported\n", "A")}
+	h, base := servertest.StartEpicDetail(t, func(store string) {
 		for epic, ts := range map[string]string{
 			"middle": "2026-02-01T10:00:00Z", "newest": "2026-03-01T10:00:00Z", "oldest": "2026-01-01T10:00:00Z",
 		} {
-			writeEpicFiles(t, store, epic, loop, ask)
+			servertest.WriteEpicFiles(t, store, epic, loop, ask)
 			writeQuestionLog(t, store, epic, "01-a.jsonl", ts, "q")
 		}
 	})
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	var names []string
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		if r.Section == wire.SectionNeedsYou {
 			names = append(names, r.Name)
 		}
@@ -142,16 +146,18 @@ func TestEpicList_NeedsYouSortsOldestWaitFirst(t *testing.T) {
 func TestEpicList_SeveralWaitingTicketsNameTheOldest(t *testing.T) {
 	t.Parallel()
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "many", loop, map[string]string{
-			"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\n", "A"),
-			"02-b.md": issueMD("02", "paused", "pause_reason: self-reported\n", "B"),
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "many", loop, map[string]string{
+			"01-a.md": servertest.IssueMD("01", "paused", "pause_reason: self-reported\n", "A"),
+			"02-b.md": servertest.IssueMD("02", "paused", "pause_reason: self-reported\n", "B"),
 		})
+
 		writeQuestionLog(t, store, "many", "01-a.jsonl", "2026-03-01T10:00:00Z", "later")
 		writeQuestionLog(t, store, "many", "02-b.jsonl", "2026-02-01T10:00:00Z", "earlier")
 	})
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
-	rows := getEpicList(t, code, body).Epics
+
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
+	rows := servertest.GetEpicList(t, code, body).Epics
 	if len(rows) != 1 {
 		t.Fatalf("rows = %+v", rows)
 	}
@@ -174,9 +180,9 @@ func TestEpicList_PermissionWaitingIsNeedsYou(t *testing.T) {
 	// reads "implementing" until then.
 	var r wire.EpicListRow
 	waitFor(t, func() bool {
-		code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+		code, body := servertest.WebDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
 		r = wire.EpicListRow{}
-		for _, row := range getEpicList(t, code, body).Epics {
+		for _, row := range servertest.GetEpicList(t, code, body).Epics {
 			if row.Address == "proj:epic-a" {
 				r = row
 			}

@@ -1,46 +1,51 @@
 package server_test
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestEpicList_CardTimePair(t *testing.T) {
 	t.Parallel()
-	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
-	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-	paused := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\nclaimed_at: 2026-01-05T08:00:00Z\n", "A")}
+	open := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
+	done := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+	paused := map[string]string{"01-a.md": servertest.IssueMD("01", "paused", "pause_reason: self-reported\nclaimed_at: 2026-01-05T08:00:00Z\n", "A")}
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "ready", loop, open)
-		writeEpicFiles(t, store, "queued", loop, open)
-		writeEpicFiles(t, store, "paused", loop, paused)
-		writeEpicFiles(t, store, "draft", "---\nstatus: draft\ncreated_at: 2026-01-03T10:00:00Z\n---\n", open)
-		writeEpicFiles(t, store, "noopen", loop, map[string]string{"01-a.md": issueMD("01", "claimed", "", "A")})
-		writeEpicFiles(t, store, "merging", "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\nstarted_at: 2026-01-02T09:00:00Z\n---\n", map[string]string{
-			"01-a.md": issueMD("01", "done", "", "A"),
-			"02-m.md": strings.Replace(issueMD("02", "open", "", "M"), "type: implement", "type: merge", 1),
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "ready", loop, open)
+		servertest.WriteEpicFiles(t, store, "queued", loop, open)
+		servertest.WriteEpicFiles(t, store, "paused", loop, paused)
+		servertest.WriteEpicFiles(t, store, "draft", "---\nstatus: draft\ncreated_at: 2026-01-03T10:00:00Z\n---\n", open)
+		servertest.WriteEpicFiles(t, store, "noopen", loop, map[string]string{"01-a.md": servertest.IssueMD("01", "claimed", "", "A")})
+		servertest.WriteEpicFiles(t, store, "merging", "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\nstarted_at: 2026-01-02T09:00:00Z\n---\n", map[string]string{
+			"01-a.md": servertest.IssueMD("01", "done", "", "A"),
+			"02-m.md": strings.Replace(servertest.IssueMD("02", "open", "", "M"), "type: implement", "type: merge", 1),
 		})
-		writeEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
-		writeEpicFiles(t, store, "follow-ups", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "F")})
-		writeEpicFiles(t, store, "one-offs", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": issueMD("01", "open", "", "Queued one"),
-			"02-b.md": issueMD("02", "claimed", "claimed_at: 2026-01-04T08:00:00Z\n", "Running one"),
-			"03-c.md": issueMD("03", "open", "", "Idle one"),
+
+		servertest.WriteEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
+		servertest.WriteEpicFiles(t, store, "follow-ups", "---\nstatus: open\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "F")})
+		servertest.WriteEpicFiles(t, store, "one-offs", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": servertest.IssueMD("01", "open", "", "Queued one"),
+			"02-b.md": servertest.IssueMD("02", "claimed", "claimed_at: 2026-01-04T08:00:00Z\n", "Running one"),
+			"03-c.md": servertest.IssueMD("03", "open", "", "Idle one"),
 		})
+
 	})
+
 	before := time.Now().Add(-time.Second)
 	for _, addr := range []string{"proj:queued", "proj:one-offs/01"} {
 		if res, err := h.Client.QueueAdd(t.Context(), addr, ""); err != nil || res.Refused {
 			t.Fatalf("queue add %s = %+v, %v", addr, res, err)
 		}
 	}
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	got := map[string]wire.EpicListRow{}
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		got[r.Address] = r
 	}
 	at := func(s string) time.Time {

@@ -37,16 +37,18 @@ func labelsOf(t *testing.T, h *servertest.Harness, base, epic, address string) w
 
 func TestHarnessLabel_WaitingNotes(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": issueMD("01", "open", "", "A"),
-			"02-b.md": issueMD("02", "open", "agent: codex\n", "B"),
-			"03-c.md": issueMD("03", "open", "", "C"),
-			"04-d.md": issueMD("04", "open", "agent: codex\n", "D"),
-			"05-e.md": issueMD("05", "open", "", "E"),
-			"06-f.md": issueMD("06", "done", "", "F"),
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
+			"02-b.md": servertest.IssueMD("02", "open", "agent: codex\n", "B"),
+			"03-c.md": servertest.IssueMD("03", "open", "", "C"),
+			"04-d.md": servertest.IssueMD("04", "open", "agent: codex\n", "D"),
+			"05-e.md": servertest.IssueMD("05", "open", "", "E"),
+			"06-f.md": servertest.IssueMD("06", "done", "", "F"),
 		})
+
 	})
+
 	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "03", "sess-3", true)
 	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "04", "sess-4", true)
 	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "05", "sess-5", false)
@@ -74,11 +76,13 @@ func TestHarnessLabel_WaitingNotes(t *testing.T) {
 
 func TestHarnessLabel_QueueItemAgentPins(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": issueMD("01", "open", "", "A"),
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
 		})
+
 	})
+
 	ctx := context.Background()
 	if _, err := h.Client.QueuePause(ctx); err != nil {
 		t.Fatal(err)

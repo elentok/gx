@@ -210,8 +210,8 @@ func TestChecksStatus_NoProjectListsEveryProject(t *testing.T) {
 
 func TestWeb_ChecksStatusIsServed(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/checks/status"); code != http.StatusOK {
+	h, base := servertest.StartWeb(t)
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/checks/status"); code != http.StatusOK {
 		t.Errorf("GET /v1/checks/status = %d", code)
 	}
 }

@@ -2,12 +2,14 @@ package server_test
 
 import (
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 type accountLogin struct {
@@ -75,7 +77,7 @@ func TestWebAccount_RenameIsStoredAndLogged(t *testing.T) {
 	a := startAccountWeb(t)
 	id := a.logins(t, a.first)[1].ID
 	_, body := a.post(t, "/v1/web/logins/rename", `{"id":"`+id+`","name":"Kitchen tablet"}`, a.first)
-	if reason := reasonOf(t, body); reason != "" {
+	if reason := servertest.ReasonOf(t, body); reason != "" {
 		t.Fatalf("rename refused: %q", reason)
 	}
 	if got := a.logins(t, a.first)[1].Name; got != "Kitchen tablet" {
@@ -86,7 +88,7 @@ func TestWebAccount_RenameIsStoredAndLogged(t *testing.T) {
 		t.Errorf("rename log lines %v, want one with the IP and the new name", lines)
 	}
 	_, body = a.post(t, "/v1/web/logins/rename", `{"id":"`+id+`","name":""}`, a.first)
-	if got := reasonOf(t, body); got != wire.ReasonLoginNameInvalid {
+	if got := servertest.ReasonOf(t, body); got != wire.ReasonLoginNameInvalid {
 		t.Errorf("empty name reason %q, want %q", got, wire.ReasonLoginNameInvalid)
 	}
 }
@@ -102,7 +104,7 @@ func TestWebAccount_RevokeEndsTheStreamAndTheNextRequestGets401(t *testing.T) {
 	}
 	req, _ := http.NewRequest(http.MethodGet, a.base+"/v1/events", nil)
 	req.AddCookie(a.second)
-	stream, err := webClient().Do(req)
+	stream, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +113,7 @@ func TestWebAccount_RevokeEndsTheStreamAndTheNextRequestGets401(t *testing.T) {
 	go func() { _, _ = io.Copy(io.Discard, stream.Body); close(ended) }()
 
 	_, body := a.post(t, "/v1/web/logins/revoke", `{"id":"`+second.ID+`"}`, a.first)
-	if reason := reasonOf(t, body); reason != "" {
+	if reason := servertest.ReasonOf(t, body); reason != "" {
 		t.Fatalf("revoke refused: %q", reason)
 	}
 	select {
@@ -160,7 +162,7 @@ func TestWebAccount_UnknownIDIsRefusedWithItsReason(t *testing.T) {
 	a := startAccountWeb(t)
 	for _, path := range []string{"/v1/web/logins/rename", "/v1/web/logins/revoke"} {
 		_, body := a.post(t, path, `{"id":"nope","name":"x"}`, a.first)
-		if got := reasonOf(t, body); got != wire.ReasonLoginNotFound {
+		if got := servertest.ReasonOf(t, body); got != wire.ReasonLoginNotFound {
 			t.Errorf("%s: reason %q, want %q", path, got, wire.ReasonLoginNotFound)
 		}
 	}
@@ -202,14 +204,14 @@ func (a *accountWeb) changePassword(t *testing.T, cookie *http.Cookie, current, 
 	t.Helper()
 	_, body := a.post(t, "/v1/web/account/password",
 		`{"password":"`+current+`","totp_code":"`+code+`","new_password":"`+next+`"}`, cookie)
-	return reasonOf(t, body)
+	return servertest.ReasonOf(t, body)
 }
 
 func (a *accountWeb) streamOf(t *testing.T, cookie *http.Cookie) <-chan struct{} {
 	t.Helper()
 	req, _ := http.NewRequest(http.MethodGet, a.base+"/v1/events", nil)
 	req.AddCookie(cookie)
-	stream, err := webClient().Do(req)
+	stream, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +338,7 @@ func TestWebAccount_TOTPOffNeedsNoCodeAndRefusesTheResetRoutes(t *testing.T) {
 	}
 	for _, path := range []string{"/v1/web/account/authenticator/begin", "/v1/web/account/authenticator/finish"} {
 		_, body := a.post(t, path, `{"password":"`+accountNewPassword+`"}`, a.first)
-		if got := reasonOf(t, body); got != wire.ReasonTOTPOff {
+		if got := servertest.ReasonOf(t, body); got != wire.ReasonTOTPOff {
 			t.Errorf("%s reason %q, want %q", path, got, wire.ReasonTOTPOff)
 		}
 	}

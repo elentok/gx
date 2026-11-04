@@ -66,7 +66,7 @@ func (f commandsFixture) probes(t *testing.T) int {
 // get calls the route with query and decodes a 200 answer.
 func (f commandsFixture) get(t *testing.T, query url.Values) (int, wire.SessionCommandsResponse, wire.SessionResult) {
 	t.Helper()
-	code, body := webDoCookie(t, http.MethodGet, f.base+"/v1/sessions/commands?"+query.Encode(), f.ck)
+	code, body := servertest.WebDoCookie(t, http.MethodGet, f.base+"/v1/sessions/commands?"+query.Encode(), f.ck)
 	var res wire.SessionCommandsResponse
 	var refusal wire.SessionResult
 	if code == http.StatusOK {

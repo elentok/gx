@@ -39,7 +39,7 @@ func startRestartCheck(t *testing.T, bin func() string) (*servertest.Harness, st
 
 func restartCheckOver(t *testing.T, h *servertest.Harness, base string) wire.RestartCheckReport {
 	t.Helper()
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/restart/check")
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/restart/check")
 	if code != http.StatusOK {
 		t.Fatalf("GET /v1/restart/check = %d: %s", code, body)
 	}
@@ -125,10 +125,10 @@ func TestRestartCheck_NeedsALogin(t *testing.T) {
 	t.Parallel()
 	bin := fakeRestartBinary(t, okCheckScript)
 	h, base := startRestartCheck(t, func() string { return bin })
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/restart/check", nil); code != http.StatusUnauthorized {
+	if code, _ := servertest.WebDoCookie(t, http.MethodGet, base+"/v1/restart/check", nil); code != http.StatusUnauthorized {
 		t.Errorf("without login = %d, want 401", code)
 	}
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/restart/check"); code != http.StatusOK {
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/restart/check"); code != http.StatusOK {
 		t.Errorf("with login = %d, want 200", code)
 	}
 }

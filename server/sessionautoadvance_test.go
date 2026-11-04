@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/testutil/agentfake"
@@ -69,12 +70,12 @@ func TestWebSessions_AutoAdvanceNeedsAFreshTokenOnADesignSession(t *testing.T) {
 		{"plain session", plain, sessionToken(ctx, t, h, plain), wire.ReasonSessionNotDesign},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "auto-advance", tc.id, tc.state)
-		if code != http.StatusOK || reasonOf(t, body) != tc.want {
+		if code != http.StatusOK || servertest.ReasonOf(t, body) != tc.want {
 			t.Errorf("auto-advance with %s = %d %s, want %s", tc.name, code, body, tc.want)
 		}
 	}
 	code, body := webSessionWrite(t, base, cookie, "auto-advance", design, sessionToken(ctx, t, h, design))
-	if code != http.StatusOK || reasonOf(t, body) != "" {
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Errorf("auto-advance with a fresh token = %d %s, want accepted", code, body)
 	}
 }

@@ -40,7 +40,7 @@ func TestClaimHold_HarnessMissingHoldsTicket(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Agent: tc.agent})
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			pty := namedFake{runnerfake.NewRunner(), "pty"}
+			pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
 			opts := append([]func(*server.Config){servertest.WithRunner(pty)}, tc.options...)
 			h := servertest.StartWithStore(t, store, opts...)
 			t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
@@ -99,7 +99,7 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 			servertest.SetProjectRepo(t, store, "proj", repo)
 			path := filepath.Join(t.TempDir(), "config.json")
 			servertest.WriteConfig(t, path, store, nil)
-			pty := namedFake{runnerfake.NewRunner(), "pty"}
+			pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
 			h := servertest.StartWithStore(t, store, servertest.WithRunner(pty), servertest.WithConfigFile(path))
 			tc.change(t, h, path, store)
 			h.Programs.Missing("codex")

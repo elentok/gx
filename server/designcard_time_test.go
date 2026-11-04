@@ -1,10 +1,11 @@
 package server_test
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -13,7 +14,7 @@ import (
 func TestEpicList_DesignAndJoinedCardsCarryTheTimePair(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+	open := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
 	mapFront := func(extra string) string {
 		return "---\nstatus: open\nkind: map\ndesign_step: spec\n" + extra + "---\n"
 	}
@@ -26,26 +27,26 @@ func TestEpicList_DesignAndJoinedCardsCarryTheTimePair(t *testing.T) {
 		done    = "completed_at: 2026-01-03T10:00:00Z\n"
 	)
 
-	writeEpicFiles(t, store, "notstarted", "---\nstatus: open\nkind: map\ndesign_step: chart\ndestination_unconfirmed: true\n"+created+"---\n", open)
-	writeEpicFiles(t, store, "stopped", mapFront(created+started), open)
-	writeEpicFiles(t, store, "stopped-nostamp", mapFront(created), open)
-	writeEpicFiles(t, store, "finished", "---\nstatus: done\nkind: map\ndesign_step: done\n"+created+done+"---\n", open)
-	writeEpicFiles(t, store, "creating", joinedFront("create-tickets", created+started), open)
-	writeEpicFiles(t, store, "creating-impl", "---\nstatus: draft\n---\n", open)
-	writeEpicFiles(t, store, "branch", joinedFront("branch", created+started), open)
-	writeEpicFiles(t, store, "branch-impl", "---\nstatus: open\ncreated_at: 2026-01-04T10:00:00Z\n---\n", open)
-	writeEpicFiles(t, store, "merged", joinedFront("done", created+started+done), open)
-	writeEpicFiles(t, store, "merged-impl", "---\nstatus: done\ncreated_at: 2026-01-04T10:00:00Z\ncompleted_at: 2026-01-05T10:00:00Z\nmerged_at: 2026-01-06T10:00:00Z\n---\n",
-		map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+	servertest.WriteEpicFiles(t, store, "notstarted", "---\nstatus: open\nkind: map\ndesign_step: chart\ndestination_unconfirmed: true\n"+created+"---\n", open)
+	servertest.WriteEpicFiles(t, store, "stopped", mapFront(created+started), open)
+	servertest.WriteEpicFiles(t, store, "stopped-nostamp", mapFront(created), open)
+	servertest.WriteEpicFiles(t, store, "finished", "---\nstatus: done\nkind: map\ndesign_step: done\n"+created+done+"---\n", open)
+	servertest.WriteEpicFiles(t, store, "creating", joinedFront("create-tickets", created+started), open)
+	servertest.WriteEpicFiles(t, store, "creating-impl", "---\nstatus: draft\n---\n", open)
+	servertest.WriteEpicFiles(t, store, "branch", joinedFront("branch", created+started), open)
+	servertest.WriteEpicFiles(t, store, "branch-impl", "---\nstatus: open\ncreated_at: 2026-01-04T10:00:00Z\n---\n", open)
+	servertest.WriteEpicFiles(t, store, "merged", joinedFront("done", created+started+done), open)
+	servertest.WriteEpicFiles(t, store, "merged-impl", "---\nstatus: done\ncreated_at: 2026-01-04T10:00:00Z\ncompleted_at: 2026-01-05T10:00:00Z\nmerged_at: 2026-01-06T10:00:00Z\n---\n",
+		map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")})
 
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+	code, body := servertest.WebDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
 	got := map[string]wire.EpicListRow{}
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}
 

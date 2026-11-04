@@ -1,12 +1,14 @@
 package server_test
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
@@ -33,10 +35,11 @@ func runsOf(t *testing.T, status string, evs ...ralphloop.Event) []wire.DetailRu
 // log at the given minutes, and a hook on the ticket file once it is written.
 func runsWith(t *testing.T, status, extra string, answerMins []int, prep func(ticketPath string), evs ...ralphloop.Event) []wire.DetailRun {
 	t.Helper()
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-			"01-a.md": issueMD("01", status, extra, "A"),
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": servertest.IssueMD("01", status, extra, "A"),
 		})
+
 		withRepo(t, store)
 		for _, ev := range evs {
 			if err := ralphloop.AppendEvent(filepath.Join(store, "proj"), "work", ev); err != nil {
@@ -54,6 +57,7 @@ func runsWith(t *testing.T, status, extra string, answerMins []int, prep func(ti
 			prep(path)
 		}
 	})
+
 	return fetchDetail(t, h, base, "proj:work/01").Runs
 }
 

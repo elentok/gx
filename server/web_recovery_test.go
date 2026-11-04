@@ -2,13 +2,14 @@ package server_test
 
 import (
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
@@ -57,12 +58,12 @@ func startRecoveryWeb(t *testing.T) (h *servertest.Harness, repo, base string, c
 	if err := h.Server.PauseAs(recoveryAddr, events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
-	return h, repo, hs.WebURL, login(t, h.StateDir, hs.WebURL)
+	return h, repo, hs.WebURL, servertest.Login(t, h.StateDir, hs.WebURL)
 }
 
 func detailState(t *testing.T, h *servertest.Harness, base string) string {
 	t.Helper()
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address="+recoveryAddr)
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address="+recoveryAddr)
 	if code != http.StatusOK {
 		t.Fatalf("detail = %d %s", code, body)
 	}
@@ -91,16 +92,16 @@ func TestWebRecoveryVerbs_OldTokenIsStaleCurrentRuns(t *testing.T) {
 			state := detailState(t, h, base)
 			post := func(token string) string {
 				body := `{"address":"` + recoveryAddr + `","state":"` + token + `","reason":"stuck"}`
-				code, out := webPostJSON(t, base+path, body, cookie, "", jsonPost(base))
+				code, out := servertest.WebPostJSON(t, base+path, body, cookie, "", servertest.JSONPost(base))
 				if code != http.StatusOK {
 					t.Fatalf("POST %s = %d %s", path, code, out)
 				}
 				return out
 			}
-			if got := reasonOf(t, post("99:repair")); got != wire.ReasonStale {
+			if got := servertest.ReasonOf(t, post("99:repair")); got != wire.ReasonStale {
 				t.Errorf("old token: reason = %q, want %q", got, wire.ReasonStale)
 			}
-			if got := reasonOf(t, post(state)); got == wire.ReasonStale {
+			if got := servertest.ReasonOf(t, post(state)); got == wire.ReasonStale {
 				t.Errorf("current token was refused as stale")
 			}
 		})
@@ -111,7 +112,7 @@ func TestWebStartOver_DeleteFlagKeepsTheBranch(t *testing.T) {
 	t.Parallel()
 	h, repo, base, cookie := startRecoveryWeb(t)
 	body := `{"address":"` + recoveryAddr + `","state":"` + detailState(t, h, base) + `","reason":"stuck","delete_branch":true}`
-	code, out := webPostJSON(t, base+"/v1/tickets/start-over", body, cookie, "", jsonPost(base))
+	code, out := servertest.WebPostJSON(t, base+"/v1/tickets/start-over", body, cookie, "", servertest.JSONPost(base))
 	if code != http.StatusOK || strings.Contains(out, `"refused"`) {
 		t.Fatalf("start-over = %d %s", code, out)
 	}

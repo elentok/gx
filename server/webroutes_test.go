@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 )
 
 // Every write the web mux serves is either a socket route or on the web-only
@@ -44,7 +45,7 @@ func postReport(t *testing.T, base, body string, headers map[string]string) (int
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := webClient().Do(req)
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,9 +56,9 @@ func postReport(t *testing.T, base, body string, headers map[string]string) (int
 
 func TestWeb_ClientErrorReportNeedsNoCookieAndLogsOneWarn(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	code, body := postReport(t, base, `{"message":"boom","stack":"at x","url":"http://h/#/q","user_agent":"UA/1"}`, jsonPost(base))
-	if code != http.StatusOK || reasonOf(t, body) != "" {
+	h, base := servertest.StartWeb(t)
+	code, body := postReport(t, base, `{"message":"boom","stack":"at x","url":"http://h/#/q","user_agent":"UA/1"}`, servertest.JSONPost(base))
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("status %d body %q, want an accepted report", code, body)
 	}
 	logs, err := os.ReadFile(server.LogPath(h.StateDir))
@@ -82,7 +83,7 @@ func TestWeb_ClientErrorReportNeedsNoCookieAndLogsOneWarn(t *testing.T) {
 
 func TestWeb_ClientErrorReportKeepsTheWriteChecks(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
+	_, base := servertest.StartWeb(t)
 	if code, _ := postReport(t, base, `{}`, map[string]string{"Content-Type": "application/json"}); code != http.StatusForbidden {
 		t.Errorf("no Origin: status %d, want 403", code)
 	}
@@ -96,10 +97,10 @@ func TestWeb_ClientErrorReportKeepsTheWriteChecks(t *testing.T) {
 
 func TestWeb_ClientErrorReportRefusesAnOversizeBody(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	big := `{"message":"` + strings.Repeat("a", 64<<10) + `"}`
-	code, body := postReport(t, base, big, jsonPost(base))
-	if code != http.StatusOK || reasonOf(t, body) != "too-large" {
+	code, body := postReport(t, base, big, servertest.JSONPost(base))
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != "too-large" {
 		t.Errorf("status %d body %q, want a too-large refusal", code, body)
 	}
 	logs, _ := os.ReadFile(server.LogPath(h.StateDir))
@@ -110,14 +111,14 @@ func TestWeb_ClientErrorReportRefusesAnOversizeBody(t *testing.T) {
 
 func TestWeb_ClientErrorReportDropsReportsPastThePerIPLimit(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
+	_, base := servertest.StartWeb(t)
 	refused := 0
 	for range 60 {
-		code, body := postReport(t, base, `{"message":"m"}`, jsonPost(base))
+		code, body := postReport(t, base, `{"message":"m"}`, servertest.JSONPost(base))
 		if code != http.StatusOK {
 			t.Fatalf("status %d", code)
 		}
-		if reasonOf(t, body) == "rate-limited" {
+		if servertest.ReasonOf(t, body) == "rate-limited" {
 			refused++
 		}
 	}
@@ -128,8 +129,8 @@ func TestWeb_ClientErrorReportDropsReportsPastThePerIPLimit(t *testing.T) {
 
 func TestWeb_OtherRoutesStillNeedTheCookie(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
-	resp, err := webClient().Get(base + "/v1/snapshot")
+	_, base := servertest.StartWeb(t)
+	resp, err := servertest.WebClient().Get(base + "/v1/snapshot")
 	if err != nil {
 		t.Fatal(err)
 	}

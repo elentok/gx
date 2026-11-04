@@ -24,7 +24,7 @@ func limitBurnStats(t *testing.T) func(query string) wire.Stats {
 	}
 	return func(query string) wire.Stats {
 		t.Helper()
-		code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/stats"+query)
+		code, body := servertest.WebDo(t, h, http.MethodGet, hs.WebURL+"/v1/stats"+query)
 		if code != http.StatusOK {
 			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
 		}

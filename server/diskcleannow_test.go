@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -214,10 +215,10 @@ func TestDiskCleanNow_FailureIsAnAnswer(t *testing.T) {
 
 func TestWebDiskClean_PostReachesTheHandler(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	cookie := login(t, h.StateDir, base)
-	code, body := webPostJSON(t, base+"/v1/disk/clean", `{"disk":"nope"}`, cookie, "", jsonPost(base))
-	if code != http.StatusOK || reasonOf(t, body) != wire.ReasonUnknownDisk {
+	h, base := servertest.StartWeb(t)
+	cookie := servertest.Login(t, h.StateDir, base)
+	code, body := servertest.WebPostJSON(t, base+"/v1/disk/clean", `{"disk":"nope"}`, cookie, "", servertest.JSONPost(base))
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonUnknownDisk {
 		t.Errorf("web disk clean = %d %s", code, body)
 	}
 }

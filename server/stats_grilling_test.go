@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -19,9 +20,10 @@ func grillItem(id string, at time.Time, q, w int) conversations.GrillingItem {
 // the conversations dir.
 func grillingStats(t *testing.T, recs []conversations.Record) (get func(query string) wire.Stats) {
 	t.Helper()
-	h, base := startEpicDetail(t, func(store string) {
+	h, base := servertest.StartEpicDetail(t, func(store string) {
 		writeProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: open\n---\n", nil)
 	})
+
 	for _, r := range recs {
 		if r.RecordedAt.IsZero() {
 			r.RecordedAt = time.Now()
@@ -32,7 +34,7 @@ func grillingStats(t *testing.T, recs []conversations.Record) (get func(query st
 	}
 	return func(query string) wire.Stats {
 		t.Helper()
-		code, body := webDo(t, h, http.MethodGet, base+"/v1/stats"+query)
+		code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/stats"+query)
 		if code != http.StatusOK {
 			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
 		}

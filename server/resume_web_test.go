@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/repair"
@@ -200,7 +201,7 @@ func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
 		t.Errorf("state = %q, want unchanged %q", got, state)
 	}
 
-	code, body := webDo(t, e.h, http.MethodGet, hs.WebURL+"/v1/tickets/detail?address="+answerAddr)
+	code, body := servertest.WebDo(t, e.h, http.MethodGet, hs.WebURL+"/v1/tickets/detail?address="+answerAddr)
 	if code != http.StatusOK {
 		t.Fatalf("detail = %d %s", code, body)
 	}

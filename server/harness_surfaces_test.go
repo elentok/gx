@@ -139,7 +139,7 @@ func TestFixAgent_StartsOnACodexDefault(t *testing.T) {
 				}
 			} else {
 				body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: repairToken})
-				if code, out := webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base)); code != 200 || reasonOf(t, out) != "" {
+				if code, out := servertest.WebPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", servertest.JSONPost(f.base)); code != 200 || servertest.ReasonOf(t, out) != "" {
 					t.Fatalf("web fix = %d %s", code, out)
 				}
 			}
@@ -163,7 +163,7 @@ func startSplitRunners(t *testing.T, store string, extra ...func(*server.Config)
 	t.Helper()
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	claude, pty = runnerfake.NewRunner(), runnerfake.NewRunner()
-	cl, pt := namedFake{claude, "headless"}, namedFake{pty, "pty"}
+	cl, pt := servertest.NewNamedFake(claude, "headless"), servertest.NewNamedFake(pty, "pty")
 	path = filepath.Join(t.TempDir(), "config.json")
 	opts := append([]func(*server.Config){
 		servertest.WithRunnerFor(cl, func(name, _ string) agentrunner.Runner {

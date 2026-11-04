@@ -30,7 +30,7 @@ func startWebDesign(t *testing.T) (h *servertest.Harness, base string, cookie *h
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	base, cookie = hs.WebURL, login(t, h.StateDir, hs.WebURL)
+	base, cookie = hs.WebURL, servertest.Login(t, h.StateDir, hs.WebURL)
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
@@ -64,7 +64,7 @@ func sessionToken(ctx context.Context, t *testing.T, h *servertest.Harness, id s
 
 func webSessionWrite(t *testing.T, base string, cookie *http.Cookie, verb, id, state string) (int, string) {
 	t.Helper()
-	return webPostJSON(t, base+"/v1/sessions/"+verb, fmt.Sprintf(`{"id":%q,"state":%q}`, id, state), cookie, "", jsonPost(base))
+	return servertest.WebPostJSON(t, base+"/v1/sessions/"+verb, fmt.Sprintf(`{"id":%q,"state":%q}`, id, state), cookie, "", servertest.JSONPost(base))
 }
 
 func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T) {
@@ -79,23 +79,23 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 		{"old token", design, design + ":starting:1", wire.ReasonStale},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "stop", tc.id, tc.state)
-		if code != http.StatusOK || reasonOf(t, body) != tc.want {
+		if code != http.StatusOK || servertest.ReasonOf(t, body) != tc.want {
 			t.Errorf("stop with %s = %d %s, want %s", tc.name, code, body, tc.want)
 		}
 	}
-	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != wire.ReasonSessionNotDesign {
+	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionNotDesign {
 		t.Errorf("restore of a plain session = %d %s, want not-design-session", code, body)
 	}
 
-	if code, body := webSessionWrite(t, base, cookie, "stop", design, fresh); code != http.StatusOK || reasonOf(t, body) != "" {
+	if code, body := webSessionWrite(t, base, cookie, "stop", design, fresh); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("stop with a fresh token = %d %s, want it to succeed", code, body)
 	}
 	waitForSession(ctx, t, h, evs, design, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
-	if code, body := webSessionWrite(t, base, cookie, "resume", design, fresh); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
+	if code, body := webSessionWrite(t, base, cookie, "resume", design, fresh); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("restore with the pre-stop token = %d %s, want stale", code, body)
 	}
-	if code, body := webSessionWrite(t, base, cookie, "resume", design, sessionToken(ctx, t, h, design)); code != http.StatusOK || reasonOf(t, body) != "" {
+	if code, body := webSessionWrite(t, base, cookie, "resume", design, sessionToken(ctx, t, h, design)); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Errorf("restore with a fresh token = %d %s, want it to succeed", code, body)
 	}
 }
@@ -106,18 +106,18 @@ func TestWebSessions_StopThenRemoveAPlainSession(t *testing.T) {
 	waitForHolder(t, filepath.Join(h.SessionsDir, plain))
 
 	live := sessionToken(ctx, t, h, plain)
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != wire.ReasonSessionLive {
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionLive {
 		t.Fatalf("remove of a live session = %d %s, want session-live", code, body)
 	}
-	if code, body := webSessionWrite(t, base, cookie, "stop", plain, live); code != http.StatusOK || reasonOf(t, body) != "" {
+	if code, body := webSessionWrite(t, base, cookie, "stop", plain, live); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("stop of a plain session = %d %s, want it to succeed", code, body)
 	}
 	waitForSession(ctx, t, h, evs, plain, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, live); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("remove with the pre-stop token = %d %s, want stale", code, body)
 	}
-	if code, body := webSessionWrite(t, base, cookie, "remove", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != "" {
+	if code, body := webSessionWrite(t, base, cookie, "remove", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("remove with a fresh token = %d %s, want it to succeed", code, body)
 	}
 	snap, err := h.Client.Snapshot(ctx)
@@ -136,13 +136,13 @@ func TestWebSessions_WriteChecksStillApply(t *testing.T) {
 	h, base, cookie, ctx, _, design, _ := startWebDesign(t)
 	body := fmt.Sprintf(`{"id":%q,"state":%q}`, design, sessionToken(ctx, t, h, design))
 	for _, path := range []string{"/v1/sessions/stop", "/v1/sessions/resume"} {
-		if code, _ := webPostJSON(t, base+path, body, cookie, "", map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}); code != http.StatusForbidden {
+		if code, _ := servertest.WebPostJSON(t, base+path, body, cookie, "", map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}); code != http.StatusForbidden {
 			t.Errorf("%s foreign Origin = %d, want 403", path, code)
 		}
-		if code, _ := webPostJSON(t, base+path, body, cookie, "", map[string]string{"Origin": base, "Content-Type": "text/plain"}); code != http.StatusForbidden {
+		if code, _ := servertest.WebPostJSON(t, base+path, body, cookie, "", map[string]string{"Origin": base, "Content-Type": "text/plain"}); code != http.StatusForbidden {
 			t.Errorf("%s text/plain = %d, want 403", path, code)
 		}
-		if code, _ := webPostJSON(t, base+path, body, nil, "", jsonPost(base)); code != http.StatusUnauthorized && code != http.StatusForbidden {
+		if code, _ := servertest.WebPostJSON(t, base+path, body, nil, "", servertest.JSONPost(base)); code != http.StatusUnauthorized && code != http.StatusForbidden {
 			t.Errorf("%s without cookie = %d, want 401/403", path, code)
 		}
 	}

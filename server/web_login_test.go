@@ -3,7 +3,6 @@ package server_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
 	"strings"
@@ -11,11 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
-const loginTestPassword = "correct horse battery"
+const loginTestPassword = servertest.LoginPassword
 
 // loginWeb is a web listener on a clock the test can move.
 type loginWeb struct {
@@ -39,7 +40,7 @@ func startLoginWeb(t *testing.T) *loginWeb {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake %+v, %v", hs, err)
 	}
-	l.base = webBase(hs.WebURL)
+	l.base = servertest.WebBase(hs.WebURL)
 	return l
 }
 
@@ -50,7 +51,7 @@ func (l *loginWeb) post(t *testing.T, path, body string, cookie *http.Cookie) (*
 	if err != nil {
 		t.Fatal(err)
 	}
-	for k, v := range jsonPost(l.base) {
+	for k, v := range servertest.JSONPost(l.base) {
 		req.Header.Set(k, v)
 	}
 	if cookie != nil {
@@ -73,7 +74,7 @@ func (l *loginWeb) get(t *testing.T, path string, cookie *http.Cookie) (*http.Re
 
 func doBody(t *testing.T, req *http.Request) (*http.Response, string) {
 	t.Helper()
-	resp, err := webClient().Do(req)
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,21 +95,7 @@ func (l *loginWeb) totp(t *testing.T, secret string) string {
 // signIn sets the account up through the real routes and returns the cookie.
 func (l *loginWeb) signIn(t *testing.T) (*http.Cookie, string) {
 	t.Helper()
-	info, err := l.h.Client.WebInfo(context.Background())
-	if err != nil || !info.SetupPending || info.SetupCode == "" {
-		t.Fatalf("web info %+v, %v; want setup pending with a code", info, err)
-	}
-	_, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"`+info.SetupCode+`"}`, nil)
-	var start struct{ Secret string }
-	if err := json.Unmarshal([]byte(body), &start); err != nil || start.Secret == "" {
-		t.Fatalf("setup-start body %q: %v", body, err)
-	}
-	resp, body := l.post(t, "/v1/web/auth/setup-finish",
-		`{"code":"`+info.SetupCode+`","password":"`+loginTestPassword+`","totp_code":"`+l.totp(t, start.Secret)+`"}`, nil)
-	if reasonOf(t, body) != "" || len(resp.Cookies()) != 1 {
-		t.Fatalf("setup-finish body %q, %d cookies", body, len(resp.Cookies()))
-	}
-	return resp.Cookies()[0], start.Secret
+	return servertest.SignIn(t, l.h, l.base, l.now)
 }
 
 func TestWebLogin_SetupPendingServesThePageAndNothingElse(t *testing.T) {
@@ -201,17 +188,17 @@ func TestWebLogin_WrongPasswordAndWrongCodeGiveTheSameReason(t *testing.T) {
 	l.advance(31 * time.Second)
 	_, wrongPassword := l.post(t, "/v1/web/auth/login", `{"password":"not the password","totp_code":"`+l.totp(t, secret)+`"}`, nil)
 	_, wrongCode := l.post(t, "/v1/web/auth/login", `{"password":"`+loginTestPassword+`","totp_code":"000000"}`, nil)
-	if got := reasonOf(t, wrongPassword); got != wire.ReasonWrongCredentials {
+	if got := servertest.ReasonOf(t, wrongPassword); got != wire.ReasonWrongCredentials {
 		t.Errorf("wrong password reason %q, want %q", got, wire.ReasonWrongCredentials)
 	}
-	if got := reasonOf(t, wrongCode); got != wire.ReasonWrongCredentials {
+	if got := servertest.ReasonOf(t, wrongCode); got != wire.ReasonWrongCredentials {
 		t.Errorf("wrong code reason %q, want %q", got, wire.ReasonWrongCredentials)
 	}
 	resp, body := l.post(t, "/v1/web/auth/login", `{"password":"`+loginTestPassword+`","totp_code":"`+l.totp(t, secret)+`"}`, nil)
-	if reasonOf(t, body) != "" && reasonOf(t, body) != wire.ReasonRateLimited {
+	if servertest.ReasonOf(t, body) != "" && servertest.ReasonOf(t, body) != wire.ReasonRateLimited {
 		t.Fatalf("good login body %q", body)
 	}
-	if reasonOf(t, body) == "" && len(resp.Cookies()) != 1 {
+	if servertest.ReasonOf(t, body) == "" && len(resp.Cookies()) != 1 {
 		t.Errorf("good login set %d cookies, want 1", len(resp.Cookies()))
 	}
 }
@@ -220,7 +207,7 @@ func TestWebLogin_SetupRefusalsNameTheirReason(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
 	info, _ := l.h.Client.WebInfo(context.Background())
-	if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); reasonOf(t, body) != wire.ReasonSetupCodeWrong {
+	if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); servertest.ReasonOf(t, body) != wire.ReasonSetupCodeWrong {
 		t.Errorf("wrong Setup code: body %q, want %q", body, wire.ReasonSetupCodeWrong)
 	}
 	_, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"`+info.SetupCode+`"}`, nil)
@@ -228,7 +215,7 @@ func TestWebLogin_SetupRefusalsNameTheirReason(t *testing.T) {
 	_ = json.Unmarshal([]byte(body), &start)
 	finish := func(password, code string) string {
 		_, b := l.post(t, "/v1/web/auth/setup-finish", `{"code":"`+info.SetupCode+`","password":"`+password+`","totp_code":"`+code+`"}`, nil)
-		return reasonOf(t, b)
+		return servertest.ReasonOf(t, b)
 	}
 	if got := finish("short", l.totp(t, start.Secret)); got != wire.ReasonPasswordTooShort {
 		t.Errorf("short password reason %q, want %q", got, wire.ReasonPasswordTooShort)
@@ -244,7 +231,7 @@ func TestWebLogin_SignOutClearsTheCookieAndEndsStreams(t *testing.T) {
 	cookie, _ := l.signIn(t)
 	req, _ := http.NewRequest(http.MethodGet, l.base+"/v1/events", nil)
 	req.AddCookie(cookie)
-	stream, err := webClient().Do(req)
+	stream, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

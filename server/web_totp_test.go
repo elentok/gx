@@ -3,11 +3,12 @@ package server_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -33,7 +34,7 @@ func startTOTPWeb(t *testing.T, totp bool) *totpWeb {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake %+v, %v", hs, err)
 	}
-	w.base = webBase(hs.WebURL)
+	w.base = servertest.WebBase(hs.WebURL)
 	return w
 }
 
@@ -65,7 +66,7 @@ func (w *totpWeb) setupWithoutTOTP(t *testing.T) *http.Cookie {
 		t.Fatalf("setup-start with TOTP off handed out %q", body)
 	}
 	resp, body := w.post(t, "/v1/web/auth/setup-finish", `{"code":"`+info.SetupCode+`","password":"`+loginTestPassword+`"}`, nil)
-	if reasonOf(t, body) != "" || len(resp.Cookies()) != 1 {
+	if servertest.ReasonOf(t, body) != "" || len(resp.Cookies()) != 1 {
 		t.Fatalf("setup-finish body %q, %d cookies", body, len(resp.Cookies()))
 	}
 	return resp.Cookies()[0]
@@ -113,7 +114,7 @@ func TestWebTOTP_OffTakesThePasswordAlone(t *testing.T) {
 		t.Errorf("wrong password reason %q, want %q", a.Reason, wire.ReasonWrongCredentials)
 	}
 	resp, body := w.post(t, "/v1/web/auth/add-authenticator", `{"pending_id":"x","totp_code":"000000"}`, nil)
-	if reasonOf(t, body) != wire.ReasonTOTPOff || len(resp.Cookies()) != 0 {
+	if servertest.ReasonOf(t, body) != wire.ReasonTOTPOff || len(resp.Cookies()) != 0 {
 		t.Errorf("add-authenticator with TOTP off: %q, %d cookies; want %q", body, len(resp.Cookies()), wire.ReasonTOTPOff)
 	}
 }

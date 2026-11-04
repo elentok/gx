@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -17,7 +18,7 @@ import (
 // permissionRead GETs the permission route on the web mux.
 func (f promptFixture) permissionRead(t *testing.T, id string) (int, string) {
 	t.Helper()
-	return webDoCookie(t, http.MethodGet, f.base+"/v1/sessions/permission?session="+id, f.ck)
+	return servertest.WebDoCookie(t, http.MethodGet, f.base+"/v1/sessions/permission?session="+id, f.ck)
 }
 
 func (f promptFixture) wantPermission(t *testing.T, want wire.SessionPermissionResponse) {
@@ -96,7 +97,7 @@ func TestSessionPermission_Refusals(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			code, body := f.permissionRead(t, tc.id)
-			if code == http.StatusOK || reasonOf(t, body) != tc.want {
+			if code == http.StatusOK || servertest.ReasonOf(t, body) != tc.want {
 				t.Errorf("permission = %d %s, want refusal %s", code, body, tc.want)
 			}
 		})
@@ -107,7 +108,7 @@ func TestSessionPermission_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	code, body := f.permissionRead(t, "queue-agent-x")
-	if code == http.StatusOK || reasonOf(t, body) != wire.ReasonSessionReadOnly {
+	if code == http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionReadOnly {
 		t.Errorf("permission = %d %s, want refusal %s", code, body, wire.ReasonSessionReadOnly)
 	}
 }

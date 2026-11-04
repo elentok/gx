@@ -33,11 +33,11 @@ func writeWaiting(t *testing.T, h *servertest.Harness, w check.Waiting) string {
 
 func waitingLabels(t *testing.T, h *servertest.Harness) (queue, detail string) {
 	t.Helper()
-	rows := queueRows(t, h)
+	rows := servertest.QueueRows(t, h)
 	if len(rows) != 1 {
 		t.Fatalf("queue rows = %+v, want one", rows)
 	}
-	d, err := h.Client.Detail(context.Background(), queueRowTicket)
+	d, err := h.Client.Detail(context.Background(), servertest.QueueRowTicket)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,13 +49,13 @@ func waitingLabels(t *testing.T, h *servertest.Harness) (queue, detail string) {
 
 func workingQueueRow(t *testing.T) (*servertest.Harness, string) {
 	t.Helper()
-	h, fake := startQueueRows(t, "pty")
-	fake.SetState(resumeLabel, agentrunner.StateWorking, "")
+	h, fake := servertest.StartQueueRows(t, "pty")
+	fake.SetState(servertest.ResumeLabel, agentrunner.StateWorking, "")
 	servertest.WaitFor(t, 10*time.Second, "a working row", func() bool {
-		rows := queueRows(t, h)
+		rows := servertest.QueueRows(t, h)
 		return len(rows) == 1 && rows[0].Status.State == wire.SessionWorking
 	})
-	return h, queueRows(t, h)[0].Dir
+	return h, servertest.QueueRows(t, h)[0].Dir
 }
 
 // Seam 6: the label follows a live waiting state of the claimed ticket's worktree.

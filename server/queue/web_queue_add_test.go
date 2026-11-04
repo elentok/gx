@@ -1,12 +1,13 @@
-package server_test
+package queue_test
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -45,16 +46,16 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
 	base := hs.WebURL
-	cookie := login(t, h.StateDir, base)
+	cookie := servertest.Login(t, h.StateDir, base)
 	add := func(address, state string) (int, string) {
 		body := `{"address":"` + address + `"`
 		if state != "" {
 			body += `,"state":"` + state + `"`
 		}
-		return webPostJSON(t, base+"/v1/queue/add", body+"}", cookie, "", jsonPost(base))
+		return servertest.WebPostJSON(t, base+"/v1/queue/add", body+"}", cookie, "", servertest.JSONPost(base))
 	}
 
-	if code, body := add("proj:epic-a", "1"); code != http.StatusOK || reasonOf(t, body) != "" {
+	if code, body := add("proj:epic-a", "1"); code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("epic add = %d %s, want accepted", code, body)
 	}
 	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
@@ -74,15 +75,15 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 		{"claimed only", "proj:epic-claimed", wire.ReasonNoOpenTickets},
 		{"merged", "proj:epic-merged", wire.ReasonAlreadyMerged},
 	} {
-		if code, body := add(c.address, "1"); code != http.StatusOK || reasonOf(t, body) != c.reason {
+		if code, body := add(c.address, "1"); code != http.StatusOK || servertest.ReasonOf(t, body) != c.reason {
 			t.Errorf("%s = %d %s, want refusal %s", c.name, code, body, c.reason)
 		}
 	}
 
-	if code, body := add("proj:epic-a", ""); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
+	if code, body := add("proj:epic-a", ""); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("without token = %d %s, want a stale refusal", code, body)
 	}
-	if code, _ := webPostJSON(t, base+"/v1/queue/add", `{"address":"proj:epic-a","state":"1"}`, nil, "", jsonPost(base)); code != http.StatusUnauthorized {
+	if code, _ := servertest.WebPostJSON(t, base+"/v1/queue/add", `{"address":"proj:epic-a","state":"1"}`, nil, "", servertest.JSONPost(base)); code != http.StatusUnauthorized {
 		t.Errorf("without cookie = %d, want 401", code)
 	}
 }

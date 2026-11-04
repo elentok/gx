@@ -37,8 +37,8 @@ func TestOrigin_WebAnswerLogsWeb(t *testing.T) {
 		t.Fatalf("handshake = %+v, %v; want a web_url", hs, err)
 	}
 	body, _ := json.Marshal(wire.QueueRequest{Address: answerAddr, State: state, Choice: "a", Source: "cli"})
-	cookie := login(t, h.StateDir, hs.WebURL)
-	if code, out := webPostJSON(t, hs.WebURL+"/v1/tickets/answer", string(body), cookie, "", jsonPost(hs.WebURL)); code != 200 {
+	cookie := servertest.Login(t, h.StateDir, hs.WebURL)
+	if code, out := servertest.WebPostJSON(t, hs.WebURL+"/v1/tickets/answer", string(body), cookie, "", servertest.JSONPost(hs.WebURL)); code != 200 {
 		t.Fatalf("web answer = %d %s", code, out)
 	}
 	if got := answerSource(t, ticketPath); got != "web" {

@@ -51,21 +51,21 @@ func actionKinds(r wire.EpicListRow) []wire.CardActionKind {
 func TestEpicList_DesignCards(t *testing.T) {
 	t.Parallel()
 	cfg := t.TempDir()
-	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+	open := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
 	four := map[string]string{
-		"01-a.md": issueMD("01", "done", "", "A"), "02-b.md": issueMD("02", "done", "", "B"),
-		"03-c.md": issueMD("03", "open", "", "C"), "04-d.md": issueMD("04", "open", "", "D"),
+		"01-a.md": servertest.IssueMD("01", "done", "", "A"), "02-b.md": servertest.IssueMD("02", "done", "", "B"),
+		"03-c.md": servertest.IssueMD("03", "open", "", "C"), "04-d.md": servertest.IssueMD("04", "open", "", "D"),
 	}
 	mapMD := func(front string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" }
 	unconfirmed := "design_step: chart\ndestination_unconfirmed: true\n"
 
 	store := t.TempDir()
-	writeEpicFiles(t, store, "d-idle", mapMD(unconfirmed), open)
-	writeEpicFiles(t, store, "d-live", mapMD(unconfirmed), open)
-	writeEpicFiles(t, store, "d-wait", mapMD(unconfirmed), open)
-	writeEpicFiles(t, store, "d-stopped", mapMD("design_step: spec\ncreated_at: 2026-01-01T10:00:00Z\n"), open)
-	writeEpicFiles(t, store, "d-pct", mapMD("design_step: resolve-tickets\n"), four)
-	writeEpicFiles(t, store, "d-done", "---\nstatus: done\nkind: map\ndesign_step: done\n---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+	servertest.WriteEpicFiles(t, store, "d-idle", mapMD(unconfirmed), open)
+	servertest.WriteEpicFiles(t, store, "d-live", mapMD(unconfirmed), open)
+	servertest.WriteEpicFiles(t, store, "d-wait", mapMD(unconfirmed), open)
+	servertest.WriteEpicFiles(t, store, "d-stopped", mapMD("design_step: spec\ncreated_at: 2026-01-01T10:00:00Z\n"), open)
+	servertest.WriteEpicFiles(t, store, "d-pct", mapMD("design_step: resolve-tickets\n"), four)
+	servertest.WriteEpicFiles(t, store, "d-done", "---\nstatus: done\nkind: map\ndesign_step: done\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")})
 
 	f := startDesignsIn(t, store, servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg))
 	startDesign := func(ticket string) (id, conv string) {

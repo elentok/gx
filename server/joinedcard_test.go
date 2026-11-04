@@ -23,29 +23,29 @@ func joinedMapMD(step string) string {
 func TestEpicList_JoinedCardPhases(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	mapTickets := map[string]string{"01-a.md": issueMD("01", "done", "", "A"), "02-b.md": issueMD("02", "open", "", "B")}
-	implTickets := map[string]string{"01-a.md": issueMD("01", "done", "", "A"), "02-b.md": issueMD("02", "open", "", "B"), "03-c.md": issueMD("03", "open", "", "C")}
+	mapTickets := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A"), "02-b.md": servertest.IssueMD("02", "open", "", "B")}
+	implTickets := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A"), "02-b.md": servertest.IssueMD("02", "open", "", "B"), "03-c.md": servertest.IssueMD("03", "open", "", "C")}
 	implMD := "---\nstatus: open\n---\n"
 	draftImplMD := "---\nstatus: draft\n---\n"
 
-	writeEpicFiles(t, store, "designing", joinedMapMD("spec"), mapTickets)
-	writeEpicFiles(t, store, "creating", joinedMapMD("create-tickets"), mapTickets)
-	writeEpicFiles(t, store, "creating-impl", draftImplMD, implTickets)
-	writeEpicFiles(t, store, "building", joinedMapMD("branch"), mapTickets)
-	writeEpicFiles(t, store, "building-impl", implMD, implTickets)
-	writeEpicFiles(t, store, "queued-done", joinedMapMD("done"), mapTickets)
-	writeEpicFiles(t, store, "queued-done-impl", implMD, implTickets)
-	writeEpicFiles(t, store, "orphan-impl", implMD, implTickets)
-	writeEpicFiles(t, store, "solo", joinedMapMD("spec"), mapTickets)
+	servertest.WriteEpicFiles(t, store, "designing", joinedMapMD("spec"), mapTickets)
+	servertest.WriteEpicFiles(t, store, "creating", joinedMapMD("create-tickets"), mapTickets)
+	servertest.WriteEpicFiles(t, store, "creating-impl", draftImplMD, implTickets)
+	servertest.WriteEpicFiles(t, store, "building", joinedMapMD("branch"), mapTickets)
+	servertest.WriteEpicFiles(t, store, "building-impl", implMD, implTickets)
+	servertest.WriteEpicFiles(t, store, "queued-done", joinedMapMD("done"), mapTickets)
+	servertest.WriteEpicFiles(t, store, "queued-done-impl", implMD, implTickets)
+	servertest.WriteEpicFiles(t, store, "orphan-impl", implMD, implTickets)
+	servertest.WriteEpicFiles(t, store, "solo", joinedMapMD("spec"), mapTickets)
 
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+	code, body := servertest.WebDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
 	got := map[string]wire.EpicListRow{}
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}
 
@@ -89,9 +89,9 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	t.Parallel()
 	cfg := t.TempDir()
 	store := t.TempDir()
-	tix := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-	writeEpicFiles(t, store, "m", joinedMapMD("done"), tix)
-	writeEpicFiles(t, store, "m-impl", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	tix := map[string]string{"01-a.md": servertest.IssueMD("01", "done", "", "A")}
+	servertest.WriteEpicFiles(t, store, "m", joinedMapMD("done"), tix)
+	servertest.WriteEpicFiles(t, store, "m-impl", "---\nstatus: open\n---\n", map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
 
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
@@ -106,8 +106,8 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 		t.Fatal(err)
 	}
 	row := func() wire.EpicListRow {
-		code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
-		for _, r := range getEpicList(t, code, body).Epics {
+		code, body := servertest.WebDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+		for _, r := range servertest.GetEpicList(t, code, body).Epics {
 			if r.Name == "m" {
 				return r
 			}
@@ -172,17 +172,18 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 
 func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
 	t.Parallel()
-	tix := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "m", joinedMapMD("done"), tix)
-		writeEpicFiles(t, store, "m-impl", "---\nstatus: open\n---\n", tix)
+	tix := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "m", joinedMapMD("done"), tix)
+		servertest.WriteEpicFiles(t, store, "m-impl", "---\nstatus: open\n---\n", tix)
 	})
+
 	if res, err := h.Client.QueueAdd(t.Context(), "proj:m-impl", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	var row *wire.EpicListRow
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		if r.Name == "m" {
 			row = &r
 		}
@@ -197,22 +198,23 @@ func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
 
 func TestEpicList_JoinedCardCarriesImplQueueSlot(t *testing.T) {
 	t.Parallel()
-	tix := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "other", "---\nstatus: open\n---\n", tix)
-		writeEpicFiles(t, store, "queued", joinedMapMD("done"), tix)
-		writeEpicFiles(t, store, "queued-impl", "---\nstatus: open\n---\n", tix)
-		writeEpicFiles(t, store, "idle", joinedMapMD("done"), tix)
-		writeEpicFiles(t, store, "idle-impl", "---\nstatus: open\n---\n", tix)
+	tix := map[string]string{"01-a.md": servertest.IssueMD("01", "open", "", "A")}
+	h, base := servertest.StartEpicDetail(t, func(store string) {
+		servertest.WriteEpicFiles(t, store, "other", "---\nstatus: open\n---\n", tix)
+		servertest.WriteEpicFiles(t, store, "queued", joinedMapMD("done"), tix)
+		servertest.WriteEpicFiles(t, store, "queued-impl", "---\nstatus: open\n---\n", tix)
+		servertest.WriteEpicFiles(t, store, "idle", joinedMapMD("done"), tix)
+		servertest.WriteEpicFiles(t, store, "idle-impl", "---\nstatus: open\n---\n", tix)
 	})
+
 	for _, name := range []string{"other", "queued-impl"} {
 		if res, err := h.Client.QueueAdd(t.Context(), "proj:"+name, ""); err != nil || res.Refused {
 			t.Fatalf("queue add %s = %+v, %v", name, res, err)
 		}
 	}
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	got := map[string]wire.EpicListRow{}
-	for _, r := range getEpicList(t, code, body).Epics {
+	for _, r := range servertest.GetEpicList(t, code, body).Epics {
 		got[r.Name] = r
 	}
 	if s := got["queued"].QueueSlot; s != 2 {

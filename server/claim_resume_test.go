@@ -3,7 +3,6 @@ package server_test
 import (
 	"context"
 	"errors"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -20,16 +21,6 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 )
-
-// namedFake is a fake that reports itself as the runner called name.
-type namedFake struct {
-	*runnerfake.Runner
-	name string
-}
-
-func (n namedFake) Name() string { return n.name }
-
-const resumeLabel = "epic-a-iter-01"
 
 // claimOpen puts ticket 01 in the queue as a ticket that has run before
 // (session sess-old) and was paused, then waits for its next claim to launch.
@@ -61,7 +52,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 		t.Fatal(err)
 	}
 
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(namedFake{fake, runner}), servertest.WithEnv("CODEX_HOME="+codexHome))
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(servertest.NewNamedFake(fake, runner)), servertest.WithEnv("CODEX_HOME="+codexHome))
 	if rollout {
 		_, _, wt := ralphloop.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
 		meta := `{"type":"session_meta","payload":{"id":"sess-old","cwd":` + strconv.Quote(wt) + `}}` + "\n"
@@ -91,7 +82,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 			break
 		}
 	}
-	t.Cleanup(func() { fake.SetState(resumeLabel, agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.SetState(servertest.ResumeLabel, agentrunner.StateDone, "") })
 	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +117,7 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 			fake := runnerfake.NewRunner()
 			fake.ResumeErr = c.resumeErr
 			logged := claimOpen(t, c.runner, c.agent, c.answered, c.rollout, fake)
-			if got := fake.ResumeIDs(resumeLabel); !slices.Equal(got, c.wantIDs) {
+			if got := fake.ResumeIDs(servertest.ResumeLabel); !slices.Equal(got, c.wantIDs) {
 				t.Errorf("start attempts carried resume ids %q, want %q", got, c.wantIDs)
 			}
 			if len(logged) != 1 || logged[0].Path != c.wantPath {
@@ -135,7 +126,7 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 			// A cold start carries no conversation: the skill command names the ticket,
 			// and the agent reads the Handoff from it.
 			if c.wantPath == "cold-start" {
-				if got := fake.Prompts(resumeLabel); len(got) == 0 || !strings.Contains(got[0], "proj:epic-a/01") {
+				if got := fake.Prompts(servertest.ResumeLabel); len(got) == 0 || !strings.Contains(got[0], "proj:epic-a/01") {
 					t.Errorf("cold-start prompts = %q, want the first to name the ticket", got)
 				}
 			}

@@ -464,7 +464,7 @@ func TestHerdr_NotProbedForRunnerWithoutHost(t *testing.T) {
 
 func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
 	t.Parallel()
-	fake := namedFake{runnerfake.NewRunner(), "herdr"}
+	fake := servertest.NewNamedFake(runnerfake.NewRunner(), "herdr")
 	fake.SetHealthErr(errors.New("down"))
 	h := servertest.StartWithStore(t, herdrTicketStore(t), servertest.WithRunner(fake))
 	ctx := context.Background()

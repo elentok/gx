@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server/servertest"
 )
 
 func TestWebRoot_DownloadsNeedNoLoginAndCarryNoHSTS(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	root, _ := webRootPEM(t, h)
 	tests := []struct {
 		path, contentType string
@@ -28,7 +30,7 @@ func TestWebRoot_DownloadsNeedNoLoginAndCarryNoHSTS(t *testing.T) {
 		}},
 	}
 	for _, tt := range tests {
-		resp, err := webClient().Get(base + tt.path)
+		resp, err := servertest.WebClient().Get(base + tt.path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,14 +54,14 @@ func TestWebRoot_DownloadsNeedNoLoginAndCarryNoHSTS(t *testing.T) {
 
 func TestWebHead_PublicRoutesMatchGetWithoutBody(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
+	_, base := servertest.StartWeb(t)
 	for _, path := range []string{"/gx-root.mobileconfig", "/gx-root.cer", "/"} {
-		get, err := webClient().Get(base + path)
+		get, err := servertest.WebClient().Get(base + path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		get.Body.Close()
-		resp, err := webClient().Head(base + path)
+		resp, err := servertest.WebClient().Head(base + path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,9 +79,9 @@ func TestWebHead_PublicRoutesMatchGetWithoutBody(t *testing.T) {
 
 func TestWebHead_NeedsLoginOutsidePublicRoutes(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
+	_, base := servertest.StartWeb(t)
 	for _, path := range []string{"/v1/snapshot", "/v1/events"} {
-		resp, err := webClient().Head(base + path)
+		resp, err := servertest.WebClient().Head(base + path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -88,7 +90,7 @@ func TestWebHead_NeedsLoginOutsidePublicRoutes(t *testing.T) {
 			t.Errorf("HEAD %s = %d, want 401", path, resp.StatusCode)
 		}
 	}
-	resp, err := webClient().Head(base + "/assets/missing.js")
+	resp, err := servertest.WebClient().Head(base + "/assets/missing.js")
 	if err != nil {
 		t.Fatal(err)
 	}

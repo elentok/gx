@@ -2,13 +2,15 @@ package server_test
 
 import (
 	"encoding/json"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -17,7 +19,7 @@ import (
 // ticket lookup needs.
 func writeDetailEpic(t *testing.T, store string, issues map[string]string) {
 	t.Helper()
-	writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", issues)
+	servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", issues)
 	pf := `{"name":"proj","repo":` + strconv.Quote(t.TempDir()) + `}`
 	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(pf), 0o644); err != nil {
 		t.Fatal(err)
@@ -26,12 +28,13 @@ func writeDetailEpic(t *testing.T, store string, issues map[string]string) {
 
 func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
+	h, base := servertest.StartEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
 			"01-a.md": "---\nid: [unclosed\n---\n\n# A\n",
 		})
 	})
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address=proj:work/01")
+
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address=proj:work/01")
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
@@ -52,12 +55,13 @@ func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
 
 func TestDetailWeb_GraphErrorKeepsFullPayload(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
+	h, base := servertest.StartEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
-			"01-a.md": issueMD("01", "open", "blocked_by: [\"nope\"]\n", "A"),
+			"01-a.md": servertest.IssueMD("01", "open", "blocked_by: [\"nope\"]\n", "A"),
 		})
 	})
-	code, body := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address=proj:work/01")
+
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address=proj:work/01")
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
@@ -75,13 +79,14 @@ func TestDetailWeb_GraphErrorKeepsFullPayload(t *testing.T) {
 
 func TestDetailWeb_UnknownAndMalformedAddressAre404(t *testing.T) {
 	t.Parallel()
-	h, base := startEpicDetail(t, func(store string) {
+	h, base := servertest.StartEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
-			"01-a.md": issueMD("01", "open", "", "A"),
+			"01-a.md": servertest.IssueMD("01", "open", "", "A"),
 		})
 	})
+
 	for _, addr := range []string{"proj:work/99", "not%20an%20address", "proj:work/%%"} {
-		if code, body := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address="+addr); code != http.StatusNotFound {
+		if code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address="+addr); code != http.StatusNotFound {
 			t.Errorf("%q: status %d (%s), want 404", addr, code, body)
 		}
 	}

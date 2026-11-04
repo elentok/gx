@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 )
@@ -209,7 +210,7 @@ func TestSaveChecks_InvalidConfigIsRefused(t *testing.T) {
 
 func TestWeb_ChecksSaveIsAWrite(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	headers := map[string]string{"Content-Type": "application/json", "Origin": base}
 	if code := webSend(t, h, "POST", base+"/v1/checks/save", headers); code != 200 {
 		t.Errorf("status = %d", code)

@@ -259,12 +259,12 @@ func TestWebSessionPrompt_StaleWhenTheTranscriptMoved(t *testing.T) {
 	)
 	post := func(last string) (int, string) {
 		body := fmt.Sprintf(`{"id":%q,"text":"SQLite","last_message":%q}`, f.id, last)
-		return webPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", jsonPost(f.base))
+		return servertest.WebPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", servertest.JSONPost(f.base))
 	}
-	if code, out := post("a1"); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
+	if code, out := post("a1"); code != http.StatusOK || servertest.ReasonOf(t, out) != wire.ReasonStale {
 		t.Errorf("old message id = %d %s, want stale", code, out)
 	}
-	if code, out := post("a2"); code != http.StatusOK || reasonOf(t, out) != "" {
+	if code, out := post("a2"); code != http.StatusOK || servertest.ReasonOf(t, out) != "" {
 		t.Errorf("current message id = %d %s, want sent", code, out)
 	}
 	waitForSubmitted(t, f.conv, "\"SQLite\"\n")
@@ -314,15 +314,15 @@ func TestWebSessionPrompt_StaleContinueIsRefused(t *testing.T) {
 	)
 	post := func(last string) (int, string) {
 		body := fmt.Sprintf(`{"id":%q,"continue":true,"last_message":%q}`, f.id, last)
-		return webPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", jsonPost(f.base))
+		return servertest.WebPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", servertest.JSONPost(f.base))
 	}
-	if code, out := post("a1"); code != http.StatusOK || reasonOf(t, out) != wire.ReasonStale {
+	if code, out := post("a1"); code != http.StatusOK || servertest.ReasonOf(t, out) != wire.ReasonStale {
 		t.Errorf("old message id = %d %s, want stale", code, out)
 	}
 	if got := submitted(t, f.conv); got != "" {
 		t.Errorf("stale continue typed %q", got)
 	}
-	if code, out := post("a2"); code != http.StatusOK || reasonOf(t, out) != "" {
+	if code, out := post("a2"); code != http.StatusOK || servertest.ReasonOf(t, out) != "" {
 		t.Errorf("current message id = %d %s, want sent", code, out)
 	}
 	waitForSubmitted(t, f.conv, "\"/clear\"\n\"/gx-design map\"\n")
@@ -333,13 +333,13 @@ func TestWebSessionPrompt_KeepsTheWriteChecks(t *testing.T) {
 	f := startPromptSession(t)
 	url := f.base + "/v1/sessions/prompt"
 	body := fmt.Sprintf(`{"id":%q,"text":"hi"}`, f.id)
-	if code, _ := webPostJSON(t, url, body, nil, "", jsonPost(f.base)); code != http.StatusUnauthorized {
+	if code, _ := servertest.WebPostJSON(t, url, body, nil, "", servertest.JSONPost(f.base)); code != http.StatusUnauthorized {
 		t.Errorf("no token = %d, want 401", code)
 	}
-	if code, _ := webPostJSON(t, url, body, f.ck, "", map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}); code != http.StatusForbidden {
+	if code, _ := servertest.WebPostJSON(t, url, body, f.ck, "", map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}); code != http.StatusForbidden {
 		t.Errorf("foreign Origin = %d, want 403", code)
 	}
-	if code, _ := webPostJSON(t, url, body, f.ck, "", map[string]string{"Origin": f.base, "Content-Type": "text/plain"}); code != http.StatusForbidden {
+	if code, _ := servertest.WebPostJSON(t, url, body, f.ck, "", map[string]string{"Origin": f.base, "Content-Type": "text/plain"}); code != http.StatusForbidden {
 		t.Errorf("text/plain = %d, want 403", code)
 	}
 }

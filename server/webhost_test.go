@@ -25,7 +25,7 @@ func hostStatus(t *testing.T, base, host string, cookie *http.Cookie) (int, stri
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}
-	resp, err := webClient().Do(req)
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func startWebHosts(t *testing.T, hosts ...string) (*servertest.Harness, string, 
 func TestWebHost_Table(t *testing.T) {
 	t.Parallel()
 	h, base, port := startWebHosts(t, "gx.tail1234.ts.net")
-	cookie := login(t, h.StateDir, base)
+	cookie := servertest.Login(t, h.StateDir, base)
 	tests := []struct {
 		name string
 		host string
@@ -86,12 +86,12 @@ func TestWebHost_Table(t *testing.T) {
 func TestWebHost_AllRoutesRefuseUnlistedName(t *testing.T) {
 	t.Parallel()
 	h, base, _ := startWebHosts(t)
-	cookie := login(t, h.StateDir, base)
+	cookie := servertest.Login(t, h.StateDir, base)
 	for _, path := range []string{"/", "/index.html", "/some/client/route", "/v1/snapshot", "/v1/events", "/v1/nope"} {
 		req, _ := http.NewRequest(http.MethodGet, base+path, nil)
 		req.Host = "evil.example"
 		req.AddCookie(cookie)
-		resp, err := webClient().Do(req)
+		resp, err := servertest.WebClient().Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +107,7 @@ func TestWebHost_RefusalIsShortPlainText(t *testing.T) {
 	_, base, _ := startWebHosts(t)
 	req, _ := http.NewRequest(http.MethodGet, base+"/", nil)
 	req.Host = "evil.example"
-	resp, err := webClient().Do(req)
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestWebHost_AnyHostIPLiteralPassesOnAllInterfacesBind(t *testing.T) {
 	}
 	_, port, _ := net.SplitHostPort(webHostPort(hs.WebURL))
 	base := "https://127.0.0.1:" + port
-	cookie := login(t, h.StateDir, base)
+	cookie := servertest.Login(t, h.StateDir, base)
 	for _, host := range []string{"0.0.0.0:" + port, "192.168.1.20:" + port, "100.64.0.1:" + port} {
 		if code, _ := hostStatus(t, base, host, cookie); code != http.StatusOK {
 			t.Errorf("Host %q = %d, want 200", host, code)
@@ -183,7 +183,7 @@ func TestWebHost_ReloadAppliesAllowedHostsWithoutRestart(t *testing.T) {
 		c.WebAddr = "127.0.0.1:0"
 	})
 	base := h.Server.WebURL()
-	cookie := login(t, h.StateDir, base)
+	cookie := servertest.Login(t, h.StateDir, base)
 	if code, _ := hostStatus(t, base, "new.example", cookie); code != http.StatusForbidden {
 		t.Fatalf("before reload = %d, want 403", code)
 	}

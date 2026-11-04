@@ -45,7 +45,7 @@ func startWebFocus(t *testing.T) *webFocus {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	return &webFocus{h: h, base: hs.WebURL, cookie: login(t, h.StateDir, hs.WebURL), chat: chat, started: started, id: id,
+	return &webFocus{h: h, base: hs.WebURL, cookie: servertest.Login(t, h.StateDir, hs.WebURL), chat: chat, started: started, id: id,
 		step: func(c agentfake.Control, state string) { reach(ctx, t, h, evs, id, conv, c, state) }}
 }
 
@@ -59,7 +59,7 @@ func (f *webFocus) openTab(t *testing.T, client string) {
 		t.Fatal(err)
 	}
 	req.AddCookie(f.cookie)
-	resp, err := webClient().Do(req)
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func (f *webFocus) openTab(t *testing.T, client string) {
 func (f *webFocus) report(t *testing.T, client string, focused bool, session string) string {
 	t.Helper()
 	body := fmt.Sprintf(`{"client":%q,"focused":%t,"session":%q}`, client, focused, session)
-	code, res := webPostJSON(t, f.base+"/v1/sessions/focus", body, f.cookie, "", jsonPost(f.base))
+	code, res := servertest.WebPostJSON(t, f.base+"/v1/sessions/focus", body, f.cookie, "", servertest.JSONPost(f.base))
 	if code != http.StatusOK {
 		t.Fatalf("web focus = %d %s", code, res)
 	}

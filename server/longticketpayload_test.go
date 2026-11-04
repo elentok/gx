@@ -12,10 +12,11 @@ import (
 func TestLongTicketMark_ReachesTheEpicRowAndTheTicketDetail(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
-		"01-a.md": issueMD("01", "open", "long_ticket_turns: 120\n", "Marked"),
-		"02-b.md": issueMD("02", "open", "", "Plain"),
+	servertest.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+		"01-a.md": servertest.IssueMD("01", "open", "long_ticket_turns: 120\n", "Marked"),
+		"02-b.md": servertest.IssueMD("02", "open", "", "Plain"),
 	})
+
 	withRepo(t, store)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.WebAddr = "127.0.0.1:0"

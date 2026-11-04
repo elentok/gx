@@ -25,7 +25,7 @@ func TestRateLimitHold_StopsNewClaimsOfThatHarnessOnly(t *testing.T) {
 		servertest.WriteTicket(t, store, "proj", epic, "01", epic, "")
 	}
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	pty := namedFake{runnerfake.NewRunner(), "pty"}
+	pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
 	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
 		func(c *server.Config) { c.MaxAgents = 4 })
 	t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })

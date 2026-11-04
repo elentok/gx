@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/testutil/agentfake"
@@ -44,7 +45,7 @@ func TestWebSessions_InterruptNeedsAFreshTokenOnADesignSession(t *testing.T) {
 		{"fresh token, not working", design, sessionToken(ctx, t, h, design), wire.ReasonSessionNotWorking},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "interrupt", tc.id, tc.state)
-		if code != http.StatusOK || reasonOf(t, body) != tc.want {
+		if code != http.StatusOK || servertest.ReasonOf(t, body) != tc.want {
 			t.Errorf("interrupt with %s = %d %s, want %s", tc.name, code, body, tc.want)
 		}
 	}

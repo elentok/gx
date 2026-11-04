@@ -37,8 +37,8 @@ func TestWebDevProxy_ServesAssetsFromDevFrontend(t *testing.T) {
 	t.Cleanup(dev.Close)
 
 	base, h := startWebDev(t, dev.URL)
-	cookie := login(t, h.StateDir, base)
-	code, body := webDoCookie(t, http.MethodGet, base+"/src/main.tsx", cookie)
+	cookie := servertest.Login(t, h.StateDir, base)
+	code, body := servertest.WebDoCookie(t, http.MethodGet, base+"/src/main.tsx", cookie)
 	if code != http.StatusOK || body != "dev:/src/main.tsx" {
 		t.Errorf("asset = %d %q, want the dev frontend's response", code, body)
 	}
@@ -52,11 +52,11 @@ func TestWebDevProxy_ModulesNeedNoCookieButTheAPIDoes(t *testing.T) {
 	t.Cleanup(dev.Close)
 
 	base, _ := startWebDev(t, dev.URL)
-	code, body := webDoCookie(t, http.MethodGet, base+"/src/main.tsx?t=1792556497813", nil)
+	code, body := servertest.WebDoCookie(t, http.MethodGet, base+"/src/main.tsx?t=1792556497813", nil)
 	if code != http.StatusOK || body != "dev:/src/main.tsx" {
 		t.Errorf("module without a cookie = %d %q, want the dev frontend's response", code, body)
 	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot", nil); code != http.StatusUnauthorized {
+	if code, _ := servertest.WebDoCookie(t, http.MethodGet, base+"/v1/snapshot", nil); code != http.StatusUnauthorized {
 		t.Errorf("API without a cookie = %d, want 401", code)
 	}
 }
@@ -69,8 +69,8 @@ func TestWebDevProxy_SnapshotStaysLocal(t *testing.T) {
 	t.Cleanup(dev.Close)
 
 	base, h := startWebDev(t, dev.URL)
-	cookie := login(t, h.StateDir, base)
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot", cookie); code != http.StatusOK {
+	cookie := servertest.Login(t, h.StateDir, base)
+	if code, _ := servertest.WebDoCookie(t, http.MethodGet, base+"/v1/snapshot", cookie); code != http.StatusOK {
 		t.Errorf("snapshot status = %d, want 200", code)
 	}
 }
@@ -97,8 +97,8 @@ func TestWebDevProxy_ExplainsWhenDevFrontendIsDown(t *testing.T) {
 	dev.Close()
 
 	base, h := startWebDev(t, devURL)
-	cookie := login(t, h.StateDir, base)
-	code, body := webDoCookie(t, http.MethodGet, base+"/", cookie)
+	cookie := servertest.Login(t, h.StateDir, base)
+	code, body := servertest.WebDoCookie(t, http.MethodGet, base+"/", cookie)
 	if code != http.StatusBadGateway || !strings.Contains(body, devURL) {
 		t.Errorf("page = %d %q, want 502 naming %s", code, body, devURL)
 	}

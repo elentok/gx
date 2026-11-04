@@ -66,7 +66,7 @@ const confirmedBody = `{"new_version":"new-2","config_ok":true,"failing_projects
 
 func (f *restartFixture) post(t *testing.T, body string) (int, wire.RestartResult) {
 	t.Helper()
-	code, out := webPostJSON(t, f.base+"/v1/restart", body, login(t, f.h.StateDir, f.base), "", jsonPost(f.base))
+	code, out := servertest.WebPostJSON(t, f.base+"/v1/restart", body, servertest.Login(t, f.h.StateDir, f.base), "", servertest.JSONPost(f.base))
 	var res wire.RestartResult
 	if code == http.StatusOK {
 		if err := json.Unmarshal([]byte(out), &res); err != nil {
@@ -154,7 +154,7 @@ func TestRestart_UnreadableCheckIsRefusedAndSpawnsNothing(t *testing.T) {
 func TestRestart_NeedsALogin(t *testing.T) {
 	t.Parallel()
 	f := newRestartFixture(t)
-	code, _ := webPostJSON(t, f.base+"/v1/restart", confirmedBody, nil, "", jsonPost(f.base))
+	code, _ := servertest.WebPostJSON(t, f.base+"/v1/restart", confirmedBody, nil, "", servertest.JSONPost(f.base))
 	if code != http.StatusUnauthorized {
 		t.Errorf("without login = %d, want 401", code)
 	}

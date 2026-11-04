@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
@@ -15,7 +16,7 @@ import (
 
 func (f designsFixture) webCreate(t *testing.T, body string) (int, wire.SessionResult) {
 	t.Helper()
-	code, out := webPostJSON(t, f.base+"/v1/sessions/create", body, f.ck, "", jsonPost(f.base))
+	code, out := servertest.WebPostJSON(t, f.base+"/v1/sessions/create", body, f.ck, "", servertest.JSONPost(f.base))
 	var res wire.SessionResult
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatalf("body %q: %v", out, err)

@@ -58,7 +58,7 @@ func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 				servertest.WriteTicket(t, store, "proj", epic, "01", epic, "")
 			}
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			pty := namedFake{runnerfake.NewRunner(), "pty"}
+			pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
 			h := servertest.StartWithStore(t, store,
 				servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
 				withUsageSample(t, c.rec))
@@ -98,7 +98,7 @@ func TestUsageGate_OverrideLetsAClaudeTicketClaim(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "epic-a", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	pty := namedFake{runnerfake.NewRunner(), "pty"}
+	pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
 	rec := nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: &nativerunner.UsageWindow{UsedPercentage: 99, ResetsAt: time.Now().Add(time.Hour).Unix()}}
 	h := servertest.StartWithStore(t, store,
 		servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
@@ -132,7 +132,7 @@ func TestUsageGate_LiftsAtResetWithNoNewSample(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "epic-a", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	pty := namedFake{runnerfake.NewRunner(), "pty"}
+	pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
 	resets := time.Now().Add(3 * time.Second)
 	rec := nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: &nativerunner.UsageWindow{UsedPercentage: 99, ResetsAt: resets.Unix()}}
 	h := servertest.StartWithStore(t, store,

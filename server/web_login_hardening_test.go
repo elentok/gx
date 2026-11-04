@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,6 +11,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
 )
@@ -81,7 +83,7 @@ func TestWebLoginLimits_FiveWrongSetupCodesLockLoginsToo(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
 	for i := 0; i < 5; i++ {
-		if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); reasonOf(t, body) != wire.ReasonSetupCodeWrong {
+		if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); servertest.ReasonOf(t, body) != wire.ReasonSetupCodeWrong {
 			t.Fatalf("wrong Setup code %d: body %q", i+1, body)
 		}
 	}
@@ -149,7 +151,7 @@ func TestWebLoginLimits_RestartedServerAcceptsTheOldCookie(t *testing.T) {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake %+v, %v", hs, err)
 	}
-	l.base = webBase(hs.WebURL)
+	l.base = servertest.WebBase(hs.WebURL)
 	u, err := url.Parse(l.base)
 	if err != nil {
 		t.Fatal(err)

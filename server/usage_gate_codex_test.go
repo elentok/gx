@@ -53,7 +53,7 @@ func TestUsageGate_CodexSampleHoldsCodexClaimsOnlyAndItsOverrideLiftsThem(t *tes
 		servertest.WriteTicket(t, store, "proj", epic, "01", epic, "")
 	}
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	pty := namedFake{runnerfake.NewRunner(), "pty"}
+	pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
 	resets := time.Now().Add(time.Hour).Truncate(time.Second)
 	rec := nativerunner.UsageRecord{SeenAt: time.Now(), SevenDay: &nativerunner.UsageWindow{UsedPercentage: 98, ResetsAt: resets.Unix(), Name: "weekly"}}
 	h := servertest.StartWithStore(t, store,

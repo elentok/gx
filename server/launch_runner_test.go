@@ -2,10 +2,11 @@ package server_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/servertest"
@@ -28,9 +29,9 @@ func TestLaunchRunner_CodexRunsOnPtyUnlessHerdrIsConfigured(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "codex one", "")
 			servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			fakes := map[string]namedFake{}
+			fakes := map[string]servertest.NamedFake{}
 			for _, name := range []string{"pty", "headless", "herdr"} {
-				fakes[name] = namedFake{runnerfake.NewRunner(), name}
+				fakes[name] = servertest.NewNamedFake(runnerfake.NewRunner(), name)
 			}
 			configured := fakes[tc.configured]
 			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {

@@ -1,10 +1,11 @@
 package server_test
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"net/http"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -24,22 +25,22 @@ func TestWeb_EpicMergeChecksTheShownState(t *testing.T) {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
 	base := hs.WebURL
-	cookie := login(t, h.StateDir, base)
+	cookie := servertest.Login(t, h.StateDir, base)
 	merge := func(state string, headers map[string]string) (int, string) {
 		body := `{"address":"proj:research"`
 		if state != "" {
 			body += `,"state":"` + state + `"`
 		}
-		return webPostJSON(t, base+"/v1/epics/merge", body+"}", cookie, "", headers)
+		return servertest.WebPostJSON(t, base+"/v1/epics/merge", body+"}", cookie, "", headers)
 	}
 	merged := func() bool {
 		return !tickets.LoadEpicTicketMD(filepath.Join(store, "proj", "research")).MergedAt.IsZero()
 	}
 
-	if code, body := merge(string(wire.EpicStateRunning), jsonPost(base)); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
+	if code, body := merge(string(wire.EpicStateRunning), servertest.JSONPost(base)); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("stale state = %d %s, want the stale refusal", code, body)
 	}
-	if code, body := merge("", jsonPost(base)); code != http.StatusOK || reasonOf(t, body) != wire.ReasonStale {
+	if code, body := merge("", servertest.JSONPost(base)); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonStale {
 		t.Errorf("no state = %d %s, want the stale refusal", code, body)
 	}
 	foreign := map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}
@@ -50,8 +51,8 @@ func TestWeb_EpicMergeChecksTheShownState(t *testing.T) {
 		t.Fatal("a refused request merged the epic")
 	}
 
-	code, body := merge(string(wire.EpicStateAwaitingMerge), jsonPost(base))
-	if code != http.StatusOK || reasonOf(t, body) != "" || !merged() {
+	code, body := merge(string(wire.EpicStateAwaitingMerge), servertest.JSONPost(base))
+	if code != http.StatusOK || servertest.ReasonOf(t, body) != "" || !merged() {
 		t.Errorf("matching state = %d %s (merged %v), want a merge", code, body, merged())
 	}
 }

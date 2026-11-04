@@ -35,7 +35,7 @@ func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "codex one", "")
 			servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			herdr := namedFake{runnerfake.NewRunner(), "herdr"}
+			herdr := servertest.NewNamedFake(runnerfake.NewRunner(), "herdr")
 			herdr.SetHealthErr(tc.err)
 			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(herdr, func(name, _ string) agentrunner.Runner {
 				if name == "herdr" {
@@ -107,8 +107,8 @@ func TestHerdrBanner_HiddenForCodexTicketOnPty(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Agent: "codex"})
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	pty := namedFake{runnerfake.NewRunner(), "pty"}
-	herdr := namedFake{runnerfake.NewRunner(), "herdr"}
+	pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
+	herdr := servertest.NewNamedFake(runnerfake.NewRunner(), "herdr")
 	herdr.SetHealthErr(errors.New("socket closed"))
 	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(name, _ string) agentrunner.Runner {
 		if name == "herdr" {
@@ -144,8 +144,8 @@ func TestHerdrBanner_HiddenWhileNoTicketNeedsHerdr(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	pty := namedFake{runnerfake.NewRunner(), "pty"}
-	herdr := namedFake{runnerfake.NewRunner(), "herdr"}
+	pty := servertest.NewNamedFake(runnerfake.NewRunner(), "pty")
+	herdr := servertest.NewNamedFake(runnerfake.NewRunner(), "herdr")
 	herdr.SetHealthErr(errors.New("socket closed"))
 	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(name, _ string) agentrunner.Runner {
 		if name == "herdr" {

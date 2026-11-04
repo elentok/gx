@@ -12,47 +12,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"testing/fstest"
 
-	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
-func startWeb(t *testing.T) (*servertest.Harness, string) {
-	t.Helper()
-	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	hs, err := h.Client.Handshake(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if hs.WebURL == "" {
-		t.Fatalf("handshake has no web_url: %+v", hs)
-	}
-	return h, hs.WebURL
-}
-
-// webHTTP is the one client every test uses to reach the web listener.
-var webHTTP = servertest.WebHTTPClient()
-
-// webClient returns the client for the web listener.
-func webClient() *http.Client { return webHTTP }
-
 // noRedirect lets a test see the redirect itself instead of its target.
 var noRedirect = &http.Client{
-	Transport:     webHTTP.Transport,
+	Transport:     servertest.WebClient().Transport,
 	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-}
-
-// webBase returns the scheme and host of a web URL, for example "http://127.0.0.1:8080".
-func webBase(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		panic(err)
-	}
-	return u.Scheme + "://" + u.Host
 }
 
 // webHostPort returns the host:port of a web URL.
@@ -64,54 +34,6 @@ func webHostPort(rawURL string) string {
 	return u.Host
 }
 
-type loginEntry struct {
-	once   sync.Once
-	cookie *http.Cookie
-}
-
-// logins holds one signed-in cookie per harness: setup runs once, because a
-// second sign-in in the same TOTP step would be refused as a replay.
-var logins sync.Map
-
-// login signs the harness in through the real setup routes and returns the cookie.
-func login(t *testing.T, stateDir, base string) *http.Cookie {
-	t.Helper()
-	e, _ := logins.LoadOrStore(stateDir+"|"+webBase(base), &loginEntry{})
-	entry := e.(*loginEntry)
-	entry.once.Do(func() {
-		l := &loginWeb{h: &servertest.Harness{Client: apiclient.New(server.SocketPath(stateDir))}, base: webBase(base)}
-		entry.cookie, _ = l.signIn(t)
-	})
-	if entry.cookie == nil {
-		t.Fatal("sign-in failed earlier in this harness")
-	}
-	return entry.cookie
-}
-
-func webDoCookie(t *testing.T, method, url string, cookie *http.Cookie) (int, string) {
-	t.Helper()
-	req, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cookie != nil {
-		req.AddCookie(cookie)
-	}
-	resp, err := webClient().Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode, string(body)
-}
-
-// webDo sends an authenticated request.
-func webDo(t *testing.T, h *servertest.Harness, method, url string) (int, string) {
-	t.Helper()
-	return webDoCookie(t, method, url, login(t, h.StateDir, webBase(url)))
-}
-
 // webSend sends an authenticated request with the given headers and an empty JSON body.
 func webSend(t *testing.T, h *servertest.Harness, method, url string, headers map[string]string) int {
 	t.Helper()
@@ -119,11 +41,11 @@ func webSend(t *testing.T, h *servertest.Harness, method, url string, headers ma
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.AddCookie(login(t, h.StateDir, webBase(url)))
+	req.AddCookie(servertest.Login(t, h.StateDir, servertest.WebBase(url)))
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := webClient().Do(req)
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +55,7 @@ func webSend(t *testing.T, h *servertest.Harness, method, url string, headers ma
 
 func TestWeb_WriteRequestOriginAndJSONCheck(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	host := webHostPort(base)
 	hostname, port, _ := net.SplitHostPort(host)
 	otherPort := "http://" + hostname + ":1"
@@ -169,8 +91,8 @@ func TestWeb_WriteRequestOriginAndJSONCheck(t *testing.T) {
 
 func TestWeb_GetNeedsNoOrigin(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/snapshot"); code != http.StatusOK {
+	h, base := servertest.StartWeb(t)
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/snapshot"); code != http.StatusOK {
 		t.Errorf("GET without Origin = %d, want 200", code)
 	}
 }
@@ -179,8 +101,8 @@ func TestWeb_GetNeedsNoOrigin(t *testing.T) {
 // 401 even with a bad Origin.
 func TestWeb_WriteLoginCheckComesFirst(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
-	if code, _ := webDoCookie(t, http.MethodPost, base+"/nope", nil); code != http.StatusUnauthorized {
+	_, base := servertest.StartWeb(t)
+	if code, _ := servertest.WebDoCookie(t, http.MethodPost, base+"/nope", nil); code != http.StatusUnauthorized {
 		t.Errorf("unauthenticated POST = %d, want 401", code)
 	}
 }
@@ -200,11 +122,11 @@ func webGet(t *testing.T, h *servertest.Harness, url string, headers map[string]
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.AddCookie(login(t, h.StateDir, webBase(url)))
+	req.AddCookie(servertest.Login(t, h.StateDir, servertest.WebBase(url)))
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := webClient().Do(req)
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +139,7 @@ func webGet(t *testing.T, h *servertest.Harness, url string, headers map[string]
 // against a fake build in TestServeAsset_CacheHeaders.
 func TestWeb_ServesIndexOnlyAtRoot(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	resp := webGet(t, h, base+"/", nil)
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK || !strings.Contains(resp.Header.Get("Content-Type"), "text/html") ||
@@ -235,7 +157,7 @@ func TestWeb_ServesIndexOnlyAtRoot(t *testing.T) {
 		t.Errorf("GET / with matching If-None-Match = %d, want 304", got)
 	}
 	for _, path := range []string{"/assets/missing.js", "/stats", "/some/client/route", "/index.html"} {
-		if code, _ := webDo(t, h, http.MethodGet, base+path); code != http.StatusNotFound {
+		if code, _ := servertest.WebDo(t, h, http.MethodGet, base+path); code != http.StatusNotFound {
 			t.Errorf("GET %s = %d, want 404", path, code)
 		}
 	}
@@ -273,46 +195,46 @@ func TestServeAsset_CacheHeaders(t *testing.T) {
 
 func TestWeb_SnapshotIsServed(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/snapshot"); code != http.StatusOK {
+	h, base := servertest.StartWeb(t)
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/snapshot"); code != http.StatusOK {
 		t.Errorf("GET /v1/snapshot = %d", code)
 	}
 }
 
 func TestWeb_SessionReadsAreServed(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/sessions"); code != http.StatusOK {
+	h, base := servertest.StartWeb(t)
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/sessions"); code != http.StatusOK {
 		t.Errorf("GET /v1/sessions = %d", code)
 	}
 	// A bad id is the handler's 400; an unserved route would be a 404.
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/sessions/chat?session=../x"); code != http.StatusBadRequest {
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/sessions/chat?session=../x"); code != http.StatusBadRequest {
 		t.Errorf("GET /v1/sessions/chat = %d, want 400", code)
 	}
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/sessions/screen?session=../x"); code != http.StatusBadRequest {
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/sessions/screen?session=../x"); code != http.StatusBadRequest {
 		t.Errorf("GET /v1/sessions/screen = %d, want 400", code)
 	}
 }
 
 func TestWeb_HealthReadIsServed(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/health"); code != http.StatusOK {
+	h, base := servertest.StartWeb(t)
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/health"); code != http.StatusOK {
 		t.Errorf("GET /v1/health = %d", code)
 	}
 }
 
 func TestUsageSummary_WebServesRead(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/usage/summary"); code != http.StatusOK {
+	h, base := servertest.StartWeb(t)
+	if code, _ := servertest.WebDo(t, h, http.MethodGet, base+"/v1/usage/summary"); code != http.StatusOK {
 		t.Errorf("GET /v1/usage/summary = %d", code)
 	}
 }
 
 func TestWeb_EverythingElseIs404(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	validWrite := map[string]string{"Origin": base, "Content-Type": "application/json"}
 	for _, pattern := range server.RoutePatterns() {
 		method, path, _ := strings.Cut(pattern, " ")
@@ -342,7 +264,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 // like for any visitor, nothing is set, and the API stays closed.
 func TestWeb_OldTokenLinkAndCookieAreIgnored(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
+	_, base := servertest.StartWeb(t)
 	req, err := http.NewRequest(http.MethodGet, base+"/?gx_token=abc", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -360,14 +282,14 @@ func TestWeb_OldTokenLinkAndCookieAreIgnored(t *testing.T) {
 	if len(resp.Cookies()) != 0 {
 		t.Errorf("old token link set cookies %v, want none", resp.Cookies())
 	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot?gx_token=abc", &http.Cookie{Name: "gx_web", Value: "x"}); code != http.StatusUnauthorized {
+	if code, _ := servertest.WebDoCookie(t, http.MethodGet, base+"/v1/snapshot?gx_token=abc", &http.Cookie{Name: "gx_web", Value: "x"}); code != http.StatusUnauthorized {
 		t.Errorf("snapshot with an old token and cookie = %d, want 401", code)
 	}
 }
 
 func TestWeb_StartDeletesTheOldTokenFile(t *testing.T) {
 	t.Parallel()
-	h, _ := startWeb(t)
+	h, _ := servertest.StartWeb(t)
 	path := filepath.Join(h.StateDir, "web-token")
 	if err := os.WriteFile(path, []byte("old\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -380,13 +302,13 @@ func TestWeb_StartDeletesTheOldTokenFile(t *testing.T) {
 
 func TestWeb_CookieAuthenticatesEventStream(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
+	h, base := servertest.StartWeb(t)
 	req, err := http.NewRequest(http.MethodGet, base+"/v1/events", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.AddCookie(login(t, h.StateDir, base))
-	resp, err := webClient().Do(req)
+	req.AddCookie(servertest.Login(t, h.StateDir, base))
+	resp, err := servertest.WebClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,9 +340,9 @@ func TestWeb_BindFailureIsReportedAndServerKeepsRunning(t *testing.T) {
 // overwrite each other's session.
 func TestWeb_TwoServersKeepSeparateCookies(t *testing.T) {
 	t.Parallel()
-	h1, base1 := startWeb(t)
-	h2, base2 := startWeb(t)
-	c1, c2 := login(t, h1.StateDir, base1), login(t, h2.StateDir, base2)
+	h1, base1 := servertest.StartWeb(t)
+	h2, base2 := servertest.StartWeb(t)
+	c1, c2 := servertest.Login(t, h1.StateDir, base1), servertest.Login(t, h2.StateDir, base2)
 	if c1.Name == c2.Name {
 		t.Fatalf("both servers use cookie %q", c1.Name)
 	}
@@ -432,7 +354,7 @@ func TestWeb_TwoServersKeepSeparateCookies(t *testing.T) {
 		for _, c := range tc.cookies {
 			req.AddCookie(c)
 		}
-		resp, err := webClient().Do(req)
+		resp, err := servertest.WebClient().Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
