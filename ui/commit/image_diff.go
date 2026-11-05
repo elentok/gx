@@ -31,7 +31,7 @@ type overlaySignature struct {
 
 func (m Model) overlaySignature() overlaySignature {
 	path := ""
-	if file, ok := m.selectedCommitFile(); ok {
+	if file, ok := m.sidebar.selectedCommitFile(); ok {
 		path = file.Path
 	}
 	return overlaySignature{
@@ -67,7 +67,7 @@ func (m *Model) isImageDiffEligible(file stage.CommitFile) bool {
 // the overlay area — the kitty graphics are placed as a side effect, never
 // embedded here (ADR 0010). Otherwise it is the plain "binary file" summary.
 func (m Model) binaryDiffLines(bodyH, innerW int) []string {
-	if file, ok := m.selectedCommitFile(); ok && m.isImageDiffEligible(file) && m.overlay.FallbackPath() != file.Path {
+	if file, ok := m.sidebar.selectedCommitFile(); ok && m.isImageDiffEligible(file) && m.overlay.FallbackPath() != file.Path {
 		blank := strings.Repeat(" ", innerW)
 		lines := make([]string, 0, bodyH)
 		for range bodyH {
@@ -107,7 +107,7 @@ func (m Model) SelectedImageFile() (string, bool) {
 	if !m.screenVisible {
 		return "", false
 	}
-	file, ok := m.selectedCommitFile()
+	file, ok := m.sidebar.selectedCommitFile()
 	if !ok || !m.isImageDiffEligible(file) {
 		return "", false
 	}
@@ -131,7 +131,7 @@ func (m Model) PanelGeometry() (originCol, originRow, availCols, availRows int, 
 // FetchBlobs implements imagediff.SettleHost: the selected file's old/new image
 // bytes, resolved against the current ref by the shared endpoint helper.
 func (m Model) FetchBlobs() (old, newBytes []byte, oldOK, newOK bool) {
-	file, ok := m.selectedCommitFile()
+	file, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		return nil, nil, false, false
 	}
@@ -142,7 +142,7 @@ func (m Model) FetchBlobs() (old, newBytes []byte, oldOK, newOK bool) {
 // cells relative to the commit panel's own top-left, mirroring contentView's
 // layout exactly so the reserved blank lines and the overlay line up.
 func (m Model) diffPaneBodyRect() (col, row, w, h int, ok bool) {
-	if !m.ready || len(m.fileTreeModel.Entries()) == 0 {
+	if !m.ready || len(m.sidebar.fileTreeModel.Entries()) == 0 {
 		return 0, 0, 0, 0, false
 	}
 	bodyH, contentH := m.layoutHeights()
@@ -152,7 +152,7 @@ func (m Model) diffPaneBodyRect() (col, row, w, h int, ok bool) {
 		filesH, diffH := m.narrowPaneHeights(contentH)
 		paneX, paneY, paneW, paneH = 0, bodyH+filesH+1, m.width, diffH
 	} else {
-		leftW := m.filesPaneWidth(contentH)
+		leftW := m.sidebar.filesPaneWidth(m.filesInput(), contentH)
 		paneX, paneY, paneW, paneH = leftW, bodyH, m.width-leftW, contentH
 	}
 	if paneW <= 2 || paneH <= 2 {

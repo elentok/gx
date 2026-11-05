@@ -41,7 +41,7 @@ type Model struct {
 	header headerPane
 
 	commitDiffArea
-	commitSidebarState
+	sidebar filesPane
 
 	help help.Model
 	keys keys.Manager
@@ -68,11 +68,6 @@ type commitDiffArea struct {
 	diffContextLines int
 }
 
-type commitSidebarState struct {
-	files         []stage.CommitFile
-	fileTreeModel tree.Model[stage.CommitFile]
-}
-
 func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraKeys keys.Manager) Model {
 	m := Model{
 		worktreeRoot: worktreeRoot,
@@ -88,7 +83,7 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 			diffModel:        diffview.NewModel(settings.UseNerdFontIcons),
 			diffContextLines: settings.DiffContextLines,
 		},
-		commitSidebarState: commitSidebarState{
+		sidebar: filesPane{
 			fileTreeModel: tree.NewModel[stage.CommitFile](),
 		},
 		keys: newCommitManager(),
@@ -179,25 +174,20 @@ func (m Model) WithContainerFocus(focused bool) Model {
 func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
-		m.files = nil
+		m.sidebar.files = nil
 		m.diffModel.SetData(diffview.NewDiffData())
 		m.header.headerOffset = 0
 		return
 	}
-	m.files, m.err = stage.CommitFilesForRef(m.worktreeRoot, m.ref)
+	m.sidebar.files, m.err = stage.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.diffModel.SetData(diffview.NewDiffData())
 		m.header.headerOffset = 0
 		return
 	}
-	entries := tree.BuildEntriesFromPaths(
-		m.files,
-		func(file stage.CommitFile) string { return file.Path },
-		m.fileTreeModel.CollapsedIDs(),
-	)
-	m.fileTreeModel.SetEntries(entries)
-	if entry, ok := m.selectedCommitEntry(); !ok || entry.HasChildren {
-		m.selectFirstCommitFile()
+	m.sidebar.rebuildCommitFiletree()
+	if entry, ok := m.sidebar.selectedCommitEntry(); !ok || entry.HasChildren {
+		m.sidebar.selectFirstCommitFile()
 	}
 	m.applyFilterPathSearch()
 	m.header.headerOffset = 0
@@ -205,7 +195,7 @@ func (m *Model) reload() {
 }
 
 func (m *Model) refreshDiff() {
-	file, ok := m.selectedCommitFile()
+	file, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		m.diffModel.SetData(diffview.NewDiffData())
 		return
@@ -225,22 +215,12 @@ func (m *Model) refreshDiff() {
 	m.syncDiffViewport()
 }
 
-func (m *Model) selectFirstCommitFile() {
-	entries := m.fileTreeModel.Entries()
-	for i, entry := range entries {
-		if !entry.HasChildren {
-			m.fileTreeModel.SetSelectedIndex(i)
-			return
-		}
-	}
-}
-
 func (m *Model) applyFilterPathSearch() {
 	if m.filterPath == "" {
 		return
 	}
-	m.fileTreeModel.ApplyPassiveSearch(m.filterPath, m.fileEntrySearchText)
-	if m.fileTreeModel.FocusCurrentSearchMatch() {
+	m.sidebar.fileTreeModel.ApplyPassiveSearch(m.filterPath, m.sidebar.fileEntrySearchText)
+	if m.sidebar.fileTreeModel.FocusCurrentSearchMatch() {
 		m.refreshDiff()
 	}
 }

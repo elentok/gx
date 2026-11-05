@@ -143,14 +143,14 @@ func TestJKWithoutDiffFocusMoveFiles(t *testing.T) {
 
 	m := newTestModel(repo, "HEAD")
 	m.ready = true
-	if len(m.files) < 2 {
-		t.Fatalf("expected multiple files, got %d", len(m.files))
+	if len(m.sidebar.files) < 2 {
+		t.Fatalf("expected multiple files, got %d", len(m.sidebar.files))
 	}
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.fileTreeModel.SelectedIndex() != 1 {
-		t.Fatalf("expected j to move selected file, got %d", m.fileTreeModel.SelectedIndex())
+	if m.sidebar.fileTreeModel.SelectedIndex() != 1 {
+		t.Fatalf("expected j to move selected file, got %d", m.sidebar.fileTreeModel.SelectedIndex())
 	}
 	if m.focusDiff {
 		t.Fatalf("expected file navigation not to force diff focus")

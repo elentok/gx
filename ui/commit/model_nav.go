@@ -8,13 +8,13 @@ func (m Model) CurrentRef() string {
 // HasInternalFocus reports whether the commit model has a focused sub-panel
 // (diff or header) that esc should step back through before the caller acts.
 func (m Model) HasInternalFocus() bool {
-	return m.focusDiff || m.focusHeader || m.fileTreeModel.Search().IsActive()
+	return m.focusDiff || m.focusHeader || m.sidebar.fileTreeModel.Search().IsActive()
 }
 
 // IsFileTreeFocused reports whether the commit file tree is the active
 // sub-panel. Search input focus is excluded so typed characters are preserved.
 func (m Model) IsFileTreeFocused() bool {
-	return !m.focusDiff && !m.focusHeader && !m.fileTreeModel.Search().InputFocused()
+	return !m.focusDiff && !m.focusHeader && !m.sidebar.fileTreeModel.Search().InputFocused()
 }
 
 // IsHeaderFocused reports whether the commit info/header panel owns internal
@@ -34,5 +34,5 @@ func (m Model) DiffScrollOffset() int {
 // offset, for callers (e.g. hover-routing tests) that need to observe
 // whether a wheel event reached the file tree.
 func (m Model) FileTreeScrollOffset() int {
-	return m.fileTreeModel.ScrollOffset()
+	return m.sidebar.fileTreeModel.ScrollOffset()
 }

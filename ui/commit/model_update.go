@@ -104,16 +104,16 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, diffCmd
 			}
 		}
-	} else if !m.focusHeader && (len(m.keys.Prefix()) == 0 || m.fileTreeModel.HasPendingChord()) {
+	} else if !m.focusHeader && (len(m.keys.Prefix()) == 0 || m.sidebar.fileTreeModel.HasPendingChord()) {
 		var ftCmd tea.Cmd
 		var ftResult tree.Result
-		m.fileTreeModel, ftCmd, ftResult = m.fileTreeModel.Update(msg)
+		m.sidebar.fileTreeModel, ftCmd, ftResult = m.sidebar.fileTreeModel.Update(msg)
 		if ftResult.Handled {
 			if ftResult.SearchQueryChanged {
-				m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
+				m.sidebar.fileTreeModel.RecomputeSearchMatches(m.sidebar.fileEntrySearchText)
 			}
 			if ftResult.SearchQueryChanged || ftResult.SearchCursorChanged {
-				if m.fileTreeModel.FocusCurrentSearchMatch() {
+				if m.sidebar.fileTreeModel.FocusCurrentSearchMatch() {
 					m.refreshDiff()
 				}
 			}
@@ -122,9 +122,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.ensureActiveVisible()
 			}
 			if ftResult.RebuildRequested {
-				m.rebuildCommitFiletree()
-				if m.fileTreeModel.Search().HasQuery() {
-					m.fileTreeModel.RecomputeSearchMatches(m.fileEntrySearchText)
+				m.sidebar.rebuildCommitFiletree()
+				if m.sidebar.fileTreeModel.Search().HasQuery() {
+					m.sidebar.fileTreeModel.RecomputeSearchMatches(m.sidebar.fileEntrySearchText)
 				}
 			}
 			if ftResult.SelectionChanged {

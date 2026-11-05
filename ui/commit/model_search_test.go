@@ -27,7 +27,7 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.fileTreeModel.Search().Mode() != search.SearchModeInput {
+	if m.sidebar.fileTreeModel.Search().Mode() != search.SearchModeInput {
 		t.Fatalf("expected / to enter search mode")
 	}
 
@@ -35,11 +35,11 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		m = updated.(Model)
 	}
-	if m.fileTreeModel.Search().Query() != "txt" {
-		t.Fatalf("search.Query() = %q, want txt", m.fileTreeModel.Search().Query())
+	if m.sidebar.fileTreeModel.Search().Query() != "txt" {
+		t.Fatalf("search.Query() = %q, want txt", m.sidebar.fileTreeModel.Search().Query())
 	}
-	if m.fileTreeModel.Search().MatchesCount() < 2 {
-		t.Fatalf("expected multiple sidebar matches, got %d", m.fileTreeModel.Search().MatchesCount())
+	if m.sidebar.fileTreeModel.Search().MatchesCount() < 2 {
+		t.Fatalf("expected multiple sidebar matches, got %d", m.sidebar.fileTreeModel.Search().MatchesCount())
 	}
 	if m.focusDiff {
 		t.Fatalf("expected sidebar search to keep focus in sidebar")
@@ -47,14 +47,14 @@ func TestSidebarSearchMovesToFileMatches(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.fileTreeModel.Search().Mode() == search.SearchModeInput {
+	if m.sidebar.fileTreeModel.Search().Mode() == search.SearchModeInput {
 		t.Fatalf("expected enter to leave input mode")
 	}
 
-	first := m.fileTreeModel.SelectedIndex()
+	first := m.sidebar.fileTreeModel.SelectedIndex()
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if m.fileTreeModel.SelectedIndex() == first {
+	if m.sidebar.fileTreeModel.SelectedIndex() == first {
 		t.Fatalf("expected n to move to next sidebar match")
 	}
 }
@@ -69,20 +69,20 @@ func TestFilterPathHighlightsAndFocusesFileOnOpen(t *testing.T) {
 	testutil.CommitAll(t, repo, "change")
 
 	m := newTestModelWithFilter(repo, "HEAD", "beta.txt", ui.Settings{})
-	file, ok := m.selectedCommitFile()
+	file, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		t.Fatalf("expected selected commit file")
 	}
 	if file.Path != "beta.txt" {
 		t.Fatalf("selected file = %q, want %q", file.Path, "beta.txt")
 	}
-	if m.fileTreeModel.Search().Query() != "beta.txt" {
-		t.Fatalf("search.Query() = %q, want %q", m.fileTreeModel.Search().Query(), "beta.txt")
+	if m.sidebar.fileTreeModel.Search().Query() != "beta.txt" {
+		t.Fatalf("search.Query() = %q, want %q", m.sidebar.fileTreeModel.Search().Query(), "beta.txt")
 	}
-	if m.fileTreeModel.Search().Mode() != search.SearchModeNone {
-		t.Fatalf("search.Mode() = %v, want SearchModeNone", m.fileTreeModel.Search().Mode())
+	if m.sidebar.fileTreeModel.Search().Mode() != search.SearchModeNone {
+		t.Fatalf("search.Mode() = %v, want SearchModeNone", m.sidebar.fileTreeModel.Search().Mode())
 	}
-	if m.fileTreeModel.Search().MatchesCount() == 0 {
+	if m.sidebar.fileTreeModel.Search().MatchesCount() == 0 {
 		t.Fatalf("expected sidebar search matches")
 	}
 }

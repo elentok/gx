@@ -25,7 +25,7 @@ func TestFilesPaneShowsNerdFontIcons(t *testing.T) {
 	m.width = 100
 	m.height = 24
 
-	pane := m.renderFilesPane(30, 10)
+	pane := m.sidebar.renderFilesPane(m.filesInput(), 30, 10)
 	icons := ui.Icons(true)
 	if !strings.Contains(pane, icons.FolderOpen) {
 		t.Fatalf("expected files pane to show folder icon, got:\n%s", pane)
@@ -46,7 +46,7 @@ func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
 	testutil.CommitAll(t, repo, "change")
 
 	m := newTestModel(repo, "HEAD")
-	entry, ok := m.selectedCommitEntry()
+	entry, ok := m.sidebar.selectedCommitEntry()
 	if !ok {
 		t.Fatal("expected selected commit entry")
 	}
@@ -129,14 +129,14 @@ func TestCommaDotInDiffFrameSwitchFiles(t *testing.T) {
 	m.syncDiffViewport()
 	m.focusDiff = true
 
-	before, ok := m.selectedCommitFile()
+	before, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		t.Fatal("expected selected file")
 	}
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
 	m = updated.(Model)
-	after, ok := m.selectedCommitFile()
+	after, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		t.Fatal("expected selected file after .")
 	}
@@ -146,7 +146,7 @@ func TestCommaDotInDiffFrameSwitchFiles(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
 	m = updated.(Model)
-	back, ok := m.selectedCommitFile()
+	back, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		t.Fatal("expected selected file after ,")
 	}
@@ -174,14 +174,14 @@ func commitModelWithDir(t *testing.T) Model {
 	m.ready = true
 	m.width = 100
 	m.height = 24
-	entries := m.fileTreeModel.Entries()
+	entries := m.sidebar.fileTreeModel.Entries()
 	if len(entries) < 3 {
 		t.Fatalf("precondition: expected expanded dir + files, got %d entries", len(entries))
 	}
 	if !entries[0].HasChildren || !entries[0].Expanded {
 		t.Fatalf("precondition: expected expanded dir row, got hasChildren=%v expanded=%v", entries[0].HasChildren, entries[0].Expanded)
 	}
-	m.fileTreeModel.SetSelectedIndex(0)
+	m.sidebar.fileTreeModel.SetSelectedIndex(0)
 	return m
 }
 
@@ -190,7 +190,7 @@ func TestLeftOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	entries := m.fileTreeModel.Entries()
+	entries := m.sidebar.fileTreeModel.Entries()
 	if len(entries) != 1 {
 		t.Fatalf("expected collapsed tree with 1 dir row, got %d", len(entries))
 	}
@@ -204,7 +204,7 @@ func TestEnterOnSelectedDirCollapsesCommitFiletreeDir(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	entries := m.fileTreeModel.Entries()
+	entries := m.sidebar.fileTreeModel.Entries()
 	if len(entries) != 1 {
 		t.Fatalf("expected collapsed tree with 1 dir row after enter, got %d", len(entries))
 	}
@@ -219,7 +219,7 @@ func TestRightOnCollapsedDirExpandsCommitFiletreeDir(t *testing.T) {
 	// collapse first
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	entries := m.fileTreeModel.Entries()
+	entries := m.sidebar.fileTreeModel.Entries()
 	if len(entries) != 1 || entries[0].Expanded {
 		t.Fatalf("precondition: expected 1 collapsed dir row, got %d entries expanded=%v", len(entries), entries[0].Expanded)
 	}
@@ -227,7 +227,7 @@ func TestRightOnCollapsedDirExpandsCommitFiletreeDir(t *testing.T) {
 	// expand with l
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
-	entries = m.fileTreeModel.Entries()
+	entries = m.sidebar.fileTreeModel.Entries()
 	if len(entries) < 3 {
 		t.Fatalf("expected expanded dir + files after l, got %d entries", len(entries))
 	}

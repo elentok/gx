@@ -11,7 +11,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		m.help = next
 		return m, cmd
 	}
-	if m.commitOps.AmendOpen() || m.diffModel.Search().IsActive() || m.fileTreeModel.Search().IsActive() {
+	if m.commitOps.AmendOpen() || m.diffModel.Search().IsActive() || m.sidebar.fileTreeModel.Search().IsActive() {
 		return m, nil
 	}
 	mouse := msg.Mouse()
@@ -31,8 +31,8 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if idx == 0 {
 		m.diffModel.ScrollViewport(dir * 3)
 	} else {
-		m.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
-		m.fileTreeModel.ScrollViewport(dir * 3)
+		m.sidebar.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
+		m.sidebar.fileTreeModel.ScrollViewport(dir * 3)
 	}
 	return m, nil
 }
@@ -43,7 +43,7 @@ func (m Model) diffRect() ui.Rect {
 		filesH, diffH := m.narrowPaneHeights(contentH)
 		return ui.Rect{X: 0, Y: bodyH + filesH, W: m.width, H: diffH}
 	}
-	leftW := m.filesPaneWidth(contentH)
+	leftW := m.sidebar.filesPaneWidth(m.filesInput(), contentH)
 	return ui.Rect{X: leftW, Y: bodyH, W: m.width - leftW, H: contentH}
 }
 
@@ -53,6 +53,6 @@ func (m Model) filetreeRect() ui.Rect {
 		filesH, _ := m.narrowPaneHeights(contentH)
 		return ui.Rect{X: 0, Y: bodyH, W: m.width, H: filesH}
 	}
-	leftW := m.filesPaneWidth(contentH)
+	leftW := m.sidebar.filesPaneWidth(m.filesInput(), contentH)
 	return ui.Rect{X: 0, Y: bodyH, W: leftW, H: contentH}
 }

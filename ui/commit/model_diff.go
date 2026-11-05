@@ -10,7 +10,7 @@ func (m *Model) diffPaneSize() (int, int) {
 		_, diffH := m.narrowPaneHeights(contentH)
 		return m.width, diffH
 	}
-	leftW := m.filesPaneWidth(contentH)
+	leftW := m.sidebar.filesPaneWidth(m.filesInput(), contentH)
 	return m.width - leftW, contentH
 }
 
@@ -26,7 +26,17 @@ func (m *Model) syncDiffViewport() {
 	m.diffModel.Reflow(bodyW)
 	m.diffModel.SyncViewport(bodyW, bodyH)
 	m.ensureActiveVisible()
-	m.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
+	m.sidebar.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
+}
+
+func (m *Model) moveToAdjacentFile(delta int) {
+	if !m.sidebar.moveToAdjacentFile(delta) {
+		return
+	}
+	m.refreshDiff()
+	if m.focusDiff {
+		m.ensureActiveVisible()
+	}
 }
 
 func (m *Model) filesInnerHeight() int {

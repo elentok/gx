@@ -33,8 +33,8 @@ func TestAskAIInDiffWithoutFileContextShowsError(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModel(repo, "HEAD")
 	m.focusDiff = true
-	m.files = nil
-	m.fileTreeModel.SetEntries(nil)
+	m.sidebar.files = nil
+	m.sidebar.fileTreeModel.SetEntries(nil)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)

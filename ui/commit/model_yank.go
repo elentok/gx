@@ -14,7 +14,7 @@ import (
 var commitClipboardWrite = clip.Write
 
 func (m *Model) selectedFile() (path string, ok bool) {
-	file, ok := m.selectedCommitFile()
+	file, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		return "", false
 	}

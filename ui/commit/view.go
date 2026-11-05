@@ -119,7 +119,7 @@ func normalizeCommitBody(body string) string {
 }
 
 func (m Model) contentView(contentH int) string {
-	if len(m.fileTreeModel.Entries()) == 0 {
+	if len(m.sidebar.fileTreeModel.Entries()) == 0 {
 		width := max(20, m.width)
 		lines := []string{ui.StyleMuted.Render("no changed files")}
 		return ui.RenderPanel(ui.PanelOptionsFor(width, contentH, "Changes", "", lines, false, ui.ColorBlue, nil, false))
@@ -127,15 +127,15 @@ func (m Model) contentView(contentH int) string {
 
 	if m.width < 90 {
 		filesH, diffH := m.narrowPaneHeights(contentH)
-		files := m.renderFilesPane(m.width, filesH)
+		files := m.sidebar.renderFilesPane(m.filesInput(), m.width, filesH)
 		diff := m.renderDiffPane(m.width, diffH)
 		return lipgloss.JoinVertical(lipgloss.Left, files, ui.RenderSeamRow(m.width, ui.SeamColor), diff)
 	}
 	mainH := contentH
 	width := m.width - 1
-	leftW := m.filesPaneWidth(mainH)
+	leftW := m.sidebar.filesPaneWidth(m.filesInput(), mainH)
 	rightW := width - leftW
-	left := m.renderFilesPane(leftW, mainH)
+	left := m.sidebar.renderFilesPane(m.filesInput(), leftW, mainH)
 	right := m.renderDiffPane(rightW, mainH)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, ui.RenderSeamColumn(mainH, ui.SeamColor), right)
 }
@@ -162,21 +162,6 @@ func (m Model) narrowPaneHeights(contentH int) (filesH, diffH int) {
 func (m Model) layoutHeights() (bodyH, contentH int) {
 	contentH = max(1, m.height)
 	return 0, contentH
-}
-
-func (m Model) renderFilesPane(width, height int) string {
-	lines := m.visibleFileLines(width, height)
-	if len(lines) == 0 {
-		lines = append(lines, ui.StyleMuted.Render("no changed files"))
-	}
-	title, rightTitle := "Files", m.filesPaneRightTitle()
-	active := m.isContainerFocused() && !m.focusDiff && !m.focusHeader
-	titleColor := m.filesPaneTitleColor()
-	accent := color.Color(nil)
-	if active {
-		accent = titleColor
-	}
-	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, false))
 }
 
 func (m Model) renderDiffPane(width, height int) string {
@@ -278,89 +263,6 @@ func isTrunkRef(decoration git.RefDecoration, trunk string) bool {
 		_, name, _ = strings.Cut(name, "/")
 	}
 	return name == trunk
-}
-
-func (m Model) visibleFileLines(width, height int) []string {
-	opts := m.filetreeRenderOpts()
-	opts.Width = width - 2
-	return m.fileTreeModel.RenderLines(height, opts)
-}
-
-func (m Model) requiredFilesPaneWidth(height int) int {
-	required := ansi.StringWidth(" Files ")
-	if w := m.fileTreeModel.RequiredWidth(height, m.filetreeRenderOpts()); w > required {
-		required = w
-	}
-	// 2 for the frame + 1 for padding
-	return required + 2 + 1
-}
-
-func (m Model) filetreeRenderOpts() tree.RenderOpts[stage.CommitFile] {
-	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	return tree.RenderOpts[stage.CommitFile]{
-		AccentColor: ui.ColorOrange,
-		Active:      m.isContainerFocused() && !m.focusDiff && !m.focusHeader,
-		EmptyLine:   ui.StyleMuted.Render("no changed files"),
-		Icon: func(entry tree.Entry[stage.CommitFile]) string {
-			if entry.HasChildren {
-				if entry.Expanded {
-					return icons.FolderOpen
-				}
-				return icons.FolderClosed
-			}
-			return commitFileIcon(entry.Value, m.settings.UseNerdFontIcons)
-		},
-		Label: func(entry tree.Entry[stage.CommitFile]) string {
-			if entry.HasChildren {
-				return entry.DisplayName + "/"
-			}
-			if entry.Value.RenameFrom != "" {
-				return entry.Value.RenameFrom + " -> " + entry.Value.Path
-			}
-			return entry.DisplayName
-		},
-		MetaText: func(entry tree.Entry[stage.CommitFile]) string {
-			return commitEntryMeta(entry, m.settings.UseNerdFontIcons)
-		},
-		RowColor: func(entry tree.Entry[stage.CommitFile]) string {
-			return commitEntryColor(entry)
-		},
-	}
-}
-
-func (m Model) filesPaneWidth(height int) int {
-	width := max(FILE_TREE_MIN_WIDTH, min(FILE_TREE_MAX_WIDTH, m.requiredFilesPaneWidth(height)))
-	if m.width-width < DIFF_MIN_WIDTH {
-		width = m.width - DIFF_MIN_WIDTH
-	}
-	if width < FILE_TREE_MIN_WIDTH {
-		width = FILE_TREE_MIN_WIDTH
-	}
-	return width
-}
-
-func (m Model) filesPaneTitleColor() color.Color {
-	if !m.isContainerFocused() || m.focusDiff || m.focusHeader {
-		return ui.ColorBlue
-	}
-	return ui.ColorOrange
-}
-
-func (m Model) filesPaneBorderColor() color.Color {
-	if !m.isContainerFocused() || m.focusDiff || m.focusHeader {
-		return ui.ColorBorder
-	}
-	return ui.ColorOrange
-}
-
-func (m Model) filesPaneRightTitle() string {
-	if m.focusDiff {
-		return ""
-	}
-	if len(m.fileTreeModel.Entries()) == 0 {
-		return ""
-	}
-	return "tree"
 }
 
 func (m Model) diffPaneTitleColor() color.Color {

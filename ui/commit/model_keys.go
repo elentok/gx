@@ -128,8 +128,8 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.diffModel.Search().DismissAndClear()
 			return m, nil
 		}
-		if !m.focusDiff && m.fileTreeModel.Search().IsActive() {
-			m.fileTreeModel.Search().DismissAndClear()
+		if !m.focusDiff && m.sidebar.fileTreeModel.Search().IsActive() {
+			m.sidebar.fileTreeModel.Search().DismissAndClear()
 			return m, nil
 		}
 		if m.focusDiff && m.diffModel.DataRef().VisualActive {
@@ -180,14 +180,18 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		if m.focusHeader {
 			m.header.scrollHeaderPage(m.headerInput(), 1)
 		} else {
-			m.scrollSidebarPage(1)
+			if m.sidebar.scrollSidebarPage(1) {
+				m.refreshDiff()
+			}
 		}
 		return m, nil
 	case bindingPageUp:
 		if m.focusHeader {
 			m.header.scrollHeaderPage(m.headerInput(), -1)
 		} else {
-			m.scrollSidebarPage(-1)
+			if m.sidebar.scrollSidebarPage(-1) {
+				m.refreshDiff()
+			}
 		}
 		return m, nil
 	case bindingNext:
@@ -205,7 +209,9 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case bindingBottom:
-		m.jumpSidebarBottom()
+		if m.sidebar.jumpSidebarBottom() {
+			m.refreshDiff()
+		}
 		return m, nil
 	case bindingEnter:
 		if m.focusHeader {
@@ -230,7 +236,9 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m.reload()
 		return m, notify.Success("refreshed")
 	case bindingGotoTop:
-		m.jumpSidebarTop()
+		if m.sidebar.jumpSidebarTop() {
+			m.refreshDiff()
+		}
 		return m, nil
 	case bindingYankContent:
 		if m.focusHeader {
@@ -285,7 +293,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 
 func (m Model) filterLogViewState() nav.ViewState {
 	vs := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
-	file, ok := m.selectedCommitFile()
+	file, ok := m.sidebar.selectedCommitFile()
 	if !ok {
 		return vs
 	}
@@ -328,7 +336,7 @@ func (m Model) handleTabFocusCycle() (tea.Model, tea.Cmd) {
 		m.focusDiff = false
 		return m, nil
 	}
-	if _, ok := m.selectedCommitFile(); !ok {
+	if _, ok := m.sidebar.selectedCommitFile(); !ok {
 		m.focusHeader = true
 		m.focusDiff = false
 		return m, nil

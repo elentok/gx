@@ -28,7 +28,7 @@ func TestMouseWheelScrollsDiffViewport(t *testing.T) {
 	m.syncDiffViewport()
 
 	bodyH, contentH := m.layoutHeights()
-	diffX := m.filesPaneWidth(contentH) + 1
+	diffX := m.sidebar.filesPaneWidth(m.filesInput(), contentH) + 1
 	diffY := bodyH + 1
 
 	beforeOffset := m.diffModel.Viewport().YOffset()
@@ -61,11 +61,11 @@ func TestMouseWheelOverFiletreeScrollsFiletree(t *testing.T) {
 	filetreeX := 1
 	filetreeY := bodyH + 1
 
-	beforeOffset := m.fileTreeModel.ScrollOffset()
+	beforeOffset := m.sidebar.fileTreeModel.ScrollOffset()
 	updated, _ := m.Update(tea.MouseWheelMsg{X: filetreeX, Y: filetreeY, Button: tea.MouseWheelDown})
 	m = updated.(Model)
-	if m.fileTreeModel.ScrollOffset() <= beforeOffset {
-		t.Fatalf("expected filetree to scroll down on wheel over filetree, before=%d after=%d", beforeOffset, m.fileTreeModel.ScrollOffset())
+	if m.sidebar.fileTreeModel.ScrollOffset() <= beforeOffset {
+		t.Fatalf("expected filetree to scroll down on wheel over filetree, before=%d after=%d", beforeOffset, m.sidebar.fileTreeModel.ScrollOffset())
 	}
 }
 
@@ -118,7 +118,7 @@ func TestMouseWheelWhileHelpOpenScrollsHelpNotDiff(t *testing.T) {
 	m.help.Open(m.width, m.height)
 
 	bodyH, contentH := m.layoutHeights()
-	diffX := m.filesPaneWidth(contentH) + 1
+	diffX := m.sidebar.filesPaneWidth(m.filesInput(), contentH) + 1
 	diffY := bodyH + 1
 
 	beforeDiffOffset := m.diffModel.Viewport().YOffset()

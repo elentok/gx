@@ -22,7 +22,7 @@ func newScrollTestModel(t *testing.T) Model {
 
 func TestJumpSidebarTop_Empty(t *testing.T) {
 	m := newScrollTestModel(t)
-	moved := m.jumpSidebarTop()
+	moved := m.sidebar.jumpSidebarTop()
 	if moved {
 		t.Error("expected jumpSidebarTop=false with empty filetree")
 	}
@@ -30,7 +30,7 @@ func TestJumpSidebarTop_Empty(t *testing.T) {
 
 func TestJumpSidebarBottom_Empty(t *testing.T) {
 	m := newScrollTestModel(t)
-	moved := m.jumpSidebarBottom()
+	moved := m.sidebar.jumpSidebarBottom()
 	if moved {
 		t.Error("expected jumpSidebarBottom=false with empty filetree")
 	}
@@ -38,5 +38,5 @@ func TestJumpSidebarBottom_Empty(t *testing.T) {
 
 func TestScrollSidebarPage_NoContent(t *testing.T) {
 	m := newScrollTestModel(t)
-	m.scrollSidebarPage(1) // should not panic
+	m.sidebar.scrollSidebarPage(1) // should not panic
 }

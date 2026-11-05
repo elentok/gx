@@ -178,12 +178,12 @@ func TestHeaderLines_WithDecorations_WrapsBadgeWhenItDoesNotFit(t *testing.T) {
 }
 
 func TestVisibleFileLines_UsesCommitSpecificLabelAndMeta(t *testing.T) {
-	m := Model{settings: ui.Settings{}, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
-	m.fileTreeModel.SetEntries([]tree.Entry[stage.CommitFile]{
+	m := Model{settings: ui.Settings{}, sidebar: filesPane{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
+	m.sidebar.fileTreeModel.SetEntries([]tree.Entry[stage.CommitFile]{
 		{DisplayName: "new.go", Value: stage.CommitFile{Path: "new.go", RenameFrom: "old.go", Status: "R "}},
 	})
 
-	lines := m.visibleFileLines(30, 3)
+	lines := m.sidebar.visibleFileLines(m.filesInput(), 30, 3)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(lines))
 	}
@@ -193,29 +193,29 @@ func TestVisibleFileLines_UsesCommitSpecificLabelAndMeta(t *testing.T) {
 }
 
 func TestContainerFocusDisablesCommitPaneActiveStyling(t *testing.T) {
-	m := Model{settings: ui.Settings{}, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
-	m.fileTreeModel.SetEntries([]tree.Entry[stage.CommitFile]{
+	m := Model{settings: ui.Settings{}, sidebar: filesPane{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
+	m.sidebar.fileTreeModel.SetEntries([]tree.Entry[stage.CommitFile]{
 		{DisplayName: "selected.go", Value: stage.CommitFile{Path: "selected.go", Status: "M "}},
 	})
 
-	if m.filesPaneBorderColor() != ui.ColorOrange {
+	if m.sidebar.filesPaneBorderColor(m.filesInput()) != ui.ColorOrange {
 		t.Fatal("expected active file tree border by default")
 	}
-	if !m.filetreeRenderOpts().Active {
+	if !m.sidebar.filetreeRenderOpts(m.filesInput()).Active {
 		t.Fatal("expected file tree render opts active by default")
 	}
-	if line := m.visibleFileLines(30, 3)[0]; !strings.Contains(line, "\x1b[48;2;") {
+	if line := m.sidebar.visibleFileLines(m.filesInput(), 30, 3)[0]; !strings.Contains(line, "\x1b[48;2;") {
 		t.Fatal("expected active selected file row to have a highlight background")
 	}
 
 	inactive := m.WithContainerFocus(false)
-	if inactive.filesPaneBorderColor() != ui.ColorBorder {
+	if inactive.sidebar.filesPaneBorderColor(inactive.filesInput()) != ui.ColorBorder {
 		t.Fatal("expected inactive file tree border when container is not focused")
 	}
-	if inactive.filetreeRenderOpts().Active {
+	if inactive.sidebar.filetreeRenderOpts(inactive.filesInput()).Active {
 		t.Fatal("expected inactive file tree render opts when container is not focused")
 	}
-	if line := inactive.visibleFileLines(30, 3)[0]; strings.Contains(line, "\x1b[48;2;") {
+	if line := inactive.sidebar.visibleFileLines(inactive.filesInput(), 30, 3)[0]; strings.Contains(line, "\x1b[48;2;") {
 		t.Fatal("expected inactive selected file row without highlight background")
 	}
 
@@ -245,15 +245,15 @@ func TestRenderHeaderPopup_HasBorder(t *testing.T) {
 }
 
 func TestView_FiletreeSearchOverlayAppearsInView(t *testing.T) {
-	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
-	m.fileTreeModel.Search().Start("files")
+	m := Model{ready: true, width: 100, height: 20, sidebar: filesPane{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
+	m.sidebar.fileTreeModel.Search().Start("files")
 	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "files") {
 		t.Fatalf("expected filetree search overlay, got %q", got)
 	}
 }
 
 func TestInputFocused_DiffSearchDelegatesIntoDiffModel(t *testing.T) {
-	m := Model{ready: true, width: 100, height: 20, commitSidebarState: commitSidebarState{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
+	m := Model{ready: true, width: 100, height: 20, sidebar: filesPane{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
 	m.focusDiff = true
 	m.diffModel.Search().Start("diff")
 	if !m.InputFocused() {
