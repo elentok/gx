@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/grillround"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -48,7 +48,7 @@ type ParsedRound struct {
 func ParseRoundSegment(seq int, seg string) ParsedRound {
 	body, blocks := grillround.SplitFences(seg)
 	header, rest, _ := strings.Cut(body, "\n")
-	card := wire.SessionRoundCard{Label: strconv.Itoa(seq), Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
+	card := wire.SessionRoundCard{Label: strconv.Itoa(seq), Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: ticketlog.QuestionText}
 	if m := roundNumberRE.FindStringSubmatch(header); m != nil {
 		card.Label = m[1] + m[2]
 	}
@@ -63,7 +63,7 @@ func ParseRoundSegment(seq int, seg string) ParsedRound {
 		res.Err = fmt.Errorf("%d gx-question blocks, want one", len(blocks))
 		return res
 	}
-	q, err := tickets.ParseQuestionBlock(blocks[0])
+	q, err := ticketlog.ParseQuestionBlock(blocks[0])
 	if err != nil {
 		res.Card.Note = roundBlockNote
 		res.Err = err

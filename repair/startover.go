@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // StartOverResult is the --json success payload of a start-over. AtticRef is nil when
@@ -94,7 +95,7 @@ func StartOver(in StartOverInput, d ralphloop.Deps) (StartOverResult, error) {
 		return StartOverResult{}, err
 	}
 
-	if err := tickets.StartOver(t.Path, in.Now, startOverNote(in, attic), in.Source); err != nil {
+	if err := ticketlog.StartOver(t.Path, in.Now, startOverNote(in, attic), in.Source); err != nil {
 		return StartOverResult{}, fmt.Errorf("starting ticket %s over: %w", in.ID, err)
 	}
 

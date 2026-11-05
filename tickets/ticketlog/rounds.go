@@ -1,16 +1,18 @@
-package tickets
+package ticketlog
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/elentok/gx/tickets"
 )
 
 // RenderRounds renders the "Pause rounds" block of a ticket's log: earlier
 // rounds one line each, the latest round in full. It returns "" when the log
 // holds no pause.question. Plain text, no ANSI: the CLI and the TUI preview
 // share it.
-func RenderRounds(events []LogEvent) string {
-	rounds := Rounds(events)
+func RenderRounds(events []tickets.LogEvent) string {
+	rounds := tickets.Rounds(events)
 	if len(rounds) == 0 {
 		return ""
 	}
@@ -42,11 +44,11 @@ func RenderRounds(events []LogEvent) string {
 	return b.String()
 }
 
-func roundState(r PauseRound) string {
+func roundState(r tickets.PauseRound) string {
 	switch {
 	case r.End == nil:
 		return "open"
-	case r.End.Type == EventPauseClosed:
+	case r.End.Type == tickets.EventPauseClosed:
 		return "closed"
 	default:
 		return "answered"
@@ -54,11 +56,11 @@ func roundState(r PauseRound) string {
 }
 
 // roundOutcome is the answer or close reason of a finished round, "" while open.
-func roundOutcome(r PauseRound) string {
+func roundOutcome(r tickets.PauseRound) string {
 	if r.End == nil {
 		return ""
 	}
-	if r.End.Type == EventPauseClosed {
+	if r.End.Type == tickets.EventPauseClosed {
 		if r.End.Reason == "" {
 			return "closed"
 		}

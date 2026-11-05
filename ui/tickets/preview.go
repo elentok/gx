@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/ui"
 )
 
@@ -155,7 +156,7 @@ func ticketLogEvents(t tickets.Ticket) []tickets.LogEvent {
 // within block, for the caller to scroll to; found is false when the log has
 // no pause round.
 func renderPauseRoundsBlock(events []tickets.LogEvent, width int) (block string, line int, found bool) {
-	rounds := tickets.RenderRounds(events)
+	rounds := ticketlog.RenderRounds(events)
 	if rounds == "" {
 		return "", 0, false
 	}

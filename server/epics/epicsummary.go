@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // EpicSummaries summarizes every epic with a queue item, in queue order. A
@@ -79,7 +80,7 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (t
 		info := wire.SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
 		switch {
 		case IsPaused(e, t):
-			info.Recovery, info.Reason = recoveryOf(addr), tickets.PauseDetail(e, t)
+			info.Recovery, info.Reason = recoveryOf(addr), ticketlog.PauseDetail(e, t)
 			info.ReasonLabel = t.PauseReason.Label()
 			open := tickets.OpenQuestion(logOf(t))
 			info.Summary = info.Reason
@@ -139,7 +140,7 @@ func pausedEpicReason(e tickets.Epic) (reason string, more int) {
 			continue
 		}
 		if n == 0 {
-			reason = tickets.PauseDetail(e, t)
+			reason = ticketlog.PauseDetail(e, t)
 		}
 		n++
 	}

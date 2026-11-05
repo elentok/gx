@@ -1,8 +1,9 @@
-package tickets
+package ticketlog
 
 import (
 	"time"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -18,7 +19,7 @@ func StartOver(path string, now time.Time, note, source string) error {
 	// Before the status write, so a crash between them leaves a closed round
 	// on a still-paused ticket rather than an open one on an open ticket.
 	if source != "" {
-		if err := EndOpenRound(path, source, HowStartOver, "start-over"); err != nil {
+		if err := tickets.EndOpenRound(path, source, tickets.HowStartOver, "start-over"); err != nil {
 			return err
 		}
 	}

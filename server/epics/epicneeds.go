@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // The state pill words of a Needs-you loop card.
@@ -113,7 +114,7 @@ func (s *Epics) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Ticke
 	case IsPaused(e, t) && status != tickets.StatusDraft:
 		evs := queue.ReadLogLenient(t)
 		n := needsYou{
-			Pill: PillPaused, Reason: label + ": " + tickets.PauseDetail(e, t),
+			Pill: PillPaused, Reason: label + ": " + ticketlog.PauseDetail(e, t),
 			Action: wire.CardAction{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: addr.String()},
 		}
 		if rounds := tickets.AllRounds(evs); len(rounds) > 0 {

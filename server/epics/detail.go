@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // actionInfo looks up each action's label and tooltip.
@@ -193,7 +194,7 @@ func fillHeader(d *wire.TicketDetail, ref queue.TicketRef, t schema.Ticket) {
 	d.Body = ref.Ticket.Body
 	if ref.Epic.RenderedStatus(ref.Ticket) == tickets.StatusError {
 		d.Status = tickets.StatusError.Word()
-		d.ErrorReason = tickets.PauseDetail(ref.Epic, ref.Ticket)
+		d.ErrorReason = ticketlog.PauseDetail(ref.Epic, ref.Ticket)
 		d.Path = ref.Ticket.Path
 	}
 	if t.PausedClass() != "" {
@@ -269,7 +270,7 @@ func detailRound(r tickets.PauseRound, full bool) wire.DetailRound {
 	if !full {
 		return out
 	}
-	q := tickets.QuestionOfEvent(r.Question)
+	q := ticketlog.QuestionOfEvent(r.Question)
 	out.Kind, out.Text, out.Block, out.Handoff = q.Kind, q.Detail, r.Question.Block, q.Handoff
 	out.Recommended, out.Yes, out.No = q.Recommended, q.Yes, q.No
 	for _, o := range q.Options {

@@ -6,7 +6,7 @@ import (
 	"unicode"
 
 	"github.com/elentok/gx/conversations"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -128,7 +128,7 @@ func segmentWords(seg string) int {
 	body, blocks := SplitFences(seg)
 	words := countWords(questionNoRE.ReplaceAllString(body, ""))
 	for _, block := range blocks {
-		q, err := tickets.ParseQuestionBlock(block)
+		q, err := ticketlog.ParseQuestionBlock(block)
 		if err != nil {
 			continue
 		}

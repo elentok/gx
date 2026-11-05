@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // trunkConflictNote tells a trunk-conflict agent what the one-off skill does
@@ -154,7 +155,7 @@ func answeredSession(t tickets.Ticket) string {
 		return ""
 	}
 	evs, err := tickets.ReadLog(t.Path)
-	if err != nil || !tickets.Answered(st.Status, evs) {
+	if err != nil || !ticketlog.Answered(st.Status, evs) {
 		return ""
 	}
 	return st.SessionIDs[len(st.SessionIDs)-1]

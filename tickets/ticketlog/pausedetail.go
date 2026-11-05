@@ -1,15 +1,10 @@
-package tickets
+package ticketlog
 
 import (
 	"regexp"
 	"strings"
-)
 
-// The headings an old pause appended to a paused ticket's body. Read shim only:
-// nothing writes them any more.
-const (
-	LegacyAnswerHeading = "## Needs Answer"
-	LegacyRepairHeading = "## Needs Repair"
+	"github.com/elentok/gx/tickets"
 )
 
 var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
@@ -21,18 +16,18 @@ var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
 // Repair heading, markdown markers stripped, unclipped. An error ticket's
 // text is what broke it. It is "" for any other status, and for a paused
 // ticket with neither an open question nor a section.
-func PauseDetail(e Epic, t Ticket) string {
+func PauseDetail(e tickets.Epic, t tickets.Ticket) string {
 	switch status := e.RenderedStatus(t); status {
-	case StatusPausedAnswer:
-		if evs, err := ReadLog(t.Path); err == nil {
-			if q := OpenQuestion(evs); q != nil && q.Summary != "" {
+	case tickets.StatusPausedAnswer:
+		if evs, err := tickets.ReadLog(t.Path); err == nil {
+			if q := tickets.OpenQuestion(evs); q != nil && q.Summary != "" {
 				return strings.TrimSpace(markdownMarkerPattern.ReplaceAllString(q.Summary, ""))
 			}
 		}
-		return headingLine(t.Body, LegacyAnswerHeading)
-	case StatusPausedRepair:
-		return headingLine(t.Body, LegacyRepairHeading)
-	case StatusError:
+		return headingLine(t.Body, tickets.LegacyAnswerHeading)
+	case tickets.StatusPausedRepair:
+		return headingLine(t.Body, tickets.LegacyRepairHeading)
+	case tickets.StatusError:
 		for _, msg := range []string{t.ReadErr, t.GraphErr, t.BlockedByErr} {
 			if msg != "" {
 				return msg

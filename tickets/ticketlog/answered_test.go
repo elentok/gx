@@ -1,10 +1,11 @@
-package tickets_test
+package ticketlog_test
 
 import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestAnswered(t *testing.T) {
@@ -26,7 +27,7 @@ func TestAnswered(t *testing.T) {
 		{"no question", schema.StatusOpen, nil, false},
 	}
 	for _, c := range cases {
-		if got := tickets.Answered(c.status, c.evs); got != c.want {
+		if got := ticketlog.Answered(c.status, c.evs); got != c.want {
 			t.Errorf("%s: Answered = %v, want %v", c.name, got, c.want)
 		}
 	}

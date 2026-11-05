@@ -188,7 +188,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   and the rescan call back), with `Routes()` for `designs/open`, `designs/delete` and
   `designs/worktree`
 - `ralphloop/` — ralph-loop scheduler, landing and verification
-- `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers
+- `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail)
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners
 - `harness/` — what runs inside an interactive agent session
 - `herdr/` — herdr CLI/socket client

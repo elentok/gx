@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
@@ -25,7 +26,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	if d.State != state {
 		t.Errorf("state = %q, want %q", d.State, state)
 	}
-	if d.Latest == nil || d.Latest.Kind != tickets.QuestionOptions || len(d.Latest.Options) != 2 || d.Latest.Handoff != "h" || d.Latest.Outcome != wire.RoundOpen {
+	if d.Latest == nil || d.Latest.Kind != ticketlog.QuestionOptions || len(d.Latest.Options) != 2 || d.Latest.Handoff != "h" || d.Latest.Outcome != wire.RoundOpen {
 		t.Errorf("latest = %+v", d.Latest)
 	}
 	if want := []string{wire.ActionAnswer}; !slices.Equal(d.Actions, want) {
@@ -187,7 +188,7 @@ func TestDetail_BadBlockReadsAsText(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, "type: nonsense\n")
 	d, err := h.Client.Detail(context.Background(), answerAddr)
-	if err != nil || d.Latest == nil || d.Latest.Kind != tickets.QuestionText || len(d.Latest.Options) != 0 {
+	if err != nil || d.Latest == nil || d.Latest.Kind != ticketlog.QuestionText || len(d.Latest.Options) != 0 {
 		t.Errorf("latest = %+v, %v; want a text question", d.Latest, err)
 	}
 }

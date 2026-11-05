@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/ui"
 )
 
@@ -115,7 +116,7 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 					sum.State = wire.EpicStateRunning
 				}
 			case gxtickets.StatusPausedAnswer, gxtickets.StatusPausedRepair:
-				info.Status, info.Reason = status.Word(), gxtickets.PauseDetail(epic, t)
+				info.Status, info.Reason = status.Word(), ticketlog.PauseDetail(epic, t)
 				sum.Paused = append(sum.Paused, info)
 			}
 		}

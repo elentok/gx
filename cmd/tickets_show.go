@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // ticketShowJSON is the --json shape of `gx tickets show`.
@@ -206,7 +207,7 @@ func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer)
 	if err != nil {
 		return err
 	}
-	if rounds := tickets.RenderRounds(events); rounds != "" {
+	if rounds := ticketlog.RenderRounds(events); rounds != "" {
 		fmt.Fprintf(w, "\n%s", rounds)
 	}
 	return nil

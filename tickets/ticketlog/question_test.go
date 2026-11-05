@@ -1,4 +1,4 @@
-package tickets
+package ticketlog
 
 import (
 	"strings"

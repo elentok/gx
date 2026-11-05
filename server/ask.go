@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 const askAuthorAgent = "agent"
@@ -17,7 +18,7 @@ const askAuthorAgent = "agent"
 // strictly first, and any refusal writes nothing. It returns at once; pausing
 // the ticket is a later step.
 func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
-	q, err := tickets.ParseQuestionStrict(req.Text)
+	q, err := ticketlog.ParseQuestionStrict(req.Text)
 	if err != nil {
 		return queue.Refusal(wire.ReasonInvalidQuestion, err.Error()), nil
 	}
@@ -30,7 +31,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 			By:      askAuthorAgent,
 			Summary: q.Summary,
 			Text:    q.Detail,
-			Block:   tickets.QuestionBlock(req.Text),
+			Block:   ticketlog.QuestionBlock(req.Text),
 			Handoff: q.Handoff,
 		}
 		_, err := tickets.AppendLogIf(ref.Ticket.Path, ev, func(events []tickets.LogEvent) error {

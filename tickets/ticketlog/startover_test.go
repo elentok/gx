@@ -1,4 +1,4 @@
-package tickets
+package ticketlog
 
 import (
 	"os"
@@ -8,12 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/tickettest"
 )
 
 func TestStartOver_PausedTicketReturnsToFreshOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, `---
+	tickettest.WriteFile(t, path, `---
 id: "05"
 status: paused
 blocked_by: ["03"]
@@ -33,7 +35,7 @@ pause_reason: self-reported
 
 Human prose.
 
-`+LegacyAnswerHeading+`
+`+tickets.LegacyAnswerHeading+`
 
 Which db?
 
@@ -43,7 +45,7 @@ Earlier note.
 `)
 
 	now := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
-	if err := StartOver(path, now, "", SourceCLI); err != nil {
+	if err := StartOver(path, now, "", tickets.SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
@@ -67,10 +69,10 @@ Earlier note.
 	}
 
 	body := schema.ParseBody(string(raw))
-	if strings.Contains(body, "\n"+LegacyAnswerHeading) {
+	if strings.Contains(body, "\n"+tickets.LegacyAnswerHeading) {
 		t.Errorf("legacy answer section not retired:\n%s", body)
 	}
-	for _, s := range []string{"# 05 — Thing", "Human prose.", "Earlier note.", "retired from `" + LegacyAnswerHeading + "`", "Which db?"} {
+	for _, s := range []string{"# 05 — Thing", "Human prose.", "Earlier note.", "retired from `" + tickets.LegacyAnswerHeading + "`", "Which db?"} {
 		if !strings.Contains(body, s) {
 			t.Errorf("body lost %q:\n%s", s, body)
 		}
@@ -79,24 +81,24 @@ Earlier note.
 
 func TestStartOver_RetiresOldRepairSection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: merge-conflict\ntype: implement\n---\n\n"+LegacyRepairHeading+"\n\nBroke.\n")
+	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: merge-conflict\ntype: implement\n---\n\n"+tickets.LegacyRepairHeading+"\n\nBroke.\n")
 
-	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
 	raw, _ := os.ReadFile(path)
 	body := schema.ParseBody(string(raw))
-	if strings.Contains(body, "\n"+LegacyRepairHeading) || !strings.Contains(body, "Broke.") {
+	if strings.Contains(body, "\n"+tickets.LegacyRepairHeading) || !strings.Contains(body, "Broke.") {
 		t.Fatalf("unexpected body:\n%s", body)
 	}
 }
 
 func TestStartOver_NoteIsWrittenInSameWrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
+	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
 
-	if err := StartOver(path, time.Now(), "restart note text\n", SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "restart note text\n", tickets.SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
@@ -108,50 +110,50 @@ func TestStartOver_NoteIsWrittenInSameWrite(t *testing.T) {
 
 func TestStartOver_ClosesOpenQuestion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: self-reported\ntype: implement\n---\n\n# 05 — Thing\n")
-	q, err := AppendLog(path, LogEvent{Type: EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
+	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: self-reported\ntype: implement\n---\n\n# 05 — Thing\n")
+	q, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
-	evs, _ := ReadLog(path)
-	if len(evs) != 2 || evs[1].Type != EventPauseClosed || evs[1].Question != q.Seq || evs[1].Reason != "start-over" || evs[1].Source != SourceCLI || evs[1].How != HowStartOver {
+	evs, _ := tickets.ReadLog(path)
+	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != q.Seq || evs[1].Reason != "start-over" || evs[1].Source != tickets.SourceCLI || evs[1].How != tickets.HowStartOver {
 		t.Fatalf("log = %+v, want pause.closed{question: %d, reason: start-over, source: cli, how: start-over}", evs, q.Seq)
 	}
 	// A second start over has no open question: no write, no error.
-	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
 		t.Fatalf("second StartOver: %v", err)
 	}
-	if evs, _ = ReadLog(path); len(evs) != 2 {
+	if evs, _ = tickets.ReadLog(path); len(evs) != 2 {
 		t.Fatalf("log grew without an open question: %+v", evs)
 	}
 }
 
 func TestStartOver_WithoutSourceLeavesTheRoundOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
-	if _, err := AppendLog(path, LogEvent{Type: EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"}); err != nil {
+	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
+	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := StartOver(path, time.Now(), "", ""); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
-	if evs, _ := ReadLog(path); len(evs) != 1 {
+	if evs, _ := tickets.ReadLog(path); len(evs) != 1 {
 		t.Fatalf("log = %+v, want only the question", evs)
 	}
 }
 
 func TestStartOver_NoQuestionWritesNoLog(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
-	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
+	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
+	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
-	if _, err := os.Stat(LogPath(path)); !os.IsNotExist(err) {
+	if _, err := os.Stat(tickets.LogPath(path)); !os.IsNotExist(err) {
 		t.Fatalf("log exists after start over with no question: %v", err)
 	}
 }

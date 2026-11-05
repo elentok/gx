@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // maxAnswerChars caps a note, and the text of a free-text answer.
@@ -39,10 +40,10 @@ func answerFrame(seq int, answer, note string) string {
 
 // validateAnswer checks the answer against the question's kind and returns the
 // text to deliver and log: the choice (or the free text) and the note.
-func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note string, bad *wire.QueueResult) {
+func validateAnswer(q ticketlog.Question, req wire.QueueRequest) (answer, note string, bad *wire.QueueResult) {
 	note = strings.TrimSpace(wire.NormalizeAnswer(req.Note))
 	switch q.Kind {
-	case tickets.QuestionText:
+	case ticketlog.QuestionText:
 		answer, note = strings.TrimSpace(wire.NormalizeAnswer(req.Text)), ""
 		if req.Choice != "" {
 			r := queue.Refusal(wire.ReasonBadChoice, "this question takes free text, not a choice")
@@ -51,7 +52,7 @@ func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note str
 	default:
 		answer = strings.TrimSpace(req.Choice)
 		valid := []string{"yes", "no"}
-		if q.Kind == tickets.QuestionOptions {
+		if q.Kind == ticketlog.QuestionOptions {
 			valid = nil
 			for _, o := range q.Options {
 				valid = append(valid, o.ID)
@@ -109,7 +110,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 				res.Question, res.State = open, state
 				return refuse(res)
 			}
-			q := tickets.QuestionOfEvent(*open)
+			q := ticketlog.QuestionOfEvent(*open)
 			answer, note, bad := validateAnswer(q, req)
 			if bad != nil {
 				return refuse(*bad)
@@ -144,7 +145,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 				}
 			}
 			ev := tickets.LogEvent{Type: tickets.EventPauseAnswer, Source: req.Source, How: tickets.HowAnswer, Question: open.Seq, Choice: answer, Note: note}
-			if q.Kind == tickets.QuestionText {
+			if q.Kind == ticketlog.QuestionText {
 				ev.Choice, ev.Text = "", answer
 			}
 			return ev, nil

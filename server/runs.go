@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Runs lists the registry, for tests and later reads.
@@ -275,7 +276,7 @@ func (s *Server) reopenEmptyClaim(t runs.TrackedRun) (bool, error) {
 		return false, err
 	}
 	const reason = "agent gone, no commits, no edits"
-	if err := tickets.StartOver(t.TicketPath, time.Now(), "reopened automatically after restart: "+reason, ""); err != nil {
+	if err := ticketlog.StartOver(t.TicketPath, time.Now(), "reopened automatically after restart: "+reason, ""); err != nil {
 		return false, err
 	}
 	if err := ralphloop.AppendEvent(dir, addr.Epic, ralphloop.Event{

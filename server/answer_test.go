@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func answerCount(t *testing.T, ticketPath string) int {
@@ -149,7 +150,7 @@ func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake 
 		t.Errorf("ticket = %+v, %v; want open", tk, err)
 	}
 	evs, err := tickets.ReadLog(ticketPath)
-	if err != nil || !tickets.Answered(tk.Status, evs) {
+	if err != nil || !ticketlog.Answered(tk.Status, evs) {
 		t.Errorf("Answered = false (%v), want true", err)
 	}
 	if runs := h.Server.Runs(); len(runs) != 0 {
