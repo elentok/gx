@@ -57,6 +57,7 @@ func allow(reason string, tokens ...string) allowance { return allowance{reason,
 var allowed = map[string]allowance{
 	// The read shim: the single place old logs and tickets are loaded.
 	"tickets/status.go":             allow("read shim", "needsanswer", "needsrepair"),
+	"tickets/legacy_headings.go":    allow("read shim", "needsanswer", "needsrepair"),
 	"tickets/log.go":                allow("read shim", "park"),
 	"tickets/migrate.go":            allow("read shim", "needsanswer", "needsrepair"),
 	"tickets/migrate_pause.go":      allow("read shim", "park", "needsanswer", "needsrepair"),

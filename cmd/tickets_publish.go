@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
+	"github.com/elentok/gx/tickets/ticketspec"
 	"github.com/spf13/cobra"
 )
 
@@ -76,7 +77,7 @@ func checkPublishShape(p *publishPlan) []error {
 	}
 	var errs []error
 	for _, t := range p.Tickets {
-		for _, miss := range tickets.PublishShapeMisses(t.Type, t.Body, t.Window) {
+		for _, miss := range ticketspec.PublishShapeMisses(t.Type, t.Body, t.Window) {
 			errs = append(errs, fmt.Errorf("%s: %s (--allow-check-misses publishes anyway)", t.Slug, miss))
 		}
 	}
@@ -103,7 +104,7 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 	for _, t := range epic.Tickets {
 		epicIDs = append(epicIDs, t.Identifier)
 	}
-	m, err := tickets.ParseManifest(manifestPath, epicIDs)
+	m, err := ticketspec.ParseManifest(manifestPath, epicIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 	}
 
 	// The renderer's one pass also stamps {{commit}}; the slug "commit" is reserved.
-	bodyIDs := map[string]string{tickets.CommitSlug: commit}
+	bodyIDs := map[string]string{ticketspec.CommitSlug: commit}
 	for slug, id := range ids {
 		bodyIDs[slug] = id
 	}
@@ -148,7 +149,7 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 			t.BlockedBy = append(t.BlockedBy, schema.TicketID(ref))
 		}
 		t.StampCreated(now, address.String())
-		rendered := tickets.RenderManifestBody(e.Body, bodyIDs)
+		rendered := ticketspec.RenderManifestBody(e.Body, bodyIDs)
 		text := "\n" + strings.Trim(rendered, "\n") + "\n"
 		draft, err := schema.MarshalTicket(t, text)
 		if err != nil {
@@ -189,7 +190,7 @@ func printBundledAdvisories(w io.Writer, cwd string, plan *publishPlan) {
 	}
 	topDirs := topLevelDirs(root)
 	for _, t := range plan.Tickets {
-		if line := tickets.BundledAdvisory(t.Slug, t.Type, t.Body, topDirs); line != "" {
+		if line := ticketspec.BundledAdvisory(t.Slug, t.Type, t.Body, topDirs); line != "" {
 			fmt.Fprintln(w, line)
 		}
 	}

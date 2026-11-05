@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketspec"
 )
 
 // shapeSections are the sections an implement ticket needs to pass the publish checks.
@@ -364,10 +364,10 @@ func TestPublishShapeChecks(t *testing.T) {
 		{"none with reason", "implement", 1000, "\n## Test seams\n\nnone — pure docs\n" + where, ""},
 		{"bare none", "implement", 1000, "\n## Test seams\n\nnone\n" + where, ""},
 		{"no where to look", "implement", 1000, "\n## Test seams\n\nnone\n", "a: no ## Where to look"},
-		{"over the limit", "implement", tickets.SplitLimitTokens + 1, "\n## Test seams\n\nnone\n" + where, fmt.Sprintf("split limit %d", tickets.SplitLimitTokens)},
+		{"over the limit", "implement", ticketspec.SplitLimitTokens + 1, "\n## Test seams\n\nnone\n" + where, fmt.Sprintf("split limit %d", ticketspec.SplitLimitTokens)},
 		{"verify exempt from sections", "verify", 1000, "nothing\n", ""},
 		{"research exempt from sections", "research", 1000, "nothing\n", ""},
-		{"verify exempt from the cap", "verify", tickets.SplitLimitTokens + 1, "nothing\n", ""},
+		{"verify exempt from the cap", "verify", ticketspec.SplitLimitTokens + 1, "nothing\n", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -400,7 +400,7 @@ func TestPublishAllowFlagsAreIndependent(t *testing.T) {
 	if _, _, err := publishShape(t, "implement", 1000, body, "--allow-check-misses", "--allow-claim-misses"); err != nil {
 		t.Errorf("both flags: %v", err)
 	}
-	if _, _, err := publishShape(t, "implement", tickets.SplitLimitTokens+1, "\n## Test seams\n\nnone\n\n## Where to look\n\nx\n", "--allow-check-misses"); err != nil {
+	if _, _, err := publishShape(t, "implement", ticketspec.SplitLimitTokens+1, "\n## Test seams\n\nnone\n\n## Where to look\n\nx\n", "--allow-check-misses"); err != nil {
 		t.Errorf("--allow-check-misses over the cap: %v", err)
 	}
 }

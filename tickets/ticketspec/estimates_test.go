@@ -1,6 +1,10 @@
-package tickets
+package ticketspec
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/elentok/gx/tickets"
+)
 
 func TestWork(t *testing.T) {
 	t.Parallel()
@@ -19,7 +23,7 @@ func TestWork(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, approx := Work(Ticket{PrefixTokens: tt.prefix, ActualContextWindow: tt.actual})
+			got, approx := Work(tickets.Ticket{PrefixTokens: tt.prefix, ActualContextWindow: tt.actual})
 			if got != tt.want || approx != tt.wantApproxim {
 				t.Errorf("Work = %d, %v; want %d, %v", got, approx, tt.want, tt.wantApproxim)
 			}

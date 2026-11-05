@@ -1,4 +1,6 @@
-package tickets
+package ticketspec
+
+import "github.com/elentok/gx/tickets"
 
 // SplitLimitTokens is the most work one ticket should hold. It is an
 // experiment: retune it after 2 or 3 epics.
@@ -23,7 +25,7 @@ const FallbackPrefixTokens = 48_000
 // Work returns the ticket's own work: its actual context window minus the
 // prefix every session starts with. A ticket without a stamped prefix uses
 // FallbackPrefixTokens, and approximate reports that. Work is never negative.
-func Work(t Ticket) (work int, approximate bool) {
+func Work(t tickets.Ticket) (work int, approximate bool) {
 	prefix := t.PrefixTokens
 	if prefix <= 0 {
 		prefix = FallbackPrefixTokens

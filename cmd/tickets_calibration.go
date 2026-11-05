@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketspec"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +45,7 @@ func buildCalibration(name string, e tickets.Epic) Calibration {
 			tk.ExpectedContextWindow <= 0 || tk.ActualContextWindow <= 0 {
 			continue
 		}
-		work, approx := tickets.Work(tk)
+		work, approx := ticketspec.Work(tk)
 		if work == 0 {
 			continue
 		}

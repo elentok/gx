@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketspec"
 	"github.com/spf13/cobra"
 )
 
@@ -228,7 +229,7 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 	// Conflict sessions are listed apart, so any extra session here is a relaunch.
 	add(len(row.Sessions) > 1, flagRelaunch)
 	add(has(string(events.Nudged)), flagNudge)
-	work, _ := tickets.Work(tk)
+	work, _ := ticketspec.Work(tk)
 	add(row.ExpectedContext > 0 && work > 2*row.ExpectedContext, flagOverrun)
 	add(median > 0 && row.ElapsedSeconds > 2*median, flagSlow)
 	add(tk.Status == string(schema.StatusDone) && !tk.Commitless && (row.ActualContext == 0 || row.ElapsedSeconds == 0), flagMetricsAbsent)

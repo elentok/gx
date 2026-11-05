@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketspec"
 )
 
 // The split limit lives in two places: the skill text and the Go constant.
@@ -20,7 +20,7 @@ func TestToTicketsSplitLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := k * 1000; got != tickets.SplitLimitTokens {
-		t.Errorf("skill says %dK, tickets.SplitLimitTokens is %d", k, tickets.SplitLimitTokens)
+	if got := k * 1000; got != ticketspec.SplitLimitTokens {
+		t.Errorf("skill says %dK, ticketspec.SplitLimitTokens is %d", k, ticketspec.SplitLimitTokens)
 	}
 }

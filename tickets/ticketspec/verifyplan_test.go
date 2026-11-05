@@ -1,4 +1,4 @@
-package tickets
+package ticketspec
 
 import (
 	"slices"

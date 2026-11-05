@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketspec"
 )
 
 func newTicketsVerifyPlanCmd(d deps) *cobra.Command {
@@ -21,7 +21,7 @@ func newTicketsVerifyPlanCmd(d deps) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if table {
-				tickets.WriteEstimateTable(c.OutOrStdout())
+				ticketspec.WriteEstimateTable(c.OutOrStdout())
 				return nil
 			}
 			if len(args) != 1 || planPath == "" {
@@ -55,7 +55,7 @@ func runVerifyPlan(cwd, epicArg, planPath, manifestPath string, w io.Writer) err
 	if err != nil {
 		return err
 	}
-	plan, err := tickets.ParseVerifyPlan(data)
+	plan, err := ticketspec.ParseVerifyPlan(data)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func runVerifyPlan(cwd, epicArg, planPath, manifestPath string, w io.Writer) err
 	if err != nil {
 		return err
 	}
-	built, err := tickets.BuildVerifyTickets(plan, string(spec), filepath.ToSlash(specPath))
+	built, err := ticketspec.BuildVerifyTickets(plan, string(spec), filepath.ToSlash(specPath))
 	if err != nil {
 		return err
 	}
@@ -94,12 +94,12 @@ func runVerifyPlan(cwd, epicArg, planPath, manifestPath string, w io.Writer) err
 
 // writeVerifyManifest writes the body files next to the manifest, then appends
 // the entries to it.
-func writeVerifyManifest(path string, ts []tickets.VerifyTicket) error {
+func writeVerifyManifest(path string, ts []ticketspec.VerifyTicket) error {
 	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	out, err := tickets.AppendManifest(existing, ts)
+	out, err := ticketspec.AppendManifest(existing, ts)
 	if err != nil {
 		return err
 	}
