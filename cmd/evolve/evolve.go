@@ -1,4 +1,5 @@
-package cmd
+// Package evolve is `gx evolve` (run, skip, all, inputs, export).
+package evolve
 
 import (
 	"context"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/projects"
@@ -288,7 +290,17 @@ func runEvolveAll(ctx context.Context, env evolveEnv, w, errW io.Writer, since t
 	return errors.Join(errs...)
 }
 
-func newEvolveCmd(d deps) *cobra.Command {
+// Deps is the runtime context of `gx evolve`.
+type Deps struct {
+	cmdbase.Env
+	// UserHomeDir resolves the home directory that holds the claude transcripts.
+	UserHomeDir func() (string, error)
+	// ConfirmForce asks a yes/no question; `evolve all` asks before each submit.
+	ConfirmForce func(string) (bool, error)
+}
+
+// New returns `gx evolve`.
+func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "evolve",
 		Short: "retro a finished epic and file what it learned",
@@ -362,25 +374,25 @@ func newEvolveCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func defaultEvolveEnv(d deps) (evolveEnv, error) {
-	cfg, err := d.loadConfig()
+func defaultEvolveEnv(d Deps) (evolveEnv, error) {
+	cfg, err := d.LoadConfig()
 	if err != nil {
 		return evolveEnv{}, err
 	}
-	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now, confirm: d.confirmForce,
+	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now, confirm: d.ConfirmForce,
 		merged: defaultMerged(cfg.TicketStore.Path)}
 	// Missing dirs only cost digests, which then report "missing".
-	env.homeDir, _ = d.userHomeDir()
-	env.stateDir, _ = d.dirs().StateDir()
-	env.dataDir, _ = d.dirs().DataDir()
-	env.codexHome = sessionlookup.RootsFrom(d.env).CodexHome
+	env.homeDir, _ = d.UserHomeDir()
+	env.stateDir, _ = d.Dirs().StateDir()
+	env.dataDir, _ = d.Dirs().DataDir()
+	env.codexHome = sessionlookup.RootsFrom(d.Env.Env).CodexHome
 	if cwd, err := os.Getwd(); err == nil {
-		if root, err := tickets.RootForDirs(d.dirs(), cwd); err == nil {
+		if root, err := tickets.RootForDirs(d.Dirs(), cwd); err == nil {
 			env.cwdProject = tickets.ProjectName(root)
 		}
 	}
 	env.submit = func(ctx context.Context, req wire.OneOffRequest) (wire.OneOffResult, error) {
-		cl, err := d.dial()()
+		cl, err := d.Dial()()
 		if err != nil {
 			return wire.OneOffResult{}, err
 		}

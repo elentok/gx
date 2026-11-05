@@ -15,6 +15,7 @@ import (
 	codexcmd "github.com/elentok/gx/cmd/codex"
 	configcmd "github.com/elentok/gx/cmd/config"
 	"github.com/elentok/gx/cmd/doctor"
+	"github.com/elentok/gx/cmd/evolve"
 	"github.com/elentok/gx/cmd/gitops"
 	"github.com/elentok/gx/cmd/limits"
 	"github.com/elentok/gx/cmd/project"
@@ -148,6 +149,12 @@ func (d deps) gitopsDeps() gitops.Deps {
 	return s
 }
 
+// evolveDeps is the `gx evolve` hooks joined with the shared env. userHomeDir
+// and confirmForce stay in root deps because other commands read them too.
+func (d deps) evolveDeps() evolve.Deps {
+	return evolve.Deps{Env: d.base(), UserHomeDir: d.userHomeDir, ConfirmForce: d.confirmForce}
+}
+
 // serverapiDeps is the `gx server` API verbs' hook joined with the shared env.
 // stdinIsTerminal stays in root deps because other commands read it too.
 func (d deps) serverapiDeps() serverapi.Deps {
@@ -264,7 +271,7 @@ Run without a command to open the status UI.`,
 		newTicketsCmd(d),
 		newServerCmd(d),
 		newRecoveryCmd(d),
-		newEvolveCmd(d),
+		evolve.New(d.evolveDeps()),
 		project.New(d.projectDeps()),
 		limits.New(limits.Deps{Env: d.base()}),
 		limits.NewUsage(limits.Deps{Env: d.base()}),

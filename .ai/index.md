@@ -129,6 +129,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/config` — `gx config` and `gx notify` (`New`, `NewNotify`, `Deps` with the `InitConfig` and `RunEditor` hooks, `DefaultDeps`); `cmdbase.RunEditorCommand` is the shared editor runner
   - `cmd/codex` — `gx codex` doctor and setup (`New`, `Deps` with the `StdinIsTerminal` hook)
   - `cmd/doctor` — `gx doctor` (`New`, `Deps` with the `ExplainAgent`, `ProbeGhostty`, `ConfirmForce` and `GOOS` hooks, `DefaultDeps`)
+  - `cmd/evolve` — `gx evolve` run, skip, all, inputs and export (`New`, `Deps` with the `UserHomeDir` and `ConfirmForce` hooks)
   - `cmd/skills` — `gx skills install|uninstall` (`New`, `Deps` with the `skills*` hooks, `DefaultDeps`, `Refresh` for `gx server start`)
   - `cmd/term` — `gx term` (`New`, `Deps` with the `GOOS` field)
   - `cmd/limits` — `gx budget`, `gx usage`, `gx afk`, `gx vimode` (`New`, `NewUsage`, `NewAFK`, `NewViMode`, `Deps` with no hooks of its own; `BudgetLine` is called by `gx server status`)
