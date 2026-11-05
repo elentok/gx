@@ -4,6 +4,47 @@ import { useCallback, useEffect, useState } from "react";
 // (private mode, quota), so every read and write swallows errors, as pageCache does.
 const COMPOSER = "gx.draft.composer.";
 const ROUND = "gx.draft.round.";
+const IMAGES = "gx.draft.images.";
+
+/** One image of a draft: `id` is set once the upload finished, a missing `id` is an upload in flight. */
+export interface DraftImage {
+  key: string;
+  id?: string;
+}
+
+function readImages(key: string): DraftImage[] {
+  try {
+    const parsed = JSON.parse(read(key) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The image draft of one session. `update` receives the stored list, so a change made in another tab is never lost. */
+export function useImageDraft(sessionId: string): [DraftImage[], (update: (cur: DraftImage[]) => DraftImage[]) => void] {
+  const key = IMAGES + sessionId;
+  const [images, setImages] = useState(() => readImages(key));
+
+  useEffect(() => {
+    setImages(readImages(key));
+    const listener = (e: StorageEvent) => {
+      if (e.key === key || e.key === null) setImages(readImages(key));
+    };
+    window.addEventListener("storage", listener);
+    return () => window.removeEventListener("storage", listener);
+  }, [key]);
+
+  const update = useCallback(
+    (fn: (cur: DraftImage[]) => DraftImage[]) => {
+      const next = fn(readImages(key));
+      setImages(next);
+      write(key, next.length === 0 ? null : JSON.stringify(next));
+    },
+    [key],
+  );
+  return [images, update];
+}
 
 function read(key: string): string | null {
   try {
@@ -69,7 +110,7 @@ export function pruneDrafts(liveSessionIds: Iterable<string>): void {
     const stale: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      const prefix = key && [COMPOSER, ROUND].find((p) => key.startsWith(p));
+      const prefix = key && [COMPOSER, ROUND, IMAGES].find((p) => key.startsWith(p));
       if (key && prefix && !live.has(key.slice(prefix.length))) stale.push(key);
     }
     stale.forEach((key) => localStorage.removeItem(key));

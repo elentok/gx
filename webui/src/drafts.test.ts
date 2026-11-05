@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { pruneDrafts, readRoundDraft, useComposerDraft, writeRoundDraft } from "./drafts";
+import { useComposerImages } from "./design/useComposerImages";
+import { pruneDrafts, readRoundDraft, useComposerDraft, useImageDraft, writeRoundDraft } from "./drafts";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -71,6 +72,47 @@ describe("pruneDrafts", () => {
     expect(renderHook(() => useComposerDraft("drop")).result.current[0]).toBe("");
     expect(readRoundDraft("drop", "r")).toBeNull();
     expect(localStorage.getItem("other")).toBe("untouched");
+  });
+
+  it("also deletes the image drafts of gone sessions", () => {
+    for (const id of ["keep", "drop"]) {
+      const { result } = renderHook(() => useImageDraft(id));
+      act(() => result.current[1]((cur) => [...cur, { key: "k", id: "img" }]));
+    }
+    pruneDrafts(["keep"]);
+    expect(renderHook(() => useImageDraft("keep")).result.current[0]).toHaveLength(1);
+    expect(renderHook(() => useImageDraft("drop")).result.current[0]).toHaveLength(0);
+  });
+});
+
+describe("image draft", () => {
+  it("keeps ids and pending entries across a remount", () => {
+    const { result } = renderHook(() => useImageDraft("a"));
+    act(() => result.current[1]((cur) => [...cur, { key: "1", id: "x" }, { key: "2" }]));
+    expect(renderHook(() => useImageDraft("a")).result.current[0]).toEqual([{ key: "1", id: "x" }, { key: "2" }]);
+  });
+
+  it("shows another tab's change, and a pending entry turning ready", () => {
+    const { result } = renderHook(() => useImageDraft("a"));
+    const key = "gx.draft.images.a";
+    act(() => otherTabWrites(key, JSON.stringify([{ key: "1" }])));
+    expect(result.current[0]).toEqual([{ key: "1" }]);
+    act(() => otherTabWrites(key, JSON.stringify([{ key: "1", id: "x" }])));
+    expect(result.current[0]).toEqual([{ key: "1", id: "x" }]);
+  });
+});
+
+describe("composer images after a reload", () => {
+  it("reads a pending entry as failed 'Upload cut off' with no retry, and ready once another tab finishes it", () => {
+    localStorage.setItem("gx.draft.images.a", JSON.stringify([{ key: "1" }, { key: "2", id: "x" }]));
+    const { result } = renderHook(() => useComposerImages("a"));
+    expect(result.current.images[0]).toMatchObject({ state: "failed", message: "Upload cut off", canRetry: false });
+    expect(result.current.failed).toBe(1);
+    expect(result.current.readyIds).toEqual(["x"]);
+    act(() => otherTabWrites("gx.draft.images.a", JSON.stringify([{ key: "1", id: "y" }, { key: "2", id: "x" }])));
+    expect(result.current.failed).toBe(0);
+    expect(result.current.readyIds).toEqual(["y", "x"]);
+    expect(result.current.images[0].url).toContain("id=y");
   });
 });
 
