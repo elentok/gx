@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/limits"
+	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
@@ -48,6 +49,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),
 		ticketwrite.Routes(func() *ticketwrite.Writer { return s.writer }),
 		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
+		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
 	)
 }
 

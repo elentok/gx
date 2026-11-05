@@ -175,7 +175,12 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   imports it too); `server/harness/` holds the harness and runner choice (resolution order, Default
   harness, labels, missing-program checks, runner selection) and the `/v1/settings/agents` routes
   (imports `index`, `projects`, `queue`, `runs`, `settings` and `wire`; the root implements `Host`
-  and imports it as `harnesschoice`, since the top-level `harness/` clashes)
+  and imports it as `harnesschoice`, since the top-level `harness/` clashes);
+  `server/merge/` holds epic merging and landing: the `Merger` (epic merge, merge recovery, the
+  late-finish and hand-merged scans), the `Landing` (dirty-trunk merge, stash-merge, trunk conflicts) and
+  the `Reconciler` (parent-defect and late-finish scans the root registers as `OnRescan` steps),
+  with `Routes()` for `epics/merge` and `epics/stash-merge`. The root implements its `Deps`; the
+  merge guard's `closeAndWait` stays with the root's shutdown
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

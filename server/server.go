@@ -493,8 +493,6 @@ var routeTable = []struct {
 	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAnswer)(w, r) }},
 	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
-	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.merger.EpicMerge)(w, r) }},
-	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.landing.EpicStashMerge)(w, r) }},
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},
 	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},
