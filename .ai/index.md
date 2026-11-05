@@ -243,8 +243,20 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `git/pr` — GitHub pull requests via `gh` (list open/closed, comments, facets, PR URLs); imports `git`, never the reverse
 - `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
   - `ui/tickets` — the Tickets tab root (`Model`); children never import it: `ui/tickets/rowfmt` (leaf: metrics, pause labels, live row), `ui/tickets/tabapi` (names `ui/app` and `ui/agents` use: `ServerAPI`, `ServerLink*`, messages), `ui/tickets/preview` (preview pane), `ui/tickets/rowactions` (row menus, row editor, watch modal), `ui/tickets/queue` (`QueueModel` and children), `ui/tickets/sidebar` (sidebar tree), `ui/tickets/serverlink` (`Binding`: the client, last snapshot, project scope and link state), `ui/tickets/internal/tickettest` (shared test helpers)
+  - `ui` itself is the render kit and tokens (styles, frames, overlays, icons, key hints). A helper with a domain gets its own package
   - `ui/gitops` — shared bump, push and pull handling for `ui/status` and `ui/log`
   - `ui/commitops` — shared commit handling for `ui/commit` and `ui/log`
+  - `ui/fuzzy` — fuzzy matching and scoring
+  - `ui/refrules` — important-ref rules and colour resolve (used by `ui/log`)
+  - `ui/cmdoutput` — command-output recorder
+  - `ui/pushstate` — push-state styles (pushed, unpushed, diverged)
+  - `ui/status/stagemodal` — the stage modal of `ui/status`
+  - `ui/worktrees/launch` — terminal launchers for `ui/worktrees` (the only `ui/worktrees` package that imports `herdr`)
+  - `ui/worktrees/modal` — modals of `ui/worktrees`
+  - `ui/agents/agentstyle` — shared agent row styles
+  - `ui/agents/terminal` — the attached terminal pane and copy mode
+  - `ui/agents/create` — the create-agent form
+  - `ui/agents/jump` — the jump-to-agent popup
 - `e2e/` — end-to-end tests (slow, CI only)
 - `testutil/` — fakes and helpers: `testutil/agentfake` (fake Claude, shared core),
   `testutil/agentfake/codex` (fake Codex, imports `agentfake`), `testutil/herdrfake`,
