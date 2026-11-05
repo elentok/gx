@@ -168,6 +168,20 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		}
 	})
 
+	t.Run("refusal for several failures names --known-failures", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		f.record(t, check.ExitFail, "", "TestA", "TestB")
+		err := f.finish(t, "--check-failures=02")
+		if err == nil || !strings.Contains(err.Error(), "--known-failures") {
+			t.Fatalf("want a refusal naming --known-failures, got %v", err)
+		}
+		f.record(t, check.ExitFail, "", "TestA")
+		if err := f.finish(t); err == nil || strings.Contains(err.Error(), "--known-failures") {
+			t.Fatalf("one failure: want a refusal without the hint, got %v", err)
+		}
+	})
+
 	t.Run("known failures: one address covers the failing set", func(t *testing.T) {
 		f := newFinishFixture(t)
 		cmdtest.CommitFile(t, f.wt, "a.txt", "a")

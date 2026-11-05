@@ -102,7 +102,11 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		addrs, need = known, len(known)
 	}
 	if len(addrs) < need {
-		return fmt.Errorf("%s: the last `gx check` run failed %d test(s); pass --check-failures with at least %d follow-up address(es), got %d", label, need, need, len(addrs))
+		hint := ""
+		if need > 1 {
+			hint = "; if they are already red on the base, file one follow-up for the family and pass --known-failures <addr> instead"
+		}
+		return fmt.Errorf("%s: the last `gx check` run failed %d test(s); pass --check-failures with at least %d follow-up address(es), got %d%s", label, need, need, len(addrs), hint)
 	}
 	cwd, err := getwd()
 	if err != nil {
