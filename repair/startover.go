@@ -115,9 +115,16 @@ func StartOver(in StartOverInput, d deps.Deps) (StartOverResult, error) {
 
 // closeIdleSession stops an idle or done agent: it is a leftover pane, and
 // leaving it would make the next launch hit its label. A working agent, or
-// one whose state is unknown, refuses.
+// one whose state is unknown, refuses. A session that died is gone already:
+// Stop only clears the runner's record of it and reaps its holder.
 func closeIdleSession(r agentrunner.Runner, s agentrunner.Session, id string) error {
 	st, err := r.Status(s)
+	if errors.Is(err, agentrunner.ErrSessionDied) {
+		if err := r.Stop(s); err != nil {
+			return fmt.Errorf("clearing the dead agent of ticket %s: %w", id, err)
+		}
+		return nil
+	}
 	if err != nil || (st.State != agentrunner.StateIdle && st.State != agentrunner.StateDone) {
 		return &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("an agent is still alive for ticket %s; stop it first", id)}
 	}

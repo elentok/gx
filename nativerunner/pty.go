@@ -378,9 +378,9 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		// Longer than the holder's own grace for claude, plus its final flush.
 		grace = 2 * holder.HolderStopGrace
 	}
-	if ss.holder == nil {
-		// A silent holder can't be asked; its exited is already closed, so
-		// wait on the pid itself.
+	if ss.holder == nil || p.reg.hasDied(ss) {
+		// A silent or dead holder can't be asked, and its exited may never
+		// close, so kill it and wait on the pid itself.
 		p.killSessions(ss)
 		if err := p.awaitHolderGone(ss, grace); err != nil {
 			return p.reg.stopFailed(ss, err)

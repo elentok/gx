@@ -55,6 +55,13 @@ func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
 	return s, adoptedLive, nil
 }
 
+// holderRuns reports whether ss's holder pid still runs. A failed lookup
+// counts as running, so a session is never forgotten on a guess.
+func (p *Pty) holderRuns(ss *ptySession) bool {
+	live, err := pidAlive(orPS(p.Procs), ss.holderPID, ss.holderStart, ss.session.SessionID)
+	return err != nil || live
+}
+
 func (p *Pty) newSession(label string, meta Meta) *ptySession {
 	return &ptySession{
 		session:     agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
@@ -97,10 +104,17 @@ func (p *Pty) heldLabel(opts agentrunner.StartOptions) (agentrunner.Session, boo
 }
 
 // Find returns label's agent, adopting a live holder an earlier server left
-// behind. A holder with a live pid and a silent socket is returned dead.
+// behind. A holder with a live pid and a silent socket is returned dead. A
+// tracked session that died and whose holder is gone is forgotten, so a label
+// whose dial failed doesn't outlive its processes.
 func (p *Pty) Find(label string) (agentrunner.Session, bool, error) {
 	if ss, ok := p.reg.get(label); ok {
-		return ss.session, true, nil
+		if !p.reg.hasDied(ss) || p.holderRuns(ss) {
+			return ss.session, true, nil
+		}
+		p.reg.remove(label)
+		_ = p.Cleanup(label)
+		return agentrunner.Session{}, false, nil
 	}
 	s, outcome, err := p.adopt(label)
 	if errors.Is(err, agentrunner.ErrNotFound) {

@@ -54,6 +54,12 @@ func (r *ptyRegistry) markDied(ss *ptySession, err error) {
 	ss.died = err
 }
 
+func (r *ptyRegistry) hasDied(ss *ptySession) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return ss.died != nil
+}
+
 // stopFailed lets a later Stop retry after err and returns err.
 func (r *ptyRegistry) stopFailed(ss *ptySession, err error) error {
 	r.mu.Lock()

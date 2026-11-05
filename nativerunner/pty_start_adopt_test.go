@@ -203,6 +203,32 @@ func TestPty_StartSilentHolderIsTakenAndStopKillsIt(t *testing.T) {
 	waitGone(t, meta.HolderPID)
 }
 
+// A died session stays findable while its holder runs, so start-over can stop
+// it, and is forgotten once the holder is gone.
+func TestPty_FindForgetsDiedSessionOnceHolderIsGone(t *testing.T) {
+	t.Parallel()
+	p := fakeclaudeRunner(t)
+	cwd := t.TempDir()
+	if _, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: cwd, Kind: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	meta := readHolderMeta(t, p, "e-01")
+	if err := syscall.Kill(meta.HolderPID, syscall.SIGSTOP); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = syscall.Kill(-meta.HolderPID, syscall.SIGKILL) })
+
+	q := secondRunner(t, p)
+	if _, ok, err := q.Find("e-01"); err != nil || !ok {
+		t.Fatalf("Find = %v, %v; want the silent holder", ok, err)
+	}
+	_ = syscall.Kill(-meta.HolderPID, syscall.SIGKILL)
+	waitGone(t, meta.HolderPID)
+	if _, ok, err := q.Find("e-01"); err != nil || ok {
+		t.Fatalf("Find after the holder died = %v, %v; want it forgotten", ok, err)
+	}
+}
+
 func waitGone(t *testing.T, pid int) {
 	t.Helper()
 	if !testutil.Poll(5*time.Second, 20*time.Millisecond, func() bool { return syscall.Kill(pid, 0) != nil }) {

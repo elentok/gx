@@ -44,6 +44,21 @@ func startOverFixture(t *testing.T, state agentrunner.State) (repair.StartOverIn
 	return in, d, runner, label
 }
 
+func TestStartOver_ClearsADeadAgentInsteadOfRefusing(t *testing.T) {
+	in, d, runner, label := startOverFixture(t, agentrunner.StateIdle)
+	runner.DieAfterPrompt(label, agentrunner.SessionDied("holder failed: dial"))
+	s, _, _ := runner.Find(label)
+	if err := runner.Prompt(s, "go"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repair.StartOver(in, d); err != nil {
+		t.Fatalf("StartOver: %v", err)
+	}
+	if _, ok, _ := runner.Find(label); ok {
+		t.Error("the dead agent's record is still there")
+	}
+}
+
 func TestStartOver_ClosesAnIdleOrDoneAgentAndStartsOver(t *testing.T) {
 	for _, state := range []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone} {
 		t.Run(string(state), func(t *testing.T) {
