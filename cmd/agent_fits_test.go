@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 func fitsDeps(stdout *bytes.Buffer, used int) deps {
@@ -102,7 +102,7 @@ func TestExecute_AgentContextWindow_FitsSwitchOffStops(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := fitsDeps(&stdout, 1_000)
-	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", nativerunner.AgentSessionEnv: "gx-1"}
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", holder.AgentSessionEnv: "gx-1"}
 	d.getenv = func(k string) string { return env[k] }
 	d.readAutoAdvance = func(id string) (bool, error) { return id != "gx-1", nil }
 	code, err := fitsExit(t, []string{"agent", "context-window", "--fits", "spec"}, d)
@@ -115,7 +115,7 @@ func TestExecute_AgentContextWindow_FitsSwitchOnUsesTable(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := fitsDeps(&stdout, 1_000)
-	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", nativerunner.AgentSessionEnv: "gx-1"}
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", holder.AgentSessionEnv: "gx-1"}
 	d.getenv = func(k string) string { return env[k] }
 	d.readAutoAdvance = func(string) (bool, error) { return true, nil }
 	code, err := fitsExit(t, []string{"agent", "context-window", "--fits", "spec"}, d)
@@ -128,7 +128,7 @@ func TestExecute_AgentContextWindow_FitsSwitchUnreachableErrors(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := fitsDeps(&stdout, 1_000)
-	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", nativerunner.AgentSessionEnv: "gx-1"}
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", holder.AgentSessionEnv: "gx-1"}
 	d.getenv = func(k string) string { return env[k] }
 	d.readAutoAdvance = func(string) (bool, error) { return false, errors.New("no server") }
 	code, err := fitsExit(t, []string{"agent", "context-window", "--fits", "spec"}, d)
@@ -141,7 +141,7 @@ func TestExecute_AgentContextWindow_FitsCodexSwitchOffStops(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := fitsDeps(&stdout, 0)
-	env := map[string]string{nativerunner.AgentSessionEnv: "gx-1"}
+	env := map[string]string{holder.AgentSessionEnv: "gx-1"}
 	d.getenv = func(k string) string { return env[k] }
 	d.verifyCodexSession = func(string, string) (bool, error) { return true, nil }
 	d.readCodexContext = func(string, string) (int, bool, error) { return 1_000, true, nil }
@@ -196,7 +196,7 @@ func TestExecute_AgentContextWindow_FitsClaudeMissingTranscriptIsAnError(t *test
 
 func TestExecute_AgentContextWindow_BothEnvVarsPickTheGXSessionHarness(t *testing.T) {
 	t.Parallel()
-	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", "CODEX_THREAD_ID": "c-1", nativerunner.AgentSessionEnv: "gx-1"}
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", "CODEX_THREAD_ID": "c-1", holder.AgentSessionEnv: "gx-1"}
 	var stdout bytes.Buffer
 	d := freshCodexDeps(&stdout, env)
 	d.readCodexContext = func(string, string) (int, bool, error) { return 42, true, nil }
@@ -211,7 +211,7 @@ func TestExecute_AgentContextWindow_BothEnvVarsPickTheGXSessionHarness(t *testin
 	}
 
 	// Without a gx session the ambiguity stays.
-	delete(env, nativerunner.AgentSessionEnv)
+	delete(env, holder.AgentSessionEnv)
 	if err := execute([]string{"agent", "context-window"}, d); err == nil || !strings.Contains(err.Error(), "ambiguous") {
 		t.Fatalf("err = %v, want the ambiguity error", err)
 	}

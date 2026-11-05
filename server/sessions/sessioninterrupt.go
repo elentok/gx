@@ -5,7 +5,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // InterruptSession ends a Working session's current turn and keeps the session,
@@ -21,7 +21,7 @@ func (mg *Manager) InterruptSession(req wire.SessionRequest) (wire.SessionResult
 	if st := meta.Info().Status; st.State != wire.SessionWorking {
 		return Refusal(wire.ReasonSessionNotWorking, fmt.Sprintf("session %s is %s, not working", req.ID, st.State)), nil
 	}
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err == nil {
 		err = c.SendKeys("\x03")
 	}

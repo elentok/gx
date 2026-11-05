@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -21,14 +21,14 @@ import (
 // AttachStream is the slice of nativerunner.HolderAttach the terminal panel
 // uses.
 type AttachStream interface {
-	Next() (nativerunner.AttachMessage, error)
+	Next() (holder.AttachMessage, error)
 	SendKey(k screen.Key) error
 	Paste(text string) error
 	Resize(cols, rows int) error
 	Scroll(offset int) error
 	Wheel(x, y int, down bool) error
 	Mouse(x, y int, kind screen.MouseKind, button int) error
-	Copy(start, end nativerunner.LinePos) error
+	Copy(start, end holder.LinePos) error
 	Close() error
 }
 
@@ -39,12 +39,12 @@ type attachDialer func(dir string) (stream AttachStream, snapshot []string, err 
 // dialHolderAttach talks to holder.sock directly, not through the server
 // (ADR 0037).
 func dialHolderAttach(dir string) (AttachStream, []string, error) {
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err != nil {
 		return nil, nil, err
 	}
 	a, err := c.Attach()
-	if errors.Is(err, nativerunner.ErrAttachUnsupported) {
+	if errors.Is(err, holder.ErrAttachUnsupported) {
 		rows, _, err := c.Screen(0)
 		return nil, rows, err
 	}
@@ -77,7 +77,7 @@ type attachment struct {
 	exited bool
 	err    error
 	rows   []string
-	cursor nativerunner.FrameCursor
+	cursor holder.FrameCursor
 	// offset, scrollMax, scrollBase and newLines are the latest frame's
 	// scroll state.
 	offset, scrollMax, scrollBase, newLines int
@@ -134,7 +134,7 @@ const (
 
 type attachStreamMsg struct {
 	a   *attachment
-	msg nativerunner.AttachMessage
+	msg holder.AttachMessage
 	err error
 }
 
@@ -235,20 +235,20 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.msg.Type {
-	case nativerunner.StreamFrame:
+	case holder.StreamFrame:
 		f := msg.msg.Frame
 		a.rows = applyFrame(a.rows, f)
 		a.cursor = f.Cursor
 		a.offset, a.scrollMax, a.scrollBase, a.newLines = f.ScrollOffset, f.ScrollMax, f.ScrollBase, f.NewLines
 		a.mouse = f.Mouse
-	case nativerunner.StreamExit:
+	case holder.StreamExit:
 		a.ended, a.exited = true, true
 		m.terminalFocused = false
 		// Shown until the server reports the exit and the saved last screen loads.
 		m.lastScreen = lastScreen{id: a.id, rows: a.rows}
 		m.copy = nil
 		return m, nil
-	case nativerunner.StreamCopy:
+	case holder.StreamCopy:
 		return m, tea.Batch(m.writeCopied(msg.msg.Text), readAttach(a))
 	}
 	return m, readAttach(a)
@@ -256,7 +256,7 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 
 // applyFrame returns rows with the frame's changed rows written over them, or
 // just the frame's rows for a full frame.
-func applyFrame(rows []string, f nativerunner.Frame) []string {
+func applyFrame(rows []string, f holder.Frame) []string {
 	if f.Full {
 		rows = nil
 	}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // movedProcs is the real process table until moved is set; then every pid
@@ -40,7 +41,7 @@ func TestPty_CleanupRefusesWhileHolderLive(t *testing.T) {
 	if err := p.Cleanup("e-01"); err == nil {
 		t.Fatal("Cleanup with a live holder = nil, want an error")
 	}
-	if _, err := os.Stat(filepath.Join(p.Root, "e-01", nativerunner.HolderSocketFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(p.Root, "e-01", holder.HolderSocketFile)); err != nil {
 		t.Errorf("holder.sock after refused Cleanup: %v", err)
 	}
 	if _, err := p.Status(s); err != nil {
@@ -63,7 +64,7 @@ func TestPty_StopSkipsMovedPidAndCapsTheWait(t *testing.T) {
 	if err := syscall.Kill(holderPID, syscall.SIGSTOP); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Remove(filepath.Join(dir, nativerunner.HolderSocketFile)); err != nil {
+	if err := os.Remove(filepath.Join(dir, holder.HolderSocketFile)); err != nil {
 		t.Fatal(err)
 	}
 	procs.moved.Store(true)

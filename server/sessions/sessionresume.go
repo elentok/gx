@@ -12,7 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // resumeSpacing staggers a server start's auto-resumes.
@@ -97,7 +97,7 @@ func (rs *Resumer) startResumedHolder(dir string, meta *Meta, crashUntil time.Ti
 func clearOldHolder(dir string) error {
 	deadline := time.Now().Add(sessionStopTimeout)
 	for {
-		if _, err := nativerunner.DialHolder(dir); err != nil {
+		if _, err := holder.DialHolder(dir); err != nil {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -105,7 +105,7 @@ func clearOldHolder(dir string) error {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	for _, f := range []string{nativerunner.ExitCodeFile, nativerunner.HolderSocketFile} {
+	for _, f := range []string{holder.ExitCodeFile, holder.HolderSocketFile} {
 		if err := os.Remove(filepath.Join(dir, f)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
@@ -130,7 +130,7 @@ func (rs *Resumer) RestoreSessions() {
 			continue
 		}
 		dir := filepath.Join(rs.mg.cfg.SessionsDir, info.ID)
-		if _, err := nativerunner.DialHolder(dir); err == nil {
+		if _, err := holder.DialHolder(dir); err == nil {
 			meta, err := ReadMeta(dir)
 			if err != nil {
 				rs.mg.log.Warn("read session meta", "session", info.ID, "err", err)
@@ -143,7 +143,7 @@ func (rs *Resumer) RestoreSessions() {
 			rs.mg.Watches.Start(func() { rs.mg.watchSession(dir, info.ID, meta.Run, time.Time{}, true) })
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err == nil || info.Stopped {
+		if _, err := os.Stat(filepath.Join(dir, holder.ExitCodeFile)); err == nil || info.Stopped {
 			exit := savedSessionExit(dir)
 			rs.mg.UpdateSessionMetaOrWarn(dir, info.ID, func(m *Meta) bool { return rs.mg.recordSessionExit(m, exit) })
 			continue

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 )
@@ -61,8 +61,8 @@ func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 type actionRun struct {
 	p      *Prompt
 	dir    string
-	holder *nativerunner.HolderClient
-	msgs   <-chan nativerunner.WatchMessage
+	holder *holder.HolderClient
+	msgs   <-chan holder.WatchMessage
 	state  string
 	// background marks a Working state whose turn is over, with a background
 	// task still running; Promptable treats it as Idle.
@@ -126,7 +126,7 @@ func (p *Prompt) runAction(dir string, action []string) (int, error) {
 // openActionRun dials the session's holder and starts following its watch;
 // the returned func ends the watch.
 func (p *Prompt) openActionRun(dir string, opts RunOpts) (*actionRun, func(), error) {
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -135,7 +135,7 @@ func (p *Prompt) openActionRun(dir string, opts RunOpts) (*actionRun, func(), er
 		return nil, nil, err
 	}
 	done := make(chan struct{})
-	msgs := make(chan nativerunner.WatchMessage)
+	msgs := make(chan holder.WatchMessage)
 	go func() {
 		defer close(msgs)
 		for {
@@ -162,10 +162,10 @@ func (p *Prompt) openActionRun(dir string, opts RunOpts) (*actionRun, func(), er
 	}, nil
 }
 
-func (r *actionRun) State() string                      { return r.state }
-func (r *actionRun) Holder() *nativerunner.HolderClient { return r.holder }
-func (r *actionRun) PersonTyped() bool                  { return r.personTyped }
-func (r *actionRun) ClearPersonTyped()                  { r.personTyped = false }
+func (r *actionRun) State() string                { return r.state }
+func (r *actionRun) Holder() *holder.HolderClient { return r.holder }
+func (r *actionRun) PersonTyped() bool            { return r.personTyped }
+func (r *actionRun) ClearPersonTyped()            { r.personTyped = false }
 
 // TypeStep types one prompt and presses its Enter, without waiting.
 func (r *actionRun) TypeStep(i int, prompt string) error {
@@ -323,14 +323,14 @@ func (r *actionRun) TurnRunning() bool {
 	return r.state == wire.SessionWorking && !r.background
 }
 
-func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {
-	if !ok || msg.Type == nativerunner.StreamExit {
+func (r *actionRun) apply(msg holder.WatchMessage, ok bool) error {
+	if !ok || msg.Type == holder.StreamExit {
 		return errors.New("session ended")
 	}
-	if msg.Type == nativerunner.StreamInput {
+	if msg.Type == holder.StreamInput {
 		r.personTyped = true
 	}
-	if msg.Type == nativerunner.StreamStatus {
+	if msg.Type == holder.StreamStatus {
 		st := sessions.SessionStatusOf(msg.Status)
 		r.state, r.background = st.State, st.Background
 		log := r.p.log.With("session", filepath.Base(r.dir))

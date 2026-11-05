@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 const permissionPollInterval = 100 * time.Millisecond
@@ -67,13 +68,13 @@ func newAgentPermissionRequestCmd() *cobra.Command {
 
 // permissionRequestOf reads the hook payload. A payload it cannot read gives
 // no request, so the hook stays out of Codex's way.
-func permissionRequestOf(raw []byte) (nativerunner.PermissionRequest, bool) {
+func permissionRequestOf(raw []byte) (holder.PermissionRequest, bool) {
 	var in struct {
 		ToolName  string          `json:"tool_name"`
 		ToolInput json.RawMessage `json:"tool_input"`
 	}
 	if json.Unmarshal(raw, &in) != nil || in.ToolName == "" {
-		return nativerunner.PermissionRequest{}, false
+		return holder.PermissionRequest{}, false
 	}
 	var shell struct {
 		Command string `json:"command"`
@@ -81,34 +82,34 @@ func permissionRequestOf(raw []byte) (nativerunner.PermissionRequest, bool) {
 	_ = json.Unmarshal(in.ToolInput, &shell)
 	id, err := nativerunner.NewUUID()
 	if err != nil {
-		return nativerunner.PermissionRequest{}, false
+		return holder.PermissionRequest{}, false
 	}
-	return nativerunner.PermissionRequest{ID: id, Tool: in.ToolName, Input: in.ToolInput, Description: shell.Command}, true
+	return holder.PermissionRequest{ID: id, Tool: in.ToolName, Input: in.ToolInput, Description: shell.Command}, true
 }
 
 // holdForDecision publishes req and waits for its decision. ok is false when
 // the wait ended without one: cancelled, or the agent dir went away. Either way
 // the files are cleared.
-func holdForDecision(ctx context.Context, dir string, req nativerunner.PermissionRequest, poll time.Duration) (nativerunner.PermissionDecision, bool, error) {
-	nativerunner.ClearPermission(dir)
-	defer nativerunner.ClearPermission(dir)
-	if err := nativerunner.WritePermissionRequest(dir, req); err != nil {
-		return nativerunner.PermissionDecision{}, false, err
+func holdForDecision(ctx context.Context, dir string, req holder.PermissionRequest, poll time.Duration) (holder.PermissionDecision, bool, error) {
+	holder.ClearPermission(dir)
+	defer holder.ClearPermission(dir)
+	if err := holder.WritePermissionRequest(dir, req); err != nil {
+		return holder.PermissionDecision{}, false, err
 	}
 	tick := time.NewTicker(poll)
 	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return nativerunner.PermissionDecision{}, false, nil
+			return holder.PermissionDecision{}, false, nil
 		case <-tick.C:
 		}
 		if _, err := os.Stat(dir); err != nil {
-			return nativerunner.PermissionDecision{}, false, nil
+			return holder.PermissionDecision{}, false, nil
 		}
-		d, ok, err := nativerunner.ReadPermissionDecision(dir)
+		d, ok, err := holder.ReadPermissionDecision(dir)
 		if err != nil {
-			return nativerunner.PermissionDecision{}, false, err
+			return holder.PermissionDecision{}, false, err
 		}
 		if ok && d.ID == req.ID {
 			return d, true, nil
@@ -117,7 +118,7 @@ func holdForDecision(ctx context.Context, dir string, req nativerunner.Permissio
 }
 
 // codexPermissionOutput is the hook output Codex reads for a PermissionRequest.
-func codexPermissionOutput(d nativerunner.PermissionDecision) map[string]any {
+func codexPermissionOutput(d holder.PermissionDecision) map[string]any {
 	decision := map[string]any{"behavior": "allow"}
 	if !d.Allow {
 		decision = map[string]any{"behavior": "deny", "message": d.Reason}

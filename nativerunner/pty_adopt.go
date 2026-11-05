@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 type adoption int
@@ -39,7 +40,7 @@ func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
 		return agentrunner.Session{}, adoptGone, nil
 	}
 	// A holder whose socket stays silent can't be driven.
-	holder, err := DialHolder(dir)
+	holder, err := holder.DialHolder(dir)
 	if err != nil {
 		return p.reg.trackSilent(p.newSession(label, meta)), adoptSilent, nil
 	}

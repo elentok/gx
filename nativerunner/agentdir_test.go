@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // prepareForeignAgent writes an old agent directory whose runner has no
@@ -146,7 +147,7 @@ func assertFiles(t *testing.T, dir string, kept, gone []string) {
 
 var (
 	headlessFiles = []string{nativerunner.OutFile, nativerunner.ErrFile, nativerunner.StdinFile}
-	ptyFiles      = []string{nativerunner.RawLogFile, nativerunner.ScreenFile, nativerunner.HolderSocketFile}
+	ptyFiles      = []string{holder.RawLogFile, holder.ScreenFile, holder.HolderSocketFile}
 )
 
 func TestAgentDir_PruneMixedRootByEachRunnersFiles(t *testing.T) {
@@ -209,7 +210,7 @@ func TestAgentDir_CleanupMixedRootByEachRunnersFiles(t *testing.T) {
 		}
 	}
 	assertFiles(t, h, []string{nativerunner.MetaFile, nativerunner.OutFile, nativerunner.ErrFile}, []string{nativerunner.StdinFile})
-	assertFiles(t, p, []string{nativerunner.MetaFile, nativerunner.RawLogFile, nativerunner.ScreenFile}, []string{nativerunner.HolderSocketFile})
+	assertFiles(t, p, []string{nativerunner.MetaFile, holder.RawLogFile, holder.ScreenFile}, []string{holder.HolderSocketFile})
 }
 
 func TestAgentDir_HeadlessCleanupRemovesOnlyTheFIFO(t *testing.T) {

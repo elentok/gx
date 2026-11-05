@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/runnertest"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
 )
@@ -38,14 +39,14 @@ func newPty(t *testing.T) *nativerunner.Pty {
 	root := shortTempDir(t)
 	t.Cleanup(func() { killAgents(root) })
 	p := ptyOn(root, exe)
-	p.Env = ptyTestEnv(t.TempDir(), holderEnv+"=1", agentfake.TUIEnv+"=1", agentfake.TUIReadyDelayEnv+"="+agentfake.TUIReadyOff)
+	p.Env = ptyTestEnv(t.TempDir(), holder.HolderEnv+"=1", agentfake.TUIEnv+"=1", agentfake.TUIReadyDelayEnv+"="+agentfake.TUIReadyOff)
 	return p
 }
 
 // ptyTestEnv is the env a test pty gives its holder: claude's home and no
 // config dir, plus the marker entries.
 func ptyTestEnv(home string, markers ...string) []string {
-	env := []string{"HOME=" + home, "CLAUDE_CONFIG_DIR=", holderOwnerEnv + "=" + strconv.Itoa(os.Getpid())}
+	env := []string{"HOME=" + home, "CLAUDE_CONFIG_DIR=", holder.HolderOwnerEnv + "=" + strconv.Itoa(os.Getpid())}
 	return append(env, markers...)
 }
 
@@ -79,7 +80,7 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 	t.Parallel()
 	t.Run("poisoned home, clean config dir", func(t *testing.T) {
 		p := newPty(t)
-		p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
+		p.Env = append(claudeenv.In(t.TempDir()), holder.HolderEnv+"=1", agentfake.TUIEnv+"=1")
 		in, err := ptyKeysTyped(t, p, "do it")
 		if err != nil || in != "do it\r" {
 			t.Fatalf("Prompt = %v, keys = %q; want typed with no i", err, in)
@@ -89,7 +90,7 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 	// nudge press `i`.
 	t.Run("vim mode in the config dir before launch", func(t *testing.T) {
 		p := newPty(t)
-		p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
+		p.Env = append(claudeenv.In(t.TempDir()), holder.HolderEnv+"=1", agentfake.TUIEnv+"=1")
 		cfg, _ := envValue(p.Env, "CLAUDE_CONFIG_DIR")
 		if err := os.WriteFile(filepath.Join(cfg, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
 			t.Fatal(err)
@@ -107,7 +108,7 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 func TestPty_NudgeAfterVimToggleLogsUnknownWithCaptureAndTypesNothing(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
-	p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
+	p.Env = append(claudeenv.In(t.TempDir()), holder.HolderEnv+"=1", agentfake.TUIEnv+"=1")
 	var logs bytes.Buffer
 	p.SetLog(slog.New(slog.NewJSONHandler(&logs, nil)))
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
@@ -258,7 +259,7 @@ func ptyControl(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, c agen
 // ptyLastPrompt reads the prompt off the TUI fake's working screen.
 func ptyLastPrompt(t *testing.T, p *nativerunner.Pty, s agentrunner.Session) string {
 	t.Helper()
-	c, err := nativerunner.DialHolder(filepath.Join(p.Root, s.Label))
+	c, err := holder.DialHolder(filepath.Join(p.Root, s.Label))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +299,7 @@ func blockedPty(t *testing.T, p *nativerunner.Pty, stalled bool) agentrunner.Ses
 func TestPty_DenyReasonFallbackOnOlderHolder(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
-	p.Env = append(p.Env, holderNoOpsEnv+"=1")
+	p.Env = append(p.Env, holder.HolderNoOpsEnv+"=1")
 	s := blockedPty(t, p, false)
 
 	if err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"}); err != nil {
@@ -325,7 +326,7 @@ func TestPty_DenyReasonIdleTimeoutIsSessionDied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			p := newPty(t)
-			p.Env = append(p.Env, holderDenyTimeoutEnv+"=200ms", holderNoOpsEnv+"="+tc.noOps)
+			p.Env = append(p.Env, holder.HolderDenyTimeoutEnv+"=200ms", holder.HolderNoOpsEnv+"="+tc.noOps)
 			s := blockedPty(t, p, true)
 
 			err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"})
@@ -560,7 +561,7 @@ func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
 func TestPty_ExitBeforeExitCodeFileIsClaudeExited(t *testing.T) {
 	t.Parallel()
 	p := &nativerunner.Pty{Root: t.TempDir()}
-	err := nativerunner.Died(p, "e-01", fmt.Errorf("wait: %w", &nativerunner.ClaudeExitedError{Code: 3}))
+	err := nativerunner.Died(p, "e-01", fmt.Errorf("wait: %w", &holder.ClaudeExitedError{Code: 3}))
 	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.HasSuffix(err.Error(), ": claude exited (code 3)") || strings.Contains(err.Error(), "holder failed") {
 		t.Fatalf("died = %v; want session died: claude exited (code 3)", err)
 	}
@@ -611,7 +612,7 @@ func TestPty_StopRemovesHolderSock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sock := filepath.Join(p.Root, "e-01", nativerunner.HolderSocketFile)
+	sock := filepath.Join(p.Root, "e-01", holder.HolderSocketFile)
 	if _, err := os.Stat(sock); err != nil {
 		t.Fatalf("holder.sock while running: %v", err)
 	}
@@ -630,7 +631,7 @@ func TestPty_CleanupRemovesStaleHolderSock(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	sock := filepath.Join(dir, nativerunner.HolderSocketFile)
+	sock := filepath.Join(dir, holder.HolderSocketFile)
 	if err := os.WriteFile(sock, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -745,7 +746,7 @@ func TestPty_ReattachDeadAgentDied(t *testing.T) {
 				tt.procs(procs)
 			}
 			p, dir := preparePtyAgent(t, procs)
-			if err := os.WriteFile(filepath.Join(dir, nativerunner.ExitCodeFile), []byte("0\n"), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, holder.ExitCodeFile), []byte("0\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			if tt.silent {
@@ -891,7 +892,7 @@ func preparePtyAgent(t *testing.T, procs *fakeProcs) (*nativerunner.Pty, string)
 // without answering, like a stuck holder.
 func serveOldHolder(t *testing.T, dir string, resps map[string]any) {
 	t.Helper()
-	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	ln, err := net.Listen("unix", filepath.Join(dir, holder.HolderSocketFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -920,7 +921,7 @@ func serveOldHolder(t *testing.T, dir string, resps map[string]any) {
 func TestPty_KeysDuringDenyReasonAreNotReady(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
-	p.Env = append(p.Env, holderDenyTimeoutEnv+"=1500ms")
+	p.Env = append(p.Env, holder.HolderDenyTimeoutEnv+"=1500ms")
 	s := blockedPty(t, p, true)
 
 	denied := make(chan error, 1)

@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -67,7 +67,7 @@ func newDesignsWorktreeCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			req := wire.DesignWorktreeRequest{Epic: args[0], ExcludeSession: os.Getenv(nativerunner.AgentSessionEnv)}
+			req := wire.DesignWorktreeRequest{Epic: args[0], ExcludeSession: os.Getenv(holder.AgentSessionEnv)}
 			return runDesignsWorktree(c.Context(), cl, c.OutOrStdout(), jsonOut, req)
 		},
 	}

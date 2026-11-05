@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/transcript"
@@ -138,7 +138,7 @@ func withClearHint(reason string) string {
 // clearLeftover clears the whole input once and reports whether the harness
 // check confirms it empty.
 func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
-	c, err := nativerunner.DialHolder(f.dir)
+	c, err := holder.DialHolder(f.dir)
 	if err != nil {
 		f.log.Warn("clear leftover first prompt", "err", err)
 		return false, false
@@ -218,7 +218,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 	if strings.HasPrefix(prompt, "/") {
 		return f.deliverSlash(prompt)
 	}
-	c, err := nativerunner.DialHolder(f.dir)
+	c, err := holder.DialHolder(f.dir)
 	if err != nil {
 		return err
 	}
@@ -359,7 +359,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 // its own WaitStart. Once cancel closes, no more keys go out; onTyped, when
 // set, runs once the text is typed.
 type holderPrompter struct {
-	c       *nativerunner.HolderClient
+	c       *holder.HolderClient
 	typing  harness.Typing
 	io      harness.TypingIO
 	cancel  <-chan struct{}
@@ -429,7 +429,7 @@ func (f *firstPrompt) typing() harness.Typing {
 	return f.p.projects.SessionTyping(f.dir)
 }
 
-func (f *firstPrompt) prompter(c *nativerunner.HolderClient, turn int) *firstPrompter {
+func (f *firstPrompt) prompter(c *holder.HolderClient, turn int) *firstPrompter {
 	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.p.projects.TypingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
 }
 

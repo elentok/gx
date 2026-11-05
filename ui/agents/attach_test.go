@@ -18,7 +18,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -27,7 +27,7 @@ import (
 
 // fakeAttach is an attach stream whose messages the test queues.
 type fakeAttach struct {
-	msgs   chan nativerunner.AttachMessage
+	msgs   chan holder.AttachMessage
 	done   chan struct{}
 	keys   []screen.Key
 	pastes []string
@@ -45,7 +45,7 @@ type fakeAttach struct {
 }
 
 func newFakeAttach() *fakeAttach {
-	return &fakeAttach{msgs: make(chan nativerunner.AttachMessage, 16), done: make(chan struct{})}
+	return &fakeAttach{msgs: make(chan holder.AttachMessage, 16), done: make(chan struct{})}
 }
 
 func (f *fakeAttach) isClosed() bool {
@@ -54,12 +54,12 @@ func (f *fakeAttach) isClosed() bool {
 	return f.closed
 }
 
-func (f *fakeAttach) Next() (nativerunner.AttachMessage, error) {
+func (f *fakeAttach) Next() (holder.AttachMessage, error) {
 	select {
 	case msg := <-f.msgs:
 		return msg, nil
 	case <-f.done:
-		return nativerunner.AttachMessage{}, io.EOF
+		return holder.AttachMessage{}, io.EOF
 	}
 }
 
@@ -91,7 +91,7 @@ func (f *fakeAttach) Mouse(x, y int, kind screen.MouseKind, button int) error {
 	return nil
 }
 
-func (f *fakeAttach) Copy(start, end nativerunner.LinePos) error {
+func (f *fakeAttach) Copy(start, end holder.LinePos) error {
 	f.log = append(f.log, fmt.Sprintf("copy:%d.%d-%d.%d", start.Line, start.Col, end.Line, end.Col))
 	return nil
 }
@@ -112,11 +112,11 @@ func (f *fakeAttach) Close() error {
 }
 
 func (f *fakeAttach) frame(rows ...string) {
-	var fr nativerunner.Frame
+	var fr holder.Frame
 	for i, r := range rows {
-		fr.Rows = append(fr.Rows, nativerunner.FrameRow{Index: i, ANSI: r})
+		fr.Rows = append(fr.Rows, holder.FrameRow{Index: i, ANSI: r})
 	}
-	f.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: fr}
+	f.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: fr}
 }
 
 // fakeHolders serves each session id an attach, or a snapshot for an older
@@ -204,8 +204,8 @@ func TestAttach_FramesRenderInThePanel(t *testing.T) {
 		t.Fatalf("frame rows not drawn:\n%s", view)
 	}
 
-	h.attaches["a"].msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame,
-		Frame: nativerunner.Frame{Rows: []nativerunner.FrameRow{{Index: 1, ANSI: "> world"}}}}
+	h.attaches["a"].msgs <- holder.AttachMessage{Type: holder.StreamFrame,
+		Frame: holder.Frame{Rows: []holder.FrameRow{{Index: 1, ANSI: "> world"}}}}
 	m, _ = read(t, m, next)
 	view = plainView(m)
 	if !strings.Contains(view, "$ claude") || !strings.Contains(view, "> world") || strings.Contains(view, "> hello") {
@@ -220,8 +220,8 @@ func TestAttach_FullFrameDropsRowsPastItsHeight(t *testing.T) {
 	h.attaches["a"].frame("$ claude", "> hello", "> stale")
 	m, next = read(t, m, next)
 
-	h.attaches["a"].msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame,
-		Frame: nativerunner.Frame{Full: true, Rows: []nativerunner.FrameRow{{Index: 0, ANSI: "$ shrunk"}}}}
+	h.attaches["a"].msgs <- holder.AttachMessage{Type: holder.StreamFrame,
+		Frame: holder.Frame{Full: true, Rows: []holder.FrameRow{{Index: 0, ANSI: "$ shrunk"}}}}
 	m, _ = read(t, m, next)
 	view := plainView(m)
 	if !strings.Contains(view, "$ shrunk") || strings.Contains(view, "> hello") || strings.Contains(view, "> stale") {
@@ -549,7 +549,7 @@ func TestAttach_ExitedAttachIsNotRedialedOnSessionUpdate(t *testing.T) {
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
 	m, cmd := attachModel(t, h)
 	m, next := dialed(t, m, cmd)
-	h.attaches["a"].msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamExit}
+	h.attaches["a"].msgs <- holder.AttachMessage{Type: holder.StreamExit}
 	m, _ = read(t, m, next)
 
 	if _, cmd := withStatusOfA(m, startingStatus); cmd != nil {
@@ -568,7 +568,7 @@ func TestAttach_ExitSwitchesToTheExitedView(t *testing.T) {
 	fa := h.attaches["a"]
 	fa.frame("bye")
 	m, next = read(t, m, next)
-	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamExit}
+	fa.msgs <- holder.AttachMessage{Type: holder.StreamExit}
 	m, next = read(t, m, next)
 	if next != nil {
 		t.Fatal("the attach kept reading after the exit")

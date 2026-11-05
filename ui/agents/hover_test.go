@@ -9,7 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 )
@@ -121,7 +121,7 @@ func TestHover_AttachedMouseChildStillGetsOnlyTheWheel(t *testing.T) {
 	m, cmd := attachModel(t, h)
 	m, next := dialed(t, m, cmd)
 	fa := h.attaches["a"]
-	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: nativerunner.Frame{Mouse: true}}
+	fa.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: holder.Frame{Mouse: true}}
 	m, _ = read(t, m, next)
 	m = update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	fa.log = nil
@@ -143,7 +143,7 @@ func TestClick_ReachesAnAgentThatReportsTheMouse(t *testing.T) {
 	m, cmd := attachModel(t, h)
 	m, next := dialed(t, m, cmd)
 	fa := h.attaches["a"]
-	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: nativerunner.Frame{Mouse: true}}
+	fa.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: holder.Frame{Mouse: true}}
 	m, _ = read(t, m, next)
 	fa.log = nil
 
@@ -168,7 +168,7 @@ func TestClick_SidebarStaysWithGxForAMouseAgent(t *testing.T) {
 	m, cmd := attachModel(t, h)
 	m, next := dialed(t, m, cmd)
 	fa := h.attaches["a"]
-	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: nativerunner.Frame{Mouse: true}}
+	fa.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: holder.Frame{Mouse: true}}
 	m, _ = read(t, m, next)
 	fa.log = nil
 

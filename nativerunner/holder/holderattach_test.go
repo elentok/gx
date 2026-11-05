@@ -1,4 +1,4 @@
-package nativerunner_test
+package holder_test
 
 import (
 	"errors"
@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // attachTestHolder runs a holder whose child prints two rows, rewrites the
 // second once the change file appears, and exits with 3 once the stop file
 // appears. It returns once the two rows are on the screen.
-func attachTestHolder(t *testing.T) (c *nativerunner.HolderClient, change, stop string, finished chan struct{}) {
+func attachTestHolder(t *testing.T) (c *holder.HolderClient, change, stop string, finished chan struct{}) {
 	t.Helper()
 	dir := shortTempDir(t)
 	change, stop = filepath.Join(dir, "change"), filepath.Join(dir, "stop")
@@ -35,7 +35,7 @@ func attachTestHolder(t *testing.T) (c *nativerunner.HolderClient, change, stop 
 	return c, change, stop, finished
 }
 
-func attach(t *testing.T, c *nativerunner.HolderClient) *nativerunner.HolderAttach {
+func attach(t *testing.T, c *holder.HolderClient) *holder.HolderAttach {
 	t.Helper()
 	a, err := c.Attach()
 	if err != nil {
@@ -45,7 +45,7 @@ func attach(t *testing.T, c *nativerunner.HolderClient) *nativerunner.HolderAtta
 	return a
 }
 
-func nextAttach(t *testing.T, a *nativerunner.HolderAttach) nativerunner.AttachMessage {
+func nextAttach(t *testing.T, a *holder.HolderAttach) holder.AttachMessage {
 	t.Helper()
 	m, err := a.Next()
 	if err != nil {
@@ -61,7 +61,7 @@ func touch(t *testing.T, path string) {
 	}
 }
 
-func rowIndexes(f nativerunner.Frame) []int {
+func rowIndexes(f holder.Frame) []int {
 	var idx []int
 	for _, r := range f.Rows {
 		idx = append(idx, r.Index)
@@ -71,20 +71,20 @@ func rowIndexes(f nativerunner.Frame) []int {
 
 func TestHolderAttach_FullFrameThenDirtyRowsThenExit(t *testing.T) {
 	c, change, stop, _ := attachTestHolder(t)
-	if !c.Supports(nativerunner.OpAttach) {
+	if !c.Supports(holder.OpAttach) {
 		t.Fatal("ping does not list attach")
 	}
-	attaches := []*nativerunner.HolderAttach{attach(t, c), attach(t, c)}
+	attaches := []*holder.HolderAttach{attach(t, c), attach(t, c)}
 
 	for i, a := range attaches {
 		m := nextAttach(t, a)
-		if m.Type != nativerunner.StreamFrame || !m.Frame.Full || len(m.Frame.Rows) != nativerunner.HolderRows {
-			t.Fatalf("attach %d first message = type %d with %d rows; want a full frame of %d rows", i, m.Type, len(m.Frame.Rows), nativerunner.HolderRows)
+		if m.Type != holder.StreamFrame || !m.Frame.Full || len(m.Frame.Rows) != holder.HolderRows {
+			t.Fatalf("attach %d first message = type %d with %d rows; want a full frame of %d rows", i, m.Type, len(m.Frame.Rows), holder.HolderRows)
 		}
 		if !strings.Contains(m.Frame.Rows[0].ANSI, "first") || !strings.Contains(m.Frame.Rows[1].ANSI, "second") {
 			t.Errorf("attach %d full frame starts %q, %q; want the child's rows", i, m.Frame.Rows[0].ANSI, m.Frame.Rows[1].ANSI)
 		}
-		if m.Frame.Cursor != (nativerunner.FrameCursor{X: 6, Y: 1, Visible: true}) {
+		if m.Frame.Cursor != (holder.FrameCursor{X: 6, Y: 1, Visible: true}) {
 			t.Errorf("attach %d cursor = %+v; want after \"second\"", i, m.Frame.Cursor)
 		}
 	}
@@ -92,7 +92,7 @@ func TestHolderAttach_FullFrameThenDirtyRowsThenExit(t *testing.T) {
 	touch(t, change)
 	for i, a := range attaches {
 		m := nextAttach(t, a)
-		if m.Type != nativerunner.StreamFrame || m.Frame.Full || !slices.Equal(rowIndexes(m.Frame), []int{1}) {
+		if m.Type != holder.StreamFrame || m.Frame.Full || !slices.Equal(rowIndexes(m.Frame), []int{1}) {
 			t.Fatalf("attach %d after the change = type %d rows %v; want a frame of row 1 only", i, m.Type, rowIndexes(m.Frame))
 		}
 		if got := m.Frame.Rows[0].ANSI; !strings.Contains(got, "\x1b[31mchanged") {
@@ -102,7 +102,7 @@ func TestHolderAttach_FullFrameThenDirtyRowsThenExit(t *testing.T) {
 
 	touch(t, stop)
 	for i, a := range attaches {
-		if m := nextAttach(t, a); m.Type != nativerunner.StreamExit || m.ExitCode != 3 {
+		if m := nextAttach(t, a); m.Type != holder.StreamExit || m.ExitCode != 3 {
 			t.Errorf("attach %d on exit = %+v; want exit code 3", i, m)
 		}
 	}
@@ -110,7 +110,7 @@ func TestHolderAttach_FullFrameThenDirtyRowsThenExit(t *testing.T) {
 
 // scriptHolder runs a holder whose child runs script with the holder's dir as
 // $1, and returns once the child printed "ready".
-func scriptHolder(t *testing.T, script string) (c *nativerunner.HolderClient, dir string) {
+func scriptHolder(t *testing.T, script string) (c *holder.HolderClient, dir string) {
 	t.Helper()
 	dir = shortTempDir(t)
 	c, finished := startTestHolder(t, dir, settableHarness{w: &settableWatcher{}}, []string{"sh", "-c", script, "sh", dir})
@@ -125,8 +125,8 @@ func scriptHolder(t *testing.T, script string) (c *nativerunner.HolderClient, di
 	return c, dir
 }
 
-func frameHas(f nativerunner.Frame, text string) bool {
-	return slices.ContainsFunc(f.Rows, func(r nativerunner.FrameRow) bool { return strings.Contains(r.ANSI, text) })
+func frameHas(f holder.Frame, text string) bool {
+	return slices.ContainsFunc(f.Rows, func(r holder.FrameRow) bool { return strings.Contains(r.ANSI, text) })
 }
 
 // waitGo makes a child wait for the test to touch $1/go.
@@ -153,21 +153,21 @@ func TestHolderAttach_BurstIsPacedThenStopsItsTimers(t *testing.T) {
 		}
 	}
 	span := last.Sub(first)
-	if span < 5*nativerunner.FrameInterval {
+	if span < 5*holder.FrameInterval {
 		t.Fatalf("burst spanned %v; too short to show pacing", span)
 	}
-	if limit := int(span/nativerunner.FrameInterval) + 2; frames > limit {
+	if limit := int(span/holder.FrameInterval) + 2; frames > limit {
 		t.Errorf("%d frames over %v; want at most %d", frames, span, limit)
 	}
 
-	waitFor(t, "pacing timers stopped", func() bool { return nativerunner.ArmedFrameTimers() == 0 })
+	waitFor(t, "pacing timers stopped", func() bool { return holder.ArmedFrameTimers() == 0 })
 }
 
 func TestHolderAttach_KeyEchoSkipsThePacing(t *testing.T) {
 	// An interval far above any load delay: paced echoes take whole seconds,
 	// skipped ones take a few milliseconds.
 	const interval = 2 * time.Second
-	nativerunner.SetFramePacing(t, interval, interval/2)
+	holder.SetFramePacing(t, interval, interval/2)
 	c, _ := scriptHolder(t, `printf ready; exec cat`)
 	a := attach(t, c)
 	nextAttach(t, a)
@@ -196,7 +196,7 @@ func TestHolderAttach_SlowClientRecoversWithAFullFrame(t *testing.T) {
 	nextAttach(t, slow)
 	nextAttach(t, steady)
 	touch(t, filepath.Join(dir, "go"))
-	if m := nextAttach(t, slow); len(m.Frame.Rows) == nativerunner.HolderRows {
+	if m := nextAttach(t, slow); len(m.Frame.Rows) == holder.HolderRows {
 		t.Fatalf("first frame of the redraw has all %d rows; want only the redrawn ones", len(m.Frame.Rows))
 	}
 
@@ -209,7 +209,7 @@ func TestHolderAttach_SlowClientRecoversWithAFullFrame(t *testing.T) {
 		t.Errorf("steady attach got %d frames while the other stalled; want the holder unblocked", steadyFrames)
 	}
 
-	for i := 0; len(nextAttach(t, slow).Frame.Rows) != nativerunner.HolderRows; i++ {
+	for i := 0; len(nextAttach(t, slow).Frame.Rows) != holder.HolderRows; i++ {
 		if i > 100 {
 			t.Fatal("no full frame once the slow attach read again")
 		}
@@ -220,13 +220,13 @@ func TestHolderAttach_NoOutputMeansNoFramesNorTimers(t *testing.T) {
 	c, _, stop, _ := attachTestHolder(t)
 	a := attach(t, c)
 	nextAttach(t, a)
-	time.Sleep(5 * nativerunner.FrameInterval)
-	if n := nativerunner.ArmedFrameTimers(); n != 0 {
+	time.Sleep(5 * holder.FrameInterval)
+	if n := holder.ArmedFrameTimers(); n != 0 {
 		t.Errorf("%d pacing timers armed while idle; want none", n)
 	}
 	// The only message after the full frame is the exit.
 	touch(t, stop)
-	if m := nextAttach(t, a); m.Type != nativerunner.StreamExit {
+	if m := nextAttach(t, a); m.Type != holder.StreamExit {
 		t.Errorf("after an idle child = %+v; want the exit", m)
 	}
 }
@@ -235,7 +235,7 @@ func TestHolderAttach_OversizedMessageClosesWithError(t *testing.T) {
 	c, _, _, _ := attachTestHolder(t)
 	a := attach(t, c)
 	nextAttach(t, a)
-	if err := nativerunner.SendOversizedHeader(a); err != nil {
+	if err := holder.SendOversizedHeader(a); err != nil {
 		t.Fatal(err)
 	}
 	m, err := a.Next()
@@ -248,9 +248,9 @@ func TestHolderAttach_OversizedMessageClosesWithError(t *testing.T) {
 }
 
 func TestHolderAttach_OlderHolderIsUnsupported(t *testing.T) {
-	nativerunner.SetHolderOptionalOps(t, nil)
+	holder.SetHolderOptionalOps(t, nil)
 	c, _, _, _ := attachTestHolder(t)
-	if _, err := c.Attach(); !errors.Is(err, nativerunner.ErrAttachUnsupported) {
+	if _, err := c.Attach(); !errors.Is(err, holder.ErrAttachUnsupported) {
 		t.Errorf("Attach() on an older holder = %v; want ErrAttachUnsupported", err)
 	}
 	rows, _, err := c.Screen(0)

@@ -7,16 +7,16 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // scrolledFrame queues a full frame at a scroll offset.
 func (f *fakeAttach) scrolledFrame(offset, scrollMax, newLines int, rows ...string) {
-	fr := nativerunner.Frame{ScrollOffset: offset, ScrollMax: scrollMax, NewLines: newLines}
+	fr := holder.Frame{ScrollOffset: offset, ScrollMax: scrollMax, NewLines: newLines}
 	for i, r := range rows {
-		fr.Rows = append(fr.Rows, nativerunner.FrameRow{Index: i, ANSI: r})
+		fr.Rows = append(fr.Rows, holder.FrameRow{Index: i, ANSI: r})
 	}
-	f.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: fr}
+	f.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: fr}
 }
 
 // scrollModel is attachModel with session a attached and one frame read,
@@ -58,8 +58,8 @@ func TestScroll_WheelGoesToAChildThatReportsTheMouse(t *testing.T) {
 	m, cmd := attachModel(t, h)
 	m, next := dialed(t, m, cmd)
 	fa := h.attaches["a"]
-	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: nativerunner.Frame{
-		Mouse: true, ScrollMax: 100, Rows: []nativerunner.FrameRow{{Index: 0, ANSI: "claude"}},
+	fa.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: holder.Frame{
+		Mouse: true, ScrollMax: 100, Rows: []holder.FrameRow{{Index: 0, ANSI: "claude"}},
 	}}
 	m, _ = read(t, m, next)
 

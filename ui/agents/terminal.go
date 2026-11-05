@@ -13,7 +13,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 )
 
@@ -46,7 +46,7 @@ func (m Model) loadLastScreen() tea.Cmd {
 		(m.lastScreen.id == s.ID && m.lastScreen.changedAt.Equal(s.StatusChangedAt)) {
 		return nil
 	}
-	path := filepath.Join(m.sessionsDir, s.ID, nativerunner.LastScreenFile)
+	path := filepath.Join(m.sessionsDir, s.ID, holder.LastScreenFile)
 	return func() tea.Msg {
 		msg := lastScreenMsg{id: s.ID, changedAt: s.StatusChangedAt}
 		if data, err := os.ReadFile(path); err == nil {

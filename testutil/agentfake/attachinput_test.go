@@ -7,14 +7,14 @@ import (
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // The fake program echoes what it reads but drops each ESC, so the screen
 // shows how the holder encoded the input: "[A" for a plain arrow, "OA" for
 // one in application cursor mode.
 
-func holdProgramAttach(t *testing.T) (*HeldProgram, *nativerunner.HolderAttach) {
+func holdProgramAttach(t *testing.T) (*HeldProgram, *holder.HolderAttach) {
 	t.Helper()
 	conv := NewConversationID(t)
 	p := HoldProgram(t, Harness{}.Launch(harness.LaunchOptions{SessionID: conv}), conv)
@@ -39,14 +39,14 @@ func (p *HeldProgram) writeOutput(out, marker string) {
 
 func TestAttachInput_KeyReachesChildAndNextFrameShowsIt(t *testing.T) {
 	p, a := holdProgramAttach(t)
-	frames := make(chan nativerunner.Frame)
+	frames := make(chan holder.Frame)
 	go func() {
 		for {
 			m, err := a.Next()
 			if err != nil {
 				return
 			}
-			if m.Type == nativerunner.StreamFrame {
+			if m.Type == holder.StreamFrame {
 				frames <- m.Frame
 			}
 		}
@@ -116,7 +116,7 @@ func TestAttachInput_KeyEmitsInputEventOnWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = watch.Close() })
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus {
 		t.Fatalf("first watch message = %+v, %v; want a status", m, err)
 	}
 
@@ -127,7 +127,7 @@ func TestAttachInput_KeyEmitsInputEventOnWatch(t *testing.T) {
 	go func() {
 		for {
 			m, err := watch.Next()
-			if err != nil || m.Type == nativerunner.StreamInput {
+			if err != nil || m.Type == holder.StreamInput {
 				got <- err
 				return
 			}

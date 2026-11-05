@@ -15,15 +15,16 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // attachTo opens an attach stream on s's holder, the way a person's live panel
 // does.
-func attachTo(t *testing.T, p *nativerunner.Pty, s agentrunner.Session) *nativerunner.HolderAttach {
+func attachTo(t *testing.T, p *nativerunner.Pty, s agentrunner.Session) *holder.HolderAttach {
 	t.Helper()
-	c, err := nativerunner.DialHolder(filepath.Join(p.Root, s.Label))
+	c, err := holder.DialHolder(filepath.Join(p.Root, s.Label))
 	if err != nil {
 		t.Fatal(err)
 	}

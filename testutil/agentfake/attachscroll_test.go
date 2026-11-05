@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // writeLines makes the program write lines "L<from>   x" up to, not
@@ -29,7 +29,7 @@ func (v *attachView) row(i int) string {
 	return strings.TrimRight(ansi.Strip(v.rows[i]), " ")
 }
 
-func (v *attachView) frame() nativerunner.Frame {
+func (v *attachView) frame() holder.Frame {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return v.last
@@ -72,7 +72,7 @@ func TestAttachScroll_ViewsScrollbackPerViewerAndStaysPutWhileOutputArrives(t *t
 	// Row 7 is the scrollback's last line, L093; row 8 the screen's first.
 	f := va.frame()
 	top := f.ScrollMax - f.ScrollOffset
-	if err := a.Copy(nativerunner.LinePos{Line: top + 7, Col: 2}, nativerunner.LinePos{Line: top + 8, Col: 7}); err != nil {
+	if err := a.Copy(holder.LinePos{Line: top + 7, Col: 2}, holder.LinePos{Line: top + 8, Col: 7}); err != nil {
 		t.Fatal(err)
 	}
 	select {

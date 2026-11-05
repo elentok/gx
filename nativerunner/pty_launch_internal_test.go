@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // A server stop cancels the launch ctx while the launch waits for the turn.
@@ -21,7 +23,7 @@ func TestPtyPrompter_CancelledCtxEndsTheTurnWait(t *testing.T) {
 	}
 	// waitTurn checks cancelled before it reads the holder, so no holder is needed.
 	start := time.Now()
-	_, err := HolderAnswerer{}.WaitTurn(0, time.Minute, pr.cancelled)
+	_, err := holder.HolderAnswerer{}.WaitTurn(0, time.Minute, pr.cancelled)
 	if !errors.Is(err, context.Canceled) || time.Since(start) > time.Second {
 		t.Fatalf("waitTurn = %v after %v; want context.Canceled at once", err, time.Since(start))
 	}

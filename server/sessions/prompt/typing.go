@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // sessionTyping is the only harness the server types into. It serves the parts
@@ -36,7 +36,7 @@ const (
 // ClearDraft empties a person's draft before gx types. The placeholder is not
 // a draft: the harness check tells them apart by its dim style. A check that
 // can't decide types as before.
-func (p *Prompt) ClearDraft(dir string, c *nativerunner.HolderClient) error {
+func (p *Prompt) ClearDraft(dir string, c *holder.HolderClient) error {
 	log := p.log.With("session", filepath.Base(dir))
 	if state, _ := InputState(c); state != harness.InputNotEmpty {
 		log.Debug("draft check", "holds_draft", false)
@@ -73,8 +73,8 @@ func (p *Prompt) ClearDraft(dir string, c *nativerunner.HolderClient) error {
 // InputState runs the harness empty check when the holder serves styled rows.
 // A holder that doesn't, or a read that fails, is InputUndecided; the error is
 // for callers that report it.
-func InputState(c *nativerunner.HolderClient) (harness.InputState, error) {
-	if !c.Supports(nativerunner.OpScreenStyled) {
+func InputState(c *holder.HolderClient) (harness.InputState, error) {
+	if !c.Supports(holder.OpScreenStyled) {
 		return harness.InputUndecided, nil
 	}
 	rows, err := c.StyledScreen()
@@ -96,7 +96,7 @@ var (
 // the session reacting: while the harness empty check says the prompt is still
 // in the input, press Enter, up to settleEnters times. An empty input, or a
 // check that can't decide, presses nothing.
-func (p *Prompt) PressEnterIfStillTyped(dir string, holder *nativerunner.HolderClient) (pressed bool, err error) {
+func (p *Prompt) PressEnterIfStillTyped(dir string, holder *holder.HolderClient) (pressed bool, err error) {
 	log := p.log.With("session", filepath.Base(dir))
 	for i := range settleEnters {
 		state, err := InputState(holder)

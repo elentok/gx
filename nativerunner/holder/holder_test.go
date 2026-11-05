@@ -1,7 +1,6 @@
-package nativerunner_test
+package holder_test
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,72 +13,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	agentharness "github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"golang.org/x/sys/unix"
 )
 
-// The test binary doubles as the holder and as a launcher that starts the
-// holder detached and exits at once, like the server going away.
-const (
-	holderEnv       = "GX_TEST_HOLDER"
-	holderLaunchEnv = "GX_TEST_HOLDER_LAUNCH"
-	// holderNoOpsEnv makes the holder an older one, serving only core ops.
-	holderNoOpsEnv = "GX_TEST_HOLDER_NO_OPS"
-	// holderDenyTimeoutEnv overrides the holder's deny-reason timeout.
-	holderDenyTimeoutEnv = "GX_TEST_HOLDER_DENY_TIMEOUT"
-	// holderOwnerEnv is the pid of the test binary that started the holder.
-	// The holder is detached on purpose, so a test run killed before its
-	// cleanup would leave it, and its claude, running for good. The holder
-	// watches this pid and exits with it.
-	holderOwnerEnv = "GX_TEST_HOLDER_OWNER"
-)
-
-// exitWithOwner kills the holder and its child once the owner pid is gone.
-func exitWithOwner(owner int) {
-	tick := time.NewTicker(500 * time.Millisecond)
-	defer tick.Stop()
-	for syscall.Kill(owner, 0) == nil {
-		<-tick.C
-	}
-	_ = exec.Command("pkill", "-KILL", "-P", strconv.Itoa(os.Getpid())).Run()
-	os.Exit(1)
+// psCmdline is pid's command line, false when no such process runs. The
+// holder package can't use nativerunner's export_test.go process table.
+func psCmdline(pid int) (string, bool) {
+	out, err := exec.Command("ps", "-ww", "-p", strconv.Itoa(pid), "-o", "command=").Output()
+	cmdline := strings.TrimSpace(string(out))
+	return cmdline, err == nil && cmdline != ""
 }
 
-// testHolder takes the gx agent-holder flags: --session-id <id> --dir <dir> -- <cmd...>.
-func testHolder() {
-	args := os.Args[1:]
-	dir := args[slices.Index(args, "--dir")+1]
-	// The child may be this binary too, as the TUI fake.
-	_ = os.Unsetenv(holderEnv)
-	if owner, err := strconv.Atoi(os.Getenv(holderOwnerEnv)); err == nil && owner > 0 {
-		go exitWithOwner(owner)
+func TestMain(m *testing.M) {
+	if holder.ServeTestBinary() {
+		return
 	}
-	if os.Getenv(holderNoOpsEnv) == "1" {
-		*nativerunner.HolderOptionalOps = nil
-	}
-	if d, err := time.ParseDuration(os.Getenv(holderDenyTimeoutEnv)); err == nil {
-		*nativerunner.HolderDenyTimeout = d
-	}
-	kind := agentharness.Claude
-	if i := slices.Index(args, "--harness"); i >= 0 {
-		kind = agentrunner.Kind(args[i+1])
-	}
-	if err := nativerunner.RunHarnessHolder(dir, kind, nativerunner.HolderOptions{}, args[slices.Index(args, "--")+1:]); err != nil {
-		// Like the real command, whose error cobra prints.
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
-	}
-}
-
-func launchHolder() {
-	cmd := exec.Command(os.Args[0], os.Args[1:]...)
-	cmd.Env = append(os.Environ(), holderEnv+"=1", holderLaunchEnv+"=")
-	if err := nativerunner.StartDetached(cmd); err != nil {
-		os.Exit(1)
-	}
-	_, _ = os.Stdout.WriteString(strconv.Itoa(cmd.Process.Pid))
+	os.Exit(m.Run())
 }
 
 func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
@@ -90,7 +41,7 @@ func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
 	child := `printf 'hello\n'; while [ ! -e "$1" ]; do sleep 0.05; done; printf 'bye\n'; exit 3`
 
 	launcher := exec.Command(os.Args[0], "--session-id", sessionID, "--dir", dir, "--", "sh", "-c", child, "sh", stop)
-	launcher.Env = append(os.Environ(), holderLaunchEnv+"=1")
+	launcher.Env = append(os.Environ(), holder.HolderLaunchEnv+"=1")
 	out, err := launcher.Output()
 	if err != nil {
 		t.Fatalf("launcher: %v", err)
@@ -102,20 +53,20 @@ func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
 	t.Cleanup(func() { _ = syscall.Kill(-pid, syscall.SIGKILL) })
 
 	waitFor(t, "raw.log has the child's output", func() bool {
-		raw, _ := os.ReadFile(filepath.Join(dir, nativerunner.RawLogFile))
+		raw, _ := os.ReadFile(filepath.Join(dir, holder.RawLogFile))
 		return strings.Contains(string(raw), "hello")
 	})
-	proc, ok, err := nativerunner.PS.Lookup(pid)
-	if err != nil || !ok {
-		t.Fatalf("holder gone after its launcher exited: ok=%v err=%v", ok, err)
+	cmdline, ok := psCmdline(pid)
+	if !ok {
+		t.Fatal("holder gone after its launcher exited")
 	}
-	if !strings.Contains(proc.Cmdline, sessionID) {
-		t.Errorf("holder cmdline %q lacks the session id", proc.Cmdline)
+	if !strings.Contains(cmdline, sessionID) {
+		t.Errorf("holder cmdline %q lacks the session id", cmdline)
 	}
 	if sid, err := unix.Getsid(pid); err != nil || sid != pid {
 		t.Errorf("holder session = %d, %v; want its own session %d", sid, err, pid)
 	}
-	if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, holder.ExitCodeFile)); err == nil {
 		t.Fatal("exit code written while the child still runs")
 	}
 
@@ -123,18 +74,18 @@ func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "the holder exits", func() bool {
-		_, ok, _ := nativerunner.PS.Lookup(pid)
+		_, ok := psCmdline(pid)
 		return !ok
 	})
-	code, err := os.ReadFile(filepath.Join(dir, nativerunner.ExitCodeFile))
+	code, err := os.ReadFile(filepath.Join(dir, holder.ExitCodeFile))
 	if err != nil || strings.TrimSpace(string(code)) != "3" {
 		t.Errorf("exit code = %q, %v; want 3", code, err)
 	}
-	scr, err := os.ReadFile(filepath.Join(dir, nativerunner.ScreenFile))
+	scr, err := os.ReadFile(filepath.Join(dir, holder.ScreenFile))
 	if err != nil || !strings.Contains(string(scr), "hello") || !strings.Contains(string(scr), "bye") {
 		t.Errorf("screen.txt = %q, %v; want the last screen", scr, err)
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, nativerunner.RawLogFile))
+	raw, _ := os.ReadFile(filepath.Join(dir, holder.RawLogFile))
 	if !strings.Contains(string(raw), "bye") {
 		t.Errorf("raw.log = %q; want the child's last output", raw)
 	}
@@ -142,12 +93,12 @@ func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
 
 func TestHolder_PTYIsWide(t *testing.T) {
 	dir := shortTempDir(t)
-	if err := nativerunner.RunHolder(dir, []string{"stty", "size"}); err != nil {
+	if err := holder.RunHolder(dir, []string{"stty", "size"}); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, nativerunner.RawLogFile))
-	if got := strings.Fields(string(raw)); len(got) != 2 || got[1] != strconv.Itoa(nativerunner.HolderCols) {
-		t.Errorf("stty size = %q; want %d columns", raw, nativerunner.HolderCols)
+	raw, _ := os.ReadFile(filepath.Join(dir, holder.RawLogFile))
+	if got := strings.Fields(string(raw)); len(got) != 2 || got[1] != strconv.Itoa(holder.HolderCols) {
+		t.Errorf("stty size = %q; want %d columns", raw, holder.HolderCols)
 	}
 }
 
@@ -155,14 +106,14 @@ func TestHolder_PTYIsWide(t *testing.T) {
 // fg it, so the holder resumes it.
 func TestHolder_ResumesASuspendedChild(t *testing.T) {
 	dir := shortTempDir(t)
-	if err := nativerunner.RunHolder(dir, []string{"sh", "-c", "kill -STOP $$; echo resumed"}); err != nil {
+	if err := holder.RunHolder(dir, []string{"sh", "-c", "kill -STOP $$; echo resumed"}); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, nativerunner.RawLogFile))
+	raw, _ := os.ReadFile(filepath.Join(dir, holder.RawLogFile))
 	if !strings.Contains(string(raw), "resumed") {
 		t.Errorf("raw.log = %q; want the child to run on after it stopped", raw)
 	}
-	code, _ := os.ReadFile(filepath.Join(dir, nativerunner.ExitCodeFile))
+	code, _ := os.ReadFile(filepath.Join(dir, holder.ExitCodeFile))
 	if strings.TrimSpace(string(code)) != "0" {
 		t.Errorf("exit code = %q; want 0", code)
 	}
@@ -181,12 +132,12 @@ func TestHolder_AnswersProgramStatusProbeAndFeedsReportsToWatch(t *testing.T) {
 	finished := make(chan struct{})
 	go func() {
 		defer close(finished)
-		_ = nativerunner.RunTestHolder(dir, recordingHarness{w: w}, []string{"sh", "-c", probeChild})
+		_ = holder.RunTestHolder(dir, recordingHarness{w: w}, []string{"sh", "-c", probeChild})
 	}()
-	var c *nativerunner.HolderClient
+	var c *holder.HolderClient
 	waitFor(t, "holder.sock answers", func() bool {
 		var err error
-		c, err = nativerunner.DialHolder(dir)
+		c, err = holder.DialHolder(dir)
 		return err == nil
 	})
 	t.Cleanup(func() {

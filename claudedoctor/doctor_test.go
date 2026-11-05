@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 func pass(Input) (string, bool) { return "ok", true }
@@ -187,7 +187,7 @@ func TestCheckPermissionRequestShape_FailsOnMutatedRequest(t *testing.T) {
 // fakeHolder answers every holder.sock request in dir with an empty response.
 func fakeHolder(t *testing.T, dir string) {
 	t.Helper()
-	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	ln, err := net.Listen("unix", filepath.Join(dir, holder.HolderSocketFile))
 	if err != nil {
 		t.Fatal(err)
 	}

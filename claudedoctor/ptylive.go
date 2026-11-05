@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // PtyLiveLabel is the agent label PtyLive starts under p.Root.
@@ -61,14 +62,14 @@ func PtyLive(p *nativerunner.Pty, cwd string, drive func(agentrunner.Session) er
 type ptyRecorder struct {
 	dir    string
 	env    []string
-	holder *nativerunner.HolderClient
+	holder *holder.HolderClient
 	Recording
 	lastStatus string
 }
 
 func (r *ptyRecorder) sample() {
 	if r.holder == nil {
-		h, err := nativerunner.DialHolder(r.dir)
+		h, err := holder.DialHolder(r.dir)
 		if err != nil {
 			return
 		}

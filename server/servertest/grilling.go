@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -112,7 +112,7 @@ func WriteAssistantMessage(t *testing.T, path, text string) {
 // raised Actionable.
 func ClearByInput(t *testing.T, h *Harness, id string) {
 	t.Helper()
-	c, err := nativerunner.DialHolder(filepath.Join(h.SessionsDir, id))
+	c, err := holder.DialHolder(filepath.Join(h.SessionsDir, id))
 	if err != nil {
 		t.Fatal(err)
 	}

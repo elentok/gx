@@ -26,6 +26,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -316,7 +317,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 		cols, rows = meta.Cols, meta.Rows
 	}
 	if cols <= 0 || rows <= 0 {
-		cols, rows = nativerunner.HolderCols, nativerunner.HolderRows
+		cols, rows = holder.HolderCols, holder.HolderRows
 	}
 	meta.Cols, meta.Rows = cols, rows
 	if err := WriteMeta(dir, *meta); err != nil {
@@ -542,7 +543,7 @@ func (mg *Manager) StopSession(req wire.SessionRequest) (wire.SessionResult, err
 	}
 	// A Starting session's holder may not have opened its socket yet; left
 	// undialed, it would run on with no session to stop it.
-	dial := nativerunner.DialHolder
+	dial := holder.DialHolder
 	if starting {
 		dial = mg.dialNewHolder
 	}
@@ -552,7 +553,7 @@ func (mg *Manager) StopSession(req wire.SessionRequest) (wire.SessionResult, err
 		if err := c.Stop(); err != nil {
 			return wire.SessionResult{}, fmt.Errorf("stop session %s: %w", req.ID, err)
 		}
-		waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
+		waitForFile(filepath.Join(dir, holder.ExitCodeFile), sessionStopTimeout)
 	}
 	if err := mg.UpdateSessionMeta(dir, req.ID, func(m *Meta) bool { return mg.recordSessionExit(m, wire.SessionExitClean) }); err != nil {
 		return wire.SessionResult{}, err

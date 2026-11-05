@@ -14,7 +14,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -305,7 +305,7 @@ func TestPrintSessionResult_PrintsTheRebaseNoteOnlyWhenSet(t *testing.T) {
 
 func TestAgentLinkAndStep_IgnoreTheClaudeSessionVariable(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_SESSION_ID", "claude-1")
-	t.Setenv(nativerunner.AgentSessionEnv, "")
+	t.Setenv(holder.AgentSessionEnv, "")
 	for _, args := range [][]string{{"agent", "link", "auth/03"}, {"agent", "step", "spec"}} {
 		var out bytes.Buffer
 		d := agentTestDeps(&out, nil)

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -67,7 +68,7 @@ func awaitPending(t *testing.T, p *nativerunner.Pty, s agentrunner.Session) *age
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if holder, err := nativerunner.DialHolder(filepath.Join(p.Root, "e-01")); err == nil {
+	if holder, err := holder.DialHolder(filepath.Join(p.Root, "e-01")); err == nil {
 		rows, _, _ := holder.Screen(0)
 		t.Logf("screen:\n%s", strings.Join(rows, "\n"))
 	}
@@ -112,11 +113,11 @@ func TestPtyCodexApproval_HookDenyPassesTheReason(t *testing.T) {
 	if err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, RequestID: pending.ID, Text: "use fd instead"}); err != nil {
 		t.Fatal(err)
 	}
-	holder, err := nativerunner.DialHolder(filepath.Join(p.Root, "e-01"))
+	client, err := holder.DialHolder(filepath.Join(p.Root, "e-01"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForScreen(t, holder, "denied: use fd instead")
+	waitForScreen(t, client, "denied: use fd instead")
 	runs, err := agentfake.ReadCodexHookLog(home, "perm-deny")
 	if err != nil {
 		t.Fatal(err)

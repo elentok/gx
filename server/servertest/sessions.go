@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -131,7 +131,7 @@ func exitWithTest(pid int) {
 func runTestHolder(args []string) error {
 	fs := flag.NewFlagSet(holderArg, flag.ContinueOnError)
 	var dir, kind string
-	var opts nativerunner.HolderOptions
+	var opts holder.HolderOptions
 	fs.StringVar(&opts.SessionID, "session-id", "", "")
 	fs.StringVar(&kind, "harness", "", "")
 	fs.StringVar(&opts.GXSession, "gx-session", "", "")
@@ -142,14 +142,14 @@ func runTestHolder(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	return nativerunner.RunHarnessHolder(dir, agentrunner.Kind(kind), opts, fs.Args())
+	return holder.RunHarnessHolder(dir, agentrunner.Kind(kind), opts, fs.Args())
 }
 
 // stopSessionHolders stops every live holder under dir.
 func stopSessionHolders(dir string) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
-		c, err := nativerunner.DialHolder(filepath.Join(dir, e.Name()))
+		c, err := holder.DialHolder(filepath.Join(dir, e.Name()))
 		if err != nil {
 			continue
 		}

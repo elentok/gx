@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 var (
@@ -27,7 +28,7 @@ func (p *Pty) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error
 	if err != nil {
 		return nil, nil, err
 	}
-	if !ss.holder.Supports(OpWatch) {
+	if !ss.holder.Supports(holder.OpWatch) {
 		return nil, nil, errors.New("holder has no watch op")
 	}
 	watch, err := ss.holder.Watch()
@@ -41,7 +42,7 @@ func (p *Pty) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error
 			if err != nil {
 				return
 			}
-			if m.Type != StreamInput {
+			if m.Type != holder.StreamInput {
 				continue
 			}
 			select {
@@ -106,7 +107,7 @@ func (inputNotEmpty) Is(target error) bool { return target == claudeui.ErrInputN
 // pressed an `i` since the last send. Any other content, a one-letter draft
 // included, stays. It reports whether it cleared.
 func (pr *ptyPrompter) clearGxI() (bool, error) {
-	if !pr.ss.holder.Supports(OpScreenStyled) {
+	if !pr.ss.holder.Supports(holder.OpScreenStyled) {
 		return false, nil
 	}
 	rows, err := pr.ss.holder.StyledScreen()
@@ -190,7 +191,7 @@ func (pr *ptyPrompter) Clear() error {
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.
 func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
-	if !pr.ss.holder.Supports(OpScreenStyled) {
+	if !pr.ss.holder.Supports(holder.OpScreenStyled) {
 		return false, false, nil
 	}
 	rows, err := pr.ss.holder.StyledScreen()
@@ -217,10 +218,10 @@ func (pr *ptyPrompter) ReadyToType() bool {
 
 // HolderTypingIO reads styled rows when the holder serves them, plain rows
 // otherwise; the ready-to-type step needs only the text.
-func HolderTypingIO(h *HolderClient) harness.TypingIO {
+func HolderTypingIO(h *holder.HolderClient) harness.TypingIO {
 	return harness.TypingIO{
 		Rows: func() ([]string, error) {
-			if h.Supports(OpScreenStyled) {
+			if h.Supports(holder.OpScreenStyled) {
 				return h.StyledScreen()
 			}
 			rows, _, err := h.Screen(0)

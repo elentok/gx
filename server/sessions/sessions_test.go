@@ -17,7 +17,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -275,10 +275,10 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 	if got.Exit != wire.SessionExitClean || !got.Stopped || got.Unread.Unread {
 		t.Errorf("stopped session = %+v, want exited clean, stopped and read", got)
 	}
-	if _, err := nativerunner.DialHolder(dir); err == nil {
+	if _, err := holder.DialHolder(dir); err == nil {
 		t.Error("holder still serves after stop")
 	}
-	if _, err := os.Stat(filepath.Join(dir, nativerunner.LastScreenFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, holder.LastScreenFile)); err != nil {
 		t.Errorf("last screen not kept: %v", err)
 	}
 
@@ -299,11 +299,11 @@ func TestStopSession_StopsAHolderStillStarting(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, holder.ExitCodeFile)); err != nil {
 		t.Errorf("holder saved no exit by the time stop returned: %v", err)
 	}
 	servertest.WaitFor(t, 5*time.Second, "the holder to stop serving", func() bool {
-		_, err := nativerunner.DialHolder(dir)
+		_, err := holder.DialHolder(dir)
 		return err != nil
 	})
 }
@@ -471,10 +471,10 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 	}
 
 	sessionDir := filepath.Join(h.SessionsDir, id)
-	holder := waitForHolder(t, sessionDir)
+	hc := waitForHolder(t, sessionDir)
 	servertest.WaitFor(t, 10*time.Second, "the trust dialog to be shown and answered", func() bool {
-		raw, _ := os.ReadFile(filepath.Join(sessionDir, nativerunner.RawLogFile))
-		return strings.Contains(string(raw), agentfake.ProgramTrustPrompt) && !screenHas(t, holder, agentfake.ProgramTrustPrompt)
+		raw, _ := os.ReadFile(filepath.Join(sessionDir, holder.RawLogFile))
+		return strings.Contains(string(raw), agentfake.ProgramTrustPrompt) && !screenHas(t, hc, agentfake.ProgramTrustPrompt)
 	})
 
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {

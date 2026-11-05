@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/codexui"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 )
@@ -43,13 +43,13 @@ func (c *Chat) readPermission(id string) (wire.SessionResult, wire.SessionPermis
 	case st != wire.SessionBlocked:
 		return refuse(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", id, st)), out, nil
 	}
-	conn, err := nativerunner.DialHolder(dir)
+	conn, err := holder.DialHolder(dir)
 	if err != nil {
 		return refuse(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", id)), out, nil
 	}
 	if meta.Harness == string(harness.Codex) {
 		// The hook's request is exact and needs no screen.
-		if req, hooked, err := nativerunner.ReadPermissionRequest(dir); err != nil {
+		if req, hooked, err := holder.ReadPermissionRequest(dir); err != nil {
 			return wire.SessionResult{}, out, err
 		} else if hooked {
 			text := req.Description

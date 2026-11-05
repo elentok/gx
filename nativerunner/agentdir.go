@@ -3,6 +3,7 @@ package nativerunner
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/nativerunner/holder"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,7 +30,7 @@ type layout struct {
 var layouts = map[string]layout{
 	runnerName: {logs: []string{OutFile, ErrFile}, transient: []string{StdinFile}, alive: headlessAlive},
 	ptyRunnerName: {
-		logs: []string{RawLogFile, ScreenFile, HolderErrFile}, transient: []string{HolderSocketFile},
+		logs: []string{holder.RawLogFile, holder.ScreenFile, holder.HolderErrFile}, transient: []string{holder.HolderSocketFile},
 		alive: ptyAlive, readsTranscript: true,
 	},
 }

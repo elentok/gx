@@ -12,7 +12,7 @@ import (
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -266,7 +266,7 @@ func (f *fixture) cli(args ...string) ([]byte, error) {
 // linkSession marks the session id a design session of the map at addr.
 func (f *fixture) linkSession(id, addr string) error {
 	cmd := exec.Command(f.gx, "agent", "link", addr)
-	cmd.Env = append(slices.Clone(f.env), nativerunner.AgentSessionEnv+"="+id)
+	cmd.Env = append(slices.Clone(f.env), holder.AgentSessionEnv+"="+id)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("link %s to %s: %w\n%s", id, addr, err, out)
 	}

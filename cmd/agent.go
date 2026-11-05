@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ func newAgentCmd(d deps) *cobra.Command {
 
 func newAgentHolderCmd() *cobra.Command {
 	var dir, kind string
-	var opts nativerunner.HolderOptions
+	var opts holder.HolderOptions
 	cmd := &cobra.Command{
 		Use:   "agent-holder --session-id <uuid> [--harness <name>] [--gx-session <id>] [--cols N --rows N] [--trust] --dir <agent-dir> -- <cmd...>",
 		Short: "run a pty agent and record its output (started by the pty runner and the server)",
@@ -37,7 +37,7 @@ func newAgentHolderCmd() *cobra.Command {
 		Hidden: true,
 		Args:   cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return nativerunner.RunHarnessHolder(dir, agentrunner.Kind(kind), opts, args)
+			return holder.RunHarnessHolder(dir, agentrunner.Kind(kind), opts, args)
 		},
 	}
 	cmd.Flags().IntVar(&opts.Cols, "cols", 0, "the pty's width (default the loop's)")
@@ -45,7 +45,7 @@ func newAgentHolderCmd() *cobra.Command {
 	// The id also sits in the holder's cmdline, which the liveness check requires.
 	cmd.Flags().StringVar(&opts.SessionID, "session-id", "", "the agent's session id")
 	cmd.Flags().StringVar(&kind, "harness", string(harness.Claude), "the harness that watches the agent")
-	cmd.Flags().StringVar(&opts.GXSession, "gx-session", "", "the gx session id, set as "+nativerunner.AgentSessionEnv+" in the agent's env")
+	cmd.Flags().StringVar(&opts.GXSession, "gx-session", "", "the gx session id, set as "+holder.AgentSessionEnv+" in the agent's env")
 	cmd.Flags().StringVar(&dir, "dir", "", "the agent directory")
 	cmd.Flags().BoolVar(&opts.Trust, "trust", false, "answer the harness's trust dialog")
 	_ = cmd.MarkFlagRequired("session-id")
@@ -174,7 +174,7 @@ var errCodexNoUsage = errors.New("no context usage yet")
 // pickByGXSession settles both-variables-set by the harness of the gx session
 // the command runs in. Without GX_AGENT_SESSION it keeps the ambiguity.
 func pickByGXSession(d deps, candidates []agentCandidate) ([]agentCandidate, error) {
-	id := d.getenv(nativerunner.AgentSessionEnv)
+	id := d.getenv(holder.AgentSessionEnv)
 	if id == "" || d.readSessionHarness == nil {
 		return candidates, nil
 	}

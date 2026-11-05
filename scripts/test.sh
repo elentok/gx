@@ -35,6 +35,7 @@ race_pkgs=(
 	./agentrunner/screen
 	./agentrunner/claudeui
 	./nativerunner
+	./nativerunner/holder
 	./claudedoctor
 	./agentrunner/herdrrunner
 	./testutil/herdrfake

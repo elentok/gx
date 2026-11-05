@@ -18,7 +18,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -89,7 +89,7 @@ func (p *Prompt) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 	case req.OnlyBlocked && st.State != wire.SessionBlocked:
 		return dir, sessions.Refusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", req.ID, st.State)), nil
 	}
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err != nil {
 		return dir, sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID)), nil
 	}
@@ -143,7 +143,7 @@ func (p *Prompt) answerSessionPermission(req wire.SessionKeysRequest, source str
 		p.sessions.Watches.MetaMu.Unlock()
 		return sessions.Refusal(wire.ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", req.ID)), nil
 	}
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	// The answer waits for the agent to move on; the status update that ends the
 	// wait needs the lock.
 	p.sessions.Watches.MetaMu.Unlock()
@@ -152,7 +152,7 @@ func (p *Prompt) answerSessionPermission(req wire.SessionKeysRequest, source str
 	}
 	grace := cmp.Or(p.cfg.PromptGrace, claudeui.DefaultNudgeCaps.Grace)
 	answer := agentrunner.Answer{Decision: agentrunner.Decision(req.Permission), RequestID: req.RequestID}
-	if err := nativerunner.AnswerSessionPermission(c, dir, agentrunner.Kind(meta.Harness), answer, 20*time.Millisecond, grace); err != nil {
+	if err := holder.AnswerSessionPermission(c, dir, agentrunner.Kind(meta.Harness), answer, 20*time.Millisecond, grace); err != nil {
 		return sessionAnswerRefusal(req.ID, err)
 	}
 	ev := ralphloop.Event{
@@ -172,7 +172,7 @@ func sessionAnswerRefusal(id string, err error) (wire.SessionResult, error) {
 	switch {
 	case errors.Is(err, agentrunner.ErrRequestMismatch):
 		return sessions.Refusal(wire.ReasonRequestChanged, err.Error()), nil
-	case errors.Is(err, nativerunner.ErrNotApprovable), errors.Is(err, agentrunner.ErrInvalidDecision):
+	case errors.Is(err, holder.ErrNotApprovable), errors.Is(err, agentrunner.ErrInvalidDecision):
 		return sessions.Refusal(wire.ReasonNotApprovable, err.Error()), nil
 	case errors.Is(err, agentrunner.ErrNotDelivered):
 		return sessions.Refusal(wire.ReasonKeysNotDelivered, err.Error()), nil

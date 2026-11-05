@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/claudedoctor"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -20,7 +21,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv(holderEnv) == "1" {
 		args := os.Args[1:]
 		_ = os.Unsetenv(holderEnv)
-		if err := nativerunner.RunHolder(args[slices.Index(args, "--dir")+1], args[slices.Index(args, "--")+1:]); err != nil {
+		if err := holder.RunHolder(args[slices.Index(args, "--dir")+1], args[slices.Index(args, "--")+1:]); err != nil {
 			os.Exit(1)
 		}
 		return

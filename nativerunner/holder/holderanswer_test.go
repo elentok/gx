@@ -1,4 +1,4 @@
-package nativerunner_test
+package holder_test
 
 import (
 	"errors"
@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	agentharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -24,7 +25,7 @@ stty -icanon -icrnl min 1; printf 'ready\n'; dd bs=1 count=1 2>/dev/null | od -A
 ` + tail
 }
 
-func startKeyHolder(t *testing.T, tail string) (*nativerunner.HolderClient, string) {
+func startKeyHolder(t *testing.T, tail string) (*holder.HolderClient, string) {
 	t.Helper()
 	home := shortTempDir(t)
 	t.Setenv("HOME", home)
@@ -46,7 +47,7 @@ func keyPressed(t *testing.T, keyFile string) string {
 
 func TestHolderAnswer_ClaudeAllowSendsEnter(t *testing.T) {
 	c, key := startKeyHolder(t, `st idle; cat >/dev/null`)
-	if err := nativerunner.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionAllow}); err != nil {
+	if err := holder.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionAllow}); err != nil {
 		t.Fatal(err)
 	}
 	if got := keyPressed(t, key); got != "0d" {
@@ -56,7 +57,7 @@ func TestHolderAnswer_ClaudeAllowSendsEnter(t *testing.T) {
 
 func TestHolderAnswer_ClaudeDenySendsEsc(t *testing.T) {
 	c, key := startKeyHolder(t, `st idle; cat >/dev/null`)
-	if err := nativerunner.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionDeny}); err != nil {
+	if err := holder.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionDeny}); err != nil {
 		t.Fatal(err)
 	}
 	if got := keyPressed(t, key); got != "1b" {
@@ -66,7 +67,7 @@ func TestHolderAnswer_ClaudeDenySendsEsc(t *testing.T) {
 
 func TestHolderAnswer_ClaudeDialogThatStaysIsNotDelivered(t *testing.T) {
 	c, _ := startKeyHolder(t, `cat >/dev/null`)
-	err := nativerunner.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionAllow})
+	err := holder.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionAllow})
 	if !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Errorf("err = %v; want ErrNotDelivered", err)
 	}
@@ -74,7 +75,7 @@ func TestHolderAnswer_ClaudeDialogThatStaysIsNotDelivered(t *testing.T) {
 
 func TestHolderAnswer_ClaudeRequestMismatchSendsNothing(t *testing.T) {
 	c, key := startKeyHolder(t, `st idle; cat >/dev/null`)
-	err := nativerunner.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionAllow, RequestID: "other"})
+	err := holder.AnswerClaude(c, t.TempDir(), agentrunner.Answer{Decision: agentrunner.DecisionAllow, RequestID: "other"})
 	if !errors.Is(err, agentrunner.ErrRequestMismatch) {
 		t.Fatalf("err = %v; want ErrRequestMismatch", err)
 	}
@@ -86,7 +87,7 @@ func TestHolderAnswer_ClaudeRequestMismatchSendsNothing(t *testing.T) {
 
 // codexHolder runs a Codex-like child that draws screen, records the first key
 // and then lets the watcher go idle, as Codex does once the dialog closes.
-func codexHolder(t *testing.T, screen string) (c *nativerunner.HolderClient, dir, keyFile string) {
+func codexHolder(t *testing.T, screen string) (c *holder.HolderClient, dir, keyFile string) {
 	t.Helper()
 	dir = shortTempDir(t)
 	keyFile = filepath.Join(dir, "key")
@@ -110,22 +111,22 @@ const codexDialog = "Blocked by hook\n  Run rm -rf build"
 
 func TestHolderAnswer_CodexHookWritesTheDecisionFile(t *testing.T) {
 	c, dir, _ := codexHolder(t, "nothing readable")
-	if err := nativerunner.WritePermissionRequest(dir, nativerunner.PermissionRequest{ID: "r1", Tool: "Bash"}); err != nil {
+	if err := holder.WritePermissionRequest(dir, holder.PermissionRequest{ID: "r1", Tool: "Bash"}); err != nil {
 		t.Fatal(err)
 	}
 	// A decision file does not move the fake watcher; the answer waits for it.
 	go func() {
 		testutil.Poll(5*time.Second, 10*time.Millisecond, func() bool {
-			_, ok, _ := nativerunner.ReadPermissionDecision(dir)
+			_, ok, _ := holder.ReadPermissionDecision(dir)
 			return ok
 		})
 		_ = c.SendKeys("x")
 	}()
-	err := nativerunner.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionDeny, RequestID: "r1", Text: "no"}, false)
+	err := holder.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionDeny, RequestID: "r1", Text: "no"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, ok, err := nativerunner.ReadPermissionDecision(dir)
+	d, ok, err := holder.ReadPermissionDecision(dir)
 	if err != nil || !ok || d.ID != "r1" || d.Allow || d.Reason != "no" {
 		t.Errorf("decision = %+v, %v, %v; want a deny of r1 with the reason", d, ok, err)
 	}
@@ -133,21 +134,21 @@ func TestHolderAnswer_CodexHookWritesTheDecisionFile(t *testing.T) {
 
 func TestHolderAnswer_CodexHookRequestMismatchWritesNothing(t *testing.T) {
 	c, dir, _ := codexHolder(t, "nothing readable")
-	if err := nativerunner.WritePermissionRequest(dir, nativerunner.PermissionRequest{ID: "r1", Tool: "Bash"}); err != nil {
+	if err := holder.WritePermissionRequest(dir, holder.PermissionRequest{ID: "r1", Tool: "Bash"}); err != nil {
 		t.Fatal(err)
 	}
-	err := nativerunner.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionAllow, RequestID: "r2"}, false)
+	err := holder.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionAllow, RequestID: "r2"}, false)
 	if !errors.Is(err, agentrunner.ErrRequestMismatch) {
 		t.Fatalf("err = %v; want ErrRequestMismatch", err)
 	}
-	if _, ok, _ := nativerunner.ReadPermissionDecision(dir); ok {
+	if _, ok, _ := holder.ReadPermissionDecision(dir); ok {
 		t.Error("a decision was written for a mismatched request")
 	}
 }
 
 func TestHolderAnswer_CodexKeysAllowSendsY(t *testing.T) {
 	c, dir, key := codexHolder(t, codexDialog)
-	if err := nativerunner.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionAllow}, false); err != nil {
+	if err := holder.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionAllow}, false); err != nil {
 		t.Fatal(err)
 	}
 	if got := keyPressed(t, key); got != "79" {
@@ -159,7 +160,7 @@ func TestHolderAnswer_CodexUnreadableScreenPolicy(t *testing.T) {
 	t.Run("queue refuses both", func(t *testing.T) {
 		c, dir, key := codexHolder(t, "nothing readable")
 		for _, d := range []agentrunner.Decision{agentrunner.DecisionAllow, agentrunner.DecisionDeny} {
-			err := nativerunner.AnswerCodex(c, dir, agentrunner.Answer{Decision: d}, false)
+			err := holder.AnswerCodex(c, dir, agentrunner.Answer{Decision: d}, false)
 			if !errors.Is(err, agentrunner.ErrRequestMismatch) {
 				t.Errorf("%s: err = %v; want ErrRequestMismatch", d, err)
 			}
@@ -170,7 +171,7 @@ func TestHolderAnswer_CodexUnreadableScreenPolicy(t *testing.T) {
 	})
 	t.Run("keys route denies with Esc", func(t *testing.T) {
 		c, dir, key := codexHolder(t, "nothing readable")
-		if err := nativerunner.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionDeny}, true); err != nil {
+		if err := holder.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionDeny}, true); err != nil {
 			t.Fatal(err)
 		}
 		if got := keyPressed(t, key); got != "1b" {
@@ -179,8 +180,8 @@ func TestHolderAnswer_CodexUnreadableScreenPolicy(t *testing.T) {
 	})
 	t.Run("keys route refuses Allow", func(t *testing.T) {
 		c, dir, key := codexHolder(t, "nothing readable")
-		err := nativerunner.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionAllow}, true)
-		if !errors.Is(err, nativerunner.ErrNotApprovable) {
+		err := holder.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionAllow}, true)
+		if !errors.Is(err, holder.ErrNotApprovable) {
 			t.Errorf("err = %v; want ErrNotApprovable", err)
 		}
 		if got := keyPressed(t, key); got != "" {

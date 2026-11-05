@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -54,7 +54,7 @@ func TestActionable_AgentRaisedClearsOnlyOnInput(t *testing.T) {
 		t.Errorf("saved actionable = %v, want the reason", saved)
 	}
 
-	c, err := nativerunner.DialHolder(filepath.Join(h.SessionsDir, id))
+	c, err := holder.DialHolder(filepath.Join(h.SessionsDir, id))
 	if err != nil {
 		t.Fatal(err)
 	}

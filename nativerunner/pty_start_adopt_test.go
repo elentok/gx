@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -164,7 +165,7 @@ func TestPty_StartHolderThatCannotBindShowsItsStderr(t *testing.T) {
 	if strings.Contains(err.Error(), "holder.sock never answered") {
 		t.Errorf("error = %q; want the holder's own stderr", err)
 	}
-	stderr, rerr := os.ReadFile(filepath.Join(p.Root, label, nativerunner.HolderErrFile))
+	stderr, rerr := os.ReadFile(filepath.Join(p.Root, label, holder.HolderErrFile))
 	if rerr != nil {
 		t.Fatalf("holder.err: %v", rerr)
 	}

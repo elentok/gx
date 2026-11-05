@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 func TestProgramDir_IsPerTestAndRemovedAfterIt(t *testing.T) {
@@ -80,7 +80,7 @@ func TestHarness_ProgramEchoesInputAndSetsTitle(t *testing.T) {
 
 	p.control(Control{Action: ActionTitle, Title: "Fix the flaky test"})
 	p.WaitFor("the display name", func() bool {
-		raw, err := os.ReadFile(filepath.Join(p.Dir, nativerunner.RawLogFile))
+		raw, err := os.ReadFile(filepath.Join(p.Dir, holder.RawLogFile))
 		name, ok := Harness{}.DisplayName(raw)
 		return err == nil && ok && name == "Fix the flaky test"
 	})
@@ -95,7 +95,7 @@ func TestHarness_ProgramExitsWithCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.done <- nil
-	code, err := os.ReadFile(filepath.Join(p.Dir, nativerunner.ExitCodeFile))
+	code, err := os.ReadFile(filepath.Join(p.Dir, holder.ExitCodeFile))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // attachView is what one attach shows: its rows by index, rebuilt from the
@@ -18,14 +18,14 @@ type attachView struct {
 	mu   sync.Mutex
 	rows map[int]string
 	// last is the latest frame, for its scroll fields.
-	last nativerunner.Frame
+	last holder.Frame
 	// copied gets the attach's copy replies.
 	copied chan string
 }
 
 // viewResized skips a's first frame, which predates its size, resizes it and
 // follows its frames from there.
-func (p *HeldProgram) viewResized(a *nativerunner.HolderAttach, cols, rows int) *attachView {
+func (p *HeldProgram) viewResized(a *holder.HolderAttach, cols, rows int) *attachView {
 	p.t.Helper()
 	if _, err := a.Next(); err != nil {
 		p.t.Fatal(err)
@@ -41,9 +41,9 @@ func (p *HeldProgram) viewResized(a *nativerunner.HolderAttach, cols, rows int) 
 				return
 			}
 			switch m.Type {
-			case nativerunner.StreamFrame:
+			case holder.StreamFrame:
 				v.apply(m.Frame)
-			case nativerunner.StreamCopy:
+			case holder.StreamCopy:
 				v.copied <- m.Text
 			}
 		}
@@ -51,7 +51,7 @@ func (p *HeldProgram) viewResized(a *nativerunner.HolderAttach, cols, rows int) 
 	return v
 }
 
-func (v *attachView) apply(f nativerunner.Frame) {
+func (v *attachView) apply(f holder.Frame) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	for _, r := range f.Rows {

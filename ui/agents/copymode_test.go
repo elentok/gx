@@ -7,7 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 var copyRowsText = []string{"$ claude", "foo bar.baz  qux"}
@@ -50,7 +50,7 @@ func letters(s string) []tea.KeyPressMsg {
 
 func TestCopyMode_StartsOnTheLastNonBlankRow(t *testing.T) {
 	m, _, _ := copyModel(t, 0, 100)
-	if want := (nativerunner.LinePos{Line: 101}); m.copy.cursor != want {
+	if want := (holder.LinePos{Line: 101}); m.copy.cursor != want {
 		t.Fatalf("cursor = %+v, want %+v", m.copy.cursor, want)
 	}
 }
@@ -60,26 +60,26 @@ func TestCopyMode_Moves(t *testing.T) {
 	tests := []struct {
 		name string
 		keys []tea.KeyPressMsg
-		want nativerunner.LinePos
+		want holder.LinePos
 	}{
-		{"l l h", letters("llh"), nativerunner.LinePos{Line: 101, Col: 1}},
-		{"arrows", []tea.KeyPressMsg{{Code: tea.KeyRight}, {Code: tea.KeyRight}, {Code: tea.KeyUp}, {Code: tea.KeyLeft}}, nativerunner.LinePos{Line: 100, Col: 1}},
-		{"k j j", letters("kjj"), nativerunner.LinePos{Line: 102}},
-		{"$", letters("$"), nativerunner.LinePos{Line: 101, Col: 15}},
-		{"0", letters("$0"), nativerunner.LinePos{Line: 101}},
-		{"w over words and punctuation", letters("www"), nativerunner.LinePos{Line: 101, Col: 8}},
-		{"w over a double space", letters("wwww"), nativerunner.LinePos{Line: 101, Col: 13}},
-		{"e", letters("e"), nativerunner.LinePos{Line: 101, Col: 2}},
-		{"e to the end of a word", letters("wwwe"), nativerunner.LinePos{Line: 101, Col: 10}},
-		{"b", letters("$b"), nativerunner.LinePos{Line: 101, Col: 13}},
-		{"b back across a line", letters("b"), nativerunner.LinePos{Line: 100, Col: 2}},
-		{"w forward across a line", letters("kww"), nativerunner.LinePos{Line: 101}},
-		{"ctrl+u", []tea.KeyPressMsg{ctrl('u')}, nativerunner.LinePos{Line: 96}},
-		{"ctrl+d", []tea.KeyPressMsg{ctrl('d')}, nativerunner.LinePos{Line: 106}},
-		{"PgUp", []tea.KeyPressMsg{{Code: tea.KeyPgUp}}, nativerunner.LinePos{Line: 90}},
-		{"PgDn clamps to the last line", []tea.KeyPressMsg{{Code: tea.KeyPgDown}}, nativerunner.LinePos{Line: 110}},
-		{"g g", letters("lgg"), nativerunner.LinePos{}},
-		{"G", letters("lkG"), nativerunner.LinePos{Line: 110}},
+		{"l l h", letters("llh"), holder.LinePos{Line: 101, Col: 1}},
+		{"arrows", []tea.KeyPressMsg{{Code: tea.KeyRight}, {Code: tea.KeyRight}, {Code: tea.KeyUp}, {Code: tea.KeyLeft}}, holder.LinePos{Line: 100, Col: 1}},
+		{"k j j", letters("kjj"), holder.LinePos{Line: 102}},
+		{"$", letters("$"), holder.LinePos{Line: 101, Col: 15}},
+		{"0", letters("$0"), holder.LinePos{Line: 101}},
+		{"w over words and punctuation", letters("www"), holder.LinePos{Line: 101, Col: 8}},
+		{"w over a double space", letters("wwww"), holder.LinePos{Line: 101, Col: 13}},
+		{"e", letters("e"), holder.LinePos{Line: 101, Col: 2}},
+		{"e to the end of a word", letters("wwwe"), holder.LinePos{Line: 101, Col: 10}},
+		{"b", letters("$b"), holder.LinePos{Line: 101, Col: 13}},
+		{"b back across a line", letters("b"), holder.LinePos{Line: 100, Col: 2}},
+		{"w forward across a line", letters("kww"), holder.LinePos{Line: 101}},
+		{"ctrl+u", []tea.KeyPressMsg{ctrl('u')}, holder.LinePos{Line: 96}},
+		{"ctrl+d", []tea.KeyPressMsg{ctrl('d')}, holder.LinePos{Line: 106}},
+		{"PgUp", []tea.KeyPressMsg{{Code: tea.KeyPgUp}}, holder.LinePos{Line: 90}},
+		{"PgDn clamps to the last line", []tea.KeyPressMsg{{Code: tea.KeyPgDown}}, holder.LinePos{Line: 110}},
+		{"g g", letters("lgg"), holder.LinePos{}},
+		{"G", letters("lkG"), holder.LinePos{Line: 110}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,20 +96,20 @@ func TestCopyMode_LinesStayPutWhileTheScrollbackTrims(t *testing.T) {
 	tests := []struct {
 		name string
 		keys string
-		want nativerunner.LinePos
+		want holder.LinePos
 	}{
-		{"the cursor stays on its line", "j", nativerunner.LinePos{Line: 102}},
-		{"g g goes to the oldest retained line", "gg", nativerunner.LinePos{Line: 3}},
-		{"G goes to the last line", "G", nativerunner.LinePos{Line: 113}},
+		{"the cursor stays on its line", "j", holder.LinePos{Line: 102}},
+		{"g g goes to the oldest retained line", "gg", holder.LinePos{Line: 3}},
+		{"G goes to the last line", "G", holder.LinePos{Line: 113}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m, fa, next := copyModel(t, 0, 100)
-			fr := nativerunner.Frame{ScrollMax: 100, ScrollBase: 3, Full: true}
+			fr := holder.Frame{ScrollMax: 100, ScrollBase: 3, Full: true}
 			for i, r := range copyRowsText {
-				fr.Rows = append(fr.Rows, nativerunner.FrameRow{Index: i, ANSI: r})
+				fr.Rows = append(fr.Rows, holder.FrameRow{Index: i, ANSI: r})
 			}
-			fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: fr}
+			fa.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: fr}
 			m, _ = read(t, m, next)
 			m = pressKeys(t, m, letters(tt.keys)...)
 			if m.copy.cursor != tt.want {
@@ -139,11 +139,11 @@ func copyMouseModel(t *testing.T) (Model, *fakeAttach) {
 	m, cmd := attachModel(t, h)
 	m, next := dialed(t, m, cmd)
 	fa := h.attaches["a"]
-	fr := nativerunner.Frame{Mouse: true, ScrollMax: 100}
+	fr := holder.Frame{Mouse: true, ScrollMax: 100}
 	for i, r := range copyRowsText {
-		fr.Rows = append(fr.Rows, nativerunner.FrameRow{Index: i, ANSI: r})
+		fr.Rows = append(fr.Rows, holder.FrameRow{Index: i, ANSI: r})
 	}
-	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: fr}
+	fa.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: fr}
 	m, _ = read(t, m, next)
 	m = update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	m, _ = leaderThen(t, m, letter("["))
@@ -157,7 +157,7 @@ func copyMouseModel(t *testing.T) (Model, *fakeAttach) {
 func TestCopyMode_CursorPastTheViewWheelsAChildThatReportsTheMouse(t *testing.T) {
 	m, fa := copyMouseModel(t)
 	m = pressKeys(t, m, letters("lkkk")...)
-	if want := (nativerunner.LinePos{Line: 100, Col: 1}); m.copy.cursor != want {
+	if want := (holder.LinePos{Line: 100, Col: 1}); m.copy.cursor != want {
 		t.Fatalf("cursor = %+v, want %+v on the top row", m.copy.cursor, want)
 	}
 	m = pressKeys(t, m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
@@ -214,7 +214,7 @@ func TestCopyMode_YankCopiesTheRangeAndWritesTheReply(t *testing.T) {
 		t.Fatal("y did not leave copy mode")
 	}
 
-	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamCopy, Text: "bar"}
+	fa.msgs <- holder.AttachMessage{Type: holder.StreamCopy, Text: "bar"}
 	read(t, m, next)
 	if !slices.Equal(clipped, []string{"bar"}) {
 		t.Fatalf("clipboard got %v, want [bar]", clipped)

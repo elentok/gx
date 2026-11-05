@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -114,7 +115,7 @@ func TestAgentLog_Pruned(t *testing.T) {
 func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 	home := t.TempDir()
 	stateDir := t.TempDir()
-	dir := writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
+	dir := writeRunnerDir(t, stateDir, "pty", holder.RawLogFile)
 	procs := fakeProcs{
 		41: {Start: "t0", Cmdline: "gx agent-holder --session-id " + session},
 		42: liveProcs[42],
@@ -138,7 +139,7 @@ func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 func TestAgentLog_CodexPtyReadsTheRollout(t *testing.T) {
 	codexHome := t.TempDir()
 	stateDir := t.TempDir()
-	dir := writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
+	dir := writeRunnerDir(t, stateDir, "pty", holder.RawLogFile)
 	d, err := nativerunner.OpenDir(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +179,7 @@ func TestAgentLog_CodexPtyReadsTheRollout(t *testing.T) {
 func TestAgentLog_TranscriptUnderAnotherProjectDir(t *testing.T) {
 	home := t.TempDir()
 	stateDir := t.TempDir()
-	writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
+	writeRunnerDir(t, stateDir, "pty", holder.RawLogFile)
 	// The launcher wrote the transcript under the epic's dir, not the worktree's.
 	want := transcript.PathIn(home, "/work", session)
 	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {

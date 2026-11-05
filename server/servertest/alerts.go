@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
@@ -88,7 +88,7 @@ func IdleWithAction(ctx context.Context, t *testing.T, h *Harness, evs <-chan wi
 }
 
 // ScreenHas reports whether the holder's screen shows text.
-func ScreenHas(t *testing.T, c *nativerunner.HolderClient, text string) bool {
+func ScreenHas(t *testing.T, c *holder.HolderClient, text string) bool {
 	t.Helper()
 	rows, _, err := c.Screen(0)
 	if err != nil {
@@ -98,7 +98,7 @@ func ScreenHas(t *testing.T, c *nativerunner.HolderClient, text string) bool {
 }
 
 // WaitForScreen waits for the holder's screen to show text.
-func WaitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
+func WaitForScreen(t *testing.T, c *holder.HolderClient, text string) {
 	t.Helper()
 	WaitFor(t, 10*time.Second, fmt.Sprintf("the screen to show %q", text), func() bool { return ScreenHas(t, c, text) })
 }

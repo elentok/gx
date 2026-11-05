@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -18,7 +19,7 @@ const narrowCols = 120
 // when a person focuses it, and returns once the pty has taken the size.
 func viewerResized(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, cols, rows int) {
 	t.Helper()
-	c, err := nativerunner.DialHolder(filepath.Join(p.Root, s.Label))
+	c, err := holder.DialHolder(filepath.Join(p.Root, s.Label))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +36,7 @@ func viewerResized(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, col
 		if err != nil {
 			t.Fatal(err)
 		}
-		if m.Type != nativerunner.StreamFrame {
+		if m.Type != holder.StreamFrame {
 			continue
 		}
 		for _, r := range m.Frame.Rows {

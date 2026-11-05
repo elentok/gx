@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -89,7 +90,7 @@ func holderSurvives(dir string, kickstart func() (int, error)) (string, bool) {
 	if err != nil {
 		return err.Error(), false
 	}
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err != nil {
 		return fmt.Sprintf("holder %d after kickstart -k: %v", pid, err), false
 	}

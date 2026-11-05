@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
@@ -63,7 +63,7 @@ func TestTerminal_Golden(t *testing.T) {
 		t.Fatal(err)
 	}
 	screen := "\x1b[31m$ claude\x1b[0m\nbye\n"
-	if err := os.WriteFile(filepath.Join(sessionsDir, "s1", nativerunner.LastScreenFile), []byte(screen), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(sessionsDir, "s1", holder.LastScreenFile), []byte(screen), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	exited := terminalSession(wire.SessionStatus{State: wire.SessionExited})
@@ -125,7 +125,7 @@ func TestTerminal_InfoRowShowsTheCountdownAndCancel(t *testing.T) {
 
 func TestTerminal_ExitedScreenReloadsAfterALaterExit(t *testing.T) {
 	sessionsDir := t.TempDir()
-	path := filepath.Join(sessionsDir, "s1", nativerunner.LastScreenFile)
+	path := filepath.Join(sessionsDir, "s1", holder.LastScreenFile)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}

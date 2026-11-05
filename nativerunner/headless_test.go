@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 	"golang.org/x/sys/unix"
 )
@@ -40,12 +41,7 @@ func TestMain(m *testing.M) {
 		fakeClaude()
 		return
 	}
-	if os.Getenv(holderLaunchEnv) == "1" {
-		launchHolder()
-		return
-	}
-	if os.Getenv(holderEnv) == "1" {
-		testHolder()
+	if holder.ServeTestBinary() {
 		return
 	}
 	// After the holder check: the holder's env carries the program's marker.

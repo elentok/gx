@@ -1,4 +1,4 @@
-package nativerunner_test
+package holder_test
 
 import (
 	"errors"
@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/syshealth"
 )
 
@@ -20,25 +21,25 @@ import (
 const echoChild = `printf 'ready\n'; while read -r l; do printf 'got:%s\n' "$l"; done`
 
 // startHolder runs a holder over child in-process and dials it.
-func startHolder(t *testing.T, child string) (dir string, c *nativerunner.HolderClient, done <-chan error) {
+func startHolder(t *testing.T, child string) (dir string, c *holder.HolderClient, done <-chan error) {
 	t.Helper()
-	return startHolderWith(t, nativerunner.HolderOptions{}, child)
+	return startHolderWith(t, holder.HolderOptions{}, child)
 }
 
 // startHolderWith is startHolder with holder options and extra args after the
 // script, as a launch's flags follow claude's command.
-func startHolderWith(t *testing.T, opts nativerunner.HolderOptions, child string, args ...string) (dir string, c *nativerunner.HolderClient, done <-chan error) {
+func startHolderWith(t *testing.T, opts holder.HolderOptions, child string, args ...string) (dir string, c *holder.HolderClient, done <-chan error) {
 	t.Helper()
 	dir = shortTempDir(t)
 	errc := make(chan error, 1)
 	finished := make(chan struct{})
 	go func() {
 		defer close(finished)
-		errc <- nativerunner.RunHarnessHolder(dir, gxharness.Claude, opts, append([]string{"sh", "-c", child, "sh"}, args...))
+		errc <- holder.RunHarnessHolder(dir, gxharness.Claude, opts, append([]string{"sh", "-c", child, "sh"}, args...))
 	}()
 	waitFor(t, "holder.sock answers", func() bool {
 		var err error
-		c, err = nativerunner.DialHolder(dir)
+		c, err = holder.DialHolder(dir)
 		return err == nil
 	})
 	t.Cleanup(func() {
@@ -78,7 +79,7 @@ func TestHolderSocket_StatusCountsTurns(t *testing.T) {
 	}
 }
 
-func waitForStatus(t *testing.T, c *nativerunner.HolderClient, want nativerunner.PidStatus, turn int) {
+func waitForStatus(t *testing.T, c *holder.HolderClient, want nativerunner.PidStatus, turn int) {
 	t.Helper()
 	waitFor(t, fmt.Sprintf("status %+v at turn %d", want, turn), func() bool {
 		got, n, err := c.Status()
@@ -91,7 +92,7 @@ func TestRunHolder_LongSocketPathNamesTheCap(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	err := nativerunner.RunHolder(dir, []string{"true"})
+	err := holder.RunHolder(dir, []string{"true"})
 	if err == nil || !strings.Contains(err.Error(), "unix socket path") {
 		t.Fatalf("err = %v, want one naming the unix socket path length cap", err)
 	}
@@ -129,7 +130,7 @@ func TestHolderSocket_PingNamesPidsAndStartTimes(t *testing.T) {
 
 func TestDialHolder_OldHolderStartTimesNotKnown(t *testing.T) {
 	dir := shortTempDir(t)
-	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	ln, err := net.Listen("unix", filepath.Join(dir, holder.HolderSocketFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +144,7 @@ func TestDialHolder_OldHolderStartTimesNotKnown(t *testing.T) {
 		_, _ = conn.Write([]byte(`{"version":1,"ops":["deny-reason"],"pid":4242}` + "\n"))
 	}()
 
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,10 +165,10 @@ func TestDialHolder_OldHolderStartTimesNotKnown(t *testing.T) {
 func TestHolderSocket_CoreOps(t *testing.T) {
 	dir, c, done := startHolder(t, echoChild)
 
-	if c.Version() != nativerunner.HolderProtocolVersion {
-		t.Errorf("version = %d; want %d", c.Version(), nativerunner.HolderProtocolVersion)
+	if c.Version() != holder.HolderProtocolVersion {
+		t.Errorf("version = %d; want %d", c.Version(), holder.HolderProtocolVersion)
 	}
-	if !c.Supports(nativerunner.OpDenyReason) {
+	if !c.Supports(holder.OpDenyReason) {
 		t.Error("ping does not list deny-reason")
 	}
 	waitForScreen(t, c, "ready")
@@ -182,19 +183,19 @@ func TestHolderSocket_CoreOps(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatalf("holder: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, holder.ExitCodeFile)); err != nil {
 		t.Errorf("no exit code after stop: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, nativerunner.HolderSocketFile)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, holder.HolderSocketFile)); !os.IsNotExist(err) {
 		t.Errorf("holder.sock left behind: %v", err)
 	}
 }
 
 func TestHolderSocket_NoOptionalOps(t *testing.T) {
-	nativerunner.SetHolderOptionalOps(t, nil)
+	holder.SetHolderOptionalOps(t, nil)
 	_, c, _ := startHolder(t, echoChild)
 
-	if c.Supports(nativerunner.OpDenyReason) {
+	if c.Supports(holder.OpDenyReason) {
 		t.Error("holder with no optional ops reports one supported")
 	}
 	if err := c.DenyWithReason("no"); err == nil {
@@ -215,13 +216,13 @@ const denyGoesIdle = `st idle; read -r l; st busy; printf 'got:%s\n' "$l"; cat >
 
 const denyStaysWaiting = `cat >/dev/null`
 
-func startDenyHolder(t *testing.T, tail string) *nativerunner.HolderClient {
+func startDenyHolder(t *testing.T, tail string) *holder.HolderClient {
 	t.Helper()
 	return startDenyHolderWith(t, tail, func(t *testing.T) { t.Setenv("HOME", shortTempDir(t)) })
 }
 
 // startDenyHolderWith lets setup choose the HOME the holder runs with.
-func startDenyHolderWith(t *testing.T, tail string, setup func(*testing.T)) *nativerunner.HolderClient {
+func startDenyHolderWith(t *testing.T, tail string, setup func(*testing.T)) *holder.HolderClient {
 	t.Helper()
 	setup(t)
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
@@ -233,7 +234,7 @@ func startDenyHolderWith(t *testing.T, tail string, setup func(*testing.T)) *nat
 
 func TestHolderSocket_StatusCarriesOSCState(t *testing.T) {
 	c := startDenyHolder(t, `printf '\033]7501;state=working:app=claude\a'; cat >/dev/null`)
-	if !c.Supports(nativerunner.OpTurnOSC) {
+	if !c.Supports(holder.OpTurnOSC) {
 		t.Fatal("ping does not list the turn-osc marker")
 	}
 	// denyChild runs the tail after one key.
@@ -260,9 +261,9 @@ func TestHolderSocket_StatusWithoutRateLimitFieldsIsNotLimited(t *testing.T) {
 }
 
 func TestHolderSocket_OlderHolderLacksTurnMarker(t *testing.T) {
-	nativerunner.SetHolderOptionalOps(t, nil)
+	holder.SetHolderOptionalOps(t, nil)
 	_, c, _ := startHolder(t, echoChild)
-	if c.Supports(nativerunner.OpTurnOSC) {
+	if c.Supports(holder.OpTurnOSC) {
 		t.Error("an older holder lists turn-osc")
 	}
 	waitForScreen(t, c, "ready")
@@ -305,7 +306,7 @@ func TestHolderSocket_DenyReason(t *testing.T) {
 }
 
 func TestHolderSocket_DenyReasonIdleTimeout(t *testing.T) {
-	nativerunner.SetHolderDenyTimeout(t, 300*time.Millisecond)
+	holder.SetHolderDenyTimeout(t, 300*time.Millisecond)
 	c := startDenyHolder(t, denyStaysWaiting)
 
 	if err := c.DenyWithReason("use rg"); err == nil {
@@ -351,7 +352,7 @@ func TestHolderSocket_DenyReason_VimGiveUpFailsTheDenyWithoutTyping(t *testing.T
 func TestHolderSocket_DenyReason_OverrideSendsNoStrayI(t *testing.T) {
 	vimConfigHome(t)
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
-	opts := nativerunner.HolderOptions{SessionID: "deny-override-no-i"}
+	opts := holder.HolderOptions{SessionID: "deny-override-no-i"}
 	dir, c, _ := startHolderWith(t, opts, denyChild+denyGoesIdle, "--settings", `{"editorMode":"normal"}`)
 	waitForScreen(t, c, "ready")
 	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
@@ -359,7 +360,7 @@ func TestHolderSocket_DenyReason_OverrideSendsNoStrayI(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForScreen(t, c, "got:use rg")
-	data, err := os.ReadFile(filepath.Join(dir, nativerunner.HolderLogFile))
+	data, err := os.ReadFile(filepath.Join(dir, holder.HolderLogFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,7 +375,7 @@ const idleThenExit = `st idle; read -r l; exit 3`
 func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
 	// Hold the holder before its wind-down, while holder.sock still answers.
 	release := make(chan struct{})
-	nativerunner.SetHolderAfterExit(t, func() { <-release })
+	holder.SetHolderAfterExit(t, func() { <-release })
 	c := startDenyHolder(t, idleThenExit)
 	defer close(release)
 	if err := c.SendKeys("x"); err != nil {
@@ -394,7 +395,7 @@ func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
 		}
 		return err != nil
 	})
-	var exited *nativerunner.ClaudeExitedError
+	var exited *holder.ClaudeExitedError
 	if !errors.As(err, &exited) || exited.Code != 3 {
 		t.Errorf("status error = %v; want ClaudeExitedError with code 3", err)
 	}
@@ -406,7 +407,7 @@ const pasteChild = `printf '\033[?2004hready\n'; while IFS= read -r l; do printf
 
 func TestHolderSocket_PasteIsBracketed(t *testing.T) {
 	_, c, _ := startHolder(t, pasteChild)
-	if !c.Supports(nativerunner.OpPaste) {
+	if !c.Supports(holder.OpPaste) {
 		t.Fatal("ping does not list paste")
 	}
 	waitForScreen(t, c, "ready")
@@ -451,7 +452,7 @@ func TestHolderClient_TypeTextSendsShortTextAsKeys(t *testing.T) {
 }
 
 func TestHolderClient_TypeTextWithoutPasteOpSendsKeys(t *testing.T) {
-	nativerunner.SetHolderOptionalOps(t, nil)
+	holder.SetHolderOptionalOps(t, nil)
 	_, c, _ := startHolder(t, echoChild)
 	waitForScreen(t, c, "ready")
 	long := strings.Repeat("y", 600)
@@ -466,7 +467,7 @@ const dimChild = `printf '\033[2mdimmed\033[0m\n'; cat >/dev/null`
 
 func TestHolderSocket_StyledScreen(t *testing.T) {
 	_, c, _ := startHolder(t, dimChild)
-	if !c.Supports(nativerunner.OpScreenStyled) {
+	if !c.Supports(holder.OpScreenStyled) {
 		t.Fatal("ping does not list screen-styled")
 	}
 	waitForScreen(t, c, "dimmed")
@@ -488,7 +489,7 @@ func TestHolderSocket_StyledScreen(t *testing.T) {
 	}
 }
 
-func waitForScreen(t *testing.T, c *nativerunner.HolderClient, want string) {
+func waitForScreen(t *testing.T, c *holder.HolderClient, want string) {
 	t.Helper()
 	waitFor(t, "the screen shows "+want, func() bool {
 		rows, _, err := c.Screen(10)
@@ -525,7 +526,7 @@ func TestHolderSocket_DenyReasonLocksKeysAndHoldsAttachInput(t *testing.T) {
 	go func() { denied <- c.DenyWithReason("use rg") }()
 	// An empty keys op writes nothing, so it probes the lock without typing.
 	waitFor(t, "keys refused during the step", func() bool {
-		return errors.Is(c.SendKeys(""), nativerunner.ErrHolderDenyBusy)
+		return errors.Is(c.SendKeys(""), holder.ErrHolderDenyBusy)
 	})
 	if err := a.Paste("held"); err != nil {
 		t.Fatal(err)
@@ -533,7 +534,7 @@ func TestHolderSocket_DenyReasonLocksKeysAndHoldsAttachInput(t *testing.T) {
 	if err := a.SendKey(screen.Key{Code: '\r'}); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.SendKeys("q"); !errors.Is(err, nativerunner.ErrHolderDenyBusy) {
+	if err := c.SendKeys("q"); !errors.Is(err, holder.ErrHolderDenyBusy) {
 		t.Fatalf("keys during the step = %v; want ErrHolderDenyBusy", err)
 	}
 	if err := <-denied; err != nil {
@@ -552,9 +553,9 @@ func TestHolderSocket_SecondDenyReasonDuringStepIsBusy(t *testing.T) {
 	denied := make(chan error, 1)
 	go func() { denied <- c.DenyWithReason("use rg") }()
 	waitFor(t, "keys refused during the step", func() bool {
-		return errors.Is(c.SendKeys(""), nativerunner.ErrHolderDenyBusy)
+		return errors.Is(c.SendKeys(""), holder.ErrHolderDenyBusy)
 	})
-	if err := c.DenyWithReason("other"); !errors.Is(err, nativerunner.ErrHolderDenyBusy) {
+	if err := c.DenyWithReason("other"); !errors.Is(err, holder.ErrHolderDenyBusy) {
 		t.Fatalf("second deny-reason = %v; want ErrHolderDenyBusy", err)
 	}
 	if err := <-denied; err != nil {

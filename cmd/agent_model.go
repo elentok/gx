@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
@@ -21,7 +21,7 @@ func newAgentModelCmd(d deps) *cobra.Command {
 			"Claude prints the model alone. Codex prints \"model effort\" on one line, or the model\n" +
 			"alone when its effort is empty.\n\n" +
 			"The agent is found in this order:\n" +
-			"  1. " + nativerunner.AgentSessionEnv + ": the harness of that gx server session\n" +
+			"  1. " + holder.AgentSessionEnv + ": the harness of that gx server session\n" +
 			"  2. " + projects.AgentEnv + ": set by ralph-loop to the run's agent\n" +
 			"  3. claude\n\n" +
 			"The value comes from the config agents.* section with the current directory's project\n" +
@@ -75,7 +75,7 @@ func runAgentModel(d deps, out io.Writer, tierName string) error {
 // harness, else GX_AGENT, else Claude. A session the server cannot tell us
 // about falls through to the next source.
 func currentAgent(d deps) ralphloop.AgentKind {
-	if id := d.getenv(nativerunner.AgentSessionEnv); id != "" {
+	if id := d.getenv(holder.AgentSessionEnv); id != "" {
 		if h, ok := sessionHarness(d, id); ok {
 			return ralphloop.AgentFor(h)
 		}

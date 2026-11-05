@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -180,9 +181,9 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 	}
 	deadline := time.Now().Add(l.startTimeout)
 	for {
-		holder, err := DialHolder(dir)
+		client, err := holder.DialHolder(dir)
 		if err == nil {
-			ss.holder, ss.claudePID = holder, holder.ChildPID()
+			ss.holder, ss.claudePID = client, client.ChildPID()
 			break
 		}
 		if err := l.launchTick(ss, dir, deadline, "holder.sock never answered"); err != nil {
@@ -216,7 +217,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 	ss.holderStart, ss.claudeStart = meta.HolderPIDStart, meta.PIDStart
 	// A holder without the watch op can't report ready; it falls back to the
 	// pid file's idle.
-	watchReady := ss.holder.Supports(OpWatch)
+	watchReady := ss.holder.Supports(holder.OpWatch)
 	ready := make(chan struct{})
 	if watchReady {
 		watch, err := ss.holder.Watch()
@@ -230,7 +231,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 				if err != nil {
 					return
 				}
-				if m.Type == StreamStatus && m.Ready != "" {
+				if m.Type == holder.StreamStatus && m.Ready != "" {
 					close(ready)
 					return
 				}
@@ -260,7 +261,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 			// The trust dialog shows before claude writes its pid file, so
 			// no holder rule can see it. Claude drops a key typed before it
 			// reads input, so keys repeat while the dialog stays up.
-			rows, scrolled, err := ss.holder.Screen(StartupScrollback)
+			rows, scrolled, err := ss.holder.Screen(holder.StartupScrollback)
 			if err != nil {
 				return err
 			}
@@ -268,7 +269,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 				if err := ss.holder.SendKeys(startup.Key); err != nil {
 					return err
 				}
-				nextTrustKey = time.Now().Add(TrustKeyRepeat)
+				nextTrustKey = time.Now().Add(holder.TrustKeyRepeat)
 			}
 		}
 		select {
@@ -288,7 +289,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 // holderExitedErr reports a holder gone before claude turned idle, with
 // claude's exit code when the holder saved one.
 func (l ptyLauncher) holderExitedErr(dir string) error {
-	code, err := os.ReadFile(filepath.Join(dir, ExitCodeFile))
+	code, err := os.ReadFile(filepath.Join(dir, holder.ExitCodeFile))
 	if err != nil {
 		return errors.New("pty start: holder exited before claude turned idle")
 	}
@@ -312,7 +313,7 @@ func (l ptyLauncher) watchExit(ss *ptySession, meta Meta) {
 }
 
 func (l ptyLauncher) startupScreen(ss *ptySession) (string, error) {
-	rows, scrolled, err := ss.holder.Screen(StartupScrollback)
+	rows, scrolled, err := ss.holder.Screen(holder.StartupScrollback)
 	if err != nil {
 		return "", err
 	}
@@ -336,7 +337,7 @@ func (l ptyLauncher) noPidFileErr(ss *ptySession) error {
 func (l ptyLauncher) launchTick(ss *ptySession, dir string, deadline time.Time, what string) error {
 	select {
 	case <-ss.exited:
-		if text := HolderErrText(dir); text != "" {
+		if text := holder.HolderErrText(dir); text != "" {
 			return fmt.Errorf("pty start: holder exited: %s", text)
 		}
 		return fmt.Errorf("pty start: holder exited: %s", what)
@@ -350,28 +351,28 @@ func (l ptyLauncher) launchTick(ss *ptySession, dir string, deadline time.Time, 
 
 // spawn starts the holder detached, running claude in its pty.
 func (l ptyLauncher) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec.Cmd, error) {
-	holder := l.holder
-	if len(holder) == 0 {
+	holderArgv := l.holder
+	if len(holderArgv) == 0 {
 		exe, err := os.Executable()
 		if err != nil {
 			return nil, err
 		}
-		holder = []string{exe, "agent-holder"}
+		holderArgv = []string{exe, "agent-holder"}
 	}
 	kind := ptyKind(opts)
 	launch, err := l.launchCommand(opts, dir, sessionID)
 	if err != nil {
 		return nil, err
 	}
-	args := slices.Concat(holder[1:],
+	args := slices.Concat(holderArgv[1:],
 		// The holder takes the session id too, so its cmdline passes the
 		// liveness check like the agent's.
 		[]string{"--session-id", sessionID, "--harness", string(kind), "--dir", dir, "--", launch.Name},
 		launch.Args)
-	cmd := exec.Command(holder[0], args...)
+	cmd := exec.Command(holderArgv[0], args...)
 	cmd.Dir = opts.Cwd
 	cmd.Env = launch.Env
-	errFile, err := CreateHolderErr(dir)
+	errFile, err := holder.CreateHolderErr(dir)
 	if err != nil {
 		return nil, err
 	}

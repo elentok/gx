@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -17,7 +18,7 @@ import (
 func TestPty_StartRunsTheKindsHarness(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
-	p.Env = ptyTestEnv(t.TempDir(), holderEnv+"=1", agentfake.ProgramIdleEnv+"=1")
+	p.Env = ptyTestEnv(t.TempDir(), holder.HolderEnv+"=1", agentfake.ProgramIdleEnv+"=1")
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: agentfake.HarnessKind})
 	if err != nil {
 		t.Fatalf("Start: %v", err)

@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/transcript"
 )
@@ -113,7 +114,7 @@ func (p *Registry) Typing() harness.Typing { return harness.ClaudeTypingIn(p.cfg
 // typingIO is the ready-to-type step's view of the session in dir. It carries
 // the session id the probe keys its memory by, the server logger and the
 // caller's label, so the probe's decisions reach server.log.
-func (p *Registry) TypingIO(dir string, c *nativerunner.HolderClient, caller string) harness.TypingIO {
+func (p *Registry) TypingIO(dir string, c *holder.HolderClient, caller string) harness.TypingIO {
 	io := nativerunner.HolderTypingIO(c)
 	if meta, err := readTypingMeta(dir); err == nil {
 		io.Session = meta.ConversationID

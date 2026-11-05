@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 const permissionPayload = `{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rg foo"}}`
@@ -17,7 +17,7 @@ const permissionPayload = `{"hook_event_name":"PermissionRequest","tool_name":"B
 // runPermissionHook runs the hook on stdin. A non-nil answer is called with the
 // request the hook wrote and its result is written as the decision; with nil
 // the wait is cancelled instead.
-func runPermissionHook(t *testing.T, dir, stdin string, answer func(nativerunner.PermissionRequest)) string {
+func runPermissionHook(t *testing.T, dir, stdin string, answer func(holder.PermissionRequest)) string {
 	t.Helper()
 	c := newAgentPermissionRequestCmd()
 	var stdout bytes.Buffer
@@ -33,7 +33,7 @@ func runPermissionHook(t *testing.T, dir, stdin string, answer func(nativerunner
 		cancel()
 	} else {
 		for {
-			req, ok, err := nativerunner.ReadPermissionRequest(dir)
+			req, ok, err := holder.ReadPermissionRequest(dir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,14 +63,14 @@ func TestAgentPermissionRequest_AllowAndDeny(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
-			var seen nativerunner.PermissionRequest
-			out := runPermissionHook(t, dir, permissionPayload, func(req nativerunner.PermissionRequest) {
+			var seen holder.PermissionRequest
+			out := runPermissionHook(t, dir, permissionPayload, func(req holder.PermissionRequest) {
 				seen = req
-				d := nativerunner.PermissionDecision{ID: req.ID, Allow: tc.allow}
+				d := holder.PermissionDecision{ID: req.ID, Allow: tc.allow}
 				if !tc.allow {
 					d.Reason = "use fd instead"
 				}
-				if err := nativerunner.WritePermissionDecision(dir, d); err != nil {
+				if err := holder.WritePermissionDecision(dir, d); err != nil {
 					t.Error(err)
 				}
 			})
@@ -80,7 +80,7 @@ func TestAgentPermissionRequest_AllowAndDeny(t *testing.T) {
 			if strings.TrimSpace(out) != tc.want {
 				t.Errorf("output = %s, want %s", out, tc.want)
 			}
-			if _, ok, _ := nativerunner.ReadPermissionRequest(dir); ok {
+			if _, ok, _ := holder.ReadPermissionRequest(dir); ok {
 				t.Error("request file left behind")
 			}
 		})
@@ -90,11 +90,11 @@ func TestAgentPermissionRequest_AllowAndDeny(t *testing.T) {
 func TestAgentPermissionRequest_IgnoresADecisionForAnotherRequest(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	out := runPermissionHook(t, dir, permissionPayload, func(req nativerunner.PermissionRequest) {
+	out := runPermissionHook(t, dir, permissionPayload, func(req holder.PermissionRequest) {
 		// A stale decision first, then the right one.
-		_ = nativerunner.WritePermissionDecision(dir, nativerunner.PermissionDecision{ID: "stale"})
+		_ = holder.WritePermissionDecision(dir, holder.PermissionDecision{ID: "stale"})
 		time.Sleep(30 * time.Millisecond)
-		_ = nativerunner.WritePermissionDecision(dir, nativerunner.PermissionDecision{ID: req.ID, Allow: true})
+		_ = holder.WritePermissionDecision(dir, holder.PermissionDecision{ID: req.ID, Allow: true})
 	})
 	if !strings.Contains(out, `"allow"`) {
 		t.Errorf("output = %s, want an allow", out)
@@ -115,7 +115,7 @@ func TestAgentPermissionRequest_NoDecisionWhenThereIsNothingToAnswerTo(t *testin
 		if out := runPermissionHook(t, dir, permissionPayload, nil); out != "" {
 			t.Errorf("output = %q, want none", out)
 		}
-		if _, err := os.Stat(filepath.Join(dir, nativerunner.PermissionRequestFile)); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, holder.PermissionRequestFile)); err == nil {
 			t.Error("request file left behind after the cancel")
 		}
 	})

@@ -9,7 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -26,9 +26,9 @@ var (
 type copyMode struct {
 	// a is the attach copy mode was entered on; another attach ends it.
 	a      *attachment
-	cursor nativerunner.LinePos
+	cursor holder.LinePos
 	// anchor is the selection's other end, set while selecting.
-	anchor    nativerunner.LinePos
+	anchor    holder.LinePos
 	selecting bool
 	linewise  bool
 	// pendingG: the first g of `g g` was pressed.
@@ -81,9 +81,9 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		c.pendingG = false
 		if k == "g" && c.a.mouse {
 			// The child's history has no known top to wheel to.
-			c.cursor = nativerunner.LinePos{Line: c.a.scrollBase + c.a.scrollMax - c.a.offset}
+			c.cursor = holder.LinePos{Line: c.a.scrollBase + c.a.scrollMax - c.a.offset}
 		} else if k == "g" {
-			c.cursor = nativerunner.LinePos{Line: c.a.scrollBase}
+			c.cursor = holder.LinePos{Line: c.a.scrollBase}
 			m.scrollToCopyCursor()
 		}
 		return m, nil
@@ -118,7 +118,7 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		c.pendingG = true
 		return m, nil
 	case "G":
-		c.cursor = nativerunner.LinePos{Line: last}
+		c.cursor = holder.LinePos{Line: last}
 	case "v", "V":
 		linewise := k == "V"
 		if c.selecting && c.linewise == linewise {
@@ -203,14 +203,14 @@ func (m Model) scrollToCopyCursor() {
 }
 
 // selection is the selected range, end exclusive as the holder takes it.
-func (c *copyMode) selection() (start, end nativerunner.LinePos) {
+func (c *copyMode) selection() (start, end holder.LinePos) {
 	start, end = c.anchor, c.cursor
 	if end.Line < start.Line || (end.Line == start.Line && end.Col < start.Col) {
 		start, end = end, start
 	}
 	if c.linewise {
 		// The end column reaches past any line; the holder clamps it.
-		return nativerunner.LinePos{Line: start.Line}, nativerunner.LinePos{Line: end.Line, Col: 1 << 30}
+		return holder.LinePos{Line: start.Line}, holder.LinePos{Line: end.Line, Col: 1 << 30}
 	}
 	end.Col++
 	return start, end
@@ -246,7 +246,7 @@ func (m Model) copyRows(rows []string) []string {
 	c := m.copy
 	top, _ := m.copyView()
 	cols, _ := m.screenSize()
-	var start, end nativerunner.LinePos
+	var start, end holder.LinePos
 	if c.selecting {
 		start, end = c.selection()
 	}
@@ -285,7 +285,7 @@ func overlayCells(row string, from, to int, style lipgloss.Style) string {
 
 // wordMove is vi's w, b or e over the lines from first to last. A line's
 // end counts as a space, so words never run across lines.
-func wordMove(k string, pos nativerunner.LinePos, first, last int, text func(int) string) nativerunner.LinePos {
+func wordMove(k string, pos holder.LinePos, first, last int, text func(int) string) holder.LinePos {
 	lines := make([][]rune, last-first+1)
 	for i := range lines {
 		lines[i] = []rune(text(first + i))
@@ -354,7 +354,7 @@ func wordMove(k string, pos nativerunner.LinePos, first, last int, text func(int
 		}
 		cur = q
 	}
-	return nativerunner.LinePos{Line: first + cur.line, Col: cur.col}
+	return holder.LinePos{Line: first + cur.line, Col: cur.col}
 }
 
 func runeClass(r rune) int {

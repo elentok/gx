@@ -85,7 +85,7 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
     `make web-build` only when `webui/dist/index.html` is missing.
 - Unix socket paths are capped near 100 bytes, and `t.TempDir()` can exceed that. Holder-socket
   tests (anything that binds `holder.sock`) need a short `TMPDIR` or a short state root; use
-  `shortTempDir` in `nativerunner` tests. The failure is `bind: invalid argument`.
+  `shortTempDir` in `nativerunner` and `nativerunner/holder` tests. The failure is `bind: invalid argument`.
 - Tests never read live machine state, such as sibling worktrees, real branches or the live
   server's state. Use `t.TempDir()` and `testutil.TempRepo`.
 
@@ -197,7 +197,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   tests use `launchFake`)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail); `tickets/ticketmove` — ticket move, id allocation and ref rewriting; `tickets/ticketmigrate` — migrations and backfills (Migrate*, Backfill*, pause migration, store walk); `tickets/ticketspec` — publish-side code (lint-claims, manifest, verify plan, publish checks, estimates)
-- `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners
+- `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners; `nativerunner/holder` — the pty holder process, its socket protocol and client (`nativerunner` imports it, never the reverse)
 - `harness/` — what runs inside an interactive agent session
 - `herdr/` — herdr CLI/socket client
 - `runner/` — runs a child command with inherited stdio

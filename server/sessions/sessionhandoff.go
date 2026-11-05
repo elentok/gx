@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -60,11 +61,11 @@ func (rs *Resumer) chartingHandoff(dir, id string) {
 		return
 	}
 	// No lock held: the stop waits for the holder to save its exit.
-	if c, err := nativerunner.DialHolder(dir); err == nil {
+	if c, err := holder.DialHolder(dir); err == nil {
 		if err := c.Stop(); err != nil {
 			rs.mg.log.Warn("handoff: stop agent", "session", id, "err", err)
 		} else {
-			waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
+			waitForFile(filepath.Join(dir, holder.ExitCodeFile), sessionStopTimeout)
 		}
 	}
 	rs.mg.Watches.MetaMu.Lock()

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // shutdown stops the server before its detached holders, so it cannot launch
@@ -50,10 +50,10 @@ func (f *fixture) stopHolders() error {
 		if entry.IsDir() && entry.Name() == ".git" {
 			return filepath.SkipDir
 		}
-		if entry.Name() != nativerunner.HolderSocketFile || entry.Type()&os.ModeSocket == 0 {
+		if entry.Name() != holder.HolderSocketFile || entry.Type()&os.ModeSocket == 0 {
 			return nil
 		}
-		holder, err := nativerunner.DialHolder(filepath.Dir(path))
+		holder, err := holder.DialHolder(filepath.Dir(path))
 		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) {
 			return nil // A holder that already exited can leave a stale socket.
 		}

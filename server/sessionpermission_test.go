@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -65,7 +65,7 @@ func TestSessionPermission_CodexHookRequestGivesItsText(t *testing.T) {
 	t.Parallel()
 	f := servertest.StartCodexPermissionSession(t, false)
 	dir := filepath.Join(f.H.SessionsDir, f.ID)
-	if err := nativerunner.WritePermissionRequest(dir, nativerunner.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
+	if err := holder.WritePermissionRequest(dir, holder.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
 		t.Fatal(err)
 	}
 	f.Block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})

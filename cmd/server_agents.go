@@ -18,7 +18,7 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -38,13 +38,13 @@ func runAgentsScreen(log agentlog.Log, w io.Writer) error {
 	if log.PtyDir == "" {
 		return errNotPTY
 	}
-	if h, err := nativerunner.DialHolder(log.PtyDir); err == nil {
+	if h, err := holder.DialHolder(log.PtyDir); err == nil {
 		if rows, _, err := h.Screen(0); err == nil {
 			_, err = fmt.Fprintln(w, strings.Join(rows, "\n"))
 			return err
 		}
 	}
-	data, err := os.ReadFile(filepath.Join(log.PtyDir, nativerunner.ScreenFile))
+	data, err := os.ReadFile(filepath.Join(log.PtyDir, holder.ScreenFile))
 	if errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("no live holder and no saved screen in %s", log.PtyDir)
 	}
@@ -62,13 +62,13 @@ func runAgentsRaw(log agentlog.Log, w, warn io.Writer, width int) error {
 	if log.PtyDir == "" {
 		return errNotPTY
 	}
-	f, err := os.Open(filepath.Join(log.PtyDir, nativerunner.RawLogFile))
+	f, err := os.Open(filepath.Join(log.PtyDir, holder.RawLogFile))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	if width > 0 && width < nativerunner.HolderCols {
-		fmt.Fprintf(warn, "warning: the terminal is %d columns wide; raw.log needs %d to render right\n", width, nativerunner.HolderCols)
+	if width > 0 && width < holder.HolderCols {
+		fmt.Fprintf(warn, "warning: the terminal is %d columns wide; raw.log needs %d to render right\n", width, holder.HolderCols)
 	}
 	_, err = io.Copy(w, f)
 	return err
@@ -133,7 +133,7 @@ func newServerAgentsCmd(d deps) *cobra.Command {
 	watch.Flags().IntVar(&opts.Tail, "tail", 0, "show only the last N lines (N events with --json)")
 	watch.Flags().BoolVar(&opts.JSON, "json", false, "print raw JSONL events instead of rendered lines")
 	watch.Flags().BoolVar(&opts.Screen, "screen", false, "print a pty agent's current screen (the saved one once it ended)")
-	watch.Flags().BoolVar(&opts.Raw, "raw", false, fmt.Sprintf("replay a pty agent's raw terminal output (needs a %d-column terminal)", nativerunner.HolderCols))
+	watch.Flags().BoolVar(&opts.Raw, "raw", false, fmt.Sprintf("replay a pty agent's raw terminal output (needs a %d-column terminal)", holder.HolderCols))
 	watch.MarkFlagsMutuallyExclusive("screen", "raw", "json")
 	watch.MarkFlagsMutuallyExclusive("screen", "raw", "follow")
 	watch.MarkFlagsMutuallyExclusive("screen", "raw", "tail")

@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/codexdoctor"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/transcript"
 )
@@ -152,7 +152,7 @@ func TestCodex_WatcherFollowsATurnTitleAndExit(t *testing.T) {
 	}
 	want := "fix it | " + filepath.Base(cwd)
 	p.WaitFor("the display name", func() bool {
-		raw, err := os.ReadFile(filepath.Join(p.Dir, nativerunner.RawLogFile))
+		raw, err := os.ReadFile(filepath.Join(p.Dir, holder.RawLogFile))
 		name, ok := Harness{}.DisplayName(raw)
 		return err == nil && ok && name == want
 	})
@@ -162,7 +162,7 @@ func TestCodex_WatcherFollowsATurnTitleAndExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.done <- nil
-	code, err := os.ReadFile(filepath.Join(p.Dir, nativerunner.ExitCodeFile))
+	code, err := os.ReadFile(filepath.Join(p.Dir, holder.ExitCodeFile))
 	if err != nil {
 		t.Fatal(err)
 	}

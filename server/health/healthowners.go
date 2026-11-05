@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/syshealth"
 )
 
@@ -23,7 +23,7 @@ type ownerCache struct {
 type pingHolder func(dir string) ([]syshealth.OwnerKey, error)
 
 func dialHolderOwners(dir string) ([]syshealth.OwnerKey, error) {
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err != nil {
 		return nil, err
 	}

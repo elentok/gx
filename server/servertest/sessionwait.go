@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -24,12 +24,12 @@ func Report(t *testing.T, conv string, c agentfake.Control) {
 }
 
 // WaitForHolder dials the holder in dir until it answers.
-func WaitForHolder(t *testing.T, dir string) *nativerunner.HolderClient {
+func WaitForHolder(t *testing.T, dir string) *holder.HolderClient {
 	t.Helper()
-	var c *nativerunner.HolderClient
+	var c *holder.HolderClient
 	var err error
 	if !Poll(30*time.Second, func() bool {
-		c, err = nativerunner.DialHolder(dir)
+		c, err = holder.DialHolder(dir)
 		return err == nil
 	}) {
 		t.Fatalf("no holder in %s: %v", dir, err)

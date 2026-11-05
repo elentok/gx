@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentlog"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 func readLines(t *testing.T, path string) []string {
@@ -159,7 +159,7 @@ func ptyAgentDir(t *testing.T, files map[string]string) string {
 // serveFakeHolder answers ping and screen on dir's holder.sock.
 func serveFakeHolder(t *testing.T, dir string, rows []string) {
 	t.Helper()
-	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	ln, err := net.Listen("unix", filepath.Join(dir, holder.HolderSocketFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func serveFakeHolder(t *testing.T, dir string, rows []string) {
 }
 
 func TestAgentsScreen_Live(t *testing.T) {
-	dir := ptyAgentDir(t, map[string]string{nativerunner.ScreenFile: "stale\n"})
+	dir := ptyAgentDir(t, map[string]string{holder.ScreenFile: "stale\n"})
 	serveFakeHolder(t, dir, []string{"live row 1", "live row 2"})
 	var out bytes.Buffer
 	if err := runAgentsScreen(agentlog.Log{PtyDir: dir}, &out); err != nil {
@@ -196,7 +196,7 @@ func TestAgentsScreen_Live(t *testing.T) {
 }
 
 func TestAgentsScreen_Saved(t *testing.T) {
-	dir := ptyAgentDir(t, map[string]string{nativerunner.ScreenFile: "saved row\n"})
+	dir := ptyAgentDir(t, map[string]string{holder.ScreenFile: "saved row\n"})
 	var out bytes.Buffer
 	if err := runAgentsScreen(agentlog.Log{PtyDir: dir}, &out); err != nil {
 		t.Fatal(err)
@@ -216,11 +216,11 @@ func TestAgentsScreen_NoScreen(t *testing.T) {
 
 func TestAgentsRaw(t *testing.T) {
 	raw := "\x1b[2J\x1b[Hhello\r\n"
-	dir := ptyAgentDir(t, map[string]string{nativerunner.RawLogFile: raw})
+	dir := ptyAgentDir(t, map[string]string{holder.RawLogFile: raw})
 	for _, tc := range []struct {
 		width int
 		warns bool
-	}{{0, false}, {nativerunner.HolderCols, false}, {80, true}} {
+	}{{0, false}, {holder.HolderCols, false}, {80, true}} {
 		var out, warn bytes.Buffer
 		if err := runAgentsRaw(agentlog.Log{PtyDir: dir}, &out, &warn, tc.width); err != nil {
 			t.Fatal(err)

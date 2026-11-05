@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // ptyRunnerName is the Runner value a pty agent records in meta.json.
@@ -83,7 +84,7 @@ type ptySession struct {
 	session   agentrunner.Session
 	epic      string
 	kind      agentrunner.Kind
-	holder    *HolderClient
+	holder    *holder.HolderClient
 	holderPID int
 	claudePID int
 	// The start times meta.json records; blank until launch records them.
@@ -122,7 +123,7 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 	}
 	// Leftovers of an earlier run would stop the holder listening or pass
 	// for this claude's exit.
-	if err := removeAll(dir, []string{HolderSocketFile, ExitCodeFile}); err != nil {
+	if err := removeAll(dir, []string{holder.HolderSocketFile, holder.ExitCodeFile}); err != nil {
 		return agentrunner.Session{}, err
 	}
 	sessionID := opts.ResumeSessionID
@@ -259,14 +260,14 @@ func (p *Pty) died(ss *ptySession, err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, ErrHolderDenyBusy) {
+	if errors.Is(err, holder.ErrHolderDenyBusy) {
 		return fmt.Errorf("%w: %v", agentrunner.ErrNotReady, err)
 	}
-	var exited *ClaudeExitedError
+	var exited *holder.ClaudeExitedError
 	if errors.As(err, &exited) {
 		return agentrunner.SessionDied(exited.Error())
 	}
-	code, rerr := os.ReadFile(filepath.Join(p.Root, ss.session.Label, ExitCodeFile))
+	code, rerr := os.ReadFile(filepath.Join(p.Root, ss.session.Label, holder.ExitCodeFile))
 	if rerr == nil {
 		return agentrunner.SessionDied(fmt.Sprintf("claude exited (code %s)", strings.TrimSpace(string(code))))
 	}
@@ -306,7 +307,7 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	case ClaudeWaiting:
 		st.State, st.BlockedReason = agentrunner.StateBlocked, claude.WaitingFor
 		// Only here, on demand: the screen is never read on a timer for it.
-		if claude.WaitingFor == PermissionPrompt {
+		if claude.WaitingFor == holder.PermissionPrompt {
 			d, err := p.screenDialog(ss)
 			if err != nil {
 				return agentrunner.Status{}, err
@@ -323,7 +324,7 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 // status file. Working with a background task stays Working: the server reads
 // Background off the holder's watch stream. The session id is the one the
 // harness reports, not gx's start id, until the harness reports one.
-func watchedStatus(st agentrunner.Status, w WatchedStatus) agentrunner.Status {
+func watchedStatus(st agentrunner.Status, w holder.WatchedStatus) agentrunner.Status {
 	if w.ConversationID != "" {
 		st.SessionID = w.ConversationID
 	}
@@ -375,7 +376,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 	grace := p.StopGrace
 	if grace <= 0 {
 		// Longer than the holder's own grace for claude, plus its final flush.
-		grace = 2 * HolderStopGrace
+		grace = 2 * holder.HolderStopGrace
 	}
 	if ss.holder == nil {
 		// A silent holder can't be asked; its exited is already closed, so

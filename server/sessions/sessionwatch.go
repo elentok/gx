@@ -16,7 +16,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/sound"
 )
 
@@ -138,7 +138,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			return
 		}
 		switch msg.Type {
-		case nativerunner.StreamStatus:
+		case holder.StreamStatus:
 			st := SessionStatusOf(msg.Status)
 			var prompt, signal string
 			var design chat.DesignRef
@@ -217,7 +217,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			if prompt != "" {
 				first.Start(signal, prompt)
 			}
-		case nativerunner.StreamInput:
+		case holder.StreamInput:
 			first.PersonInput()
 			// Typing during a countdown stops only the countdown: the run-end
 			// Continue stays raised.
@@ -232,7 +232,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 				m.Actionable = wire.SessionActionable{}
 				return changed
 			})
-		case nativerunner.StreamExit:
+		case holder.StreamExit:
 			recordExit(sessionExitOf(msg.ExitCode))
 			return
 		}
@@ -242,7 +242,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 // typeSessionPrompt sends Enter on its own, so the harness reads the prompt
 // as typed rather than as a paste ending in a newline.
 func TypeSessionPrompt(dir, prompt string) error {
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err == nil {
 		err = c.TypeText(prompt)
 	}
@@ -263,7 +263,7 @@ func sessionExitOf(code int) string {
 // a child that exited before the watch connected; without one the holder
 // died.
 func savedSessionExit(dir string) string {
-	data, err := os.ReadFile(filepath.Join(dir, nativerunner.ExitCodeFile))
+	data, err := os.ReadFile(filepath.Join(dir, holder.ExitCodeFile))
 	if err != nil {
 		return wire.SessionExitCrashed
 	}
@@ -276,7 +276,7 @@ func savedSessionExit(dir string) string {
 
 // openSessionWatch waits for a just-started holder's socket, then opens its
 // watch stream.
-func (mg *Manager) openSessionWatch(dir string) (*nativerunner.HolderWatch, error) {
+func (mg *Manager) openSessionWatch(dir string) (*holder.HolderWatch, error) {
 	c, err := mg.dialNewHolder(dir)
 	if errors.Is(err, errHolderExited) {
 		return nil, errors.New("holder exited before its watch opened")
@@ -284,7 +284,7 @@ func (mg *Manager) openSessionWatch(dir string) (*nativerunner.HolderWatch, erro
 	if err != nil {
 		return nil, err
 	}
-	if !c.Supports(nativerunner.OpWatch) {
+	if !c.Supports(holder.OpWatch) {
 		return nil, errors.New("holder does not serve watch")
 	}
 	return c.Watch()
@@ -294,14 +294,14 @@ var errHolderExited = errors.New("holder exited")
 
 // dialNewHolder waits for a just-started holder's socket, until the holder
 // saves an exit, holderDialTimeout passes or the server stops.
-func (mg *Manager) dialNewHolder(dir string) (*nativerunner.HolderClient, error) {
+func (mg *Manager) dialNewHolder(dir string) (*holder.HolderClient, error) {
 	deadline := time.Now().Add(holderDialTimeout)
 	for {
-		c, err := nativerunner.DialHolder(dir)
+		c, err := holder.DialHolder(dir)
 		if err == nil {
 			return c, nil
 		}
-		if _, statErr := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); statErr == nil {
+		if _, statErr := os.Stat(filepath.Join(dir, holder.ExitCodeFile)); statErr == nil {
 			return nil, errHolderExited
 		}
 		if time.Now().After(deadline) {

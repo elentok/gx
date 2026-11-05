@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -22,7 +23,7 @@ func fakeclaudeRunner(t *testing.T) *nativerunner.Pty {
 	root := shortTempDir(t)
 	t.Cleanup(func() { killAgents(root) })
 	p := ptyOn(root, exe)
-	p.Env = ptyTestEnv(t.TempDir(), holderEnv+"=1")
+	p.Env = ptyTestEnv(t.TempDir(), holder.HolderEnv+"=1")
 	p.Claude = bin
 	return p
 }

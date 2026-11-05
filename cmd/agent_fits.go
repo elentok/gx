@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -35,7 +35,7 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 	if !ok {
 		return tickets.CheckDesignStep(stepName)
 	}
-	if id := d.getenv(nativerunner.AgentSessionEnv); id != "" {
+	if id := d.getenv(holder.AgentSessionEnv); id != "" {
 		on, err := d.readAutoAdvance(id)
 		if err != nil {
 			return err

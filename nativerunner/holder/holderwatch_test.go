@@ -1,4 +1,4 @@
-package nativerunner_test
+package holder_test
 
 import (
 	"os"
@@ -12,21 +12,21 @@ import (
 	"time"
 
 	agentharness "github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // startTestHolder runs a holder in-process and dials it once holder.sock
 // answers; finished closes when the holder returns.
-func startTestHolder(t *testing.T, dir string, h agentharness.Harness, argv []string) (c *nativerunner.HolderClient, finished chan struct{}) {
+func startTestHolder(t *testing.T, dir string, h agentharness.Harness, argv []string) (c *holder.HolderClient, finished chan struct{}) {
 	t.Helper()
 	finished = make(chan struct{})
 	go func() {
 		defer close(finished)
-		_ = nativerunner.RunTestHolder(dir, h, argv)
+		_ = holder.RunTestHolder(dir, h, argv)
 	}()
 	waitFor(t, "holder.sock answers", func() bool {
 		var err error
-		c, err = nativerunner.DialHolder(dir)
+		c, err = holder.DialHolder(dir)
 		return err == nil
 	})
 	return c, finished
@@ -42,7 +42,7 @@ func TestHolderWatch_StreamsStatusConversationAndExit(t *testing.T) {
 		_ = c.Stop()
 		<-finished
 	})
-	if !c.Supports(nativerunner.OpWatch) {
+	if !c.Supports(holder.OpWatch) {
 		t.Fatal("ping does not list watch")
 	}
 	watch, err := c.Watch()
@@ -51,7 +51,7 @@ func TestHolderWatch_StreamsStatusConversationAndExit(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = watch.Close() })
 
-	next := func() nativerunner.WatchMessage {
+	next := func() holder.WatchMessage {
 		t.Helper()
 		m, err := watch.Next()
 		if err != nil {
@@ -59,27 +59,27 @@ func TestHolderWatch_StreamsStatusConversationAndExit(t *testing.T) {
 		}
 		return m
 	}
-	if m := next(); m.Type != nativerunner.StreamStatus || m.Status.State != agentharness.Starting {
+	if m := next(); m.Type != holder.StreamStatus || m.Status.State != agentharness.Starting {
 		t.Errorf("first message = %+v; want the Starting status", m)
 	}
 	blocked := agentharness.Status{State: agentharness.Blocked, Blocked: agentharness.BlockedQuestion, Message: "Red or blue?"}
 	w.set(blocked, "")
-	if m := next(); m.Type != nativerunner.StreamStatus || m.Status != blocked {
+	if m := next(); m.Type != holder.StreamStatus || m.Status != blocked {
 		t.Errorf("after a status change = %+v; want %+v", m, blocked)
 	}
 	w.set(blocked, "conv-1")
-	if m := next(); m.Type != nativerunner.StreamStatus || m.ConversationID != "conv-1" || m.Status != blocked {
+	if m := next(); m.Type != holder.StreamStatus || m.ConversationID != "conv-1" || m.Status != blocked {
 		t.Errorf("after a conversation id change = %+v; want conv-1", m)
 	}
 
 	if err := os.WriteFile(stop, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if m := next(); m.Type != nativerunner.StreamExit || m.ExitCode != 4 {
+	if m := next(); m.Type != holder.StreamExit || m.ExitCode != 4 {
 		t.Errorf("on exit = %+v; want exit code 4", m)
 	}
 	// The exit is only sent once the last screen is saved.
-	last, err := os.ReadFile(filepath.Join(dir, nativerunner.LastScreenFile))
+	last, err := os.ReadFile(filepath.Join(dir, holder.LastScreenFile))
 	if err != nil || !strings.Contains(string(last), "bold") || !strings.Contains(string(last), "\x1b[") {
 		t.Errorf("last screen = %q, %v; want styled rows", last, err)
 	}
@@ -100,7 +100,7 @@ func TestHolderWatch_PersonKeysWakeWatchersPlainKeysDoNot(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = watch.Close() })
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus {
 		t.Fatalf("first message = %+v, %v; want the status", m, err)
 	}
 
@@ -112,7 +112,7 @@ func TestHolderWatch_PersonKeysWakeWatchersPlainKeysDoNot(t *testing.T) {
 	if err := c.SendPersonKeys("b\r"); err != nil {
 		t.Fatal(err)
 	}
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamInput {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamInput {
 		t.Fatalf("after person keys = %+v, %v; want StreamInput", m, err)
 	}
 	waitForScreen(t, c, "got:b")
@@ -122,16 +122,16 @@ func TestHolderWatch_PersonKeysWakeWatchersPlainKeysDoNot(t *testing.T) {
 		if err := c.TypePersonTextBy("c\r", paste); err != nil {
 			t.Fatal(err)
 		}
-		if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamInput {
+		if m, err := watch.Next(); err != nil || m.Type != holder.StreamInput {
 			t.Fatalf("after person text (paste=%v) = %+v, %v; want StreamInput", paste, m, err)
 		}
 	}
 }
 
 func TestHolderClient_PersonKeysWithoutTheOpFallBackToKeys(t *testing.T) {
-	nativerunner.SetHolderOptionalOps(t, []string{nativerunner.OpWatch})
+	holder.SetHolderOptionalOps(t, []string{holder.OpWatch})
 	_, c, _ := startHolder(t, echoChild)
-	if c.Supports(nativerunner.OpPersonKeys) {
+	if c.Supports(holder.OpPersonKeys) {
 		t.Fatal("holder lists person-keys")
 	}
 	waitForScreen(t, c, "ready")
@@ -158,7 +158,7 @@ func TestHolderWatch_IdleStreamDoesNoPeriodicWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = watch.Close() })
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus {
 		t.Fatalf("first message = %+v, %v; want a status", m, err)
 	}
 
@@ -178,7 +178,7 @@ func TestHolderWatch_IdleStreamDoesNoPeriodicWork(t *testing.T) {
 func TestHolderWatch_ClosesWithoutExitWhenHolderDies(t *testing.T) {
 	dir := shortTempDir(t)
 	launcher := exec.Command(os.Args[0], "--session-id", "s", "--dir", dir, "--", "sh", "-c", "sleep 30")
-	launcher.Env = append(os.Environ(), holderLaunchEnv+"=1")
+	launcher.Env = append(os.Environ(), holder.HolderLaunchEnv+"=1")
 	out, err := launcher.Output()
 	if err != nil {
 		t.Fatalf("launcher: %v", err)
@@ -188,9 +188,9 @@ func TestHolderWatch_ClosesWithoutExitWhenHolderDies(t *testing.T) {
 		t.Fatalf("launcher printed %q", out)
 	}
 	t.Cleanup(func() { _ = syscall.Kill(-pid, syscall.SIGKILL) })
-	var c *nativerunner.HolderClient
+	var c *holder.HolderClient
 	waitFor(t, "holder.sock answers", func() bool {
-		c, err = nativerunner.DialHolder(dir)
+		c, err = holder.DialHolder(dir)
 		return err == nil
 	})
 	watch, err := c.Watch()
@@ -198,7 +198,7 @@ func TestHolderWatch_ClosesWithoutExitWhenHolderDies(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = watch.Close() })
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus {
 		t.Fatalf("first message = %+v, %v; want a status", m, err)
 	}
 
@@ -211,25 +211,25 @@ func TestHolderWatch_ClosesWithoutExitWhenHolderDies(t *testing.T) {
 }
 
 func TestHolderWatch_OlderHolderDoesNotListIt(t *testing.T) {
-	nativerunner.SetHolderOptionalOps(t, nil)
+	holder.SetHolderOptionalOps(t, nil)
 	dir := shortTempDir(t)
 	c, finished := startTestHolder(t, dir, settableHarness{w: &settableWatcher{}}, []string{"sh", "-c", "sleep 30"})
 	t.Cleanup(func() {
 		_ = c.Stop()
 		<-finished
 	})
-	if c.Supports(nativerunner.OpWatch) {
+	if c.Supports(holder.OpWatch) {
 		t.Error("an older holder lists watch")
 	}
 }
 
 func TestHolder_SetsAgentSessionInChildEnv(t *testing.T) {
 	dir := shortTempDir(t)
-	child := `printf 'session=%s\n' "$` + nativerunner.AgentSessionEnv + `"`
-	if err := nativerunner.RunTestSessionHolder(dir, settableHarness{w: &settableWatcher{}}, "gx-42", []string{"sh", "-c", child}); err != nil {
+	child := `printf 'session=%s\n' "$` + holder.AgentSessionEnv + `"`
+	if err := holder.RunTestSessionHolder(dir, settableHarness{w: &settableWatcher{}}, "gx-42", []string{"sh", "-c", child}); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, nativerunner.RawLogFile))
+	raw, _ := os.ReadFile(filepath.Join(dir, holder.RawLogFile))
 	if !strings.Contains(string(raw), "session=gx-42") {
 		t.Errorf("raw.log = %q; want the child to see the gx session id", raw)
 	}
@@ -355,7 +355,7 @@ func TestHolderWatch_ScreenOnlyReadyNeedsNoOtherStatusEvent(t *testing.T) {
 	if err := os.WriteFile(show, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus || m.Ready != agentharness.ReadyScreen {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != agentharness.ReadyScreen {
 		t.Errorf("after the screen shows ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyScreen)
 	}
 }
@@ -374,11 +374,11 @@ func TestHolderWatch_ReportsReadySignal(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = watch.Close() })
 
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus || m.Ready != "" {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != "" {
 		t.Fatalf("first message = %+v, %v; want a status that is not ready", m, err)
 	}
 	w.setReady(agentharness.ReadyScreen)
-	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus || m.Ready != agentharness.ReadyScreen {
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != agentharness.ReadyScreen {
 		t.Errorf("after ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyScreen)
 	}
 }

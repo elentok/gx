@@ -12,7 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -38,7 +38,7 @@ type HeldProgram struct {
 	t       *testing.T
 	Dir     string
 	conv    string
-	client  *nativerunner.HolderClient
+	client  *holder.HolderClient
 	Watcher harness.Watcher
 	done    chan error
 }
@@ -59,7 +59,7 @@ func HoldProgram(t *testing.T, cmd harness.Command, conv string, env ...string) 
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	p := &HeldProgram{t: t, Dir: dir, conv: conv, done: make(chan error, 1)}
 	go func() {
-		p.done <- nativerunner.RunHarnessHolder(dir, capturingKind, nativerunner.HolderOptions{Env: env}, append([]string{cmd.Name}, cmd.Args...))
+		p.done <- holder.RunHarnessHolder(dir, capturingKind, holder.HolderOptions{Env: env}, append([]string{cmd.Name}, cmd.Args...))
 	}()
 	select {
 	case p.Watcher = <-watchers:
@@ -69,7 +69,7 @@ func HoldProgram(t *testing.T, cmd harness.Command, conv string, env ...string) 
 		t.Fatal("holder never started a watch")
 	}
 	p.WaitFor("holder.sock answers", func() bool {
-		p.client, err = nativerunner.DialHolder(dir)
+		p.client, err = holder.DialHolder(dir)
 		return err == nil
 	})
 	t.Cleanup(func() {

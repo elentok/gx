@@ -7,7 +7,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -68,7 +68,7 @@ func TestSessionKeys_CodexHookRequestIsAnsweredByTheDecisionFile(t *testing.T) {
 	t.Parallel()
 	f := startCodexPermissionSession(t, false)
 	dir := filepath.Join(f.h.SessionsDir, f.id)
-	if err := nativerunner.WritePermissionRequest(dir, nativerunner.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
+	if err := holder.WritePermissionRequest(dir, holder.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
 		t.Fatal(err)
 	}
 	f.block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
@@ -76,7 +76,7 @@ func TestSessionKeys_CodexHookRequestIsAnsweredByTheDecisionFile(t *testing.T) {
 	if res := f.permission(t, "allow", "req-0"); !res.Refused || res.Reason != wire.ReasonRequestChanged {
 		t.Fatalf("allow of another request = %+v, want %s", res, wire.ReasonRequestChanged)
 	}
-	if _, ok, err := nativerunner.ReadPermissionDecision(dir); err != nil || ok {
+	if _, ok, err := holder.ReadPermissionDecision(dir); err != nil || ok {
 		t.Fatalf("decision after a mismatch = %v, %v; want none", ok, err)
 	}
 
@@ -85,7 +85,7 @@ func TestSessionKeys_CodexHookRequestIsAnsweredByTheDecisionFile(t *testing.T) {
 	if res := f.permission(t, "allow", "req-1"); !res.Refused || res.Reason != wire.ReasonKeysNotDelivered {
 		t.Fatalf("allow = %+v, want %s", res, wire.ReasonKeysNotDelivered)
 	}
-	d, ok, err := nativerunner.ReadPermissionDecision(dir)
+	d, ok, err := holder.ReadPermissionDecision(dir)
 	if err != nil || !ok || d.ID != "req-1" || !d.Allow {
 		t.Errorf("decision = %+v, %v, %v; want req-1 allowed", d, ok, err)
 	}

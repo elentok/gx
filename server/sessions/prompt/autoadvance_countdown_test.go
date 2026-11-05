@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -119,7 +119,7 @@ func TestAutoAdvance_SwitchOffStartsNoCountdown(t *testing.T) {
 }
 
 // startCountdown ends a run on a session so its countdown runs over a raised Continue.
-func startCountdown(t *testing.T) (*grillingFixture, *nativerunner.HolderClient) {
+func startCountdown(t *testing.T) (*grillingFixture, *holder.HolderClient) {
 	t.Helper()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
@@ -131,7 +131,7 @@ func startCountdown(t *testing.T) (*grillingFixture, *nativerunner.HolderClient)
 
 // wantStopped checks that nothing was sent, the run-end Continue still stands
 // and exactly one banner told the person.
-func wantStopped(t *testing.T, f *grillingFixture, c *nativerunner.HolderClient) {
+func wantStopped(t *testing.T, f *grillingFixture, c *holder.HolderClient) {
 	t.Helper()
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown still running would end within this window
 	if screenHas(t, c, "/clear") {

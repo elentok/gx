@@ -13,19 +13,20 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // codexPromptSession starts an idle fake Codex with a known conversation id and
 // returns it with its holder.
-func codexPromptSession(t *testing.T, id string) (*nativerunner.Pty, agentrunner.Session, *nativerunner.HolderClient) {
+func codexPromptSession(t *testing.T, id string) (*nativerunner.Pty, agentrunner.Session, *holder.HolderClient) {
 	t.Helper()
 	p, _ := codexRunner(t, agentfake.CodexIDEnv+"="+id)
 	s := startCodex(t, p, realDir(t))
 	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
-	holder, err := nativerunner.DialHolder(filepath.Join(p.Root, "e-01"))
+	holder, err := holder.DialHolder(filepath.Join(p.Root, "e-01"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +34,7 @@ func codexPromptSession(t *testing.T, id string) (*nativerunner.Pty, agentrunner
 }
 
 // waitWatched polls the holder's watched status until ok accepts it.
-func waitWatched(t *testing.T, holder *nativerunner.HolderClient, ok func(gxharness.Status) bool) {
+func waitWatched(t *testing.T, holder *holder.HolderClient, ok func(gxharness.Status) bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {

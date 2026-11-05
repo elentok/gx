@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -61,7 +62,7 @@ func (c *Chat) TicketPtyDir(addr tickets.Address) (string, bool) {
 
 // savedRows is the screen a pty agent saved when it ended; none yet gives no rows.
 func savedRows(dir string) ([]string, error) {
-	data, err := os.ReadFile(filepath.Join(dir, nativerunner.ScreenFile))
+	data, err := os.ReadFile(filepath.Join(dir, holder.ScreenFile))
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
@@ -77,7 +78,7 @@ func writeScreen(w http.ResponseWriter, dir string, saved bool) {
 	rows, err := []string{}, error(nil)
 	if saved {
 		rows, err = savedRows(dir)
-	} else if c, derr := nativerunner.DialHolder(dir); derr == nil {
+	} else if c, derr := holder.DialHolder(dir); derr == nil {
 		rows, _, err = c.Screen(0)
 	}
 	writeRows(w, rows, err)
@@ -85,7 +86,7 @@ func writeScreen(w http.ResponseWriter, dir string, saved bool) {
 
 // liveRows is the screen of the holder serving dir.
 func liveRows(dir string) ([]string, error) {
-	c, err := nativerunner.DialHolder(dir)
+	c, err := holder.DialHolder(dir)
 	if err != nil {
 		return nil, err
 	}

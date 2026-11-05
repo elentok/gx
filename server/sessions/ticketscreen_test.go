@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -36,7 +37,7 @@ func ticketAgentDir(t *testing.T, stateDir, runner, screen string) {
 		t.Fatal(err)
 	}
 	if screen != "" {
-		if err := os.WriteFile(filepath.Join(dir, nativerunner.ScreenFile), []byte(screen), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, holder.ScreenFile), []byte(screen), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -76,7 +77,7 @@ func startTicketScreenShortPath(t *testing.T) *servertest.Harness {
 // live is nil, as a holder does that exits after the ping.
 func fakeHolder(t *testing.T, dir string, live []string) {
 	t.Helper()
-	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	ln, err := net.Listen("unix", filepath.Join(dir, holder.HolderSocketFile))
 	if err != nil {
 		t.Fatal(err)
 	}

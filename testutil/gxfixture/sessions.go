@@ -15,7 +15,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -123,7 +123,7 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 	}
 	if s.actionable != "" {
 		cmd := exec.Command(f.gx, "agent", "actionable", s.actionable)
-		cmd.Env = append(slices.Clone(f.env), nativerunner.AgentSessionEnv+"="+id)
+		cmd.Env = append(slices.Clone(f.env), holder.AgentSessionEnv+"="+id)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("actionable %s: %w\n%s", id, err, out)
 		}

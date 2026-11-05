@@ -57,10 +57,10 @@ var allowed = map[string]int{
 	"nativerunner/answer_test.go":                          1,
 	"nativerunner/conformance_test.go":                     1,
 	"nativerunner/headless_test.go":                        3,
-	"nativerunner/holder_test.go":                          1,
-	"nativerunner/holderanswer_test.go":                    1, // negative wait: a request mismatch sends no key
-	"nativerunner/holderattach_test.go":                    1,
-	"nativerunner/holderwatch_test.go":                     1,
+	"nativerunner/holder/holder_test.go":                   1,
+	"nativerunner/holder/holderanswer_test.go":             1, // negative wait: a request mismatch sends no key
+	"nativerunner/holder/holderattach_test.go":             1,
+	"nativerunner/holder/holderwatch_test.go":              1,
 	"nativerunner/pty_pending_test.go":                     1,
 	"nativerunner/pty_ratelimit_test.go":                   1, // negative wait: another API error never marks the session limited
 	"nativerunner/pty_test.go":                             1,

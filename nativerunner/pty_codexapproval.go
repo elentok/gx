@@ -4,13 +4,14 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/nativerunner/holder"
 )
 
 // codexPending is the approval a blocked Codex waits on: the hook's request
 // when it fired, else the dialog on the screen. nil when there is neither, or
 // the screen is not a dialog gx may answer.
 func (p *Pty) codexPending(ss *ptySession) (*agentrunner.Pending, error) {
-	req, ok, err := ReadPermissionRequest(p.agentDir(ss))
+	req, ok, err := holder.ReadPermissionRequest(p.agentDir(ss))
 	if err != nil {
 		return nil, err
 	}
@@ -28,8 +29,8 @@ func (p *Pty) agentDir(ss *ptySession) string { return filepath.Join(p.Root, ss.
 
 // answerer is the shared answer logic over ss's holder, with the queue's
 // timings and its died mapping.
-func (p *Pty) answerer(ss *ptySession) HolderAnswerer {
-	return HolderAnswerer{
+func (p *Pty) answerer(ss *ptySession) holder.HolderAnswerer {
+	return holder.HolderAnswerer{
 		Holder:    ss.holder,
 		Dir:       p.agentDir(ss),
 		Poll:      p.pollInterval(),

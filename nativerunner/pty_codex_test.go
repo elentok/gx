@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -26,7 +27,7 @@ func codexRunner(t *testing.T, env ...string) (p *nativerunner.Pty, codexHome st
 	t.Cleanup(func() { killAgents(root) })
 	home := t.TempDir()
 	p = ptyOn(root, exe)
-	p.Env = ptyTestEnv(home, append([]string{holderEnv + "=1", agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t)}, env...)...)
+	p.Env = ptyTestEnv(home, append([]string{holder.HolderEnv + "=1", agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t)}, env...)...)
 	p.Codex = bin
 	return p, filepath.Join(home, ".codex")
 }
@@ -102,7 +103,7 @@ func TestPtyCodex_WorkingWithReadyTitleIsBackground(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	holder, err := nativerunner.DialHolder(filepath.Join(p.Root, "e-01"))
+	holder, err := holder.DialHolder(filepath.Join(p.Root, "e-01"))
 	if err != nil {
 		t.Fatal(err)
 	}
