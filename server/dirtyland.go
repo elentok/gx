@@ -18,7 +18,7 @@ const backupMaxAge = 30 * 24 * time.Hour
 // backs them up to a gx ref, sets them aside, fast-forwards and restores them.
 // landed is false, with nothing touched, when the restore would conflict.
 // The caller holds the target's trunk lock.
-func (s *Server) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, target string, clashing []string) (landed bool, err error) {
+func (s *Landing) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, target string, clashing []string) (landed bool, err error) {
 	snapshot, err := git.SnapshotPaths(dir, clashing)
 	if err != nil {
 		return false, err
@@ -46,7 +46,7 @@ func (s *Server) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, ta
 // the fast-forward fails the files go back as they were and landed is false;
 // landed is true when only the final restore failed. failLog and doneWord are
 // the Warn message and the error wording of the two callers.
-func (s *Server) landWithRestore(repoRoot, dir, epic, target, snapshot, merged string, files []string, failLog, doneWord string) (ref string, now time.Time, landed bool, err error) {
+func (s *Landing) landWithRestore(repoRoot, dir, epic, target, snapshot, merged string, files []string, failLog, doneWord string) (ref string, now time.Time, landed bool, err error) {
 	ref, now, err = s.backupSnapshot(repoRoot, epic, snapshot)
 	if err != nil {
 		return "", now, false, err
@@ -72,7 +72,7 @@ func (s *Server) landWithRestore(repoRoot, dir, epic, target, snapshot, merged s
 
 // backupSnapshot names the snapshot commit with a new backup ref and prunes the
 // old ones.
-func (s *Server) backupSnapshot(repoRoot, epic, snapshot string) (ref string, now time.Time, err error) {
+func (s *Landing) backupSnapshot(repoRoot, epic, snapshot string) (ref string, now time.Time, err error) {
 	now = time.Now()
 	ref = fmt.Sprintf("%s%s-%d", git.BackupRefPrefix, epic, now.UnixNano())
 	if err := git.UpdateRef(repoRoot, ref, snapshot); err != nil {
@@ -84,7 +84,7 @@ func (s *Server) backupSnapshot(repoRoot, epic, snapshot string) (ref string, no
 
 // pruneBackups drops the gx backup refs older than backupMaxAge. A failure is
 // logged, never fatal: it must not stop a land.
-func (s *Server) pruneBackups(repoRoot string, now time.Time) {
+func (s *Landing) pruneBackups(repoRoot string, now time.Time) {
 	refs, err := git.ListBackupRefs(repoRoot)
 	if err != nil {
 		s.log.Warn("list backup refs", "err", err)

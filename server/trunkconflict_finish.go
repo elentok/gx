@@ -31,7 +31,7 @@ func filesWithMarkers(dir string, files []string) []string {
 
 // dropTrunkConflictBackup deletes the backup ref of a trunk-conflict ticket
 // that just went done: the resolution replaced what the ref kept safe.
-func (s *Server) dropTrunkConflictBackup(addr tickets.Address) {
+func (s *Landing) dropTrunkConflictBackup(addr tickets.Address) {
 	e, ok := s.writer.FreshEpic(addr.Project, addr.Epic)
 	if !ok || e.TrunkConflictBackup == "" {
 		return
@@ -48,7 +48,7 @@ func (s *Server) dropTrunkConflictBackup(addr tickets.Address) {
 
 // backupInUse reports whether an open trunk-conflict ticket names ref as its
 // backup; the prune keeps such a ref whatever its age.
-func (s *Server) backupInUse(ref string) bool {
+func (s *Landing) backupInUse(ref string) bool {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return true // cannot tell: keep it

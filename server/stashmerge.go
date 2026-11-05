@@ -20,7 +20,7 @@ import (
 // target and puts the files back with conflict markers, committing nothing. A
 // trunk-conflict ticket carries the resolution; until it is done the epic is
 // not merged.
-func (s *Server) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error) {
+func (s *Landing) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 	m, err := s.loadMergeEpic(req)
 	if err != nil {
 		return mergeVerbError(err)
@@ -49,7 +49,7 @@ func (s *Server) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error)
 // stashMergeLocked is epicStashMerge's work under the target's trunk lock. A
 // decision is returned when the clashing files restore without conflict, so the
 // caller finishes an ordinary merge instead.
-func (s *Server) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, target string) (wire.QueueResult, *mergeDecision, error) {
+func (s *Landing) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, target string) (wire.QueueResult, *mergeDecision, error) {
 	root, e, epic := m.root, m.epic, m.root.Epic
 	if r := epicMergeRefusal(root, e, m.repo); r != nil {
 		return *r, nil, nil
@@ -91,7 +91,7 @@ func (s *Server) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, ta
 // recordTrunkConflict writes down a stash-merge that left conflict markers: the
 // epic fields, the run log and the trunk-conflict ticket. The root gets no
 // merged_at and no completed_at, so it stays queued and dependent epics wait.
-func (s *Server) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration, target, ref string, files []string, now time.Time) (wire.QueueResult, *mergeDecision, error) {
+func (s *Landing) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration, target, ref string, files []string, now time.Time) (wire.QueueResult, *mergeDecision, error) {
 	root, e := m.root, m.epic
 	err := tickets.StampEpicFields(e.Path, map[string]any{
 		"trunk_fast_forwarded_at": now.UTC(),

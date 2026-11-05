@@ -219,7 +219,7 @@ func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Rep
 	}
 	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
 		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
-		return s.startOverTrunkConflict(req, rc, addr, t)
+		return s.landing.startOverTrunkConflict(req, rc, addr, t)
 	}
 	// The web never deletes the branch, whatever the body says.
 	deleteBranch := req.DeleteBranch && !rc.RequireState

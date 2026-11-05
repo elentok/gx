@@ -17,7 +17,7 @@ import (
 // branch to reset: the backed-up files go back into the target's checkout, the
 // ticket is done and the backup ref goes, so the epic can land. Any clash the
 // restore leaves is the person's to fix by hand.
-func (s *Server) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, addr tickets.Address, t tickets.Ticket) (wire.RepairResult, error) {
+func (s *Landing) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, addr tickets.Address, t tickets.Ticket) (wire.RepairResult, error) {
 	if strings.TrimSpace(req.Reason) == "" {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "--reason is required"}), nil
 	}

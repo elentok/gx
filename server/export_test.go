@@ -59,7 +59,7 @@ func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairRes
 }
 
 // PruneBackups runs the backup-ref prune as of now.
-func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.pruneBackups(repoRoot, now) }
+func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.landing.pruneBackups(repoRoot, now) }
 
 // SetShutdownRecorder makes Serve report each shutdown step to rec; nil clears it.
 func SetShutdownRecorder(rec func(step string)) {

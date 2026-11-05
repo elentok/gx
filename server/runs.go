@@ -346,7 +346,7 @@ func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloo
 		return one, ralphloop.IterationWorktree{}, iterationMode{}, errors.New("ticket gone")
 	}
 	one.Sink = s.writer.FinishSink(addr, one.Ticket.Path)
-	mode := s.iterationModeFor(addr, one.Ticket)
+	mode := s.landing.iterationModeFor(addr, one.Ticket)
 	wt, err := mode.resume(s.projects.DefaultDeps(), one, t.Base)
 	return one, wt, mode, err
 }

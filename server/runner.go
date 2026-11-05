@@ -313,7 +313,7 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 	if (agent == ralphloop.AgentClaude || agent == ralphloop.AgentCodex) && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
 		one.ResumeSessionID = answered
 	}
-	mode := s.iterationModeFor(ticket, t)
+	mode := s.landing.iterationModeFor(ticket, t)
 	if mode.commitless && mode.scratchDir == "" {
 		if mode.ref, err = s.commitlessRef(ticket, t, repo, epics); err != nil {
 			return false, fmt.Errorf("base for %s: %w", ticketAddr, err)

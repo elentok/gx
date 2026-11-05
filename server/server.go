@@ -148,7 +148,9 @@ type Server struct {
 	pauseHold ticketwrite.RecoveryHold
 	recovery  *srvrecovery.Recovery
 	// rec repairs merge state at startup and on each rescan.
-	rec         *Reconciler
+	rec *Reconciler
+	// landing lands over a dirty trunk and handles trunk conflicts.
+	landing     *Landing
 	designSteps sync.Map // map address -> design step at the last rescan
 	deadlocks   deadlocks
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
@@ -334,6 +336,7 @@ func New(cfg Config) (*Server, error) {
 		focus: sessions.NewFocusReports(),
 	}
 	s.rec = newReconciler(s)
+	s.landing = newLanding(s)
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
@@ -494,7 +497,7 @@ var routeTable = []struct {
 	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
 	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicMerge)(w, r) }},
-	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicStashMerge)(w, r) }},
+	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.landing.epicStashMerge)(w, r) }},
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},
 	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},

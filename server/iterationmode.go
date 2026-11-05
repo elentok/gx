@@ -42,7 +42,7 @@ type iterationMode struct {
 	ref string
 }
 
-func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
+func (s *Landing) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
 	typ := schema.TicketType(t.Type)
 	if typ == schema.TypeMerge {
 		return iterationMode{feature: true, target: func() (string, error) { return s.mergeTarget(addr) }}
@@ -70,7 +70,7 @@ func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterat
 // targetCheckout is the directory where addr's root epic merges: the checkout
 // of its target branch, where the uncommitted files a trunk-conflict ticket
 // resolves live.
-func (s *Server) targetCheckout(addr tickets.Address) (string, error) {
+func (s *Landing) targetCheckout(addr tickets.Address) (string, error) {
 	target, err := s.mergeTarget(addr)
 	if err != nil {
 		return "", err
@@ -103,7 +103,7 @@ func checkoutDirFor(repoDir, target string) (git.Repo, string, error) {
 
 // projectHasNoVCS: a commitless ticket in a vcs: none project has no repository
 // to check out, so it runs in a scratch subdir.
-func (s *Server) projectHasNoVCS(project string) bool {
+func (s *Landing) projectHasNoVCS(project string) bool {
 	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return false

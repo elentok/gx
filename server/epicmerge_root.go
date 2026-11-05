@@ -473,7 +473,7 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 		// only a refused merge looks at them.
 		if _, dir, derr := checkoutDirFor(repoDir, target); derr == nil {
 			if clashing := clashingFiles(info.Repo.Root, dir, target, one.Epic); len(clashing) > 0 {
-				landed, lerr := s.landOverDirtyTrunk(project, info.Repo, dir, one.Epic, target, clashing)
+				landed, lerr := s.landing.landOverDirtyTrunk(project, info.Repo, dir, one.Epic, target, clashing)
 				if lerr != nil {
 					return mergeFailed(project, one.Epic, lerr)
 				}
