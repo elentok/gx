@@ -75,8 +75,8 @@ func (s *Stats) read(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	out := buildStats(all, n, project, now, led)
-	out.Grilling = buildGrilling(recs, s.MapEpics.OnMapEpic, limits.NewStatsWindow(n, now), project)
-	out.LimitBurn = s.Burns.BurnStats(n, now)
-	wire.WriteJSON(w, out)
+	wire.WriteJSON(w, buildStats(statsInput{
+		Epics: all, Days: n, Project: project, Now: now, Ledger: led,
+		Records: recs, IsDesign: s.MapEpics.OnMapEpic, Burn: s.Burns.BurnStats(n, now),
+	}))
 }

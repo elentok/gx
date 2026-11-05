@@ -61,7 +61,7 @@ func statsBuildOnce(b *testing.B, store string) time.Duration {
 	if err != nil {
 		b.Fatal(err)
 	}
-	buildStats(all, 90, "", time.Now(), costLedger{})
+	buildStats(statsInput{Epics: all, Days: 90, Now: time.Now()})
 	return time.Since(start)
 }
 

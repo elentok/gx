@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -41,13 +42,24 @@ func newStats(n int) wire.Stats {
 			PauseReasons:   []string{},
 			PausesByReason: emptyCounts(n), RunEvents: emptyCounts(n), PauseEndings: emptyCounts(n),
 		},
-		Grilling:  newStatsGrilling(n),
-		LimitBurn: limits.NewStatsLimitBurns(n),
 	}
 }
 
-func buildStats(all []ticketmigrate.StoreEpic, n int, project string, now time.Time, led costLedger) wire.Stats {
-	win := limits.NewStatsWindow(n, now)
+// statsInput is everything one Stats payload is built from.
+type statsInput struct {
+	Epics    []ticketmigrate.StoreEpic
+	Days     int
+	Project  string
+	Now      time.Time
+	Ledger   costLedger
+	Records  []conversations.Record
+	IsDesign func(ticket string) bool
+	Burn     wire.StatsLimitBurns
+}
+
+func buildStats(in statsInput) wire.Stats {
+	n, project, led := in.Days, in.Project, in.Ledger
+	win := limits.NewStatsWindow(n, in.Now)
 	out := newStats(n)
 	out.Project, out.Days = project, win.Labels()
 	b := statsBuilder{
@@ -58,7 +70,7 @@ func buildStats(all []ticketmigrate.StoreEpic, n int, project string, now time.T
 			reasonTotal: map[string]int{},
 		},
 	}
-	for _, se := range all {
+	for _, se := range in.Epics {
 		if project == "" || se.Project == project {
 			b.addEpic(se.Epic)
 		}
@@ -68,6 +80,8 @@ func buildStats(all []ticketmigrate.StoreEpic, n int, project string, now time.T
 		costLedger: led, Days: out.Days,
 		Design: b.design, Impl: b.impl, Project: project,
 	}))
+	out.Grilling = buildGrilling(in.Records, in.IsDesign, win, project)
+	out.LimitBurn = in.Burn
 	return out
 }
 
