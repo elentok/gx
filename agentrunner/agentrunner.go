@@ -74,6 +74,9 @@ type Status struct {
 	// with StateBlocked in place of BlockedReason: nothing is waiting for an
 	// answer, the next prompt starts a new turn.
 	Error string
+	// Background is set with StateIdle while a background task the agent
+	// started still runs: the turn is over, but the task may wake it again.
+	Background bool
 	// Pending is the open tool-permission request, for runners that can name
 	// it (headless). Nil when none is open.
 	Pending *Pending

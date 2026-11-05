@@ -135,7 +135,7 @@ func TestPty_NudgeAfterVimToggleLogsUnknownWithCaptureAndTypesNothing(t *testing
 }
 
 // With BackgroundTasks nil, a Pty reads the transcript under the HOME in its
-// Env, and gates on nothing without one.
+// Env, and reports Idle with Background set (or no flag at all without one).
 func TestPty_BackgroundTasksFallbackReadsEnvHome(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
@@ -150,19 +150,19 @@ func TestPty_BackgroundTasksFallbackReadsEnvHome(t *testing.T) {
 	withHome.Env = p.Env
 	noHome.Env = slices.DeleteFunc(slices.Clone(p.Env), func(kv string) bool { return strings.HasPrefix(kv, "HOME=") })
 	for name, tc := range map[string]struct {
-		r    *nativerunner.Pty
-		want agentrunner.State
+		r          *nativerunner.Pty
+		background bool
 	}{
-		"home in Env": {withHome, agentrunner.StateWorking},
-		"no HOME":     {noHome, agentrunner.StateIdle},
+		"home in Env": {withHome, true},
+		"no HOME":     {noHome, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			r, v, err := tc.r.Reattach("e-01")
 			if err != nil || v != nativerunner.VerdictLive {
 				t.Fatalf("Reattach = %v, %v; want live", err, v)
 			}
-			if st, err := tc.r.Status(r); err != nil || st.State != tc.want {
-				t.Fatalf("Status = %+v, %v; want %v", st, err, tc.want)
+			if st, err := tc.r.Status(r); err != nil || st.State != agentrunner.StateIdle || st.Background != tc.background {
+				t.Fatalf("Status = %+v, %v; want Idle, Background=%v", st, err, tc.background)
 			}
 		})
 	}

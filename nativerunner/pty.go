@@ -300,10 +300,10 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	}
 	switch claude.Status {
 	case ClaudeIdle:
-		// A running background task will wake claude again.
-		if !p.turns().backgroundTasks(ss.session) {
-			st.State = agentrunner.StateIdle
-		}
+		// Idle, not Working, with a background task: Wait must return so the
+		// finish gate sees the task, logs the hold and lets recovery raise it.
+		st.State = agentrunner.StateIdle
+		st.Background = p.turns().backgroundTasks(ss.session)
 	case ClaudeWaiting:
 		st.State, st.BlockedReason = agentrunner.StateBlocked, claude.WaitingFor
 		// Only here, on demand: the screen is never read on a timer for it.
