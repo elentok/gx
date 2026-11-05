@@ -499,6 +499,22 @@ test("the buttons run partner first and the action last, Merge in the done tone"
   expect(buttons[1].getAttribute("data-tone")).toBe("done");
 });
 
+test.each([
+  ["phone", "1"],
+  ["wide", ""],
+])("the locked Queue wrapper stretches only on a phone (%s)", async (width, grow) => {
+  if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    render("/e/gx:blog-impl", [], "loop", { detail: { draft: true } });
+    const queue = await screen.findByRole("button", { name: "Queue" });
+    const style = getComputedStyle(queue.parentElement as HTMLElement);
+    expect(style.display).toBe("flex");
+    expect(style.flexGrow).toBe(grow);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("a draft -impl epic has a disabled Queue with its tooltip", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { draft: true } });
   const queue = (await screen.findByRole("button", { name: "Queue" })) as HTMLButtonElement;

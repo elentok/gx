@@ -162,7 +162,7 @@ function EpicBar({
             </Button>
           )}
           {detail.draft && isImpl && (
-            <Box as="span" title={QUEUE_LOCKED}>
+            <Box as="span" title={QUEUE_LOCKED} display="flex" css={wide ? undefined : { flex: "1" }}>
               <Button tone="running" disabled>
                 Queue
               </Button>

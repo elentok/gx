@@ -181,13 +181,12 @@ Per design step, the main session and its subagents run on these tiers:
 
 ### Agents tab: model display
 
-- The session header shows `<model> · <effort>` next to the state chip. The effort is left out when empty. The switcher row does not change.
-- A tooltip names the tier, for example "Strongest tier".
+- The session header shows the model as the joined name, with the effort on desktop (`<Harness> <Model> · <effort>`) and only the model on a phone, as `docs/specs/better-epic-header.md` sets. The effort is left out when empty. The tier is never shown in the header; it sits in the session's more-actions menu. The switcher row does not change.
 - Saved value: at every launch, resume and handoff restart, gx saves the tier, the resolved model and the effort in `meta.json`. This is the fallback.
 - Reported value: the model the agent reports wins whenever it is present. A change in the middle of a run shows on the next reply. A reported ID is shown as its `modelName` (see `docs/specs/better-epic-header.md` "Model names"), for example `claude-sonnet-5-5` reads "Claude Sonnet 5.5".
   - Claude: the model ID on assistant messages in the session transcript. The transcript has no effort, so the saved effort is shown. It reads from the same server code that reads the transcript for the design Actionable, on the same refresh. No new hook or poll.
   - Codex: this epic builds no Codex rollout reader. The Codex header shows the saved `meta.json` values only. The reported Codex model takes effect once Codex design sessions get Continue and a rollout reader.
-- CLI default: a tier with an empty `model` has no saved model. Until the first reply the header shows "<Harness> CLI default" and the tier label, for example `Claude CLI default · Worker`. The reported model replaces it after the first reply. gx never guesses a model name.
+- CLI default: a tier with an empty `model` has no saved model. Until the first reply the header shows "<Harness> CLI default" (the tier is never shown in the header). The reported model replaces it after the first reply. gx never guesses a model name.
 - `SessionInfo` gains three additive fields: tier, model and effort. The header shows nothing when all three are empty. No new API version.
 - A session created before this change shows the reported model once it replies, and nothing before that.
 - Every session kind shows it: design, fix agent and interactive, for Claude and Codex. Codex shows saved values only.
