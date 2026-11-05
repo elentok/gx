@@ -331,8 +331,6 @@ func New(cfg Config) (*Server, error) {
 		focus: sessions.NewFocusReports(),
 	}
 	s.rec = newReconciler(s)
-	s.landing = newLanding(s)
-	s.merger = newMerger(s)
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
@@ -370,6 +368,10 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.writer = newTicketWriter(s)
 	s.recovery = newRecovery(s)
+	// Built once the fields they copy are set; they and rec reach each other through s.
+	s.landing = newLanding(s)
+	s.merger = newMerger(s)
+	s.landing.merger = s.merger
 	s.settings.Init(settings.Options{
 		ConfigPath: cfg.ConfigPath,
 		Startup: settings.Startup{

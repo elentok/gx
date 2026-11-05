@@ -17,6 +17,7 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 			Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
 	}
 	s.idx = index.New("", broker.New(1), nil)
+	s.merger = newMerger(s) // copies idx
 	dir, _, err := s.projects.Of("proj")
 	if err != nil {
 		t.Fatal(err)

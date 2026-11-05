@@ -45,7 +45,7 @@ type iterationMode struct {
 func (s *Landing) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
 	typ := schema.TicketType(t.Type)
 	if typ == schema.TypeMerge {
-		return iterationMode{feature: true, target: func() (string, error) { return s.mergeTarget(addr) }}
+		return iterationMode{feature: true, target: func() (string, error) { return s.host.mergeTarget(addr) }}
 	}
 	if typ == schema.TypeTrunkConflict {
 		dir, err := s.targetCheckout(addr)
@@ -71,7 +71,7 @@ func (s *Landing) iterationModeFor(addr tickets.Address, t tickets.Ticket) itera
 // of its target branch, where the uncommitted files a trunk-conflict ticket
 // resolves live.
 func (s *Landing) targetCheckout(addr tickets.Address) (string, error) {
-	target, err := s.mergeTarget(addr)
+	target, err := s.host.mergeTarget(addr)
 	if err != nil {
 		return "", err
 	}

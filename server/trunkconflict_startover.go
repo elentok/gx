@@ -43,7 +43,7 @@ func (s *Landing) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, a
 		return wire.RepairResult{}, fmt.Errorf("marking trunk-conflict ticket %s done: %w", addr.ID, err)
 	}
 	s.dropTrunkConflictBackup(addr)
-	if _, fresh, ok := s.FreshTicket(addr); ok && s.guards.Merges.Begin() {
+	if _, fresh, ok := s.host.FreshTicket(addr); ok && s.guards.Merges.Begin() {
 		defer s.guards.Merges.End()
 		s.merger.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: fresh})
 	}
