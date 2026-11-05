@@ -32,7 +32,10 @@ type (
 
 var epicA01 = servertest.EpicA01
 
-var waitStatus = servertest.WaitStatus
+var (
+	pauseBlocked = servertest.PauseBlocked
+	waitStatus   = servertest.WaitStatus
+)
 
 var (
 	pausedIteration         = servertest.PausedIteration

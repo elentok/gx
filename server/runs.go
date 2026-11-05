@@ -57,13 +57,5 @@ func (h reclaimHost) Publish(event, id string) { h.s.events.Publish(event, id) }
 func (h reclaimHost) ReportedFinished(ticketPath string) bool { return reportedFinished(ticketPath) }
 
 func (h reclaimHost) Continue(runner agentrunner.Runner, t runs.TrackedRun, root queue.RootRef, mode merge.IterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, settleNow bool) {
-	s := h.s
-	deps := s.projects.DepsWith(runner)
-	deps.GateReleased = s.registry.GateReleased(t.Address)
-	rc := runContext{deps, root, mode, one, wt, t.Run, t.Address}
-	if settleNow {
-		s.guards.GoSettle(func() { s.settleRun(rc, nil) })
-		return
-	}
-	s.guards.GoSettle(func() { s.finishRun(rc) })
+	h.s.launcher.Continue(runner, t, root, mode, one, wt, settleNow)
 }

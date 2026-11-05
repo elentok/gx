@@ -1,4 +1,4 @@
-package server_test
+package sched_test
 
 // Server-harness ports of ralphloop's run_realgit_codex_launch scenarios
 // (seam A).

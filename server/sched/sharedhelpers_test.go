@@ -8,7 +8,11 @@ import (
 
 // Short names for the helpers that live in servertest because the root
 // package's tests use them too.
-const holderLabel = servertest.HolderLabel
+const (
+	answerAddr        = servertest.AnswerAddr
+	holderLabel       = servertest.HolderLabel
+	testFlushInterval = servertest.FlushInterval
+)
 
 type (
 	headlessFake = servertest.HeadlessFake
@@ -20,7 +24,12 @@ var epicA01 = servertest.EpicA01
 var (
 	asHeadlessRun           = servertest.AsHeadlessRun
 	assertPaused            = servertest.AssertPaused
+	chatRecorder            = servertest.ChatRecorder
 	commitAgentWork         = servertest.CommitAgentWork
+	newSlackHook            = servertest.NewSlackHook
+	pauseBlocked            = servertest.PauseBlocked
+	startBlockable          = servertest.StartBlockable
+	waitForChat             = servertest.WaitForChat
 	leaveIteration          = servertest.LeaveIteration
 	markWaiting             = servertest.MarkWaiting
 	newRenamedFake          = servertest.NewRenamedFake

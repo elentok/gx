@@ -1,23 +1,79 @@
-package server
+package sched
 
 import (
 	"cmp"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/projects"
-	srvrecovery "github.com/elentok/gx/server/recovery"
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/wire"
+	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/budget"
+	harnesschoice "github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/merge"
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/queue"
+	srvrecovery "github.com/elentok/gx/server/recovery"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/ticketwrite"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
+
+// LaunchHost is what the launcher needs from the server: the base derivation
+// and the delay, which the claim loop shares.
+type LaunchHost interface {
+	// ResolveBase derives where t starts from; see the root's base rules.
+	ResolveBase(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (ref, stamp, leaf string, err error)
+	// CommitlessRef is the ref a commitless ticket reads at.
+	CommitlessRef(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (string, error)
+	// MergeTargetTip is the tip of the branch addr merges into.
+	MergeTargetTip(addr tickets.Address, repo string) (string, error)
+	// StalledNudgeDelay is how long an idle agent with no report waits for its nudge.
+	StalledNudgeDelay() time.Duration
+}
+
+// LauncherDeps is what a Launcher is built from.
+type LauncherDeps struct {
+	Log      *slog.Logger
+	Host     LaunchHost
+	Projects *projects.Registry
+	Recovery *srvrecovery.Recovery
+	Sessions *sessions.Manager
+	Settings *settings.Holder
+	Registry *runs.Registry
+	Guards   *runs.Guards
+	Events   *broker.Broker
+	Index    *index.Index
+	Budget   *budget.Budget
+	Writer   *ticketwrite.Writer
+	Harness  *harnesschoice.Harness
+	Landing  *merge.Landing
+	Merger   *merge.Merger
+	OneOffs  *queue.OneOffs
+	Chat     *ralphloop.ServerChat
+	// DropAskedAgent closes an agent that asked instead of keeping it alive.
+	DropAskedAgent bool
+}
+
+// Launcher claims a ticket, starts its agent and settles the run when the
+// agent ends.
+type Launcher struct {
+	LauncherDeps
+}
+
+// NewLauncher returns a launcher over d.
+func NewLauncher(d LauncherDeps) *Launcher { return &Launcher{d} }
 
 // trunkConflictNote tells a trunk-conflict agent what the one-off skill does
 // not: it works in the target's own checkout, where a commit would be the
@@ -37,12 +93,12 @@ func launchNote(t tickets.Ticket) string {
 // evolveDirs are the dirs a retro's `gx tickets` verbs write to outside the
 // ticket's own epic: the follow-ups epic and the gx project's ticket dir.
 // A dir that does not resolve is left out; the verb then fails with its own error.
-func (s *Server) evolveDirs(ticket tickets.Address) []string {
+func (l *Launcher) evolveDirs(ticket tickets.Address) []string {
 	var dirs []string
-	if d, err := s.recovery.FollowUpsEpicPath(ticket.Project); err == nil {
+	if d, err := l.Recovery.FollowUpsEpicPath(ticket.Project); err == nil {
 		dirs = append(dirs, d)
 	}
-	if d, err := s.projects.Dir("gx"); err == nil {
+	if d, err := l.Projects.Dir("gx"); err == nil {
 		dirs = append(dirs, d)
 	}
 	return dirs
@@ -61,21 +117,21 @@ func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agent ral
 
 // launch starts one's agent in cwd. Its Codex sandbox gets one.ScratchDir, the
 // project dir where the epic's tickets live.
-func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (runs.Run, error) {
+func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (runs.Run, error) {
 	t, agent := one.Ticket, one.Agent
 	var extraDirs []string
 	if t.Type == string(schema.TypeEvolve) {
-		extraDirs = s.evolveDirs(ticket)
+		extraDirs = l.evolveDirs(ticket)
 	}
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
 	resumeID := one.ResumeSessionID
-	if agent == ralphloop.AgentCodex && !s.CodexRolloutExists(cwd, resumeID) {
+	if agent == ralphloop.AgentCodex && !l.CodexRolloutExists(cwd, resumeID) {
 		resumeID = ""
 	}
 	// A server stop ends the launch prompt's wait, which Serve would otherwise
 	// sit out before it can finish.
-	ctx, release := s.sessions.Watches.Context()
+	ctx, release := l.Sessions.Watches.Context()
 	defer release()
 	start := func() (agentrunner.Session, error) {
 		return ralphloop.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
@@ -84,10 +140,10 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 			Cwd:             cwd,
 			Kind:            agentrunner.Kind(agent),
 			Args:            ralphloop.AgentArgs(agent, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
-			Env:             agentEnv(s.settings.Load().TabEnv, t, ticket, agent),
+			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agent),
 			ResumeSessionID: resumeID,
 		}, srvrecovery.LaunchPrompt(agent, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
-			s.LogEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
+			l.LogEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
 	}
 	session, err := start()
@@ -95,7 +151,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 		// The conversation may be gone or unreadable: the agent starts over
 		// from the ticket's latest round and handoff. A session that came up
 		// before the error is stopped so only one of the two attempts lives.
-		s.log.Warn("resume failed, cold-starting", "ticket", ticket.String(), "session", resumeID, "err", err)
+		l.Log.Warn("resume failed, cold-starting", "ticket", ticket.String(), "session", resumeID, "err", err)
 		if session.Label != "" {
 			_ = deps.Runner.Stop(session)
 		}
@@ -103,18 +159,18 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 		session, err = start()
 	}
 	if errors.Is(err, agentrunner.ErrLabelTaken) {
-		if h := s.labelHolder(deps.Runner, ticket, label, err); h.stale {
+		if h := l.labelHolder(deps.Runner, ticket, label, err); h.stale {
 			if serr := deps.Runner.Stop(h.Session); serr != nil {
-				s.log.Warn("close stale holder", "ticket", ticket.String(), "pane", h.ID, "err", serr)
+				l.Log.Warn("close stale holder", "ticket", ticket.String(), "pane", h.ID, "err", serr)
 			} else {
-				s.LogEvent(ticket, ralphloop.Event{Type: string(events.StalePaneClosed), Label: label, Pane: h.ID, Cwd: h.cwd, Reason: string(h.State)})
+				l.LogEvent(ticket, ralphloop.Event{Type: string(events.StalePaneClosed), Label: label, Pane: h.ID, Cwd: h.cwd, Reason: string(h.State)})
 				session, err = start()
 			}
 		}
 	}
 	if errors.Is(err, agentrunner.ErrLabelTaken) {
-		taken := &nameTakenError{reason: s.labelHolder(deps.Runner, ticket, label, err).describe(), err: err}
-		s.LogEvent(ticket, ralphloop.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
+		taken := &nameTakenError{reason: l.labelHolder(deps.Runner, ticket, label, err).describe(), err: err}
+		l.LogEvent(ticket, ralphloop.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
 		return runs.Run{}, taken
 	}
 	if err != nil {
@@ -124,7 +180,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	if resumeID != "" {
 		path = "resumed"
 	}
-	s.LogEvent(ticket, ralphloop.Event{
+	l.LogEvent(ticket, ralphloop.Event{
 		Type: string(events.IterationStarted), Agent: agent, Label: label, Cwd: cwd,
 		AgentSession: session.SessionID, Path: path, TargetTip: one.TargetTip,
 	})
@@ -134,11 +190,11 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 
 // CodexRolloutExists reports whether Codex has a rollout for session id under
 // cwd. An empty id has none.
-func (s *Server) CodexRolloutExists(cwd, id string) bool {
+func (l *Launcher) CodexRolloutExists(cwd, id string) bool {
 	if id == "" {
 		return false
 	}
-	home, err := s.projects.CodexHome()
+	home, err := l.Projects.CodexHome()
 	if err != nil {
 		return false
 	}
@@ -146,10 +202,10 @@ func (s *Server) CodexRolloutExists(cwd, id string) bool {
 	return err == nil && ok
 }
 
-// answeredSession is the last agent session of a ticket whose latest question
+// AnsweredSession is the last agent session of a ticket whose latest question
 // has an answer, "" for any other ticket. Call it before the claim: claiming
 // clears the answered state.
-func answeredSession(t tickets.Ticket) string {
+func AnsweredSession(t tickets.Ticket) string {
 	st, err := schema.ParseTicket(t.Path)
 	if err != nil || len(st.SessionIDs) == 0 {
 		return ""
@@ -162,8 +218,8 @@ func answeredSession(t tickets.Ticket) string {
 }
 
 // LogEvent appends ev to ticket's run log, best effort.
-func (s *Server) LogEvent(ticket tickets.Address, ev ralphloop.Event) {
-	dir, err := s.projects.Dir(ticket.Project)
+func (l *Launcher) LogEvent(ticket tickets.Address, ev ralphloop.Event) {
+	dir, err := l.Projects.Dir(ticket.Project)
 	if err != nil {
 		return
 	}
@@ -202,7 +258,7 @@ func (h labelHolder) describe() string {
 // labelHolder finds who holds label after Start failed with takenErr. Only
 // herdr's error says the holder's cwd. The launching ticket's own registry
 // entry has no session yet, so it never counts as tracking the holder.
-func (s *Server) labelHolder(r agentrunner.Runner, ticket tickets.Address, label string, takenErr error) labelHolder {
+func (l *Launcher) labelHolder(r agentrunner.Runner, ticket tickets.Address, label string, takenErr error) labelHolder {
 	var h labelHolder
 	var taken *agentrunner.LabelTakenError
 	if errors.As(takenErr, &taken) {
@@ -216,7 +272,7 @@ func (s *Server) labelHolder(r agentrunner.Runner, ticket tickets.Address, label
 	if h.Status, err = r.Status(sess); err != nil {
 		return h
 	}
-	tracked := slices.ContainsFunc(s.registry.List(), func(t runs.TrackedRun) bool {
+	tracked := slices.ContainsFunc(l.Registry.List(), func(t runs.TrackedRun) bool {
 		return t.Address != ticket.String() && (t.Session.Label == sess.Label || (sess.ID != "" && t.Session.ID == sess.ID))
 	})
 	h.stale = !tracked && h.Waiting()

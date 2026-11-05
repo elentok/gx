@@ -24,5 +24,5 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return s.claimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, ralphloop.AgentKind(agent), epics)
+	return s.launcher.ClaimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, ralphloop.AgentKind(agent), epics)
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // HolderLabel is the launch label of proj:epic-a/01.
@@ -45,6 +46,17 @@ func (CodexNamed) Name() string { return "headless" }
 type PtyNamed struct{ *TurnRunner }
 
 func (PtyNamed) Name() string { return "pty" }
+
+// PauseBlocked blocks the session of a headless run on a permission request
+// and returns once the ticket is paused and the run waits.
+func PauseBlocked(t *testing.T) (*Harness, string, *TurnRunner) {
+	t.Helper()
+	h, ticketPath, turn := StartBlockable(t, "headless")
+	turn.SetPending(HolderLabel, &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
+	WaitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+	Await(t, func() bool { return RunsJSONHas(h, `"waiting_since"`) })
+	return h, ticketPath, turn
+}
 
 // StartBlockable starts proj:epic-a/01 on a runner named runnerName whose agent
 // keeps working until the test blocks it, and returns once the session is live.

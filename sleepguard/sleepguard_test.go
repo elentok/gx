@@ -97,7 +97,7 @@ var allowed = map[string]int{
 	"server/queue/pause_test.go":                           1,
 	"server/sched/reclaim_waiting_test.go":                 1,
 	"server/ratelimit_claim_hold_test.go":                  1, // negative wait: a claim would show within a few ticks
-	"server/ratelimit_hold_run_test.go":                    1, // negative wait: a launch would show within a few ticks
+	"server/sched/ratelimit_hold_run_test.go":              1, // negative wait: a launch would show within a few ticks
 	"server/recovery/recovery_notify_test.go":              4,
 	"server/recovery/recovery_investigate_test.go":         1,
 	"server/recovery/recovery_gates_test.go":               6,

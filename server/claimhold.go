@@ -2,6 +2,7 @@ package server
 
 import (
 	harnesschoice "github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/wire"
 	"time"
 
@@ -30,7 +31,7 @@ func (s *Server) claimHold(project string, t tickets.Ticket, rh harnesschoice.Re
 	if limited, held := s.registry.RateLimitHeld(string(agent)); held {
 		return claimHold{Verdict: rateLimitVerdict(limited.RateLimitReset)}, true
 	}
-	if answeredSession(t) == "" {
+	if sched.AnsweredSession(t) == "" {
 		if v, held := s.limits.UsageGate(agent, time.Now()); held {
 			return claimHold{Verdict: v}, true
 		}

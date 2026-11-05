@@ -1,4 +1,4 @@
-package server_test
+package sched_test
 
 import (
 	"context"
@@ -98,17 +98,6 @@ func TestHeadlessBlock_AnswerOnClaimedLeavesStatus(t *testing.T) {
 	if tk.Status != schema.StatusClaimed {
 		t.Errorf("status = %q, want claimed", tk.Status)
 	}
-}
-
-// pauseBlocked blocks the session of a headless run on a permission request
-// and returns once the ticket is paused and the run waits.
-func pauseBlocked(t *testing.T) (*servertest.Harness, string, *servertest.TurnRunner) {
-	t.Helper()
-	h, ticketPath, turn := startBlockable(t, "headless")
-	turn.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
-	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
-	waitFor(t, func() bool { return runsJSONHas(h, `"waiting_since"`) })
-	return h, ticketPath, turn
 }
 
 func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {

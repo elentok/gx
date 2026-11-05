@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
@@ -22,7 +23,7 @@ func newTicketWriter(s *Server) *ticketwrite.Writer {
 	return ticketwrite.New(ticketwrite.Deps{
 		Log: s.log, Index: s.idx, Events: s.events, Projects: s.projects, Chat: s.chat,
 		Registry: s.registry, Guards: s.guards, Harness: s.harness, Budget: s.budget,
-		Host: ticketWriteHost{s}, BlockWatchPoll: blockWatchPoll,
+		Host: ticketWriteHost{s}, BlockWatchPoll: sched.BlockWatchPoll,
 	})
 }
 
@@ -68,7 +69,7 @@ func (h ticketWriteHost) SettleLive(addrs []tickets.Address, stop bool, reason s
 }
 
 func (h ticketWriteHost) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (bool, error) {
-	return h.s.claimAndLaunch(root, queued, t, repo, agent, epics)
+	return h.s.launcher.ClaimAndLaunch(root, queued, t, repo, agent, epics)
 }
 
 func (h ticketWriteHost) CancelInvestigateChild(ref queue.TicketRef, source string) error {

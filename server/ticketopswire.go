@@ -76,8 +76,6 @@ func (s *Server) resettleWaiting(t runs.TrackedRun) error {
 		return err
 	}
 	s.registry.ClearWaiting(t.Address)
-	deps := s.projects.DepsWith(runner)
-	deps.GateReleased = s.registry.GateReleased(t.Address)
-	s.guards.GoSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
+	s.launcher.Continue(runner, t, root, mode, one, wt, false)
 	return nil
 }

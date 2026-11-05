@@ -384,8 +384,8 @@ func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
 	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeImplement})
 	oneOff := write("cron", queue.OneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt})
 
-	s.notifyDone(tickets.Address{Project: "p", Epic: "cron", ID: "01"}, oneOff)
-	s.notifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, merged)
+	s.launcher.NotifyDone(tickets.Address{Project: "p", Epic: "cron", ID: "01"}, oneOff)
+	s.launcher.NotifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, merged)
 	s.chat.Close()
 	got := wait(1)
 	if len(got) != 1 {
@@ -448,7 +448,7 @@ func TestNotifyDone_CrossEpicBlockersDoNotUndercountDoneTickets(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
 
-	s.notifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "")
+	s.launcher.NotifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "")
 	s.chat.Close()
 	got := wait(1)
 	if len(got) != 1 || !strings.Contains(got[0], "2 done · 2 total") {
