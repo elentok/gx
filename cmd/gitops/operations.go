@@ -1,4 +1,4 @@
-package cmd
+package gitops
 
 import (
 	"fmt"
@@ -13,12 +13,12 @@ import (
 	humanize "github.com/dustin/go-humanize"
 )
 
-func runCloneWT(args []string, d deps) error {
+func runCloneWT(args []string, d Deps) error {
 	if len(args) < 1 || len(args) > 2 {
 		return fmt.Errorf("usage: gx wt clone <repo-url> [directory]")
 	}
 
-	cwd, err := d.getwd()
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -48,12 +48,12 @@ func runCloneWT(args []string, d deps) error {
 		return fmt.Errorf("clone succeeded but initial worktree creation failed: %w", err)
 	}
 
-	fmt.Fprintf(d.stdout, "Cloned to %s and created worktree %s\n", outerDir, wtPath)
+	fmt.Fprintf(d.Stdout, "Cloned to %s and created worktree %s\n", outerDir, wtPath)
 	return nil
 }
 
-func runListWorktrees(d deps) error {
-	cwd, err := d.getwd()
+func runListWorktrees(d Deps) error {
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -66,13 +66,13 @@ func runListWorktrees(d deps) error {
 		return err
 	}
 	for _, wt := range wts {
-		fmt.Fprintln(d.stdout, filepath.Base(wt.Path))
+		fmt.Fprintln(d.Stdout, filepath.Base(wt.Path))
 	}
 	return nil
 }
 
-func runWorktreeAbsPath(name string, d deps) error {
-	cwd, err := d.getwd()
+func runWorktreeAbsPath(name string, d Deps) error {
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -86,15 +86,15 @@ func runWorktreeAbsPath(name string, d deps) error {
 	}
 	for _, wt := range wts {
 		if filepath.Base(wt.Path) == name {
-			fmt.Fprintln(d.stdout, wt.Path)
+			fmt.Fprintln(d.Stdout, wt.Path)
 			return nil
 		}
 	}
 	return fmt.Errorf("worktree %q not found", name)
 }
 
-func runPush(d deps) error {
-	cwd, err := d.getwd()
+func runPush(d Deps) error {
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -120,12 +120,12 @@ func runPush(d deps) error {
 		return fmt.Errorf("cannot push from detached HEAD")
 	}
 
-	cfg, _ := d.dirs().Load()
+	cfg, _ := d.Dirs().Load()
 	nerd := cfg.UseNerdFontIcons
 
 	remote := git.BranchRemote(info.Repo, branch)
 	prompt := fmt.Sprintf("Push branch %s to %s?", branch, remote)
-	confirmed, err := d.confirmForce(prompt)
+	confirmed, err := d.ConfirmForce(prompt)
 	if err != nil {
 		return err
 	}
@@ -135,12 +135,12 @@ func runPush(d deps) error {
 
 	var div *git.PushDivergence
 	fetchLabel := fmt.Sprintf("Fetching %s before checking divergence...", remote)
-	printBadge(d.stderr, nerd, fetchLabel, fetchLabel)
-	if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "fetch", remote); err != nil {
+	printBadge(d.Stderr, nerd, fetchLabel, fetchLabel)
+	if err := runGitInteractive(pushDir, d.Stdin, d.Stdout, d.Stderr, "fetch", remote); err != nil {
 		return err
 	}
 	checkLabel := fmt.Sprintf("Checking remote divergence for %s...", branch)
-	if err := runWithSpinner(d.stdin, d.stderr, checkLabel, func() error {
+	if err := runWithSpinner(d.Stdin, d.Stderr, checkLabel, func() error {
 		var detectErr error
 		div, detectErr = git.DetectPushDivergenceAfterFetch(pushDir, branch)
 		return detectErr
@@ -148,32 +148,32 @@ func runPush(d deps) error {
 		return err
 	}
 	if div != nil {
-		chooser := d.choosePushDivergence
+		chooser := d.ChoosePushDivergence
 		if chooser == nil {
 			chooser = choosePushDivergence
 		}
-		choice, err := chooser(d.stdin, d.stdout, div)
+		choice, err := chooser(d.Stdin, d.Stdout, div)
 		if err != nil {
 			return err
 		}
 		switch choice {
 		case 1:
 			rebaseLabel := fmt.Sprintf("Rebasing %s on %s...", branch, div.Upstream)
-			if err := runWithSpinner(d.stdin, d.stderr, rebaseLabel, func() error {
+			if err := runWithSpinner(d.Stdin, d.Stderr, rebaseLabel, func() error {
 				_, err := git.Rebase(pushDir, div.Upstream)
 				return err
 			}); err != nil {
 				return err
 			}
-			printSuccess(d.stderr, fmt.Sprintf("Rebased %s on %s", branch, div.Upstream))
+			printSuccess(d.Stderr, fmt.Sprintf("Rebased %s on %s", branch, div.Upstream))
 			return nil
 		case 2:
 			forceLabel := fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
-			printBadge(d.stderr, nerd, forceLabel, forceLabel)
-			if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force", remote, branch); err != nil {
+			printBadge(d.Stderr, nerd, forceLabel, forceLabel)
+			if err := runGitInteractive(pushDir, d.Stdin, d.Stdout, d.Stderr, "push", "--force", remote, branch); err != nil {
 				return err
 			}
-			printSuccess(d.stderr, fmt.Sprintf("Force-pushed %s to %s with --force", branch, remote))
+			printSuccess(d.Stderr, fmt.Sprintf("Force-pushed %s to %s with --force", branch, remote))
 			return nil
 		default:
 			return fmt.Errorf("push aborted")
@@ -181,14 +181,14 @@ func runPush(d deps) error {
 	}
 
 	pushLabel := fmt.Sprintf("Pushing %s to %s...", branch, remote)
-	printBadge(d.stderr, nerd, pushLabel, pushLabel)
-	if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", remote, branch); err != nil {
+	printBadge(d.Stderr, nerd, pushLabel, pushLabel)
+	if err := runGitInteractive(pushDir, d.Stdin, d.Stdout, d.Stderr, "push", remote, branch); err != nil {
 		if !git.IsNonFastForwardPushError(err) {
 			return err
 		}
 
 		prompt := fmt.Sprintf("Push rejected for %s/%s. Force push with lease?", remote, branch)
-		confirmed, confirmErr := d.confirmForce(prompt)
+		confirmed, confirmErr := d.ConfirmForce(prompt)
 		if confirmErr != nil {
 			return confirmErr
 		}
@@ -196,10 +196,10 @@ func runPush(d deps) error {
 			return fmt.Errorf("push aborted")
 		}
 		forceLeaseLabel := fmt.Sprintf("Force-pushing %s to %s with lease...", branch, remote)
-		printBadge(d.stderr, nerd, forceLeaseLabel, forceLeaseLabel)
-		if forceErr := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force-with-lease", remote, branch); forceErr != nil {
+		printBadge(d.Stderr, nerd, forceLeaseLabel, forceLeaseLabel)
+		if forceErr := runGitInteractive(pushDir, d.Stdin, d.Stdout, d.Stderr, "push", "--force-with-lease", remote, branch); forceErr != nil {
 			prompt := fmt.Sprintf("--force-with-lease failed: %v\nRun plain --force for %s/%s?", forceErr, remote, branch)
-			confirmedForce, confirmErr := d.confirmForce(prompt)
+			confirmedForce, confirmErr := d.ConfirmForce(prompt)
 			if confirmErr != nil {
 				return confirmErr
 			}
@@ -207,18 +207,18 @@ func runPush(d deps) error {
 				return fmt.Errorf("push aborted after --force-with-lease failure")
 			}
 			forceLabel := fmt.Sprintf("Force-pushing %s to %s...", branch, remote)
-			printBadge(d.stderr, nerd, forceLabel, forceLabel)
-			if err := runGitInteractive(pushDir, d.stdin, d.stdout, d.stderr, "push", "--force", remote, branch); err != nil {
+			printBadge(d.Stderr, nerd, forceLabel, forceLabel)
+			if err := runGitInteractive(pushDir, d.Stdin, d.Stdout, d.Stderr, "push", "--force", remote, branch); err != nil {
 				return err
 			}
-			printSuccess(d.stderr, fmt.Sprintf("Force-pushed %s to %s with --force", branch, remote))
+			printSuccess(d.Stderr, fmt.Sprintf("Force-pushed %s to %s with --force", branch, remote))
 			return nil
 		}
-		printSuccess(d.stderr, fmt.Sprintf("Force-pushed %s to %s with --force-with-lease", branch, remote))
+		printSuccess(d.Stderr, fmt.Sprintf("Force-pushed %s to %s with --force-with-lease", branch, remote))
 		return nil
 	}
 
-	printSuccess(d.stderr, fmt.Sprintf("Pushed %s to %s", branch, remote))
+	printSuccess(d.Stderr, fmt.Sprintf("Pushed %s to %s", branch, remote))
 	return nil
 }
 

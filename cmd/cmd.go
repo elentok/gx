@@ -15,6 +15,7 @@ import (
 	codexcmd "github.com/elentok/gx/cmd/codex"
 	configcmd "github.com/elentok/gx/cmd/config"
 	"github.com/elentok/gx/cmd/doctor"
+	"github.com/elentok/gx/cmd/gitops"
 	"github.com/elentok/gx/cmd/limits"
 	"github.com/elentok/gx/cmd/project"
 	"github.com/elentok/gx/cmd/serverapi"
@@ -41,24 +42,23 @@ type LogOptions struct {
 type ExitError = cmdbase.ExitError
 
 type deps struct {
-	stdin                io.Reader
-	stdout               io.Writer
-	stderr               io.Writer
-	getwd                func() (string, error)
-	runWorktrees         func(string) error
-	runStatus            func(string) error
-	runLog               func(LogOptions) error
-	runShow              func(string) error
-	runStash             func() error
-	runPRs               func(allRepos bool) error
-	runTab               func(nav.TabID) error
-	confirmForce         func(string) (bool, error)
-	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
-	loadConfig           func() (config.Config, error)
-	getenv               func(string) string
-	goos                 string
-	userHomeDir          func() (string, error)
-	stdinIsTerminal      func() bool
+	stdin           io.Reader
+	stdout          io.Writer
+	stderr          io.Writer
+	getwd           func() (string, error)
+	runWorktrees    func(string) error
+	runStatus       func(string) error
+	runLog          func(LogOptions) error
+	runShow         func(string) error
+	runStash        func() error
+	runPRs          func(allRepos bool) error
+	runTab          func(nav.TabID) error
+	confirmForce    func(string) (bool, error)
+	loadConfig      func() (config.Config, error)
+	getenv          func(string) string
+	goos            string
+	userHomeDir     func() (string, error)
+	stdinIsTerminal func() bool
 	// agent holds the `gx agent`, `gx agents` and `gx designs` hooks (its Env
 	// and OpenTab are unset; agentDeps fills them).
 	agent agentcmd.Deps
@@ -139,6 +139,15 @@ func (d deps) agentDeps() agentcmd.Deps {
 	return s
 }
 
+// gitopsDeps is the git-work verbs' hooks joined with the shared env.
+// confirmForce stays in root deps because `gx doctor` also reads it.
+func (d deps) gitopsDeps() gitops.Deps {
+	s := gitops.DefaultDeps()
+	s.Env = d.base()
+	s.ConfirmForce = d.confirmForce
+	return s
+}
+
 // serverapiDeps is the `gx server` API verbs' hook joined with the shared env.
 // stdinIsTerminal stays in root deps because other commands read it too.
 func (d deps) serverapiDeps() serverapi.Deps {
@@ -165,23 +174,22 @@ func defaultDeps() deps {
 		confirmForce: func(prompt string) (bool, error) {
 			return confirm.RunWithNerd(prompt, cfg.UseNerdFontIcons)
 		},
-		runWorktrees:         func(target string) error { return runWorktrees(dirs, target) },
-		runStatus:            func(target string) error { return runStatus(dirs, target) },
-		runLog:               func(opts LogOptions) error { return runLog(dirs, opts) },
-		runShow:              func(ref string) error { return runShow(dirs, ref) },
-		runStash:             func() error { return runStash(dirs) },
-		runPRs:               func(allRepos bool) error { return runPRs(dirs, allRepos) },
-		runTab:               func(tab nav.TabID) error { return runTab(dirs, tab) },
-		choosePushDivergence: choosePushDivergence,
-		loadConfig:           dirs.Load,
-		getenv:               os.Getenv,
-		goos:                 runtime.GOOS,
-		userHomeDir:          dirs.Home,
-		stdinIsTerminal:      func() bool { return isTerminalFile(os.Stdin) },
-		agent:                agentcmd.DefaultDeps(dirs, roots),
-		skills:               skillscmd.DefaultDeps(dirs, roots.CodexHome),
-		doctor:               doctor.DefaultDeps(),
-		config:               configcmd.DefaultDeps(dirs, env),
+		runWorktrees:    func(target string) error { return runWorktrees(dirs, target) },
+		runStatus:       func(target string) error { return runStatus(dirs, target) },
+		runLog:          func(opts LogOptions) error { return runLog(dirs, opts) },
+		runShow:         func(ref string) error { return runShow(dirs, ref) },
+		runStash:        func() error { return runStash(dirs) },
+		runPRs:          func(allRepos bool) error { return runPRs(dirs, allRepos) },
+		runTab:          func(tab nav.TabID) error { return runTab(dirs, tab) },
+		loadConfig:      dirs.Load,
+		getenv:          os.Getenv,
+		goos:            runtime.GOOS,
+		userHomeDir:     dirs.Home,
+		stdinIsTerminal: func() bool { return cmdbase.IsTerminalFile(os.Stdin) },
+		agent:           agentcmd.DefaultDeps(dirs, roots),
+		skills:          skillscmd.DefaultDeps(dirs, roots.CodexHome),
+		doctor:          doctor.DefaultDeps(),
+		config:          configcmd.DefaultDeps(dirs, env),
 	}
 }
 
@@ -247,7 +255,7 @@ Run without a command to open the status UI.`,
 		claudecmd.New(d.claudeDeps()),
 		codexcmd.New(d.codexDeps()),
 		newWorktreesCmd(d),
-		newPushCmd(d),
+		gitops.NewPush(d.gitopsDeps()),
 		newStatusCmd(d),
 		newLogCmd(d),
 		newShowCmd(d),
@@ -262,14 +270,14 @@ Run without a command to open the status UI.`,
 		limits.NewUsage(limits.Deps{Env: d.base()}),
 		limits.NewAFK(limits.Deps{Env: d.base()}),
 		limits.NewViMode(limits.Deps{Env: d.base()}),
-		newMergeCmd(d),
-		newCleanupCmd(d),
+		gitops.NewMerge(d.gitopsDeps()),
+		gitops.NewCleanup(d.gitopsDeps()),
 		skillscmd.New(d.skillsDeps()),
 		configcmd.New(d.configDeps()),
-		newBumpCmd(d),
+		gitops.NewBump(d.gitopsDeps()),
 		configcmd.NewNotify(d.configDeps()),
-		newStashifyCmd(d),
-		newRunCmd(d),
+		gitops.NewStashify(d.gitopsDeps()),
+		gitops.NewRun(d.gitopsDeps()),
 		agentcmd.NewHolder(),
 		term.New(term.Deps{Env: d.base(), GOOS: d.goos}),
 		brief.New(brief.Deps{Env: d.base(), CacheGate: brief.DefaultDeps().CacheGate}),

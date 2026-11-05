@@ -1,4 +1,4 @@
-package cmd
+package gitops
 
 import (
 	"bytes"
@@ -12,16 +12,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
-// storeProjectFor isolates the ticket store and registers repoDir as a project
-// in it, returning the project directory that holds its epics.
-func storeProjectFor(t *testing.T, repoDir string) string {
+// scanEnv builds the Env of a `cleanup scan` run in dir that writes stdout.
+func scanEnv(t *testing.T, dir string, stdout *bytes.Buffer) cmdbase.Env {
 	t.Helper()
-	return addProject(t, isolateTicketStore(t), "mine", repoDir)
+	return cmdbase.Env{
+		Stdout: stdout,
+		Stderr: bytes.NewBuffer(nil),
+		Getwd:  func() (string, error) { return dir, nil },
+		Env:    cmdtest.EnvFor(t),
+	}
 }
 
 func writeCleanupScanTicket(t *testing.T, projectDir, epic, filename, id, status, ticketType string) {
@@ -30,7 +36,7 @@ func writeCleanupScanTicket(t *testing.T, projectDir, epic, filename, id, status
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
-	ensureIssueEpic(t, path)
+	cmdtest.EnsureIssueEpic(t, path)
 	content := "---\nid: \"" + id + "\"\nstatus: " + status + "\ntype: " + ticketType + "\n---\nBody.\n"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
@@ -39,7 +45,7 @@ func writeCleanupScanTicket(t *testing.T, projectDir, epic, filename, id, status
 
 func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	dir := testutil.TempRepo(t)
-	project := storeProjectFor(t, dir)
+	project := cmdtest.StoreProjectFor(t, dir)
 
 	// epic-done-merged-review-done: all tickets done, branch merged (no
 	// extra commits so it's trivially an ancestor of main), has a done
@@ -68,14 +74,9 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return dir, nil },
-	}
+	env := scanEnv(t, dir, &stdout)
 
-	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
@@ -117,20 +118,15 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 
 func TestExecute_CleanupScan_SkipsOnDemandContainerEpics(t *testing.T) {
 	dir := testutil.TempRepo(t)
-	project := storeProjectFor(t, dir)
+	project := cmdtest.StoreProjectFor(t, dir)
 
 	writeCleanupScanTicket(t, project, tickets.FollowUpsEpic, "01-work.md", "01", "done", "implement")
 	writeCleanupScanTicket(t, project, tickets.ArchivedFollowUpsEpic, "01-work.md", "01", "done", "implement")
 	writeCleanupScanTicket(t, project, "real-epic", "01-work.md", "01", "done", "implement")
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return dir, nil },
-	}
-	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+	env := scanEnv(t, dir, &stdout)
+	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
@@ -149,20 +145,15 @@ func TestExecute_CleanupScan_SkipsOnDemandContainerEpics(t *testing.T) {
 
 func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
 	dir := testutil.TempRepo(t)
-	storeProjectFor(t, dir)
+	cmdtest.StoreProjectFor(t, dir)
 	testutil.MustGitExported(t, dir, "branch", "ralph-loop/attic/epic-a/03-1")
 	testutil.MustGitExported(t, dir, "branch", "ralph-loop/attic/epic-a/03-2")
 	testutil.MustGitExported(t, dir, "branch", "unrelated")
 
 	run := func(args ...string) string {
 		var stdout bytes.Buffer
-		d := deps{
-			env:    envFor(t),
-			stdout: &stdout,
-			stderr: bytes.NewBuffer(nil),
-			getwd:  func() (string, error) { return dir, nil },
-		}
-		if err := execute(append([]string{"cleanup", "scan"}, args...), d); err != nil {
+		env := scanEnv(t, dir, &stdout)
+		if err := cmdtest.Run(t, env, append([]string{"cleanup", "scan"}, args...), NewCleanup(Deps{Env: env})); err != nil {
 			t.Fatalf("execute cleanup scan %v: %v", args, err)
 		}
 		return stdout.String()
@@ -198,15 +189,10 @@ func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
 
 func TestExecute_CleanupScan_NoAtticRefsIsEmptyList(t *testing.T) {
 	dir := testutil.TempRepo(t)
-	storeProjectFor(t, dir)
+	cmdtest.StoreProjectFor(t, dir)
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return dir, nil },
-	}
-	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+	env := scanEnv(t, dir, &stdout)
+	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stdout.String(), `"attic_refs": []`) {
@@ -216,20 +202,15 @@ func TestExecute_CleanupScan_NoAtticRefsIsEmptyList(t *testing.T) {
 
 func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(t *testing.T) {
 	dir := testutil.TempRepo(t)
-	storeProjectFor(t, dir)
+	cmdtest.StoreProjectFor(t, dir)
 	testutil.Mkdir(t, filepath.Join(dir, ".scratch", "stray-epic"))
 	testutil.WriteFile(t, dir, ".scratch/stray-epic/leaked.txt", "oops, this got committed")
 	testutil.CommitAll(t, dir, "accidentally commit .scratch")
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return dir, nil },
-	}
+	env := scanEnv(t, dir, &stdout)
 
-	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
@@ -252,17 +233,12 @@ func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(
 
 func TestExecute_CleanupScan_HousekeepingSkippedAtBareRootWithNoWorktree(t *testing.T) {
 	dir := testutil.TempBareRepo(t)
-	storeProjectFor(t, dir)
+	cmdtest.StoreProjectFor(t, dir)
 
 	var stdout bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return dir, nil },
-	}
+	env := scanEnv(t, dir, &stdout)
 
-	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
 		t.Fatalf("execute cleanup scan --json: %v", err)
 	}
 
@@ -281,14 +257,10 @@ func TestExecute_CleanupScan_NotAGitRepo(t *testing.T) {
 	dir := t.TempDir()
 
 	var stdout, stderr bytes.Buffer
-	d := deps{
-		env:    envFor(t),
-		stdout: &stdout,
-		stderr: &stderr,
-		getwd:  func() (string, error) { return dir, nil },
-	}
+	env := scanEnv(t, dir, &stdout)
+	env.Stderr = &stderr
 
-	err := execute([]string{"cleanup", "scan"}, d)
+	err := cmdtest.Run(t, env, []string{"cleanup", "scan"}, NewCleanup(Deps{Env: env}))
 	if err == nil {
 		t.Fatal("expected error when cwd is outside a git repo, got nil")
 	}
@@ -296,15 +268,15 @@ func TestExecute_CleanupScan_NotAGitRepo(t *testing.T) {
 
 func TestExecute_CleanupScan_FollowsConfiguredTrunk(t *testing.T) {
 	dir := testutil.TempRepo(t)
-	registerWithTrunk(t, dir, "develop")
+	cmdtest.RegisterWithTrunk(t, dir, "develop")
 	testutil.MustGitExported(t, dir, "checkout", "-b", "develop")
-	commitFile(t, dir, "merged.txt", "x")
+	cmdtest.CommitFile(t, dir, "merged.txt", "x")
 	testutil.MustGitExported(t, dir, "branch", "merged-on-develop")
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }, env: envFor(t)}
-	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+	env := scanEnv(t, dir, &stdout)
+	if err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env})); err != nil {
 		t.Fatalf("cleanup scan: %v", err)
 	}
 	var result CleanupScanResult
@@ -329,11 +301,11 @@ func TestExecute_CleanupScan_FollowsConfiguredTrunk(t *testing.T) {
 
 func TestExecute_CleanupScan_MissingTrunkStopsBeforeReporting(t *testing.T) {
 	dir := testutil.TempRepo(t)
-	registerWithTrunk(t, dir, "develop")
+	cmdtest.RegisterWithTrunk(t, dir, "develop")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }, env: envFor(t)}
-	err := execute([]string{"cleanup", "scan", "--json"}, d)
+	env := scanEnv(t, dir, &stdout)
+	err := cmdtest.Run(t, env, []string{"cleanup", "scan", "--json"}, NewCleanup(Deps{Env: env}))
 	var missing *ticketgit.ErrTrunkMissing
 	if !errors.As(err, &missing) {
 		t.Fatalf("err = %v, want ErrTrunkMissing", err)

@@ -1,4 +1,4 @@
-package cmd
+package gitops
 
 import (
 	"bytes"
@@ -10,38 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
-
-// mergeTestRepo creates a plain bare repo with a linked worktree for main
-// (at mainDir) plus one linked worktree per branch/dir pair in worktrees
-// (map of dir name -> branch name); each worktree's branch is created off
-// main's tip. It returns the repo dir and main's worktree path.
-func mergeTestRepo(t *testing.T, worktrees map[string]string) (repoDir, mainDir string) {
-	t.Helper()
-	repoDir = testutil.TempBareRepo(t)
-	mainDir = filepath.Join(repoDir, "main")
-	testutil.MustGitExported(t, repoDir, "worktree", "add", mainDir, "main")
-
-	for dir, branch := range worktrees {
-		wtDir := filepath.Join(repoDir, dir)
-		testutil.MustGitExported(t, repoDir, "worktree", "add", "-b", branch, wtDir)
-		testutil.MustGitExported(t, wtDir, "config", "user.email", "test@test.com")
-		testutil.MustGitExported(t, wtDir, "config", "user.name", "Test")
-	}
-	return repoDir, mainDir
-}
-
-func commitFile(t *testing.T, dir, name, content string) {
-	t.Helper()
-	testutil.WriteFile(t, dir, name, content)
-	testutil.MustGitExported(t, dir, "add", ".")
-	testutil.MustGitExported(t, dir, "commit", "-m", "add "+name)
-}
 
 func decodeMergeResult(t *testing.T, stdout *bytes.Buffer) MergeResult {
 	t.Helper()
@@ -54,11 +29,11 @@ func decodeMergeResult(t *testing.T, stdout *bytes.Buffer) MergeResult {
 
 func TestRunMerge_CleanFastForward(t *testing.T) {
 	t.Parallel()
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -78,12 +53,12 @@ func TestRunMerge_CleanFastForward(t *testing.T) {
 
 func TestRunMerge_Diverged(t *testing.T) {
 	t.Parallel()
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
-	commitFile(t, mainDir, "main-only.txt", "diverge")
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	cmdtest.CommitFile(t, mainDir, "main-only.txt", "diverge")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -106,11 +81,11 @@ func TestRunMerge_ResolvesWorktreeDirNameToRealBranch(t *testing.T) {
 	t.Parallel()
 	// A nested branch name checked out under a shorter worktree dir name,
 	// mirroring ralph-loop's iteration branches.
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"item-01": "ralph-loop/epic-item-01"})
-	commitFile(t, filepath.Join(repoDir, "item-01"), "work.txt", "hi")
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"item-01": "ralph-loop/epic-item-01"})
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "item-01"), "work.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "item-01", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "item-01", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -122,12 +97,12 @@ func TestRunMerge_ResolvesWorktreeDirNameToRealBranch(t *testing.T) {
 
 func TestRunMerge_NoMatchingWorktreeTreatsArgAsLiteralBranch(t *testing.T) {
 	t.Parallel()
-	_, mainDir := mergeTestRepo(t, map[string]string{})
+	_, mainDir := cmdtest.MergeTestRepo(t, map[string]string{})
 	// A branch that exists but has no linked worktree of its own.
 	testutil.MustGitExported(t, mainDir, "branch", "literal-branch")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "literal-branch", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "literal-branch", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -142,11 +117,11 @@ func TestRunMerge_NoMatchingWorktreeTreatsArgAsLiteralBranch(t *testing.T) {
 
 func TestRunMerge_TextOutput(t *testing.T) {
 	t.Parallel()
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", false, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", false, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 	if got, want := stdout.String(), "merged onto main\n"; got != want {
@@ -163,21 +138,11 @@ func revParse(t *testing.T, dir, ref string) string {
 	return sha
 }
 
-// registerWithTrunk isolates the ticket store and registers repoDir as a
-// project whose project.json sets trunk. Not parallel-safe (sets env).
-func registerWithTrunk(t *testing.T, repoDir, trunk string) (projectDir string) {
-	t.Helper()
-	projectDir = addProject(t, isolateTicketStore(t), "p", repoDir)
-	testutil.WriteFile(t, projectDir, "project.json",
-		`{"name":"p","repo":"`+repoDir+`","trunk":"`+trunk+`"}`)
-	return projectDir
-}
-
 // mergeEpicSetup registers repoDir as a project holding epic e, whose
 // ticket.md carries completedAt when non-empty. Not parallel-safe (sets env).
 func mergeEpicSetup(t *testing.T, repoDir, completedAt string) (ticketMD string) {
 	t.Helper()
-	projectDir := addProject(t, isolateTicketStore(t), "p", repoDir)
+	projectDir := cmdtest.AddProject(t, cmdtest.IsolateTicketStore(t), "p", repoDir)
 	fm := "status: open\n"
 	if completedAt != "" {
 		fm += "completed_at: " + completedAt + "\n"
@@ -190,11 +155,11 @@ func mergeEpicSetup(t *testing.T, repoDir, completedAt string) (ticketMD string)
 }
 
 func TestRunMerge_EpicBranchStampsMergedAtOnly(t *testing.T) {
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"e": "e"})
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"e": "e"})
 	ticketMD := mergeEpicSetup(t, repoDir, "")
-	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
 
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -208,11 +173,11 @@ func TestRunMerge_EpicBranchStampsMergedAtOnly(t *testing.T) {
 }
 
 func TestRunMerge_EpicBranchKeepsExistingCompletedAt(t *testing.T) {
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"e": "e"})
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"e": "e"})
 	ticketMD := mergeEpicSetup(t, repoDir, "2026-01-02T03:04:05Z")
-	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
 
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -226,12 +191,12 @@ func TestRunMerge_EpicBranchKeepsExistingCompletedAt(t *testing.T) {
 }
 
 func TestRunMerge_NeedsRebaseLeavesEpicUnmerged(t *testing.T) {
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"e": "e"})
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"e": "e"})
 	ticketMD := mergeEpicSetup(t, repoDir, "")
-	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
-	commitFile(t, mainDir, "main-only.txt", "diverge")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
+	cmdtest.CommitFile(t, mainDir, "main-only.txt", "diverge")
 
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -241,12 +206,12 @@ func TestRunMerge_NeedsRebaseLeavesEpicUnmerged(t *testing.T) {
 }
 
 func TestRunMerge_NonEpicBranchStampsNothing(t *testing.T) {
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
 	ticketMD := mergeEpicSetup(t, repoDir, "")
 	before, _ := os.ReadFile(ticketMD)
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -256,14 +221,14 @@ func TestRunMerge_NonEpicBranchStampsNothing(t *testing.T) {
 }
 
 func TestRunMerge_LandsOnConfiguredTrunk(t *testing.T) {
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
 	testutil.MustGitExported(t, mainDir, "branch", "develop")
-	registerWithTrunk(t, repoDir, "develop")
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	cmdtest.RegisterWithTrunk(t, repoDir, "develop")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 	mainBefore := revParse(t, mainDir, "main")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -280,15 +245,15 @@ func TestRunMerge_LandsOnConfiguredTrunk(t *testing.T) {
 }
 
 func TestRunMerge_TextOutputNamesConfiguredTrunk(t *testing.T) {
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
 	testutil.MustGitExported(t, mainDir, "branch", "develop")
-	registerWithTrunk(t, repoDir, "develop")
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
-	commitFile(t, mainDir, "main-only.txt", "x")
+	cmdtest.RegisterWithTrunk(t, repoDir, "develop")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	cmdtest.CommitFile(t, mainDir, "main-only.txt", "x")
 	testutil.MustGitExported(t, mainDir, "branch", "-f", "develop", "main")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", false, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", false, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 	if got := stdout.String(); !strings.HasPrefix(got, "needs rebase: feature onto develop\n") {
@@ -297,12 +262,12 @@ func TestRunMerge_TextOutputNamesConfiguredTrunk(t *testing.T) {
 }
 
 func TestRunMerge_UnregisteredRepoUsesDetectedDefault(t *testing.T) {
-	isolateTicketStore(t)
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	cmdtest.IsolateTicketStore(t)
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 	if got, want := decodeMergeResult(t, &stdout), (MergeResult{Status: "merged", Target: "main"}); got != want {
@@ -311,13 +276,13 @@ func TestRunMerge_UnregisteredRepoUsesDetectedDefault(t *testing.T) {
 }
 
 func TestRunMerge_MissingTrunkFailsWithSharedError(t *testing.T) {
-	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
-	registerWithTrunk(t, repoDir, "develop")
-	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	repoDir, mainDir := cmdtest.MergeTestRepo(t, map[string]string{"feature": "feature"})
+	cmdtest.RegisterWithTrunk(t, repoDir, "develop")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 	mainBefore := revParse(t, mainDir, "main")
 
 	var stdout bytes.Buffer
-	err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout)
+	err := runMerge(config.DirsFrom(cmdtest.EnvFor(t)), mainDir, "feature", true, &stdout)
 	var missing *ticketgit.ErrTrunkMissing
 	if !errors.As(err, &missing) || missing.Trunk != "develop" {
 		t.Fatalf("err = %v, want ErrTrunkMissing for develop", err)

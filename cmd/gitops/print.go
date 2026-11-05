@@ -1,9 +1,10 @@
-package cmd
+package gitops
 
 import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ui"
 
 	"charm.land/lipgloss/v2"
@@ -18,7 +19,7 @@ func printBadge(w io.Writer, nerd bool, nerdText, plainText string) {
 	if nerd {
 		text = nerdText
 	}
-	if isTerminalWriter(w) {
+	if cmdbase.IsTerminalWriter(w) {
 		badge := lipgloss.NewStyle().
 			Background(lipgloss.Color("4")).
 			Foreground(lipgloss.Color("0")).
@@ -33,7 +34,7 @@ func printBadge(w io.Writer, nerd bool, nerdText, plainText string) {
 
 // printSuccess prints a blank line then a green checkmark success message.
 func printSuccess(w io.Writer, text string) {
-	if isTerminalWriter(w) {
+	if cmdbase.IsTerminalWriter(w) {
 		style := lipgloss.NewStyle().Foreground(ui.ColorGreen)
 		fmt.Fprintln(w, "\n"+style.Render("✔ "+text))
 	} else {
@@ -43,7 +44,7 @@ func printSuccess(w io.Writer, text string) {
 
 // printError prints a blank line then a red ✘ error message.
 func printError(w io.Writer, text string) {
-	if isTerminalWriter(w) {
+	if cmdbase.IsTerminalWriter(w) {
 		style := lipgloss.NewStyle().Foreground(ui.ColorRed)
 		fmt.Fprintln(w, "\n"+style.Render("✘ "+text))
 	} else {

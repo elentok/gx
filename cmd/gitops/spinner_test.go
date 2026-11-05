@@ -1,10 +1,12 @@
-package cmd
+package gitops
 
 import (
 	"bytes"
 	"errors"
 	"os"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdbase"
 )
 
 func TestRunWithSpinner_NonTTYRunsFunction(t *testing.T) {
@@ -35,7 +37,7 @@ func TestRunWithSpinner_NonTTYPropagatesError(t *testing.T) {
 
 func TestIsTerminalWriter_Buffer(t *testing.T) {
 	t.Parallel()
-	if isTerminalWriter(bytes.NewBuffer(nil)) {
+	if cmdbase.IsTerminalWriter(bytes.NewBuffer(nil)) {
 		t.Fatal("bytes.Buffer should not be a terminal writer")
 	}
 }
@@ -43,5 +45,5 @@ func TestIsTerminalWriter_Buffer(t *testing.T) {
 func TestIsTerminalWriter_Stderr(t *testing.T) {
 	t.Parallel()
 	// os.Stderr is an *os.File but may not be a TTY in CI — just verify it doesn't panic.
-	_ = isTerminalWriter(os.Stderr)
+	_ = cmdbase.IsTerminalWriter(os.Stderr)
 }

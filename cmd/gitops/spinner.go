@@ -1,12 +1,11 @@
-package cmd
+package gitops
 
 import (
 	"io"
-	"os"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
-	"github.com/mattn/go-isatty"
+	"github.com/elentok/gx/cmd/cmdbase"
 )
 
 type spinnerDoneMsg struct{ err error }
@@ -56,7 +55,7 @@ func waitForDone(doneCh <-chan error) tea.Cmd {
 }
 
 func runWithSpinner(in io.Reader, out io.Writer, label string, fn func() error) error {
-	if !isTerminalWriter(out) {
+	if !cmdbase.IsTerminalWriter(out) {
 		return fn()
 	}
 	doneCh := make(chan error, 1)
@@ -70,14 +69,4 @@ func runWithSpinner(in io.Reader, out io.Writer, label string, fn func() error) 
 		return err
 	}
 	return finalModel.(spinnerModel).err
-}
-
-func isTerminalWriter(w io.Writer) bool {
-	f, ok := w.(*os.File)
-	return ok && isTerminalFile(f)
-}
-
-func isTerminalFile(f *os.File) bool {
-	fd := f.Fd()
-	return isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd)
 }

@@ -7,18 +7,19 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/spf13/cobra"
 )
 
 func TestNewEpicScopedCmd_ResolvesEpicArgAndInvokesRun(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(storeProjectFor(t, repoDir), "widget-epic")
+	epicDir := filepath.Join(cmdtest.StoreProjectFor(t, repoDir), "widget-epic")
 	testutil.Mkdir(t, epicDir)
 
 	var gotEpicPath string
 	var gotArgs []string
-	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: envFor(t)}
+	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: cmdtest.EnvFor(t)}
 	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(epicPath string, args []string, out io.Writer) error {
 		gotEpicPath = epicPath
 		gotArgs = args
@@ -80,11 +81,11 @@ func TestNewEpicScopedCmd_RequiresExactlyOneArg(t *testing.T) {
 
 func TestNewEpicScopedCmd_ValidArgsFunctionListsEpicNames(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
-	project := storeProjectFor(t, repoDir)
+	project := cmdtest.StoreProjectFor(t, repoDir)
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "widget-epic"))
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "bugs-05"))
 
-	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: envFor(t)}
+	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: cmdtest.EnvFor(t)}
 	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })
 
 	names, directive := cmd.ValidArgsFunction(cmd, nil, "")

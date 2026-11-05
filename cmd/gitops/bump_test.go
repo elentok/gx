@@ -1,16 +1,31 @@
-package cmd
+package gitops
 
 import (
 	"bytes"
+	"io"
 	"os/exec"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+// bumpDeps builds Deps that read stdin, write stdout and decline every confirm.
+func bumpDeps(stdin string, stdout io.Writer, dir string) Deps {
+	return Deps{
+		Env: cmdbase.Env{
+			Stdin:  strings.NewReader(stdin),
+			Stdout: stdout,
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return dir, nil },
+		},
+		ConfirmForce: func(string) (bool, error) { return false, nil },
+	}
+}
 
 func gitOutput(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
@@ -141,13 +156,7 @@ func TestRunBump_PatchExplicit(t *testing.T) {
 	tagRepo(t, dir, "v1.2.3")
 
 	var stdout bytes.Buffer
-	d := deps{
-		stdin:        strings.NewReader(""),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	d := bumpDeps("", &stdout, dir)
 
 	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
@@ -164,13 +173,7 @@ func TestRunBump_MinorExplicit(t *testing.T) {
 	tagRepo(t, dir, "v1.2.3")
 
 	var stdout bytes.Buffer
-	d := deps{
-		stdin:        strings.NewReader(""),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	d := bumpDeps("", &stdout, dir)
 
 	if err := runBump([]string{"minor"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
@@ -187,13 +190,7 @@ func TestRunBump_MajorExplicit(t *testing.T) {
 	tagRepo(t, dir, "v1.2.3")
 
 	var stdout bytes.Buffer
-	d := deps{
-		stdin:        strings.NewReader(""),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	d := bumpDeps("", &stdout, dir)
 
 	if err := runBump([]string{"major"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
@@ -209,13 +206,7 @@ func TestRunBump_NoExistingTag_DefaultsToV0(t *testing.T) {
 	dir := testutil.TempRepo(t)
 
 	var stdout bytes.Buffer
-	d := deps{
-		stdin:        strings.NewReader(""),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	d := bumpDeps("", &stdout, dir)
 
 	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
@@ -231,13 +222,7 @@ func TestRunBump_CreatesAnnotatedTag(t *testing.T) {
 	dir := testutil.TempRepo(t)
 	tagRepo(t, dir, "v1.0.0")
 
-	d := deps{
-		stdin:        strings.NewReader(""),
-		stdout:       bytes.NewBuffer(nil),
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	d := bumpDeps("", bytes.NewBuffer(nil), dir)
 
 	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
@@ -268,13 +253,7 @@ func TestRunBump_SkipsPushWhenDeclined(t *testing.T) {
 	tagRepo(t, dir, "v1.0.0")
 
 	var stdout bytes.Buffer
-	d := deps{
-		stdin:        strings.NewReader(""),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	d := bumpDeps("", &stdout, dir)
 
 	if err := runBump([]string{"patch"}, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
@@ -298,15 +277,10 @@ func TestRunBump_Yes_SkipsConfirmAndPushes(t *testing.T) {
 	testutil.SetBranchUpstream(t, dir, "main", "origin/main")
 
 	var stdout bytes.Buffer
-	d := deps{
-		stdin:  strings.NewReader(""),
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) {
-			t.Fatal("confirmForce should not be called when yes is true")
-			return false, nil
-		},
+	d := bumpDeps("", &stdout, dir)
+	d.ConfirmForce = func(string) (bool, error) {
+		t.Fatal("confirmForce should not be called when yes is true")
+		return false, nil
 	}
 
 	if err := runBump([]string{"patch"}, d, true); err != nil {
@@ -323,14 +297,8 @@ func TestRunBump_InteractivePicker(t *testing.T) {
 	tagRepo(t, dir, "v2.0.0")
 
 	var stdout bytes.Buffer
-	d := deps{
-		// "j\r" = move down once, then enter → picks "minor"
-		stdin:        strings.NewReader("j\r"),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	// "j\r" = move down once, then enter → picks "minor"
+	d := bumpDeps("j\r", &stdout, dir)
 
 	if err := runBump(nil, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)
@@ -346,13 +314,7 @@ func TestRunBump_InteractivePicker_Cancel(t *testing.T) {
 	tagRepo(t, dir, "v1.0.0")
 
 	var stdout bytes.Buffer
-	d := deps{
-		stdin:        strings.NewReader("q"),
-		stdout:       &stdout,
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return dir, nil },
-		confirmForce: func(string) (bool, error) { return false, nil },
-	}
+	d := bumpDeps("q", &stdout, dir)
 
 	if err := runBump(nil, d, false); err != nil {
 		t.Fatalf("runBump: %v", err)

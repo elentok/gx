@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
@@ -22,7 +23,7 @@ type finishFixture struct {
 // e) and ticket 01, with an iteration worktree on ralph-loop/e-item-01.
 func newFinishFixture(t *testing.T) *finishFixture {
 	t.Helper()
-	repoDir, _ := mergeTestRepo(t, map[string]string{"e": "e"})
+	repoDir, _ := cmdtest.MergeTestRepo(t, map[string]string{"e": "e"})
 	projectDir := addProject(t, isolateTicketStore(t), "p", repoDir)
 	wt := filepath.Join(repoDir, "item-01")
 	testutil.MustGitExported(t, repoDir, "worktree", "add", "-b", "ralph-loop/e-item-01", wt, "e")
@@ -100,7 +101,7 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 	t.Parallel()
 	t.Run("commit with no record is refused", func(t *testing.T) {
 		f := newFinishFixture(t)
-		commitFile(t, f.wt, "a.txt", "a")
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
 		err := f.finish(t)
 		if err == nil || !strings.Contains(err.Error(), "gx check") || !strings.Contains(err.Error(), "--check-failures") {
 			t.Fatalf("err = %v, want a refusal naming gx check and --check-failures", err)
@@ -121,7 +122,7 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 
 	t.Run("no applicable checks counts as a pass", func(t *testing.T) {
 		f := newFinishFixture(t)
-		commitFile(t, f.wt, "a.txt", "a")
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
 		f.record(t, check.ExitNone, "")
 		if err := f.finish(t); err != nil {
 			t.Fatalf("finish: %v", err)
@@ -130,7 +131,7 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 
 	t.Run("kind-filtered line does not count", func(t *testing.T) {
 		f := newFinishFixture(t)
-		commitFile(t, f.wt, "a.txt", "a")
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
 		f.record(t, check.ExitPass, "test")
 		if err := f.finish(t); err == nil {
 			t.Fatal("want a refusal")
@@ -140,7 +141,7 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 
 	t.Run("line for another tree does not count", func(t *testing.T) {
 		f := newFinishFixture(t)
-		commitFile(t, f.wt, "a.txt", "a")
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
 		f.recordTree(t, "0000000000000000000000000000000000000000", check.ExitPass, "")
 		if err := f.finish(t); err == nil {
 			t.Fatal("want a refusal")
@@ -150,7 +151,7 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 
 	t.Run("failing line needs one address per failing test", func(t *testing.T) {
 		f := newFinishFixture(t)
-		commitFile(t, f.wt, "a.txt", "a")
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
 		f.record(t, check.ExitFail, "", "TestA", "TestB")
 		if err := f.finish(t); err == nil {
 			t.Fatal("no addresses: want a refusal")
@@ -169,7 +170,7 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 
 	t.Run("known failures: one address covers the failing set", func(t *testing.T) {
 		f := newFinishFixture(t)
-		commitFile(t, f.wt, "a.txt", "a")
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
 		f.record(t, check.ExitFail, "", "TestA", "TestB")
 		if err := f.finish(t, "--known-failures=99"); err == nil {
 			t.Fatal("unknown address: want a refusal")
@@ -182,7 +183,7 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 
 	t.Run("failing line naming no tests needs one address", func(t *testing.T) {
 		f := newFinishFixture(t)
-		commitFile(t, f.wt, "a.txt", "a")
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
 		f.record(t, check.ExitFail, "")
 		if err := f.finish(t); err == nil {
 			t.Fatal("want a refusal")

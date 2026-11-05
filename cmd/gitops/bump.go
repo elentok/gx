@@ -1,4 +1,4 @@
-package cmd
+package gitops
 
 import (
 	"fmt"
@@ -13,10 +13,10 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func runBump(args []string, d deps, yes bool) error {
+func runBump(args []string, d Deps, yes bool) error {
 	skipConfirm := yes
 
-	cwd, err := d.getwd()
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func runBump(args []string, d deps, yes bool) error {
 	if len(args) == 1 && (args[0] == "major" || args[0] == "minor" || args[0] == "patch") {
 		bump = args[0]
 	} else {
-		bump, err = pickBump(lastTag, major, minor, patch, d.stdin, d.stdout)
+		bump, err = pickBump(lastTag, major, minor, patch, d.Stdin, d.Stdout)
 		if err != nil {
 			return err
 		}
@@ -54,16 +54,16 @@ func runBump(args []string, d deps, yes bool) error {
 	}
 
 	newTag := fmt.Sprintf("v%d.%d.%d", major, minor, patch)
-	fmt.Fprintf(d.stdout, "Bumping %s → %s\n", lastTag, newTag)
+	fmt.Fprintf(d.Stdout, "Bumping %s → %s\n", lastTag, newTag)
 
 	if err := git.CreateAnnotatedTag(cwd, newTag, "Release "+newTag); err != nil {
 		return fmt.Errorf("failed to create tag: %w", err)
 	}
-	fmt.Fprintf(d.stdout, "Created annotated tag %s\n\n", newTag)
+	fmt.Fprintf(d.Stdout, "Created annotated tag %s\n\n", newTag)
 
 	confirmed := skipConfirm
 	if !skipConfirm {
-		confirmed, err = d.confirmForce("Push commits and tag to origin?")
+		confirmed, err = d.ConfirmForce("Push commits and tag to origin?")
 		if err != nil {
 			return err
 		}
@@ -75,11 +75,11 @@ func runBump(args []string, d deps, yes bool) error {
 		if err := git.PushTag(cwd, newTag); err != nil {
 			return err
 		}
-		fmt.Fprintln(d.stdout, "Pushed.")
+		fmt.Fprintln(d.Stdout, "Pushed.")
 	} else {
-		fmt.Fprintln(d.stdout, "Skipped. To push manually:")
-		fmt.Fprintln(d.stdout, "  git push origin")
-		fmt.Fprintf(d.stdout, "  git push origin %s\n", newTag)
+		fmt.Fprintln(d.Stdout, "Skipped. To push manually:")
+		fmt.Fprintln(d.Stdout, "  git push origin")
+		fmt.Fprintf(d.Stdout, "  git push origin %s\n", newTag)
 	}
 	return nil
 }
