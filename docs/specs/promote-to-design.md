@@ -80,15 +80,15 @@ brief's decisions as settled. The old chat stays a plain session. [01]
 ### CLI: `gx agent transcript`
 
 - A new verb under `gx agent`, next to `actionable` and `link`. It resolves the calling session from the same environment variable those verbs use.
-- It prints the path of the session's conversation file. For Claude it reuses the server's `claudeTranscript` lookup (honours `CLAUDE_CONFIG_DIR`, tries the expected project dir first). For Codex it uses the server's Codex rollout lookup. The route calls `s.chatTranscript`, the lookup the web chat uses (it wraps `claudeTranscript` and `codexRollout` behind the transcript miss cache), so the verb and the chat cannot disagree. Several matches count as "not found". `transcript.FindByID` is not used: it ignores `CLAUDE_CONFIG_DIR` and can return several matches. [default]
+- It prints the path of the session's conversation file. For Claude it reuses the server's `Chat.ClaudeTranscript` lookup (`server/sessions/chat/transcripts.go`) (honours `CLAUDE_CONFIG_DIR`, tries the expected project dir first). For Codex it uses the server's Codex rollout lookup. The route calls the `server/sessions/chat` lookup the web chat uses (it wraps `ClaudeTranscript` and `codexRollout` behind the transcript miss cache), so the verb and the chat cannot disagree. Several matches count as "not found". `transcript.FindByID` is not used: it ignores `CLAUDE_CONFIG_DIR` and can return several matches. [default]
 - A new verb is still needed: `gx claude session-path <id>` needs the id and covers Claude only, while this verb finds the calling session itself and covers Codex.
 - `--json` exits 0 and always returns `harness`, `conversation_id`, `path` and `found`. Harness and id are empty only outside a gx session. The skill uses `--json`, so it gets all three values in one call, and it still has the harness and id when no file is found. Text mode prints the path. [default]
 - Outside a gx session, or when no file is found, text mode exits 1, prints nothing on stdout and gives the reason on stderr. The skill then leaves the transcript line out of the brief. The brief stays valid without it. [default]
-- A verb that reads a session goes through the server like the other `gx agent` verbs; a matching server route and the parity table in the CLI tests follow the existing pattern.
+- A verb that reads a session goes through the server like the other `gx agent` verbs; a matching server route and the parity table in `cmd/server_parity_test.go` follow the existing pattern.
 
 ### CLI: `gx designs open`
 
-- Today, in text mode, `printSessionResult` returns nil when the session is nil, so a created map with a failed session start exits 0 and prints nothing. The skill cannot detect the half-made Design. [person, Q1]
+- Today, in text mode, `printSessionResult` (`cmd/agent/agents.go`) returns nil when the session is nil, so a created map with a failed session start exits 0 and prints nothing. The skill cannot detect the half-made Design. [person, Q1]
 - Fix: when `EpicCreated` is set and `StartError` is not empty, the command prints `project:slug` and the start error, and exits non-zero. This is the cause fix, so the skill does not need `--json` to work around it. The condition is not "Session is nil": `printSessionResult` is shared with `gx designs delete`, the `gx agents` verbs and `agentsfix`, and a successful delete has no session. `--json` keeps exit 0 and already carries `epic_created` and `start_error`. [default]
 - A CLI test checks that the text output and exit code of `gx designs delete` do not change.
 - Add `--idea -`: read the idea text from stdin. The 32 KB limit applies as before. [default]
@@ -99,7 +99,7 @@ brief's decisions as settled. The old chat stays a plain session. [01]
 - A secondary "Promote to Design" button in the web session header (`SessionHeader` in the Agents session view), in both the wide and the phone layout. [01]
 - Shown on plain sessions only. Hidden on Design agents and Queue agents. [default]
 - Disabled when the composer cannot send (offline, non-chat harness, exited, busy) and while the chat has no message. When disabled, the reason is shown the same way the composer shows its reason. The implementer picks the exact text and whether the header reads the chat's message count from props or a hook. [default]
-- A click posts a new `promote` field on `SessionPromptRequest`, next to the `Continue` field. The server expands it to one text, `harness.SkillCommand(meta.Harness, "gx-promote-to-design", "")`: `/gx-promote-to-design` for Claude, `$gx-promote-to-design` for Codex. The web UI keeps no prefix table. The send keeps the composer's refusals and the same `last_message` check. [person, Q2]
+- A click posts a new `promote` field on `SessionPromptRequest` (`server/wire/sessions.go`), next to the `Continue` field. The server expands it to one text, `harness.SkillCommand(meta.Harness, "gx-promote-to-design", "")`: `/gx-promote-to-design` for Claude, `$gx-promote-to-design` for Codex. The web UI keeps no prefix table. The send keeps the composer's refusals and the same `last_message` check. [person, Q2]
 - Unlike `continue`, `promote` sends that one text through the plain send path and never calls `startContinue`, because that path types `/clear` first and would wipe the chat being promoted. Like `continue`, it replaces `Text`. The event log records `Action: "promote"`. [default]
 - The server refuses `promote` on a Design session and on a Queue agent with a new reason (the implementer names it, for example `not-plain-session`). A request with both `continue` and `promote` set is a bad request. The web shows the reason like other refusals. [person, Q3]
 - No confirm dialog. A draft in the composer stays untouched; the click neither reads nor clears it. [default]
@@ -158,3 +158,11 @@ temporary gx server. Flow numbers below are new; the implementer takes the next 
 
 - Tickets for the build use the epic `promote-to-design-impl`. Suggested slices: the `gx agent transcript` verb with its server route; the skill plus the gx-wayfinder Chart rule; the `gx designs open` fix and `--idea -`; the web button with the `promote` field and its e2e flows and the CATALOG entry.
 - Implementer's choices (the map did not decide them): the slug-proposal wording and how the agent derives a slug; the wording of the fixed first-line sentence of the brief; the flag names of `gx agent transcript`; the name of the server's refusal reason for `promote`; the exact text of the button's disabled reason; how the header learns that the chat has a message; the e2e flow numbers and scenario names.
+
+## Package layout (after the server split)
+
+The server is split into packages and `sizeguard` fails a package over 50 files, 4,500 source lines, 5,000 test lines, or a file over 1,000 lines (see `.ai/index.md`, "File size"). `server/sessions` is near its limits (49 files, 4,325 test lines), so do not add files there.
+
+- The `gx agent transcript` route goes in `server/sessions/chat`, next to `Chat.ClaudeTranscript`. The verb goes in `cmd/agent`.
+- The `promote` field and its refusal go in `server/wire/sessions.go` and `server/sessions/prompt/sessionprompt.go`.
+- The `gx designs open` change goes in `server/designs/designs.go` and `cmd/agent/agents.go`.
