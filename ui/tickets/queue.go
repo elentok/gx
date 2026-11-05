@@ -31,6 +31,7 @@ type QueueModel struct {
 	now          func() time.Time
 	worktreeRoot string
 	settings     ui.Settings
+	editor       rowEditor
 	checked      map[string]bool
 	checkOrder   map[string]uint64
 	// live is epicName -> ticket identifier -> running state, derived from the
@@ -157,6 +158,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		now:              time.Now,
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
+		editor:           rowEditor{worktreeRoot: worktreeRoot, settings: settings},
 		checked:          map[string]bool{},
 		checkOrder:       map[string]uint64{},
 		live:             map[string]map[string]rowfmt.LiveTicketState{},

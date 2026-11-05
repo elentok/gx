@@ -28,16 +28,9 @@ func (m Model) yankTicketSummary() tea.Cmd {
 	}
 	epic := m.epicAt(r)
 	if r.isEpic() {
-		if err := ticketsClipboardWrite(epic.Name); err != nil {
-			return notify.Error("clipboard copy failed: " + err.Error())
-		}
-		return notify.Info("yanked epic")
+		return m.editor.yank(epic.Name, "epic")
 	}
-	text := formatTicketSummary(epic.Name, epic.Tickets[r.ticketIdx])
-	if err := ticketsClipboardWrite(text); err != nil {
-		return notify.Error("clipboard copy failed: " + err.Error())
-	}
-	return notify.Info("yanked ticket")
+	return m.editor.yank(formatTicketSummary(epic.Name, epic.Tickets[r.ticketIdx]), "ticket")
 }
 
 // yankTicketFilePath implements the Tickets tab's "yf" chord: copies the
@@ -47,30 +40,20 @@ func (m Model) yankTicketFilePath() tea.Cmd {
 	if !ok {
 		return notify.Warning(warning)
 	}
-	if err := ticketsClipboardWrite(path); err != nil {
-		return notify.Error("clipboard copy failed: " + err.Error())
-	}
-	return notify.Info("yanked file path")
+	return m.editor.yank(path, "file path")
 }
 
 // yankQueueTicketSummary is the Queue tab's counterpart to
 // Model.yankTicketSummary ("yy").
 func (m QueueModel) yankQueueTicketSummary() tea.Cmd {
 	if epic, ok := m.selectedQueueEpic(); ok {
-		if err := ticketsClipboardWrite(epic.Name); err != nil {
-			return notify.Error("clipboard copy failed: " + err.Error())
-		}
-		return notify.Info("yanked epic")
+		return m.editor.yank(epic.Name, "epic")
 	}
 	r, ok := m.selectedQueueRow()
 	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	text := formatTicketSummary(r.epic.Name, r.ticket)
-	if err := ticketsClipboardWrite(text); err != nil {
-		return notify.Error("clipboard copy failed: " + err.Error())
-	}
-	return notify.Info("yanked ticket")
+	return m.editor.yank(formatTicketSummary(r.epic.Name, r.ticket), "ticket")
 }
 
 // yankQueueTicketFilePath is the Queue tab's counterpart to
@@ -80,9 +63,5 @@ func (m QueueModel) yankQueueTicketFilePath() tea.Cmd {
 	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	path := r.ticket.FilePath()
-	if err := ticketsClipboardWrite(path); err != nil {
-		return notify.Error("clipboard copy failed: " + err.Error())
-	}
-	return notify.Info("yanked file path")
+	return m.editor.yank(r.ticket.FilePath(), "file path")
 }

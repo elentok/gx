@@ -32,6 +32,7 @@ import (
 type Model struct {
 	worktreeRoot string
 	settings     ui.Settings
+	editor       rowEditor
 	keys         keys.Manager // this tab's own navigation/collapse bindings
 	help         help.Model
 
@@ -130,6 +131,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 	return Model{
 		worktreeRoot:      worktreeRoot,
 		settings:          settings,
+		editor:            rowEditor{worktreeRoot: worktreeRoot, settings: settings},
 		keys:              km,
 		sidebarTree:       sidebarTree,
 		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys), settings.About),

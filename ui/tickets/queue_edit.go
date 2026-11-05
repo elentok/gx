@@ -27,7 +27,7 @@ func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd
 	if !ok {
 		return notify.Warning("nothing selected")
 	}
-	return editTicketFile(m.worktreeRoot, m.settings, file, splitType, false)
+	return m.editor.edit(file, splitType, false)
 }
 
 // selectedEditTarget is the file the selected row's address resolves to.
@@ -45,5 +45,5 @@ func (m QueueModel) selectedEditTarget() (file string, ok bool) {
 }
 
 func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {
-	return m, editFileFinishedCmd(msg)
+	return m, m.editor.finished(msg)
 }

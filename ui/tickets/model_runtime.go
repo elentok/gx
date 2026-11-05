@@ -30,7 +30,7 @@ func (m Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 		return notify.Warning(warning)
 	}
 	r, _ := m.selectedRow()
-	return launchTicketEditor(m.worktreeRoot, m.settings, target, splitType, r.archived)
+	return m.editor.edit(target, splitType, r.archived)
 }
 
 // launchTicketEditor is a seam so tests can see what the Tickets tab edits.
@@ -87,17 +87,5 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 }
 
 func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (Model, tea.Cmd) {
-	return m, editFileFinishedCmd(msg)
-}
-
-// editFileFinishedCmd is shared by the Tickets tab's Model.handleEditFileFinished
-// and the Queue tab's QueueModel.handleEditFileFinished, which react identically.
-func editFileFinishedCmd(msg editFileFinishedMsg) tea.Cmd {
-	if msg.err != nil {
-		return notify.Error("edit failed: " + msg.err.Error())
-	}
-	if msg.splitApp != "" {
-		return notify.Info("opened " + msg.splitApp + " split: editor")
-	}
-	return nil
+	return m, m.editor.finished(msg)
 }
