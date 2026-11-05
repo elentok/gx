@@ -257,6 +257,19 @@ test("the menu lists Live sessions only with 2 or more, and has none with one", 
   expect(screen.queryByText(/Live sessions/)).toBeNull();
 });
 
+test("New session and the Live sessions rows share a section, with a rule before Copy design ID only", async () => {
+  render("/d/gx:a", [session("a"), session("b")]);
+  await openMenu();
+  const fresh = await newSession();
+  const live = screen.getByText(/Live sessions/);
+  const copy = screen.getByRole("menuitem", { name: /Copy design ID/ });
+  const rules = screen.getAllByRole("separator");
+  const between = (a: Node, b: Node) => (r: Node) =>
+    !!(a.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(b.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_PRECEDING);
+  expect(rules.filter(between(fresh, live))).toHaveLength(0);
+  expect(rules.filter(between(live, copy))).toHaveLength(1);
+});
+
 test("the Live sessions list switches the page and stops another session with a token", async () => {
   // The older run flipped state last; the newer run start still wins.
   const older = session("old", {

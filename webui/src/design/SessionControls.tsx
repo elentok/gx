@@ -1,10 +1,11 @@
 import { Box, Menu, Spinner, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { copyText } from "../clipboard";
 import { useConnectionContext } from "../connection";
 import type { DesignOpenRequest, SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
-import { MoreActionsMenu, type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
+import { menuItemStyle, type MenuItemStyle } from "../ui/more-actions/menuFrame";
+import { MoreActionsMenu,type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
 import { useWide } from "../useWide";
 import { agentDetails } from "./agentDetails";
 import { useWrite } from "../useWrite";
@@ -73,42 +74,6 @@ export function startNew(
   const body: DesignOpenRequest = { epic: address, new: true, ...(isLive ? { state: stateToken(shown) } : {}) };
   run(() => open(body));
 }
-
-/** The popover's positioner, or on a phone a dimmed backdrop that holds the menu as a bottom sheet and closes it on a press. */
-export function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode }) {
-  if (!sheet) return <Menu.Positioner>{children}</Menu.Positioner>;
-  return (
-    <Menu.Context>
-      {(menu) =>
-        menu.open && (
-          <Box
-            position="fixed"
-            inset="0"
-            zIndex="modal"
-            bg="overlay"
-            display="flex"
-            alignItems="flex-end"
-            onClick={(e) => e.target === e.currentTarget && menu.setOpen(false)}
-          >
-            {children}
-          </Box>
-        )
-      }
-    </Menu.Context>
-  );
-}
-
-export const menuItemStyle = (sheetMode: boolean) =>
-  ({
-    cursor: "pointer",
-    color: "text",
-    ps: "3",
-    _highlighted: { bg: "surface" },
-    fontWeight: "600",
-    fontSize: "17px",
-    ...(sheetMode && { py: "3", minH: "44px" }),
-  }) as const;
-type MenuItemStyle = ReturnType<typeof menuItemStyle>;
 
 /** The live sessions: pick one to show it, or stop one that is not shown. */
 function LiveSessionRows({
@@ -248,9 +213,9 @@ export function DesignActionsMenu({
       hint: shown.status.state === "exited" ? "Start a fresh session" : "Stop this session and start a fresh one",
       onSelect: () => startNew(run, address, shown, open),
     });
-  if (sessionItems.length > 0) sections.push(sessionItems);
   if (shown && live.length > 1)
     sections.push({
+      items: sessionItems,
       content: (
         <LiveSessionRows
           item={item}
@@ -262,7 +227,19 @@ export function DesignActionsMenu({
         />
       ),
     });
-  sections.push([{ value: "copy-design-id", label: "Copy design ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) }]);
+  else if (sessionItems.length > 0) sections.push(sessionItems);
+  const copySection: MoreActionsItem[] = [
+    { value: "copy-design-id", label: "Copy design ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) },
+  ];
+  if (canDelete && !confirming)
+    copySection.push({
+      value: "delete-design",
+      label: "Delete design",
+      danger: true,
+      closeOnSelect: false,
+      onSelect: () => setConfirming(true),
+    });
+  sections.push(copySection);
   if (canDelete && confirming)
     sections.push({
       content: (
@@ -272,14 +249,6 @@ export function DesignActionsMenu({
           onDelete={() => run(() => remove({ epic: address }), { onDone: onDeleted })}
         />
       ),
-    });
-  else if (canDelete)
-    (sections[sections.length - 1] as MoreActionsItem[]).push({
-      value: "delete-design",
-      label: "Delete design",
-      danger: true,
-      closeOnSelect: false,
-      onSelect: () => setConfirming(true),
     });
   return <MoreActionsMenu sections={sections} onClosed={() => setConfirming(false)} />;
 }

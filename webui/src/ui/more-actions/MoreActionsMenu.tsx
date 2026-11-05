@@ -1,6 +1,6 @@
 import { Box, chakra, Menu, Text } from "@chakra-ui/react";
 import { Fragment, type ReactNode } from "react";
-import { MenuFrame, menuItemStyle } from "../../design/SessionControls";
+import { MenuFrame, menuItemStyle } from "./menuFrame";
 import { useWide } from "../../useWide";
 import { GrabHandle, sheetPanel } from "../modal/BottomSheet";
 
@@ -20,9 +20,10 @@ export interface MoreActionsItem {
 
 /**
  * A section is a group of items; the menu draws a rule between sections. A page whose rows are
- * not plain items (a key-value block, a row with its own button) passes `{ content }` instead.
+ * not plain items (a key-value block, a row with its own button) passes `{ content }` instead,
+ * which may follow plain `items` in the same section.
  */
-export type MoreActionsSection = MoreActionsItem[] | { content: ReactNode };
+export type MoreActionsSection = MoreActionsItem[] | { items?: MoreActionsItem[]; content: ReactNode };
 
 const dots = (
   <svg viewBox="0 0 20 20" aria-hidden width="20" height="20" fill="currentColor">
@@ -92,8 +93,7 @@ export function MoreActionsMenu({
           {sections.map((section, i) => (
             <Fragment key={i}>
               {i > 0 && <Box role="separator" h="1px" bg="border" mx="1" my="1.5" />}
-              {"content" in section && section.content}
-              {Array.isArray(section) && section.map((it) => (
+              {(Array.isArray(section) ? section : (section.items ?? [])).map((it) => (
                 <Menu.Item
                   key={it.value}
                   value={it.value}
@@ -114,6 +114,7 @@ export function MoreActionsMenu({
                   )}
                 </Menu.Item>
               ))}
+              {!Array.isArray(section) && section.content}
             </Fragment>
           ))}
         </Menu.Content>
