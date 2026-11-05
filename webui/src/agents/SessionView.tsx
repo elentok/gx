@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { hasChat, useSessionChat, type FetchChat } from "../design/chat";
@@ -15,6 +15,7 @@ import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
 import { AgentChat } from "./AgentChat";
 import { AgentComposer } from "./AgentComposer";
+import { PromoteButton } from "./PromoteButton";
 import { stateLabel, statusMark } from "./rules";
 import { SessionHarnessLabel } from "./SessionHarnessLabel";
 import { StatusMark } from "./SessionGlyphs";
@@ -29,7 +30,18 @@ function DesignLink({ map, ml }: { map: string; ml?: string }) {
   );
 }
 
-function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
+function SessionHeader({
+  session: s,
+  sessions,
+  onNew,
+  promote,
+}: {
+  session: SessionInfo;
+  sessions: SessionInfo[];
+  onNew: () => void;
+  /** The Promote to Design button; absent for a gx-driven agent. */
+  promote?: ReactNode;
+}) {
   const navigate = useNavigate();
   const actions = <SessionActions session={s} onRemoved={() => navigate("/agents")} />;
   const { tone } = statusMark(s);
@@ -37,7 +49,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
   const wide = useWide();
   if (!wide) {
     return (
-      <Box as="header" display="flex" alignItems="center" gap="2" mb="3" pb="2" borderBottomWidth="1px" borderColor="border">
+      <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3" pb="2" borderBottomWidth="1px" borderColor="border">
         <Link href={AGENTS_HREF} aria-label="All sessions" fontSize="2xl" lineHeight="1" px="2" color="text.muted">
           ‹
         </Link>
@@ -51,6 +63,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
         </Box>
         {map && <DesignLink map={map} ml="auto" />}
         <Box ml={map ? undefined : "auto"}>{actions}</Box>
+        {promote && <Box flexBasis="100%">{promote}</Box>}
       </Box>
     );
   }
@@ -71,6 +84,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
         </Text>
       )}
       {map && <DesignLink map={map} ml="auto" />}
+      {promote}
       <Box ml={map ? undefined : "auto"}>{actions}</Box>
     </Box>
   );
@@ -167,7 +181,23 @@ export function SessionView({
   const shown = chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat;
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
-      <SessionHeader session={session} sessions={sessions} onNew={onNew} />
+      <SessionHeader
+        session={session}
+        sessions={sessions}
+        onNew={onNew}
+        promote={
+          kind === undefined && (
+            <PromoteButton
+              session={session}
+              lastMessage={chat?.messages.at(-1)?.id}
+              hasMessages={(chat?.messages.length ?? 0) > 0}
+              connected={connected && chatty}
+              reason={sendReason(session, connected)}
+              onStale={refetch}
+            />
+          )
+        }
+      />
       {chatty && chat && chat.messages.length === 0 && !chat.archived && !chat.unreadable && (
         <Text color="text.muted" flex="1" display="flex" alignItems="center" justifyContent="center">
           No messages yet
