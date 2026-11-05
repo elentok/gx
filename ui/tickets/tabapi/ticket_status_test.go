@@ -1,4 +1,4 @@
-package tickets
+package tabapi
 
 import (
 	"strings"
@@ -8,16 +8,14 @@ import (
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
-	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 func TestTicketStatus_ServerWordWinsOverComputed(t *testing.T) {
 	info := wire.TicketInfo{
 		Address: "p:e/01", Title: "one", Status: "open", RenderedStatus: "waiting-for-children",
 	}
-	tk := tabapi.TicketFromInfo(info, "01")
+	tk := TicketFromInfo(info, "01")
 	epic := gxtickets.Epic{Name: "p:e", Tickets: []gxtickets.Ticket{tk}}
-
 	if got := epic.RenderedStatus(tk); got != gxtickets.StatusOpen {
 		t.Fatalf("computed status = %v, want open (the test needs the two to differ)", got)
 	}
