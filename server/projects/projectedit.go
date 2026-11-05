@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 func refuseProject(reason, msg string) (wire.ProjectResult, error) {
@@ -81,7 +82,7 @@ func (p *Registry) SetPath(req wire.ProjectRequest) (wire.ProjectResult, error) 
 		}
 	}
 	pf.Repo = &repo
-	if err := tickets.WriteProjectFile(dir, pf); err != nil {
+	if err := ticketmigrate.WriteProjectFile(dir, pf); err != nil {
 		return wire.ProjectResult{}, err
 	}
 	return wire.ProjectResult{Name: req.Name, Repo: repo}, nil

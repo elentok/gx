@@ -1,10 +1,12 @@
-package tickets
+package ticketmigrate
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/tickets"
 )
 
 // BackfillEpicTimes stamps created_at on every epic under root that lacks it,
@@ -12,24 +14,24 @@ import (
 // lacks it once its <map>-impl epic exists, from that epic's created_at (its
 // file creation time when that isn't stamped yet). Stamping never overwrites,
 // so a rerun is a no-op.
-func BackfillEpicTimes(root string) ([]MigrationChange, error) {
+func BackfillEpicTimes(root string) ([]tickets.MigrationChange, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
-	var changes []MigrationChange
+	var changes []tickets.MigrationChange
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		epicPath := filepath.Join(root, entry.Name())
-		epic := LoadEpicTicketMD(epicPath)
+		epic := tickets.LoadEpicTicketMD(epicPath)
 		if !epic.HasTicketMD {
 			continue
 		}
-		for _, backfill := range []func() (*MigrationChange, error){
-			func() (*MigrationChange, error) { return backfillCreatedAt(epicPath, epic) },
-			func() (*MigrationChange, error) { return backfillMapCompletedAt(root, entry.Name(), epic) },
+		for _, backfill := range []func() (*tickets.MigrationChange, error){
+			func() (*tickets.MigrationChange, error) { return backfillCreatedAt(epicPath, epic) },
+			func() (*tickets.MigrationChange, error) { return backfillMapCompletedAt(root, entry.Name(), epic) },
 		} {
 			change, err := backfill()
 			if err != nil {
@@ -44,7 +46,7 @@ func BackfillEpicTimes(root string) ([]MigrationChange, error) {
 }
 
 // backfillCreatedAt stamps created_at from the file's creation time.
-func backfillCreatedAt(epicPath string, epic Epic) (*MigrationChange, error) {
+func backfillCreatedAt(epicPath string, epic tickets.Epic) (*tickets.MigrationChange, error) {
 	if !epic.CreatedAt.IsZero() {
 		return nil, nil
 	}
@@ -52,10 +54,10 @@ func backfillCreatedAt(epicPath string, epic Epic) (*MigrationChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := StampEpicFieldsInner(epicPath, map[string]any{"created_at": created}); err != nil {
+	if err := tickets.StampEpicFieldsInner(epicPath, map[string]any{"created_at": created}); err != nil {
 		return nil, err
 	}
-	return &MigrationChange{
+	return &tickets.MigrationChange{
 		Path:  filepath.Join(epicPath, "ticket.md"),
 		Notes: []string{"created_at backfilled from file creation time"},
 	}, nil
@@ -63,12 +65,12 @@ func backfillCreatedAt(epicPath string, epic Epic) (*MigrationChange, error) {
 
 // backfillMapCompletedAt stamps a map's completed_at from its <map>-impl
 // epic, the rule CreateEpic applies when it creates that epic.
-func backfillMapCompletedAt(root, name string, epic Epic) (*MigrationChange, error) {
+func backfillMapCompletedAt(root, name string, epic tickets.Epic) (*tickets.MigrationChange, error) {
 	if !epic.IsMap || !epic.CompletedAt.IsZero() {
 		return nil, nil
 	}
-	implPath := implEpicPath(root, name)
-	impl := LoadEpicTicketMD(implPath)
+	implPath := tickets.ImplEpicPath(root, name)
+	impl := tickets.LoadEpicTicketMD(implPath)
 	if !impl.HasTicketMD {
 		return nil, nil
 	}
@@ -80,12 +82,12 @@ func backfillMapCompletedAt(root, name string, epic Epic) (*MigrationChange, err
 		}
 	}
 	epicPath := filepath.Join(root, name)
-	if err := StampEpicFieldsInner(epicPath, map[string]any{"completed_at": completed}); err != nil {
+	if err := tickets.StampEpicFieldsInner(epicPath, map[string]any{"completed_at": completed}); err != nil {
 		return nil, err
 	}
-	return &MigrationChange{
+	return &tickets.MigrationChange{
 		Path:  filepath.Join(epicPath, "ticket.md"),
-		Notes: []string{"completed_at backfilled from " + name + ImplEpicSuffix},
+		Notes: []string{"completed_at backfilled from " + name + tickets.ImplEpicSuffix},
 	}, nil
 }
 

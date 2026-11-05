@@ -1,10 +1,12 @@
-package tickets
+package ticketmigrate
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/tickets"
 )
 
 // BackfillMergedAt stamps merged_at on every loop epic under root that is
@@ -14,24 +16,24 @@ import (
 // it never got one, every ticket finished, and merged_at is the newest
 // done_at. isMerged is only called for those candidates, so a root with none
 // never touches git. An epic already stamped is skipped, so a rerun is a no-op.
-func BackfillMergedAt(root string, isMerged func(Epic) (bool, error)) ([]MigrationChange, error) {
+func BackfillMergedAt(root string, isMerged func(tickets.Epic) (bool, error)) ([]tickets.MigrationChange, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
-	var changes []MigrationChange
+	var changes []tickets.MigrationChange
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
-		epic := LoadEpicTicketMD(filepath.Join(root, entry.Name()))
+		epic := tickets.LoadEpicTicketMD(filepath.Join(root, entry.Name()))
 		epic.Name = entry.Name()
 		if !epic.HasTicketMD || epic.IsMap || !epic.MergedAt.IsZero() {
 			continue
 		}
 		mergedAt, note := epic.CompletedAt, "merged_at backfilled from completed_at"
 		if mergedAt.IsZero() {
-			epic = loadEpic(root, entry.Name())
+			epic = tickets.LoadEpic(root, entry.Name())
 			mergedAt, note = lastDoneAt(epic), "merged_at backfilled from the last done_at"
 		}
 		if mergedAt.IsZero() {
@@ -44,10 +46,10 @@ func BackfillMergedAt(root string, isMerged func(Epic) (bool, error)) ([]Migrati
 		if !ok {
 			continue
 		}
-		if err := StampEpicFieldsInner(epic.Path, map[string]any{"merged_at": mergedAt}); err != nil {
+		if err := tickets.StampEpicFieldsInner(epic.Path, map[string]any{"merged_at": mergedAt}); err != nil {
 			return changes, err
 		}
-		changes = append(changes, MigrationChange{
+		changes = append(changes, tickets.MigrationChange{
 			Path:  filepath.Join(epic.Path, "ticket.md"),
 			Notes: []string{note},
 		})
@@ -59,11 +61,10 @@ func BackfillMergedAt(root string, isMerged func(Epic) (bool, error)) ([]Migrati
 // is not done or cancelled, or none has a done_at. It reads the raw status, not
 // RenderedStatus: the epic is loaded alone, so a cross-epic blocker would look
 // dangling and render a done ticket as an error.
-func lastDoneAt(e Epic) time.Time {
+func lastDoneAt(e tickets.Epic) time.Time {
 	var newest time.Time
 	for _, t := range e.Tickets {
-		status := strings.ToLower(strings.TrimSpace(t.Status))
-		if t.ReadErr != "" || !doneStatuses[status] && !cancelledStatuses[status] {
+		if t.ReadErr != "" || !t.IsTerminal() {
 			return time.Time{}
 		}
 		if t.DoneAt.After(newest) {

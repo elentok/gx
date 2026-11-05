@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -227,7 +228,7 @@ func sumSessions(refs []SessionRef, notFound error, resolve func(SessionRef) (st
 // SessionIDsTotals sums the total tokens and cost of the Claude sessions in
 // ids, finding each transcript under home by id alone: the worktree a session ran in may
 // be gone. All-or-nothing, like SessionsTotals; an id with no transcript, or
-// with several, wraps tickets.ErrUnreadable; so does one that cannot be parsed.
+// with several, wraps ticketmigrate.ErrUnreadable; so does one that cannot be parsed.
 // Any other error is a real I/O failure.
 func SessionIDsTotals(home string, ids []string) (tokens int64, cost float64, err error) {
 	refs := make([]SessionRef, len(ids))
@@ -240,15 +241,15 @@ func SessionIDsTotals(home string, ids []string) (tokens int64, cost float64, er
 			return sessionStats{}, ref.Agent, false, err
 		}
 		if len(matches) != 1 {
-			return sessionStats{}, ref.Agent, false, fmt.Errorf("%d transcripts found: %w", len(matches), tickets.ErrUnreadable)
+			return sessionStats{}, ref.Agent, false, fmt.Errorf("%d transcripts found: %w", len(matches), ticketmigrate.ErrUnreadable)
 		}
 		stats, err := readTranscriptStats(matches[0])
 		if err != nil {
-			return sessionStats{}, ref.Agent, false, fmt.Errorf("%w: %w", tickets.ErrUnreadable, err)
+			return sessionStats{}, ref.Agent, false, fmt.Errorf("%w: %w", ticketmigrate.ErrUnreadable, err)
 		}
 		return stats, ref.Agent, stats.ok, nil
 	}
-	sum, err := sumSessions(refs, tickets.ErrUnreadable, resolveByID)
+	sum, err := sumSessions(refs, ticketmigrate.ErrUnreadable, resolveByID)
 	return sum.tokens, sum.cost, err
 }
 

@@ -54,7 +54,7 @@ func Load(scratchDir string) ([]Epic, error) {
 		sem <- struct{}{}
 		go func() {
 			defer wg.Done()
-			epics[i] = loadEpic(scratchDir, name)
+			epics[i] = LoadEpic(scratchDir, name)
 			<-sem
 		}()
 	}
@@ -66,10 +66,10 @@ const loadEpicWorkers = 8
 
 // LoadEpicAt loads the one epic at epicPath, tickets included.
 func LoadEpicAt(epicPath string) Epic {
-	return loadEpic(filepath.Dir(epicPath), filepath.Base(epicPath))
+	return LoadEpic(filepath.Dir(epicPath), filepath.Base(epicPath))
 }
 
-func loadEpic(scratchDir, name string) Epic {
+func LoadEpic(scratchDir, name string) Epic {
 	epicPath := filepath.Join(scratchDir, name)
 	epic := Epic{Name: name, Path: epicPath, forks: &forkCache{}}
 	loadEpicTicketMD(&epic)
@@ -84,7 +84,7 @@ func loadEpic(scratchDir, name string) Epic {
 		if issueEntry.IsDir() {
 			continue
 		}
-		number, identifier, title, ok := parseTicketFilename(issueEntry.Name())
+		number, identifier, title, ok := ParseTicketFilename(issueEntry.Name())
 		if !ok {
 			continue
 		}
@@ -182,8 +182,8 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	}
 
 	ticket.Type = string(parsed.Type)
-	ticket.BlockedBy = idsToStrings(parsed.BlockedBy)
-	ticket.Parent = idToStringPtr(parsed.Parent)
+	ticket.BlockedBy = IDsToStrings(parsed.BlockedBy)
+	ticket.Parent = IDToStringPtr(parsed.Parent)
 	ticket.Status = string(parsed.Status)
 	ticket.Body = schema.ParseBody(string(raw))
 	if heading := headingTitle(ticket.Body, identifier); heading != "" {
@@ -222,12 +222,12 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	return ticket
 }
 
-// parseTicketFilename splits a "NN[suffix]-<slug>.md" filename into its
+// ParseTicketFilename splits a "NN[suffix]-<slug>.md" filename into its
 // numeric sort key, full identifier, and a humanized title. The optional
 // suffix supports wayfinder's split tickets (for example 10a) and, one
 // level deeper, a numeric child of a lettered split (10b1) — see
 // ticketmove.NextTicketID.
-func parseTicketFilename(filename string) (number int, identifier, title string, ok bool) {
+func ParseTicketFilename(filename string) (number int, identifier, title string, ok bool) {
 	m := ticketFilenameRe.FindStringSubmatch(filename)
 	if m == nil {
 		return 0, "", "", false
@@ -432,9 +432,9 @@ func loadEpicEvolveFields(epic *Epic, fm string) {
 	}
 }
 
-// epicTiming is an epic's optional started_at/completed_at pair, as stored in
+// EpicTiming is an epic's optional started_at/completed_at pair, as stored in
 // ticket.md's frontmatter (and in migrate's old-shape epic.yaml sidecar).
-type epicTiming struct {
+type EpicTiming struct {
 	StartedAt   *time.Time `yaml:"started_at,omitempty"`
 	CompletedAt *time.Time `yaml:"completed_at,omitempty"`
 }
@@ -445,7 +445,7 @@ type epicTiming struct {
 // on every ticket claim — not just the epic's first — never overwrites an
 // already-recorded start time across a resumed or reattached run.
 func StampEpicStarted(scratchDir, epicName string, now time.Time) error {
-	return stampEpicTiming(scratchDir, epicName, func(wire *epicTiming) bool {
+	return stampEpicTiming(scratchDir, epicName, func(wire *EpicTiming) bool {
 		if wire.StartedAt != nil {
 			return false
 		}
@@ -486,7 +486,7 @@ func StampEpicFields(epicPath string, fields map[string]any) error {
 // StampEpicFieldsInner is StampEpicFields without the project's migration lock,
 // for migration steps, which run while their migration holds it exclusive.
 func StampEpicFieldsInner(epicPath string, fields map[string]any) error {
-	return stampEpicFields(editEpicFrontmatterInner, epicPath, fields, false)
+	return stampEpicFields(EditEpicFrontmatterInner, epicPath, fields, false)
 }
 
 // OverwriteEpicFields is StampEpicFields for keys a later run legitimately
@@ -497,7 +497,7 @@ func OverwriteEpicFields(epicPath string, fields map[string]any) error {
 
 // OverwriteEpicFieldsInner is OverwriteEpicFields without the migration lock.
 func OverwriteEpicFieldsInner(epicPath string, fields map[string]any) error {
-	return stampEpicFields(editEpicFrontmatterInner, epicPath, fields, true)
+	return stampEpicFields(EditEpicFrontmatterInner, epicPath, fields, true)
 }
 
 // ClearEpicFields removes each key from the epic's ticket.md frontmatter. A key
@@ -506,7 +506,7 @@ func ClearEpicFields(epicPath string, keys ...string) error {
 	return editEpicFrontmatter(epicPath, func(mapping *yaml.Node) (bool, error) {
 		changed := false
 		for _, key := range keys {
-			if i := mappingKeyIndex(mapping, key); i >= 0 {
+			if i := MappingKeyIndex(mapping, key); i >= 0 {
 				mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
 				changed = true
 			}
@@ -519,7 +519,7 @@ func stampEpicFields(edit epicFrontmatterEditor, epicPath string, fields map[str
 	return edit(epicPath, func(mapping *yaml.Node) (bool, error) {
 		changed := false
 		for key, value := range fields {
-			idx := mappingKeyIndex(mapping, key)
+			idx := MappingKeyIndex(mapping, key)
 			if idx >= 0 && !overwrite {
 				continue
 			}
@@ -549,13 +549,13 @@ func editEpicFrontmatter(epicPath string, edit func(mapping *yaml.Node) (bool, e
 		return err
 	}
 	defer unlock()
-	return editEpicFrontmatterInner(epicPath, edit)
+	return EditEpicFrontmatterInner(epicPath, edit)
 }
 
-// editEpicFrontmatterInner runs edit on the epic's ticket.md frontmatter mapping
+// EditEpicFrontmatterInner runs edit on the epic's ticket.md frontmatter mapping
 // under the ticket lock, and writes the file back only when edit reports a
 // change. Migration steps call it directly: they hold the migration lock.
-func editEpicFrontmatterInner(epicPath string, edit func(mapping *yaml.Node) (bool, error)) error {
+func EditEpicFrontmatterInner(epicPath string, edit func(mapping *yaml.Node) (bool, error)) error {
 	ticketPath := filepath.Join(epicPath, "ticket.md")
 	if _, err := os.Stat(ticketPath); err != nil {
 		return fmt.Errorf("epic %s has no ticket.md: %w", epicPath, err)
@@ -595,9 +595,9 @@ func editEpicFrontmatterInner(epicPath string, edit func(mapping *yaml.Node) (bo
 	return fsutil.WriteFileAtomic(ticketPath, []byte("---\n"+string(out)+"---\n"+body))
 }
 
-// mappingKeyIndex returns the index of key in mapping.Content, or -1 when absent.
+// MappingKeyIndex returns the index of key in mapping.Content, or -1 when absent.
 // The value node sits at the returned index + 1.
-func mappingKeyIndex(mapping *yaml.Node, key string) int {
+func MappingKeyIndex(mapping *yaml.Node, key string) int {
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		if mapping.Content[i].Value == key {
 			return i
@@ -609,7 +609,7 @@ func mappingKeyIndex(mapping *yaml.Node, key string) int {
 // stampEpicTiming reads scratchDir/epicName's ticket.md timing, hands it to
 // mutate, and writes it back only when mutate reports a change — the shared
 // idempotency check both StampEpicStarted and StampEpicCompleted rely on.
-func stampEpicTiming(scratchDir, epicName string, mutate func(*epicTiming) bool) error {
+func stampEpicTiming(scratchDir, epicName string, mutate func(*EpicTiming) bool) error {
 	epicPath := filepath.Join(scratchDir, epicName)
 	ticketPath := filepath.Join(epicPath, "ticket.md")
 	if _, err := os.Stat(ticketPath); err != nil {
@@ -637,7 +637,7 @@ func stampEpicTiming(scratchDir, epicName string, mutate func(*epicTiming) bool)
 // stampTicketMDTiming applies mutate to the timing fields of ticket.md's
 // frontmatter. It edits the YAML node tree rather than re-marshaling a struct,
 // so the epic's other frontmatter keys and its body survive untouched.
-func stampTicketMDTiming(path, raw string, mutate func(*epicTiming) bool) error {
+func stampTicketMDTiming(path, raw string, mutate func(*EpicTiming) bool) error {
 	fm, body, ok := schema.SplitFrontmatter(raw)
 	if !ok {
 		return fmt.Errorf("%s: no frontmatter to stamp timing into", path)
@@ -649,7 +649,7 @@ func stampTicketMDTiming(path, raw string, mutate func(*epicTiming) bool) error 
 	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		return fmt.Errorf("%s: frontmatter is not a mapping", path)
 	}
-	var wire epicTiming
+	var wire EpicTiming
 	if err := doc.Content[0].Decode(&wire); err != nil {
 		return fmt.Errorf("parsing %s: %w", path, err)
 	}
@@ -674,17 +674,17 @@ func stampTicketMDTiming(path, raw string, mutate func(*epicTiming) bool) error 
 func setMappingTime(mapping *yaml.Node, key string, t time.Time) {
 	var val yaml.Node
 	_ = val.Encode(t)
-	if i := mappingKeyIndex(mapping, key); i >= 0 {
+	if i := MappingKeyIndex(mapping, key); i >= 0 {
 		mapping.Content[i+1] = &val
 		return
 	}
 	mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
 }
 
-// idsToStrings lowers schema.TicketIDs to plain strings for tickets.Ticket's
+// IDsToStrings lowers schema.TicketIDs to plain strings for tickets.Ticket's
 // BlockedBy field, which predates the schema package and is read directly by
 // ralphloop/ui call sites that don't know about schema.TicketID.
-func idsToStrings(ids []schema.TicketID) []string {
+func IDsToStrings(ids []schema.TicketID) []string {
 	if len(ids) == 0 {
 		return nil
 	}
@@ -695,9 +695,9 @@ func idsToStrings(ids []schema.TicketID) []string {
 	return out
 }
 
-// idToStringPtr lowers an optional schema.TicketID to a plain *string, for
+// IDToStringPtr lowers an optional schema.TicketID to a plain *string, for
 // tickets.Ticket's Parent field (see idsToStrings).
-func idToStringPtr(id *schema.TicketID) *string {
+func IDToStringPtr(id *schema.TicketID) *string {
 	if id == nil {
 		return nil
 	}

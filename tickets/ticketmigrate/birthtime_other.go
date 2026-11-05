@@ -1,6 +1,6 @@
 //go:build !darwin
 
-package tickets
+package ticketmigrate
 
 import (
 	"os"

@@ -14,11 +14,12 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 // runTicketsMigrateToStore copies the old tracker tree at oldRoot into the
 // ticket store as the project for the repo at cwd (see
-// tickets.MigrateIntoStore). The project is named projectFlag, else after the
+// ticketmigrate.MigrateIntoStore). The project is named projectFlag, else after the
 // repo directory: for a bare layout, the directory holding .bare.
 func runTicketsMigrateToStore(dirs config.Dirs, cwd, oldRoot, projectFlag string, dryRun bool, w io.Writer) error {
 	repo, err := git.FindRepo(cwd)
@@ -42,7 +43,7 @@ func runTicketsMigrateToStore(dirs config.Dirs, cwd, oldRoot, projectFlag string
 		name = filepath.Base(dir)
 	}
 
-	n, err := tickets.MigrateIntoStore(oldRoot, filepath.Join(cfg.TicketStore.Path, name), name, repo.Root, dryRun)
+	n, err := ticketmigrate.MigrateIntoStore(oldRoot, filepath.Join(cfg.TicketStore.Path, name), name, repo.Root, dryRun)
 	if err != nil {
 		return err
 	}

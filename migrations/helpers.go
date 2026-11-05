@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 // designProbeUnder is the trunk checkout and repo of the project at root, for
@@ -30,14 +31,14 @@ func designProbeUnder(root string) tickets.DesignProbe {
 
 // backfillTicketCreation stamps created_at and the original address on the
 // tickets of the ticket-store project at root from the store's git history
-// (see tickets.BackfillTicketCreation). A root that is not a project of a
+// (see ticketmigrate.BackfillTicketCreation). A root that is not a project of a
 // git-tracked store has no history to read and is skipped.
 func backfillTicketCreation(root string, dryRun bool) ([]tickets.MigrationChange, error) {
 	storeRoot, epics, err := storeProjectEpics(root)
 	if err != nil || epics == nil {
 		return nil, err
 	}
-	created, err := tickets.BackfillTicketCreation(epics, storeRoot, ticketOrigin(func(rel string) (git.FileOrigin, bool, error) {
+	created, err := ticketmigrate.BackfillTicketCreation(epics, storeRoot, ticketOrigin(func(rel string) (git.FileOrigin, bool, error) {
 		return git.FirstCommitOfFile(storeRoot, rel)
 	}), dryRun)
 	if err != nil {
@@ -48,17 +49,17 @@ func backfillTicketCreation(root string, dryRun bool) ([]tickets.MigrationChange
 	if err != nil {
 		return created, err
 	}
-	cancelled, err := tickets.BackfillCancelledAt(epics, storeRoot, ticketOrigin(func(rel string) (git.FileOrigin, bool, error) {
+	cancelled, err := ticketmigrate.BackfillCancelledAt(epics, storeRoot, ticketOrigin(func(rel string) (git.FileOrigin, bool, error) {
 		return git.LastCommitChangingLine(storeRoot, rel, "^status: cancelled$")
 	}), dryRun)
 	return mergeChanges(created, cancelled), err
 }
 
 // ticketOrigin adapts a git history lookup to the origin func the backfills take.
-func ticketOrigin(lookup func(rel string) (git.FileOrigin, bool, error)) func(string) (tickets.TicketOrigin, bool, error) {
-	return func(rel string) (tickets.TicketOrigin, bool, error) {
+func ticketOrigin(lookup func(rel string) (git.FileOrigin, bool, error)) func(string) (ticketmigrate.TicketOrigin, bool, error) {
+	return func(rel string) (ticketmigrate.TicketOrigin, bool, error) {
 		o, ok, err := lookup(rel)
-		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
+		return ticketmigrate.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
 	}
 }
 
@@ -73,7 +74,7 @@ func storeProjectEpics(root string) (storeRoot string, epics []tickets.Epic, err
 	if _, err := os.Stat(filepath.Join(storeRoot, ".git")); err != nil {
 		return "", nil, nil
 	}
-	all, err := tickets.LoadStoreEpics(storeRoot)
+	all, err := ticketmigrate.LoadStoreEpics(storeRoot)
 	if err != nil {
 		return "", nil, err
 	}

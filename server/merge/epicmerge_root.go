@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 // CompleteRootIfDone merges the root's feature branch once every ticket in its
@@ -361,7 +362,7 @@ func (s *Merger) StampEpic(root queue.RootRef, epicPath string, keys ...string) 
 	}
 	// Every merge path stamps merged_at here, so an <map>-impl merge completes its map here.
 	if slices.Contains(keys, "merged_at") {
-		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
+		if _, err := ticketmigrate.MarkMapDone(epicPath, false); err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
 		}
 		s.guards.GoSettle(func() { s.rec.RemoveMergedWorktree(root) })

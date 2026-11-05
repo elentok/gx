@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/projectlock"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // lockedProjectTicketPath makes a ticket inside a store project (a dir holding
@@ -57,37 +56,6 @@ func TestAppendLog_WaitsForProjectMigration(t *testing.T) {
 	evs, err := ReadLog(path)
 	if err != nil || len(evs) != 1 {
 		t.Fatalf("ReadLog = %v, %v; want one event", evs, err)
-	}
-}
-
-// A migration step runs while its migration holds the lock exclusive. The
-// pause unit writes tickets itself, so it must not wait for its own lock.
-func TestApplyPauseMigration_RunsWhileProjectLockHeld(t *testing.T) {
-	dir, path := lockedProjectTicketPath(t, lockedTicketContent)
-	unlock, err := projectlock.Exclusive(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer unlock()
-	done := make(chan error, 1)
-	go func() {
-		_, err := ApplyPauseMigration([]PauseStep{{Path: path, Reason: schema.PausedReason("", schema.PauseClassAnswer)}})
-		if err == nil {
-			_, err = AppendLogInner(path, question("gx"))
-		}
-		done <- err
-	}()
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(3 * time.Second):
-		t.Fatal("migration step waited for its own migration lock")
-	}
-	raw, _ := os.ReadFile(path)
-	if !strings.Contains(string(raw), "status: paused") {
-		t.Errorf("ticket = %q, want status paused", raw)
 	}
 }
 

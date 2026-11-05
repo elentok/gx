@@ -193,8 +193,8 @@ func mapCompletionFields(conversationsDir, mapPath string, at time.Time) (map[st
 	return fields, nil
 }
 
-// implEpicPath is where a map's <map>-impl epic lives.
-func implEpicPath(root, mapName string) string {
+// ImplEpicPath is where a map's <map>-impl epic lives.
+func ImplEpicPath(root, mapName string) string {
 	return filepath.Join(root, mapName+ImplEpicSuffix)
 }
 

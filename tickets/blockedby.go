@@ -160,7 +160,7 @@ func EpicsWaitedOn(project string, epics []Epic) map[string]bool {
 // nothing is checked.
 func CheckBlockedByWrite(path string, st schema.Ticket) ([]string, error) {
 	issuesDir := filepath.Dir(path)
-	number, identifier, _, ok := parseTicketFilename(filepath.Base(path))
+	number, identifier, _, ok := ParseTicketFilename(filepath.Base(path))
 	if filepath.Base(issuesDir) != "issues" || !ok {
 		return nil, nil
 	}
@@ -174,8 +174,8 @@ func CheckBlockedByWrite(path string, st schema.Ticket) ([]string, error) {
 		Number:     number,
 		Identifier: identifier,
 		Path:       path,
-		BlockedBy:  idsToStrings(st.BlockedBy),
-		Parent:     idToStringPtr(st.Parent),
+		BlockedBy:  IDsToStrings(st.BlockedBy),
+		Parent:     IDToStringPtr(st.Parent),
 		Status:     string(st.Status),
 		Commitless: st.IsCommitless(),
 	}

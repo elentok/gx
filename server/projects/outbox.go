@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 // OutboxProject is the project evolve findings are filed in. A maintainer
@@ -41,7 +42,7 @@ func EnsureOutboxProject(ticketStore, mode string) error {
 	}
 	name, vcs := OutboxProject, config.VCSNone
 	dir := filepath.Join(ticketStore, OutboxProject)
-	if err := tickets.WriteProjectFile(dir, config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs}); err != nil {
+	if err := ticketmigrate.WriteProjectFile(dir, config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs}); err != nil {
 		return err
 	}
 	return migrations.WriteFullApplied(dir)

@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 const (
@@ -45,7 +46,7 @@ func newStats(n int) wire.Stats {
 	}
 }
 
-func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time, led costLedger) wire.Stats {
+func buildStats(all []ticketmigrate.StoreEpic, n int, project string, now time.Time, led costLedger) wire.Stats {
 	win := limits.NewStatsWindow(n, now)
 	out := newStats(n)
 	out.Project, out.Days = project, win.Labels()

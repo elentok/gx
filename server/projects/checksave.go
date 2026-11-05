@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 func refuseSave(reason, msg string) (wire.SaveChecksResult, error) {
@@ -47,7 +48,7 @@ func (c *Checks) Save(req wire.SaveChecksRequest) (wire.SaveChecksResult, error)
 
 func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
 	pf.Checks = req.Checks
-	if err := tickets.WriteProjectFile(dir, pf); err != nil {
+	if err := ticketmigrate.WriteProjectFile(dir, pf); err != nil {
 		return wire.SaveChecksResult{}, err
 	}
 	return wire.SaveChecksResult{Project: req.Project, Target: req.Target, Path: filepath.Join(dir, config.ProjectFileName)}, nil

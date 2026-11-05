@@ -1,4 +1,4 @@
-package tickets
+package ticketmigrate
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/tickettest"
 )
 
 func TestMigrate_BackfillsClaimedAtAndDoneAtOnce(t *testing.T) {
@@ -14,8 +15,8 @@ func TestMigrate_BackfillsClaimedAtAndDoneAtOnce(t *testing.T) {
 	issues := filepath.Join(dir, "my-epic", "issues")
 	donePath := filepath.Join(issues, "01-done.md")
 	openPath := filepath.Join(issues, "02-open.md")
-	writeFile(t, donePath, "---\nid: \"01\"\nstatus: done\ntype: implement\ncompleted_at: 2026-01-02T03:04:05Z\n---\nBody.\n")
-	writeFile(t, openPath, "---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	tickettest.WriteFile(t, donePath, "---\nid: \"01\"\nstatus: done\ntype: implement\ncompleted_at: 2026-01-02T03:04:05Z\n---\nBody.\n")
+	tickettest.WriteFile(t, openPath, "---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	result, err := Migrate(dir)
 	if err != nil {
@@ -50,7 +51,7 @@ func TestMigrate_IterationStatusRoundTripsUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "my-epic", "issues", "01-first-ticket.md")
 	original := "---\nid: \"01\"\nstatus: done\ntype: implement\niteration_status: working\nclaimed_at: 2026-01-02T03:04:05Z\ndone_at: 2026-01-02T03:04:05Z\n---\nBody.\n"
-	writeFile(t, path, original)
+	tickettest.WriteFile(t, path, original)
 
 	result, err := Migrate(dir)
 	if err != nil {
@@ -73,10 +74,10 @@ func TestMigrate_RewritesSupersededInTheArchive(t *testing.T) {
 	dir := t.TempDir()
 	livePath := filepath.Join(dir, "live-epic", "issues", "01-live.md")
 	archivedPath := filepath.Join(dir, ".archive", "old-epic", "issues", "01-old.md")
-	writeFile(t, livePath, "---\nid: \"01\"\nstatus: superseded\ntype: implement\n---\nBody.\n")
-	writeFile(t, archivedPath, "---\nid: \"01\"\nstatus: superseded\ntype: implement\n---\nBody.\n")
+	tickettest.WriteFile(t, livePath, "---\nid: \"01\"\nstatus: superseded\ntype: implement\n---\nBody.\n")
+	tickettest.WriteFile(t, archivedPath, "---\nid: \"01\"\nstatus: superseded\ntype: implement\n---\nBody.\n")
 	archivedDonePath := filepath.Join(dir, ".archive", "old-epic", "issues", "02-done.md")
-	writeFile(t, archivedDonePath, "---\nid: \"02\"\nstatus: done\ntype: implement\n---\nBody.\n")
+	tickettest.WriteFile(t, archivedDonePath, "---\nid: \"02\"\nstatus: done\ntype: implement\n---\nBody.\n")
 
 	result, err := Migrate(dir)
 	if err != nil {

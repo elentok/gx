@@ -1,4 +1,4 @@
-package tickets
+package ticketmigrate
 
 import (
 	"encoding/json"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -118,7 +119,7 @@ func validateStaged(files []storeFile, projectDir, name, repo string) error {
 			return err
 		}
 	}
-	if err := ValidateProject(tmp); err != nil {
+	if err := tickets.ValidateProject(tmp); err != nil {
 		return errors.New(strings.ReplaceAll(err.Error(), tmp, projectDir))
 	}
 	return nil
@@ -138,7 +139,7 @@ func isEpicSidecar(rel string) bool {
 // rewritten, or raw untouched when path isn't a ticket, doesn't parse, or
 // already has the new shape.
 func convertTicketFile(path string, raw []byte) []byte {
-	if _, _, _, ok := parseTicketFilename(filepath.Base(path)); !ok {
+	if _, _, _, ok := tickets.ParseTicketFilename(filepath.Base(path)); !ok {
 		return raw
 	}
 	if parent := filepath.Base(filepath.Dir(path)); parent != "issues" && parent != ".archive" {
@@ -212,7 +213,7 @@ func readOptional(path string) ([]byte, error) {
 }
 
 func epicTicketMD(sidecar, body []byte) ([]byte, error) {
-	var wire epicTiming
+	var wire tickets.EpicTiming
 	if err := yaml.Unmarshal(sidecar, &wire); err != nil {
 		return nil, err
 	}
@@ -226,7 +227,7 @@ func epicTicketMD(sidecar, body []byte) ([]byte, error) {
 		fm.Status = string(schema.StatusDone)
 	}
 	if body != nil {
-		fm.Kind = KindMap
+		fm.Kind = tickets.KindMap
 	}
 	head, err := yaml.Marshal(fm)
 	if err != nil {
@@ -244,7 +245,7 @@ func migrateFileProblems(src, dst string) []error {
 		problems = append(problems, fmt.Errorf("already exists, refusing to overwrite: %s", dst))
 	}
 
-	_, id, _, isTicket := parseTicketFilename(filepath.Base(src))
+	_, id, _, isTicket := tickets.ParseTicketFilename(filepath.Base(src))
 	if !isTicket || filepath.Base(filepath.Dir(src)) != "issues" {
 		return problems
 	}

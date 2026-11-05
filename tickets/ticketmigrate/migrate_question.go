@@ -1,4 +1,4 @@
-package tickets
+package ticketmigrate
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -24,12 +25,12 @@ const (
 //
 // Run after Migrate, which maps the legacy pause statuses. Retiring the
 // sections is what makes a second run a no-op.
-func MigrateQuestionSections(root string, now time.Time) ([]MigrationChange, error) {
+func MigrateQuestionSections(root string, now time.Time) ([]tickets.MigrationChange, error) {
 	epics, err := os.ReadDir(root)
 	if err != nil {
 		return nil, fmt.Errorf("reading tracker root %s: %w", root, err)
 	}
-	var changes []MigrationChange
+	var changes []tickets.MigrationChange
 	for _, epic := range epics {
 		if !epic.IsDir() || strings.HasPrefix(epic.Name(), ".") {
 			continue
@@ -43,7 +44,7 @@ func MigrateQuestionSections(root string, now time.Time) ([]MigrationChange, err
 			if issue.IsDir() {
 				continue
 			}
-			if _, _, _, ok := parseTicketFilename(issue.Name()); !ok {
+			if _, _, _, ok := tickets.ParseTicketFilename(issue.Name()); !ok {
 				continue
 			}
 			path := filepath.Join(issuesDir, issue.Name())
@@ -52,7 +53,7 @@ func MigrateQuestionSections(root string, now time.Time) ([]MigrationChange, err
 				return changes, fmt.Errorf("%s: %w", path, err)
 			}
 			if migrated {
-				changes = append(changes, MigrationChange{Path: path, Notes: []string{"Needs Answer section moved to the ticket log"}})
+				changes = append(changes, tickets.MigrationChange{Path: path, Notes: []string{"Needs Answer section moved to the ticket log"}})
 			}
 		}
 	}
@@ -85,26 +86,26 @@ func migrateQuestionSection(path string, now time.Time) (bool, error) {
 		by = "agent"
 	}
 	summary, _, _ := strings.Cut(text, "\n")
-	q, err := AppendLogInner(path, LogEvent{
-		Type:      EventPauseQuestion,
+	q, err := tickets.AppendLogInner(path, tickets.LogEvent{
+		Type:      tickets.EventPauseQuestion,
 		By:        by,
 		PauseKind: string(kind),
-		Summary:   ClipRunes(strings.TrimSpace(summary), MaxLogSummaryChars),
-		Text:      ClipRunes(text, MaxLogTextChars),
-		Handoff:   ClipRunes(handoff, MaxLogTextChars),
+		Summary:   tickets.ClipRunes(strings.TrimSpace(summary), tickets.MaxLogSummaryChars),
+		Text:      tickets.ClipRunes(text, tickets.MaxLogTextChars),
+		Handoff:   tickets.ClipRunes(handoff, tickets.MaxLogTextChars),
 	})
 	if err != nil {
 		return false, err
 	}
 	if t.Status == schema.StatusOpen {
-		_, err = AppendLogInner(path, LogEvent{Type: EventPauseAnswer, Question: q.Seq, Source: "cli", Note: handAnsweredNote})
+		_, err = tickets.AppendLogInner(path, tickets.LogEvent{Type: tickets.EventPauseAnswer, Question: q.Seq, Source: "cli", Note: handAnsweredNote})
 		if err != nil {
 			return false, err
 		}
 	}
 
 	err = schema.UpdateTicketWithBodyInner(path, func(_ *schema.Ticket, body *string) {
-		*body = schema.DemoteSection(*body, LegacyAnswerHeading, now)
+		*body = schema.DemoteSection(*body, tickets.LegacyAnswerHeading, now)
 		*body = schema.DemoteSection(*body, "## Handoff", now)
 	})
 	return err == nil, err

@@ -1,4 +1,4 @@
-package tickets
+package ticketmigrate
 
 import (
 	"os"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/tickettest"
 )
 
 const legacyTicket = "---\nid: \"01\"\nstatus: ready-for-agent\ntype: implement\n---\nBody.\n"
@@ -16,7 +17,7 @@ func migrateWithHook(t *testing.T, hook func(path string)) (path string, err err
 	t.Helper()
 	dir := t.TempDir()
 	path = filepath.Join(dir, "my-epic", "issues", "01-first.md")
-	writeFile(t, path, legacyTicket)
+	tickettest.WriteFile(t, path, legacyTicket)
 	beforeMigrationWrite = func() { hook(path) }
 	t.Cleanup(func() { beforeMigrationWrite = nil })
 	_, err = Migrate(dir)
@@ -30,7 +31,7 @@ func TestMigrate_KeepsWriteLandedBetweenCollectAndWrite(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer unlock()
-		writeFile(t, path, strings.Replace(legacyTicket, "Body.", "Body.\n\nAgent note.", 1))
+		tickettest.WriteFile(t, path, strings.Replace(legacyTicket, "Body.", "Body.\n\nAgent note.", 1))
 	})
 	if err != nil {
 		t.Fatalf("Migrate: %v", err)
@@ -46,7 +47,7 @@ func TestMigrate_KeepsWriteLandedBetweenCollectAndWrite(t *testing.T) {
 
 func TestMigrate_FreshContentsFailingValidationFailTheRun(t *testing.T) {
 	invalid := "---\nid: \"01\"\nstatus: ready-for-agent\ntype: nonsense\n---\nBody.\n"
-	path, err := migrateWithHook(t, func(path string) { writeFile(t, path, invalid) })
+	path, err := migrateWithHook(t, func(path string) { tickettest.WriteFile(t, path, invalid) })
 	if err == nil {
 		t.Fatal("Migrate succeeded, want a validation error")
 	}

@@ -1,21 +1,22 @@
-package tickets
+package ticketmigrate
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestSumEpicStats_FrictionIncludesCancelledButTokensStayDoneOnly(t *testing.T) {
 	doneTokens, cancelledTokens := int64(100), int64(900)
-	ts := []Ticket{
+	ts := []tickets.Ticket{
 		{Status: "done", TotalTokens: &doneTokens, ActualCost: 1, Friction: &schema.FrictionSummary{TotalPausedSecs: 10}},
 		{Status: "cancelled", TotalTokens: &cancelledTokens, ActualCost: 5, HadCodex: true, Friction: &schema.FrictionSummary{TotalPausedSecs: 7}},
 	}
 
-	got := SumEpicStats(ts)
+	got := tickets.SumEpicStats(ts)
 
 	if got.Friction.TotalPausedSecs != 17 {
 		t.Errorf("Friction.TotalPausedSecs = %d, want 17", got.Friction.TotalPausedSecs)
@@ -48,14 +49,14 @@ func TestBackfillFriction_EpicSumIncludesCancelledTicket(t *testing.T) {
 		}
 	}
 
-	_, err := BackfillFriction(root, func(epicName string, tk Ticket) (schema.FrictionSummary, error) {
+	_, err := BackfillFriction(root, func(epicName string, tk tickets.Ticket) (schema.FrictionSummary, error) {
 		return schema.FrictionSummary{TotalPausedSecs: 7}, nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got := LoadEpicTicketMD(epicDir)
+	got := tickets.LoadEpicTicketMD(epicDir)
 	if got.Friction == nil || got.Friction.TotalPausedSecs != 17 {
 		t.Errorf("epic Friction = %+v, want TotalPausedSecs 17", got.Friction)
 	}

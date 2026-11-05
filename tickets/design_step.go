@@ -141,8 +141,8 @@ func MigrateDesignStep(root string, probe DesignProbe) ([]MigrationChange, error
 			continue
 		}
 		step := GuessDesignStep(e, byName, probe)
-		err := editEpicFrontmatterInner(e.Path, func(mapping *yaml.Node) (bool, error) {
-			if mappingKeyIndex(mapping, "design_step") >= 0 {
+		err := EditEpicFrontmatterInner(e.Path, func(mapping *yaml.Node) (bool, error) {
+			if MappingKeyIndex(mapping, "design_step") >= 0 {
 				return false, nil
 			}
 			return true, setMappingValue(mapping, "design_step", string(step))

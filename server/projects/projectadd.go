@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 // ScratchProject is the built-in repo-less project; no registration may take
@@ -82,7 +83,7 @@ func (p *Registry) Add(req wire.AddProjectRequest) (wire.AddProjectResult, error
 		pf.VCS = &req.VCS
 	}
 	projectDir := filepath.Join(p.cfg().TicketStore, name)
-	if err := tickets.WriteProjectFile(projectDir, pf); err != nil {
+	if err := ticketmigrate.WriteProjectFile(projectDir, pf); err != nil {
 		return wire.AddProjectResult{}, err
 	}
 	if err := migrations.WriteFullApplied(projectDir); err != nil {

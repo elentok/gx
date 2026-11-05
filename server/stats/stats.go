@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 	"github.com/elentok/gx/tokenledger"
 )
 
@@ -61,7 +61,7 @@ func (s *Stats) read(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	project := r.URL.Query().Get("project")
-	all, err := tickets.LoadStoreEpics(s.TicketStore)
+	all, err := ticketmigrate.LoadStoreEpics(s.TicketStore)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

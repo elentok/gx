@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/limits"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 const (
@@ -57,7 +57,7 @@ func writeBenchStore(b *testing.B, store string) {
 func statsBuildOnce(b *testing.B, store string) time.Duration {
 	b.Helper()
 	start := time.Now()
-	all, err := tickets.LoadStoreEpics(store)
+	all, err := ticketmigrate.LoadStoreEpics(store)
 	if err != nil {
 		b.Fatal(err)
 	}

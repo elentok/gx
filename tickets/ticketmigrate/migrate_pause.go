@@ -1,4 +1,4 @@
-package tickets
+package ticketmigrate
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -44,7 +45,7 @@ func PlanPauseMigration(root string) ([]PauseStep, error) {
 	var steps []PauseStep
 	for _, epic := range epics {
 		epicPath := filepath.Join(root, epic.Name())
-		if !epic.IsDir() || strings.HasPrefix(epic.Name(), ".") || IsMapEpic(epicPath) {
+		if !epic.IsDir() || strings.HasPrefix(epic.Name(), ".") || tickets.IsMapEpic(epicPath) {
 			continue
 		}
 		issuesDir := filepath.Join(epicPath, "issues")
@@ -56,7 +57,7 @@ func PlanPauseMigration(root string) ([]PauseStep, error) {
 			if issue.IsDir() {
 				continue
 			}
-			if _, _, _, ok := parseTicketFilename(issue.Name()); !ok {
+			if _, _, _, ok := tickets.ParseTicketFilename(issue.Name()); !ok {
 				continue
 			}
 			path := filepath.Join(issuesDir, issue.Name())
@@ -115,12 +116,12 @@ func planPauseStep(path string) (PauseStep, bool, error) {
 // latestLoggedReason is the reason of the latest pause event in the ticket's
 // log, or class's default when the log has none that fits.
 func latestLoggedReason(path string, class schema.PauseClass) (schema.PauseReason, error) {
-	events, err := ReadLog(path)
+	events, err := tickets.ReadLog(path)
 	if err != nil {
 		return "", fmt.Errorf("reading log of %s: %w", path, err)
 	}
 	for _, ev := range slices.Backward(events) {
-		if ev.Type == EventPauseQuestion {
+		if ev.Type == tickets.EventPauseQuestion {
 			return schema.PausedReason(ev.PauseKind, class), nil
 		}
 	}
@@ -130,8 +131,8 @@ func latestLoggedReason(path string, class schema.PauseClass) (schema.PauseReaso
 // ApplyPauseMigration writes each planned step: status paused, the chosen
 // reason, no park_kind, and the old body headings renamed to "## Paused". Run
 // it after MigrateQuestionSections, which still looks for "## Needs Answer".
-func ApplyPauseMigration(steps []PauseStep) ([]MigrationChange, error) {
-	var changes []MigrationChange
+func ApplyPauseMigration(steps []PauseStep) ([]tickets.MigrationChange, error) {
+	var changes []tickets.MigrationChange
 	for _, s := range steps {
 		err := schema.UpdateTicketWithBodyInner(s.Path, func(t *schema.Ticket, body *string) {
 			t.Status = schema.StatusPaused
@@ -142,7 +143,7 @@ func ApplyPauseMigration(steps []PauseStep) ([]MigrationChange, error) {
 		if err != nil {
 			return changes, fmt.Errorf("%s: %w", s.Path, err)
 		}
-		changes = append(changes, MigrationChange{Path: s.Path, Notes: []string{s.Note()}})
+		changes = append(changes, tickets.MigrationChange{Path: s.Path, Notes: []string{s.Note()}})
 	}
 	return changes, nil
 }
@@ -150,7 +151,7 @@ func ApplyPauseMigration(steps []PauseStep) ([]MigrationChange, error) {
 func renamePauseHeadings(body string) string {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
-		if line == LegacyAnswerHeading || line == LegacyRepairHeading {
+		if line == tickets.LegacyAnswerHeading || line == tickets.LegacyRepairHeading {
 			lines[i] = schema.PausedHeading
 		}
 	}

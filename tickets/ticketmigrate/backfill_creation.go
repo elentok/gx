@@ -1,4 +1,4 @@
-package tickets
+package ticketmigrate
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -26,14 +27,14 @@ type TicketOrigin struct {
 // commit's day rather than a time that means nothing. Only zero fields are
 // stamped, so a rerun changes nothing. With dryRun it reports without writing.
 func BackfillTicketCreation(
-	epics []Epic,
+	epics []tickets.Epic,
 	storeRoot string,
 	origin func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
-) ([]MigrationChange, error) {
+) ([]tickets.MigrationChange, error) {
 	return backfillFromHistory(epics, storeRoot, origin, dryRun, backfillSpec{
-		skip: func(t Ticket) bool { return !t.CreatedAt.IsZero() && t.OriginalAddress != "" },
-		plan: func(t Ticket, o TicketOrigin) (notes []string, apply func(*schema.Ticket)) {
+		skip: func(t tickets.Ticket) bool { return !t.CreatedAt.IsZero() && t.OriginalAddress != "" },
+		plan: func(t tickets.Ticket, o TicketOrigin) (notes []string, apply func(*schema.Ticket)) {
 			original, hasOriginal := originalAddressOf(o.Path)
 			if t.CreatedAt.IsZero() {
 				notes = append(notes, "created_at backfilled from store history")
@@ -61,14 +62,14 @@ func BackfillTicketCreation(
 // BackfillTicketCreation. Only a zero cancelled_at is stamped, so a rerun
 // changes nothing. With dryRun it reports without writing.
 func BackfillCancelledAt(
-	epics []Epic,
+	epics []tickets.Epic,
 	storeRoot string,
 	cancelledIn func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
-) ([]MigrationChange, error) {
+) ([]tickets.MigrationChange, error) {
 	return backfillFromHistory(epics, storeRoot, cancelledIn, dryRun, backfillSpec{
-		skip: func(t Ticket) bool { return !t.IsCancelled() || !t.CancelledAt.IsZero() },
-		plan: func(_ Ticket, o TicketOrigin) ([]string, func(*schema.Ticket)) {
+		skip: func(t tickets.Ticket) bool { return !t.IsCancelled() || !t.CancelledAt.IsZero() },
+		plan: func(_ tickets.Ticket, o TicketOrigin) ([]string, func(*schema.Ticket)) {
 			return []string{"cancelled_at backfilled from store history"}, func(st *schema.Ticket) {
 				if st.CancelledAt.IsZero() {
 					st.CancelledAt = o.day()
@@ -91,21 +92,21 @@ func (o TicketOrigin) day() time.Time {
 // tickets that need nothing. plan returns the notes to report (none means
 // nothing to do) and the stamp to write unless dryRun.
 type backfillSpec struct {
-	skip func(Ticket) bool
-	plan func(Ticket, TicketOrigin) ([]string, func(*schema.Ticket))
+	skip func(tickets.Ticket) bool
+	plan func(tickets.Ticket, TicketOrigin) ([]string, func(*schema.Ticket))
 }
 
 // backfillFromHistory is the shared walk of the two history backfills: for each
 // ticket spec does not skip, it looks up the ticket's store history and asks
 // spec.plan what to stamp.
 func backfillFromHistory(
-	epics []Epic,
+	epics []tickets.Epic,
 	storeRoot string,
 	lookup func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
 	spec backfillSpec,
-) ([]MigrationChange, error) {
-	var changes []MigrationChange
+) ([]tickets.MigrationChange, error) {
+	var changes []tickets.MigrationChange
 	for _, epic := range epics {
 		for _, t := range epic.Tickets {
 			if spec.skip(t) {
@@ -131,7 +132,7 @@ func backfillFromHistory(
 					return changes, err
 				}
 			}
-			changes = append(changes, MigrationChange{Path: t.FilePath(), Notes: notes})
+			changes = append(changes, tickets.MigrationChange{Path: t.FilePath(), Notes: notes})
 		}
 	}
 	return changes, nil
@@ -148,9 +149,9 @@ func originalAddressOf(storePath string) (string, bool) {
 	if len(parts) != 4 || parts[2] != "issues" {
 		return "", false
 	}
-	_, id, _, ok := parseTicketFilename(parts[3])
+	_, id, _, ok := tickets.ParseTicketFilename(parts[3])
 	if !ok {
 		return "", false
 	}
-	return Address{Project: parts[0], Epic: parts[1], ID: id}.String(), true
+	return tickets.Address{Project: parts[0], Epic: parts[1], ID: id}.String(), true
 }

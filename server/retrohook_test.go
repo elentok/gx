@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
@@ -64,7 +65,7 @@ func TestRetroHook_NothingWhenTheProjectOptedOut(t *testing.T) {
 	}
 	no := false
 	pf.Evolve = &no
-	if err := tickets.WriteProjectFile(dir, pf); err != nil {
+	if err := ticketmigrate.WriteProjectFile(dir, pf); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.completeEpic(t); len(got) != 0 {

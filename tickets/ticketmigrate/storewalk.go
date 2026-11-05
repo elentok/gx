@@ -1,28 +1,30 @@
-package tickets
+package ticketmigrate
+
+import "github.com/elentok/gx/tickets"
 
 // StoreEpic is one epic of the ticket store with the project it belongs to.
 // Archived is true for an epic under the project's ".archive/" directory.
 type StoreEpic struct {
 	Project  string
 	Archived bool
-	Epic     Epic
+	Epic     tickets.Epic
 }
 
 // backfillEpics calls step on every non-map epic of the project at root, live
 // and archived, and collects the changes it reports (also on error, so a
 // partial run still reports what it wrote). step may fill in the epic's
 // tickets in memory for the steps that follow it on the same epic.
-func backfillEpics(root string, step func(epic *Epic) ([]MigrationChange, error)) ([]MigrationChange, error) {
-	live, err := Load(root)
+func backfillEpics(root string, step func(epic *tickets.Epic) ([]tickets.MigrationChange, error)) ([]tickets.MigrationChange, error) {
+	live, err := tickets.Load(root)
 	if err != nil {
 		return nil, err
 	}
-	archived, err := LoadArchived(root)
+	archived, err := tickets.LoadArchived(root)
 	if err != nil {
 		return nil, err
 	}
-	var changes []MigrationChange
-	for _, epics := range [][]Epic{live, archived} {
+	var changes []tickets.MigrationChange
+	for _, epics := range [][]tickets.Epic{live, archived} {
 		for i := range epics {
 			if epics[i].IsMap {
 				continue
@@ -42,21 +44,21 @@ func backfillEpics(root string, step func(epic *Epic) ([]MigrationChange, error)
 // ordinary epic directories) and each project's ".archive/" epics. Unlike the
 // listing walkers, it hides nothing.
 func LoadStoreEpics(storePath string) ([]StoreEpic, error) {
-	dirs, err := ProjectDirs(storePath)
+	dirs, err := tickets.ProjectDirs(storePath)
 	if err != nil {
 		return nil, err
 	}
 	var out []StoreEpic
 	for _, dir := range dirs {
-		project := ProjectName(dir)
-		live, err := Load(dir)
+		project := tickets.ProjectName(dir)
+		live, err := tickets.Load(dir)
 		if err != nil {
 			return nil, err
 		}
 		for _, e := range live {
 			out = append(out, StoreEpic{Project: project, Epic: e})
 		}
-		archived, err := LoadArchived(dir)
+		archived, err := tickets.LoadArchived(dir)
 		if err != nil {
 			return nil, err
 		}

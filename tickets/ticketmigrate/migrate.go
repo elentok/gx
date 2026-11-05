@@ -1,4 +1,4 @@
-package tickets
+package ticketmigrate
 
 import (
 	"errors"
@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 // MigrationResult is Migrate's report, in Path-sorted order. A nil Changes
 // means scratchRoot was already fully in the post-refactor shape.
 type MigrationResult struct {
-	Changes []MigrationChange
+	Changes []tickets.MigrationChange
 }
 
 // migratedTicketFile is one on-disk ticket file's before/after state, tracked
@@ -56,12 +57,12 @@ type migratedTicketFile struct {
 // archiving and earlier migrations rewrote those files, so the mtime is a
 // recent day, not the day the work happened.
 func Migrate(scratchRoot string) (MigrationResult, error) {
-	var epics []Epic
+	var epics []tickets.Epic
 	var files []migratedTicketFile
 	if err := collectMigration(scratchRoot, false, &epics, &files); err != nil {
 		return MigrationResult{}, err
 	}
-	archive := ArchiveDir(scratchRoot)
+	archive := tickets.ArchiveDir(scratchRoot)
 	if _, err := os.Stat(archive); err == nil {
 		if err := collectMigration(archive, true, &epics, &files); err != nil {
 			return MigrationResult{}, err
@@ -78,7 +79,7 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 // collectMigration computes the migrated state of every ticket in the epics
 // directly under root, appending to epics and files. It writes nothing.
 // archived drops the mtime fallback for claimed_at and done_at.
-func collectMigration(root string, archived bool, epics *[]Epic, files *[]migratedTicketFile) error {
+func collectMigration(root string, archived bool, epics *[]tickets.Epic, files *[]migratedTicketFile) error {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return fmt.Errorf("reading tracker root %s: %w", root, err)
@@ -96,14 +97,14 @@ func collectMigration(root string, archived bool, epics *[]Epic, files *[]migrat
 			continue
 		}
 
-		epic := Epic{Name: entry.Name(), Path: epicPath}
-		isMap := IsMapEpic(epicPath)
+		epic := tickets.Epic{Name: entry.Name(), Path: epicPath}
+		isMap := tickets.IsMapEpic(epicPath)
 
 		for _, issueEntry := range issueEntries {
 			if issueEntry.IsDir() {
 				continue
 			}
-			number, identifier, title, ok := parseTicketFilename(issueEntry.Name())
+			number, identifier, title, ok := tickets.ParseTicketFilename(issueEntry.Name())
 			if !ok {
 				continue
 			}
@@ -137,14 +138,14 @@ func collectMigration(root string, archived bool, epics *[]Epic, files *[]migrat
 				mtime:     mtime,
 			})
 
-			epic.Tickets = append(epic.Tickets, Ticket{
+			epic.Tickets = append(epic.Tickets, tickets.Ticket{
 				Number:     number,
 				Identifier: identifier,
 				Title:      title,
 				Path:       ticketPath,
 				Type:       string(newTicket.Type),
-				BlockedBy:  idsToStrings(newTicket.BlockedBy),
-				Parent:     idToStringPtr(newTicket.Parent),
+				BlockedBy:  tickets.IDsToStrings(newTicket.BlockedBy),
+				Parent:     tickets.IDToStringPtr(newTicket.Parent),
 				Status:     string(newTicket.Status),
 			})
 		}
@@ -158,7 +159,7 @@ func collectMigration(root string, archived bool, epics *[]Epic, files *[]migrat
 // and every epic's migrated parent graph via Epic.ValidateParentGraph,
 // joining every failure so a caller sees the whole picture at once rather
 // than stopping at the first bad file.
-func validateMigration(files []migratedTicketFile, epics []Epic) error {
+func validateMigration(files []migratedTicketFile, epics []tickets.Epic) error {
 	var errs []error
 	for _, f := range files {
 		if err := schema.Validate(f.newTicket); err != nil {
@@ -254,7 +255,7 @@ func writeMigration(files []migratedTicketFile) (MigrationResult, error) {
 		if err := fsutil.WriteFileAtomic(p.path, p.out); err != nil {
 			return MigrationResult{}, fmt.Errorf("writing %s: %w", p.path, err)
 		}
-		result.Changes = append(result.Changes, MigrationChange{Path: p.path, Notes: p.notes})
+		result.Changes = append(result.Changes, tickets.MigrationChange{Path: p.path, Notes: p.notes})
 	}
 	return result, nil
 }

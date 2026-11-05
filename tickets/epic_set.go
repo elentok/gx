@@ -102,7 +102,7 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 			}
 		}
 		for key, value := range completion {
-			if mappingKeyIndex(mapping, key) >= 0 {
+			if MappingKeyIndex(mapping, key) >= 0 {
 				continue
 			}
 			if err := setMappingValue(mapping, key, value); err != nil {
@@ -145,7 +145,7 @@ func effectiveKind(mapping *yaml.Node, next *string) string {
 	if next != nil {
 		return *next
 	}
-	if i := mappingKeyIndex(mapping, "kind"); i >= 0 {
+	if i := MappingKeyIndex(mapping, "kind"); i >= 0 {
 		return mapping.Content[i+1].Value
 	}
 	return ""
@@ -154,7 +154,7 @@ func effectiveKind(mapping *yaml.Node, next *string) string {
 // checkDesignStepMove refuses a move from the stored step to an earlier one
 // unless allowBackward is set.
 func checkDesignStepMove(mapping *yaml.Node, next string, allowBackward bool) error {
-	i := mappingKeyIndex(mapping, "design_step")
+	i := MappingKeyIndex(mapping, "design_step")
 	if i < 0 || allowBackward {
 		return nil
 	}

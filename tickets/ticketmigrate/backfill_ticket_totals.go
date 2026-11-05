@@ -1,10 +1,11 @@
-package tickets
+package ticketmigrate
 
 import (
 	"errors"
 	"fmt"
 	"slices"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -27,9 +28,9 @@ func BackfillTicketTotals(
 	root string,
 	totals func(ids []string) (tokens int64, cost float64, err error),
 	conflictSessions func(epicName, ticketID string) ([]string, error),
-) ([]MigrationChange, error) {
-	return backfillEpics(root, func(epic *Epic) ([]MigrationChange, error) {
-		var changes []MigrationChange
+) ([]tickets.MigrationChange, error) {
+	return backfillEpics(root, func(epic *tickets.Epic) ([]tickets.MigrationChange, error) {
+		var changes []tickets.MigrationChange
 		for i := range epic.Tickets {
 			t := &epic.Tickets[i]
 			if !t.IsDone() || t.TotalTokens != nil {
@@ -52,7 +53,7 @@ func BackfillTicketTotals(
 					continue
 				}
 			} else if tokens, cost, err = totals(ids); errors.Is(err, ErrUnreadable) {
-				changes = append(changes, MigrationChange{
+				changes = append(changes, tickets.MigrationChange{
 					Path:  t.FilePath(),
 					Notes: []string{"skipped: unreadable transcript"},
 				})
@@ -68,7 +69,7 @@ func BackfillTicketTotals(
 				return changes, err
 			}
 			t.TotalTokens, t.ActualCost = &tokens, cost
-			changes = append(changes, MigrationChange{
+			changes = append(changes, tickets.MigrationChange{
 				Path:  t.FilePath(),
 				Notes: []string{"tokens and cost backfilled from transcripts"},
 			})

@@ -46,7 +46,8 @@ func TestPausePath_NoStatusWriteBypasses(t *testing.T) {
 		}
 		// The one-off ticket migration rewrites legacy statuses to paused; it is
 		// not a runtime pause, so it owes no event or notification.
-		if filepath.ToSlash(filepath.Clean(path)) == "../tickets/migrate_pause.go" {
+		// servertest/pausedrun.go seeds a legacy-status ticket for tests.
+		if p := filepath.ToSlash(filepath.Clean(path)); p == "../tickets/ticketmigrate/migrate_pause.go" || p == "../server/servertest/pausedrun.go" {
 			return nil
 		}
 		inRalphloop := filepath.Clean(filepath.Dir(path)) == filepath.Join("..", "ralphloop")

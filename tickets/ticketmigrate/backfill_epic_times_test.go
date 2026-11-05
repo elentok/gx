@@ -1,9 +1,11 @@
-package tickets
+package ticketmigrate
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/tickets"
 )
 
 func TestBackfillEpicTimes_StampsOnceAndIsIdempotent(t *testing.T) {
@@ -31,19 +33,19 @@ func TestBackfillEpicTimes_StampsOnceAndIsIdempotent(t *testing.T) {
 		t.Fatal("no changes on first run")
 	}
 	for _, name := range []string{"m", "m-impl", "solo", "open-m"} {
-		if LoadEpicTicketMD(filepath.Join(root, name)).CreatedAt.IsZero() {
+		if tickets.LoadEpicTicketMD(filepath.Join(root, name)).CreatedAt.IsZero() {
 			t.Errorf("%s: created_at not backfilled", name)
 		}
 	}
-	m := LoadEpicTicketMD(filepath.Join(root, "m"))
-	impl := LoadEpicTicketMD(filepath.Join(root, "m-impl"))
+	m := tickets.LoadEpicTicketMD(filepath.Join(root, "m"))
+	impl := tickets.LoadEpicTicketMD(filepath.Join(root, "m-impl"))
 	if m.CompletedAt.IsZero() || !m.CompletedAt.Equal(impl.CreatedAt) {
 		t.Errorf("map completed_at %v, impl created_at %v; want equal and set", m.CompletedAt, impl.CreatedAt)
 	}
-	if !LoadEpicTicketMD(filepath.Join(root, "open-m")).CompletedAt.IsZero() {
+	if !tickets.LoadEpicTicketMD(filepath.Join(root, "open-m")).CompletedAt.IsZero() {
 		t.Error("map without an impl epic got completed_at")
 	}
-	if !LoadEpicTicketMD(filepath.Join(root, "solo")).CompletedAt.IsZero() {
+	if !tickets.LoadEpicTicketMD(filepath.Join(root, "solo")).CompletedAt.IsZero() {
 		t.Error("loop epic got completed_at")
 	}
 

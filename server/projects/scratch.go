@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 // ScratchWorkspace is the scratch project's working area: beside the ticket
@@ -52,7 +52,7 @@ func EnsureScratchProject(ticketStore string) error {
 	_, statErr := os.Stat(filepath.Join(dir, config.ProjectFileName))
 	isNew := os.IsNotExist(statErr)
 	name, vcs := ScratchProject, config.VCSNone
-	if err := tickets.WriteProjectFile(dir, config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs}); err != nil {
+	if err := ticketmigrate.WriteProjectFile(dir, config.ProjectFile{Name: &name, Repo: &workspace, VCS: &vcs}); err != nil {
 		return err
 	}
 	if isNew {
