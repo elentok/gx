@@ -107,6 +107,35 @@ func StatusDetail(s wire.SessionInfo) string {
 	return strings.Join(parts, ": ")
 }
 
+func DisplayName(s wire.SessionInfo) string {
+	if s.Name != "" {
+		return s.Name
+	}
+	return s.ID
+}
+
+// IsActionable: a Blocked session always waits on the person, with or
+// without a recorded reason.
+func IsActionable(s wire.SessionInfo) bool {
+	return s.Actionable.Reason != "" || s.Status.State == wire.SessionBlocked
+}
+
+// Marks fills the Unread and Actionable slots; Queue and Design agents leave
+// them blank, their status mark is all a row shows.
+func Marks(s wire.SessionInfo, icons ui.IconSet) string {
+	unread, actionable := " ", " "
+	if s.Queue || s.Design {
+		return unread + " " + actionable + " "
+	}
+	if s.Unread.Unread {
+		unread = UnreadMark.Render(icons.Unread)
+	}
+	if IsActionable(s) {
+		actionable = Actionable.Render(icons.SuggestedAction)
+	}
+	return unread + " " + actionable + " "
+}
+
 func ShortDir(home, dir string) string {
 	if home == "" {
 		return dir

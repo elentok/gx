@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ui/agents/agentstyle"
 	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -46,7 +47,7 @@ func (m Model) stopSelected() (tea.Model, tea.Cmd) {
 		return m, notify.Info(queueStopHint)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    "Stop session " + displayName(s) + "?",
+		Prompt:    "Stop session " + agentstyle.DisplayName(s) + "?",
 		AcceptCmd: sessionActionCmd("stop", m.sessionAPI.Stop, s.ID),
 	})
 	return m, nil
@@ -66,7 +67,7 @@ func (m Model) removeSelected() (tea.Model, tea.Cmd) {
 	if s.Status.State != wire.SessionExited {
 		return m, remove
 	}
-	m.confirm = m.confirm.Open(confirm.Options{Prompt: "Remove session " + displayName(s) + "?", AcceptCmd: remove})
+	m.confirm = m.confirm.Open(confirm.Options{Prompt: "Remove session " + agentstyle.DisplayName(s) + "?", AcceptCmd: remove})
 	return m, nil
 }
 
@@ -108,7 +109,7 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 		accept = sessionActionCmd("run action", m.sessionAPI.RunAction, s.ID)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:     "Run action on " + displayName(s) + "?",
+		Prompt:     "Run action on " + agentstyle.DisplayName(s) + "?",
 		Items:      steps,
 		AcceptCmd:  accept,
 		DefaultYes: true,
@@ -248,7 +249,7 @@ func (m Model) openMenu() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	m.menu = m.menu.Open(s, "Session "+displayName(s), sessionMenuItems(s))
+	m.menu = m.menu.Open(s, "Session "+agentstyle.DisplayName(s), sessionMenuItems(s))
 	return m, nil
 }
 

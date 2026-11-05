@@ -87,7 +87,7 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 			header(s.Project)
 		}
 		prev = &m.sessions[i]
-		row := agentstyle.Fit(" "+agentstyle.StatusIcon(s, icons, m.spinner.View())+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + marks(s, icons)
+		row := agentstyle.Fit(" "+agentstyle.StatusIcon(s, icons, m.spinner.View())+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + agentstyle.Marks(s, icons)
 		if i == m.cursor {
 			row = ui.RenderRowHighlight(row)
 		}
@@ -226,7 +226,7 @@ func sessionLabel(s wire.SessionInfo, icons ui.IconSet) string {
 	if s.Unread.Unread {
 		style = agentstyle.NameUnread
 	}
-	label := style.Render(displayName(s))
+	label := style.Render(agentstyle.DisplayName(s))
 	if s.Design {
 		label = agentstyle.Design.Render(icons.DesignSession) + " " + label
 	}
@@ -237,26 +237,4 @@ func sessionLabel(s wire.SessionInfo, icons ui.IconSet) string {
 		label += " " + agentstyle.Ticket.Render(s.Ticket)
 	}
 	return label
-}
-
-// marks fills the Unread and Actionable slots; Queue and Design agents leave
-// them blank, their status mark is all a row shows.
-func marks(s wire.SessionInfo, icons ui.IconSet) string {
-	unread, actionable := " ", " "
-	if s.Queue || s.Design {
-		return unread + " " + actionable + " "
-	}
-	if s.Unread.Unread {
-		unread = agentstyle.UnreadMark.Render(icons.Unread)
-	}
-	if isActionable(s) {
-		actionable = agentstyle.Actionable.Render(icons.SuggestedAction)
-	}
-	return unread + " " + actionable + " "
-}
-
-// isActionable: a Blocked session always waits on the person, with or
-// without a recorded reason.
-func isActionable(s wire.SessionInfo) bool {
-	return s.Actionable.Reason != "" || s.Status.State == wire.SessionBlocked
 }

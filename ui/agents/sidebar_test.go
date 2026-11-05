@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/agents/agentstyle"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 
 	tea "charm.land/bubbletea/v2"
@@ -119,12 +120,12 @@ func TestMarks_QueueAndDesignAgentsShowNone(t *testing.T) {
 	flagged := wire.SessionInfo{
 		Status: wire.SessionStatus{State: wire.SessionBlocked},
 		Unread: wire.SessionUnread{Unread: true}, Actionable: wire.SessionActionable{Reason: "blocked"}}
-	if got := ansi.Strip(marks(flagged, icons)); got != "U A " {
+	if got := ansi.Strip(agentstyle.Marks(flagged, icons)); got != "U A " {
 		t.Fatalf("plain marks = %q, want both", got)
 	}
 	for name, s := range map[string]wire.SessionInfo{"queue": flagged, "design": flagged} {
 		s.Queue, s.Design = name == "queue", name == "design"
-		if got := strings.TrimSpace(ansi.Strip(marks(s, icons))); got != "" {
+		if got := strings.TrimSpace(ansi.Strip(agentstyle.Marks(s, icons))); got != "" {
 			t.Errorf("%s marks = %q, want none", name, got)
 		}
 	}

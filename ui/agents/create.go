@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/agents/create"
+	"github.com/elentok/gx/ui/agents/jump"
 )
 
 // WithCwdProject names the project of the repo gx was opened in.
@@ -33,6 +34,10 @@ func (m Model) OpenCreateForm(p create.Prefill) (Model, tea.Cmd) {
 	}
 	m.create = create.New(m.settings.Home(), p)
 	return m, m.create.Load(m.listProjects)
+}
+
+func (m Model) jumpCtx() jump.Ctx {
+	return jump.Ctx{Sessions: m.sessions, Now: m.now, Width: m.width, Height: m.height, Settings: m.settings, SpinnerView: m.spinner.View()}
 }
 
 func (m Model) createCtx() create.Ctx {

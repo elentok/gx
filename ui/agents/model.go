@@ -16,7 +16,9 @@ import (
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/agentstyle"
 	"github.com/elentok/gx/ui/agents/create"
+	"github.com/elentok/gx/ui/agents/jump"
 	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/confirm"
@@ -73,7 +75,7 @@ type Model struct {
 	// leaderPending: the leader was pressed and the next key is its action.
 	leaderPending bool
 	// jump is nil while the jump popup is closed.
-	jump *jumpPopup
+	jump *jump.Popup
 	// create is nil while the create form is closed.
 	create       *create.Form
 	listProjects func() ([]create.Project, error)
@@ -342,7 +344,7 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keyAttention):
 		m.cursor = m.nextNeedingAttention()
 	case key.Matches(msg, keyJump):
-		m.jump = &jumpPopup{}
+		m.jump = &jump.Popup{}
 		return m.startSpinner()
 	case key.Matches(msg, keyCreate):
 		return m.openCreate()
@@ -402,7 +404,7 @@ func (m Model) startSpinner() (tea.Model, tea.Cmd) {
 func (m Model) workingVisible() bool {
 	var shown []int
 	if m.jump != nil {
-		shown = m.jump.shown(m.jumpCtx())
+		shown = m.jump.Shown(m.jumpCtx())
 	}
 	if m.sidebarShown() {
 		for _, r := range m.visibleRows() {
@@ -464,7 +466,7 @@ func (m Model) termView() terminal.View {
 		Width: m.width, Height: m.height, MainWidth: m.mainWidth(),
 		Sessions: m.sessions, Cursor: m.cursor, Attach: m.attach, Copy: m.copy,
 		Focused: m.terminalFocused, Covered: m.ModalOpen() || m.leaderPending, Selected: m.selectedID(),
-		DisplayName: displayName,
+		DisplayName: agentstyle.DisplayName,
 	}
 	v := m.term.WithInput(in)
 	if m.copy != nil {
@@ -493,7 +495,7 @@ func (m Model) render() string {
 		out = m.renderMain(m.width, lines)
 	}
 	if m.jump != nil {
-		out = ui.OverlayCenter(out, m.jump.render(m.jumpCtx()), m.width, m.height)
+		out = ui.OverlayCenter(out, m.jump.Render(m.jumpCtx()), m.width, m.height)
 	}
 	if m.create != nil {
 		out = ui.OverlayCenter(out, m.create.View(m.width, m.height, m.sessions), m.width, m.height)
@@ -547,11 +549,4 @@ func (m Model) lines() []string {
 		return []string{ui.StyleMuted.Render("c new session")}
 	}
 	return nil
-}
-
-func displayName(s wire.SessionInfo) string {
-	if s.Name != "" {
-		return s.Name
-	}
-	return s.ID
 }

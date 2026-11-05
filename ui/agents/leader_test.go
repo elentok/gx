@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/agents/create"
+	"github.com/elentok/gx/ui/agents/jump"
 	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -311,7 +312,7 @@ func TestModalOpen_EachPopup(t *testing.T) {
 		t.Fatal("ModalOpen()=true with no popup")
 	}
 	for name, open := range map[string]func(*Model){
-		"jump":    func(m *Model) { m.jump = &jumpPopup{} },
+		"jump":    func(m *Model) { m.jump = &jump.Popup{} },
 		"create":  func(m *Model) { m.create = &create.Form{} },
 		"confirm": func(m *Model) { m.confirm.IsOpen = true },
 		"menu":    func(m *Model) { m.menu.IsOpen = true },

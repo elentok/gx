@@ -9,6 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ui/agents/agentstyle"
+	"github.com/elentok/gx/ui/agents/jump"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -98,7 +100,7 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
 	case m.jump != nil:
-		var res jumpResult
+		var res jump.Result
 		m.jump, res = m.jump.Update(msg, m.jumpCtx())
 		if res.Picked {
 			return m.selectAndFocus(res.Session)
@@ -157,7 +159,7 @@ func (m Model) openHelp() Model {
 func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	switch k {
 	case "j":
-		m.jump = &jumpPopup{}
+		m.jump = &jump.Popup{}
 		return m.startSpinner()
 	case "c":
 		return m.openCreate()
@@ -226,7 +228,7 @@ func (m Model) nextNeedingAttention() int {
 // Actionable, or failing that Unread; -1 when there is none.
 func (m Model) attentionFrom(start int) int {
 	for _, needs := range []func(wire.SessionInfo) bool{
-		isActionable,
+		agentstyle.IsActionable,
 		func(s wire.SessionInfo) bool { return s.Unread.Unread },
 	} {
 		for step := range len(m.sessions) {
