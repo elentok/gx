@@ -22,7 +22,7 @@ func (s *Server) epicsDeps() epics.Deps {
 
 		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
 		CheckWaitingLabel: s.CheckWaitingLabel,
-		AgentGone:         s.agentGone,
+		AgentGone:         func(address string) (bool, error) { return s.ops.AgentGone(address) },
 		AmbiguousBlockers: s.ambiguousBlockers,
 		DesignUncharted:   s.designs.Uncharted,
 	}

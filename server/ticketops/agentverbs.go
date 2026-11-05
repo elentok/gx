@@ -1,4 +1,4 @@
-package server
+package ticketops
 
 import (
 	"errors"
@@ -13,9 +13,9 @@ import (
 
 // agentVerb resolves a ticket to the runner session of its live iteration, so
 // prompt, interrupt and answer reach the agent whichever runner hosts it.
-func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (wire.QueueResult, error)) (wire.QueueResult, error) {
-	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
-		runner, sess, ok, err := s.harness.LiveSession(ref.Addr)
+func (o *Ops) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (wire.QueueResult, error)) (wire.QueueResult, error) {
+	return o.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		runner, sess, ok, err := o.d.Harness.LiveSession(ref.Addr)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
@@ -26,12 +26,12 @@ func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, ag
 	})
 }
 
-func (s *Server) agentPrompt(req wire.QueueRequest) (wire.QueueResult, error) {
+func (o *Ops) AgentPrompt(req wire.QueueRequest) (wire.QueueResult, error) {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
 		return queue.Refusal(wire.ReasonTextRequired, "text to send is required"), nil
 	}
-	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
+	return o.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
 		err := r.Prompt(sess, text)
 		if errors.Is(err, agentrunner.ErrNotReady) {
 			return queue.Refusal(wire.ReasonAgentNotReady, err.Error()), nil
@@ -40,8 +40,8 @@ func (s *Server) agentPrompt(req wire.QueueRequest) (wire.QueueResult, error) {
 	})
 }
 
-func (s *Server) agentInterrupt(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
+func (o *Ops) AgentInterrupt(req wire.QueueRequest) (wire.QueueResult, error) {
+	return o.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (wire.QueueResult, error) {
 		err := r.Interrupt(sess)
 		if errors.Is(err, agentrunner.ErrNotReady) {
 			return queue.Refusal(wire.ReasonAgentNotReady, err.Error()), nil
@@ -50,17 +50,17 @@ func (s *Server) agentInterrupt(req wire.QueueRequest) (wire.QueueResult, error)
 	})
 }
 
-// agentAnswer allows or denies the permission request a live agent waits on.
+// AgentAnswer allows or denies the permission request a live agent waits on.
 // With a request ID the open request must be that one and approvable; without
 // one (the TUI and CLI) whatever is open is answered. A decision that reached
 // the agent is logged as pause.permission; a refusal logs nothing.
-func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
+func (o *Ops) AgentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 	decision := agentrunner.Decision(req.Decision)
 	if decision != agentrunner.DecisionAllow && decision != agentrunner.DecisionDeny {
 		return queue.Refusal(wire.ReasonBadDecision, "decision must be allow or deny"), nil
 	}
-	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
-		runner, sess, ok, err := s.harness.LiveSession(ref.Addr)
+	return o.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		runner, sess, ok, err := o.d.Harness.LiveSession(ref.Addr)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
@@ -95,22 +95,22 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if _, err := tickets.AppendLog(ref.Ticket.Path, ev); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.Addr, err)
 		}
-		if err := s.writer.LeaveBlocked(ref.Addr.String()); err != nil {
+		if err := o.d.Writer.LeaveBlocked(ref.Addr.String()); err != nil {
 			return wire.QueueResult{}, err
 		}
 		// The prompt is gone, so open pages re-read the detail and the snapshot.
-		s.events.Publish(wire.EventTicketChanged, ref.Addr.String())
+		o.d.Events.Publish(wire.EventTicketChanged, ref.Addr.String())
 		return wire.QueueResult{}, nil
 	})
 }
 
-// agentAnswerWeb is agentAnswer for the web mux: the person answered a card, so
+// AgentAnswerWeb is AgentAnswer for the web mux: the person answered a card, so
 // the request must name the prompt they saw.
-func (s *Server) agentAnswerWeb(req wire.QueueRequest) (wire.QueueResult, error) {
+func (o *Ops) AgentAnswerWeb(req wire.QueueRequest) (wire.QueueResult, error) {
 	if req.RequestID == "" {
 		return queue.Refusal(wire.ReasonRequestIDRequired, "a request ID is required; review the current prompt"), nil
 	}
-	return s.agentAnswer(req)
+	return o.AgentAnswer(req)
 }
 
 // checkOpenRequest refuses unless st holds an approvable open request named id.

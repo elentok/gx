@@ -1,4 +1,4 @@
-package server
+package ticketops
 
 import (
 	"fmt"
@@ -13,11 +13,11 @@ import (
 
 const askAuthorAgent = "agent"
 
-// ticketAsk records an agent's question: it appends one pause.question to the
+// Ask records an agent's question: it appends one pause.question to the
 // ticket's log and sets iteration_status asking. The body is validated
 // strictly first, and any refusal writes nothing. It returns at once; pausing
 // the ticket is a later step.
-func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
+func (o *Ops) Ask(req wire.QueueRequest) (wire.QueueResult, error) {
 	q, err := ticketlog.ParseQuestionStrict(req.Text)
 	if err != nil {
 		return queue.Refusal(wire.ReasonInvalidQuestion, err.Error()), nil
@@ -25,7 +25,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 	if strings.TrimSpace(q.Handoff) == "" {
 		return queue.Refusal(wire.ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
 	}
-	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return o.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		ev := tickets.LogEvent{
 			Type:    tickets.EventPauseQuestion,
 			By:      askAuthorAgent,
@@ -52,7 +52,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("ask %s: setting iteration_status: %w", ref.Addr, err)
 		}
-		s.idx.Rescan()
+		o.d.Index.Rescan()
 		return wire.QueueResult{}, nil
 	})
 }

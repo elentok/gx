@@ -45,6 +45,7 @@ import (
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/stats"
+	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
@@ -130,6 +131,7 @@ type Server struct {
 	events    *broker.Broker
 	herdr     herdrWatch
 	writer    *ticketwrite.Writer
+	ops       *ticketops.Ops
 	pauseHold ticketwrite.RecoveryHold
 	recovery  *srvrecovery.Recovery
 	// rec repairs merge state at startup and on each rescan.
@@ -436,6 +438,7 @@ func New(cfg Config) (*Server, error) {
 	s.resumer = newResumer(s)
 	s.prompt.GiveResumer(s.resumer)
 	s.epics = epics.New(s.epicsDeps())
+	s.ops = newTicketOps(s)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished
 	}
@@ -487,13 +490,7 @@ var routeTable = []struct {
 	{"POST /v1/tickets/verify", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairVerify)(w, r) }},
 	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketUnmute)(w, r) }},
 	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketCancel)(w, r) }},
-	{"POST /v1/tickets/recommend", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.HandlerCtx(s.ticketRecommend)(w, r) }},
-	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAnswer)(w, r) }},
-	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
-	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},
-	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
-	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

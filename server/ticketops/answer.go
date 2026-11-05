@@ -1,4 +1,4 @@
-package server
+package ticketops
 
 import (
 	"errors"
@@ -74,14 +74,14 @@ func validateAnswer(q ticketlog.Question, req wire.QueueRequest) (answer, note s
 	return answer, note, nil
 }
 
-// ticketAnswer delivers a person's reply to the live agent that asked, then
+// Answer delivers a person's reply to the live agent that asked, then
 // claims the ticket again and settles the run when the agent finishes. The
 // state token, the prompt and the pause.answer line are one step under the
 // ticket lock, so a refusal logs nothing and a stale reply never reaches the
 // agent.
-func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
-		if s.rec.AdoptFirst(ref.ProjectDir, ref.Addr, ref.Ticket.Path) {
+func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
+	return o.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		if o.d.Rec.AdoptFirst(ref.ProjectDir, ref.Addr, ref.Ticket.Path) {
 			return wire.QueueResult{Outcome: wire.OutcomeAdopted}, nil
 		}
 		address := ref.Addr.String()
@@ -115,17 +115,17 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			if bad != nil {
 				return refuse(*bad)
 			}
-			if queued, err = s.agentGone(address); err != nil {
+			if queued, err = o.AgentGone(address); err != nil {
 				return tickets.LogEvent{}, err
 			}
 			if !queued {
 				// The budget check guards live delivery only: a queued answer
 				// launches nothing.
-				if res, refused := s.budgetRefusal(); refused {
+				if res, refused := o.d.Launch.BudgetRefusal(); refused {
 					return refuse(res)
 				}
-				run, _ = s.registry.Tracked(address)
-				runner, err := s.harness.RunnerOf(run.Run)
+				run, _ = o.d.Registry.Tracked(address)
+				runner, err := o.d.Harness.RunnerOf(run.Run)
 				if err != nil {
 					return tickets.LogEvent{}, err
 				}
@@ -139,7 +139,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 					return tickets.LogEvent{}, fmt.Errorf("prompt %s: %w", address, err)
 				default:
 					// The agent can die right after taking the prompt.
-					if queued, err = s.agentGone(address); err != nil {
+					if queued, err = o.AgentGone(address); err != nil {
 						return tickets.LogEvent{}, err
 					}
 				}
@@ -157,37 +157,37 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("answer %s: %w", ref.Addr, err)
 		}
-		if err := s.cancelInvestigateChild(ref, req.Source); err != nil {
+		if err := o.d.Launch.CancelInvestigateChild(ref, req.Source); err != nil {
 			return wire.QueueResult{}, err
 		}
 		if queued {
 			// Open again for gx to claim; the dead run has nothing to settle.
-			s.registry.Delete(address)
+			o.d.Registry.Delete(address)
 			if err := ralphloop.ResumeTicket(ref.Ticket.Path, time.Now()); err != nil {
 				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.Addr, err)
 			}
-			s.idx.Rescan()
+			o.d.Index.Rescan()
 			return wire.QueueResult{Outcome: wire.OutcomeQueued}, nil
 		}
 		if err := ralphloop.Claim(ref.Ticket.Path); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("claim %s: %w", ref.Addr, err)
 		}
-		if err := s.resettleWaiting(run); err != nil {
+		if err := o.d.Launch.ResettleWaiting(run); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("settle %s: %w", ref.Addr, err)
 		}
-		s.idx.Rescan()
+		o.d.Index.Rescan()
 		return wire.QueueResult{Outcome: wire.OutcomeDelivered}, nil
 	})
 }
 
-// agentGone reports that no live agent is waiting on address: its run is not
+// AgentGone reports that no live agent is waiting on address: its run is not
 // tracked as waiting, or its session is missing or died.
-func (s *Server) agentGone(address string) (bool, error) {
-	run, ok := s.registry.Tracked(address)
+func (o *Ops) AgentGone(address string) (bool, error) {
+	run, ok := o.d.Registry.Tracked(address)
 	if !ok || run.WaitingSince.IsZero() {
 		return true, nil
 	}
-	runner, err := s.harness.RunnerOf(run.Run)
+	runner, err := o.d.Harness.RunnerOf(run.Run)
 	if err != nil {
 		return false, err
 	}
@@ -196,26 +196,4 @@ func (s *Server) agentGone(address string) (bool, error) {
 		return true, nil
 	}
 	return false, err
-}
-
-// resettleWaiting ends a run's wait for an answer and settles it as a normal
-// run: the run context is rebuilt from the registry entry, as a restart does.
-func (s *Server) resettleWaiting(t runs.TrackedRun) error {
-	runner, err := s.harness.RunnerOf(t.Run)
-	if err != nil {
-		return err
-	}
-	one, wt, mode, err := s.resume(t)
-	if err != nil {
-		return err
-	}
-	root, err := queue.ParseRootRef(t.Root)
-	if err != nil {
-		return err
-	}
-	s.registry.ClearWaiting(t.Address)
-	deps := s.projects.DepsWith(runner)
-	deps.GateReleased = s.registry.GateReleased(t.Address)
-	s.guards.GoSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
-	return nil
 }

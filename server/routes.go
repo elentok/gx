@@ -23,6 +23,7 @@ import (
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/stats"
+	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
@@ -51,6 +52,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		chat.Routes(func() *chat.Chat { return s.sessionChat }),
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),
 		ticketwrite.Routes(func() *ticketwrite.Writer { return s.writer }),
+		ticketops.Routes(func() *ticketops.Ops { return s.ops }),
 		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
 		epics.Routes(func() *epics.Epics { return s.epics }),
 		designs.Routes(func() *designs.Designs { return s.designs }),

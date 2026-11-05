@@ -538,7 +538,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 		return wire.RepairResult{}, false, nil
 	}
 	if s.registry != nil {
-		gone, err := s.agentGone(address)
+		gone, err := s.ops.AgentGone(address)
 		if err != nil {
 			return wire.RepairResult{}, false, err
 		}
