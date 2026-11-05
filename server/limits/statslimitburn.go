@@ -18,7 +18,8 @@ func NewStatsLimitBurns(n int) wire.StatsLimitBurns {
 	}
 }
 
-func buildLimitBurn(samples []wire.LimitSample, latest wire.LimitSample, hasLatest, weekly bool, n int, now time.Time) wire.StatsLimitBurn {
+// buildLimitBurn adds a forecast from forecastFrom when it is non-nil.
+func buildLimitBurn(samples []wire.LimitSample, forecastFrom *wire.LimitSample, n int, now time.Time) wire.StatsLimitBurn {
 	out := wire.StatsLimitBurn{Days: limitBurnDays(samples, n, now)}
 	withData := 0
 	for _, d := range out.Days {
@@ -34,8 +35,8 @@ func buildLimitBurn(samples []wire.LimitSample, latest wire.LimitSample, hasLate
 			out.StartDay = limitDayKey(samples[0].ReceivedAt)
 		}
 	}
-	if weekly && hasLatest {
-		f := limitForecast(samples, latest, now)
+	if forecastFrom != nil {
+		f := limitForecast(samples, *forecastFrom, now)
 		out.Forecast = &f
 	}
 	return out
@@ -43,14 +44,25 @@ func buildLimitBurn(samples []wire.LimitSample, latest wire.LimitSample, hasLate
 
 // BurnStats is the burn of each limit over the last n days.
 func (l *Limits) BurnStats(n int, now time.Time) wire.StatsLimitBurns {
-	build := func(id string, weekly bool) wire.StatsLimitBurn {
-		latest, ok := l.history.Latest(id)
-		return buildLimitBurn(l.history.Samples(id), latest, ok, weekly, n, now)
+	build := func(id string, forecastFrom *wire.LimitSample) wire.StatsLimitBurn {
+		return buildLimitBurn(l.history.Samples(id), forecastFrom, n, now)
+	}
+	// The menu forecasts Claude weekly from the live window when no sample is
+	// saved; Stats does the same. Codex has no live window, so it needs a sample.
+	var claudeWeekly, codexWeekly *wire.LimitSample
+	if s, ok := l.history.Latest(wire.LimitIDClaudeWeekly); ok {
+		claudeWeekly = &s
+	} else if live := l.store.read().SevenDay; live != nil {
+		s := l.latestOr(wire.LimitIDClaudeWeekly, *live)
+		claudeWeekly = &s
+	}
+	if s, ok := l.history.Latest(wire.LimitIDCodexWeekly); ok {
+		codexWeekly = &s
 	}
 	return wire.StatsLimitBurns{
-		Claude5h:     build(wire.LimitIDClaude5h, false),
-		ClaudeWeekly: build(wire.LimitIDClaudeWeekly, true),
-		Codex5h:      build(wire.LimitIDCodex5h, false),
-		CodexWeekly:  build(wire.LimitIDCodexWeekly, true),
+		Claude5h:     build(wire.LimitIDClaude5h, nil),
+		ClaudeWeekly: build(wire.LimitIDClaudeWeekly, claudeWeekly),
+		Codex5h:      build(wire.LimitIDCodex5h, nil),
+		CodexWeekly:  build(wire.LimitIDCodexWeekly, codexWeekly),
 	}
 }

@@ -16,13 +16,18 @@ func (l *Limits) usageLimitWindow(w wire.LimitWindow, id string, weekly bool, no
 	}
 	samples := l.history.Samples(id)
 	row.Chip = limitBurnChip(samples, now)
-	latest, ok := l.history.Latest(id)
-	if !ok {
-		latest = wire.LimitSample{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: w.ReceivedAt}
-	}
-	f := limitForecast(samples, latest, now)
+	f := limitForecast(samples, l.latestOr(id, w), now)
 	row.Forecast = &f
 	return row
+}
+
+// latestOr is the saved latest sample of limit id, or the live window w when
+// none is saved.
+func (l *Limits) latestOr(id string, w wire.LimitWindow) wire.LimitSample {
+	if latest, ok := l.history.Latest(id); ok {
+		return latest
+	}
+	return wire.LimitSample{UsedPercentage: w.UsedPercentage, ResetsAt: w.ResetsAt, ReceivedAt: w.ReceivedAt}
 }
 
 func (l *Limits) codexSummary(now time.Time) *wire.UsageLimits {

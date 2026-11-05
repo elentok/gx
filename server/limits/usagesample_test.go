@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/wire"
 )
 
 type usageRig struct {
@@ -58,6 +59,26 @@ func (r *usageRig) limits(env []string, eventInterval time.Duration) *Limits {
 }
 
 func (r *usageRig) server() *Limits { return r.limits(nil, 0) }
+
+// With no saved sample, the Stats forecast for Claude weekly comes from the
+// live window, like the menu's, so both say "needs data".
+func TestBurnStats_ClaudeWeeklyWithoutSampleForecastsFromLiveWindow(t *testing.T) {
+	l := newUsageRig(t).server()
+	now := time.Now()
+	l.store.state.SevenDay = &wire.LimitWindow{UsedPercentage: 20, ResetsAt: now.Add(24 * time.Hour).Unix(), ReceivedAt: now.Unix()}
+
+	got := l.BurnStats(7, now)
+	if f := got.ClaudeWeekly.Forecast; f == nil || f.Status != wire.LimitForecastNeedsData {
+		t.Errorf("claude weekly forecast = %+v, want needs-data", f)
+	}
+	menu := l.usageLimitWindow(*l.store.state.SevenDay, wire.LimitIDClaudeWeekly, true, now)
+	if *menu.Forecast != *got.ClaudeWeekly.Forecast {
+		t.Errorf("menu forecast %+v != stats forecast %+v", *menu.Forecast, *got.ClaudeWeekly.Forecast)
+	}
+	if got.CodexWeekly.Forecast != nil {
+		t.Errorf("codex weekly forecast = %+v, want none", got.CodexWeekly.Forecast)
+	}
+}
 
 func (r *usageRig) write(agent string, rec nativerunner.UsageRecord) {
 	r.t.Helper()
