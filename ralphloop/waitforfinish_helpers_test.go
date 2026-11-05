@@ -1,0 +1,72 @@
+package ralphloop
+
+import (
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/testutil/runnerfake"
+)
+
+// blockedRunner is idleRunner with its session blocked.
+func blockedRunner(label string) *runnerfake.Runner {
+	r := idleRunner(label)
+	r.SetState(label, agentrunner.StateBlocked, "")
+	return r
+}
+
+// paneRunner hosts one idle session of label on pane, so a Wait aimed at any
+// other pane fails with ErrNotFound.
+func paneRunner(label, pane, sessionID string) *runnerfake.Runner {
+	r := runnerfake.NewRunner()
+	r.IDs = func(string) (string, string) { return pane, sessionID }
+	if _, err := r.Start(agentrunner.StartOptions{Label: label}); err != nil {
+		panic(err)
+	}
+	return r
+}
+
+// idlePromptRunner is paneRunner on pane-1 whose agent reports idle the moment
+// it is prompted, so a wait after "/compact" never blocks in real time.
+func idlePromptRunner(label, sessionID string) *runnerfake.Runner {
+	r := paneRunner(label, "pane-1", sessionID)
+	r.PromptState = agentrunner.StateIdle
+	return r
+}
+
+// gatedBreachParams is the launchAndPromptParams shape the compaction-gate
+// tests below share: a Claude iteration whose events merge in scratchDir.
+func gatedBreachParams(scratchDir string) launchAndPromptParams {
+	return launchAndPromptParams{
+		Label:      "iter-19",
+		Agent:      AgentClaude,
+		Pane:       "pane-1",
+		Ticket:     "19",
+		SessionCwd: "/repo/iter-19",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}
+}
+
+// breachRunner hosts gatedBreachParams' session. Its agent reports idle the
+// moment it is prompted, and timeoutIf scripts which compact polls time out.
+func breachRunner(timeoutIf func(wait int) bool) *blipRunner {
+	return &blipRunner{Runner: idlePromptRunner("iter-19", "sess-19"), timeoutIf: timeoutIf}
+}
+
+// boundGiveUpParams is the iteration shape the give-up-bound tests share: a
+// Claude iteration whose occupancy stays over the smart zone, so every poll
+// tick that times out drives one full recovery attempt.
+func boundGiveUpParams() launchAndPromptParams {
+	return launchAndPromptParams{
+		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
+		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
+	}
+}
+
+// boundGiveUpRunner hosts boundGiveUpParams' session; its finish polls time
+// out wherever timeoutIf says. Recovery's own compact-completion polls see the
+// agent idle right after "/compact": the premature idle the gate exists to
+// distrust.
+func boundGiveUpRunner(timeoutIf func(wait int) bool) *blipRunner {
+	return &blipRunner{Runner: idlePromptRunner("iter-19", "sess-19"), timeoutIf: timeoutIf, finishPollsOnly: true}
+}
+
+func alwaysTimeout(int) bool { return true }
