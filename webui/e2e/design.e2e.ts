@@ -387,6 +387,66 @@ test("50. Design epic page", async ({ page, start }) => {
   }).toPass();
 });
 
+const longSummary = "Reach the sea by building a canal, a lock and a long harbour wall before the autumn storms. ".repeat(12).trim();
+
+// The server reads a new section a moment after the CLI wrote it, so the page is opened until it shows.
+async function openEpicWithSummary(page: Page, fixture: Fixture, summary: string) {
+  await fixture.cli("tickets", "section", "demo:design-epic", "Destination", summary);
+  await expect(async () => {
+    await page.evaluate(() => (location.hash = "#/epics"));
+    await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
+    await expect(page.getByRole("button", nav("Show full description"))).toBeVisible({ timeout: 1000 });
+  }).toPass();
+}
+
+test("Header shape: Design and Epic share the left edge and row at 1440px, and neither scrolls sideways at 375px", async ({ page, start }) => {
+  const fixture = await start("design");
+  await openEpicWithSummary(page, fixture, "A short destination.");
+  const edges = async () => ({
+    title: (await page.getByRole("heading", { level: 1 }).boundingBox())!,
+    ring: (await page.getByTestId("page-header-ring").boundingBox())!,
+  });
+  const epic = await edges();
+  await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+  await expect(page.getByRole("button", nav("Start design session"))).toBeVisible();
+  const design = await edges();
+  expect(design.ring.x).toBeCloseTo(epic.ring.x, 0);
+  expect(design.title.x).toBeCloseTo(epic.title.x, 0);
+  // The two pages' containers differ by a sub-pixel or a border, so the row may sit 1px apart.
+  expect(Math.abs(design.ring.y - epic.ring.y)).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const sideways = () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  expect(await sideways()).toBe(false);
+  await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
+  await expect(page.getByRole("button", nav("Show full description"))).toBeVisible();
+  expect(await sideways()).toBe(false);
+});
+
+test("Epic description popover: click, Enter, Space and Escape, and it stays inside the viewport at 375px", async ({ page, start }) => {
+  const fixture = await start("design");
+  await openEpicWithSummary(page, fixture, longSummary);
+  const button = page.getByRole("button", nav("Show full description"));
+  const popover = page.getByTestId("description-popover");
+  for (const open of [() => button.click(), () => button.press("Enter"), () => button.press("Space")]) {
+    await open();
+    await expect(popover).toBeVisible();
+    // Zag arms its Escape listener a frame after the popover mounts, so a first press may be missed.
+    await expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(popover).toHaveCount(0, { timeout: 500 });
+    }).toPass();
+  }
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await button.click();
+  await expect(popover).toBeVisible();
+  const box = (await popover.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(375);
+  expect(box.y + box.height).toBeLessThanOrEqual(812);
+});
+
 test.describe("46. gx designs open and delete", () => {
   test("open refuses an existing epic, delete removes an uncharted design and refuses a charted one", async ({ start }) => {
     const fixture = await start("design");

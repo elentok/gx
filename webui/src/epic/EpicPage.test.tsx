@@ -667,24 +667,44 @@ test("an empty epic reads 0/0", async () => {
   expect(await screen.findByText("0/0")).toBeTruthy();
 });
 
-test("the summary renders in full", async () => {
-  const summary = "word ".repeat(200).trim();
-  render("/e/gx:blog-impl", [], "loop", { detail: { summary } });
-  expect(await screen.findByText(summary)).toBeTruthy();
+const descriptionButton = () => screen.findByRole("button", { name: "Show full description" });
+
+test("the description is one line under the title, and no summary renders no line", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { summary: "A short summary" } });
+  const line = await screen.findByTestId("page-header-line");
+  expect(within(line).getByRole("button", { name: "Show full description" }).textContent).toBe("A short summary");
+  cleanup();
+  render("/e/gx:blog-impl", [], "loop", { detail: { summary: "" } });
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("page-header-line")).toBeNull();
 });
 
-test("the summary sits beside the title wide and under the ring row on a phone", async () => {
-  const summary = "A short summary";
+// Enter and Space are the browser's own click on a native button; the e2e flow presses them for real.
+test("a click on the description opens the full text and Escape closes it", async () => {
+  const summary = "word ".repeat(200).trim();
   render("/e/gx:blog-impl", [], "loop", { detail: { summary } });
-  // The h1 sits in the jump menu; the title column is the menu's parent.
-  const titleColumn = (await screen.findByRole("heading", { level: 1 })).parentElement?.parentElement;
-  expect(titleColumn?.contains(await screen.findByText(summary))).toBe(true);
-  cleanup();
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  const button = await descriptionButton();
+  expect(button.tagName).toBe("BUTTON");
+  fireEvent.click(button);
+  const popover = await screen.findByTestId("description-popover");
+  expect(popover.textContent).toBe(summary);
+  // Zag arms its Escape listener a frame after the lazily mounted content appears, so a first press may be missed.
+  await waitFor(() => {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(screen.queryByTestId("description-popover")).toBeNull();
+  });
+});
+
+test("Copy epic ID is the only menu item and copies project:name", async () => {
+  const writeText = vi.fn(async () => {});
+  vi.stubGlobal("navigator", { clipboard: { writeText } });
   try {
-    render("/e/gx:blog-impl", [], "loop", { detail: { summary } });
-    const title = await screen.findByRole("heading", { level: 1 });
-    expect(title.parentElement?.parentElement?.contains(await screen.findByText(summary))).toBe(false);
+    render("/e/gx:blog-impl", []);
+    fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.map((i) => i.textContent)).toEqual(["Copy epic IDgx:blog-impl"]);
+    fireEvent.click(items[0]);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:blog-impl"));
   } finally {
     vi.unstubAllGlobals();
   }

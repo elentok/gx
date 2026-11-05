@@ -1,4 +1,6 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
+import { copyText } from "../clipboard";
+import { MoreActionsMenu } from "../ui/more-actions/MoreActionsMenu";
 import { Fragment, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -130,7 +132,7 @@ function EpicBar({
       ? designStatParts(detail, designLive, now)
       : loopStatParts({ ...detail, wall_clock: wallClock });
   return (
-    <Box mt={wide ? "14px" : "12px"} borderTopWidth="1px" borderColor="hairline" pt={wide ? "14px" : "12px"}>
+    <>
       <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap="3">
         <Text data-testid="stats-line" fontSize="14px" lineHeight="normal" color="text.dim">
           {parts.map((p, i) => (
@@ -174,7 +176,71 @@ function EpicBar({
         </Box>
       </Box>
       {mergeBlocked(detail) && <MergeBlockNotice address={address} detail={detail} wide={wide} onChanged={onChanged} />}
-    </Box>
+    </>
+  );
+}
+
+// The line under the title: the summary on one truncated line. It is a button that opens the full text.
+function DescriptionLine({ summary }: { summary: string }) {
+  return (
+    <Popover.Root lazyMount unmountOnExit positioning={{ placement: "bottom-start", gutter: 8 }}>
+      <Popover.Trigger asChild>
+        <chakra.button
+          type="button"
+          aria-label="Show full description"
+          display="block"
+          maxW="full"
+          textAlign="left"
+          cursor="pointer"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
+          color="inherit"
+        >
+          <Markdown inline>{summary}</Markdown>
+        </chakra.button>
+      </Popover.Trigger>
+      <Portal>
+        <Popover.Positioner>
+          <Popover.Content
+            aria-label="Epic description"
+            data-testid="description-popover"
+            bg="surface.raised"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="12px"
+            boxShadow="lg"
+            color="text"
+            w="min(560px, calc(100vw - 32px))"
+            maxH="min(70vh, 480px)"
+            overflowY="auto"
+            css={{ "--popover-bg": "colors.surface.raised" }}
+          >
+            <Markdown px="4" py="3" fontSize="15px" lineHeight="1.5">
+              {summary}
+            </Markdown>
+          </Popover.Content>
+        </Popover.Positioner>
+      </Portal>
+    </Popover.Root>
+  );
+}
+
+// The only item: the epic address, `<project>:<name>`.
+function EpicMenu({ address }: { address: string }) {
+  return (
+    <MoreActionsMenu
+      sections={[
+        [
+          {
+            value: "copy-epic-id",
+            label: "Copy epic ID",
+            hint: address,
+            onSelect: () => void copyText(address, null),
+          },
+        ],
+      ]}
+    />
   );
 }
 
@@ -286,11 +352,6 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
   const partner = joinedCard?.addresses?.find((a) => a !== address);
   // The card speaks for this page only while its active (first) address is this epic.
   const card = joinedCard?.addresses?.[0] === address ? joinedCard : undefined;
-  const summary = detail?.summary && (
-    <Markdown mt={wide ? "1" : "12px"} fontSize="15px" lineHeight="1.5" color="text.muted">
-      {detail.summary}
-    </Markdown>
-  );
 
   return (
     <>
@@ -298,28 +359,27 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
         <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
       ) : detail ? (
         <>
-          <PageHeader
-            title={name}
-            lead={<EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "md" : "sm"} />}
-            heading={
-              <>
-                <JumpMenu name={name} current={address} epics={list?.epics ?? []} />
-                {wide && summary}
-              </>
-            }
-          >
-            {!wide && summary}
-          </PageHeader>
-          <EpicBar
-            address={address}
-            detail={detail}
-            now={now}
-            wide={wide}
-            designLive={designLive}
-            partner={partner}
-            openDesign={openDesign}
-            onChanged={refetch}
-          />
+          <Box mt="4">
+            <PageHeader
+              title={name}
+              ring={<EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "header" : "headerSm"} />}
+              heading={<JumpMenu name={name} current={address} epics={list?.epics ?? []} />}
+              line={detail.summary ? <DescriptionLine summary={detail.summary} /> : undefined}
+              right={<EpicMenu address={address} />}
+              meta={
+                <EpicBar
+                  address={address}
+                  detail={detail}
+                  now={now}
+                  wide={wide}
+                  designLive={designLive}
+                  partner={partner}
+                  openDesign={openDesign}
+                  onChanged={refetch}
+                />
+              }
+            />
+          </Box>
           {detail.total === 0 ? (
             <Text mt="4" color="text.muted">
               No tickets yet

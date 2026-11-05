@@ -23,7 +23,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (111). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (115). Before you add a flow, add a step to a flow on the same scenario
 (see `skills/gx-playwright-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -53,6 +53,8 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **Stopped session card:** live asks first, a stopped card moves to Ready to design, the menu and the banner start a new session.
 - **Delete design:** appears when the session stops with the page open, and Delete removes the design.
 - **50. Design epic page.**
+- **Header shape:** the Design and Epic pages share the ring's and title's left edge and row at 1440px; neither scrolls sideways at 375px.
+- **Epic description popover:** click, Enter and Space open the full summary and Escape closes it; at 375px it stays inside the viewport.
 - **`gx designs open` and `gx designs delete`:** open refuses an existing epic; delete removes an uncharted design and refuses a charted one.
 
 ### `design-page.e2e.ts`

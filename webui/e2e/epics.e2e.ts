@@ -15,6 +15,8 @@ test("2. Epic looks right", async ({ page, start }) => {
   await expect(page.getByRole("img", { name: "Implementation" })).toBeVisible();
   await expect(page.getByTestId("comet")).toHaveCount(0);
   await expect(page.getByTestId("stats-line")).toHaveText("Not queued · $0.00 · 0s agent time");
+  // mixed-epic has no summary, so the header draws no description line.
+  await expect(page.getByTestId("page-header-line")).toHaveCount(0);
   await expect(page.getByText("1 done, 1 cancelled")).toBeVisible();
   await expect(page.getByRole("link", { name: "02 open ready" })).toBeVisible();
   await expect(page.getByRole("link", { name: "03 blocked after 02" })).toBeVisible();

@@ -28,7 +28,10 @@ test.describe("53. Phone, epic page", () => {
     const longMeta = (await longTitle.locator("xpath=ancestor::a").locator("[data-meta]").boundingBox())!;
     expect(longMeta.y).toBeGreaterThanOrEqual(box.y + box.height);
 
-    await page.getByRole("button", nav("Queue")).click();
+    // The bar's buttons wrap to a full-width row of touch-sized buttons.
+    const queue = page.getByRole("button", nav("Queue"));
+    expect((await queue.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await queue.click();
     const answer = page.getByRole("button", nav("Answer"));
     const fix = page.getByRole("button", { name: "Fix it with an agent" });
     // 07 only starts once 02 and 03 have merged, each after the server's 3s finish debounce, as in flow 2.
