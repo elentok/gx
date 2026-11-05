@@ -173,7 +173,7 @@ func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testin
 	}
 
 	clean()
-	res, err := f.H.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
@@ -215,7 +215,7 @@ func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.
 	f, clean := dirtyTrunkFixture(t)
 	f.pauseRoot(t)
 
-	res, err := f.H.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || !res.Paused || res.PauseKind != string(events.DirtyTrunk) {
 		t.Fatalf("merge again = %+v, %v; want a dirty-trunk pause", res, err)
 	}
@@ -224,7 +224,7 @@ func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.
 	}
 
 	clean()
-	res, err = f.H.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	res, err = f.H.Client.Tickets.EpicMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || !res.Merged {
 		t.Fatalf("merge after cleaning = %+v, %v", res, err)
 	}

@@ -21,7 +21,7 @@ func RetryAs(t *testing.T, h *Harness, investigator string) wire.QueueResult {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	res, err := apiclient.New(server.SocketPath(h.StateDir)).AsInvestigator(investigator).TicketRetry(ctx, "proj:epic-a/01", false)
+	res, err := apiclient.New(server.SocketPath(h.StateDir)).AsInvestigator(investigator).Tickets.Retry(ctx, "proj:epic-a/01", false)
 	if err != nil {
 		t.Fatal(err)
 	}

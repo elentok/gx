@@ -205,7 +205,7 @@ func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testin
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 0 })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Approve(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("approve = %+v, %v", res, err)
 	}
 	if tk := epicTickets(t, h).Tickets[0]; !tk.IsDone() || !tk.Commitless {

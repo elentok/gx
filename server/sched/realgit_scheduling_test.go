@@ -161,7 +161,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 	// A person answers and the ticket is picked back up.
 	// The PTY agent waits idle for the answer, so the answer is what resumes it.
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := f.H.Client.TicketAnswer(ctx, wire.QueueRequest{Address: "proj:" + schedEpic + "/01", State: state, Choice: "a"})
+	res, err := f.H.Client.Tickets.Answer(ctx, wire.QueueRequest{Address: "proj:" + schedEpic + "/01", State: state, Choice: "a"})
 	if err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}

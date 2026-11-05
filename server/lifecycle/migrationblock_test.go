@@ -68,7 +68,7 @@ func TestMigrationBlock_FailedProjectIsNotClaimedAndOthersAre(t *testing.T) {
 	}
 
 	// A person can still act on a ticket of the blocked project.
-	if res, err := f.H.Client.TicketPause(ctx, "proj:"+schedEpic+"/02", "later"); err != nil || res.Refused {
+	if res, err := f.H.Client.Tickets.Pause(ctx, "proj:"+schedEpic+"/02", "later"); err != nil || res.Refused {
 		t.Fatalf("pause on a blocked project: %+v, %v", res, err)
 	}
 

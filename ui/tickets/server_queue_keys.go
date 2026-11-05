@@ -111,13 +111,13 @@ func hasPendingProposal(body string) bool {
 // proposal, and the refusal becomes the toast.
 func (m QueueModel) handleServerApproveKey() (tea.Model, tea.Cmd) {
 	row, ok := m.selectedQueueRow()
-	if m.serverAPI == nil || !ok || !hasPendingProposal(row.ticket.Body) {
+	if m.tickets == nil || !ok || !hasPendingProposal(row.ticket.Body) {
 		return m, nil
 	}
-	api, addr := m.serverAPI, row.ticket.Path
+	api, addr := m.tickets, row.ticket.Path
 	prompt := fmt.Sprintf("Run the recovery proposal for %s %s?", row.ticket.DisplayNumber(), row.ticket.Title)
 	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: func() tea.Msg {
-		res, err := api.TicketApprove(context.Background(), addr)
+		res, err := api.Approve(context.Background(), addr)
 		switch {
 		case err != nil:
 			return serverDoneMsg{problem: err.Error()}

@@ -49,7 +49,7 @@ func TestTicketScreen_PtyAgentReturnsItsSavedScreen(t *testing.T) {
 	ticketAgentDir(t, h.StateDir, "pty", "saved one\nsaved two\n")
 	ctx := context.Background()
 
-	res, err := h.Client.TicketScreen(ctx, "proj:epic-a/01")
+	res, err := h.Client.Tickets.Screen(ctx, "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestTicketScreen_LiveHolderReturnsItsRows(t *testing.T) {
 	ticketAgentDir(t, h.StateDir, "pty", "saved\n")
 	fakeHolder(t, ticketAgentPath(h.StateDir), []string{"live one", "live two"})
 
-	res, err := h.Client.TicketScreen(context.Background(), "proj:epic-a/01")
+	res, err := h.Client.Tickets.Screen(context.Background(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestTicketScreen_HolderGoneAfterPingReturnsSavedRows(t *testing.T) {
 	ticketAgentDir(t, h.StateDir, "pty", "saved one\nsaved two\n")
 	fakeHolder(t, ticketAgentPath(h.StateDir), nil)
 
-	res, err := h.Client.TicketScreen(context.Background(), "proj:epic-a/01")
+	res, err := h.Client.Tickets.Screen(context.Background(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestTicketScreen_AgentWithoutPtyHasNoScreen(t *testing.T) {
 	ticketAgentDir(t, h.StateDir, "headless", "")
 	ctx := context.Background()
 
-	if _, err := h.Client.TicketScreen(ctx, "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {
+	if _, err := h.Client.Tickets.Screen(ctx, "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("headless agent err = %v, want a 404", err)
 	}
 	d, err := h.Client.Detail(ctx, "proj:epic-a/01")
@@ -161,7 +161,7 @@ func TestTicketScreen_TicketWithoutAgentIsRefused(t *testing.T) {
 	t.Parallel()
 	h := startTicketScreen(t)
 
-	if _, err := h.Client.TicketScreen(context.Background(), "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {
+	if _, err := h.Client.Tickets.Screen(context.Background(), "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("no-agent err = %v, want a 404", err)
 	}
 }

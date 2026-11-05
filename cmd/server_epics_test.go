@@ -158,7 +158,7 @@ func TestServerEpicsMerge_RefusesWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	err := runServerQueueWrite(context.Background(), cl, &bytes.Buffer{}, false,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-			return cl.EpicMerge(ctx, "proj:epic")
+			return cl.Tickets.EpicMerge(ctx, "proj:epic")
 		})
 	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {
 		t.Errorf("err = %v; want %s", err, wire.ReasonServerNotRunning)

@@ -98,7 +98,7 @@ func (p ZeroCommitPaused) Report(t *testing.T, mutate func(*schema.Ticket)) {
 	if err := schema.UpdateTicket(p.TicketPath, mutate); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.H.Client.TicketChanged(context.Background(), "proj:epic-a/01"); err != nil {
+	if err := p.H.Client.Tickets.Changed(context.Background(), "proj:epic-a/01"); err != nil {
 		t.Fatal(err)
 	}
 }

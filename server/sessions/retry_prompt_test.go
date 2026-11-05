@@ -16,7 +16,7 @@ func TestRetry_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
-	res, err := e.H.Client.TicketRetry(t.Context(), answerAddr, false)
+	res, err := e.H.Client.Tickets.Retry(t.Context(), answerAddr, false)
 	if err != nil || res.Refused {
 		t.Fatalf("retry = %+v, %v", res, err)
 	}
@@ -35,7 +35,7 @@ func TestRetry_BlockedPaneWithALiveAgentPrompts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if res, err := e.H.Client.TicketRetry(t.Context(), answerAddr, false); err != nil || res.Refused {
+	if res, err := e.H.Client.Tickets.Retry(t.Context(), answerAddr, false); err != nil || res.Refused {
 		t.Fatalf("retry = %+v, %v", res, err)
 	}
 	if got := e.Fake.Prompts(answerLabel); len(got) != 1 {
@@ -56,7 +56,7 @@ func TestRetry_BlockedPauseOnAQuestionMenuInterruptsAndPrompts(t *testing.T) {
 			waitFor(t, func() bool { return runsJSONHas(h, `"waiting_since"`) })
 			before := len(turn.Prompts("epic-a-iter-01"))
 
-			if res, err := h.Client.TicketRetry(t.Context(), answerAddr, false); err != nil || res.Refused {
+			if res, err := h.Client.Tickets.Retry(t.Context(), answerAddr, false); err != nil || res.Refused {
 				t.Fatalf("retry = %+v, %v", res, err)
 			}
 			waitStatus(t, ticketPath, schema.StatusClaimed)
@@ -77,7 +77,7 @@ func TestRetry_BlockedPauseOnAQuestionMenuInterruptsAndPrompts(t *testing.T) {
 func TestRetry_HeadlessBlockedPauseStillRefuses(t *testing.T) {
 	t.Parallel()
 	h, _, turn := pauseBlocked(t)
-	res, err := h.Client.TicketRetry(t.Context(), answerAddr, false)
+	res, err := h.Client.Tickets.Retry(t.Context(), answerAddr, false)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentWaiting {
 		t.Fatalf("retry = %+v, %v; want %s", res, err, wire.ReasonAgentWaiting)
 	}
@@ -95,7 +95,7 @@ func TestRetry_BudgetKilledDoesNotPromptTheAgent(t *testing.T) {
 
 	// The fixture repo has no trunk branch, so the relaunch itself errors: the
 	// error shows the relaunch path ran.
-	_, err := e.H.Client.TicketRetry(t.Context(), answerAddr, false)
+	_, err := e.H.Client.Tickets.Retry(t.Context(), answerAddr, false)
 	if err == nil || !strings.Contains(err.Error(), "trunk") {
 		t.Errorf("retry error = %v; want the relaunch's trunk error", err)
 	}

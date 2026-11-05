@@ -102,7 +102,7 @@ func TestFrictionStamp_CancelledPausedTicketEndsWithCli(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	tk, err := schema.ParseTicket(path)

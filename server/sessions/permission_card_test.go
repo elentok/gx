@@ -58,7 +58,7 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 		t.Error("snapshot does not flag the blocked ticket")
 	}
 
-	if res, err := h.Client.AgentAnswer(ctx, answerAddr, "allow", ""); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.AgentAnswer(ctx, answerAddr, "allow", ""); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	d, err = h.Client.Detail(ctx, answerAddr)
@@ -252,7 +252,7 @@ func TestPermissionCard_CodexHookRequestAllowAndDeny(t *testing.T) {
 			if d.Permission == nil || *d.Permission != want || !slices.Contains(d.Actions, wire.ActionApprove) {
 				t.Fatalf("permission = %+v, actions %v, want %+v with approve", d.Permission, d.Actions, want)
 			}
-			if res, err := h.Client.AgentAnswer(ctx, answerAddr, tc.decision, tc.text); err != nil || res.Refused {
+			if res, err := h.Client.Tickets.AgentAnswer(ctx, answerAddr, tc.decision, tc.text); err != nil || res.Refused {
 				t.Fatalf("answer = %+v, %v", res, err)
 			}
 			got := fake.Answers("epic-a-iter-01")

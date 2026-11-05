@@ -20,7 +20,7 @@ func TestAgentVerbs_ReachARunOnAnotherRunner(t *testing.T) {
 	h, own, _ := liveUnderOther(t)
 	ctx := context.Background()
 
-	if res, err := h.Client.AgentPrompt(ctx, "proj:epic-a/01", "keep going"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.AgentPrompt(ctx, "proj:epic-a/01", "keep going"); err != nil || res.Refused {
 		t.Fatalf("prompt = %+v, %v", res, err)
 	}
 	if got := own.Prompts(routedLabel); !slices.Equal(got, []string{"keep going"}) {
@@ -28,10 +28,10 @@ func TestAgentVerbs_ReachARunOnAnotherRunner(t *testing.T) {
 	}
 	// The configured runner has no such session, so reaching it would refuse
 	// iteration-not-live; the run's own runner says nothing is blocked.
-	if res, err := h.Client.AgentAnswer(ctx, "proj:epic-a/01", "allow", ""); err != nil || res.Reason != wire.ReasonNotBlocked {
+	if res, err := h.Client.Tickets.AgentAnswer(ctx, "proj:epic-a/01", "allow", ""); err != nil || res.Reason != wire.ReasonNotBlocked {
 		t.Errorf("answer = %+v, %v; want refusal %s", res, err, wire.ReasonNotBlocked)
 	}
-	if res, err := h.Client.AgentInterrupt(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.AgentInterrupt(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("interrupt = %+v, %v", res, err)
 	}
 }

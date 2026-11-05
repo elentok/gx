@@ -165,7 +165,7 @@ func TestTicketUnmute_PostsTheAddressAndReturnsTheResult(t *testing.T) {
 	go srv.Serve(ln)
 	t.Cleanup(func() { srv.Close() })
 
-	res, err := apiclient.New(sock).TicketUnmute(context.Background(), "p:e/01")
+	res, err := apiclient.New(sock).Tickets.Unmute(context.Background(), "p:e/01")
 	if err != nil {
 		t.Fatal(err)
 	}

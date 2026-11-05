@@ -38,7 +38,7 @@ func TestAsk_AppendsQuestionAndSetsIterationStatus(t *testing.T) {
 	for _, typ := range []string{"implement", "code-review", "prompt"} {
 		t.Run(typ, func(t *testing.T) {
 			h, path := askFixture(t, typ)
-			res, err := h.Client.TicketAsk(context.Background(), "proj:epic-a/01", askBody)
+			res, err := h.Client.Tickets.Ask(context.Background(), "proj:epic-a/01", askBody)
 			if err != nil || res.Refused {
 				t.Fatalf("ask = %+v, %v", res, err)
 			}
@@ -84,7 +84,7 @@ func TestAsk_Refusals(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h, path := askFixture(t, "implement")
-			res, err := h.Client.TicketAsk(context.Background(), tc.address, tc.body)
+			res, err := h.Client.Tickets.Ask(context.Background(), tc.address, tc.body)
 			if err != nil || !res.Refused || res.Reason != tc.reason {
 				t.Fatalf("ask = %+v, %v; want refusal %s", res, err, tc.reason)
 			}
@@ -106,10 +106,10 @@ func TestAsk_SecondAskRefusesWhileQuestionOpen(t *testing.T) {
 	t.Parallel()
 	h, path := askFixture(t, "implement")
 	ctx := context.Background()
-	if res, err := h.Client.TicketAsk(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Ask(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {
 		t.Fatalf("first ask = %+v, %v", res, err)
 	}
-	res, err := h.Client.TicketAsk(ctx, "proj:epic-a/01", askBody)
+	res, err := h.Client.Tickets.Ask(ctx, "proj:epic-a/01", askBody)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonQuestionOpen {
 		t.Fatalf("second ask = %+v, %v; want refusal %s", res, err, wire.ReasonQuestionOpen)
 	}

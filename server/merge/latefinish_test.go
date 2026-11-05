@@ -130,7 +130,7 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 					if err != nil || res.Refused || !strings.Contains(string(res.Data), `"adopted"`) {
 						t.Fatalf("resume = %+v (data %s), %v; want adopted", res, res.Data, err)
 					}
-				} else if res, err := p.H.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+				} else if res, err := p.H.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 					t.Fatalf("relaunch = %+v, %v", res, err)
 				}
 				if tk, err := schema.ParseTicket(p.TicketPath); err != nil || tk.Status != schema.StatusDone {

@@ -47,8 +47,8 @@ func (c *Client) queueWrite(ctx context.Context, verb string, req wire.QueueRequ
 	return c.queueWriteTo(ctx, "/v1/queue/"+verb, req)
 }
 
-func (c *Client) queueWriteTo(ctx context.Context, path string, req wire.QueueRequest) (wire.QueueResult, error) {
+func (t *transport) queueWriteTo(ctx context.Context, path string, req wire.QueueRequest) (wire.QueueResult, error) {
 	var res wire.QueueResult
-	err := c.post(ctx, path, req, &res)
+	err := t.post(ctx, path, req, &res)
 	return res, err
 }

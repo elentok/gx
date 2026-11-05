@@ -60,7 +60,7 @@ func TestOrigin_SocketAnswerLogsTUIOrCLI(t *testing.T) {
 			waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 			state := pauseWithQuestion(t, ticketPath, optionsBlock)
 			tc.mark(t, h)
-			res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+			res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 			if err != nil || res.Refused {
 				t.Fatalf("answer = %+v, %v", res, err)
 			}

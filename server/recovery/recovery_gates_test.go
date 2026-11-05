@@ -293,7 +293,7 @@ func TestRecovery_ManualAndUnmatchedBlockedPanePausesForkNothing(t *testing.T) {
 	t.Parallel()
 	pause := map[string]func(*servertest.Harness) error{
 		"manual pause": func(h *servertest.Harness) error {
-			res, err := h.Client.TicketPause(context.Background(), "proj:epic-a/01", "broken")
+			res, err := h.Client.Tickets.Pause(context.Background(), "proj:epic-a/01", "broken")
 			if err == nil && res.Refused {
 				err = errors.New(res.Reason)
 			}

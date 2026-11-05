@@ -163,7 +163,7 @@ func TestWorktreeRemoval_ManualMergeRouteRemovesTheWorktree(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	f.assertFeatureKept(t, "completion without a merge")
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 
@@ -179,7 +179,7 @@ func TestWorktreeRemoval_UntrackedFileKeepsTheWorktreeAndLogsWhy(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	testutil.WriteFile(t, f.featureWorktree(t), "scratch.txt", "keep me")
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 
@@ -256,7 +256,7 @@ func TestWorktreeRemoval_WaitsForTheWorktreeLockAfterTheMergeDequeuedTheRoot(t *
 	completedUnmerged(ctx, t, f)
 	release := holdWorktreeLock(t)
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	if f.rootQueued(t) {

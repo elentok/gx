@@ -23,7 +23,7 @@ func TestRetry_StopClosesAWorkingLeftover(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Retry(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
 		t.Fatalf("retry --stop = %+v, %v", res, err)
 	}
 	if sess, ok, _ := fake.Find(servertest.HolderLabel); ok && sess.ID == leftover.ID {
@@ -63,7 +63,7 @@ func TestRetry_RepairPauseKeepsTheBranchHead(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Retry(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("retry = %+v, %v", res, err)
 	}
 	if got := git("rev-parse", branch); got != head {
@@ -77,7 +77,7 @@ func TestRelaunch_IdleLeftoverIsLeftToTheLaunch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
 	}
 }
@@ -93,7 +93,7 @@ func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
 	}
 	evs, err := tickets.ReadLog(path)
@@ -111,7 +111,7 @@ func TestRelaunch_WithoutQuestionWritesNoLog(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
 	}
 	if evs, _ := tickets.ReadLog(path); len(evs) != 0 {

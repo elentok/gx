@@ -93,7 +93,7 @@ func TestHarnessClaim_RelaunchKeepsEarlierRunHarness(t *testing.T) {
 			h, fake, path := startHarnessClaim(t, store)
 			servertest.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", tc.transcript)
 			servertest.SwitchDefaultHarness(t, h, path, store, "codex")
-			if res, err := h.Client.TicketRelaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
+			if res, err := h.Client.Tickets.Relaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
 				t.Fatalf("relaunch: %+v, %v", res, err)
 			}
 			if k := servertest.WaitKind(t, fake, "epic-a-iter-01"); k != tc.want {

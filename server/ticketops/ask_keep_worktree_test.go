@@ -68,7 +68,7 @@ func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
 	testutil.WriteFile(t, wt, "wip.txt", "uncommitted")
 
 	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	if res, err := h.Client.TicketAsk(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Ask(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {
 		t.Fatalf("ask = %+v, %v", res, err)
 	}
 	fake.SetState(label, agentrunner.StateIdle, "")
@@ -98,7 +98,7 @@ func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
 		return len(h.Server.Runs()) == 0
 	})
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	if res, err := h.Client.TicketAnswer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Answer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { _, ok, _ := fake.Find(label); return ok })
@@ -149,7 +149,7 @@ func TestAsk_CommitlessOnNonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testi
 	testutil.WriteFile(t, wt, "wip.txt", "uncommitted")
 
 	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	if res, err := h.Client.TicketAsk(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Ask(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {
 		t.Fatalf("ask = %+v, %v", res, err)
 	}
 	fake.SetState(label, agentrunner.StateIdle, "")
@@ -159,7 +159,7 @@ func TestAsk_CommitlessOnNonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testi
 	}
 
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	if res, err := h.Client.TicketAnswer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Answer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { _, ok, _ := fake.Find(label); return ok })

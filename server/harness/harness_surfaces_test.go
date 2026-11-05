@@ -190,7 +190,7 @@ func TestRelaunch_EarlierClaudeRunPicksTheClaudeRunner(t *testing.T) {
 	h, claude, pty, path := startSplitRunners(t, store)
 	servertest.SeedEarlierClaudeRun(t, h, store, "proj", "epic-a", "01", "sess-1", true)
 	servertest.SwitchDefaultHarness(t, h, path, store, "codex")
-	if res, err := h.Client.TicketRelaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Relaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("relaunch: %+v, %v", res, err)
 	}
 	if k := servertest.WaitKind(t, claude, "epic-a-iter-01"); k != "claude" {
@@ -236,7 +236,7 @@ func TestRelaunch_FollowsCodexDefaultGateAndRunner(t *testing.T) {
 			store := t.TempDir()
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Type: typ})
 			h, claude, pty, _ := startSplitRunners(t, store, append([]func(*server.Config){servertest.WithDefaultHarness("codex")}, extra...)...)
-			if res, err := h.Client.TicketRelaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
+			if res, err := h.Client.Tickets.Relaunch(context.Background(), "proj:epic-a/01", false); err != nil || res.Refused {
 				t.Fatalf("relaunch: %+v, %v", res, err)
 			}
 			return h, claude, pty

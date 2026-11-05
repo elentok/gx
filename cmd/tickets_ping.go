@@ -26,7 +26,7 @@ func pingLabels(dial func() (*apiclient.Client, error), labels ...string) {
 	}
 	for _, l := range labels {
 		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
-		_ = cl.TicketChanged(ctx, l)
+		_ = cl.Tickets.Changed(ctx, l)
 		cancel()
 	}
 }

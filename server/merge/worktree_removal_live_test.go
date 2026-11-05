@@ -42,7 +42,7 @@ func TestWorktreeRemoval_LiveSessionKeepsTheWorktreeUntilItStops(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	id := f.sessionIn(ctx, t, f.featureWorktree(t))
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	f.settle(t)
@@ -74,7 +74,7 @@ func TestWorktreeRemoval_ExitedSessionDoesNotKeepTheWorktree(t *testing.T) {
 	}
 	waitForSession(ctx, t, f.H, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	f.settle(t)
@@ -120,7 +120,7 @@ func TestWorktreeRemoval_StoppedRunStillRegisteredDoesNotKeepTheWorktree(t *test
 	completedUnmerged(ctx, t, f)
 	f.H.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, f.featureWorktree(t), false)
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	f.settle(t)
@@ -135,7 +135,7 @@ func TestWorktreeRemoval_RunWithoutCwdKeepsTheWorktreeOfItsEpic(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	f.H.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, "", true)
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	f.settle(t)
@@ -154,7 +154,7 @@ func TestWorktreeRemoval_RunInASiblingWorktreeDoesNotKeepTheWorktree(t *testing.
 	f.Git(t, "worktree", "add", "-q", "--detach", sibling)
 	f.H.PutRunIn("proj:"+schedEpic+"/99", "proj:"+schedEpic, sibling, true)
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	f.settle(t)

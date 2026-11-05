@@ -36,7 +36,7 @@ func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
 
-	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	if res, err := f.H.Client.Tickets.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 
@@ -68,7 +68,7 @@ func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *test
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
-	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	if res, err := f.H.Client.Tickets.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")

@@ -23,7 +23,7 @@ func (f designsFixture) openDesignWorktree(t *testing.T, commit bool) (dir, id s
 	dir, _ = readMeta(t, f.h, res.Session.ID)["dir"].(string)
 	// The open's stamp write is rescanned after a debounce; a rescan that lands
 	// after the test moves the step would take the new step as its baseline.
-	if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+	if err := f.h.Client.Tickets.Changed(f.ctx, "proj:map"); err != nil {
 		t.Fatal(err)
 	}
 	if commit {
@@ -177,7 +177,7 @@ func (f designsFixture) setDesignStep(t *testing.T, step string) {
 		t.Fatal(err)
 	}
 	// Rescan now, not when the file watcher or the backstop poll gets to it.
-	if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+	if err := f.h.Client.Tickets.Changed(f.ctx, "proj:map"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -194,7 +194,7 @@ func TestDesignCleanup_StepMovingToBranchRemovesWithoutSessionExit(t *testing.T)
 	f.setDesignStepBranch(t)
 	// The watch is only a hint; rescan now instead of waiting on it. Tests that
 	// count checks leave this out: a second concurrent rescan would be a second check.
-	if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+	if err := f.h.Client.Tickets.Changed(f.ctx, "proj:map"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool { return f.designGone(t, dir) })

@@ -58,7 +58,7 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Client.TicketChanged(context.Background(), "proj:epic-a/01"); err != nil {
+	if err := h.Client.Tickets.Changed(context.Background(), "proj:epic-a/01"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,7 +85,7 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := h.Client.TicketChanged(context.Background(), "proj:epic-a/01"); err != nil {
+		if err := h.Client.Tickets.Changed(context.Background(), "proj:epic-a/01"); err != nil {
 			t.Fatal(err)
 		}
 	}

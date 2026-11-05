@@ -38,18 +38,18 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	start, _, _ := servertest.RegisterTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Pause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	h.Server.Budget().RecordSpend("spent", 6)
 
-	if res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false); err != nil || !res.Refused || res.Reason != wire.ReasonBudgetLimit || !strings.Contains(res.Message, "budget") {
+	if res, err := h.Client.Tickets.Retry(ctx, "proj:epic-a/01", false); err != nil || !res.Refused || res.Reason != wire.ReasonBudgetLimit || !strings.Contains(res.Message, "budget") {
 		t.Errorf("retry = %+v, %v; want refusal %s naming the budget", res, err, wire.ReasonBudgetLimit)
 	}
 	if len(start()) != 0 {
 		t.Errorf("agent started past the soft limit: %v", start())
 	}
-	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "finish up"); err != nil || !res.Refused || res.Reason != wire.ReasonBudgetLimit {
+	if res, err := h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "finish up"); err != nil || !res.Refused || res.Reason != wire.ReasonBudgetLimit {
 		t.Errorf("nudge = %+v, %v; want refusal %s", res, err, wire.ReasonBudgetLimit)
 	}
 }
@@ -82,7 +82,7 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "finish up"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "finish up"); err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
 	if runs := h.Server.Runs(); len(runs) != 1 {

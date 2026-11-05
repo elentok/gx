@@ -35,7 +35,7 @@ func TestCancel_PausedRetroStampsItsEpicSkipped(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:evolve-epic-a-20261010-1405/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:evolve-epic-a-20261010-1405/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	data, err := os.ReadFile(epicTicket)

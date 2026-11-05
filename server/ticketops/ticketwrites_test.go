@@ -29,7 +29,7 @@ func TestCancel_EndsThePausedTicketsRoundWithTheRequestsSource(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	rounds := endedRounds(t, path)
@@ -44,7 +44,7 @@ func TestCancel_WithoutAnOpenRoundWritesNoEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	if rounds := endedRounds(t, path); len(rounds) != 0 {
@@ -71,7 +71,7 @@ func TestCancel_RemovesTheKeptWorktreeAndKeepsTheBranch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
@@ -96,7 +96,7 @@ func TestCancel_RemovesTheForkDescendantsWorktreeToo(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	for _, wt := range wts {
@@ -131,7 +131,7 @@ func TestCancel_FailedWorktreeRemovalDoesNotStopTheCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventTicketCancelled, "proj:epic-a/01")
@@ -150,7 +150,7 @@ func TestUnmute_ReopensAStuckTicketAndDemotesItsSection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01")
+	res, err := h.Client.Tickets.Unmute(ctx, "proj:epic-a/01")
 	if err != nil || res.Refused {
 		t.Fatalf("unmute = %+v, %v", res, err)
 	}
@@ -175,7 +175,7 @@ func TestUnmute_LeavesANonPausedTicketsStatusAlone(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Unmute(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("unmute = %+v, %v", res, err)
 	}
 	data, _ := os.ReadFile(path)
@@ -191,7 +191,7 @@ func TestUnmute_RefusesATicketWithNoMutes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01")
+	res, err := h.Client.Tickets.Unmute(ctx, "proj:epic-a/01")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonNotMuted {
 		t.Fatalf("unmute = %+v, %v; want %s refusal", res, err, wire.ReasonNotMuted)
 	}
@@ -206,7 +206,7 @@ func TestUnmute_RefusesUnknownTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/99")
+	res, err := h.Client.Tickets.Unmute(ctx, "proj:epic-a/99")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonUnknownTicket {
 		t.Fatalf("unmute = %+v, %v", res, err)
 	}
@@ -224,14 +224,14 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false)
+	res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
 		t.Fatalf("cancel = %+v, %v; want %s refusal", res, err, wire.ReasonTicketLive)
 	}
 	if data, _ := os.ReadFile(path); strings.Contains(string(data), "status: cancelled") || h.Stops() != 0 {
 		t.Fatalf("refused cancel changed things (stops=%d):\n%s", h.Stops(), data)
 	}
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
 		t.Fatalf("cancel --stop = %+v, %v", res, err)
 	}
 	if data, _ := os.ReadFile(path); !strings.Contains(string(data), "status: cancelled") {
@@ -260,7 +260,7 @@ func TestCancel_OldOneOffAddressResolvesTheArchivedTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketCancel(ctx, "proj:one-offs/07", false)
+	res, err := h.Client.Tickets.Cancel(ctx, "proj:one-offs/07", false)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketDone {
 		t.Fatalf("cancel = %+v, %v; want %s refusal (not unknown-ticket)", res, err, wire.ReasonTicketDone)
 	}
@@ -282,7 +282,7 @@ func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	for p, want := range map[string]string{path: "cancelled", open: "cancelled", done: "done"} {

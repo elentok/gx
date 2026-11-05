@@ -249,10 +249,3 @@ func (s *Sessions) SetViMode(ctx context.Context, on *bool) (wire.ViModeResult, 
 	err := s.t.post(ctx, "/v1/vimode", wire.ViModeRequest{On: on}, &res)
 	return res, err
 }
-
-// TicketScreen reads a loop ticket agent's screen as plain text rows.
-func (c *Client) TicketScreen(ctx context.Context, address string) (wire.SessionScreenResponse, error) {
-	var res wire.SessionScreenResponse
-	err := c.get(ctx, "/v1/sessions/screen?ticket="+url.QueryEscape(address), &res)
-	return res, err
-}

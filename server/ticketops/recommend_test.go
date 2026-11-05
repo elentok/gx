@@ -17,7 +17,7 @@ func recommendAs(t *testing.T, h *servertest.Harness, investigator, address, ver
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	res, err := apiclient.New(server.SocketPath(h.StateDir)).AsInvestigator(investigator).TicketRecommend(ctx, address, verb, "the branch is fine, the agent just crashed")
+	res, err := apiclient.New(server.SocketPath(h.StateDir)).AsInvestigator(investigator).Tickets.Recommend(ctx, address, verb, "the branch is fine, the agent just crashed")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,7 +23,7 @@ func TestTrunkConflict_MarkersLeftPauseTheTicketAndKeepTheBackup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
-	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	if res, err := f.H.Client.Tickets.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 
@@ -51,7 +51,7 @@ func TestTrunkConflict_NoMarkersLeftMakesTheTicketDoneDeletesTheBackupAndLandsTh
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
-	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	if res, err := f.H.Client.Tickets.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 
@@ -75,7 +75,7 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
-	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	if res, err := f.H.Client.Tickets.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
@@ -110,7 +110,7 @@ func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
-	if res, err := f.H.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+	if res, err := f.H.Client.Tickets.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")

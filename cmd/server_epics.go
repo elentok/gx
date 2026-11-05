@@ -40,7 +40,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
 			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.EpicMerge(ctx, args[0])
+				return cl.Tickets.EpicMerge(ctx, args[0])
 			})
 		},
 	}
@@ -56,7 +56,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
 			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.EpicStashMerge(ctx, args[0])
+				return cl.Tickets.EpicStashMerge(ctx, args[0])
 			})
 		},
 	}

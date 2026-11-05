@@ -72,7 +72,7 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 		"proj:open":                 wire.ReasonNotComplete,
 		"proj:" + schedEpic:         wire.ReasonBranchMissing,
 	} {
-		res, err := f.H.Client.EpicMerge(context.Background(), addr)
+		res, err := f.H.Client.Tickets.EpicMerge(context.Background(), addr)
 		if err != nil || !res.Refused || res.Reason != want {
 			t.Errorf("merge %s = %+v, %v, want refusal %s", addr, res, err, want)
 		}
@@ -98,7 +98,7 @@ func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
 	servertest.WriteTicketWith(t, f.Store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
 	f.H.Server.Rescan()
 
-	res, err := f.H.Client.EpicMerge(context.Background(), "proj:research")
+	res, err := f.H.Client.Tickets.EpicMerge(context.Background(), "proj:research")
 	if err != nil || res.Refused || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want merged", res, err)
 	}
@@ -139,7 +139,7 @@ func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
 	defer cancel()
 	completedUnmerged(ctx, t, f)
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil || !res.Merged || res.Refused || res.MergeTicket != "" {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
@@ -163,7 +163,7 @@ func TestEpicMerge_RemovesLeftoverIterationWorktrees(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	wt := keepWorktree(t, f.Repo, schedEpic, "01")
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
 	f.settle(t)
@@ -184,7 +184,7 @@ func TestEpicMerge_KeepsAnotherEpicsIterationWorktree(t *testing.T) {
 	mine := keepWorktree(t, f.Repo, schedEpic, "01")
 	other := keepWorktree(t, f.Repo, "other-epic", "01")
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
 	f.settle(t)
@@ -207,7 +207,7 @@ func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T
 	defer cancel()
 	completedUnmerged(ctx, t, f)
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
@@ -248,7 +248,7 @@ func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) 
 		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
 	})
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
@@ -276,7 +276,7 @@ func TestEpicMerge_FrictionIncludesACancelledTicket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
@@ -299,7 +299,7 @@ func TestEpicMerge_UnstampedDoneTicketLeavesTokensAndCostOffButKeepsFriction(t *
 		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
 	})
 
-	if res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
 	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
@@ -325,7 +325,7 @@ func TestEpicMerge_RecreatesARemovedFeatureWorktree(t *testing.T) {
 	// The merge's background removal would delete the recreated worktree.
 	holdWorktreeLock(t)
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
 	}
@@ -343,7 +343,7 @@ func TestEpicMerge_DirtyTrunkPausesTheRootAndLeavesItQueued(t *testing.T) {
 	// An untracked file in main's checkout that the merge would overwrite.
 	testutil.WriteFile(t, f.Repo, "01.txt", "local")
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ func TestEpicMerge_RequeuedRootHasNoAgent(t *testing.T) {
 	completedUnmerged(ctx, t, f)
 	root := "proj:" + schedEpic + "/01"
 	testutil.WriteFile(t, f.Repo, "01.txt", "local")
-	if _, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil {
+	if _, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil {
 		t.Fatal(err)
 	}
 	q, err := f.H.Client.QueueItems(ctx)
@@ -396,7 +396,7 @@ func TestEpicMerge_MergeErrorReturnsAMergeErrorPause(t *testing.T) {
 	// A stale index lock fails the merge without any local change.
 	testutil.WriteFile(t, filepath.Join(f.Repo, ".git"), "index.lock", "")
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +438,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeForksANormalTicket(t *testing.T) {
 	evs := completedUnmerged(ctx, t, f.schedFixture)
 	raceTrunk(t, f)
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil || res.Refused || res.Merged || res.Paused || res.MergeTicket != "proj:"+schedEpic+"/02" {
 		t.Fatalf("merge = %+v, %v, want merge ticket 02", res, err)
 	}
@@ -456,7 +456,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeAtTheCapPauses(t *testing.T) {
 	completedUnmerged(ctx, t, f.schedFixture)
 	raceTrunk(t, f)
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func TestEpicMerge_NonFFForksAManualTicketWhoseFinishMergesTheEpic(t *testing.T)
 	defer cancel()
 	evs := completedUnmerged(ctx, t, f.schedFixture)
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +519,7 @@ func TestEpicMerge_ForkingAManualTicketClearsTheStoredBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -544,7 +544,7 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 		return history.MergeBranchInto(repo, wts, branch, target)
 	})
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,7 +574,7 @@ func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 	defer cancel()
 	evs := f.Subscribe(ctx, t)
 
-	res, err := f.H.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}

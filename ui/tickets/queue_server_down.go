@@ -34,6 +34,12 @@ func (m QueueModel) WithSessions(s SessionsAPI) QueueModel {
 	return m
 }
 
+// WithTickets gives the tab the tickets sub-client; see Model.WithTickets.
+func (m QueueModel) WithTickets(t TicketsAPI) QueueModel {
+	m.tickets = t
+	return m
+}
+
 func cmdProbeRequested() tea.Msg { return ProbeRequestedMsg{} }
 
 // serverDown reports the down banner state: the link the shell last delivered.

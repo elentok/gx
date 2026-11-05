@@ -51,7 +51,7 @@ func newBudgetEventFixture(t *testing.T) *budgetEventFixture {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "go"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "go"); err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
 	return f

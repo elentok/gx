@@ -33,7 +33,7 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{
+	res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{
 		Address: answerAddr, State: state, Choice: "b", Note: "line1\r\nline2", Source: "cli",
 	})
 	if err != nil || res.Refused || res.Outcome != wire.OutcomeDelivered {
@@ -72,7 +72,7 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 		if err := schema.UpdateTicket(ticketPath, pause); err != nil {
 			t.Fatal(err)
 		}
-		res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
+		res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
 		if err != nil || res.Reason != wire.ReasonNotAnswerable {
 			t.Errorf("%s: %+v, %v; want %s", name, res, err, wire.ReasonNotAnswerable)
 		}
@@ -91,7 +91,7 @@ func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	h.Server.Budget().RecordSpend("spent", 6)
-	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Reason != wire.ReasonBudgetLimit {
 		t.Fatalf("answer = %+v, %v; want %s", res, err, wire.ReasonBudgetLimit)
 	}
@@ -112,7 +112,7 @@ func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
 	if err := schema.UpdateTicket(p.TicketPath, p.FinishedLate(false)); err != nil {
 		t.Fatal(err)
 	}
-	res, err := p.H.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
+	res, err := p.H.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, Choice: "a"})
 	if err != nil || res.Refused || res.Outcome != wire.OutcomeAdopted {
 		t.Fatalf("answer = %+v, %v; want adopted", res, err)
 	}
@@ -126,7 +126,7 @@ func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Outcome != wire.OutcomeDelivered {
 		t.Fatalf("answer = %+v, %v; want delivered", res, err)
 	}
@@ -175,7 +175,7 @@ func TestAnswer_GoneAgentQueues(t *testing.T) {
 	if err := fake.Stop(sess); err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
 }
 
@@ -194,7 +194,7 @@ func TestAnswer_GoneAgentThenCodexClaimStartsFromTheHandoff(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	res, err := h.Client.TicketAnswer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.Tickets.Answer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
 
 	if res, err := h.Client.QueueAdd(ctx, answerAddr, "codex"); err != nil || res.Refused {
@@ -229,7 +229,7 @@ func TestAnswer_DeathAfterPromptQueues(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	fake.DieAfterPrompt("epic-a-iter-01", agentrunner.SessionDied("claude exited (code 1)"))
-	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
 }
 
@@ -241,7 +241,7 @@ func TestAnswer_Refusals(t *testing.T) {
 	ask := func(req wire.QueueRequest) wire.QueueResult {
 		t.Helper()
 		req.Address = answerAddr
-		res, err := h.Client.TicketAnswer(ctx, req)
+		res, err := h.Client.Tickets.Answer(ctx, req)
 		if err != nil {
 			t.Fatal(err)
 		}

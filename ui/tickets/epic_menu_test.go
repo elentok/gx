@@ -26,7 +26,7 @@ func epicMenuModel(t *testing.T, api fakeServerAPI) (Model, string) {
 	if err := os.WriteFile(epicMD, []byte("---\nstatus: draft\n---\n\n# alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := newServerModel(t).WithServer(api)
+	m := newServerModel(t).WithServer(api).WithTickets(api)
 	m.settings.TicketStore = store
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "A", Status: "done"},
@@ -38,11 +38,11 @@ func epicMenuModel(t *testing.T, api fakeServerAPI) (Model, string) {
 
 func TestEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T) {
 	var calls []string
-	for name, api := range map[string]ServerAPI{"server": fakeServerAPI{calls: &calls}, "no server": nil} {
+	for name, api := range map[string]TicketsAPI{"server": fakeServerAPI{calls: &calls}, "no server": nil} {
 		t.Run(name, func(t *testing.T) {
 			calls = nil
 			m, epicMD := epicMenuModel(t, fakeServerAPI{calls: &[]string{}})
-			m.serverAPI = api
+			m.tickets = api
 			_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Set open")
 			if cmd == nil {
 				t.Fatal("Set open issued nothing")
@@ -81,7 +81,7 @@ func TestEpicMenu_MergeLabelNamesTheBranch(t *testing.T) {
 }
 
 func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
-	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}), wire.Snapshot{Tickets: []wire.TicketInfo{
+	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}).WithTickets(fakeServerAPI{calls: &[]string{}}), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "A", Status: "open", EpicStatus: "draft", EpicMergeTarget: "main"},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -107,7 +107,7 @@ func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 		{Address: "gx:alpha/06", Title: "Queued", Status: "open"},
 		{Address: "gx:alpha/07", Title: "Blocked", Status: "open", BlockedBy: []string{"gx:alpha/02"}},
 	}})
-	next, _ := newServerModel(t).WithServer(api).WithServerState(&st, ServerLinkUp)
+	next, _ := newServerModel(t).WithServer(api).WithTickets(api).WithServerState(&st, ServerLinkUp)
 	m := next.(Model)
 	expandOpenEpics(&m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

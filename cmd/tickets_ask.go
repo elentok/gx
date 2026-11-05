@@ -24,7 +24,7 @@ func newTicketsAskCmd(d deps) *cobra.Command {
 				return err
 			}
 			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.TicketAsk(ctx, args[0], text)
+				return cl.Tickets.Ask(ctx, args[0], text)
 			})
 		},
 	}

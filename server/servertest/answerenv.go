@@ -62,7 +62,7 @@ func (e AnswerEnv) PermissionEvents(t *testing.T) []tickets.LogEvent {
 func (e AnswerEnv) Answer(t *testing.T, req wire.QueueRequest) wire.QueueResult {
 	t.Helper()
 	req.Address = "proj:epic-a/01"
-	res, err := e.H.Client.AgentAnswerRequest(context.Background(), req)
+	res, err := e.H.Client.Tickets.AgentAnswerRequest(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}

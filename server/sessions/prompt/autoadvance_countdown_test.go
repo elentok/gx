@@ -77,7 +77,7 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 				if err := os.WriteFile(mapMD, []byte("---\nkind: map\ndesign_step: "+tc.step+"\n---\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
-				if err := f.H.Client.TicketChanged(f.Ctx, "proj:map"); err != nil {
+				if err := f.H.Client.Tickets.Changed(f.Ctx, "proj:map"); err != nil {
 					t.Fatal(err)
 				}
 				waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })

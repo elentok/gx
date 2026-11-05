@@ -745,7 +745,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := cl.TicketChanged(ctx, args[0]); err != nil {
+			if err := cl.Tickets.Changed(ctx, args[0]); err != nil {
 				return fmt.Errorf("server ping failed: %w", err)
 			}
 			if changedJSON {
@@ -767,7 +767,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 			Hidden: name == "park",
 			RunE: func(c *cobra.Command, args []string) error {
 				return serverQueueWrite(d.dial(), c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-					return cl.TicketPause(ctx, args[0], pauseReason)
+					return cl.Tickets.Pause(ctx, args[0], pauseReason)
 				})
 			},
 		}
@@ -783,7 +783,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverQueueWrite(d.dial(), c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.TicketUnmute(ctx, args[0])
+				return cl.Tickets.Unmute(ctx, args[0])
 			})
 		},
 	}
@@ -797,7 +797,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverQueueWrite(d.dial(), c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.TicketCancel(ctx, args[0], cancelStop)
+				return cl.Tickets.Cancel(ctx, args[0], cancelStop)
 			})
 		},
 	}
@@ -812,7 +812,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverQueueWrite(d.dial(), c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.TicketApprove(ctx, args[0])
+				return cl.Tickets.Approve(ctx, args[0])
 			})
 		},
 	}
@@ -829,7 +829,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 			Hidden: name == "relaunch",
 			RunE: func(c *cobra.Command, args []string) error {
 				return serverQueueWrite(d.dial(), c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-					return cl.TicketRetry(ctx, args[0], retryStop)
+					return cl.Tickets.Retry(ctx, args[0], retryStop)
 				})
 			},
 		}
@@ -845,7 +845,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverQueueWrite(d.dial(), c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.TicketNudge(ctx, args[0], args[1])
+				return cl.Tickets.Nudge(ctx, args[0], args[1])
 			})
 		},
 	}
@@ -868,7 +868,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 				diagnosis = string(b)
 			}
 			return serverQueueWrite(d.dial(), c, recJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.TicketRecommend(ctx, args[0], recVerb, diagnosis)
+				return cl.Tickets.Recommend(ctx, args[0], recVerb, diagnosis)
 			})
 		},
 	}

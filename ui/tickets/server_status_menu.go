@@ -62,8 +62,8 @@ type serverWriteMsg struct {
 
 // cmdServerWrite issues verb for address through the server. With no server
 // it writes nothing: orchestration writes have no file fallback.
-func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
-	if api == nil {
+func cmdServerWrite(api ServerAPI, tix TicketsAPI, verb, address string) tea.Cmd {
+	if api == nil || tix == nil {
 		return notify.Warning(serverNotRunning)
 	}
 	if isWebOnlyVerb(verb) {
@@ -82,18 +82,18 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 		}
 		switch verb {
 		case serverVerbPause:
-			res, err = api.TicketPause(ctx, address, serverPauseReason)
+			res, err = tix.Pause(ctx, address, serverPauseReason)
 		case serverVerbCancel:
-			res, err = api.TicketCancel(ctx, address, true)
+			res, err = tix.Cancel(ctx, address, true)
 		case serverVerbUnmute:
-			res, err = api.TicketUnmute(ctx, address)
+			res, err = tix.Unmute(ctx, address)
 		case wire.ActionRetry:
-			res, err = api.TicketRelaunch(ctx, address, false)
+			res, err = tix.Relaunch(ctx, address, false)
 		case wire.ActionApprove:
-			res, err = api.TicketApprove(ctx, address)
+			res, err = tix.Approve(ctx, address)
 		case wire.ActionStashMerge:
 			epic, _, _ := tickets.SplitTrailerValue(address)
-			res, err = api.EpicStashMerge(ctx, epic)
+			res, err = tix.EpicStashMerge(ctx, epic)
 		case wire.ActionMerge:
 			repair(verb, wire.RepairRequest{Address: address})
 		case wire.ActionStartOver:
@@ -132,12 +132,12 @@ func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
 	if !isRepairPause(ticket) {
 		return nil, false
 	}
-	return cmdRunFirstAction(m.serverAPI, ticket.Path), true
+	return cmdRunFirstAction(m.serverAPI, m.tickets, ticket.Path), true
 }
 
 // cmdRunFirstAction reads the ticket's detail and runs its first action; with
 // none it does nothing.
-func cmdRunFirstAction(api ServerAPI, address string) tea.Cmd {
+func cmdRunFirstAction(api ServerAPI, tix TicketsAPI, address string) tea.Cmd {
 	return func() tea.Msg {
 		d, err := api.Detail(context.Background(), address)
 		if err != nil {
@@ -147,6 +147,6 @@ func cmdRunFirstAction(api ServerAPI, address string) tea.Cmd {
 		if i < 0 {
 			return nil
 		}
-		return cmdServerWrite(api, d.Actions[i], address)()
+		return cmdServerWrite(api, tix, d.Actions[i], address)()
 	}
 }

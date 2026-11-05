@@ -468,7 +468,7 @@ func TestRecovery_ApproveRunsTheLatestProposal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// Approve only runs what the proposal recorded.
-	res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01")
+	res, err := h.Client.Tickets.Approve(ctx, "proj:epic-a/01")
 	if err != nil || res.Refused {
 		t.Fatalf("approve = %+v, %v", res, err)
 	}
@@ -499,7 +499,7 @@ func TestRecovery_ApproveRetiresTheProposalSection(t *testing.T) {
 	h, _, path := proposeByPausing(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Approve(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("approve = %+v, %v", res, err)
 	}
 	if got := proposedRemedy(t, path); got != "" {
@@ -516,7 +516,7 @@ func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Reason != wire.ReasonProposalStale {
+	if res, err := h.Client.Tickets.Approve(ctx, "proj:epic-a/01"); err != nil || res.Reason != wire.ReasonProposalStale {
 		t.Errorf("approve = %+v, %v, want proposal-stale", res, err)
 	}
 	if proposedRemedy(t, path) == "" {

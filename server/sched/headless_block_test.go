@@ -90,7 +90,7 @@ func TestHeadlessBlock_AnswerOnClaimedLeavesStatus(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, _ := startBlockable(t, "headless")
 	// The agent is working and the ticket claimed; the answer may be refused, but must not move it.
-	_, _ = h.Client.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
+	_, _ = h.Client.Tickets.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestHeadlessBlock_AnswerOnClaimedLeavesStatus(t *testing.T) {
 func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
-	res, err := h.Client.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
+	res, err := h.Client.Tickets.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
 	if err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
@@ -119,7 +119,7 @@ func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
 func TestHeadlessBlock_PausesAgainAfterAnswer(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
-	if res, err := h.Client.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"}); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.AgentAnswerRequest(context.Background(), wire.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"}); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	waitStatus(t, ticketPath, schema.StatusClaimed)
@@ -132,7 +132,7 @@ func TestHeadlessBlock_AnyExitReturnsToClaimed(t *testing.T) {
 	t.Parallel()
 	exits := map[string]func(*servertest.Harness, *servertest.TurnRunner){
 		"interrupt": func(h *servertest.Harness, _ *servertest.TurnRunner) {
-			if res, err := h.Client.AgentInterrupt(context.Background(), answerAddr); err != nil || res.Refused {
+			if res, err := h.Client.Tickets.AgentInterrupt(context.Background(), answerAddr); err != nil || res.Refused {
 				t.Errorf("interrupt = %+v, %v", res, err)
 			}
 		},

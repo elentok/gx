@@ -107,27 +107,27 @@ func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (wire.
 	return f.addRes[address], nil
 }
 
-func (f fakeServerAPI) TicketPause(_ context.Context, address, _ string) (wire.QueueResult, error) {
+func (f fakeServerAPI) Pause(_ context.Context, address, _ string) (wire.QueueResult, error) {
 	f.record("pause " + address)
 	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketCancel(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
+func (f fakeServerAPI) Cancel(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
 	f.record("cancel " + address)
 	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
+func (f fakeServerAPI) Relaunch(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
 	f.record("relaunch " + address)
 	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketUnmute(_ context.Context, address string) (wire.QueueResult, error) {
+func (f fakeServerAPI) Unmute(_ context.Context, address string) (wire.QueueResult, error) {
 	f.record("unmute " + address)
 	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketApprove(_ context.Context, address string) (wire.QueueResult, error) {
+func (f fakeServerAPI) Approve(_ context.Context, address string) (wire.QueueResult, error) {
 	f.record("approve " + address)
 	return wire.QueueResult{}, nil
 }
@@ -205,7 +205,7 @@ func pausedRepairInfo(address, title string) wire.TicketInfo {
 
 func newServerModel(t *testing.T) Model {
 	t.Helper()
-	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{})
+	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{})
 }
 
 // withState hands the tab the state the app shell would deliver for snap,
@@ -360,7 +360,7 @@ func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing
 // Seam D: "enter" on a paused row issues the detail's first verb (resume here).
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		// The wire carries no pause reason, so only the retired repair status
 		// tells the client this pause is a repair.
@@ -392,7 +392,7 @@ func serverModelWithStoreTicket(t *testing.T, api fakeServerAPI, isMap bool) (Mo
 	t.Helper()
 	store := t.TempDir()
 	file := writeStoreTicket(t, store, "20-a.md", "---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n")
-	m := newServerModel(t).WithServer(api)
+	m := newServerModel(t).WithServer(api).WithTickets(api)
 	m.settings.TicketStore = store
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file, EpicIsMap: isMap},
@@ -436,7 +436,7 @@ func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
 	}
 }
 
-func (f fakeServerAPI) TicketChanged(_ context.Context, address string) error {
+func (f fakeServerAPI) Changed(_ context.Context, address string) error {
 	f.record("changed " + address)
 	return nil
 }
@@ -446,7 +446,7 @@ func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 	if len(api.detail.Actions) == 0 {
 		api.detail = detailWith(wire.ActionAnswer, wire.ActionResume)
 	}
-	m := newServerModel(t).WithServer(api)
+	m := newServerModel(t).WithServer(api).WithTickets(api)
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
@@ -467,7 +467,7 @@ func pressMenuKey(t *testing.T, m Model) Model {
 
 func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "paused"} {
-		m := newServerModel(t).WithServer(fakeServerAPI{})
+		m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{})
 		m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: status},
 			// Keeps the epic open: a fully done epic starts collapsed.

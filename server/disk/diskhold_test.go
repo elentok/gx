@@ -325,13 +325,13 @@ func TestDiskHold_RelaunchAndRetryRefused(t *testing.T) {
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb, func(c *server.Config) { c.DiskPollInterval = time.Hour })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := r.h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+	if res, err := r.h.Client.Tickets.Pause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	r.disks.SetFree(repo, 3*gb)
 	for name, call := range map[string]func() (wire.QueueResult, error){
-		"retry":    func() (wire.QueueResult, error) { return r.h.Client.TicketRetry(ctx, "proj:epic-a/01", false) },
-		"relaunch": func() (wire.QueueResult, error) { return r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false) },
+		"retry":    func() (wire.QueueResult, error) { return r.h.Client.Tickets.Retry(ctx, "proj:epic-a/01", false) },
+		"relaunch": func() (wire.QueueResult, error) { return r.h.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", false) },
 	} {
 		res, err := call()
 		if err != nil || !res.Refused || res.Reason != wire.ReasonDiskLow || !strings.Contains(res.Message, "/vol-proj") || !strings.Contains(res.Message, "3.0 GB") {
@@ -342,7 +342,7 @@ func TestDiskHold_RelaunchAndRetryRefused(t *testing.T) {
 		t.Errorf("agent started on a held disk: %v", r.start())
 	}
 	r.disks.SetFree(repo, 50*gb)
-	if res, err := r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Reason == wire.ReasonDiskLow {
+	if res, err := r.h.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", false); err != nil || res.Reason == wire.ReasonDiskLow {
 		t.Errorf("relaunch on a free disk = %+v, %v; want no disk refusal", res, err)
 	}
 }

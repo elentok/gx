@@ -64,7 +64,7 @@ func TestMigrate_AgentOutputWriteWaitsForTheMigrationThenLands(t *testing.T) {
 	ticket := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 
 	got := assertWaitsForMigration(t, release, func() writeResult {
-		res, err := h.Client.AgentAnswer(context.Background(), "proj:epic-a/01", "allow", "")
+		res, err := h.Client.Tickets.AgentAnswer(context.Background(), "proj:epic-a/01", "allow", "")
 		return writeResult{res, err}
 	})
 	if got.err != nil || got.res.Refused {
@@ -95,7 +95,7 @@ func TestMigrate_LandWriteWaitsForTheMigrationThenLands(t *testing.T) {
 	<-entered
 
 	got := assertWaitsForMigration(t, release, func() writeResult {
-		res, err := h.Client.EpicMerge(context.Background(), "proj:research")
+		res, err := h.Client.Tickets.EpicMerge(context.Background(), "proj:research")
 		return writeResult{res, err}
 	})
 	if got.err != nil || got.res.Refused || !got.res.Merged {

@@ -187,7 +187,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.status != "" {
-		return m, cmdApplyEpicStatus(m.serverAPI, m.settings.TicketStore, epic, msg.status)
+		return m, cmdApplyEpicStatus(m.tickets, m.settings.TicketStore, epic, msg.status)
 	}
 	switch msg.action {
 	case actionQueueEpic:
@@ -197,7 +197,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	case actionYankEpic:
 		return m, m.yankTicketSummary()
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.sessions, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.sessions, m.tickets, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
 
 // queueWhy is the reason Add epic to queue is dim, or "" when it applies.
@@ -268,7 +268,7 @@ func epicFile(store string, epic tickets.Epic) (string, error) {
 
 // cmdApplyEpicStatus is an Author write to the epic's own file, then a ping to
 // a running server, like cmdApplyTicketStatus.
-func cmdApplyEpicStatus(api ServerAPI, store string, epic tickets.Epic, status schema.Status) tea.Cmd {
+func cmdApplyEpicStatus(tix TicketsAPI, store string, epic tickets.Epic, status schema.Status) tea.Cmd {
 	return func() tea.Msg {
 		file, err := epicFile(store, epic)
 		if err == nil {
@@ -278,8 +278,8 @@ func cmdApplyEpicStatus(api ServerAPI, store string, epic tickets.Epic, status s
 		if err != nil {
 			return notify.Error(err.Error())()
 		}
-		if api != nil {
-			_ = api.TicketChanged(context.Background(), epic.Path)
+		if tix != nil {
+			_ = tix.Changed(context.Background(), epic.Path)
 		}
 		return statusChangedMsg{}
 	}

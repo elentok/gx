@@ -28,19 +28,24 @@ type ServerAPI interface {
 	QueueResume(ctx context.Context) (wire.QueueResult, error)
 	Budget(ctx context.Context) (wire.BudgetStatus, error)
 	BudgetOverride(ctx context.Context) (wire.BudgetResult, error)
-	TicketPause(ctx context.Context, address, reason string) (wire.QueueResult, error)
-	TicketCancel(ctx context.Context, address string, stop bool) (wire.QueueResult, error)
-	TicketRelaunch(ctx context.Context, address string, stop bool) (wire.QueueResult, error)
-	TicketUnmute(ctx context.Context, address string) (wire.QueueResult, error)
-	TicketApprove(ctx context.Context, address string) (wire.QueueResult, error)
-	EpicMerge(ctx context.Context, address string) (wire.QueueResult, error)
-	EpicStashMerge(ctx context.Context, address string) (wire.QueueResult, error)
 	Detail(ctx context.Context, address string) (wire.TicketDetail, error)
 	Repair(ctx context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error)
 	Iterations(ctx context.Context) ([]wire.IterationInfo, error)
-	TicketChanged(ctx context.Context, address string) error
 	DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error)
 	SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error)
+}
+
+// TicketsAPI is the slice of *apiclient.Tickets the tickets and queue tabs use:
+// the ticket and epic writes behind the "m" menu and the status changes.
+type TicketsAPI interface {
+	Pause(ctx context.Context, address, reason string) (wire.QueueResult, error)
+	Cancel(ctx context.Context, address string, stop bool) (wire.QueueResult, error)
+	Relaunch(ctx context.Context, address string, stop bool) (wire.QueueResult, error)
+	Unmute(ctx context.Context, address string) (wire.QueueResult, error)
+	Approve(ctx context.Context, address string) (wire.QueueResult, error)
+	EpicMerge(ctx context.Context, address string) (wire.QueueResult, error)
+	EpicStashMerge(ctx context.Context, address string) (wire.QueueResult, error)
+	Changed(ctx context.Context, address string) error
 }
 
 // SessionsAPI is the slice of *apiclient.Sessions the tickets and queue tabs
@@ -75,6 +80,13 @@ func (m Model) WithServer(api ServerAPI) Model {
 // and "investigate" unavailable.
 func (m Model) WithSessions(s SessionsAPI) Model {
 	m.sessions = s
+	return m
+}
+
+// WithTickets gives the tab the tickets sub-client; nil leaves the menu's
+// orchestration writes answering "server not running".
+func (m Model) WithTickets(t TicketsAPI) Model {
+	m.tickets = t
 	return m
 }
 

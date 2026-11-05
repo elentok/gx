@@ -16,9 +16,9 @@ const actionMerge = "merge"
 
 // cmdEpicMerge asks the server to merge epic ("project:epic") and toasts the
 // outcome: a direct merge, the forked merge ticket, a pause, or the refusal.
-func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
+func cmdEpicMerge(tix TicketsAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
-		res, err := api.EpicMerge(context.Background(), epic)
+		res, err := tix.EpicMerge(context.Background(), epic)
 		switch {
 		case err != nil:
 			return notify.Error("merge " + epic + ": " + err.Error())()
@@ -39,9 +39,9 @@ const actionStashMerge = "stash-merge-epic"
 
 // cmdEpicStashMerge asks the server to stash, merge epic ("project:epic") and
 // restore the stash, and toasts the outcome.
-func cmdEpicStashMerge(api ServerAPI, epic string) tea.Cmd {
+func cmdEpicStashMerge(tix TicketsAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
-		res, err := api.EpicStashMerge(context.Background(), epic)
+		res, err := tix.EpicStashMerge(context.Background(), epic)
 		switch {
 		case err != nil:
 			return notify.Error("stash-merge " + epic + ": " + err.Error())()

@@ -126,6 +126,7 @@ type QueueModel struct {
 	// with no client is delivered ServerLinkDown, so it shows the banner too.
 	serverAPI   ServerAPI
 	sessions    SessionsAPI
+	tickets     TicketsAPI
 	serverStart func(context.Context) error
 	link        ServerLink
 	// olderServer: see Model.olderServer.

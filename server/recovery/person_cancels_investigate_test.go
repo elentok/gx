@@ -91,7 +91,7 @@ func TestPersonVerb_AnswerCancelsTheOpenInvestigateChild(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	child := writeInvestigateChild(t, ticketPath, "open")
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	res, err := h.Client.TicketAnswer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	res, err := h.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v; want delivered", res, err)
 	}

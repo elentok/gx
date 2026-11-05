@@ -151,7 +151,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	t.Parallel()
 	f := stashMergeFixture(t)
 
-	res, err := f.H.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicStashMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || res.Refused {
 		t.Fatalf("stash-merge = %+v, %v", res, err)
 	}
@@ -200,7 +200,7 @@ func TestStashMerge_RefusesAnEpicThatIsNotPausedOnADirtyTrunk(t *testing.T) {
 	})
 	f.runEpic(t, wire.EventRootCompleted)
 
-	res, err := f.H.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
+	res, err := f.H.Client.Tickets.EpicStashMerge(context.Background(), "proj:"+schedEpic)
 
 	if err != nil || res.Reason != wire.ReasonNotDirtyTrunk {
 		t.Errorf("stash-merge = %+v, %v, want the not-dirty-trunk refusal", res, err)

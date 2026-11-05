@@ -29,7 +29,7 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "please continue")
+	res, err := h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "please continue")
 	if err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
@@ -46,11 +46,11 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	}
 
 	for i := 0; i < 2; i++ {
-		if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "again"); err != nil || res.Refused {
+		if res, err := h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "again"); err != nil || res.Refused {
 			t.Fatalf("nudge %d = %+v, %v", i+2, res, err)
 		}
 	}
-	res, err = h.Client.TicketNudge(ctx, "proj:epic-a/01", "once more")
+	res, err = h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "once more")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonRateLimited {
 		t.Errorf("over the limit = %+v, %v; want refusal %s", res, err, wire.ReasonRateLimited)
 	}
@@ -74,14 +74,14 @@ func TestNudge_NotReadyRefuses(t *testing.T) {
 	ctx := context.Background()
 
 	fake.SetState(label, agentrunner.StateBlocked, "permission to use Bash")
-	res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "hi")
+	res, err := h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "hi")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentNotReady {
 		t.Errorf("nudge while blocked = %+v, %v; want refusal %s", res, err, wire.ReasonAgentNotReady)
 	}
 
 	fake.SetState(label, agentrunner.StateIdle, "")
 	fake.SetPromptErr(label, errors.New("boom"))
-	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "hi"); err == nil || res.Refused {
+	if res, err := h.Client.Tickets.Nudge(ctx, "proj:epic-a/01", "hi"); err == nil || res.Refused {
 		t.Errorf("other prompt error = %+v, %v; want an error", res, err)
 	}
 }
@@ -98,7 +98,7 @@ func TestNudge_Refusals(t *testing.T) {
 		{"unknown ticket", "proj:epic-a/77", "hi", wire.ReasonUnknownTicket},
 		{"no live pane", "proj:epic-a/01", "hi", wire.ReasonIterationNotLive},
 	} {
-		res, err := h.Client.TicketNudge(ctx, c.addr, c.text)
+		res, err := h.Client.Tickets.Nudge(ctx, c.addr, c.text)
 		if err != nil || !res.Refused || res.Reason != c.reason {
 			t.Errorf("%s: %+v, %v; want refusal %s", c.name, res, err, c.reason)
 		}

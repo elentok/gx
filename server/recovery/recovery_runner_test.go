@@ -152,7 +152,7 @@ func TestRecoveryRunner_WaitTimesOutAtTheConfiguredBound(t *testing.T) {
 func TestRecoveryRunner_NudgePromptsThroughTheRunnerAndWatchesItsKind(t *testing.T) {
 	t.Parallel()
 	h, fake, sess := startOnRunner(t, "headless")
-	if res, err := h.Client.TicketNudge(context.Background(), "proj:epic-a/01", "go on"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Nudge(context.Background(), "proj:epic-a/01", "go on"); err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
 	if got := fake.Prompts(iterLabel); !slices.Equal(got, []string{"go on"}) {

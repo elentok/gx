@@ -77,7 +77,7 @@ func (f *tokenFixture) live(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := f.h.Client.TicketNudge(ctx, f.address, "go"); err != nil || res.Refused {
+	if res, err := f.h.Client.Tickets.Nudge(ctx, f.address, "go"); err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
 }
@@ -527,7 +527,7 @@ func TestTokenPoll_WaitsForMigrations(t *testing.T) {
 	// The ticket is still paused on disk, so the nudge makes it live again.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := f.h.Client.TicketNudge(ctx, f.address, "go"); err != nil || res.Refused {
+	if res, err := f.h.Client.Tickets.Nudge(ctx, f.address, "go"); err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
 	f.grow(t, 100, 1)

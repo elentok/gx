@@ -22,11 +22,11 @@ func TestRetryAndCancel_WorkingLeftoverRefuses(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false)
+	res, err := h.Client.Tickets.Retry(ctx, "proj:epic-a/01", false)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonAgentWorking {
 		t.Errorf("retry = %+v, %v; want %s refusal", res, err, wire.ReasonAgentWorking)
 	}
-	res, err = h.Client.TicketCancel(ctx, "proj:epic-a/01", false)
+	res, err = h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
 		t.Errorf("cancel = %+v, %v; want %s refusal", res, err, wire.ReasonTicketLive)
 	}
@@ -44,7 +44,7 @@ func TestCancel_StopClosesALeftoverThroughTheRunner(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
 		t.Fatalf("cancel --stop = %+v, %v", res, err)
 	}
 	if _, ok, _ := fake.Find(holderLabel); ok {
@@ -84,7 +84,7 @@ func TestRelaunch_OnlyAHumanRelaunchIsLogged(t *testing.T) {
 		t.Fatalf("recovery relaunch logged %+v", got)
 	}
 	h.Server.Registry().Delete("proj:epic-a/01")
-	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
 	}
 	if got := ofType(runLog(t, h), events.HumanRelaunch); len(got) != 1 || got[0].Ticket != "01" {

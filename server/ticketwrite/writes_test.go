@@ -20,7 +20,7 @@ func TestPause_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "  ")
+	res, err := h.Client.Tickets.Pause(ctx, "proj:epic-a/01", "  ")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonReasonRequired {
 		t.Fatalf("pause = %+v, %v; want %s refusal", res, err, wire.ReasonReasonRequired)
 	}
@@ -36,7 +36,7 @@ func TestPause_WritesStatusSectionAndOneEvent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "needs a human look")
+	res, err := h.Client.Tickets.Pause(ctx, "proj:epic-a/01", "needs a human look")
 	if err != nil || res.Refused {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
@@ -61,7 +61,7 @@ func TestPause_RefusesUnknownTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketPause(ctx, "proj:epic-a/99", "why")
+	res, err := h.Client.Tickets.Pause(ctx, "proj:epic-a/99", "why")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonUnknownTicket {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
@@ -85,7 +85,7 @@ func TestPause_RefusesARunningDoneAlreadyPausedOrMapEpicTicket(t *testing.T) {
 		{"done", "proj:epic-a/02", wire.ReasonTicketDone},
 		{"map epic", "proj:map-epic/01", wire.ReasonMapEpic},
 	} {
-		res, err := h.Client.TicketPause(ctx, c.address, "why")
+		res, err := h.Client.Tickets.Pause(ctx, c.address, "why")
 		if err != nil || !res.Refused || res.Reason != c.reason {
 			t.Errorf("pause %s = %+v, %v; want %s refusal", c.name, res, err, c.reason)
 		}
@@ -101,10 +101,10 @@ func TestPause_RefusesAnAlreadyPausedTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "first"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Pause(ctx, "proj:epic-a/01", "first"); err != nil || res.Refused {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
-	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "second")
+	res, err := h.Client.Tickets.Pause(ctx, "proj:epic-a/01", "second")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonAlreadyPaused {
 		t.Fatalf("second pause = %+v, %v; want %s refusal", res, err, wire.ReasonAlreadyPaused)
 	}
@@ -117,10 +117,10 @@ func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Pause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
-	res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false)
+	res, err := h.Client.Tickets.Relaunch(ctx, "proj:epic-a/01", false)
 	if err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
 	}

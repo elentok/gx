@@ -20,7 +20,7 @@ func TestUnmute_EndsTheRepairPausesRound(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Tickets.Unmute(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("unmute = %+v, %v", res, err)
 	}
 	rounds := endedRounds(t, path)

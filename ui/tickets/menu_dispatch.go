@@ -13,23 +13,23 @@ const serverNotRunning = "server not running"
 // dispatchMenuAction runs an accepted "m" menu action for either tab, keyed by
 // the row's address (result.Path). Orchestration writes go only through the
 // server.
-func dispatchMenuAction(api ServerAPI, sessions SessionsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
+func dispatchMenuAction(api ServerAPI, sessions SessionsAPI, tix TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
 	if word, ok := recoveryWord(result.Action); ok {
-		return cmdServerWrite(api, word, result.Path)
+		return cmdServerWrite(api, tix, word, result.Path)
 	}
 	switch result.Action {
 	case actionResume, actionUnmuteReopen, serverVerbPause, serverVerbCancel:
-		return cmdServerWrite(api, result.Action, result.Path)
+		return cmdServerWrite(api, tix, result.Action, result.Path)
 	case actionMerge:
-		if api == nil {
+		if tix == nil {
 			return notify.Warning(serverNotRunning)
 		}
-		return cmdEpicMerge(api, result.EpicName)
+		return cmdEpicMerge(tix, result.EpicName)
 	case actionStashMerge:
-		if api == nil {
+		if tix == nil {
 			return notify.Warning(serverNotRunning)
 		}
-		return cmdEpicStashMerge(api, result.EpicName)
+		return cmdEpicStashMerge(tix, result.EpicName)
 	case actionStartSession:
 		return startSessionCmd(sessions, settings.TicketStore, result.Path)
 	case actionInvestigate:

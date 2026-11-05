@@ -140,11 +140,11 @@ func newServerAgentsCmd(d deps) *cobra.Command {
 	cmd.AddCommand(watch)
 	cmd.AddCommand(agentsWriteCmd(d, "prompt <project:epic/NN> <text>", "send a prompt to a ticket's live agent", cobra.ExactArgs(2),
 		func(ctx context.Context, cl *apiclient.Client, args []string) (wire.QueueResult, error) {
-			return cl.AgentPrompt(ctx, args[0], args[1])
+			return cl.Tickets.AgentPrompt(ctx, args[0], args[1])
 		}))
 	cmd.AddCommand(agentsWriteCmd(d, "interrupt <project:epic/NN>", "stop the current turn of a ticket's live agent", cobra.ExactArgs(1),
 		func(ctx context.Context, cl *apiclient.Client, args []string) (wire.QueueResult, error) {
-			return cl.AgentInterrupt(ctx, args[0])
+			return cl.Tickets.AgentInterrupt(ctx, args[0])
 		}))
 	var requestID string
 	answer := agentsWriteCmd(d, "answer <project:epic/NN> <allow|deny> [reason]", "answer the permission request a ticket's agent waits on", cobra.RangeArgs(2, 3),
@@ -153,7 +153,7 @@ func newServerAgentsCmd(d deps) *cobra.Command {
 			if len(args) == 3 {
 				req.Text = args[2]
 			}
-			return cl.AgentAnswerRequest(ctx, req)
+			return cl.Tickets.AgentAnswerRequest(ctx, req)
 		})
 	answer.Flags().StringVar(&requestID, "request-id", "", "answer only this permission request; refused if the open one differs")
 	cmd.AddCommand(answer)

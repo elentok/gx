@@ -43,6 +43,7 @@ type ServerSessions interface {
 type ServerDeps struct {
 	Client   ServerClient
 	Sessions ServerSessions
+	Tickets  ticketsui.TicketsAPI
 	// Build is this client's build id, compared with the server's.
 	Build string
 	// Start launches the server (the Queue tab's "s" when the server is down).

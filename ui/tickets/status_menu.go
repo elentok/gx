@@ -27,11 +27,11 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	epic := m.epicAt(r)
-	return m, statusChangeCmd(m.serverAPI, m.settings.TicketStore, epic, epic.Tickets[r.ticketIdx], status)
+	return m, statusChangeCmd(m.tickets, m.settings.TicketStore, epic, epic.Tickets[r.ticketIdx], status)
 }
 
 // statusChangeCmd is applyStatusChange's guarded write for any tab's row.
-func statusChangeCmd(api ServerAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
+func statusChangeCmd(tix TicketsAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
 	file, address := resolveTicketPath(store, ticket.Path)
 
 	if status == schema.StatusOpen {
@@ -52,7 +52,7 @@ func statusChangeCmd(api ServerAPI, store string, epic tickets.Epic, ticket tick
 			))
 		}
 	}
-	return cmdApplyTicketStatus(api, file, address, status)
+	return cmdApplyTicketStatus(tix, file, address, status)
 }
 
 // doneIsSetByServer refuses Set done on a loop-epic ticket.
@@ -81,15 +81,15 @@ type statusChangedMsg struct{}
 // applyStatusChange) so a filesystem error surfaces as a toast rather than a
 // panic on the Update goroutine. The write is local; a running server is then
 // pinged about address.
-func cmdApplyTicketStatus(api ServerAPI, file, address string, status schema.Status) tea.Cmd {
+func cmdApplyTicketStatus(tix TicketsAPI, file, address string, status schema.Status) tea.Cmd {
 	return func() tea.Msg {
 		if err := schema.UpdateTicket(file, func(t *schema.Ticket) {
 			t.Status = status
 		}); err != nil {
 			return notify.Error(err.Error())()
 		}
-		if api != nil && address != "" {
-			_ = api.TicketChanged(context.Background(), address)
+		if tix != nil && address != "" {
+			_ = tix.Changed(context.Background(), address)
 		}
 		return statusChangedMsg{}
 	}

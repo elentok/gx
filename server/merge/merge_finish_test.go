@@ -142,7 +142,7 @@ func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.H.Client.TicketChanged(context.Background(), "proj:"+schedEpic+"/01"); err != nil {
+	if err := f.H.Client.Tickets.Changed(context.Background(), "proj:"+schedEpic+"/01"); err != nil {
 		t.Fatal(err)
 	}
 }

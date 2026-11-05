@@ -155,7 +155,7 @@ func TestEvents_TicketChangedPingPublishesAtOnce(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Replace(string(body), "status: open", "status: draft", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Client.TicketChanged(ctx, "proj:epic/01"); err != nil {
+	if err := h.Client.Tickets.Changed(ctx, "proj:epic/01"); err != nil {
 		t.Fatal(err)
 	}
 

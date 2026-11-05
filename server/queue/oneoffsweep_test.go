@@ -154,7 +154,7 @@ func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
 		t.Fatalf("submit: %+v, %v", res, err)
 	}
 	waitOneOffsQueued(t, h, true)
-	if cres, err := h.Client.TicketCancel(ctx, res.Address, false); err != nil || cres.Refused {
+	if cres, err := h.Client.Tickets.Cancel(ctx, res.Address, false); err != nil || cres.Refused {
 		t.Fatalf("cancel: %+v, %v", cres, err)
 	}
 	waitOneOffsQueued(t, h, false)
@@ -209,7 +209,7 @@ func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
 		if err != nil || res.Refused {
 			t.Fatalf("submit %d: %+v, %v", i, res, err)
 		}
-		if cres, err := h.Client.TicketCancel(ctx, res.Address, false); err != nil || cres.Refused {
+		if cres, err := h.Client.Tickets.Cancel(ctx, res.Address, false); err != nil || cres.Refused {
 			t.Fatalf("cancel %d: %+v, %v", i, cres, err)
 		}
 	}
@@ -234,7 +234,7 @@ func TestSweep_CancelArchivesTheOneOff(t *testing.T) {
 	defer cancel()
 	// The first scan may not have indexed the ticket yet.
 	servertest.WaitFor(t, 5*time.Second, "the cancel to be accepted", func() bool {
-		res, err := h.Client.TicketCancel(ctx, "proj:one-offs/01", false)
+		res, err := h.Client.Tickets.Cancel(ctx, "proj:one-offs/01", false)
 		if err == nil && !res.Refused {
 			return true
 		}
