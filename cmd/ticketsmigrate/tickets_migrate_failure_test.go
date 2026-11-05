@@ -1,10 +1,11 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
 	"os"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migratefail"
 )
@@ -34,8 +35,8 @@ func recordedFor(t *testing.T, state, project string) bool {
 
 func TestMigrate_PassingRunClearsTheProjectsFailure(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
-	dir := writeStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": legacyStatusTicket})
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
+	dir := cmdtest.WriteStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": cmdtest.LegacyStatusTicket})
 	state := seedFailure(t, dirs, "alpha")
 	_ = migratefail.Record(state, "beta", "other")
 
@@ -52,8 +53,8 @@ func TestMigrate_PassingRunClearsTheProjectsFailure(t *testing.T) {
 
 func TestMigrate_FailingRunLeavesTheRecordUnchanged(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
-	dir := writeStoreProject(t, t.TempDir(), "alpha", map[string]string{
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
+	dir := cmdtest.WriteStoreProject(t, t.TempDir(), "alpha", map[string]string{
 		"01-a.md": cyclicParents,
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
@@ -77,8 +78,8 @@ func TestMigrate_FailingRunLeavesTheRecordUnchanged(t *testing.T) {
 
 func TestMigrate_DryRunKeepsTheFailure(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
-	dir := writeStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": legacyStatusTicket})
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
+	dir := cmdtest.WriteStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": cmdtest.LegacyStatusTicket})
 	state := seedFailure(t, dirs, "alpha")
 
 	if err := runTicketsMigrate(dirs, dir, true, &bytes.Buffer{}); err != nil {

@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -24,17 +26,17 @@ func commitTrailer(t *testing.T, dir, name, content, trailerValue string) {
 
 func TestExecute_TicketsMigrate_BackfillsEpicLinesTokensAndCost(t *testing.T) {
 	t.Parallel()
-	repoDir, _ := mergeTestRepo(t, map[string]string{"full": "full", "partial": "partial"})
+	repoDir, _ := cmdtest.MergeTestRepo(t, map[string]string{"full": "full", "partial": "partial"})
 	commitTrailer(t, filepath.Join(repoDir, "full"), "a.txt", "1\n2\n3\n", "full/01")
 	commitTrailer(t, filepath.Join(repoDir, "full"), "b.txt", "1\n2\n", "full/02")
-	commitFile(t, filepath.Join(repoDir, "full"), "untrailered.txt", "1\n2\n3\n4\n5\n")
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "full"), "untrailered.txt", "1\n2\n3\n4\n5\n")
 	commitTrailer(t, filepath.Join(repoDir, "partial"), "c.txt", "1\n", "partial/01")
 
 	root := t.TempDir()
 	testutil.WriteFile(t, root, "project.json", `{"repo": "`+repoDir+`", "trunk": "main"}`)
 	const merged = "completed_at: 2026-01-02T03:04:05Z\nmerged_at: 2026-01-02T03:04:05Z\n"
 	writeEpic := func(name string, issues map[string]string) {
-		writeMigrateFixtureEpic(t, root, name, issues)
+		cmdtest.WriteMigrateFixtureEpic(t, root, name, issues)
 		testutil.WriteFile(t, filepath.Join(root, name), "ticket.md", "---\nstatus: done\n"+merged+"---\n")
 	}
 	writeEpic("full", map[string]string{
@@ -49,7 +51,7 @@ func TestExecute_TicketsMigrate_BackfillsEpicLinesTokensAndCost(t *testing.T) {
 	run := func() string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, []string{"tickets", "migrate", root}, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
 		return stdout.String()

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
 )
@@ -110,7 +111,7 @@ func TestRestartCheck_DryRunsOnlyThePendingSteps(t *testing.T) {
 	}
 	writeStoreProject(t, store, "nolist", map[string]string{"01-a.md": legacyStatusTicket})
 	writeRestartCheckConfig(t, dirs, `{"ticket-store": {"path": "`+store+`"}}`)
-	before := snapshotTree(t, full)
+	before := cmdtest.SnapshotTree(t, full)
 
 	got := runRestartCheckJSON(t, dirs)
 
@@ -124,7 +125,7 @@ func TestRestartCheck_DryRunsOnlyThePendingSteps(t *testing.T) {
 	if p := byName["nolist"]; !p.OK || len(p.Files) == 0 || p.Pending != len(migrations.Default.Names()) {
 		t.Errorf("nolist = %+v, want the whole chain pending and files reported", p)
 	}
-	assertTreeUnchanged(t, full, before)
+	cmdtest.AssertTreeUnchanged(t, full, before)
 }
 
 func TestRestartCheck_FailingMigrationShowsAsFailedAndWritesNothing(t *testing.T) {
@@ -136,12 +137,12 @@ func TestRestartCheck_FailingMigrationShowsAsFailedAndWritesNothing(t *testing.T
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
 	writeRestartCheckConfig(t, dirs, `{"ticket-store": {"path": "`+store+`"}}`)
-	before := snapshotTree(t, dir)
+	before := cmdtest.SnapshotTree(t, dir)
 
 	got := runRestartCheckJSON(t, dirs)
 
 	if len(got.Projects) != 1 || got.Projects[0].OK || !strings.Contains(got.Projects[0].Error, "broken") {
 		t.Errorf("projects = %+v, want a failed dry run naming the project path", got.Projects)
 	}
-	assertTreeUnchanged(t, dir, before)
+	cmdtest.AssertTreeUnchanged(t, dir, before)
 }

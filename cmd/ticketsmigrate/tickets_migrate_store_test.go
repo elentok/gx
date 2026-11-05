@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"os"
@@ -6,8 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 // writeOldTree builds an old .scratch tree with a ticket, an archived ticket
@@ -31,28 +34,11 @@ func writeOldTree(t *testing.T, status string) string {
 	return root
 }
 
-func snapshotTree(t *testing.T, root string) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		raw, err := os.ReadFile(p)
-		out[p] = string(raw)
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return out
-}
-
 func TestExecute_TicketsMigrateToStore_CopiesTreeAndCreatesProject(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	old := writeOldTree(t, "open")
-	before := snapshotTree(t, old)
+	before := cmdtest.SnapshotTree(t, old)
 
 	out, err := runIn(t, repo, "tickets", "migrate", "--to-store", "--project", "mine", old)
 	if err != nil {
@@ -92,12 +78,12 @@ func TestExecute_TicketsMigrateToStore_CopiesTreeAndCreatesProject(t *testing.T)
 	}
 
 	// The project is now what `tickets root` resolves for the repo.
-	root, err := runIn(t, repo, "tickets", "root")
-	if err != nil || strings.TrimSpace(root) != project {
+	root, err := tickets.RootForDirs(config.DirsFrom(cmdtest.EnvFor(t)), repo)
+	if err != nil || root != project {
 		t.Errorf("tickets root = %q, %v; want %q", root, err, project)
 	}
 
-	if after := snapshotTree(t, old); len(after) != len(before) {
+	if after := cmdtest.SnapshotTree(t, old); len(after) != len(before) {
 		t.Errorf("old tree changed: %v", after)
 	} else {
 		for p, v := range before {
@@ -109,7 +95,7 @@ func TestExecute_TicketsMigrateToStore_CopiesTreeAndCreatesProject(t *testing.T)
 }
 
 func TestExecute_TicketsMigrateToStore_ConvertsEpicShapeAndTypes(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	root := filepath.Join(t.TempDir(), ".scratch")
 	files := map[string]string{
@@ -185,7 +171,7 @@ func TestExecute_TicketsMigrateToStore_UnreadableEpicSidecarFails(t *testing.T) 
 	}
 	for _, sidecar := range []string{"epic.yaml", "map.md"} {
 		t.Run(sidecar, func(t *testing.T) {
-			store := isolateTicketStore(t)
+			store := cmdtest.IsolateTicketStore(t)
 			repo := testutil.TempRepo(t)
 			old := writeOldTree(t, "open")
 			path := filepath.Join(old, "widget", sidecar)
@@ -206,7 +192,7 @@ func TestExecute_TicketsMigrateToStore_UnreadableEpicSidecarFails(t *testing.T) 
 }
 
 func TestExecute_TicketsMigrateToStore_NameDefaultsToRepoDir(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	old := writeOldTree(t, "open")
 
@@ -219,7 +205,7 @@ func TestExecute_TicketsMigrateToStore_NameDefaultsToRepoDir(t *testing.T) {
 }
 
 func TestExecute_TicketsMigrateToStore_RerunRefusesPerExistingAddress(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	old := writeOldTree(t, "open")
 	if _, err := runIn(t, repo, "tickets", "migrate", "--to-store", "--project", "mine", old); err != nil {
@@ -240,7 +226,7 @@ func TestExecute_TicketsMigrateToStore_RerunRefusesPerExistingAddress(t *testing
 }
 
 func TestExecute_TicketsMigrateToStore_RefusesWhileTicketClaimed(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	old := writeOldTree(t, "claimed")
 
@@ -260,7 +246,7 @@ func writeInvalidTicket(t *testing.T, old string) {
 }
 
 func TestExecute_TicketsMigrateToStore_InvalidTicketRefusesNamingAddress(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	old := writeOldTree(t, "open")
 	writeInvalidTicket(t, old)
@@ -276,7 +262,7 @@ func TestExecute_TicketsMigrateToStore_InvalidTicketRefusesNamingAddress(t *test
 }
 
 func TestExecute_TicketsMigrateToStore_DryRunValidatesWithoutWriting(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	old := writeOldTree(t, "open")
 

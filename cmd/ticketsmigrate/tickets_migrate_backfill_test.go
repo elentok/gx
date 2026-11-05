@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -9,14 +9,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
 func TestExecute_TicketsMigrate_BackfillsMergedAtForLandedLoopEpics(t *testing.T) {
 	t.Parallel()
-	repoDir, _ := mergeTestRepo(t, map[string]string{"unlanded": "unlanded"})
-	commitFile(t, filepath.Join(repoDir, "unlanded"), "unlanded.txt", "hi")
+	repoDir, _ := cmdtest.MergeTestRepo(t, map[string]string{"unlanded": "unlanded"})
+	cmdtest.CommitFile(t, filepath.Join(repoDir, "unlanded"), "unlanded.txt", "hi")
 	testutil.MustGitExported(t, repoDir, "branch", "landed", "main")
 
 	root := t.TempDir()
@@ -57,7 +59,7 @@ func TestExecute_TicketsMigrate_BackfillsMergedAtForLandedLoopEpics(t *testing.T
 	}
 
 	var stdout bytes.Buffer
-	if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+	if err := runMigrate(t, []string{"tickets", "migrate", root}, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 		t.Fatalf("execute tickets migrate: %v", err)
 	}
 
@@ -86,7 +88,7 @@ func TestExecute_TicketsMigrate_BackfillsMergedAtForLandedLoopEpics(t *testing.T
 		before[name], _ = os.ReadFile(filepath.Join(root, name, "ticket.md"))
 	}
 	var second bytes.Buffer
-	if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &second, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+	if err := runMigrate(t, []string{"tickets", "migrate", root}, cmdbase.Env{Stdout: &second, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 		t.Fatalf("second execute tickets migrate: %v", err)
 	}
 	if strings.TrimSpace(second.String()) != "no changes" {

@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -38,7 +40,7 @@ func TestExecute_TicketsMigrate_MarksMapDoneWhenImplMerged(t *testing.T) {
 	run := func(args ...string) string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute(append([]string{"tickets", "migrate", root}, args...), deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, append([]string{"tickets", "migrate", root}, args...), cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute tickets migrate: %v", err)
 		}
 		return stdout.String()

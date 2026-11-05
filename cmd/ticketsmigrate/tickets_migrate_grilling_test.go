@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/testutil"
@@ -24,10 +26,10 @@ type grillingEnv struct {
 
 func newGrillingEnv(t *testing.T) grillingEnv {
 	t.Helper()
-	repoDir, _ := mergeTestRepo(t, nil)
+	repoDir, _ := cmdtest.MergeTestRepo(t, nil)
 	store := t.TempDir()
-	env := tempEnv(t)
-	home := envValue(env, "HOME")
+	env := cmdtest.TempEnv(t)
+	home := cmdtest.EnvValue(env, "HOME")
 	root := filepath.Join(store, "proj")
 	if err := os.MkdirAll(filepath.Join(root, "mapped"), 0o755); err != nil {
 		t.Fatal(err)
@@ -94,7 +96,7 @@ func (e grillingEnv) snapshot(t *testing.T) map[string]string {
 
 func migrateGrilling(t *testing.T, e grillingEnv, args ...string) {
 	t.Helper()
-	if err := execute(append([]string{"tickets", "migrate", e.root}, args...), deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, env: e.env}); err != nil {
+	if err := runMigrate(t, append([]string{"tickets", "migrate", e.root}, args...), cmdbase.Env{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}, Env: e.env}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 }

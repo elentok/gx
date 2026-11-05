@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/testutil"
@@ -46,7 +47,7 @@ func importOldTicket(t *testing.T, store, status, body string, ev *tickets.LogEv
 func serverStart(t *testing.T, project string) ([]tickets.MigrationChange, error) {
 	t.Helper()
 	changes, _, err := migrations.Run(migrations.Env{
-		Dirs: config.DirsFrom(envFor(t)), Root: project, LookupRoot: project,
+		Dirs: config.DirsFrom(cmdtest.EnvFor(t)), Root: project, LookupRoot: project,
 		AppliedPath: filepath.Join(project, migrations.AppliedFile),
 		SkipApplied: true,
 	})
@@ -76,7 +77,7 @@ func readPaused(t *testing.T, path string) schema.Ticket {
 }
 
 func TestExecute_TicketsMigrateToStore_FirstServerStartRunsEveryStep(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	project, _ := importOldTicket(t, store, "open", "Body.\n", nil)
 
 	if _, err := serverStart(t, project); err != nil {
@@ -88,7 +89,7 @@ func TestExecute_TicketsMigrateToStore_FirstServerStartRunsEveryStep(t *testing.
 }
 
 func TestExecute_TicketsMigrateToStore_NeedsRepairKeepsItsPauseReasonAfterStart(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	ev := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}
 	project, ticket := importOldTicket(t, store, "needs-repair", "Body.\n", &ev)
 
@@ -105,7 +106,7 @@ func TestExecute_TicketsMigrateToStore_NeedsRepairKeepsItsPauseReasonAfterStart(
 // unit unrecorded; the retry reruns all of it and the reason is still the one
 // from the event log, although the first half already rewrote the ticket.
 func TestExecute_TicketsMigrateToStore_PartialPauseUnitRetryRerunsAndKeepsReason(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	ev := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}
 	body := "Body.\n\n## Needs Answer\n\nWhich way?\n"
 	project, ticket := importOldTicket(t, store, "needs-repair", body, &ev)
@@ -162,7 +163,7 @@ func readAppliedOrNone(project string) []string {
 // The question reaches the ticket log before the heading is renamed: the
 // question step looks for "## Needs Answer", so renaming first would lose it.
 func TestExecute_TicketsMigrateToStore_NeedsAnswerQuestionIsLoggedBeforeHeadingBecomesPaused(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	body := "Body.\n\n## Needs Answer\n\nWhich way should it go?\n"
 	project, ticket := importOldTicket(t, store, "needs-answer", body, nil)
 

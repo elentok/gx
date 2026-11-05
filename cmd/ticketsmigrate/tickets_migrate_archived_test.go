@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -15,16 +17,16 @@ func TestExecute_TicketsMigrate_BackfillsArchivedEpics(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "gx")
 	archive := filepath.Join(root, ".archive")
 	const done = "---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n"
-	writeMigrateFixtureEpic(t, archive, "old", map[string]string{"01-a.md": done})
+	cmdtest.WriteMigrateFixtureEpic(t, archive, "old", map[string]string{"01-a.md": done})
 	testutil.WriteFile(t, filepath.Join(archive, "old"), "ticket.md", "---\nstatus: done\nmerged_at: 2026-01-02T03:04:05Z\n---\n")
-	writeRunLog(t, filepath.Join(archive, "old"), []string{
+	cmdtest.WriteRunLog(t, filepath.Join(archive, "old"), []string{
 		`{"time":"2026-01-01T00:01:00Z","type":"conflict-hit","ticket":"01"}`,
 	})
 
 	run := func() string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, []string{"tickets", "migrate", root}, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
 		return stdout.String()

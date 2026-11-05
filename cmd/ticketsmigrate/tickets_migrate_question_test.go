@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -14,7 +16,7 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	sections := "\n## Needs Answer\n\nWhich store?\n- a\n- b\n\n## Handoff\n\nResume at step 3.\n"
-	issuesDir := writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
+	issuesDir := cmdtest.WriteMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
 		"01-parked.md":   "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\npark_kind: self-reported\n---\nBody.\n" + sections,
 		"02-answered.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n" + sections,
 		"03-plain.md":    "---\nid: \"03\"\nstatus: open\ntype: implement\n---\nBody.\n",
@@ -24,7 +26,7 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 
 	run := func() string {
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, []string{"tickets", "migrate", root}, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute tickets migrate: %v", err)
 		}
 		return stdout.String()

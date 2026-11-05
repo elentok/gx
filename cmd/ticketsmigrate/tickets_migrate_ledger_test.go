@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tokenledger"
 	"github.com/elentok/gx/transcript"
@@ -17,7 +18,7 @@ import (
 // 2026-01-02, under this test's own HOME and state dir.
 func ledgerCmdFixture(t *testing.T) (dirs config.Dirs, root, state string) {
 	t.Helper()
-	dirs = config.DirsFrom(envFor(t))
+	dirs = config.DirsFrom(cmdtest.EnvFor(t))
 	root = filepath.Join(t.TempDir(), "proj")
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)

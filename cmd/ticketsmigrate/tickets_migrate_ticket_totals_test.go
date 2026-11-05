@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -18,7 +19,7 @@ import (
 // HOME in a project directory no worktree maps to, as a deleted worktree leaves it.
 func writeHomelessTranscript(t *testing.T, id string, input int) {
 	t.Helper()
-	home := envValue(envFor(t), "HOME")
+	home := cmdtest.EnvValue(cmdtest.EnvFor(t), "HOME")
 	line := `{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":` +
 		strconv.Itoa(input) + `,"output_tokens":10}}}`
 	cmdtest.WriteSessionFixture(t, home, "-gone-worktree-"+id, id, []string{line})
@@ -36,7 +37,7 @@ func TestExecute_TicketsMigrate_BackfillsTicketTokensAndCost(t *testing.T) {
 	}
 
 	root := t.TempDir()
-	issues := writeMigrateFixtureEpic(t, root, "old", map[string]string{
+	issues := cmdtest.WriteMigrateFixtureEpic(t, root, "old", map[string]string{
 		"01-two-sessions.md": "---\nid: \"01\"\n" + prefix + "session_ids: [" + id("a1") + ", " + id("a2") + "]\n---\nBody.\n",
 		"02-one-gone.md":     "---\nid: \"02\"\n" + prefix + "actual_cost: 0.5\nsession_ids: [" + id("b1") + ", " + id("missing") + "]\n---\nBody.\n",
 		"03-no-session.md":   "---\nid: \"03\"\n" + prefix + "claimed_at: 2026-01-01T00:00:00Z\n---\nBody.\n",
@@ -44,7 +45,7 @@ func TestExecute_TicketsMigrate_BackfillsTicketTokensAndCost(t *testing.T) {
 		"05-parent.md":       "---\nid: \"05\"\n" + prefix + "session_ids: [" + id("p") + "]\n---\nBody.\n",
 		"05a-conflict.md":    "---\nid: \"05a\"\nstatus: done\ntype: conflict-resolution\nparent: \"05\"\n---\nBody.\n",
 	})
-	writeRunLog(t, filepath.Join(root, "old"), []string{
+	cmdtest.WriteRunLog(t, filepath.Join(root, "old"), []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"conflict-resolved","ticket":"05","agent_session":"` + id("c") + `"}`,
 	})
 	testutil.WriteFile(t, filepath.Join(root, "old"), "ticket.md", "---\nstatus: open\n---\n")
@@ -52,7 +53,7 @@ func TestExecute_TicketsMigrate_BackfillsTicketTokensAndCost(t *testing.T) {
 	run := func() string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, []string{"tickets", "migrate", root}, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
 		return stdout.String()

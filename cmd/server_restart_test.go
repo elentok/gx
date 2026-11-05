@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migratefail"
 )
@@ -23,7 +24,7 @@ func writeStoreProject(t *testing.T, store, name string, files map[string]string
 	if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte("{}"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	writeMigrateFixtureEpic(t, dir, "epic", files)
+	cmdtest.WriteMigrateFixtureEpic(t, dir, "epic", files)
 	return dir
 }
 

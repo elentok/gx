@@ -131,6 +131,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/doctor` — `gx doctor` (`New`, `Deps` with the `ExplainAgent`, `ProbeGhostty`, `ConfirmForce` and `GOOS` hooks, `DefaultDeps`)
   - `cmd/skills` — `gx skills install|uninstall` (`New`, `Deps` with the `skills*` hooks, `DefaultDeps`, `Refresh` for `gx server start`)
   - `cmd/term` — `gx term` (`New`, `Deps` with the `GOOS` field)
+  - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
 - `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds

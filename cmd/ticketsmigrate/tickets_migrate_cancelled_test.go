@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -27,12 +29,12 @@ func TestExecute_TicketsMigrate_BackfillsCancelledAtFromStoreHistory(t *testing.
 	testutil.WriteFile(t, project, "project.json", "{}")
 
 	stamped := "---\nid: \"03\"\nstatus: cancelled\ntype: implement\ncancelled_at: 2020-01-01T00:00:00Z\n---\nBody.\n"
-	writeMigrateFixtureEpic(t, project, "e", map[string]string{
+	cmdtest.WriteMigrateFixtureEpic(t, project, "e", map[string]string{
 		"01-later.md":   creationTicket("Cancelled later."),
 		"02-open.md":    creationTicket("Still open."),
 		"03-stamped.md": stamped,
 	})
-	writeMigrateFixtureEpic(t, project, "follow-ups", map[string]string{"01-fu.md": creationTicket("A follow-up.")})
+	cmdtest.WriteMigrateFixtureEpic(t, project, "follow-ups", map[string]string{"01-fu.md": creationTicket("A follow-up.")})
 	commitStoreAt(t, store, "import", "2024-03-05T13:45:00Z")
 
 	ticketPath := func(parts ...string) string { return filepath.Join(append([]string{project}, parts...)...) }
@@ -53,7 +55,7 @@ func TestExecute_TicketsMigrate_BackfillsCancelledAtFromStoreHistory(t *testing.
 		t.Helper()
 		var stdout bytes.Buffer
 		argv := append([]string{"tickets", "migrate", project}, args...)
-		if err := execute(argv, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, argv, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute %v: %v", argv, err)
 		}
 		return stdout.String()

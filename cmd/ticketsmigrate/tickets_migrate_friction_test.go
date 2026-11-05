@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -16,16 +18,16 @@ func TestExecute_TicketsMigrate_BackfillsFrictionSummaries(t *testing.T) {
 	store := t.TempDir()
 	root := filepath.Join(store, "gx")
 	const done = "---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n"
-	writeMigrateFixtureEpic(t, root, "late", map[string]string{"01-a.md": done, "02-b.md": strings.Replace(done, `"01"`, `"02"`, 1)})
-	writeMigrateFixtureEpic(t, root, "early", map[string]string{"01-a.md": done})
+	cmdtest.WriteMigrateFixtureEpic(t, root, "late", map[string]string{"01-a.md": done, "02-b.md": strings.Replace(done, `"01"`, `"02"`, 1)})
+	cmdtest.WriteMigrateFixtureEpic(t, root, "early", map[string]string{"01-a.md": done})
 	testutil.WriteFile(t, filepath.Join(root, "late"), "ticket.md", "---\nstatus: done\nmerged_at: 2026-01-02T03:04:05Z\n---\n")
-	writeRunLog(t, filepath.Join(root, "late"), []string{
+	cmdtest.WriteRunLog(t, filepath.Join(root, "late"), []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"paused","ticket":"01","kind":"conflict"}`,
 		`{"time":"2026-01-01T00:00:01Z","type":"paused","ticket":"01","kind":"conflict"}`,
 		`{"time":"2026-01-01T00:01:00Z","type":"conflict-hit","ticket":"02"}`,
 	})
 	// An early run log sits in the store root, beside the project directories.
-	writeRunLog(t, filepath.Join(store, "early"), []string{
+	cmdtest.WriteRunLog(t, filepath.Join(store, "early"), []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"conflict-hit","ticket":"01"}`,
 		`{"time":"2026-01-01T00:00:01Z","type":"conflict-hit","ticket":"01"}`,
 	})
@@ -33,7 +35,7 @@ func TestExecute_TicketsMigrate_BackfillsFrictionSummaries(t *testing.T) {
 	run := func() string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, []string{"tickets", "migrate", root}, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
 		return stdout.String()

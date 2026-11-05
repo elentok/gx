@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -7,25 +7,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/migrations"
+	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
-
-func writeMigrateFixtureEpic(t *testing.T, root, epicName string, files map[string]string) string {
-	t.Helper()
-	issuesDir := filepath.Join(root, epicName, "issues")
-	if err := os.MkdirAll(issuesDir, 0755); err != nil {
-		t.Fatalf("mkdir issues: %v", err)
-	}
-	for name, content := range files {
-		writeTicketFile(t, filepath.Join(issuesDir, name), content)
-	}
-	return issuesDir
-}
 
 func TestExecute_TicketsMigrate_RecordsAppliedStepsAndRerunsAll(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
+	cmdtest.WriteMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n",
 	})
 	list := filepath.Join(root, migrations.AppliedFile)
@@ -36,8 +28,8 @@ func TestExecute_TicketsMigrate_RecordsAppliedStepsAndRerunsAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), env: envFor(t)}
-		if err := execute([]string{"tickets", "migrate", root}, d); err != nil {
+		d := cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil), Env: cmdtest.EnvFor(t)}
+		if err := runMigrate(t, []string{"tickets", "migrate", root}, d); err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}
 	}
@@ -55,7 +47,7 @@ func TestExecute_TicketsMigrate_RecordsAppliedStepsAndRerunsAll(t *testing.T) {
 func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	issuesDir := writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
+	issuesDir := cmdtest.WriteMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
 		// Malformed fork chain: 01 lists both its direct fork (01a) and its
 		// grandchild (01b, actually 01a's child) as children.
 		"01-root.md":         "---\nid: \"01\"\nstatus: open\ntype: implement\nchildren: [\"01a\", \"01b\"]\n---\nBody.\n",
@@ -80,9 +72,9 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), env: envFor(t)}
+	d := cmdbase.Env{Stdout: &stdout, Stderr: bytes.NewBuffer(nil), Env: cmdtest.EnvFor(t)}
 
-	if err := execute([]string{"tickets", "migrate", root}, d); err != nil {
+	if err := runMigrate(t, []string{"tickets", "migrate", root}, d); err != nil {
 		t.Fatalf("execute tickets migrate: %v", err)
 	}
 
@@ -150,10 +142,11 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 		"03-no-status.md": "", "04-already-new.md": "", "05-self-blocked.md": "",
 		"08-legacy-needs-attention.md": "",
 	} {
-		var validateOut bytes.Buffer
-		vd := deps{stdout: &validateOut, stderr: bytes.NewBuffer(nil)}
-		if err := execute([]string{"tickets", "validate", filepath.Join(issuesDir, name)}, vd); err != nil {
+		if _, err := schema.ParseTicket(filepath.Join(issuesDir, name)); err != nil {
 			t.Errorf("validating migrated %s: %v", name, err)
+		}
+		if err := tickets.ValidateProject(filepath.Dir(filepath.Dir(issuesDir))); err != nil {
+			t.Errorf("validating project after migrating %s: %v", name, err)
 		}
 	}
 
@@ -172,8 +165,8 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	}
 
 	var secondStdout bytes.Buffer
-	d2 := deps{stdout: &secondStdout, stderr: bytes.NewBuffer(nil), env: envFor(t)}
-	if err := execute([]string{"tickets", "migrate", root}, d2); err != nil {
+	d2 := cmdbase.Env{Stdout: &secondStdout, Stderr: bytes.NewBuffer(nil), Env: cmdtest.EnvFor(t)}
+	if err := runMigrate(t, []string{"tickets", "migrate", root}, d2); err != nil {
 		t.Fatalf("second execute tickets migrate: %v", err)
 	}
 	if strings.TrimSpace(secondStdout.String()) != "no changes" {
@@ -193,7 +186,7 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 func TestExecute_TicketsMigrate_InvalidResultWritesNothing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	issuesDir := writeMigrateFixtureEpic(t, root, "cyclic-epic", map[string]string{
+	issuesDir := cmdtest.WriteMigrateFixtureEpic(t, root, "cyclic-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
@@ -212,9 +205,9 @@ func TestExecute_TicketsMigrate_InvalidResultWritesNothing(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr, env: envFor(t)}
+	d := cmdbase.Env{Stdout: &stdout, Stderr: &stderr, Env: cmdtest.EnvFor(t)}
 
-	err = execute([]string{"tickets", "migrate", root}, d)
+	err = runMigrate(t, []string{"tickets", "migrate", root}, d)
 	if err == nil {
 		t.Fatal("expected an error for a cyclic parent graph, got nil")
 	}

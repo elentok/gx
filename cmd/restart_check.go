@@ -5,6 +5,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/elentok/gx/cmd/ticketsmigrate"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server/wire"
@@ -73,7 +74,7 @@ func dryRunProjects(dirs config.Dirs, storePath string) []restartCheckProject {
 		// Nothing pending: skip the scratch copy.
 		if err == nil && pending > 0 {
 			var changes []tickets.MigrationChange
-			if changes, err = dryRunChanges(dirs, dir, true); err == nil {
+			if changes, err = ticketsmigrate.DryRunChanges(dirs, dir, true); err == nil {
 				for _, c := range changes {
 					p.Files = append(p.Files, c.Path)
 				}

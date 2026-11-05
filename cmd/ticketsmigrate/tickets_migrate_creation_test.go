@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -41,11 +43,11 @@ func TestExecute_TicketsMigrate_BackfillsCreationFromStoreHistory(t *testing.T) 
 	testutil.WriteFile(t, project, "project.json", "{}")
 
 	// The import commit: pre-store tickets, one of them archived.
-	writeMigrateFixtureEpic(t, project, "imported", map[string]string{"01-old.md": creationTicket("Imported.")})
-	writeMigrateFixtureEpic(t, filepath.Join(project, ".archive"), "shelved", map[string]string{"01-old.md": creationTicket("Shelved.")})
+	cmdtest.WriteMigrateFixtureEpic(t, project, "imported", map[string]string{"01-old.md": creationTicket("Imported.")})
+	cmdtest.WriteMigrateFixtureEpic(t, filepath.Join(project, ".archive"), "shelved", map[string]string{"01-old.md": creationTicket("Shelved.")})
 	commitStoreAt(t, store, "import", "2024-03-05T13:45:00Z")
 
-	writeMigrateFixtureEpic(t, project, "first", map[string]string{
+	cmdtest.WriteMigrateFixtureEpic(t, project, "first", map[string]string{
 		"01-new.md":  creationTicket("Brand new."),
 		"02-kept.md": "---\nid: \"02\"\nstatus: open\ntype: implement\ncreated_at: 2020-01-01T00:00:00Z\noriginal_address: \"p:elsewhere/09\"\n---\nBody.\n",
 	})
@@ -57,7 +59,7 @@ func TestExecute_TicketsMigrate_BackfillsCreationFromStoreHistory(t *testing.T) 
 		t.Helper()
 		var stdout bytes.Buffer
 		argv := append([]string{"tickets", "migrate", project}, args...)
-		if err := execute(argv, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, argv, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute %v: %v", argv, err)
 		}
 		return stdout.String()

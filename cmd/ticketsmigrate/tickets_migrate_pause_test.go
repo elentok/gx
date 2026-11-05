@@ -1,4 +1,4 @@
-package cmd
+package ticketsmigrate
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -15,7 +17,7 @@ import (
 func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	issuesDir := writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
+	issuesDir := cmdtest.WriteMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
 		"01-answer-kind.md":    "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\npark_kind: self-reported\n---\nBody.\n",
 		"02-answer-none.md":    "---\nid: \"02\"\nstatus: needs-answer\ntype: implement\n---\nBody.\n",
 		"03-repair-kind.md":    "---\nid: \"03\"\nstatus: needs-repair\ntype: implement\npark_kind: land-conflict\n---\nBody.\n",
@@ -30,7 +32,7 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mapIssues := writeMigrateFixtureEpic(t, root, "map-epic", map[string]string{
+	mapIssues := cmdtest.WriteMigrateFixtureEpic(t, root, "map-epic", map[string]string{
 		"01-map.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\npark_kind: self-reported\n---\nBody.\n",
 	})
 	if err := os.WriteFile(filepath.Join(root, "map-epic", "ticket.md"), []byte("---\nkind: map\n---\n# Map\n"), 0o644); err != nil {
@@ -41,7 +43,7 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 		t.Helper()
 		var stdout bytes.Buffer
 		argv := append([]string{"tickets", "migrate", root}, args...)
-		if err := execute(argv, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
+		if err := runMigrate(t, argv, cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err != nil {
 			t.Fatalf("execute %v: %v", argv, err)
 		}
 		return stdout.String()
@@ -51,7 +53,7 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 	// just as it fails the real run.
 	var failed bytes.Buffer
 	failArgs := []string{"tickets", "migrate", root, "--dry-run"}
-	if err := execute(failArgs, deps{stdout: &failed, stderr: &bytes.Buffer{}, env: envFor(t)}); err == nil {
+	if err := runMigrate(t, failArgs, cmdbase.Env{Stdout: &failed, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t)}); err == nil {
 		t.Fatalf("dry run passed an unparseable ticket:\n%s", failed.String())
 	}
 	if err := os.Remove(path("08-broken.md")); err != nil {

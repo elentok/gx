@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/ticketref"
+	"github.com/elentok/gx/cmd/ticketsmigrate"
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/nav"
 
@@ -264,36 +265,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	cmd.AddCommand(newTicketsLogCmd(d))
 	cmd.AddCommand(newTicketsCalibrationCmd(d))
 	cmd.AddCommand(newTicketsSetCmd(d))
-	var migrateToStore, migrateDryRun bool
-	var migrateProject string
-	migrateCmd := &cobra.Command{
-		Use:   "migrate <path>",
-		Short: "rewrite every ticket under a tracker root into the post-refactor frontmatter shape, or (--to-store) copy it into the ticket store",
-		Long: `Rewrite every ticket under a tracker root into the post-refactor shape.
-
-The server runs the steps it has not yet applied at start-up; run this by hand
-to rerun every step. It also moves each live "## Needs Answer" and "## Handoff"
-section into the ticket's log as a question event (plus an answer event when
-the ticket was answered by hand and is open again), and rebuilds the token
-ledger from old transcripts (days the live poll already wrote are kept). A
-second run changes nothing.`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			if !migrateToStore {
-				warnUnknownApplied(c.ErrOrStderr(), args[0])
-				return runTicketsMigrate(d.dirs(), args[0], migrateDryRun, c.OutOrStdout())
-			}
-			cwd, err := d.getwd()
-			if err != nil {
-				return err
-			}
-			return runTicketsMigrateToStore(d.dirs(), cwd, args[0], migrateProject, migrateDryRun, c.OutOrStdout())
-		},
-	}
-	migrateCmd.Flags().BoolVar(&migrateToStore, "to-store", false, "copy the old tree into the ticket store (old tree is left untouched)")
-	migrateCmd.Flags().BoolVar(&migrateDryRun, "dry-run", false, "with --to-store: convert and validate without writing to the store; without it: run every step on a copy, print what would change and write nothing")
-	migrateCmd.Flags().StringVar(&migrateProject, "project", "", "project name in the store (default: the repo directory name)")
-	cmd.AddCommand(migrateCmd)
+	cmd.AddCommand(ticketsmigrate.New(ticketsmigrate.Deps{Env: d.base()}))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "root",
 		Short: "print the ticket root (in the ticket store, or .scratch before migrate) for the current repo",
