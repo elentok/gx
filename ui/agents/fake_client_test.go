@@ -33,11 +33,23 @@ type fakeSessionClient struct {
 var (
 	_ SessionClient = (*fakeSessionClient)(nil)
 	_ Sessions      = (*fakeSessionClient)(nil)
-	_ Queue         = (*fakeSessionClient)(nil)
+	_ Queue         = fakeQueue{}
 )
 
+// fakeQueue records into the session fake's calls and refuses the addresses
+// in its queueRefusals with the reason they map to.
+type fakeQueue struct{ rec *fakeSessionClient }
+
+func (q fakeQueue) Add(_ context.Context, address, _ string) (wire.QueueResult, error) {
+	q.rec.record("queue " + address)
+	if reason, ok := q.rec.queueRefusals[address]; ok {
+		return wire.QueueResult{Refused: true, Message: reason}, nil
+	}
+	return wire.QueueResult{}, nil
+}
+
 func newTestModel(f *fakeSessionClient, settings ui.Settings) Model {
-	return NewModel(f, f, settings).WithQueue(f)
+	return NewModel(f, f, settings).WithQueue(fakeQueue{f})
 }
 
 func (f *fakeSessionClient) record(call string) (wire.SessionResult, error) {
@@ -84,15 +96,6 @@ func (f *fakeSessionClient) CancelAutoAdvance(_ context.Context, id string) (wir
 
 func (f *fakeSessionClient) Snapshot(context.Context) (wire.Snapshot, error) {
 	return f.snapshot, nil
-}
-
-// Add refuses the addresses in queueRefusals with the reason they map to.
-func (f *fakeSessionClient) Add(_ context.Context, address, _ string) (wire.QueueResult, error) {
-	f.record("queue " + address)
-	if reason, ok := f.queueRefusals[address]; ok {
-		return wire.QueueResult{Refused: true, Message: reason}, nil
-	}
-	return wire.QueueResult{}, nil
 }
 
 func (f *fakeSessionClient) SetAFK(_ context.Context, on *bool) (wire.AFKResult, error) {
