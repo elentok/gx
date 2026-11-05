@@ -1,4 +1,4 @@
-package server_test
+package epics_test
 
 import (
 	"encoding/json"

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/disk"
+	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
@@ -49,6 +50,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),
 		ticketwrite.Routes(func() *ticketwrite.Writer { return s.writer }),
 		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
+		epics.Routes(func() *epics.Epics { return s.epics }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
 	)
 }

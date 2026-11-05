@@ -180,7 +180,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   late-finish and hand-merged scans), the `Landing` (dirty-trunk merge, stash-merge, trunk conflicts) and
   the `Reconciler` (parent-defect and late-finish scans the root registers as `OnRescan` steps),
   with `Routes()` for `epics/merge` and `epics/stash-merge`. The root implements its `Deps`; the
-  merge guard's `closeAndWait` stays with the root's shutdown
+  merge guard's `closeAndWait` stays with the root's shutdown;
+  `server/epics/` holds the epic read models (ticket detail, epic list and detail, epic and design
+  cards, map progress, recently finished) and the epic-state predicates, with `Routes()` for
+  `tickets/detail`, `epics` and `epics/detail`. The root implements its `Deps`
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

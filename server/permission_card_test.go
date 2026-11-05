@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,82 +13,11 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// herdrHosted is a runner that reports itself as herdr-hosted.
-type herdrHosted struct{ *headlessFake }
-
-func (herdrHosted) Name() string { return string(agentrunner.ChoiceHerdr) }
-
-// markStarted gives the staged run a start time, which makes the ticket active.
-func markStarted(t *testing.T, h *servertest.Harness) {
-	t.Helper()
-	path := filepath.Join(h.StateDir, "runs.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var runs []map[string]any
-	if err := json.Unmarshal(data, &runs); err != nil {
-		t.Fatal(err)
-	}
-	runs[0]["started_at"] = time.Now()
-	if data, err = json.Marshal(runs); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// startBlockedClaimed starts a claimed ticket whose live agent is blocked on p.
-func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*servertest.Harness, *headlessFake) {
-	t.Helper()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
-	var runner agentrunner.Runner = fake
-	if herdr {
-		runner = herdrHosted{fake}
-	}
-	// The scaled-down dwell would pause the blocked ticket within a loaded
-	// machine's lag, before the test reads the card.
-	hold, release := gateDwell()
-	t.Cleanup(release)
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(runner), hold, func(c *server.Config) {
-		c.BudgetPollInterval = time.Hour
-		c.WebAddr = "127.0.0.1:0"
-	})
-	wtPath, _ := leaveIteration(t, h, store, repo, "herdr")
-	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
-		t.Fatal(err)
-	}
-	// A new fake session is idle, which the restarted server reads as a finished
-	// agent: it merges the ticket and stops the session before SetPending. A
-	// restart also closes an idle (still launching) agent and reopens its claim,
-	// so the agent must already be mid-turn when the server comes back.
-	fake.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
-	asHeadlessRun(t, h)
-	markStarted(t, h)
-	h.Restart(t)
-	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	if res, err := h.Client.QueueAdd(context.Background(), answerAddr, "claude"); err != nil || res.Refused {
-		t.Fatalf("queue add = %+v, %v", res, err)
-	}
-	// A block raised while the launch still waits for the session to be ready fails
-	// the launch instead of showing the card.
-	servertest.WaitFor(t, time.Minute, "the launch finishes", func() bool {
-		return len(h.Server.Runs()) == 1 && h.Server.Budget().LaunchingRuns() == 0
-	})
-	fake.SetPending("epic-a-iter-01", p)
-	return h, fake
-}
+var startBlockedClaimed = servertest.StartBlockedClaimed
 
 func activeNeedsApproval(t *testing.T, h *servertest.Harness) bool {
 	t.Helper()

@@ -14,7 +14,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const countdownDelay = time.Second
+const countdownDelay = servertest.CountdownDelay
 
 // grillingFixture is the root view of servertest.GrillingFixture, with the
 // lowercase fields its many callers use.
@@ -34,8 +34,8 @@ func endTurn(t *testing.T, f *grillingFixture) {
 
 func startAdvancing(t *testing.T, store string) *grillingFixture {
 	t.Helper()
-	h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", store, servertest.WithAutoAdvanceDelay(countdownDelay))
-	return &grillingFixture{h, ctx, evs, id, conv, path}
+	g := servertest.StartAdvancing(t, store)
+	return &grillingFixture{g.H, g.Ctx, g.Evs, g.ID, g.Conv, g.Path}
 }
 
 func sessionSnapshot(t *testing.T, f *grillingFixture) wire.SessionInfo {

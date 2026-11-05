@@ -16,11 +16,7 @@ import (
 
 func (f designsFixture) openNew(t *testing.T, slug, idea string) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: slug, NewDesign: true, Idea: idea, Project: "proj"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
+	return f.shared().OpenNew(t, slug, idea)
 }
 
 func (f designsFixture) mapPath(slug string) string {
