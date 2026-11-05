@@ -103,8 +103,16 @@ type LogEvent struct {
 
 // ClipLogText cuts text to MaxLogTextChars and says whether it cut anything.
 func ClipLogText(text string) (string, bool) {
-	clipped := clipRunes(text, MaxLogTextChars)
+	clipped := ClipRunes(text, MaxLogTextChars)
 	return clipped, clipped != text
+}
+
+// ClipRunes cuts s to at most n runes.
+func ClipRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	return string([]rune(s)[:n])
 }
 
 // LogPath is the log beside the ticket file at ticketPath.

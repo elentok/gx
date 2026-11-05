@@ -13,13 +13,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// MigrationChange reports what changed for one ticket file during Migrate,
-// as a human-readable note per changed field.
-type MigrationChange struct {
-	Path  string
-	Notes []string
-}
-
 // MigrationResult is Migrate's report, in Path-sorted order. A nil Changes
 // means scratchRoot was already fully in the post-refactor shape.
 type MigrationResult struct {

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -90,9 +89,9 @@ func migrateQuestionSection(path string, now time.Time) (bool, error) {
 		Type:      EventPauseQuestion,
 		By:        by,
 		PauseKind: string(kind),
-		Summary:   clipRunes(strings.TrimSpace(summary), MaxLogSummaryChars),
-		Text:      clipRunes(text, MaxLogTextChars),
-		Handoff:   clipRunes(handoff, MaxLogTextChars),
+		Summary:   ClipRunes(strings.TrimSpace(summary), MaxLogSummaryChars),
+		Text:      ClipRunes(text, MaxLogTextChars),
+		Handoff:   ClipRunes(handoff, MaxLogTextChars),
 	})
 	if err != nil {
 		return false, err
@@ -109,12 +108,4 @@ func migrateQuestionSection(path string, now time.Time) (bool, error) {
 		*body = schema.DemoteSection(*body, "## Handoff", now)
 	})
 	return err == nil, err
-}
-
-// clipRunes cuts s to at most n runes.
-func clipRunes(s string, n int) string {
-	if utf8.RuneCountInString(s) <= n {
-		return s
-	}
-	return string([]rune(s)[:n])
 }
