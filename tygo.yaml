@@ -3,49 +3,25 @@ packages:
   - path: "github.com/elentok/gx/server/wire"
     output_path: "webui/src/generated/server.ts"
     include_files:
-      - budget.go
       - checkstatus.go
       - designs.go
       - detail.go
-      - diskcleannow.go
       - diskwatch.go
-      - detailrelated.go
-      - detailruns.go
-      - epiccard.go
       - epicdetail.go
       - epiclist.go
-      - limitburn.go
-      - epicsummary.go
       - fixagent.go
-      - harnesslabel.go
       - healthreport.go
-      - healthtypes.go
       - index.go
+      - limitburn.go
+      - limitsstore.go
+      - migrate.go
       - pause.go
       - projectworktrees.go
       - recentlyfinished.go
       - restart.go
-      - restartcheck.go
-      - sessionautoadvance.go
-      - sessionchat.go
-      - sessioncommands.go
-      - sessionfailure.go
-      - sessionfocus.go
-      - sessionkeys.go
-      - sessionpermission.go
-      - sessionprompt.go
-      - sessionround.go
-      - sessionscreen.go
-      - sessionstate.go
       - sessions.go
       - sessiontypes.go
       - stats.go
-      - statsgrilling.go
-      - statslimitburn.go
-      - limitsstore.go
-      - migrate.go
-      - limitsevents.go
-      - usagesample.go
       - usagesummary.go
       - verdicts.go
     type_mappings:

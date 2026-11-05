@@ -88,11 +88,11 @@ var allowed = map[string]allowance{
 	// Wire and persisted names kept for compatibility with running servers,
 	// stored logs and on-disk state.
 	"server/wire/queue.go":                          allow("JSON wire fields parked, park_kind, park_reason", "park"),
-	"server/wire/epicsummary.go":                    allow("JSON wire field parked", "park"),
+	"server/wire/epiclist.go":                       allow("JSON wire field parked", "park"),
 	"server/wire/epicdetail.go":                     allow("JSON wire field needs_answer", "needsanswer"),
 	"server/merge/landing.go":                       allow("Landing is the dirty-trunk landing type, the project `landing` policy", "land"),
 	"server/index/reads.go":                         allow("persisted lock kind \"land\"", "land"),
-	"server/wire/mergerecover.go":                   allow("persisted event kind land-rolled-back", "land"),
+	"server/wire/recovery.go":                       allow("persisted event kind land-rolled-back", "land"),
 	"server/ticketops/repair.go":                    allow("hidden unpark verb and the persisted unpark answer choice", "park"),
 	"cmd/serverapi/server_repair.go":                allow("hidden unpark verb alias", "park"),
 	"ralphloop/merge/lock.go":                       allow("on-disk land-locks state dir; renaming would orphan live locks", "land"),

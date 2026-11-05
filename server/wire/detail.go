@@ -161,3 +161,68 @@ type TicketDetail struct {
 	ParseError  string `json:"parse_error,omitempty"`
 	Path        string `json:"path,omitempty"`
 }
+
+// Relations a related ticket has to the one on the page.
+const (
+	RelationBlocker = "blocker"
+	RelationParent  = "parent"
+	RelationFork    = "fork"
+)
+
+// RelatedTicket is one ticket line of the detail page's Related section.
+type RelatedTicket struct {
+	Relation string `json:"relation"`
+	// Address is canonical for a ticket of the same project. A blocker that
+	// names no ticket keeps the token as written.
+	Address string `json:"address"`
+	// Linkable is false for a blocker that names no ticket, which has nothing to link to.
+	Linkable bool   `json:"linkable"`
+	Title    string `json:"title"`
+	// Status is the rendered-status word the epic rows use.
+	Status string `json:"status"`
+}
+
+// DetailStats is the stat line of a loop ticket. Cost and ContextWindow come
+// from the merge stamps and stay empty until the ticket merges. A map ticket
+// has no stats.
+type DetailStats struct {
+	// Elapsed is in seconds; a claimed ticket ticks on the client from ClaimedAt.
+	Elapsed       int       `json:"elapsed,omitempty"`
+	ClaimedAt     time.Time `json:"claimed_at,omitzero"`
+	Cost          float64   `json:"cost,omitempty"`
+	HadCodex      bool      `json:"had_codex,omitempty"`
+	ContextWindow int       `json:"context_window,omitempty"`
+}
+
+// Outcomes of a run line.
+const (
+	RunMerged          = "merged"
+	RunMergedNoCommits = "merged-no-commits"
+	RunPaused          = "paused"
+	RunStartedOver     = "started-over"
+	RunRunning         = "running"
+	RunAgentLost       = "agent-lost"
+	// RunAgentGoneAfterRestart is a run a restarted server found dead with no
+	// work to keep, and put back in the queue.
+	RunAgentGoneAfterRestart = "agent-gone-after-restart"
+	RunRelaunched            = "relaunched"
+	RunCancelled             = "cancelled"
+)
+
+// How a run began. The run log keeps cold-start and resumed; the page labels
+// them "new session" and "same session".
+const (
+	StartNewSession  = "new-session"
+	StartSameSession = "same-session"
+)
+
+// DetailRun is one run line of the Runs section.
+type DetailRun struct {
+	Start time.Time `json:"start"`
+	// Duration is in seconds; a running or lost run has none.
+	Duration int    `json:"duration,omitempty"`
+	Outcome  string `json:"outcome"`
+	// PauseLabel is the reason label of a run that ended in a pause.
+	PauseLabel string `json:"pause_label,omitempty"`
+	StartKind  string `json:"start_kind"`
+}
