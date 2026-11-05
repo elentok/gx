@@ -289,7 +289,7 @@ func (s *Server) repairResume(req wire.RepairRequest, rc repairCtx) (wire.Repair
 			return repairRefusal(&repair.RefusalError{Reason: wire.ReasonBadBase, Message: msg}), nil
 		}
 	}
-	if s.adoptFirst(dir, addr, t.Path) {
+	if s.rec.adoptFirst(dir, addr, t.Path) {
 		res := repair.ResumeResult{Ticket: id, Status: repair.ResumeAdopted}
 		if zeroCommit {
 			res.Message = repair.MessageAdopted

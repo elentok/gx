@@ -47,8 +47,8 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	defer ticker.Stop()
 	for {
 		s.projects.Check()
-		s.checkTrunks()
-		s.stampHandMerged()
+		s.rec.checkTrunks()
+		s.rec.stampHandMerged()
 		s.releaseWaitingSlots(time.Now())
 		s.claimNext()
 		s.publishVerdictChanges()
@@ -178,10 +178,10 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	if _, held := s.disks.FreshHeldDisk(addr.Project); held {
 		return false, nil
 	}
-	if _, missing := s.trunkMissing.get(addr.Project); missing {
+	if _, missing := s.rec.trunkMissing.get(addr.Project); missing {
 		return false, nil
 	}
-	if _, blocked := s.migrationBlock(addr.Project); blocked {
+	if _, blocked := s.rec.migrationBlock(addr.Project); blocked {
 		return false, nil
 	}
 	projectDir, repo, err := s.projects.Of(addr.Project)

@@ -105,7 +105,7 @@ func (s *Server) CompleteRootIfDone(address string) error {
 // does, on the settle group.
 func (s *Server) RemoveMergedWorktree(project, epic string) {
 	root := queue.RootRef{Project: project, Epic: epic}
-	s.guards.GoSettle(func() { s.removeMergedWorktree(root) })
+	s.guards.GoSettle(func() { s.rec.removeMergedWorktree(root) })
 }
 
 // PutRunIn is Registry.PutRunIn on the configured runner.

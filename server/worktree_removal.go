@@ -22,7 +22,7 @@ import (
 // path still holds its trunk lock, so it first waits that lock out: the queued
 // check then sees the queue after the dequeue. The first failed check keeps the
 // worktree and logs why; nothing here pauses the epic or fails the merge.
-func (s *Server) removeMergedWorktree(root queue.RootRef) {
+func (s *Reconciler) removeMergedWorktree(root queue.RootRef) {
 	if !isMergeableEpic(root) {
 		return
 	}
@@ -51,7 +51,7 @@ func (s *Server) removeMergedWorktree(root queue.RootRef) {
 }
 
 // waitOutStamping blocks until the stamping path releases the epic's trunk lock.
-func (s *Server) waitOutStamping(root queue.RootRef, project, dir, repoDir string) {
+func (s *Reconciler) waitOutStamping(root queue.RootRef, project, dir, repoDir string) {
 	if epics, err := tickets.LoadResolved(project, dir); err == nil {
 		_, _, target, refsErr := s.epicRefs(project, epics, root.Epic, repoDir)
 		s.guards.Trunks.Lock(repoDir, mergeLockKey(root, target, refsErr))()
@@ -60,7 +60,7 @@ func (s *Server) waitOutStamping(root queue.RootRef, project, dir, repoDir strin
 
 // removeLockedUnlessKept runs removeUnlessKept under the worktree lock and
 // returns why the worktree stays, or "" once it is removed.
-func (s *Server) removeLockedUnlessKept(root queue.RootRef, path, repoDir string) string {
+func (s *Reconciler) removeLockedUnlessKept(root queue.RootRef, path, repoDir string) string {
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
 		return err.Error()
@@ -75,7 +75,7 @@ func (s *Server) removeLockedUnlessKept(root queue.RootRef, path, repoDir string
 
 // removeUnlessKept returns why the worktree stays, or "" once it is removed.
 // git refuses a worktree with changes, so no --force.
-func (s *Server) removeUnlessKept(root queue.RootRef, path string, repo *git.Repo) string {
+func (s *Reconciler) removeUnlessKept(root queue.RootRef, path string, repo *git.Repo) string {
 	if reason := s.liveWorkIn(root, path); reason != "" {
 		return reason
 	}
@@ -99,7 +99,7 @@ func (s *Server) removeUnlessKept(root queue.RootRef, path string, repo *git.Rep
 
 // liveWorkIn returns which live session or run works inside the
 // worktree at path, or "".
-func (s *Server) liveWorkIn(root queue.RootRef, path string) string {
+func (s *Reconciler) liveWorkIn(root queue.RootRef, path string) string {
 	if sessions, err := s.sessions.ListSessions(); err != nil {
 		return "sessions could not be listed: " + err.Error()
 	} else {
@@ -121,7 +121,7 @@ func (s *Server) liveWorkIn(root queue.RootRef, path string) string {
 
 // runLive is liveIteration's rule applied to a registry entry, which settleRun
 // can leave behind after the agent stopped.
-func (s *Server) runLive(run runs.Run) bool {
+func (s *Reconciler) runLive(run runs.Run) bool {
 	runner := s.harness.RunnerForRun(run)
 	if runner == nil || run.Session.ID == "" {
 		return false

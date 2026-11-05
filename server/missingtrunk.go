@@ -69,7 +69,7 @@ func (m *missingTrunks) get(project string) (string, bool) {
 // pass, so claimRoot can refuse a Missing trunk project before it derives any
 // base. A project with nothing queued leaves the state silently: a re-queue
 // after a fix must not announce a stale "trunk found".
-func (s *Server) checkTrunks() {
+func (s *Reconciler) checkTrunks() {
 	seen := map[string]bool{}
 	defer s.trunkMissing.keepOnly(seen)
 	for _, item := range s.queue.List() {
@@ -93,7 +93,7 @@ func (s *Server) checkTrunks() {
 }
 
 // enterTrunkMissing puts project in Missing trunk, announcing only the entry.
-func (s *Server) enterTrunkMissing(project, reason string) {
+func (s *Reconciler) enterTrunkMissing(project, reason string) {
 	if !s.trunkMissing.set(project, reason) {
 		return
 	}
@@ -106,7 +106,7 @@ func (s *Server) enterTrunkMissing(project, reason string) {
 // migrationBlock reports a project's saved migration failure: its tickets are
 // not claimed while the record stands. The record is read on every call so a
 // clear by the CLI or a Fix agent ends the block with no restart.
-func (s *Server) migrationBlock(project string) (string, bool) {
+func (s *Reconciler) migrationBlock(project string) (string, bool) {
 	failed, err := migratefail.Read(s.cfg.StateDir, []string{project})
 	if err != nil || len(failed) == 0 {
 		return "", false
@@ -117,7 +117,7 @@ func (s *Server) migrationBlock(project string) (string, bool) {
 // trunkProblem reports why project's trunk can't be used, if it can't. A
 // project that is not found, has no repo or no VCS, or whose path is gone is
 // not Missing trunk: it has no trunk, or some other state covers it.
-func (s *Server) trunkProblem(project string) (string, bool) {
+func (s *Reconciler) trunkProblem(project string) (string, bool) {
 	dir, err := s.projects.Dir(project)
 	if err != nil {
 		// An unreadable project.json fails the whole store scan, so its project

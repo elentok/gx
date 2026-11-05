@@ -19,7 +19,7 @@ import (
 // old epic's backlog would otherwise flood recovery on the first scan. Drafts
 // are skipped as unfinished. Nothing is raised while R14 is off: a raised
 // defect is never raised again, and unmatched it would only fork investigations.
-func (s *Server) scanParentDefects() {
+func (s *Reconciler) scanParentDefects() {
 	if !s.settings.Load().Recovery.EntryEnabled("R14") {
 		return
 	}
@@ -47,7 +47,7 @@ func (s *Server) scanParentDefects() {
 	}
 }
 
-func (s *Server) raiseParentDefect(projectDir, epic, id, want string) {
+func (s *Reconciler) raiseParentDefect(projectDir, epic, id, want string) {
 	log, _, err := ralphloop.ReadEvents(projectDir, epic)
 	if err != nil {
 		s.log.Warn("parent scan cannot read the run log", "epic", epic, "err", err)

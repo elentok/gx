@@ -72,7 +72,7 @@ func (f *inFlight) running(key string) <-chan struct{} {
 // adoptFirst is resume's and relaunch's late-finish check: it adopts a match
 // itself, or waits out the adoption a rescan already started, and reports
 // whether the ticket ended adopted.
-func (s *Server) adoptFirst(dir string, addr tickets.Address, path string) bool {
+func (s *Reconciler) adoptFirst(dir string, addr tickets.Address, path string) bool {
 	lf, ok := lateFinishOf(dir, addr, path)
 	if !ok {
 		return false
@@ -91,7 +91,7 @@ func (s *Server) adoptFirst(dir string, addr tickets.Address, path string) bool 
 
 // scanLateFinishes adopts every late finish in the store. It is a finish, not
 // a recovery remedy (ADR 0038), so no settings gate holds it.
-func (s *Server) scanLateFinishes() {
+func (s *Reconciler) scanLateFinishes() {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return
@@ -139,7 +139,7 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 // commit with no commitless report, or none at all, stays paused. A merge
 // ticket closes once its finish checks pass, and stays paused until then, so
 // a later rescan retries after a person fixes the epic.
-func (s *Server) adoptLateFinish(lf lateFinish) bool {
+func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 	addr := lf.addr
 	label, branch, worktree := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.projects.WorktreeDir(addr.Project))
 	if lf.pause.Label != "" {
@@ -257,7 +257,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 
 // cancelUnstartedInvestigations cancels the adopted ticket's investigate
 // children that have not been claimed yet; a running one finishes its report.
-func (s *Server) cancelUnstartedInvestigations(dir string, addr tickets.Address) {
+func (s *Reconciler) cancelUnstartedInvestigations(dir string, addr tickets.Address) {
 	epics, err := tickets.LoadResolved(addr.Project, dir)
 	if err != nil {
 		s.log.Warn("late finish: load investigations", "ticket", addr, "err", err)

@@ -364,7 +364,7 @@ func (s *Server) StampEpic(root queue.RootRef, epicPath string, keys ...string) 
 		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
 		}
-		s.guards.GoSettle(func() { s.removeMergedWorktree(root) })
+		s.guards.GoSettle(func() { s.rec.removeMergedWorktree(root) })
 	}
 }
 
@@ -500,7 +500,7 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 func (s *Server) refsFailed(project, epic string, err error) mergePause {
 	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing merges; the project stops claiming until a person fixes trunk.
-		s.enterTrunkMissing(project, err.Error())
+		s.rec.enterTrunkMissing(project, err.Error())
 		return mergePause{reason: fmt.Sprintf("the trunk branch is missing: %v; fix the trunk, then merge again", err), kind: events.TrunkMissing}
 	}
 	return mergeFailed(project, epic, err)

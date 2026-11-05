@@ -134,24 +134,24 @@ type Server struct {
 	migrator   *projects.Migrator
 	checks     *projects.Checks
 
-	queue        *queue.Queue
-	afk          *queue.AFK
-	viMode       *queue.ViMode
-	oneOffs      *queue.OneOffs
-	budget       *budget.Budget
-	tokens       *tokenledger.Ledger
-	limits       *limits.Limits
-	stats        *stats.Stats
-	events       *broker.Broker
-	herdr        herdrWatch
-	writer       *ticketwrite.Writer
-	pauseHold    ticketwrite.RecoveryHold
-	recovery     *srvrecovery.Recovery
-	defectScan   sync.Mutex
-	lateFinishes inFlight
-	designSteps  sync.Map // map address -> design step at the last rescan
-	deadlocks    deadlocks
-	gatesRaised  map[gateHold]bool // touched only by the gate watchdog
+	queue     *queue.Queue
+	afk       *queue.AFK
+	viMode    *queue.ViMode
+	oneOffs   *queue.OneOffs
+	budget    *budget.Budget
+	tokens    *tokenledger.Ledger
+	limits    *limits.Limits
+	stats     *stats.Stats
+	events    *broker.Broker
+	herdr     herdrWatch
+	writer    *ticketwrite.Writer
+	pauseHold ticketwrite.RecoveryHold
+	recovery  *srvrecovery.Recovery
+	// rec repairs merge state at startup and on each rescan.
+	rec         *Reconciler
+	designSteps sync.Map // map address -> design step at the last rescan
+	deadlocks   deadlocks
+	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 
 	chat         *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry     *runs.Registry
@@ -162,7 +162,6 @@ type Server struct {
 	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
 	mergedProbe  func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts     verdictLog
-	trunkMissing missingTrunks
 	// sessions creates, stops and watches the sessions; resumer brings them back.
 	sessions    *sessions.Manager
 	resumer     *sessions.Resumer
@@ -334,6 +333,7 @@ func New(cfg Config) (*Server, error) {
 
 		focus: sessions.NewFocusReports(),
 	}
+	s.rec = newReconciler(s)
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
@@ -443,8 +443,8 @@ func New(cfg Config) (*Server, error) {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
 	}
 	// The rescan steps run in this order after every store scan.
-	s.idx.OnRescan(s.scanParentDefects)
-	s.idx.OnRescan(s.scanLateFinishes)
+	s.idx.OnRescan(s.rec.scanParentDefects)
+	s.idx.OnRescan(s.rec.scanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.scanDesignCleanups)
 	s.idx.SetReady(s.migrationsEnded)

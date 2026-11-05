@@ -75,7 +75,7 @@ func (h ticketWriteHost) CancelInvestigateChild(ref queue.TicketRef, source stri
 }
 
 func (h ticketWriteHost) AdoptFirst(dir string, addr tickets.Address, path string) bool {
-	return h.s.adoptFirst(dir, addr, path)
+	return h.s.rec.adoptFirst(dir, addr, path)
 }
 
 func (h ticketWriteHost) InvestigateRetryFailure(qc queue.Ctx, ref queue.TicketRef) (recovery.Failure, wire.QueueResult, bool) {
