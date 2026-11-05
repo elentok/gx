@@ -12,11 +12,11 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// epicStateValues parses wire/epicsummary.go for every EpicState constant, so a
+// epicStateValues parses wire/epiclist.go for every EpicState constant, so a
 // new state cannot slip past the guard below.
 func epicStateValues(t *testing.T) []wire.EpicState {
 	t.Helper()
-	f, err := parser.ParseFile(token.NewFileSet(), "../wire/epicsummary.go", nil, 0)
+	f, err := parser.ParseFile(token.NewFileSet(), "../wire/epiclist.go", nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
