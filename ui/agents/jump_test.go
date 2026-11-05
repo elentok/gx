@@ -29,7 +29,7 @@ func jumpModel(t *testing.T) Model {
 
 func jumpIDs(m Model) string {
 	var ids []string
-	for _, i := range m.jumpMatches() {
+	for _, i := range m.jump.matches(m.jumpCtx()) {
 		ids = append(ids, m.sessions[i].ID)
 	}
 	return strings.Join(ids, " ")

@@ -98,7 +98,12 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
 	case m.jump != nil:
-		return m.updateJumpKey(msg)
+		var res jumpResult
+		m.jump, res = m.jump.Update(msg, m.jumpCtx())
+		if res.Picked {
+			return m.selectAndFocus(res.Session)
+		}
+		return m.startSpinner()
 	case m.create != nil:
 		var cmd tea.Cmd
 		m.create, cmd, _ = m.create.Update(msg, m.createCtx())

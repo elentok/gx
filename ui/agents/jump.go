@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/server/wire"
 
@@ -32,21 +33,44 @@ type jumpPopup struct {
 	cursor       int
 }
 
+// jumpCtx is what the popup reads from the Model: the sessions it lists and
+// what it needs to draw them.
+type jumpCtx struct {
+	sessions    []wire.SessionInfo
+	now         func() time.Time
+	width       int
+	height      int
+	settings    ui.Settings
+	spinnerView string
+}
+
+func (m Model) jumpCtx() jumpCtx {
+	return jumpCtx{sessions: m.sessions, now: m.now, width: m.width, height: m.height, settings: m.settings, spinnerView: m.spinner.View()}
+}
+
+// jumpResult is what a key did beyond editing the popup: Closed when it is
+// gone, Picked when Session is the index into jumpCtx.sessions to jump to.
+type jumpResult struct {
+	Closed  bool
+	Picked  bool
+	Session int
+}
+
 func (j *jumpPopup) attention() bool { return !j.projectOrder }
 
-// jumpMatches is the indexes into m.sessions the popup lists: filtered, and
-// in attention order (Actionable, Unread, the rest) unless toggled to the
+// matches is the indexes into c.sessions the popup lists: filtered, and in
+// attention order (Actionable, Unread, the rest) unless toggled to the
 // sidebar's project order.
-func (m Model) jumpMatches() []int {
+func (j *jumpPopup) matches(c jumpCtx) []int {
 	var out []int
-	for i, s := range m.sessions {
-		if fuzzy.Match(m.jump.query, displayName(s), s.Project, s.Dir) {
+	for i, s := range c.sessions {
+		if fuzzy.Match(j.query, displayName(s), s.Project, s.Dir) {
 			out = append(out, i)
 		}
 	}
-	if m.jump.attention() {
+	if j.attention() {
 		slices.SortStableFunc(out, func(a, b int) int {
-			return attentionBucket(m.sessions[a]) - attentionBucket(m.sessions[b])
+			return attentionBucket(c.sessions[a]) - attentionBucket(c.sessions[b])
 		})
 	}
 	return out
@@ -62,77 +86,76 @@ func attentionBucket(s wire.SessionInfo) int {
 	return 2
 }
 
-func (m Model) updateJumpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	j := *m.jump
-	m.jump = &j
-	matches := m.jumpMatches()
+// Update applies a key and returns the new popup state, never mutating j.
+func (j *jumpPopup) Update(msg tea.KeyPressMsg, c jumpCtx) (*jumpPopup, jumpResult) {
+	next := *j
+	matches := next.matches(c)
 	switch msg.String() {
 	case "ctrl+n", "down":
-		j.cursor = min(j.cursor+1, max(0, len(matches)-1))
+		next.cursor = min(next.cursor+1, max(0, len(matches)-1))
 	case "ctrl+p", "up":
-		j.cursor = max(j.cursor-1, 0)
+		next.cursor = max(next.cursor-1, 0)
 	case "tab":
-		j.projectOrder = !j.projectOrder
-		j.cursor = 0
+		next.projectOrder = !next.projectOrder
+		next.cursor = 0
 	case "esc":
-		m.jump = nil
+		return nil, jumpResult{Closed: true}
 	case "enter":
-		if j.cursor >= len(matches) {
-			return m, nil
+		if next.cursor >= len(matches) {
+			return &next, jumpResult{}
 		}
-		m.jump = nil
-		return m.selectAndFocus(matches[j.cursor])
+		return nil, jumpResult{Closed: true, Picked: true, Session: matches[next.cursor]}
 	case "backspace":
-		if r := []rune(j.query); len(r) > 0 {
-			j.query = string(r[:len(r)-1])
-			j.cursor = 0
+		if r := []rune(next.query); len(r) > 0 {
+			next.query = string(r[:len(r)-1])
+			next.cursor = 0
 		}
 	default:
 		if msg.Text != "" && msg.Mod&(tea.ModCtrl|tea.ModAlt) == 0 {
-			j.query += msg.Text
-			j.cursor = 0
+			next.query += msg.Text
+			next.cursor = 0
 		}
 	}
-	return m.startSpinner()
+	return &next, jumpResult{}
 }
 
-// jumpBodyHeight is the popup's room for match rows: the screen less the
+// bodyHeight is the popup's room for match rows: the screen less the
 // border, query line, the gaps and the hint.
-func (m Model) jumpBodyHeight() int { return max(1, m.height-7) }
+func (j *jumpPopup) bodyHeight(c jumpCtx) int { return max(1, c.height-7) }
 
-// jumpOffset is the first match on screen, scrolled to keep the cursor shown.
-func (m Model) jumpOffset() int { return max(0, m.jump.cursor-m.jumpBodyHeight()+1) }
+// offset is the first match on screen, scrolled to keep the cursor shown.
+func (j *jumpPopup) offset(c jumpCtx) int { return max(0, j.cursor-j.bodyHeight(c)+1) }
 
-// jumpShown is the matches on screen in the popup.
-func (m Model) jumpShown() []int {
-	matches := m.jumpMatches()
-	offset := min(m.jumpOffset(), len(matches))
-	return matches[offset:min(len(matches), offset+m.jumpBodyHeight())]
+// shown is the matches on screen in the popup.
+func (j *jumpPopup) shown(c jumpCtx) []int {
+	matches := j.matches(c)
+	offset := min(j.offset(c), len(matches))
+	return matches[offset:min(len(matches), offset+j.bodyHeight(c))]
 }
 
-func (m Model) renderJump() string {
-	width := min(jumpMaxWidth, m.width-4)
+func (j *jumpPopup) render(c jumpCtx) string {
+	width := min(jumpMaxWidth, c.width-4)
 	innerW := width - 4
-	matches := m.jumpMatches()
+	matches := j.matches(c)
 	order := "attention"
-	if !m.jump.attention() {
+	if !j.attention() {
 		order = "project"
 	}
-	lines := []string{ui.StyleMuted.Render("> ") + m.jump.query}
+	lines := []string{ui.StyleMuted.Render("> ") + j.query}
 	if len(matches) == 0 {
 		lines = append(lines, ui.StyleMuted.Render("  no matches"))
 	}
-	offset := m.jumpOffset()
-	for n, i := range m.jumpShown() {
-		row := m.jumpRow(m.sessions[i], innerW)
-		if offset+n == m.jump.cursor {
+	offset := j.offset(c)
+	for n, i := range j.shown(c) {
+		row := j.row(c, c.sessions[i], innerW)
+		if offset+n == j.cursor {
 			row = ui.RenderRowHighlight(row)
 		}
 		lines = append(lines, row)
 	}
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:         "Jump to agent",
-		RightTitle:    order + " · " + strconv.Itoa(len(matches)) + "/" + strconv.Itoa(len(m.sessions)),
+		RightTitle:    order + " · " + strconv.Itoa(len(matches)) + "/" + strconv.Itoa(len(c.sessions)),
 		Body:          strings.Join(lines, "\n"),
 		Hint:          jumpHint,
 		Width:         width,
@@ -143,23 +166,23 @@ func (m Model) renderJump() string {
 	})
 }
 
-// jumpRow is status icon, marks, name, project, dir, the time since the last
+// row is status icon, marks, name, project, dir, the time since the last
 // status change, status label and the Actionable reason or status detail.
-func (m Model) jumpRow(s wire.SessionInfo, w int) string {
-	icons := ui.Icons(m.settings.UseNerdFontIcons)
+func (j *jumpPopup) row(c jumpCtx, s wire.SessionInfo, w int) string {
+	icons := ui.Icons(c.settings.UseNerdFontIcons)
 	style := agentstyle.NameRead
 	if s.Unread.Unread {
 		style = agentstyle.NameUnread
 	}
 	since := ""
 	if !s.StatusChangedAt.IsZero() {
-		since = ui.DurationCompact(m.now().Sub(s.StatusChangedAt))
+		since = ui.DurationCompact(c.now().Sub(s.StatusChangedAt))
 	}
 	// Some status glyphs render 2 cells wide; a fixed slot keeps columns aligned.
-	row := agentstyle.Fit(agentstyle.StatusIcon(s, icons, m.spinner.View()), 2) + " " + marks(s, icons) +
+	row := agentstyle.Fit(agentstyle.StatusIcon(s, icons, c.spinnerView), 2) + " " + marks(s, icons) +
 		agentstyle.Fit(style.Render(displayName(s)), 18) + " " +
 		agentstyle.Fit(agentstyle.ProjectHeader.Render(s.Project), 12) + " " +
-		agentstyle.Fit(ui.StyleMuted.Render(agentstyle.ShortDir(m.settings.Home(), s.Dir)), 20) + " " +
+		agentstyle.Fit(ui.StyleMuted.Render(agentstyle.ShortDir(c.settings.Home(), s.Dir)), 20) + " " +
 		agentstyle.Fit(ui.StyleMuted.Render(since), 5) + " " +
 		agentstyle.StatusLabel(s)
 	if s.Actionable.Reason != "" {

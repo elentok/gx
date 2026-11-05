@@ -402,7 +402,7 @@ func (m Model) startSpinner() (tea.Model, tea.Cmd) {
 func (m Model) workingVisible() bool {
 	var shown []int
 	if m.jump != nil {
-		shown = m.jumpShown()
+		shown = m.jump.shown(m.jumpCtx())
 	}
 	if m.sidebarShown() {
 		for _, r := range m.visibleRows() {
@@ -493,7 +493,7 @@ func (m Model) render() string {
 		out = m.renderMain(m.width, lines)
 	}
 	if m.jump != nil {
-		out = ui.OverlayCenter(out, m.renderJump(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.jump.render(m.jumpCtx()), m.width, m.height)
 	}
 	if m.create != nil {
 		out = ui.OverlayCenter(out, m.create.View(m.width, m.height, m.sessions), m.width, m.height)

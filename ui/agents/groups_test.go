@@ -105,7 +105,7 @@ func TestGroups_PendingSelectShowsTheAgent(t *testing.T) {
 
 func TestGroups_JumpListsHiddenAgentsAndOpeningShowsOne(t *testing.T) {
 	m := press(t, groupsModel(t, config.DirsFrom([]string{"HOME=" + t.TempDir()})), "/")
-	if got := len(m.jumpMatches()); got != 4 {
+	if got := len(m.jump.matches(m.jumpCtx())); got != 4 {
 		t.Fatalf("jump lists %d agents, want 4", got)
 	}
 	for _, r := range "queue-two" {
