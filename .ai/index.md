@@ -269,6 +269,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `cache-gate-custom` scenarios (`cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
   `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`.
 
+- `sizeguard/` — test-only guardrail on package, file and type size (see "File size"); like `envguard` and `playwrightguard`, it has no non-test source
+
 Run `go list ./...` for the full list.
 
 ## File size
@@ -276,6 +278,12 @@ Run `go list ./...` for the full list.
 Keep a Go source file under about 1000 lines. When one grows past that, move a cohesive group of
 declarations into a new file in the same package (for example `server/sessionstate.go` out of
 `server/sessions.go`). Moves only: don't change behaviour in the same commit.
+
+`sizeguard` (a test-only package) fails when a limit is passed. Split the unit; never raise a limit.
+Defaults per package (a directory of tracked `.go` files, `_test` packages and `package main`
+included): 50 files, 4,500 source lines, 5,000 test lines, 180 `Test` funcs. Per file: 1000 lines
+(test files count). Per type: 50 declared methods (test-file methods and promoted methods ignored).
+Its exception list is empty and stays that way unless a split is proven infeasible.
 
 ## Core principle: gx must be visually beautiful
 
