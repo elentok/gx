@@ -1,4 +1,4 @@
-package sessions_test
+package banners_test
 
 import (
 	"encoding/json"
