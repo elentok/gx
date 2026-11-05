@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -377,14 +378,14 @@ func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
 
-	if m.preview.focus != focusSidebar {
-		t.Fatalf("expected initial focus on the list, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusSidebar {
+		t.Fatalf("expected initial focus on the list, got focus=%v", m.preview.Focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(QueueModel)
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected \"l\" on a leaf row to focus the preview, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected \"l\" on a leaf row to focus the preview, got focus=%v", m.preview.Focus)
 	}
 }
 
@@ -412,8 +413,8 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected enter on already-expanded parent row to focus preview, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected enter on already-expanded parent row to focus preview, got focus=%v", m.preview.Focus)
 	}
 	rows := queueTicketEntries(m)
 	if len(rows) != 2 {
@@ -442,14 +443,14 @@ func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 		m = updated.(QueueModel)
-		if m.preview.focus != focusPreview {
-			t.Fatalf("setup: expected \"l\" to focus preview, got focus=%v", m.preview.focus)
+		if m.preview.Focus != preview.FocusPreview {
+			t.Fatalf("setup: expected \"l\" to focus preview, got focus=%v", m.preview.Focus)
 		}
 
 		updated, _ = m.Update(key)
 		m = updated.(QueueModel)
-		if m.preview.focus != focusSidebar {
-			t.Fatalf("expected %+v to return focus to the list, got focus=%v", key, m.preview.focus)
+		if m.preview.Focus != preview.FocusSidebar {
+			t.Fatalf("expected %+v to return focus to the list, got focus=%v", key, m.preview.Focus)
 		}
 	}
 }

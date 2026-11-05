@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
@@ -23,7 +24,7 @@ func TestTicketStatus_ServerWordWinsOverComputed(t *testing.T) {
 	if got := rowfmt.TicketStatus(epic, tk); got != gxtickets.StatusWaitingForChildren {
 		t.Errorf("TicketStatus = %v, want waiting-for-children", got)
 	}
-	out, _, _ := renderTicketPreview(epic, tk, 80)
+	out, _, _ := preview.RenderTicket(epic, tk, 80)
 	if !strings.Contains(out, "waiting-for-children") {
 		t.Errorf("preview does not show the server's status word:\n%s", out)
 	}

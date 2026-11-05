@@ -291,7 +291,7 @@ func layoutBody(t *testing.T, width int, epicNames ...string) (QueueModel, []str
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 	m = updated.(QueueModel)
-	sidebarW, _ := m.preview.panelWidths(m.width)
+	sidebarW, _ := m.preview.PanelWidths(m.width)
 	var lines []string
 	for _, line := range m.queueBody(sidebarW - 2) {
 		lines = append(lines, strings.TrimRight(ansi.Strip(line), " "))
@@ -302,7 +302,7 @@ func layoutBody(t *testing.T, width int, epicNames ...string) (QueueModel, []str
 func TestQueueEpicHeaderWideLayoutEndsWithCounterAndBar(t *testing.T) {
 	t.Parallel()
 	m, lines := layoutBody(t, 140, "alpha")
-	sidebarW, _ := m.preview.panelWidths(m.width)
+	sidebarW, _ := m.preview.PanelWidths(m.width)
 	var name, status string
 	for i, l := range lines {
 		if strings.Contains(l, "alpha") && name == "" {

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 // actionTranscript opens the ticket's latest session in the Watch agent
@@ -56,7 +57,7 @@ func cmdTranscriptAt(dirs config.Dirs, file, address string, width, index int) t
 		if s.Source == sessionlookup.Missing {
 			return notify.Warning("no transcript found for session " + id)()
 		}
-		md := renderTicketMarkdown(s.Markdown, watchContentWidth(width))
+		md := preview.RenderMarkdown(s.Markdown, watchContentWidth(width))
 		step := func(delta int) tea.Cmd {
 			next := index + delta
 			if next < 0 || next >= n {

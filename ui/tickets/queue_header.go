@@ -138,7 +138,7 @@ const epicBarCells = 12
 // queueBodyWidth is the width of the Queue panel's body: the sidebar less its
 // two border columns.
 func (m QueueModel) queueBodyWidth() int {
-	sidebarW, _ := m.preview.panelWidths(m.width)
+	sidebarW, _ := m.preview.PanelWidths(m.width)
 	return sidebarW - 2
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 const (
@@ -83,7 +84,7 @@ func newTicketsManager() keys.Manager {
 // that entirely since neither manager's Process is ever called twice for the
 // same keystroke.
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if m.preview.focus == focusPreview {
+	if m.preview.Focus == preview.FocusPreview {
 		return m.handlePreviewKey(msg)
 	}
 
@@ -137,14 +138,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsToggleProjectScope:
 			return m.toggleProjectScope()
 		case bindingTicketsTogglePreview:
-			m.preview.togglePreview()
+			m.preview.Toggle()
 			m.sidebarTree.SetVisibleHeight(m.sidebarViewportHeight())
 		case bindingTicketsSelectFirst:
 			m.selectFirstRow()
 		case bindingTicketsSelectLast:
 			m.selectLastRow()
 		case bindingTicketsPreviewBottom:
-			m.preview.previewVP.GotoBottom()
+			m.preview.VP.GotoBottom()
 		case bindingTicketsSuggestedActions:
 			return m.handleSuggestedActionsKey()
 		case bindingTicketsYankSummary:
@@ -179,7 +180,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	next, cmd, result := m.sidebarTree.Update(msg)
 	if result.ExpandNoop {
-		m.preview.focusPreviewPane()
+		m.preview.FocusPreviewPane()
 		return m, cmd
 	}
 	m.sidebarTree = next
@@ -187,7 +188,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd = m.afterSidebarToggle(selectedID, cmd)
 	}
 	if result.OpenSelected {
-		m.preview.focusPreviewPane()
+		m.preview.FocusPreviewPane()
 	}
 	// BindingMoveDown/BindingMoveUp already self-skip non-selectable rows
 	// inside tree.Model.Update (see SetIsSelectable/SkipUnselectable) — no

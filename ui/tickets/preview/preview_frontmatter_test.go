@@ -1,4 +1,4 @@
-package tickets
+package preview
 
 import (
 	"os"
@@ -130,7 +130,7 @@ func TestPreviewEpicContent_ShowsEvolvedAtAndCompletedAt(t *testing.T) {
 		EvolvedAt:   time.Date(2026, 10, 11, 9, 30, 0, 0, time.Local),
 	}
 
-	out := ansi.Strip(previewEpicContent(epic, 80))
+	out := ansi.Strip(EpicContent(epic, 80))
 	for _, want := range []string{"Completed at: 2026-10-10 08:00", "Evolved at: 2026-10-11 09:30"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in epic preview, got:\n%s", want, out)
@@ -140,7 +140,7 @@ func TestPreviewEpicContent_ShowsEvolvedAtAndCompletedAt(t *testing.T) {
 
 func TestPreviewEpicContent_OmitsUnsetTimes(t *testing.T) {
 	t.Parallel()
-	out := ansi.Strip(previewEpicContent(tickets.Epic{Name: "widgets"}, 80))
+	out := ansi.Strip(EpicContent(tickets.Epic{Name: "widgets"}, 80))
 	if strings.Contains(out, "Completed at") || strings.Contains(out, "Evolved at") {
 		t.Fatalf("expected no time rows for an epic without them, got:\n%s", out)
 	}
@@ -148,7 +148,7 @@ func TestPreviewEpicContent_OmitsUnsetTimes(t *testing.T) {
 
 func TestPreviewEpicContent_ShowsPlainEpicBodyAfterRule(t *testing.T) {
 	t.Parallel()
-	out := ansi.Strip(previewEpicContent(tickets.Epic{Name: "widgets", Body: "Implementation of the spec.\n"}, 80))
+	out := ansi.Strip(EpicContent(tickets.Epic{Name: "widgets", Body: "Implementation of the spec.\n"}, 80))
 	rule := strings.Index(out, "─")
 	body := strings.Index(out, "Implementation of the spec.")
 	if rule == -1 || body == -1 || body < rule {
@@ -158,7 +158,7 @@ func TestPreviewEpicContent_ShowsPlainEpicBodyAfterRule(t *testing.T) {
 
 func TestPreviewEpicContent_NoRuleForEmptyBody(t *testing.T) {
 	t.Parallel()
-	out := ansi.Strip(previewEpicContent(tickets.Epic{Name: "widgets", Body: "\n"}, 80))
+	out := ansi.Strip(EpicContent(tickets.Epic{Name: "widgets", Body: "\n"}, 80))
 	if strings.Contains(out, "─") {
 		t.Fatalf("expected no rule for an empty body, got:\n%s", out)
 	}
@@ -173,7 +173,7 @@ func TestWithEpicTicketMD_ReadsServerModeEpicBodyFromDisk(t *testing.T) {
 	}
 	epic := tickets.Epic{Name: "p:widgets", Tickets: []tickets.Ticket{{File: filepath.Join(epicDir, "issues", "01-a.md")}}}
 
-	if got := withEpicTicketMD(epic); got.Body != "Implementation of the spec.\n" {
+	if got := WithEpicTicketMD(epic); got.Body != "Implementation of the spec.\n" {
 		t.Fatalf("expected ticket.md body, got %q", got.Body)
 	}
 }
@@ -187,7 +187,7 @@ func TestWithEpicTicketMD_ReadsServerModeEpicTimesFromDisk(t *testing.T) {
 	}
 	epic := tickets.Epic{Name: "p:widgets", Tickets: []tickets.Ticket{{File: filepath.Join(epicDir, "issues", "01-a.md")}}}
 
-	got := withEpicTicketMD(epic)
+	got := WithEpicTicketMD(epic)
 	if !got.CompletedAt.Equal(time.Date(2026, 10, 10, 8, 0, 0, 0, time.UTC)) || !got.EvolvedAt.Equal(time.Date(2026, 10, 11, 9, 30, 0, 0, time.UTC)) {
 		t.Fatalf("expected ticket.md times, got completed=%v evolved=%v", got.CompletedAt, got.EvolvedAt)
 	}

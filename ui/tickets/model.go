@@ -18,20 +18,11 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
-)
-
-// focusPane is which of the tickets tab's two panels currently receives key
-// input: the sidebar (row navigation/collapse) or the preview (scroll/
-// search over the selected row's rendered body).
-type focusPane int
-
-const (
-	focusSidebar focusPane = iota
-	focusPreview
 )
 
 // Model is the top-level tickets tab model: an epic/ticket sidebar paired
@@ -89,7 +80,7 @@ type Model struct {
 
 	// preview backs the preview panel's own focus/scroll/search state
 	// (see preview_focus.go and model_preview_focus.go).
-	preview previewPane
+	preview preview.Pane
 
 	confirm confirm.Model
 
@@ -143,7 +134,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		sidebarTree:       sidebarTree,
 		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys), settings.About),
 		search:            search.NewModel(),
-		preview:           newPreviewPane(),
+		preview:           preview.NewPane(),
 		confirm:           confirm.New(),
 		explicitCollapsed: map[string]bool{},
 		archivedLazy:      archivedLazy,
@@ -404,9 +395,9 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
-	if m.preview.inPreview(mouse, m.width, m.contentHeight()) {
+	if m.preview.InPreview(mouse, m.width, m.contentHeight()) {
 		if mouse.Button == tea.MouseLeft {
-			m.preview.focusPreviewPane()
+			m.preview.FocusPreviewPane()
 		}
 		return m, nil
 	}
@@ -430,11 +421,11 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 		if _, ok := rowFromEntry(m.sidebarTree.Entries()[idx]); !ok {
 			return m, nil
 		}
-		m.preview.focus = focusSidebar
+		m.preview.Focus = preview.FocusSidebar
 		m.sidebarTree.SetSelectedIndex(idx)
 		return m.handleSuggestedActionsKey()
 	}
-	m.preview.focus = focusSidebar
+	m.preview.Focus = preview.FocusSidebar
 	if idx, ok := m.sidebarTree.EntryAtBodyLine(bodyLine); ok {
 		entry := m.sidebarTree.Entries()[idx]
 		if rowfmt.OnTreeIcon(mouse.X, entry, 0, m.icons()) && m.sidebarTree.ToggleEntry(idx) {
@@ -461,7 +452,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		return m.handleSidebarMouseWheel(msg)
 	}
 	var cmd tea.Cmd
-	m.preview.previewVP, cmd = m.preview.previewVP.Update(msg)
+	m.preview.VP, cmd = m.preview.VP.Update(msg)
 	return m, cmd
 }
 
@@ -519,8 +510,8 @@ func (m Model) activeInputSearch() (search.Model, bool) {
 	if m.search.Mode() == search.SearchModeInput {
 		return m.search, true
 	}
-	if m.preview.previewSearch.Mode() == search.SearchModeInput {
-		return m.preview.previewSearch, true
+	if m.preview.Search.Mode() == search.SearchModeInput {
+		return m.preview.Search, true
 	}
 	return search.Model{}, false
 }
@@ -534,10 +525,10 @@ func (m Model) normalView() string {
 	sidebarH, previewH := m.splitHeight(h)
 
 	sidebarViewportH := m.sidebarViewportHeight()
-	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.preview.focus == focusSidebar, true)
-	previewView := m.renderPanel(previewW, previewH, "Preview", previewSearchMatchStatus(m.preview.previewSearch), renderViewportWithScrollbar(m.preview.previewVP), m.preview.focus == focusPreview, false)
+	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.preview.Focus == preview.FocusSidebar, true)
+	previewView := m.renderPanel(previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, false)
 
-	return m.preview.joinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
+	return m.preview.JoinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
 }
 
 func (m Model) renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {
@@ -560,53 +551,24 @@ func (m Model) searchOverlayWidth() int {
 }
 
 func (m Model) useStackedLayout() bool {
-	return useStackedLayout(m.width)
+	return preview.UseStackedLayout(m.width)
 }
 
 func (m Model) splitWidth() (sidebarW, previewW int) {
-	return m.preview.panelWidths(m.width)
+	return m.preview.PanelWidths(m.width)
 }
 
 // splitHeight divides a stacked tickets view evenly between its selection-
 // driving list and preview. Wide views remain a full-height side-by-side split.
 func (m Model) splitHeight(total int) (sidebarH, previewH int) {
-	return m.preview.panelHeights(m.width, total)
-}
-
-// useStackedLayout, splitPanelWidth and splitPanelHeight are free functions
-// (rather than Model methods) so the Queue tab's own list+preview split
-// (queue_preview.go) can share the exact same layout math instead of
-// re-deriving it - both tabs' panels should size identically at a given
-// terminal width.
-func useStackedLayout(width int) bool {
-	return width <= 100
-}
-
-func splitPanelWidth(width int) (sidebarW, previewW int) {
-	if useStackedLayout(width) {
-		return width, width
-	}
-	w := width - 1
-	sidebarW = w / 2
-	previewW = w - sidebarW
-	return
-}
-
-func splitPanelHeight(width, total int) (sidebarH, previewH int) {
-	if !useStackedLayout(width) {
-		return total, total
-	}
-	total-- // seam row
-	sidebarH = total / 2
-	previewH = total - sidebarH
-	return
+	return m.preview.PanelHeights(m.width, total)
 }
 
 // previewRect returns the preview panel's absolute on-screen bounds,
 // mirroring normalView's layout math so mouse hit-testing (click-to-focus,
 // wheel routing) stays in sync with what's actually rendered.
 func (m Model) previewRect() (x, y, w, h int) {
-	return m.preview.previewRect(m.width, m.contentHeight())
+	return m.preview.Rect(m.width, m.contentHeight())
 }
 
 // sidebarRect returns the sidebar panel's absolute on-screen bounds,

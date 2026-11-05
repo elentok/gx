@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -29,17 +30,17 @@ func (m QueueModel) View() tea.View {
 		// didn't change, rather than always rebuilding from scratch.
 		m.queueTree.SetEntries(m.buildQueueEntriesCached())
 	}
-	sidebarW, previewW := m.preview.panelWidths(m.width)
-	sidebarH, previewH := m.preview.panelHeights(m.width, m.contentHeight())
+	sidebarW, previewW := m.preview.PanelWidths(m.width)
+	sidebarH, previewH := m.preview.PanelHeights(m.width, m.contentHeight())
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.preview.focus == focusSidebar, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.preview.Focus == preview.FocusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
-		previewW, previewH, "Preview", previewSearchMatchStatus(m.preview.previewSearch), renderViewportWithScrollbar(m.preview.previewVP), m.preview.focus == focusPreview, ui.ColorBlue, nil, false,
+		previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, ui.ColorBlue, nil, false,
 	))
 
-	content := m.preview.joinPanels(m.width, sidebarW, sidebarH, queueView, previewView)
+	content := m.preview.JoinPanels(m.width, sidebarW, sidebarH, queueView, previewView)
 
 	if m.ticketMenu.IsOpen {
 		content = m.ticketMenu.Overlay(content, m.menuAnchor(), m.width, m.height)
@@ -120,7 +121,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 	}
 	return tree.RenderOpts[queueNode]{
 		AccentColor: ui.ColorBlue,
-		Active:      m.preview.focus == focusSidebar,
+		Active:      m.preview.Focus == preview.FocusSidebar,
 		Width:       width,
 		// EmptyLine is blank: the header banner's queueIdleBodyLine (queue_header.go)
 		// already covers the empty-selection case with "No selected tickets...".
@@ -150,7 +151,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 							" still waiting on a dependency cycle or a blocker outside the selection",
 					)
 				}
-				return statusErrorStyle.Render("    " + entry.Value.err.Error())
+				return ui.StyleError.Render("    " + entry.Value.err.Error())
 			default: // nodeQueueTicket
 				return m.renderQueueTicketRow(entry.Value.ticket, idxByID[entry.ID])
 			}

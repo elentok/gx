@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 // stubClipboard swaps ticketsClipboardWrite for the test's duration, so these
@@ -72,7 +73,7 @@ func TestEpicTicketMDPath_ServerModeEpicFindsDirFromTicketFile(t *testing.T) {
 		Tickets: []tickets.Ticket{{Path: "proj:my-epic/01", File: file}},
 	}
 
-	got, ok := epicTicketMDPath(epic)
+	got, ok := preview.EpicTicketMDPath(epic)
 
 	want := filepath.Join(root, ".scratch", "my-epic", "ticket.md")
 	if !ok || got != want {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 // selectedQueueRow returns the queue row under m.queueTree's current
@@ -39,7 +40,7 @@ func (m QueueModel) queuePreviewContent(width int) (string, int, bool) {
 	if !ok {
 		return ui.StyleDim.Render("  no ticket selected"), 0, false
 	}
-	return renderTicketPreview(row.epic, row.ticket, width)
+	return preview.RenderTicket(row.epic, row.ticket, width)
 }
 
 // queuePreviewSelectionKey identifies which row the preview is currently
@@ -63,10 +64,10 @@ func (m *QueueModel) syncQueuePreviewViewport() {
 	if !m.ready {
 		return
 	}
-	_, previewW := splitPanelWidth(m.width)
-	_, previewH := splitPanelHeight(m.width, m.contentHeight())
-	width, ht := previewInnerSize(previewW, previewH)
-	contentW := max(width-previewScrollbarGutter, 1)
+	_, previewW := preview.SplitPanelWidth(m.width)
+	_, previewH := preview.SplitPanelHeight(m.width, m.contentHeight())
+	width, ht := preview.InnerSize(previewW, previewH)
+	contentW := max(width-preview.ScrollbarGutter, 1)
 	m.preview.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContentKey(), m.queuePreviewContent)
 }
 
@@ -93,8 +94,8 @@ func (m QueueModel) queuePreviewContentKey() string {
 // "b" jumping to the bottom, and everything else delegated to the viewport's
 // own scrolling.
 func (m QueueModel) handleQueuePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	cmd, res := m.preview.update(msg)
-	if res == previewBack {
+	cmd, res := m.preview.Update(msg)
+	if res == preview.Back {
 		return m, nav.Back()
 	}
 	return m, cmd

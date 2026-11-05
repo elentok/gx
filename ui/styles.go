@@ -70,6 +70,9 @@ var (
 	StyleStatusBehind   = lipgloss.NewStyle().Foreground(ColorYellow)
 	StyleStatusDiverged = lipgloss.NewStyle().Foreground(ColorRed)
 	StyleStatusUnknown  = lipgloss.NewStyle().Foreground(ColorSubtle)
+
+	// StyleError renders an inline error message in the tickets views.
+	StyleError = lipgloss.NewStyle().Foreground(ColorRed).Bold(true)
 )
 
 // Text styles.

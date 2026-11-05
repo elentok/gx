@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 // TestModel_NavigationCanSelectSectionHeaders covers the 03a contract:
@@ -194,8 +195,8 @@ func TestModel_EnterOnExpandedEpicFocusesPreview(t *testing.T) {
 	if !strings.Contains(m.View().Content, "First ticket") {
 		t.Fatalf("expected epic to stay expanded after enter, got:\n%s", m.View().Content)
 	}
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected enter on already-expanded epic to focus preview, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected enter on already-expanded epic to focus preview, got focus=%v", m.preview.Focus)
 	}
 }
 
@@ -224,14 +225,14 @@ func TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview(t *testing.T) {
 	if !strings.Contains(m.View().Content, "First ticket") {
 		t.Fatalf("expected first enter to expand the collapsed epic, got:\n%s", m.View().Content)
 	}
-	if m.preview.focus != focusSidebar {
-		t.Fatalf("expected first enter on collapsed epic to keep sidebar focus, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusSidebar {
+		t.Fatalf("expected first enter on collapsed epic to keep sidebar focus, got focus=%v", m.preview.Focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected second enter on now-expanded epic to focus preview, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected second enter on now-expanded epic to focus preview, got focus=%v", m.preview.Focus)
 	}
 }
 

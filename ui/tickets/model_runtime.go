@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 // editFileFinishedMsg reports the outcome of an edit-chord launch, mirroring
@@ -76,7 +77,7 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 	}
 	epic := m.epicAt(r)
 	if r.isEpic() {
-		path, ok := epicTicketMDPath(epic)
+		path, ok := preview.EpicTicketMDPath(epic)
 		if !ok {
 			return "", false, "epic has no ticket.md to edit"
 		}

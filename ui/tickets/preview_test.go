@@ -9,12 +9,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
-	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
@@ -252,10 +250,10 @@ func TestModel_BJumpsPreviewToBottomFromListFocus(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
-	if m.preview.focus != focusSidebar {
-		t.Fatalf("expected 'b' to leave focus on the sidebar, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusSidebar {
+		t.Fatalf("expected 'b' to leave focus on the sidebar, got focus=%v", m.preview.Focus)
 	}
-	content := ansi.Strip(m.preview.previewVP.View())
+	content := ansi.Strip(m.preview.VP.View())
 	if !strings.Contains(content, "BOTTOMMARKERXYZ") {
 		t.Fatalf("expected preview scrolled to bottom marker, got:\n%s", content)
 	}
@@ -280,16 +278,16 @@ func TestModel_BJumpsPreviewToBottomFromPreviewFocus(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.preview.Focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected 'b' to leave focus on the preview, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected 'b' to leave focus on the preview, got focus=%v", m.preview.Focus)
 	}
-	content := ansi.Strip(m.preview.previewVP.View())
+	content := ansi.Strip(m.preview.VP.View())
 	if !strings.Contains(content, "BOTTOMMARKERXYZ") {
 		t.Fatalf("expected preview scrolled to bottom marker, got:\n%s", content)
 	}
@@ -317,8 +315,8 @@ func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.preview.Focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Text: "/"})
@@ -330,49 +328,11 @@ func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 
-	content := m.preview.previewVP.GetContent()
+	content := m.preview.VP.GetContent()
 	if !strings.Contains(ansi.Strip(content), "distinctive body prose") {
 		t.Fatalf("expected body text still present in preview, got:\n%s", ansi.Strip(content))
 	}
 	if !strings.Contains(content, ui.StyleActiveSearchResult.Render("prose")) {
 		t.Fatalf("expected 'prose' wrapped in the active search-highlight style, got:\n%s", content)
-	}
-}
-
-// A server-mode ticket carries no body, only its file: the preview reads the
-// body from there.
-func TestRenderTicketPreview_ReadsBodyFromFileWhenMissing(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "20-a.md")
-	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nThe body text.\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	ticket := tickets.Ticket{Identifier: "20", Title: "A", Path: "gx:alpha/20", File: file, Status: "draft"}
-
-	content, _, _ := renderTicketPreview(tickets.Epic{Tickets: []tickets.Ticket{ticket}}, ticket, 80)
-
-	if !strings.Contains(ansi.Strip(content), "The body text.") {
-		t.Errorf("preview has no body:\n%s", ansi.Strip(content))
-	}
-}
-
-func TestRenderTicketPreview_PausedAnswerAppendsPauseRounds(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "20-a.md")
-	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: paused\npause_reason: blocked-pane\ntype: research\n---\n\n# 20 — A\n\nThe body text.\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tickets.AppendLog(file, tickets.LogEvent{Type: tickets.EventPauseQuestion, Summary: "Which store?", Text: "Details."}); err != nil {
-		t.Fatal(err)
-	}
-	rendered := tickets.StatusPausedAnswer
-	ticket := tickets.Ticket{Identifier: "20", Title: "A", Path: "gx:alpha/20", File: file, Status: string(schema.StatusPaused), PauseReason: schema.PauseBlockedPane, Rendered: &rendered}
-
-	content, target, ok := renderTicketPreview(tickets.Epic{Tickets: []tickets.Ticket{ticket}}, ticket, 80)
-
-	lines := strings.Split(ansi.Strip(content), "\n")
-	if !ok || target >= len(lines) || lines[target] != "1. open: Which store?" {
-		t.Fatalf("ok=%v target=%d, want the latest round line in:\n%s", ok, target, strings.Join(lines, "\n"))
-	}
-	if !strings.Contains(strings.Join(lines, "\n"), rowfmt.PausedAnswerHint) {
-		t.Errorf("preview lacks the answer hint:\n%s", strings.Join(lines, "\n"))
 	}
 }

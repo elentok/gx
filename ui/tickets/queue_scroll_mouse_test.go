@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 // TestQueueModelScrollsWithKeysAndMouse covers ticket 25's third request: the
@@ -99,8 +100,8 @@ func queueModelForHoverScroll(t *testing.T) QueueModel {
 	m = updated.(QueueModel)
 	m = selectFirstQueueTicketRow(t, m)
 
-	if m.queueTree.ScrollOffset() != 0 || m.preview.previewVP.YOffset() != 0 {
-		t.Fatalf("expected both panes to start unscrolled, got tree=%d preview=%d", m.queueTree.ScrollOffset(), m.preview.previewVP.YOffset())
+	if m.queueTree.ScrollOffset() != 0 || m.preview.VP.YOffset() != 0 {
+		t.Fatalf("expected both panes to start unscrolled, got tree=%d preview=%d", m.queueTree.ScrollOffset(), m.preview.VP.YOffset())
 	}
 	return m
 }
@@ -115,7 +116,7 @@ func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
 	t.Run("focus pinned to preview, hover over tree scrolls tree", func(t *testing.T) {
 		t.Parallel()
 		m := queueModelForHoverScroll(t)
-		m.preview.focus = focusPreview
+		m.preview.Focus = preview.FocusPreview
 
 		updated, _ := m.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown})
 		m = updated.(QueueModel)
@@ -123,31 +124,31 @@ func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
 		if m.queueTree.ScrollOffset() == 0 {
 			t.Fatalf("expected hovering the tree to scroll it")
 		}
-		if m.preview.previewVP.YOffset() != 0 {
-			t.Fatalf("expected the preview's scroll offset to stay unchanged, got %d", m.preview.previewVP.YOffset())
+		if m.preview.VP.YOffset() != 0 {
+			t.Fatalf("expected the preview's scroll offset to stay unchanged, got %d", m.preview.VP.YOffset())
 		}
-		if m.preview.focus != focusPreview {
-			t.Fatalf("expected focus to stay on the preview, got %v", m.preview.focus)
+		if m.preview.Focus != preview.FocusPreview {
+			t.Fatalf("expected focus to stay on the preview, got %v", m.preview.Focus)
 		}
 	})
 
 	t.Run("focus pinned to tree, hover over preview scrolls preview", func(t *testing.T) {
 		t.Parallel()
 		m := queueModelForHoverScroll(t)
-		m.preview.focus = focusSidebar
+		m.preview.Focus = preview.FocusSidebar
 
 		px, _, _, _ := m.previewRect()
 		updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
 		m = updated.(QueueModel)
 
-		if m.preview.previewVP.YOffset() == 0 {
+		if m.preview.VP.YOffset() == 0 {
 			t.Fatalf("expected hovering the preview to scroll it")
 		}
 		if m.queueTree.ScrollOffset() != 0 {
 			t.Fatalf("expected the tree's scroll offset to stay unchanged, got %d", m.queueTree.ScrollOffset())
 		}
-		if m.preview.focus != focusSidebar {
-			t.Fatalf("expected focus to stay on the tree, got %v", m.preview.focus)
+		if m.preview.Focus != preview.FocusSidebar {
+			t.Fatalf("expected focus to stay on the tree, got %v", m.preview.Focus)
 		}
 	})
 }
@@ -164,7 +165,7 @@ func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	m = selectFirstQueueTicketRow(t, m)
 
 	treeBefore := m.queueTree.ScrollOffset()
-	previewBefore := m.preview.previewVP.YOffset()
+	previewBefore := m.preview.VP.YOffset()
 
 	px, _, _, _ := m.previewRect()
 	updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
@@ -175,8 +176,8 @@ func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	if m.queueTree.ScrollOffset() != treeBefore {
 		t.Fatalf("expected tree scroll offset unchanged, got %d want %d", m.queueTree.ScrollOffset(), treeBefore)
 	}
-	if m.preview.previewVP.YOffset() != previewBefore {
-		t.Fatalf("expected preview scroll offset unchanged, got %d want %d", m.preview.previewVP.YOffset(), previewBefore)
+	if m.preview.VP.YOffset() != previewBefore {
+		t.Fatalf("expected preview scroll offset unchanged, got %d want %d", m.preview.VP.YOffset(), previewBefore)
 	}
 }
 
@@ -322,7 +323,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	}
 	rowY := func(entryIdx int) int { return 1 + queueHeaderReservedLines + entryIdx }
 	start := m.queueTree.SelectedIndex()
-	px, py, _, _ := m.preview.previewRect(m.width, m.contentHeight())
+	px, py, _, _ := m.preview.Rect(m.width, m.contentHeight())
 
 	for name, click := range map[string]tea.MouseClickMsg{
 		"preview": {Button: tea.MouseRight, X: px, Y: py},
@@ -402,16 +403,16 @@ func TestQueueModelClickInsidePreviewBoundsFocusesIt(t *testing.T) {
 	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
-	if m.preview.focus != focusSidebar {
-		t.Fatalf("expected initial focus on sidebar, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusSidebar {
+		t.Fatalf("expected initial focus on sidebar, got focus=%v", m.preview.Focus)
 	}
 
 	px, py, _, _ := m.previewRect()
 	updated, _ := m.Update(tea.MouseClickMsg{X: px + 1, Y: py + 1, Button: tea.MouseLeft})
 	m = updated.(QueueModel)
 
-	if m.preview.focus != focusPreview {
-		t.Fatalf("expected preview focus after click inside preview bounds, got focus=%v", m.preview.focus)
+	if m.preview.Focus != preview.FocusPreview {
+		t.Fatalf("expected preview focus after click inside preview bounds, got focus=%v", m.preview.Focus)
 	}
 }
 
@@ -430,7 +431,7 @@ func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	m = selectFirstQueueTicketRow(t, m)
 
-	initial := ansi.Strip(m.preview.previewVP.View())
+	initial := ansi.Strip(m.preview.VP.View())
 	if !strings.Contains(initial, "TOPMARKERXYZ") {
 		t.Fatalf("expected top marker visible before scrolling, got:\n%s", initial)
 	}
@@ -441,7 +442,7 @@ func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(QueueModel)
 
-	scrolled := ansi.Strip(m.preview.previewVP.View())
+	scrolled := ansi.Strip(m.preview.VP.View())
 	if !strings.Contains(scrolled, "BOTTOMMARKERXYZ") {
 		t.Fatalf("expected 'b' to scroll the preview down to the bottom marker, got:\n%s", scrolled)
 	}

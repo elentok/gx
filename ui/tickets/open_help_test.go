@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 func TestOpenHelp_TicketsOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
@@ -41,16 +42,16 @@ func TestOpenHelp_TicketsEndsPreviewSearch(t *testing.T) {
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	m.preview.focus = focusPreview
-	m.preview.previewSearch.Start("body")
+	m.preview.Focus = preview.FocusPreview
+	m.preview.Search.Start("body")
 	updated, _ = m.Update(nav.OpenHelp()())
 	m = updated.(Model)
 
 	if !m.help.IsOpen {
 		t.Fatal("OpenHelp did not open help")
 	}
-	if m.preview.previewSearch.Mode() != search.SearchModeNone || m.preview.previewSearch.Query() != "" {
-		t.Fatalf("preview search not ended: mode %v query %q", m.preview.previewSearch.Mode(), m.preview.previewSearch.Query())
+	if m.preview.Search.Mode() != search.SearchModeNone || m.preview.Search.Query() != "" {
+		t.Fatalf("preview search not ended: mode %v query %q", m.preview.Search.Mode(), m.preview.Search.Query())
 	}
 }
 

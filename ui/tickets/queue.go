@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
@@ -118,7 +119,7 @@ type QueueModel struct {
 	// with the Tickets tab (see preview_focus.go). Its focus field is set by
 	// "l"/"right"/"enter" and "h"/"left"/"esc" (see handleQueueKey and
 	// handleQueuePreviewKey in queue_preview.go).
-	preview previewPane
+	preview preview.Pane
 
 	// serverAPI/serverStart/link back the server-down banner (see
 	// queue_server_down.go). link is only ever set by WithServerState; a tab
@@ -167,7 +168,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		queueTree:        queueTree,
 		entriesCache:     &queueEntriesCache{},
 		help:             help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys), settings.About),
-		preview:          newPreviewPane(),
+		preview:          preview.NewPane(),
 	}
 }
 
@@ -310,7 +311,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "esc" {
 			m.ticketMenuPending = ""
 		}
-		if m.preview.focus == focusPreview {
+		if m.preview.Focus == preview.FocusPreview {
 			return m.handleQueuePreviewKey(msg)
 		}
 		if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
@@ -369,7 +370,7 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 	}
 	if idx == 1 {
 		var cmd tea.Cmd
-		m.preview.previewVP, cmd = m.preview.previewVP.Update(msg)
+		m.preview.VP, cmd = m.preview.VP.Update(msg)
 		return m, cmd
 	}
 	m.queueTree.ScrollViewport(dir * ui.WheelScrollLines)
@@ -380,8 +381,8 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 // mirroring previewRect's layout math (same splitPanelWidth/splitPanelHeight
 // call) for the Queue tab's own panel pair.
 func (m QueueModel) queueTreeRect() ui.Rect {
-	sidebarW, _ := m.preview.panelWidths(m.width)
-	sidebarH, _ := m.preview.panelHeights(m.width, m.contentHeight())
+	sidebarW, _ := m.preview.PanelWidths(m.width)
+	sidebarH, _ := m.preview.PanelHeights(m.width, m.contentHeight())
 	return ui.Rect{X: 0, Y: 0, W: sidebarW, H: sidebarH}
 }
 
@@ -400,7 +401,7 @@ func (m QueueModel) contentHeight() int {
 // previewRect returns the preview panel's absolute on-screen bounds,
 // mirroring Model.previewRect for the Queue tab's own layout.
 func (m QueueModel) previewRect() (x, y, w, h int) {
-	return m.preview.previewRect(m.width, m.contentHeight())
+	return m.preview.Rect(m.width, m.contentHeight())
 }
 
 // handleQueueMouseClick selects the row under the click without triggering
@@ -414,9 +415,9 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
-	if m.preview.inPreview(mouse, m.width, m.contentHeight()) {
+	if m.preview.InPreview(mouse, m.width, m.contentHeight()) {
 		if mouse.Button == tea.MouseLeft {
-			m.preview.focusPreviewPane()
+			m.preview.FocusPreviewPane()
 		}
 		return m, nil
 	}
@@ -570,7 +571,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, notify.Info(label)
 		case bindingQueueTogglePreview:
-			m.preview.togglePreview()
+			m.preview.Toggle()
 			m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		case bindingQueueEditInPlace:
 			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
@@ -591,7 +592,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueSelectLast:
 			m.selectLastRow()
 		case bindingQueuePreviewBottom:
-			m.preview.previewVP.GotoBottom()
+			m.preview.VP.GotoBottom()
 		case bindingQueueReload:
 			// The shell owns the connection and the snapshot; it hands the result
 			// back as state.
@@ -642,7 +643,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// leaves-are-a-no-op behavior).
 	next, cmd, result := m.queueTree.Update(msg)
 	if result.ExpandNoop {
-		m.preview.focusPreviewPane()
+		m.preview.FocusPreviewPane()
 		return m, cmd
 	}
 	m.queueTree = next
@@ -653,7 +654,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if result.OpenSelected {
-		m.preview.focusPreviewPane()
+		m.preview.FocusPreviewPane()
 	}
 	return m, cmd
 }
@@ -760,6 +761,6 @@ func (m *QueueModel) selectFocusEpic() {
 // (splitPanelHeight), since a stacked (narrow-terminal) layout shares the
 // available height with the preview pane below it.
 func (m QueueModel) queueViewportHeight() int {
-	sidebarH, _ := m.preview.panelHeights(m.width, m.contentHeight())
+	sidebarH, _ := m.preview.PanelHeights(m.width, m.contentHeight())
 	return max(sidebarH-1, 0)
 }

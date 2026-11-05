@@ -1,4 +1,4 @@
-package tickets
+package preview
 
 import (
 	"strconv"

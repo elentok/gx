@@ -1,4 +1,4 @@
-package tickets
+package preview
 
 import (
 	"errors"
@@ -24,7 +24,7 @@ var previewRuleStyle = lipgloss.NewStyle().Foreground(ui.ColorSurface1)
 // body for the scroll indicator (1 gap + 1 bar). It is always reserved so
 // the body's wrap width - and thus the layout - doesn't shift depending on
 // whether the selected ticket's body actually overflows.
-const previewScrollbarGutter = 2
+const ScrollbarGutter = 2
 
 // previewPanelPaddingX and previewPanelHeaderRow mirror
 // ui.PanelOptionsFor's fixed PaddingX: 1, PaddingY: 0 for every panel this
@@ -40,7 +40,7 @@ const (
 // padding, height less its header row. A free function (rather than a Model
 // method) so the flat ralph-loop TUI (see flat.go) can share it without a
 // tree-shaped Model of its own.
-func previewInnerSize(previewW, h int) (width, height int) {
+func InnerSize(previewW, h int) (width, height int) {
 	width = max(previewW-2*previewPanelPaddingX, 1)
 	height = max(h-previewPanelHeaderRow, 1)
 	return
@@ -49,7 +49,7 @@ func previewInnerSize(previewW, h int) (width, height int) {
 // renderViewportWithScrollbar pairs a viewport's currently visible lines
 // with its scroll indicator. Free function shared with the flat ralph-loop
 // TUI's own preview panel (see flat.go).
-func renderViewportWithScrollbar(vp viewport.Model) []string {
+func RenderViewportWithScrollbar(vp viewport.Model) []string {
 	body := strings.Split(vp.View(), "\n")
 	bar := ui.RenderScrollbar(vp.Height(), vp.TotalLineCount(), vp.VisibleLineCount(), vp.YOffset())
 	if bar == "" {
@@ -78,7 +78,7 @@ func renderViewportWithScrollbar(vp viewport.Model) []string {
 // implementations. The second and third return values are the pause
 // section's line index within the returned content and whether one was
 // found, for the caller to auto-scroll to.
-func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string, int, bool) {
+func RenderTicket(epic tickets.Epic, t tickets.Ticket, width int) (string, int, bool) {
 	status := rowfmt.TicketStatus(epic, t)
 
 	var b strings.Builder
@@ -88,12 +88,12 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 	b.WriteString("\n")
 	text, err := ticketBody(t)
 	if err != nil {
-		b.WriteString(statusErrorStyle.Render("  error reading ticket file: " + err.Error()))
+		b.WriteString(ui.StyleError.Render("  error reading ticket file: " + err.Error()))
 		return b.String(), 0, false
 	}
 
 	prefixLines := strings.Count(b.String(), "\n")
-	body, target, ok := highlightPauseSection(renderTicketMarkdown(text, width), status)
+	body, target, ok := highlightPauseSection(RenderMarkdown(text, width), status)
 	if ok {
 		target += prefixLines
 	}
@@ -210,7 +210,7 @@ func highlightPauseSection(rendered string, status tickets.RenderedStatus) (out 
 // previewEpicContent renders an epic row's preview: a header line, plus a
 // rule and its ticket.md body rendered through the same glamour path as a
 // ticket body. An empty body gets no rule.
-func previewEpicContent(epic tickets.Epic, width int) string {
+func EpicContent(epic tickets.Epic, width int) string {
 	header := previewEpicHeaderLine(epic)
 	if fields := epicFrontmatterFields(epic); len(fields) > 0 {
 		header += "\n" + renderFrontmatterFields(fields, width)
@@ -224,14 +224,14 @@ func previewEpicContent(epic tickets.Epic, width int) string {
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
 	b.WriteString("\n")
-	b.WriteString(renderTicketMarkdown(epic.Body, width))
+	b.WriteString(RenderMarkdown(epic.Body, width))
 	return b.String()
 }
 
 // withEpicTicketMD fills a server-mode epic's ticket.md body and timestamps.
 // The snapshot carries tickets only, so they are read from the epic directory
 // that holds the first ticket's file (<epic>/issues/<ticket>.md).
-func withEpicTicketMD(epic tickets.Epic) tickets.Epic {
+func WithEpicTicketMD(epic tickets.Epic) tickets.Epic {
 	if epic.HasTicketMD || len(epic.Tickets) == 0 || epic.Tickets[0].File == "" {
 		return epic
 	}
@@ -242,7 +242,7 @@ func withEpicTicketMD(epic tickets.Epic) tickets.Epic {
 
 // epicTicketMDPath is epic's ticket.md file. A server-mode epic's Path is its
 // name, not a directory, so its directory is found from a ticket's file.
-func epicTicketMDPath(epic tickets.Epic) (string, bool) {
+func EpicTicketMDPath(epic tickets.Epic) (string, bool) {
 	if !epic.HasTicketMD {
 		if len(epic.Tickets) == 0 || epic.Tickets[0].File == "" {
 			return "", false

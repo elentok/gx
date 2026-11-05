@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -35,8 +36,7 @@ var (
 	// text): "done" is a permanent, low-priority state that should read as
 	// clearly less prominent than everything else in the row, not merely
 	// muted.
-	statusDoneStyle  = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
-	statusErrorStyle = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
+	statusDoneStyle = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
 
 	// suggestedActionBadgeStyle renders the "m"-menu badge (ticketHasSuggestedActions)
 	// distinct from every status color so it reads as an affordance, not a
@@ -69,7 +69,7 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 
 	return tree.RenderOpts[sidebarNode]{
 		AccentColor: ui.ColorBlue,
-		Active:      m.preview.focus == focusSidebar,
+		Active:      m.preview.Focus == preview.FocusSidebar,
 		Width:       width,
 		EmptyLine:   ui.StyleDim.Render("  loading…"),
 		Label: func(entry tree.Entry[sidebarNode]) string {
@@ -87,7 +87,7 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 			case nodeLoading:
 				return ui.StyleDim.Render("loading…")
 			case nodeLoadError:
-				return statusErrorStyle.Render("failed to load: " + m.archivedLazy.Err().Error())
+				return ui.StyleError.Render("failed to load: " + m.archivedLazy.Err().Error())
 			case nodeEpic:
 				r, _ := rowFromEntry(entry)
 				return m.renderEpicRow(m.epicAt(r))
@@ -262,7 +262,7 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 	case tickets.StatusDone, tickets.StatusCancelled:
 		return icons.TicketDone, statusDoneStyle
 	default: // tickets.StatusError
-		return icons.TicketError, statusErrorStyle
+		return icons.TicketError, ui.StyleError
 	}
 }
 

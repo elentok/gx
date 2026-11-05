@@ -2,13 +2,12 @@ package tickets
 
 import (
 	"fmt"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/tickets/preview"
 )
 
 // previewSelectionKey identifies which row's content the preview is
@@ -37,8 +36,8 @@ func (m *Model) syncPreviewViewport() {
 	}
 	_, previewW := m.splitWidth()
 	_, previewH := m.splitHeight(m.contentHeight())
-	width, height := previewInnerSize(previewW, previewH)
-	contentW := max(width-previewScrollbarGutter, 1)
+	width, height := preview.InnerSize(previewW, previewH)
+	contentW := max(width-preview.ScrollbarGutter, 1)
 
 	m.preview.Sync(contentW, height, m.previewSelectionKey(), "", m.previewContent)
 }
@@ -56,86 +55,18 @@ func (m Model) previewContent(width int) (string, int, bool) {
 		return ui.StyleDim.Render("  no ticket selected"), 0, false
 	}
 	if r.isEpic() {
-		return previewEpicContent(withEpicTicketMD(m.epicAt(r)), width), 0, false
+		return preview.EpicContent(preview.WithEpicTicketMD(m.epicAt(r)), width), 0, false
 	}
 
 	epic := m.epicAt(r)
 	t := epic.Tickets[r.ticketIdx]
-	return renderTicketPreview(epic, t, width)
-}
-
-// highlightPreviewLine wraps query's first match on an already
-// glamour-rendered (ANSI-styled) line in the search-highlight style. It
-// mirrors search.Highlight's byte-offset matching, but walks ANSI sequences
-// before rebuilding the line so it never splits an escape sequence. ANSI
-// styling inside the matched run is deliberately replaced by the overlay;
-// preserving it would let its resets cancel the search highlight.
-func highlightPreviewLine(line, query string, current bool) string {
-	plain := ansi.Strip(line)
-	lower := strings.ToLower(plain)
-	lq := strings.ToLower(query)
-	idx := strings.Index(lower, lq)
-	if idx < 0 {
-		return line
-	}
-	end := min(idx+len(query), len(plain))
-
-	style := ui.StyleSearchResult
-	if current {
-		style = ui.StyleActiveSearchResult
-	}
-
-	var prefix, matched, suffix strings.Builder
-	state := ansi.NormalState
-	plainOffset := 0
-	matchStarted := false
-	matchEnded := false
-	for rest := line; len(rest) > 0; {
-		seq, _, n, nextState := ansi.DecodeSequence(rest, state, nil)
-		if n == 0 {
-			// DecodeSequence only returns zero for malformed input. Copy its
-			// remaining bytes unchanged rather than risking an infinite loop.
-			suffix.WriteString(rest)
-			break
-		}
-		state = nextState
-		rest = rest[n:]
-
-		plainSeq := ansi.Strip(seq)
-		if plainSeq == "" {
-			switch {
-			case !matchStarted:
-				prefix.WriteString(seq)
-			case matchEnded:
-				suffix.WriteString(seq)
-			}
-			continue
-		}
-
-		seqStart := plainOffset
-		plainOffset += len(plainSeq)
-		if seqStart < end && plainOffset > idx {
-			matchStarted = true
-			matched.WriteString(plainSeq)
-			continue
-		}
-		if matchStarted {
-			matchEnded = true
-		}
-		if plainOffset <= idx {
-			prefix.WriteString(seq)
-		} else {
-			suffix.WriteString(seq)
-		}
-	}
-
-	return prefix.String() + style.Render(matched.String()) + suffix.String()
+	return preview.RenderTicket(epic, t, width)
 }
 
 // handlePreviewKey routes a key to the preview pane while it has focus.
 func (m Model) handlePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	cmd, res := m.preview.update(msg)
-	if res == previewBack {
+	cmd, res := m.preview.Update(msg)
+	if res == preview.Back {
 		return m, nav.Back()
 	}
 	return m, cmd

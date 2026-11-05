@@ -1,4 +1,4 @@
-package tickets
+package preview
 
 import (
 	"fmt"
@@ -96,7 +96,7 @@ func renderWithCachedRenderer(body string, width int) (string, error) {
 // through glamour, word-wrapped to width. Falls back to the raw body on a
 // renderer error (malformed style construction only - never a property of
 // the markdown itself) so the preview panel never blanks out.
-func renderTicketMarkdown(body string, width int) string {
+func RenderMarkdown(body string, width int) string {
 	if width < 1 {
 		width = 1
 	}

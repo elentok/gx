@@ -1,4 +1,4 @@
-package tickets
+package preview
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ import (
 
 // previewSearchMatchStatus formats a preview search's current match
 // position, shown as its panel's right-aligned header text.
-func previewSearchMatchStatus(s search.Model) string {
+func SearchMatchStatus(s search.Model) string {
 	if s.HasQuery() && s.MatchesCount() > 0 {
 		return fmt.Sprintf("%d/%d matches", s.Cursor()+1, s.MatchesCount())
 	}

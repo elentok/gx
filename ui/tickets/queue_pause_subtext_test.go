@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/testutil"
@@ -16,7 +15,6 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
-	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -62,59 +60,6 @@ func TestQueueModel_DraftRowUnaffectedByPauseRendering(t *testing.T) {
 	rowText := ansi.Strip(strings.Join(lines, "\n"))
 	if strings.Contains(rowText, "Leftover text that must not surface.") {
 		t.Fatalf("expected draft row to omit pause subtext:\n%s", rowText)
-	}
-}
-
-// TestHighlightPauseSection_PausedRepairRed covers the preview's paused (repair)
-// coloring: the heading is red, and paused (answer) is left to the rounds block.
-func TestHighlightPauseSection_PausedRepairRed(t *testing.T) {
-	t.Parallel()
-	rendered := "intro\n" + rowfmt.PausedRepairHeading + "\nsome reason\n"
-	out, target, ok := highlightPauseSection(rendered, tickets.StatusPausedRepair)
-	if !ok || target != 1 {
-		t.Fatalf("highlightPauseSection() ok=%v target=%d, want ok=true target=1", ok, target)
-	}
-	wantRed := lipgloss.NewStyle().Foreground(ui.ColorRed).Render(rowfmt.PausedRepairHeading)
-	if !strings.Contains(out, wantRed) {
-		t.Fatalf("expected paused (repair) heading styled red in:\n%s", out)
-	}
-	if _, _, ok := highlightPauseSection(rendered, tickets.StatusPausedAnswer); ok {
-		t.Fatal("paused (answer) must not highlight a body section")
-	}
-}
-
-func TestRenderPauseRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
-	t.Parallel()
-	events := []tickets.LogEvent{
-		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "First?"},
-		{Seq: 2, Type: tickets.EventPauseAnswer, Question: 1, Choice: "yes"},
-		{Seq: 3, Type: tickets.EventPauseQuestion, Summary: "Second?", Text: "detail"},
-	}
-	block, line, ok := renderPauseRoundsBlock(events, 80)
-	if !ok {
-		t.Fatal("found = false, want true")
-	}
-	lines := strings.Split(block, "\n")
-	if got := ansi.Strip(lines[line]); got != "2. open: Second?" {
-		t.Errorf("latest line = %q (index %d), want the second round", got, line)
-	}
-	orange := lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	if !strings.Contains(lines[line], orange.Render("2. open: Second?")) ||
-		!strings.Contains(lines[line+1], orange.Render("   detail")) {
-		t.Errorf("latest round not orange:\n%q", lines[line:])
-	}
-	if strings.Contains(strings.Join(lines[:line], "\n"), orange.Render("1.")) {
-		t.Errorf("earlier rounds must stay plain:\n%q", lines[:line])
-	}
-	if !strings.Contains(lines[1], rowfmt.PausedAnswerHint) {
-		t.Errorf("hint missing under the heading: %q", lines[1])
-	}
-}
-
-func TestRenderPauseRoundsBlock_NoRoundsIsNotFound(t *testing.T) {
-	t.Parallel()
-	if _, _, ok := renderPauseRoundsBlock(nil, 80); ok {
-		t.Error("found = true, want false")
 	}
 }
 

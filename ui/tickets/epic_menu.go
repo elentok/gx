@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -252,7 +253,7 @@ func epicFile(store string, epic tickets.Epic) (string, error) {
 	if project, name, ok := tickets.ParseEpicAddress(epic.Path); ok {
 		return tickets.EpicTicketMDPath(filepath.Join(store, project), project, name)
 	}
-	if path, ok := epicTicketMDPath(epic); ok {
+	if path, ok := preview.EpicTicketMDPath(epic); ok {
 		return path, nil
 	}
 	return "", fmt.Errorf("epic %s has no ticket.md", epic.Name)

@@ -1,4 +1,4 @@
-package tickets
+package preview
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 )
 
 func TestPreviewFocusSync_ReusesContentForSameKeyAndWidth(t *testing.T) {
-	p := newPreviewPane()
+	p := NewPane()
 	calls := 0
 	contentFor := func(width int) (string, int, bool) {
 		calls++
@@ -31,7 +31,7 @@ func TestPreviewFocusSync_ReusesContentForSameKeyAndWidth(t *testing.T) {
 }
 
 func TestPreviewFocusSync_EmptyKeyNeverCaches(t *testing.T) {
-	p := newPreviewPane()
+	p := NewPane()
 	calls := 0
 	contentFor := func(width int) (string, int, bool) {
 		calls++
@@ -45,22 +45,22 @@ func TestPreviewFocusSync_EmptyKeyNeverCaches(t *testing.T) {
 }
 
 func TestPreviewFocusSync_CachedContentStillShownAfterSelectionChange(t *testing.T) {
-	p := newPreviewPane()
+	p := NewPane()
 	contentFor := func(width int) (string, int, bool) { return "one\ntwo\nthree", 2, true }
 
 	p.Sync(40, 2, "a", "key1", contentFor)
 	p.Sync(40, 2, "b", "key1", contentFor)
-	if !strings.Contains(p.previewVP.GetContent(), "three") {
-		t.Fatalf("viewport lost its content: %q", p.previewVP.GetContent())
+	if !strings.Contains(p.VP.GetContent(), "three") {
+		t.Fatalf("viewport lost its content: %q", p.VP.GetContent())
 	}
-	if p.previewVP.YOffset() == 0 {
+	if p.VP.YOffset() == 0 {
 		t.Fatal("cached scroll target ignored on selection change")
 	}
 }
 
 func TestRenderTicketMarkdown_ReusesRendererPerWidth(t *testing.T) {
-	a := renderTicketMarkdown("# Hi", 40)
-	b := renderTicketMarkdown("# Hi", 40)
+	a := RenderMarkdown("# Hi", 40)
+	b := RenderMarkdown("# Hi", 40)
 	if a != b || !strings.Contains(a, "Hi") {
 		t.Fatalf("renders differ: %q vs %q", a, b)
 	}
