@@ -667,12 +667,6 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	}
 }
 
-// leaveIterationWith is leaveIteration with work as what the agent did in its worktree.
-func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo, runner string, work func(wtPath string)) (string, string) {
-	t.Helper()
-	return h.LeaveHerdrRun(t, store, repo, epicA01, runner, work)
-}
-
 func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

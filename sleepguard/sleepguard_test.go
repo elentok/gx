@@ -61,6 +61,7 @@ var allowed = map[string]int{
 	"nativerunner/holder/holderanswer_test.go":             1, // negative wait: a request mismatch sends no key
 	"nativerunner/holder/holderattach_test.go":             1,
 	"nativerunner/holder/holderwatch_test.go":              1,
+	"nativerunner/shorttempdir_test.go":                    1,
 	"nativerunner/pty_pending_test.go":                     1,
 	"nativerunner/pty_ratelimit_test.go":                   1, // negative wait: another API error never marks the session limited
 	"nativerunner/pty_test.go":                             1,
@@ -81,7 +82,7 @@ var allowed = map[string]int{
 	"server/disk/diskhold_test.go":                         3,
 	"server/disk/diskwatch_test.go":                        3,
 	"server/merge/handmerged_test.go":                      1,
-	"server/headless_block_reclaim_test.go":                2,
+	"server/sched/headless_block_reclaim_test.go":          2,
 	"server/health/healthprocs_test.go":                    4,
 	"server/merge/latefinish_test.go":                      1,
 	"server/limits/limithistory_codex_test.go":             2, // settle wait for the event coalescer; received-at has second granularity
@@ -94,7 +95,7 @@ var allowed = map[string]int{
 	"server/merge/missingtrunk_test.go":                    2,
 	"server/queue/oneoffsweep_test.go":                     2,
 	"server/queue/pause_test.go":                           1,
-	"server/reclaim_waiting_test.go":                       1,
+	"server/sched/reclaim_waiting_test.go":                 1,
 	"server/ratelimit_claim_hold_test.go":                  1, // negative wait: a claim would show within a few ticks
 	"server/ratelimit_hold_run_test.go":                    1, // negative wait: a launch would show within a few ticks
 	"server/recovery/recovery_notify_test.go":              4,

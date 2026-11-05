@@ -41,8 +41,8 @@ func (s *Server) startAfterMigrations(ctx context.Context) bool {
 	s.startupStep("first-rescan", s.idx.Rescan)
 	s.startupStep("recover-merges", s.merger.RecoverMerges)
 	// Running agents stay invisible to a restart, only a little later.
-	s.startupStep("reclaim-runs", s.reclaimRuns)
-	s.logFlushingRunners()
+	s.startupStep("reclaim-runs", s.reclaimer.ReclaimRuns)
+	s.reclaimer.LogFlushingRunners()
 	s.sessions.Logs.Prune(time.Now())
 	return true
 }

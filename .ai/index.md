@@ -164,7 +164,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `srvrecovery` (the name clashes with the top-level `recovery`);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
-  (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds
+  (`Run`, `TrackedRun`, `Registry`); `server/index/` holds
   the ticket index, the store watch and the poll/watch loop, and the project, lock and history
   reads (imports `wire` and `broker`; the root registers the `OnRescan` steps and the migration gate);
   `server/projects/` holds the project `Registry`, the start-up `Migrator` and `Checks`, with their
@@ -196,7 +196,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   reaches the run loop in the root through the `Launch` interface (the root implements it; the
   tests use `launchFake`)
   `server/sched/` holds the scheduling top of the lifecycle; so far the `HerdrWatch` (herdr
-  availability, hold reason, banner, retry loop). The root implements its `HerdrHost`
+  availability, hold reason, banner, retry loop) and the `Reclaimer` (startup reclaim of saved
+  runs, `ResolveRun`, `Resume`). The root implements their `HerdrHost` and `ReclaimHost`
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail); `tickets/ticketmove` — ticket move, id allocation and ref rewriting; `tickets/ticketmigrate` — migrations and backfills (Migrate*, Backfill*, pause migration, store walk); `tickets/ticketspec` — publish-side code (lint-claims, manifest, verify plan, publish checks, estimates)
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners; `nativerunner/holder` — the pty holder process, its socket protocol and client (`nativerunner` imports it, never the reverse)

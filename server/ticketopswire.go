@@ -67,7 +67,7 @@ func (s *Server) resettleWaiting(t runs.TrackedRun) error {
 	if err != nil {
 		return err
 	}
-	one, wt, mode, err := s.resume(t)
+	one, wt, mode, err := s.reclaimer.Resume(t)
 	if err != nil {
 		return err
 	}

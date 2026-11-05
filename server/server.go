@@ -146,7 +146,7 @@ type Server struct {
 
 	chat      *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry  *runs.Registry
-	savedRuns []runs.TrackedRun // handles the previous server left; consumed by reclaimRuns
+	reclaimer *sched.Reclaimer
 	guards    *runs.Guards
 	verdicts  verdictLog
 	// sessions creates, stops and watches the sessions; resumer brings them back.
@@ -305,9 +305,8 @@ func New(cfg Config) (*Server, error) {
 		log:  log,
 		idx:  idx,
 
-		chat:      ralphloop.NewServerChat(cfg.Chat),
-		registry:  registry,
-		savedRuns: savedRuns,
+		chat:     ralphloop.NewServerChat(cfg.Chat),
+		registry: registry,
 
 		instanceID: newInstanceID(),
 
@@ -460,6 +459,7 @@ func New(cfg Config) (*Server, error) {
 	s.bindWeb()
 	// A down herdr never stops the server; it is reported and retried.
 	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
+	s.reclaimer = sched.NewReclaimer(s.log, reclaimHost{s}, s.registry, savedRuns)
 	s.herdr.Check()
 	return s, nil
 }

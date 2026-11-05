@@ -1,4 +1,4 @@
-package server_test
+package sched_test
 
 import (
 	"testing"
