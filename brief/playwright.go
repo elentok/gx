@@ -184,6 +184,9 @@ var (
 	// playwrightTotals matches the counts that follow the failure blocks.
 	playwrightTotals = regexp.MustCompile(`^\s+(\d+) (failed|passed|flaky|skipped|did not run)\b`)
 	playwrightCode   = regexp.MustCompile(`^\s*>?\s*\d+ \|`)
+	// playwrightListed matches a test line of the list under "N failed", such
+	// as `    [chromium] › epics.e2e.ts:12:5 › 2. Epic looks right`.
+	playwrightListed = regexp.MustCompile(`^\s+(?:\[[^\]]+\] › )?(\S+?):\d+:\d+ › (.+?)\s*$`)
 )
 
 // Parse reads the failure blocks and the counts from the line reporter. Each
@@ -201,22 +204,31 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 		}
 	}
 	cut := false
+	listing := false
 	passed, failed := 0, 0
 	for l := range strings.SplitSeq(string(bytes.TrimRight(out, "\n")), "\n") {
 		l = strings.TrimRight(l, "\r")
 		if m := playwrightFailure.FindStringSubmatch(l); m != nil {
 			closeUnit()
-			cur, lines, cut = &Unit{Location: m[1], Name: m[2]}, nil, false
+			cur, lines, cut, listing = &Unit{Location: m[1], Name: m[2]}, nil, false, false
 			continue
 		}
 		if m := playwrightTotals.FindStringSubmatch(l); m != nil {
 			closeUnit()
 			n, _ := strconv.Atoi(m[1])
+			listing = m[2] == "failed"
 			switch m[2] {
 			case "passed":
 				passed = n
 			case "failed":
 				failed = n
+			}
+			continue
+		}
+		if m := playwrightListed.FindStringSubmatch(l); listing && m != nil {
+			// A failure whose block heading did not parse is still named here.
+			if !slices.ContainsFunc(failures, func(u Unit) bool { return u.Location == m[1] && u.Name == m[2] }) {
+				failures = append(failures, Unit{Location: m[1], Name: m[2]})
 			}
 			continue
 		}

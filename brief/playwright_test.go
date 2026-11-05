@@ -46,6 +46,35 @@ func TestPlaywrightParse_KeepsOnlyTheFirstErrorOfEachFailure(t *testing.T) {
 	}
 }
 
+// A failure whose block has no parsable heading is still named in the list
+// under "N failed", so the record must keep it.
+func TestPlaywrightParse_FailureListNamesFailuresWithoutAHeading(t *testing.T) {
+	out := `Running 4 tests using 3 workers
+  1) [chromium] › epics.e2e.ts:12:5 › 2. Epic looks right ──────────
+
+    Error: boom
+
+  3 failed
+    [chromium] › epics.e2e.ts:12:5 › 2. Epic looks right
+    [chromium] › pause.e2e.ts:30:1 › 7. Pause works
+    [chromium] › queue.e2e.ts:8:3 › 9. Queue empties
+  1 passed (4.2s)
+`
+	got := Playwright{}.Parse([]byte(out), 1)
+
+	var names []string
+	for _, f := range got.Failures {
+		names = append(names, f.Location+"|"+f.Name)
+	}
+	want := []string{"epics.e2e.ts|2. Epic looks right", "pause.e2e.ts|7. Pause works", "queue.e2e.ts|9. Queue empties"}
+	if !slices.Equal(names, want) {
+		t.Errorf("failures = %q, want %q", names, want)
+	}
+	if got.Units != 4 {
+		t.Errorf("units = %d, want 4", got.Units)
+	}
+}
+
 func TestPlaywrightParse_NoTestsFoundIsEmpty(t *testing.T) {
 	if got := (Playwright{}).Parse([]byte("Error: No tests found\n"), 1); got.Units != 0 || len(got.Failures) != 0 {
 		t.Errorf("outcome = %+v, want empty", got)
