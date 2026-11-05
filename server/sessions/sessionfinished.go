@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -17,7 +17,7 @@ func (mg *Manager) SessionFinished(sess agentrunner.Session) bool {
 		for _, e := range epics {
 			epic := filepath.Base(e.Path)
 			for _, t := range e.Tickets {
-				if label, _, _ := ralphloop.IterationIdentity(epic, t.Identifier, ""); label != sess.Label {
+				if label, _, _ := worktree.IterationIdentity(epic, t.Identifier, ""); label != sess.Label {
 					continue
 				}
 				parsed, err := schema.ParseTicket(t.Path)

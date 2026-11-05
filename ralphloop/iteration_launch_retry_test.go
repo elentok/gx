@@ -12,11 +12,12 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
+	"github.com/elentok/gx/ralphloop/worktree"
 )
 
 const launchEpic = "my-epic"
 
-var launchLabel = iterLabel(launchEpic, "01")
+var launchLabel = worktree.IterationLabel(launchEpic, "01")
 
 // launchResult is what the server's launch sees from StartAndPrompt: the
 // session, the error, and every nudge decision as (attempt, decision).

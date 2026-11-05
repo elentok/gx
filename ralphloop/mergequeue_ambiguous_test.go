@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/elentok/gx/events"
@@ -40,7 +39,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	d.Runner = runnerfake.NewRunner()
 	lp := mergeQueueParams{
 		RepoDir: repo, FeatureWorktree: repo, FeatureBranch: "epic", ScratchDir: scratchDir,
-		WorktreeLock: &sync.Mutex{}, Gate: NewGate(), Sink: runlog.NoopEventSink{},
+		Gate: NewGate(), Sink: runlog.NoopEventSink{},
 	}
 	r := mergeOne(d, lp, mergeJob{ticket: tickets.Ticket{Identifier: "01", Path: path}, base: base, branch: "iter", path: repo})
 	if r.err != nil || r.mergeDeferred || r.pausedOnChild {

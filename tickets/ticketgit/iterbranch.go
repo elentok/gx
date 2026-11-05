@@ -5,7 +5,7 @@ import "strings"
 // ParseIterationBranch reports whether branch matches ralphloop's iteration
 // naming and, if so, the epic and ticket identifier it encodes. Two
 // generations of naming are recognized: the current flat
-// "ralph-loop/{epic}-item-{id}" (ralphloop/labels.go's iterBranch) and the
+// "ralph-loop/{epic}-item-{id}" (ralphloop/worktree's IterationBranch) and the
 // legacy nested "ralph-loop/{epic}/iter-{id}" this repo's own history still
 // carries.
 func ParseIterationBranch(branch string) (epic, ticketID string, ok bool) {

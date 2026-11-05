@@ -15,8 +15,8 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -55,7 +55,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(servertest.NewNamedFake(fake, runner)), servertest.WithEnv("CODEX_HOME="+codexHome))
 	if rollout {
-		_, _, wt := ralphloop.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
+		_, _, wt := worktree.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
 		meta := `{"type":"session_meta","payload":{"id":"sess-old","cwd":` + strconv.Quote(wt) + `}}` + "\n"
 		dir := filepath.Join(codexHome, "sessions", "2026", "10", "30")
 		if err := os.MkdirAll(dir, 0o755); err != nil {

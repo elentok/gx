@@ -8,7 +8,6 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -17,6 +16,7 @@ import (
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
 
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -32,7 +32,7 @@ func iterationSession(p iterationParams, pane string) agentrunner.Session {
 	if pane == "" {
 		return agentrunner.Session{}
 	}
-	return agentrunner.Session{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), ID: pane}
+	return agentrunner.Session{Label: worktree.IterationLabel(p.FeatureBranch, p.Ticket.Identifier), ID: pane}
 }
 
 // finishIteration merges a finished iteration's commits (or marks it
@@ -92,7 +92,7 @@ func finishIteration(d deps.Deps, p iterationParams, path, pane, base, branch, s
 			return err
 		}
 		if commitlessAdopted {
-			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), true)
+			return finishCleanup(d, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), true)
 		}
 
 		// A zero-commit finish whose last turn is shaped like ticket 01's
@@ -135,7 +135,7 @@ func finishIteration(d deps.Deps, p iterationParams, path, pane, base, branch, s
 					return err
 				}
 				if commitlessAdopted {
-					return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), true)
+					return finishCleanup(d, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), true)
 				}
 			}
 		}
@@ -233,7 +233,7 @@ func retryUnexecutedToolCallOnce(d deps.Deps, p iterationParams, path, pane, bas
 		return false, 0, "", nil
 	}
 
-	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
+	label := worktree.IterationLabel(p.FeatureBranch, p.Ticket.Identifier)
 	s, found, err := d.Runner.Find(label)
 	if err == nil && !found {
 		err = agentrunner.ErrNotFound
@@ -453,15 +453,15 @@ func stopAskedSession(d deps.Deps, p iterationParams, pane string) error {
 // or a done ticket's leftover state found on startup after a crash (any
 // subset may have survived — see classifyDoneTicket's doneStaleCleanup).
 // s is the zero Session if no live session was found for this iteration.
-func finishCleanup(d deps.Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, path, branch string, s agentrunner.Session, removeBranch bool) error {
+func finishCleanup(d deps.Deps, repoDir, featureWorktree, path, branch string, s agentrunner.Session, removeBranch bool) error {
 	hasWorktree, err := d.WorktreeExists(path)
 	if err != nil {
 		return fmt.Errorf("checking iteration worktree: %w", err)
 	}
 	if hasWorktree {
-		worktreeLock.Lock()
+		worktree.Lock.Lock()
 		err := d.RemoveWorktree(repoDir, path, true)
-		worktreeLock.Unlock()
+		worktree.Lock.Unlock()
 		if err != nil {
 			return fmt.Errorf("removing iteration worktree: %w", err)
 		}
@@ -473,21 +473,13 @@ func finishCleanup(d deps.Deps, worktreeLock *sync.Mutex, repoDir, featureWorktr
 		}
 	}
 
-	if removeBranch && branchExists(d, featureWorktree, branch) {
+	if removeBranch && worktree.BranchExists(d, featureWorktree, branch) {
 		if err := d.DeleteBranch(repoDir, branch); err != nil {
 			return fmt.Errorf("deleting iteration branch %s: %w", branch, err)
 		}
 	}
 
 	return nil
-}
-
-// branchExists reports whether branch is a resolvable ref in dir's repo,
-// treating any RevParse error as "doesn't exist" — the same convention
-// classifyDoneTicket uses to check the iteration branch's presence.
-func branchExists(d deps.Deps, dir, branch string) bool {
-	_, err := d.RevParse(dir, branch)
-	return err == nil
 }
 
 // cherryPickWithConflictResolution cherry-picks base..branch onto
@@ -618,7 +610,7 @@ func foreignCherryPick(d deps.Deps, p iterationParams) (foreign bool, sha string
 			continue
 		}
 		for _, t := range e.Tickets {
-			if ok, err := d.IsAncestor(p.FeatureWorktree, sha, iterBranch(p.FeatureBranch, t.Identifier)); err == nil && ok {
+			if ok, err := d.IsAncestor(p.FeatureWorktree, sha, worktree.IterationBranch(p.FeatureBranch, t.Identifier)); err == nil && ok {
 				return false, sha
 			}
 		}
@@ -643,7 +635,7 @@ func mergeParamsFor(p iterationParams, base, branch, sessionID string) MergePara
 		RecordedSHA:     recorded,
 		Session: MergeSession{
 			Agent: p.Agent,
-			Cwd:   iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier),
+			Cwd:   worktree.IterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier),
 			ID:    sessionID,
 		},
 	}
@@ -666,7 +658,7 @@ var errConflictResolutionUnresolved = errors.New("conflict-resolution child tick
 // survived a crash/restart and still owns the sequencer state
 // cherryPickWithConflictResolution is about to inspect.
 func findLiveConflictResolutionTab(d deps.Deps, p iterationParams) (session agentrunner.Session, found bool, err error) {
-	session, found, err = d.Runner.Find(conflictLabel(p.Ticket.Identifier))
+	session, found, err = d.Runner.Find(worktree.ConflictLabel(p.Ticket.Identifier))
 	if err != nil {
 		return agentrunner.Session{}, false, fmt.Errorf("looking for a live conflict-resolution resolver for %s: %w", p.Ticket.Identifier, err)
 	}
@@ -710,7 +702,7 @@ func findConflictResolutionChildTicket(p iterationParams) (string, error) {
 // or child ticket of its own, since both already exist from before the
 // crash.
 func reattachLiveConflictResolver(d deps.Deps, p iterationParams, live agentrunner.Session) (sessionID string, resultErr error) {
-	label := conflictLabel(p.Ticket.Identifier)
+	label := worktree.ConflictLabel(p.Ticket.Identifier)
 
 	childPath, err := findConflictResolutionChildTicket(p)
 	if err != nil {
@@ -770,7 +762,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		return "", fmt.Errorf("forking conflict-resolution ticket: %w", err)
 	}
 
-	label := conflictLabel(p.Ticket.Identifier)
+	label := worktree.ConflictLabel(p.Ticket.Identifier)
 	prompt := agent.SkillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
 
 	l, err := startAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{

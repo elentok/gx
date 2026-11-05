@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -61,7 +61,7 @@ func (o *Ops) markCancelled(ref queue.TicketRef, t tickets.Ticket, source string
 	// The branch stays: it holds the commits.
 	if ref.Repo != "" && o.awaitRunSettled(ref.Address(t)) {
 		// The epic merge removes leftovers later, so a failed removal must not stop the cancel.
-		if err := ralphloop.RemoveIterationWorktree(o.d.Projects.DefaultDeps(), ref.Repo, ref.Addr.Epic, t.Identifier); err != nil {
+		if err := worktree.RemoveIterationWorktree(o.d.Projects.DefaultDeps(), ref.Repo, ref.Addr.Epic, t.Identifier); err != nil {
 			o.d.Log.Warn("remove cancelled worktree", "ticket", ref.Address(t), "err", err)
 		}
 	}

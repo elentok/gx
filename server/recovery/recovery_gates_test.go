@@ -15,8 +15,8 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -59,7 +59,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.Recovery = recovery.Default()
 	})
-	_, branch, worktree := ralphloop.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
+	_, branch, worktree := worktree.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
 	testutil.MustGitExported(t, repo, "worktree", "add", "-b", branch, worktree)
 	prepare(worktree)
 

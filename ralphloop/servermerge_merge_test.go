@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/agent"
@@ -12,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -32,10 +32,10 @@ func serverMergeFixture(t *testing.T) (deps.Deps, iterationParams, *builtAwaitin
 	p := iterationParams{
 		WorkspaceID: "ws1", RepoDir: "/fake/repo", WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature",
 		FeatureBranch: "epic", Agent: agent.AgentClaude, Skill: "implement", Ticket: tk, ScratchDir: scratchDir,
-		WorktreeLock: &sync.Mutex{}, SmartZone: agent.DefaultSmartZone, Gate: NewGate(), Sink: runlog.NoopEventSink{},
+		SmartZone: agent.DefaultSmartZone, Gate: NewGate(), Sink: runlog.NoopEventSink{},
 	}
 	built := &builtAwaitingMergeError{job: mergeJob{
-		ticket: tk, base: "base", branch: iterBranch("epic", "01"), path: iterationWorktreePath("/fake/worktrees", "epic", "01"),
+		ticket: tk, base: "base", branch: worktree.IterationBranch("epic", "01"), path: worktree.IterationWorktreePath("/fake/worktrees", "epic", "01"),
 	}}
 	return d, p, built, filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 }

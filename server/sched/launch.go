@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -127,7 +128,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 		extraDirs = l.evolveDirs(ticket)
 	}
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
-	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
+	label, _, _ := worktree.IterationIdentity(ticket.Epic, ticket.ID, "")
 	resumeID := one.ResumeSessionID
 	if agentKind == agent.AgentCodex && !l.CodexRolloutExists(cwd, resumeID) {
 		resumeID = ""

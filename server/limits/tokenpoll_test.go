@@ -15,8 +15,8 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/metrics"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -70,7 +70,7 @@ func (f *tokenFixture) live(t *testing.T) {
 	if err := f.h.Server.PauseAs(f.address, events.IterationError, "setup"); err != nil {
 		t.Fatal(err)
 	}
-	label, _, _ := ralphloop.IterationIdentity(f.epic, "01", "")
+	label, _, _ := worktree.IterationIdentity(f.epic, "01", "")
 	if _, ok, _ := f.fake.Find(label); !ok {
 		if _, err := f.fake.Start(agentrunner.StartOptions{Label: label, Epic: f.epic, Cwd: t.TempDir(), Kind: "claude"}); err != nil {
 			t.Fatal(err)
@@ -203,7 +203,7 @@ func TestTokenPoll_StoppedTicketKeepsItsTokens(t *testing.T) {
 	f.grow(t, 180, 1)
 	f.h.Server.Limits().PollTokensAt(pollDay1)
 
-	label, _, _ := ralphloop.IterationIdentity(f.epic, "01", "")
+	label, _, _ := worktree.IterationIdentity(f.epic, "01", "")
 	sess, _, _ := f.fake.Find(label)
 	if err := f.fake.Stop(sess); err != nil {
 		t.Fatal(err)
@@ -296,7 +296,7 @@ func TestTokenPoll_IdlePollReadsNothing(t *testing.T) {
 func TestTokenPoll_CodexAddsTokensWithoutDollars(t *testing.T) {
 	t.Parallel()
 	f := newTokenFixture(t, "epic-a")
-	label, _, _ := ralphloop.IterationIdentity(f.epic, "01", "")
+	label, _, _ := worktree.IterationIdentity(f.epic, "01", "")
 	dir := filepath.Join(nativerunner.AgentsRoot(f.h.StateDir, "proj"), label)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)

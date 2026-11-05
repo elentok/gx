@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
@@ -228,7 +229,7 @@ func (b *Budget) Iteration(address string) (wire.IterationInfo, bool) {
 	if err != nil {
 		return wire.IterationInfo{}, false
 	}
-	_, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, b.projects.WorktreeDir(a.Project))
+	_, branch, worktree := worktree.IterationIdentity(a.Epic, a.ID, b.projects.WorktreeDir(a.Project))
 	r, sess, found, err := b.harness.LiveSession(a)
 	if err != nil || !found {
 		return wire.IterationInfo{}, false

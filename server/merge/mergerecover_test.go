@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -80,7 +81,7 @@ func TestMergeRecovery_OrphanLockForAMergedTicketFinishesIt(t *testing.T) {
 	// The merge got as far as the cherry-pick before the process died. -x keeps the
 	// picked commit from hashing identically to its source within one second.
 	feature := filepath.Join(filepath.Dir(wt), "epic-a")
-	if out, err := exec.Command("git", "-C", feature, "cherry-pick", "-x", ralphloop.IterationBranch("epic-a", "01")).CombinedOutput(); err != nil {
+	if out, err := exec.Command("git", "-C", feature, "cherry-pick", "-x", worktree.IterationBranch("epic-a", "01")).CombinedOutput(); err != nil {
 		t.Fatalf("cherry-pick: %v\n%s", err, out)
 	}
 
@@ -103,7 +104,7 @@ func TestMergeRecovery_OrphanLockForAnUnmergedTicketRollsBackTheHalfPick(t *test
 	feature := filepath.Join(filepath.Dir(wt), "epic-a")
 	testutil.WriteFile(t, feature, "agent.txt", "conflicting")
 	testutil.CommitAll(t, feature, "conflict")
-	_ = exec.Command("git", "-C", feature, "cherry-pick", ralphloop.IterationBranch("epic-a", "01")).Run()
+	_ = exec.Command("git", "-C", feature, "cherry-pick", worktree.IterationBranch("epic-a", "01")).Run()
 
 	restartAndSettle(t, h, wire.EventMergeRolledBack)
 

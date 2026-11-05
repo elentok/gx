@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -51,7 +51,7 @@ func (c *Chat) ticketScreenRead(w http.ResponseWriter, address string) {
 // TicketPtyDir is the agent directory of addr's latest run, when that agent
 // ran in a pty. Other runners have no screen.
 func (c *Chat) TicketPtyDir(addr tickets.Address) (string, bool) {
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	label, _, _ := worktree.IterationIdentity(addr.Epic, addr.ID, "")
 	dir := filepath.Join(nativerunner.AgentsRoot(c.cfg.StateDir, addr.Project), label)
 	d, err := nativerunner.OpenDir(dir)
 	if err != nil || !d.PTY() {

@@ -13,9 +13,9 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/metrics"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
@@ -103,7 +103,7 @@ func (l *Limits) tokenSessionOf(address string) (tokenSession, bool) {
 	if a.Epic == tickets.OneOffsEpic {
 		group = tokenledger.GroupOneOff
 	}
-	label, _, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, l.projects.WorktreeDir(a.Project))
+	label, _, worktree := worktree.IterationIdentity(a.Epic, a.ID, l.projects.WorktreeDir(a.Project))
 	agentDir := filepath.Join(nativerunner.AgentsRoot(l.cfg.StateDir, a.Project), label)
 	run, _ := l.registry.RunOf(address)
 	codex := IsCodexRun(run)

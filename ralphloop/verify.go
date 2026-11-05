@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -124,7 +125,7 @@ func VerifyEpic(vd VerifyDeps, p VerifyParams) ([]TicketVerification, error) {
 		if sessions, err := vd.ListSessions(p.Epic); err == nil {
 			live = make(map[string]bool, len(sessions))
 			for _, s := range sessions {
-				live[iterationKey(p.Epic, s.Label)] = true
+				live[worktree.IterationKey(p.Epic, s.Label)] = true
 			}
 		}
 	}
@@ -153,19 +154,19 @@ func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t t
 		return v
 	}
 
-	branch := iterBranch(featureBranch, t.Identifier)
+	branch := worktree.IterationBranch(featureBranch, t.Identifier)
 	_, revErr := vd.RevParse(paths.FeatureWorktree, branch)
 	hasBranch := revErr == nil
 	v.Leftovers.Branch = &hasBranch
 
-	hasWorktree, err := vd.WorktreeExists(iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier))
+	hasWorktree, err := vd.WorktreeExists(worktree.IterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier))
 	if err != nil {
 		return fail(fmt.Errorf("checking leftover worktree: %w", err))
 	}
 	v.Leftovers.Worktree = &hasWorktree
 
 	if live != nil {
-		hasTab := live[iterationKey(featureBranch, iterLabel(featureBranch, t.Identifier))]
+		hasTab := live[worktree.IterationKey(featureBranch, worktree.IterationLabel(featureBranch, t.Identifier))]
 		v.Leftovers.Tab = &hasTab
 	}
 

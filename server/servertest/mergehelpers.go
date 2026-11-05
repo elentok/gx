@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -66,8 +66,8 @@ func KeepWorktree(t *testing.T, repo, epic, id string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := ralphloop.IterationWorktreePath(wtDir, epic, id)
-	out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", ralphloop.IterationBranch(epic, id), path).CombinedOutput()
+	path := worktree.IterationWorktreePath(wtDir, epic, id)
+	out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", worktree.IterationBranch(epic, id), path).CombinedOutput()
 	if err != nil {
 		t.Fatalf("git worktree add: %v\n%s", err, out)
 	}

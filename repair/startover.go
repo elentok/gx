@@ -10,9 +10,9 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -77,7 +77,7 @@ func StartOver(in StartOverInput, d deps.Deps) (StartOverResult, error) {
 		return StartOverResult{}, err
 	}
 	epicName := filepath.Base(filepath.Clean(in.EpicPath))
-	if sess, alive := ralphloop.FindIterationSession(d, epicName, t.Identifier); alive {
+	if sess, alive := worktree.FindIterationSession(d, epicName, t.Identifier); alive {
 		if err := closeIdleSession(d.Runner, sess, in.ID); err != nil {
 			return StartOverResult{}, err
 		}
@@ -87,7 +87,7 @@ func StartOver(in StartOverInput, d deps.Deps) (StartOverResult, error) {
 	if err != nil {
 		return StartOverResult{}, err
 	}
-	branch := ralphloop.IterationBranch(epicName, t.Identifier)
+	branch := worktree.IterationBranch(epicName, t.Identifier)
 	attic, err := gatherAttic(in, d, filepath.Join(wtDir, epicName), epicName, branch)
 	if err != nil {
 		return StartOverResult{}, err
@@ -132,7 +132,7 @@ func closeIdleSession(r agentrunner.Runner, s agentrunner.Session, id string) er
 // to rename a branch that is checked out. A missing worktree or branch is a
 // normal outcome.
 func clearIteration(in StartOverInput, d deps.Deps, wtDir, epic, id, branch string, attic atticInfo) error {
-	path := ralphloop.IterationWorktreePath(wtDir, epic, id)
+	path := worktree.IterationWorktreePath(wtDir, epic, id)
 	if exists, err := d.WorktreeExists(path); err != nil {
 		return fmt.Errorf("checking iteration worktree: %w", err)
 	} else if exists {

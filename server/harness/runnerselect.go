@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/tickets"
 )
@@ -60,7 +60,7 @@ func (h *Harness) LiveSession(addr tickets.Address) (agentrunner.Runner, agentru
 	if err != nil {
 		return nil, agentrunner.Session{}, false, err
 	}
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	label, _, _ := worktree.IterationIdentity(addr.Epic, addr.ID, "")
 	sess, ok, err := runner.Find(label)
 	return runner, sess, ok, err
 }

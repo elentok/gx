@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -16,7 +17,7 @@ import (
 // at that ref; with ref "" (a project without a VCS) it is scratchDir, created
 // if missing and kept after the ticket ends.
 func PrepareCommitless(d deps.Deps, o OneIteration, scratchDir, ref string) (IterationWorktree, error) {
-	label := iterLabel(o.Epic, o.Ticket.Identifier)
+	label := worktree.IterationLabel(o.Epic, o.Ticket.Identifier)
 	if ref == "" {
 		if err := os.MkdirAll(scratchDir, 0o755); err != nil {
 			return IterationWorktree{}, fmt.Errorf("creating scratch directory: %w", err)
@@ -27,8 +28,8 @@ func PrepareCommitless(d deps.Deps, o OneIteration, scratchDir, ref string) (Ite
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
 	}
-	path := iterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier)
-	err = withWorktreeLock(func() error { return d.AddDetachedWorktree(o.RepoDir, path, ref) })
+	path := worktree.IterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier)
+	err = worktree.WithWorktreeLock(func() error { return d.AddDetachedWorktree(o.RepoDir, path, ref) })
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating detached worktree at %s: %w", ref, err)
 	}
@@ -42,7 +43,7 @@ func PrepareCommitless(d deps.Deps, o OneIteration, scratchDir, ref string) (Ite
 // ResumeCommitless rebuilds the handle PrepareCommitless made, for a server that
 // restarted mid-iteration. scratchDir is "" for a detached worktree.
 func ResumeCommitless(d deps.Deps, o OneIteration, scratchDir string) (IterationWorktree, error) {
-	label := iterLabel(o.Epic, o.Ticket.Identifier)
+	label := worktree.IterationLabel(o.Epic, o.Ticket.Identifier)
 	if scratchDir != "" {
 		return IterationWorktree{Path: scratchDir, Label: label, keep: true}, nil
 	}
@@ -50,7 +51,7 @@ func ResumeCommitless(d deps.Deps, o OneIteration, scratchDir string) (Iteration
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
 	}
-	return IterationWorktree{Path: iterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier), Label: label, worktreeDir: wtDir}, nil
+	return IterationWorktree{Path: worktree.IterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier), Label: label, worktreeDir: wtDir}, nil
 }
 
 // DiscardCommitless takes back what PrepareCommitless made for a launch that
@@ -59,7 +60,7 @@ func DiscardCommitless(d deps.Deps, o OneIteration, w IterationWorktree) error {
 	if w.keep {
 		return nil
 	}
-	return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", agentrunner.Session{}, false)
+	return finishCleanup(d, o.RepoDir, "", w.Path, "", agentrunner.Session{}, false)
 }
 
 // FinishCommitless settles a commitless one-off whose agent has gone idle: a
@@ -148,7 +149,7 @@ func commitlessSession(w IterationWorktree, pane string) agentrunner.Session {
 
 func cleanupCommitless(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
 	if !w.keep {
-		return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", s, false)
+		return finishCleanup(d, o.RepoDir, "", w.Path, "", s, false)
 	}
 	if s == (agentrunner.Session{}) {
 		return nil

@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -80,6 +80,6 @@ func nativeAgentDir(dirs config.Dirs, address string) string {
 	if err != nil {
 		return ""
 	}
-	label, _, _ := ralphloop.IterationIdentity(a.Epic, a.ID, "")
+	label, _, _ := worktree.IterationIdentity(a.Epic, a.ID, "")
 	return filepath.Join(nativerunner.AgentsRoot(stateDir, a.Project), label)
 }

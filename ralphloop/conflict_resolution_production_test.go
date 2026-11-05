@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -238,7 +239,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	runner.IDs = func(label string) (string, string) { return "pane-" + label, resolutionSessionID }
 
 	p := conflictParams(t, dir)
-	label := conflictLabel(p.Ticket.Identifier)
+	label := worktree.ConflictLabel(p.Ticket.Identifier)
 
 	res, gotResolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, iterTip, iterationSessionID, "iter-pane")
 	if err != nil {
@@ -333,7 +334,7 @@ func TestResolveCherryPickConflict_StopFailure_FailsTheResolution(t *testing.T) 
 	t.Parallel()
 	d, _, _ := fakes.FakeDeps()
 	p := conflictParams(t, t.TempDir())
-	label := conflictLabel(p.Ticket.Identifier)
+	label := worktree.ConflictLabel(p.Ticket.Identifier)
 	stopErr := errors.New("stop failed")
 	fakes.OnRunnerPrompt(d, func(agentrunner.Session, string) error {
 		fakes.FakeRunner(d).SetStopErr(label, stopErr)

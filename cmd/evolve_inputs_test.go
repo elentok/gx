@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 )
 
 func inputsFixture(t *testing.T) *evolveFixture {
@@ -202,7 +202,7 @@ func TestEvolveInputs_WritesDigests(t *testing.T) {
 	put(".claude/projects/p/s1.jsonl", turn("main-s1"))
 	put(".claude/projects/p/s1/subagents/agent-a.jsonl", turn("sub-s1"))
 	put(".claude/projects/p/res-1.jsonl", turn("resolved"))
-	label, _, _ := ralphloop.IterationIdentity("epic", "02", "")
+	label, _, _ := worktree.IterationIdentity("epic", "02", "")
 	put("state/agents/proj/"+label+"/meta.json", `{"runner":"headless","session_id":"s2","label":"`+label+`"}`)
 	put("state/agents/proj/"+label+"/out.jsonl", turn("native-s2"))
 	put("codex/sessions/2026/rollout-s3.jsonl",

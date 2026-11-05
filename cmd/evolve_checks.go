@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/check"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -70,7 +70,7 @@ func buildEpicChecks(env evolveEnv, t evolveTarget) (epicChecks, error) {
 	verifyBranches := map[string]bool{}
 	var firstClaim time.Time
 	for _, tk := range t.epic.Tickets {
-		b := ralphloop.IterationBranch(t.name, tk.Identifier)
+		b := worktree.IterationBranch(t.name, tk.Identifier)
 		branches[b] = true
 		if tk.Type == string(schema.TypeVerify) {
 			verifyBranches[b] = true

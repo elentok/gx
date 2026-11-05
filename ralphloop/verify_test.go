@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -127,7 +128,7 @@ func TestVerifyEpic_ClaimedTicketWithLeftoversByDesign(t *testing.T) {
 	vd.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil }
 	vd.WorktreeExists = func(path string) (bool, error) { return true, nil }
 	vd.ListSessions = func(string) ([]agentrunner.Session, error) {
-		return []agentrunner.Session{{Label: iterLabel("epic", "03")}}, nil
+		return []agentrunner.Session{{Label: worktree.IterationLabel("epic", "03")}}, nil
 	}
 	tk := tickets.Ticket{Number: 3, Identifier: "03", Status: "claimed"}
 	v := verifyOne(t, vd, tk, nil)

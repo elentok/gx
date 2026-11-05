@@ -8,7 +8,6 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -16,6 +15,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -125,22 +125,6 @@ type IterationWorktree struct {
 	keep bool
 }
 
-// worktreeLock serializes git worktree add/remove per process, as Run's
-// worktreeMu does per run.
-var worktreeLock sync.Mutex
-
-// withWorktreeLock runs fn holding worktreeLock.
-func withWorktreeLock(fn func() error) error {
-	worktreeLock.Lock()
-	defer worktreeLock.Unlock()
-	return fn()
-}
-
-// WithWorktreeLock runs fn holding the lock that PrepareFeature and
-// PrepareIteration take around creating or reusing a feature worktree, so fn
-// sees a worktree no claim is setting up.
-func WithWorktreeLock(fn func() error) error { return withWorktreeLock(fn) }
-
 // PrepareIteration creates the epic's feature worktree and the ticket's
 // iteration worktree off the feature tip, and installs dependencies in the
 // iteration worktree.
@@ -161,26 +145,26 @@ func addIterationWorktrees(d deps.Deps, o OneIteration) (IterationWorktree, erro
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
 	}
 	featurePath := filepath.Join(wtDir, o.Epic)
-	worktreeLock.Lock()
-	defer worktreeLock.Unlock()
+	worktree.Lock.Lock()
+	defer worktree.Lock.Unlock()
 	if err := addFeatureWorktree(d, o, featurePath); err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
-	branch := iterBranch(o.Epic, o.Ticket.Identifier)
+	branch := worktree.IterationBranch(o.Epic, o.Ticket.Identifier)
 	baseRef := o.Epic
 	if o.LeafBase != "" {
-		baseRef = iterBranch(o.Epic, o.LeafBase)
+		baseRef = worktree.IterationBranch(o.Epic, o.LeafBase)
 	}
 	base, err := d.RevParse(featurePath, baseRef)
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("resolving %s tip: %w", baseRef, err)
 	}
-	path := iterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier)
+	path := worktree.IterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier)
 	if err := d.AddWorktree(o.RepoDir, path, branch, base); err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating iteration worktree: %w", err)
 	}
 	return IterationWorktree{
-		Path: path, Branch: branch, Label: iterLabel(o.Epic, o.Ticket.Identifier),
+		Path: path, Branch: branch, Label: worktree.IterationLabel(o.Epic, o.Ticket.Identifier),
 		base: base, featureWorktree: featurePath, worktreeDir: wtDir,
 	}, nil
 }
@@ -197,8 +181,8 @@ func ResumeIteration(d deps.Deps, o OneIteration, base string) (IterationWorktre
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
 	}
 	return IterationWorktree{
-		Path: iterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier), Branch: iterBranch(o.Epic, o.Ticket.Identifier),
-		Label: iterLabel(o.Epic, o.Ticket.Identifier),
+		Path: worktree.IterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier), Branch: worktree.IterationBranch(o.Epic, o.Ticket.Identifier),
+		Label: worktree.IterationLabel(o.Epic, o.Ticket.Identifier),
 		base:  base, featureWorktree: filepath.Join(wtDir, o.Epic), worktreeDir: wtDir,
 	}, nil
 }
@@ -206,7 +190,7 @@ func ResumeIteration(d deps.Deps, o OneIteration, base string) (IterationWorktre
 // DiscardIteration removes a prepared iteration's worktree and branch, for a
 // launch that failed before the agent produced anything.
 func DiscardIteration(d deps.Deps, o OneIteration, w IterationWorktree) error {
-	return finishCleanup(d, &worktreeLock, o.RepoDir, w.featureWorktree, w.Path, w.Branch, agentrunner.Session{}, true)
+	return finishCleanup(d, o.RepoDir, w.featureWorktree, w.Path, w.Branch, agentrunner.Session{}, true)
 }
 
 // FinishIteration runs a finished agent through the shared finish path: pause
@@ -229,7 +213,6 @@ func FinishIteration(d deps.Deps, o OneIteration, w IterationWorktree, pane stri
 		KeepAskedAgent:  o.KeepAskedAgent,
 		Ticket:          o.Ticket,
 		ScratchDir:      o.ScratchDir,
-		WorktreeLock:    &worktreeLock,
 		SmartZone:       o.smartZone(),
 		Gate:            NewGate(),
 		Sink:            o.sink(),
@@ -493,7 +476,7 @@ func mergeBuilt(d deps.Deps, p iterationParams, built *builtAwaitingMergeError) 
 	lp := mergeQueueParams{
 		WorkspaceID: p.WorkspaceID, RepoDir: p.RepoDir, WorktreeDir: p.WorktreeDir,
 		FeatureWorktree: p.FeatureWorktree, FeatureBranch: p.FeatureBranch, Agent: p.Agent,
-		Model: p.Model, Effort: p.Effort, Skill: p.Skill, ScratchDir: p.ScratchDir, WorktreeLock: p.WorktreeLock,
+		Model: p.Model, Effort: p.Effort, Skill: p.Skill, ScratchDir: p.ScratchDir,
 		SmartZone: p.SmartZone, Gate: p.Gate, Sink: p.Sink,
 	}
 	r := mergeOne(d, lp, built.job)
@@ -523,7 +506,7 @@ func mergeBuilt(d deps.Deps, p iterationParams, built *builtAwaitingMergeError) 
 		_, err := ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 			Type: events.Paused, Kind: events.MergeConflict, Reason: reason,
-			Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},
+			Repair: schema.FaultState{Label: worktree.IterationLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},
 			Event:  p.agentEvent(built.job.pane, built.job.sessionID, built.job.path),
 		})
 		return err

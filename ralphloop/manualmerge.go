@@ -1,9 +1,6 @@
 package ralphloop
 
 import (
-	"fmt"
-
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
@@ -12,54 +9,8 @@ import (
 // session recovery stay private to this package so a hand merging can never
 // derive them differently from the live loop.
 
-// IterationBranch is the branch an iteration of epic/identifier builds on.
-func IterationBranch(epic, identifier string) string { return iterBranch(epic, identifier) }
-
 // MergeDepsOf narrows d to what a merging needs.
 func MergeDepsOf(d deps.Deps) MergeDeps { return mergeDepsFor(d) }
-
-// FindIterationSession returns the iteration's live session, if the runner
-// knows one. An unreachable runner reports none: recovery has to keep working
-// when the host is down.
-func FindIterationSession(d deps.Deps, epic, identifier string) (agentrunner.Session, bool) {
-	if d.Runner == nil {
-		return agentrunner.Session{}, false
-	}
-	s, ok, err := d.Runner.Find(iterLabel(epic, identifier))
-	if err != nil || !ok {
-		return agentrunner.Session{}, false
-	}
-	return s, true
-}
-
-// IterationWorktreePath is where an iteration of epic/identifier is checked out.
-func IterationWorktreePath(worktreeDir, epic, identifier string) string {
-	return iterationWorktreePath(worktreeDir, epic, identifier)
-}
-
-// RemoveIterationWorktree removes the leftover iteration worktree of
-// epic/identifier, keeping its branch (it holds commits). A missing worktree is
-// not an error.
-func RemoveIterationWorktree(d deps.Deps, repoDir, epic, identifier string) error {
-	wtDir, err := d.WorktreeDir(repoDir)
-	if err != nil {
-		return fmt.Errorf("resolving worktree directory for %q: %w", repoDir, err)
-	}
-	path := iterationWorktreePath(wtDir, epic, identifier)
-	return withWorktreeLock(func() error {
-		exists, err := d.WorktreeExists(path)
-		if err != nil {
-			return fmt.Errorf("checking iteration worktree: %w", err)
-		}
-		if !exists {
-			return nil
-		}
-		if err := d.RemoveWorktree(repoDir, path, true); err != nil {
-			return fmt.Errorf("removing iteration worktree: %w", err)
-		}
-		return nil
-	})
-}
 
 // StampMerged stamps the trailers (and metrics, when a session is recoverable)
 // onto the commit a resolved conflict left at HEAD. It is the stamping half of

@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/metrics"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -19,7 +20,7 @@ func stampCommitlessFixture(t *testing.T, sessionIDs string) (ticketPath, cwd st
 	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: implement\nsession_ids: " + sessionIDs + "\n---\n# A\n",
 	})
-	return filepath.Join(scratchDir, "epic", "issues", "01-a.md"), iterationWorktreePath("/fake/worktrees", "epic", "01"), homes
+	return filepath.Join(scratchDir, "epic", "issues", "01-a.md"), worktree.IterationWorktreePath("/fake/worktrees", "epic", "01"), homes
 }
 
 func TestStampCommitlessMetrics_NoSession_StampsZero(t *testing.T) {

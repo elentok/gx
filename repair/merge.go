@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -64,7 +65,7 @@ func Merge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 	}
 
 	epic := filepath.Base(filepath.Clean(in.EpicPath))
-	if _, live := ralphloop.FindIterationSession(d, epic, t.Identifier); live && !in.IgnoreLiveTab {
+	if _, live := worktree.FindIterationSession(d, epic, t.Identifier); live && !in.IgnoreLiveTab {
 		return MergeResult{}, "", &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("the agent session for ticket %s exists; stop it or pass --ignore-live-tab", in.ID)}
 	}
 
@@ -333,7 +334,7 @@ func describeStatus(t schema.Ticket) string {
 // checkRecoverable is verify's recoverable test: the iteration branch exists
 // and has commits past its merge-base with the feature branch.
 func checkRecoverable(d deps.Deps, featurePath, epic, identifier string) error {
-	branch := ralphloop.IterationBranch(epic, identifier)
+	branch := worktree.IterationBranch(epic, identifier)
 	if _, err := d.RevParse(featurePath, branch); err != nil {
 		return &RefusalError{Reason: ReasonIterationBranchMissing, Message: fmt.Sprintf("no iteration branch %s; commits not recoverable", branch)}
 	}
@@ -357,7 +358,7 @@ func mergeSourceRange(in MergeInput, d deps.Deps, featurePath, epic, identifier 
 	if in.From != "" {
 		return ralphloop.SourceRange{Base: in.From, Tip: in.To}, nil
 	}
-	branch := ralphloop.IterationBranch(epic, identifier)
+	branch := worktree.IterationBranch(epic, identifier)
 	if _, err := d.RevParse(featurePath, branch); err != nil {
 		return ralphloop.SourceRange{}, &RefusalError{Reason: ReasonIterationBranchMissing, Message: fmt.Sprintf("no iteration branch %s; commits not recoverable (--from/--to can still land an explicit range)", branch)}
 	}

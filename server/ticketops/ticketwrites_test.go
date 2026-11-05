@@ -11,9 +11,8 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 
-	"github.com/elentok/gx/ralphloop"
-
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -77,7 +76,7 @@ func TestCancel_RemovesTheKeptWorktreeAndKeepsTheBranch(t *testing.T) {
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Errorf("worktree still there: %v", err)
 	}
-	if !branchListed(t, repo, ralphloop.IterationBranch("epic-a", "01")) {
+	if !branchListed(t, repo, worktree.IterationBranch("epic-a", "01")) {
 		t.Error("iteration branch gone")
 	}
 }

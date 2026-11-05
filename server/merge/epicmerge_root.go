@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
@@ -258,7 +259,7 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 func (s *Merger) removeLeftoverWorktrees(repo string, e tickets.Epic) {
 	d := s.projects.DefaultDeps()
 	for _, t := range e.Tickets {
-		if err := ralphloop.RemoveIterationWorktree(d, repo, e.Name, t.Identifier); err != nil {
+		if err := worktree.RemoveIterationWorktree(d, repo, e.Name, t.Identifier); err != nil {
 			s.log.Warn("remove leftover iteration worktree", "epic", e.Name, "ticket", t.Identifier, "err", err)
 		}
 	}

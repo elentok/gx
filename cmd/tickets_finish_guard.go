@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
 )
@@ -46,7 +46,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	if err != nil {
 		return nil
 	}
-	branch := ralphloop.IterationBranch(epic, string(ticket.ID))
+	branch := worktree.IterationBranch(epic, string(ticket.ID))
 	wt := history.WorktreePathForBranch(branch, worktrees)
 	if wt == "" {
 		return nil

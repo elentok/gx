@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketwrite"
@@ -61,7 +62,7 @@ func (s *Scheduler) LiveIteration(address string) (ticketwrite.LiveIter, bool) {
 	if sess.SessionID == "" {
 		sess.SessionID = st.SessionID
 	}
-	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.Projects.WorktreeDir(a.Project))
+	label, branch, worktree := worktree.IterationIdentity(a.Epic, a.ID, s.Projects.WorktreeDir(a.Project))
 	it := wire.IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
 	if runner.Name() == queue.RunnerPTY {
 		it.QueueAgent = queue.AgentIDPrefix + runs.IterationLabel(address)

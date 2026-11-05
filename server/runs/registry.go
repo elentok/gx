@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -61,7 +61,7 @@ func IterationLabel(address string) string {
 	if err != nil {
 		return address
 	}
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	label, _, _ := worktree.IterationIdentity(addr.Epic, addr.ID, "")
 	return label
 }
 

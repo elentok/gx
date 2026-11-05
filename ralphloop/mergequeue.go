@@ -6,12 +6,12 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -71,14 +71,13 @@ type mergeQueueParams struct {
 	// Model and Effort are the resolved per-agent config a merged
 	// conflict-resolution agent starts under (see agent.ResolveTier); empty
 	// omits that one flag from the launch argv.
-	Model        string
-	Effort       string
-	Skill        string
-	ScratchDir   string
-	WorktreeLock *sync.Mutex
-	SmartZone    int
-	Gate         *Gate
-	Sink         runlog.EventSink
+	Model      string
+	Effort     string
+	Skill      string
+	ScratchDir string
+	SmartZone  int
+	Gate       *Gate
+	Sink       runlog.EventSink
 }
 
 // iterationParamsFor rebuilds the iterationParams mergeCherryPick/
@@ -98,7 +97,6 @@ func (lp mergeQueueParams) iterationParamsFor(job mergeJob) iterationParams {
 		Skill:           lp.Skill,
 		Ticket:          job.ticket,
 		ScratchDir:      lp.ScratchDir,
-		WorktreeLock:    lp.WorktreeLock,
 		SmartZone:       lp.SmartZone,
 		Gate:            lp.Gate,
 		Sink:            lp.Sink,
@@ -160,7 +158,7 @@ func mergeOne(d deps.Deps, lp mergeQueueParams, job mergeJob) outcome {
 			if _, perr := ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 				Type: events.Paused, Kind: events.AmbiguousMerge, Reason: amb.Error(),
-				Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},
+				Repair: schema.FaultState{Label: worktree.IterationLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},
 			}); perr != nil {
 				return outcome{ticket: job.ticket, err: perr}
 			}
@@ -185,7 +183,7 @@ func mergeOne(d deps.Deps, lp mergeQueueParams, job mergeJob) outcome {
 		return outcome{ticket: job.ticket, err: fmt.Errorf("clearing iteration_status after merging: %w", err)}
 	}
 
-	if err := finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, job.path, job.branch, iterationSession(p, job.pane), true); err != nil {
+	if err := finishCleanup(d, p.RepoDir, p.FeatureWorktree, job.path, job.branch, iterationSession(p, job.pane), true); err != nil {
 		return outcome{ticket: job.ticket, err: err}
 	}
 

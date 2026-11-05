@@ -6,6 +6,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 )
 
 // A mid-flight split keeps the same Number across every letter (04 ->
@@ -13,11 +14,11 @@ import (
 // lettered siblings would collide on the same worktree/branch.
 func TestIterLabelIterBranch_DistinctForLetteredSiblingsSharingNumber(t *testing.T) {
 	t.Parallel()
-	if iterLabel("epic", "04a") == iterLabel("epic", "04b") {
-		t.Errorf("iterLabel(04a) == iterLabel(04b) = %q, want distinct labels", iterLabel("epic", "04a"))
+	if worktree.IterationLabel("epic", "04a") == worktree.IterationLabel("epic", "04b") {
+		t.Errorf("iterLabel(04a) == iterLabel(04b) = %q, want distinct labels", worktree.IterationLabel("epic", "04a"))
 	}
-	if iterBranch("epic", "04a") == iterBranch("epic", "04b") {
-		t.Errorf("iterBranch(04a) == iterBranch(04b) = %q, want distinct branches", iterBranch("epic", "04a"))
+	if worktree.IterationBranch("epic", "04a") == worktree.IterationBranch("epic", "04b") {
+		t.Errorf("iterBranch(04a) == iterBranch(04b) = %q, want distinct branches", worktree.IterationBranch("epic", "04a"))
 	}
 }
 

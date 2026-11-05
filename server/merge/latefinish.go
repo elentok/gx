@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -149,7 +150,7 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 // a later rescan retries after a person fixes the epic.
 func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 	addr := lf.addr
-	label, branch, worktree := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.projects.WorktreeDir(addr.Project))
+	label, branch, worktree := worktree.IterationIdentity(addr.Epic, addr.ID, s.projects.WorktreeDir(addr.Project))
 	if lf.pause.Label != "" {
 		label = lf.pause.Label
 	}

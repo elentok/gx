@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/sessionlookup"
 )
 
@@ -63,7 +63,7 @@ func writeDigests(env evolveEnv, t evolveTarget, dir string, table *InputsTable)
 func digestSession(env evolveEnv, t evolveTarget, dir, ticket, session, kind string) ([]InputsDigest, error) {
 	agentDir := ""
 	if env.stateDir != "" {
-		label, _, _ := ralphloop.IterationIdentity(t.name, ticket, "")
+		label, _, _ := worktree.IterationIdentity(t.name, ticket, "")
 		agentDir = filepath.Join(nativerunner.AgentsRoot(env.stateDir, t.project), label)
 	}
 	s, err := sessionlookup.Lookup(sessionlookup.Roots{Home: env.homeDir, CodexHome: env.codexHome}, agentDir, session)

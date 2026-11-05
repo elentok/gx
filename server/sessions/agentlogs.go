@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/tickets"
@@ -95,7 +95,7 @@ func pausedLabels(projectDir string) map[string]bool {
 	for _, e := range epics {
 		for _, t := range e.Tickets {
 			if st := schema.Status(t.Status); st == schema.StatusPaused {
-				label, _, _ := ralphloop.IterationIdentity(filepath.Base(e.Path), t.Identifier, "")
+				label, _, _ := worktree.IterationIdentity(filepath.Base(e.Path), t.Identifier, "")
 				out[label] = true
 			}
 		}

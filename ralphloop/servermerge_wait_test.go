@@ -425,7 +425,7 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 			_ = ReleaseMergeLock(lockDir)
 		}
 	}
-	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, WorktreeLock: &worktreeLock, Gate: NewGate(), Sink: runlog.NoopEventSink{}}
+	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, Gate: NewGate(), Sink: runlog.NoopEventSink{}}
 	built := &builtAwaitingMergeError{job: mergeJob{ticket: tickets.Ticket{Identifier: "01"}}}
 
 	err := mergeBuilt(d, p, built)

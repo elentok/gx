@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -26,7 +26,7 @@ func holdWorktreeLock(t *testing.T) (release func()) {
 	acquired, done, stop := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(done)
-		_ = ralphloop.WithWorktreeLock(func() error {
+		_ = worktree.WithWorktreeLock(func() error {
 			close(acquired)
 			<-stop
 			return nil

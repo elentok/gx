@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -48,7 +49,7 @@ func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	sessionID := "sess-merge-01"
-	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
+	cwd := worktree.IterationWorktreePath("/fake/worktrees", "epic", "01")
 	d, peak := compactedMergingFixture(t, t.TempDir(), cwd, sessionID)
 	p := iterationParams{
 		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: agent.AgentClaude,
@@ -117,7 +118,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
 	sessionID := "sess-merge-01"
-	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
+	cwd := worktree.IterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixture.WriteFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
@@ -170,7 +171,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
 	sessionID := "sess-merge-01"
-	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
+	cwd := worktree.IterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixture.WriteFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
@@ -239,7 +240,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
 	sessionID := "sess-commitless-01"
-	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
+	cwd := worktree.IterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	fixture.WriteFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
@@ -291,7 +292,7 @@ func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutErr
 		ScratchDir:    scratchDir,
 	}
 
-	stampCommitlessMetrics(metrics.SessionHomes{Claude: home}, p, iterationWorktreePath("/fake/worktrees", "epic", "01"), "")
+	stampCommitlessMetrics(metrics.SessionHomes{Claude: home}, p, worktree.IterationWorktreePath("/fake/worktrees", "epic", "01"), "")
 
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {

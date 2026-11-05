@@ -9,8 +9,8 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -29,7 +29,7 @@ func startOverFixture(t *testing.T, state agentrunner.State) (repair.StartOverIn
 		t.Fatal(err)
 	}
 	runner := runnerfake.NewRunner()
-	label, _, _ := ralphloop.IterationIdentity("epic-a", "01", "")
+	label, _, _ := worktree.IterationIdentity("epic-a", "01", "")
 	if _, err := runner.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a"}); err != nil {
 		t.Fatal(err)
 	}

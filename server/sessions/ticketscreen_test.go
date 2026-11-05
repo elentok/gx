@@ -11,7 +11,7 @@ import (
 
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -28,7 +28,7 @@ func startTicketScreen(t *testing.T) *servertest.Harness {
 // the screen its holder saved when it ended.
 func ticketAgentDir(t *testing.T, stateDir, runner, screen string) {
 	t.Helper()
-	label, _, _ := ralphloop.IterationIdentity("epic-a", "01", "")
+	label, _, _ := worktree.IterationIdentity("epic-a", "01", "")
 	dir := filepath.Join(nativerunner.AgentsRoot(stateDir, "proj"), label)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func fakeHolder(t *testing.T, dir string, live []string) {
 }
 
 func ticketAgentPath(stateDir string) string {
-	label, _, _ := ralphloop.IterationIdentity("epic-a", "01", "")
+	label, _, _ := worktree.IterationIdentity("epic-a", "01", "")
 	return filepath.Join(nativerunner.AgentsRoot(stateDir, "proj"), label)
 }
 

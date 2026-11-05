@@ -22,9 +22,3 @@ func EpicQueue(epic tickets.Epic) []runlog.ScanDecision {
 	}
 	return out
 }
-
-// IterationIdentity is where a ticket's iteration lives: the herdr agent
-// label, the git branch and the worktree path under worktreeDir.
-func IterationIdentity(epicName, identifier, worktreeDir string) (label, branch, worktree string) {
-	return iterLabel(epicName, identifier), iterBranch(epicName, identifier), iterationWorktreePath(worktreeDir, epicName, identifier)
-}

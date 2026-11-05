@@ -13,7 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
@@ -67,7 +67,7 @@ func (s *Reconciler) removeLockedUnlessKept(root queue.RootRef, path, repoDir st
 		return err.Error()
 	}
 	var reason string
-	_ = ralphloop.WithWorktreeLock(func() error {
+	_ = worktree.WithWorktreeLock(func() error {
 		reason = s.removeUnlessKept(root, path, repo)
 		return nil
 	})

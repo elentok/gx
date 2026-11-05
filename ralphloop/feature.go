@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -20,7 +21,7 @@ func PrepareFeature(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	if err != nil {
 		return IterationWorktree{}, err
 	}
-	err = withWorktreeLock(func() error { return addFeatureWorktree(d, o, w.Path) })
+	err = worktree.WithWorktreeLock(func() error { return addFeatureWorktree(d, o, w.Path) })
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
@@ -38,7 +39,7 @@ func ResumeFeature(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	}
 	path := filepath.Join(wtDir, o.Epic)
 	return IterationWorktree{
-		Path: path, Label: iterLabel(o.Epic, o.Ticket.Identifier),
+		Path: path, Label: worktree.IterationLabel(o.Epic, o.Ticket.Identifier),
 		featureWorktree: path, worktreeDir: wtDir, keep: true,
 	}, nil
 }
@@ -156,7 +157,7 @@ func addFeatureWorktree(d deps.Deps, o OneIteration, path string) error {
 	if err != nil {
 		return err
 	}
-	preexisting := !exists && branchExists(d, o.RepoDir, o.Epic)
+	preexisting := !exists && worktree.BranchExists(d, o.RepoDir, o.Epic)
 	if err := d.AddWorktree(o.RepoDir, path, o.Epic, o.RootBase); err != nil {
 		return err
 	}

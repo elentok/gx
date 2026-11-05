@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -65,7 +66,7 @@ func TestConflictResolutionHandoff(t *testing.T) {
 				t.Parallel()
 				d, _, _ := fakes.FakeDeps()
 				p := conflictParams(t, t.TempDir())
-				label := conflictLabel(p.Ticket.Identifier)
+				label := worktree.ConflictLabel(p.Ticket.Identifier)
 				issuesDir := filepath.Join(p.ScratchDir, "main", "issues")
 				childPath := filepath.Join(issuesDir, childFile)
 				if err := os.MkdirAll(issuesDir, 0755); err != nil {

@@ -12,8 +12,8 @@ import (
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -46,7 +46,7 @@ func writeAgentDir(t *testing.T, stateDir string, withLog bool) string {
 // log when empty.
 func writeRunnerDir(t *testing.T, stateDir, runner, log string) string {
 	t.Helper()
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	label, _, _ := worktree.IterationIdentity(addr.Epic, addr.ID, "")
 	dir := filepath.Join(nativerunner.AgentsRoot(stateDir, addr.Project), label)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)

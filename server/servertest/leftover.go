@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -105,7 +106,7 @@ func (h *Harness) LeavePtyRun(t *testing.T, store, repo string, tg Target, live 
 	t.Helper()
 	return h.LeaveRun(t, store, repo, tg, work, func(r Run) map[string]any {
 		wt := r.Worktree
-		label, _, _ := ralphloop.IterationIdentity(tg.Epic, r.Ticket.Identifier, "")
+		label, _, _ := worktree.IterationIdentity(tg.Epic, r.Ticket.Identifier, "")
 		session := agentrunner.Session{Label: label, ID: label, SessionID: "dead-session"}
 		if live {
 			var err error

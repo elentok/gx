@@ -1,4 +1,4 @@
-package ralphloop
+package worktree
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ func TestFindIterationSession(t *testing.T) {
 		t.Fatal("found a session before any was started")
 	}
 
-	want, err := r.Start(agentrunner.StartOptions{Label: iterLabel("epic", "01"), Epic: "epic"})
+	want, err := r.Start(agentrunner.StartOptions{Label: IterationLabel("epic", "01"), Epic: "epic"})
 	if err != nil {
 		t.Fatal(err)
 	}

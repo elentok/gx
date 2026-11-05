@@ -9,8 +9,8 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -78,7 +78,7 @@ type Locator struct {
 
 // AgentLog finds the log of a's agent.
 func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
-	label, _, _ := ralphloop.IterationIdentity(a.Epic, a.ID, "")
+	label, _, _ := worktree.IterationIdentity(a.Epic, a.ID, "")
 	path := filepath.Join(nativerunner.AgentsRoot(l.StateDir, a.Project), label)
 	d, err := nativerunner.OpenDir(path)
 	switch {

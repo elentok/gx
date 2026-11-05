@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -133,7 +133,7 @@ func (rec *Recovery) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call)
 		if !idle {
 			return queue.Refusal(wire.ReasonAgentBusy, ref.Addr.String()+" agent is "+string(state)), nil
 		}
-		_, _, worktree := ralphloop.IterationIdentity(ref.Addr.Epic, ref.Addr.ID, rec.d.Projects.WorktreeDir(ref.Addr.Project))
+		_, _, worktree := worktree.IterationIdentity(ref.Addr.Epic, ref.Addr.ID, rec.d.Projects.WorktreeDir(ref.Addr.Project))
 		ahead, err := git.CommitsAhead(worktree, run.Base, "HEAD")
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("commits ahead in %s: %w", worktree, err)
