@@ -62,7 +62,7 @@ func TestWebPassword_StdinSignsEveryLoginOutAndTheNewPasswordLogsIn(t *testing.T
 	if err := execute(args, webResetDeps(t, h, newWebPassword+"\n", false, &out)); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if list, _ := h.Client.WebLogins(context.Background()); len(list.Logins) != 0 {
+	if list, _ := h.Client.Web.Logins(context.Background()); len(list.Logins) != 0 {
 		t.Errorf("logins after the change = %+v, want none", list.Logins)
 	}
 	if got := webLoginsStatus(t, base, old); got != http.StatusUnauthorized {
@@ -203,7 +203,7 @@ func TestWebPassword_AsksTwiceOnATerminalWithoutEcho(t *testing.T) {
 	if strings.Contains(screen, newWebPassword) {
 		t.Errorf("the terminal echoed the password:\n%q", screen)
 	}
-	if list, _ := h.Client.WebLogins(context.Background()); len(list.Logins) != 0 {
+	if list, _ := h.Client.Web.Logins(context.Background()); len(list.Logins) != 0 {
 		t.Errorf("logins after the change = %+v, want none", list.Logins)
 	}
 }
@@ -215,7 +215,7 @@ func TestWebPassword_TerminalMismatchChangesNothing(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "do not match") {
 		t.Errorf("err = %v, want a mismatch refusal", err)
 	}
-	if list, _ := h.Client.WebLogins(context.Background()); len(list.Logins) != 1 {
+	if list, _ := h.Client.Web.Logins(context.Background()); len(list.Logins) != 1 {
 		t.Errorf("logins after a mismatch = %+v, want the one login kept", list.Logins)
 	}
 }

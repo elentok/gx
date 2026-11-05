@@ -118,7 +118,7 @@ func TestWebLogin_SetupPendingServesThePageAndNothingElse(t *testing.T) {
 func TestWebLogin_AuthStateCarriesTheRootFingerprintWithoutACookie(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
-	info, err := l.h.Client.WebInfo(context.Background())
+	info, err := l.h.Client.Web.Info(context.Background())
 	if err != nil || info.Fingerprint == "" {
 		t.Fatalf("web info %+v, %v; want a fingerprint", info, err)
 	}
@@ -177,7 +177,7 @@ func TestWebLogin_SetupFinishSetsTheCookieAndOpensTheApp(t *testing.T) {
 	if _, body := l.get(t, "/v1/web/auth", cookie); !strings.Contains(body, logins[0].ID) {
 		t.Errorf("auth state %q, want signed in as %s", body, logins[0].ID)
 	}
-	if info, _ := l.h.Client.WebInfo(context.Background()); info.SetupPending || info.SetupCode != "" {
+	if info, _ := l.h.Client.Web.Info(context.Background()); info.SetupPending || info.SetupCode != "" {
 		t.Errorf("web info after setup %+v, want no pending setup", info)
 	}
 }
@@ -207,7 +207,7 @@ func TestWebLogin_WrongPasswordAndWrongCodeGiveTheSameReason(t *testing.T) {
 func TestWebLogin_SetupRefusalsNameTheirReason(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
-	info, _ := l.h.Client.WebInfo(context.Background())
+	info, _ := l.h.Client.Web.Info(context.Background())
 	if _, body := l.post(t, "/v1/web/auth/setup-start", `{"code":"0000 0000"}`, nil); servertest.ReasonOf(t, body) != wire.ReasonSetupCodeWrong {
 		t.Errorf("wrong Setup code: body %q, want %q", body, wire.ReasonSetupCodeWrong)
 	}

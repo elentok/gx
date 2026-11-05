@@ -22,7 +22,7 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 	}
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
 	ctx := context.Background()
-	created, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+	created, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || created.Session == nil || !created.Session.Design {
 		t.Fatalf("create on a map = %+v, %v; want Design", created.Session, err)
 	}
@@ -37,7 +37,7 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 		{"proj:plain", "proj:plain", false},
 		{"proj:missing", "proj:missing", false},
 	} {
-		plain, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+		plain, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 		if err != nil || plain.Session == nil || plain.Session.Design {
 			t.Fatalf("create plain = %+v, %v; want not Design", plain.Session, err)
 		}

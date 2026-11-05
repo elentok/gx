@@ -78,7 +78,7 @@ func TestWebResetAuthenticator_PrintsASetupCodeAndNoSecret(t *testing.T) {
 		if got := webLoginsStatus(t, base, old); got != http.StatusUnauthorized {
 			t.Errorf("old cookie after reset = %d, want 401", got)
 		}
-		if list, err := h.Client.WebLogins(context.Background()); err != nil || len(list.Logins) != 0 {
+		if list, err := h.Client.Web.Logins(context.Background()); err != nil || len(list.Logins) != 0 {
 			t.Errorf("logins after reset = %+v, %v; want none", list, err)
 		}
 

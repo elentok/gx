@@ -170,7 +170,7 @@ func TestRestart_StoppedAndExitedSessionsStay(t *testing.T) {
 
 func createFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness) string {
 	t.Helper()
-	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

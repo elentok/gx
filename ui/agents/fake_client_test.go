@@ -46,7 +46,7 @@ func (f *fakeSessionClient) record(call string) (wire.SessionResult, error) {
 	return f.result, f.err
 }
 
-func (f *fakeSessionClient) CreateSession(_ context.Context, req wire.CreateSessionRequest) (wire.SessionResult, error) {
+func (f *fakeSessionClient) Create(_ context.Context, req wire.CreateSessionRequest) (wire.SessionResult, error) {
 	f.mu.Lock()
 	f.creates = append(f.creates, req)
 	f.mu.Unlock()

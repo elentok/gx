@@ -252,7 +252,7 @@ func TestWebLoginLog_EachEventWritesOneLineWithIPAndName(t *testing.T) {
 func TestWebLoginLog_HoldsNoSecret(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
-	info, err := l.h.Client.WebInfo(context.Background())
+	info, err := l.h.Client.Web.Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

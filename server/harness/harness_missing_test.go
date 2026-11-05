@@ -141,7 +141,7 @@ func TestCreateSession_HarnessMissingRefused(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Worktree: "feature"})
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Worktree: "feature"})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionHarnessMissing {
 		t.Fatalf("create = %+v, %v; want a harness-missing refusal", res, err)
 	}

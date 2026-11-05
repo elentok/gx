@@ -128,7 +128,7 @@ func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	info, err := h.Client.WebInfo(context.Background())
+	info, err := h.Client.Web.Info(context.Background())
 	if err != nil || info.SetupCode == "" {
 		t.Fatalf("web info %+v, %v", info, err)
 	}

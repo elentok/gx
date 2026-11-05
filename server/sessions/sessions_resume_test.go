@@ -111,7 +111,7 @@ func TestResumeSession_Refusals(t *testing.T) {
 		t.Errorf("resume live = %+v, %v; want refused %s", res, err, wire.ReasonSessionLive)
 	}
 
-	noResume, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind)})
+	noResume, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind)})
 	if err != nil || noResume.Session == nil {
 		t.Fatalf("create = %+v, %v", noResume, err)
 	}

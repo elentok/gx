@@ -130,7 +130,7 @@ func TestChartingHandoff_NothingRestartsOutsideAStrongestDesignLaunch(t *testing
 		f := startHandoff(t, "chart")
 		setMapStep(t, f.store, "resolve-tickets")
 		// A session linked to the design later has no launch kind.
-		res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+		res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}

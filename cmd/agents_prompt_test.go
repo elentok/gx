@@ -14,7 +14,7 @@ import (
 
 func TestAgentsPrompt_JSON(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
-	created, err := h.Client.CreateSession(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	created, err := h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || created.Session == nil {
 		t.Fatalf("create = %+v, %v", created, err)
 	}

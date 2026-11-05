@@ -86,7 +86,7 @@ func TestCreateSession_FailedHolderStartEndsCrashed(t *testing.T) {
 	t.Cleanup(cancel)
 	holder.brk(t)
 
-	if res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)}); err == nil {
+	if res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)}); err == nil {
 		t.Fatalf("create = %+v, want an error", res)
 	}
 	snap, err := h.Client.Snapshot(ctx)

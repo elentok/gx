@@ -453,9 +453,9 @@ func (m Model) submitCreate() (tea.Model, tea.Cmd) {
 	// The new session has no info lines yet, so it gets the whole panel.
 	req.Cols, req.Rows = max(m.mainWidth()-2, 1), max(m.height-1, 1)
 	f.sending, f.err = true, ""
-	client := m.client
+	sessions := m.sessionAPI
 	return m, func() tea.Msg {
-		res, err := client.CreateSession(context.Background(), req)
+		res, err := sessions.Create(context.Background(), req)
 		return sessionCreatedMsg{result: res, err: err}
 	}
 }

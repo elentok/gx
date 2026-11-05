@@ -100,7 +100,7 @@ func names(list wire.SessionCommandsResponse) map[string]wire.SessionCommandEntr
 // createSession starts a fake-harness session in a temp dir.
 func (f commandsFixture) createSession(t *testing.T, kind string) string {
 	t.Helper()
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: kind, Ticket: "proj:map"})
+	res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: kind, Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

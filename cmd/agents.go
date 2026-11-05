@@ -311,7 +311,7 @@ func runAgentsSessionWrite(ctx context.Context, cl *apiclient.Client, w io.Write
 // runAgentsCreate never starts the server: a dead socket is a refusal.
 func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.CreateSessionRequest) error {
 	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
-		return cl.CreateSession(ctx, req)
+		return cl.Sessions.Create(ctx, req)
 	})
 }
 

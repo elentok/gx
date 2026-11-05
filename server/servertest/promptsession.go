@@ -44,7 +44,7 @@ func StartCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEn
 			codex.CodexIDEnv + "=" + conv,
 			agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t),
 		}, extraEnv...)...))
-	res, err := f.H.Client.CreateSession(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
+	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

@@ -45,7 +45,7 @@ func TestWebLogins_JSONListsEveryLoginWithItsFiveFields(t *testing.T) {
 func TestWebRevoke_EndsTheOpenEventStreamAndLogsLikeAWebRevoke(t *testing.T) {
 	h := startWebServer(t)
 	cookie := finishWebSetup(t, h)
-	list, err := h.Client.WebLogins(context.Background())
+	list, err := h.Client.Web.Logins(context.Background())
 	if err != nil || len(list.Logins) != 1 {
 		t.Fatalf("logins %+v, %v", list, err)
 	}
@@ -73,7 +73,7 @@ func TestWebRevoke_EndsTheOpenEventStreamAndLogsLikeAWebRevoke(t *testing.T) {
 	if got := webLoginsStatus(t, mustWebInfo(t, h).BaseURL, cookie); got != http.StatusUnauthorized {
 		t.Errorf("cookie after revoke = %d, want 401", got)
 	}
-	if after, _ := h.Client.WebLogins(context.Background()); len(after.Logins) != 0 {
+	if after, _ := h.Client.Web.Logins(context.Background()); len(after.Logins) != 0 {
 		t.Errorf("logins after revoke = %+v, want none", after.Logins)
 	}
 	logs, _ := os.ReadFile(server.LogPath(h.StateDir))
@@ -90,7 +90,7 @@ func TestWebRevoke_UnknownIDIsRefusedWithItsReason(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), wire.ReasonLoginNotFound) {
 		t.Errorf("err = %v, want %s", err, wire.ReasonLoginNotFound)
 	}
-	if list, _ := h.Client.WebLogins(context.Background()); len(list.Logins) != 1 {
+	if list, _ := h.Client.Web.Logins(context.Background()); len(list.Logins) != 1 {
 		t.Errorf("logins = %+v, want the one login kept", list.Logins)
 	}
 }

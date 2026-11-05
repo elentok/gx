@@ -95,7 +95,7 @@ func WebSend(t *testing.T, h *Harness, method, url string, headers map[string]st
 // the TOTP secret. now is the clock the server runs on.
 func SignIn(t *testing.T, h *Harness, base string, now func() time.Time) (*http.Cookie, string) {
 	t.Helper()
-	info, err := h.Client.WebInfo(context.Background())
+	info, err := h.Client.Web.Info(context.Background())
 	if err != nil || !info.SetupPending || info.SetupCode == "" {
 		t.Fatalf("web info %+v, %v; want setup pending with a code", info, err)
 	}

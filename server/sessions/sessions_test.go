@@ -34,7 +34,7 @@ func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
 	}
 	dir := t.TempDir()
 
-	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{
 		Project: "proj", Dir: dir, Name: "spike", Ticket: "proj:epic/01",
 		Harness: string(agentfake.HarnessKind), Cols: 90, Rows: 30,
 	})
@@ -112,7 +112,7 @@ func TestCreateSession_ConcurrentUniqueNamesMakeOneSession(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res, err := h.Client.CreateSession(ctx, req)
+			res, err := h.Client.Sessions.Create(ctx, req)
 			if err != nil {
 				t.Error(err)
 			}
@@ -137,7 +137,7 @@ func TestCreateSession_ConcurrentUniqueNamesMakeOneSession(t *testing.T) {
 func TestCreateSession_UniqueNameIgnoresAnExitedSession(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, _, _ := startFakeSession(t)
-	first, err := h.Client.CreateSession(ctx, uniqueNameReq("fixer", t))
+	first, err := h.Client.Sessions.Create(ctx, uniqueNameReq("fixer", t))
 	if err != nil || first.Session == nil {
 		t.Fatalf("create first = %+v, %v", first, err)
 	}
@@ -148,7 +148,7 @@ func TestCreateSession_UniqueNameIgnoresAnExitedSession(t *testing.T) {
 	}
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 
-	second, err := h.Client.CreateSession(ctx, uniqueNameReq("fixer", t))
+	second, err := h.Client.Sessions.Create(ctx, uniqueNameReq("fixer", t))
 	if err != nil || second.Session == nil {
 		t.Errorf("create next to the exited one = %+v, %v; want a session", second, err)
 	}
@@ -160,7 +160,7 @@ func TestCreateSession_TypedNameStaysNonUniqueWithoutTheOption(t *testing.T) {
 	for range 2 {
 		req := uniqueNameReq("twin", t)
 		req.UniqueName = false
-		if res, err := h.Client.CreateSession(ctx, req); err != nil || res.Session == nil {
+		if res, err := h.Client.Sessions.Create(ctx, req); err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v; want a session", res, err)
 		}
 	}
@@ -178,7 +178,7 @@ func TestCreateSession_RefusesBadRequests(t *testing.T) {
 		"missing dir":     {wire.CreateSessionRequest{Project: "p", Dir: filepath.Join(t.TempDir(), "gone")}, wire.ReasonSessionBadRequest},
 		"unknown harness": {wire.CreateSessionRequest{Project: "p", Dir: t.TempDir(), Harness: "nope"}, wire.ReasonSessionUnknownHarness},
 	} {
-		res, err := h.Client.CreateSession(ctx, tc.req)
+		res, err := h.Client.Sessions.Create(ctx, tc.req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -408,11 +408,11 @@ func TestSessionName_FallsBackToDisplayNameThenProjectN(t *testing.T) {
 		t.Errorf("name = %q, want proj-1", got.Name)
 	}
 
-	typed, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "mine", Harness: string(agentfake.HarnessKind)})
+	typed, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "mine", Harness: string(agentfake.HarnessKind)})
 	if err != nil || typed.Session == nil || typed.Session.Name != "mine" {
 		t.Fatalf("create typed = %+v, %v", typed, err)
 	}
-	second, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	second, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || second.Session == nil || second.Session.Name != "proj-2" {
 		t.Fatalf("create second = %+v, %v; want proj-2", second, err)
 	}
@@ -449,7 +449,7 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{
 		Project: "proj", Worktree: "feat", Harness: string(agentfake.HarnessKind),
 	})
 	if err != nil || res.Session == nil {
@@ -525,7 +525,7 @@ func TestCreateSession_RefusesBadWorktrees(t *testing.T) {
 		"existing branch":  {Project: "proj", Worktree: "main"},
 	} {
 		req.Harness = string(agentfake.HarnessKind)
-		res, err := h.Client.CreateSession(ctx, req)
+		res, err := h.Client.Sessions.Create(ctx, req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -631,7 +631,7 @@ func TestSessionCreate_TierIsSavedAndResumeKeepsIt(t *testing.T) {
 func TestSessionCreate_UnknownTierIsRefused(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Tier: "huge"})
+	res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Tier: "huge"})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionBadRequest {
 		t.Errorf("create = %+v, %v; want a bad-request refusal", res, err)
 	}

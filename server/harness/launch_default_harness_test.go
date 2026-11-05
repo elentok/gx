@@ -22,11 +22,11 @@ func TestCreateSession_EmptyHarnessFollowsDefault(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder(), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
-	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
 	if err != nil || res.Refused || res.Session == nil || res.Session.Harness != string(agentfake.HarnessKind) {
 		t.Fatalf("default create = %+v, %v; want the default harness", res, err)
 	}
-	res, err = h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "no-such-harness"})
+	res, err = h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "no-such-harness"})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionUnknownHarness {
 		t.Fatalf("explicit create = %+v, %v; want the explicit harness refused", res, err)
 	}
@@ -42,7 +42,7 @@ func TestCreateSession_ProjectOverrideBeatsDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
-	res, err := h.Client.CreateSession(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
+	res, err := h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionUnknownHarness {
 		t.Fatalf("create = %+v, %v; want the project override used (and refused as unregistered)", res, err)
 	}

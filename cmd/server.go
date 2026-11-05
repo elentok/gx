@@ -381,7 +381,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Paused: paused, Migrating: n.Migrating, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
 		if n.WebURL != "" {
 			info.WebURL = n.WebURL
-			if wi, werr := c.WebInfo(ctx); werr == nil && !wi.Refused {
+			if wi, werr := c.Web.Info(ctx); werr == nil && !wi.Refused {
 				info.WebFingerprint = wi.Fingerprint
 				if wi.SetupCode != "" {
 					info.WebSetupCode, info.WebSetupExpires = wi.SetupCode, wi.SetupExpires

@@ -89,7 +89,7 @@ func StartFakeSessionWith(t *testing.T, req wire.CreateSessionRequest, opts ...f
 		t.Fatal(err)
 	}
 	req.Project, req.Dir, req.Harness = "proj", t.TempDir(), cmp.Or(req.Harness, string(agentfake.HarnessKind))
-	res, err := h.Client.CreateSession(ctx, req)
+	res, err := h.Client.Sessions.Create(ctx, req)
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

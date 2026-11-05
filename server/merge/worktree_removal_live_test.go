@@ -23,7 +23,7 @@ func newLiveWorkFixture(t *testing.T) *schedFixture {
 
 func (f *schedFixture) sessionIn(ctx context.Context, t *testing.T, dir string) string {
 	t.Helper()
-	res, err := f.H.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: dir, Harness: string(agentfake.HarnessKind)})
+	res, err := f.H.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: dir, Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

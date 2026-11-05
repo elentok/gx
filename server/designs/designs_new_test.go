@@ -109,10 +109,10 @@ func TestCreateSession_RefusedNameLeavesNoDesignStamp(t *testing.T) {
 	req := func(ticket string) wire.CreateSessionRequest {
 		return wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "taken", UniqueName: true, Ticket: ticket, Harness: string(agentfake.HarnessKind)}
 	}
-	if res, err := f.h.Client.CreateSession(f.ctx, req("proj:plain")); err != nil || res.Session == nil {
+	if res, err := f.h.Client.Sessions.Create(f.ctx, req("proj:plain")); err != nil || res.Session == nil {
 		t.Fatalf("holder = %+v, %v", res, err)
 	}
-	res, err := f.h.Client.CreateSession(f.ctx, req("proj:map"))
+	res, err := f.h.Client.Sessions.Create(f.ctx, req("proj:map"))
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNameTaken {
 		t.Fatalf("second = %+v, %v; want %s", res, err, wire.ReasonSessionNameTaken)
 	}

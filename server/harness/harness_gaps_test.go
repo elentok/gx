@@ -50,7 +50,7 @@ func (f refusalFixture) create(t *testing.T, req wire.CreateSessionRequest) wire
 	if req.Dir == "" {
 		req.Dir = t.TempDir()
 	}
-	res, err := f.h.Client.CreateSession(f.ctx, req)
+	res, err := f.h.Client.Sessions.Create(f.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func startKept(t *testing.T, label string) keptSession {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: fake})
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: fake})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

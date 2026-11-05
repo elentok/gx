@@ -190,7 +190,7 @@ func TestSessionPrompt_NotIdle(t *testing.T) {
 func TestSessionPrompt_PlainSessionAcceptsText(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -209,7 +209,7 @@ func TestSessionPrompt_PlainSessionAcceptsText(t *testing.T) {
 func TestSessionPrompt_HarnessWithoutChat(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind), Ticket: "proj:map"})
+	res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
@@ -288,7 +288,7 @@ func TestSessionPrompt_ContinueTypesClearThenGxDesign(t *testing.T) {
 func TestSessionPrompt_ContinueRefusedOnANonDesignSession(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

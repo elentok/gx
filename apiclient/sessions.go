@@ -13,11 +13,11 @@ type Sessions struct {
 	t *transport
 }
 
-// CreateSession starts an interactive session. A refusal is a result
+// Create starts an interactive session. A refusal is a result
 // (Refused set), not an error.
-func (c *Client) CreateSession(ctx context.Context, req wire.CreateSessionRequest) (wire.SessionResult, error) {
+func (s *Sessions) Create(ctx context.Context, req wire.CreateSessionRequest) (wire.SessionResult, error) {
 	var res wire.SessionResult
-	err := c.post(ctx, "/v1/sessions/create", req, &res)
+	err := s.t.post(ctx, "/v1/sessions/create", req, &res)
 	return res, err
 }
 

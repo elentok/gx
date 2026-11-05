@@ -69,7 +69,7 @@ func finishWebSetup(t *testing.T, h *servertest.Harness) *http.Cookie {
 func finishWebSetupWithSecret(t *testing.T, h *servertest.Harness) (*http.Cookie, string) {
 	t.Helper()
 	var login *http.Cookie
-	info, err := h.Client.WebInfo(context.Background())
+	info, err := h.Client.Web.Info(context.Background())
 	if err != nil || !info.SetupPending {
 		t.Fatalf("web info %+v, %v; want setup pending", info, err)
 	}
@@ -101,7 +101,7 @@ func finishWebSetupWithSecret(t *testing.T, h *servertest.Harness) (*http.Cookie
 		t.Fatal(err)
 	}
 	post("/v1/web/auth/setup-finish", `{"code":"`+info.SetupCode+`","password":"correct horse battery","totp_code":"`+totp+`"}`)
-	if after, _ := h.Client.WebInfo(context.Background()); after.SetupPending {
+	if after, _ := h.Client.Web.Info(context.Background()); after.SetupPending {
 		t.Fatalf("setup still pending after setup-finish: %+v", after)
 	}
 	return login, start.Secret
@@ -174,7 +174,7 @@ func TestWebReset_YesClearsEverythingAndPrintsANewCode(t *testing.T) {
 
 func mustWebInfo(t *testing.T, h *servertest.Harness) wire.WebInfo {
 	t.Helper()
-	info, err := h.Client.WebInfo(context.Background())
+	info, err := h.Client.Web.Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func TestWebReset_RefusesWhenTheWebUIIsOff(t *testing.T) {
 
 func TestWebURL_PendingSetupPrintsTheSetupLinkAndCode(t *testing.T) {
 	h := startWebServer(t)
-	info, err := h.Client.WebInfo(context.Background())
+	info, err := h.Client.Web.Info(context.Background())
 	if err != nil || info.SetupCode == "" {
 		t.Fatalf("web info %+v, %v", info, err)
 	}
@@ -414,7 +414,7 @@ func TestWebNewRoot_SwapsRootAndLeafLive(t *testing.T) {
 		t.Fatalf("old root before the swap: %v", err)
 	}
 	resp.Body.Close()
-	before, err := h.Client.WebInfo(context.Background())
+	before, err := h.Client.Web.Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +430,7 @@ func TestWebNewRoot_SwapsRootAndLeafLive(t *testing.T) {
 	if got.Fingerprint == "" || got.Fingerprint == before.Fingerprint {
 		t.Errorf("fingerprint = %q, want one different from %q", got.Fingerprint, before.Fingerprint)
 	}
-	after, err := h.Client.WebInfo(context.Background())
+	after, err := h.Client.Web.Info(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

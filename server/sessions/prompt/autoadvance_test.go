@@ -46,7 +46,7 @@ func TestSessionAutoAdvance_FlipsTheSwitchOnADesignSession(t *testing.T) {
 func TestSessionAutoAdvance_RefusesAPlainAndAnUnknownSession(t *testing.T) {
 	t.Parallel()
 	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
-	plain, err := f.H.Client.CreateSession(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	plain, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || plain.Session == nil {
 		t.Fatalf("create = %+v, %v", plain, err)
 	}

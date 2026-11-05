@@ -108,7 +108,7 @@ func TestWebSessionCreate_NewWorktreeRunsTheSessionThere(t *testing.T) {
 func TestSessionCreate_CliRouteStillAcceptsASlashPrompt(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Prompt: "/x"})
+	res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Prompt: "/x"})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Errorf("create = %+v, %v; want accepted", res, err)
 	}

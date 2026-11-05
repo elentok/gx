@@ -61,7 +61,7 @@ func (w *totpWeb) reloadTOTP(t *testing.T, on bool) {
 // setupWithoutTOTP finishes setup with a password only and returns the cookie.
 func (w *totpWeb) setupWithoutTOTP(t *testing.T) *http.Cookie {
 	t.Helper()
-	info, err := w.h.Client.WebInfo(context.Background())
+	info, err := w.h.Client.Web.Info(context.Background())
 	if err != nil || !info.SetupPending {
 		t.Fatalf("web info %+v, %v", info, err)
 	}
