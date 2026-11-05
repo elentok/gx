@@ -98,7 +98,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
 	resumeID := one.ResumeSessionID
-	if agent == ralphloop.AgentCodex && !s.codexRolloutExists(cwd, resumeID) {
+	if agent == ralphloop.AgentCodex && !s.CodexRolloutExists(cwd, resumeID) {
 		resumeID = ""
 	}
 	// A server stop ends the launch prompt's wait, which Serve would otherwise
@@ -160,9 +160,9 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	return run, nil
 }
 
-// codexRolloutExists reports whether Codex has a rollout for session id under
+// CodexRolloutExists reports whether Codex has a rollout for session id under
 // cwd. An empty id has none.
-func (s *Server) codexRolloutExists(cwd, id string) bool {
+func (s *Server) CodexRolloutExists(cwd, id string) bool {
 	if id == "" {
 		return false
 	}

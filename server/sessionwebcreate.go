@@ -43,7 +43,7 @@ func (mg *Manager) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // checkProjectDir returns a refusal when project is not configured or a
@@ -70,7 +70,7 @@ func (mg *Manager) checkProjectDir(project, dir string) (*wire.SessionResult, er
 }
 
 func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionResult, error) {
-	prompt, refusal := validatePromptText(req.Prompt, "the first prompt")
+	prompt, refusal := wire.ValidatePromptText(req.Prompt, "the first prompt")
 	if refusal != nil {
 		return *refusal, nil
 	}

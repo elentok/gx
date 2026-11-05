@@ -44,9 +44,9 @@ func (c chatSource) CodexHome() (string, error)     { return c.s.projects.CodexH
 func (c chatSource) Publish(event, id string)       { c.s.events.Publish(event, id) }
 func (c chatSource) HasChatReader(h string) bool    { return c.s.settings.Load().HasChatReader(h) }
 
-// sessionInfo is m.info() plus the failure that needs a transcript read, the
+// SessionInfo is m.info() plus the failure that needs a transcript read, the
 // reported model and the running countdown.
-func (s *Server) sessionInfo(m sessionMeta) wire.SessionInfo {
+func (s *Server) SessionInfo(m sessionMeta) wire.SessionInfo {
 	cm := chatMeta(m)
 	info := m.info()
 	info.Model = s.sessionChat.ReportedModel(cm)

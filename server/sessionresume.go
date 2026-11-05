@@ -62,7 +62,7 @@ func (rs *Resumer) resumeRefusal(meta sessionMeta) wire.SessionResult {
 	if _, ok := h.Resume(meta.ConversationID, harness.LaunchOptions{}); !ok {
 		return sessionRefusal(wire.ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness))
 	}
-	if agentrunner.Kind(meta.Harness) == harness.Codex && !rs.mg.rollouts.codexRolloutExists(meta.Dir, meta.ConversationID) {
+	if agentrunner.Kind(meta.Harness) == harness.Codex && !rs.mg.rollouts.CodexRolloutExists(meta.Dir, meta.ConversationID) {
 		return sessionRefusal(wire.ReasonSessionNoResume, fmt.Sprintf("no Codex rollout for conversation %q in %s", meta.ConversationID, meta.Dir))
 	}
 	if msg := rs.mg.harness.InteractiveMissingReason(meta.Harness, "the session's harness"); msg != "" {

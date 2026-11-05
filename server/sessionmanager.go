@@ -33,9 +33,9 @@ type SessionsConfig struct {
 
 // Host is what the Manager and the Resumer need from the rest of the root.
 type Host interface {
-	sessionInfo(m sessionMeta) wire.SessionInfo
+	SessionInfo(m sessionMeta) wire.SessionInfo
 	WebURL() string
-	findTicket(address string) (ticketRef, bool, error)
+	FindTicket(address string) (queue.TicketRef, bool, error)
 	MigrationFailures() []wire.MigrationFailure
 }
 
@@ -66,34 +66,6 @@ type Manager struct {
 	rollouts codexRollouts
 }
 
-// newManager copies the fields it needs from s at call time, so s must have
-// them set (projects, harness and sessionChat come late in New).
-func newManager(s *Server) *Manager {
-	return &Manager{
-		cfg: SessionsConfig{
-			SessionsDir: s.cfg.SessionsDir, ConversationsDir: s.cfg.ConversationsDir,
-			TicketStore: s.cfg.TicketStore, Env: s.cfg.Env, Holder: s.cfg.Holder,
-			Notifier: s.cfg.Notifier, Player: s.cfg.Player,
-			SessionBannerDelay: s.cfg.SessionBannerDelay, SessionExitCleanupDelay: s.cfg.SessionExitCleanupDelay,
-		},
-		log:      s.log,
-		events:   s.events,
-		projects: s.projects,
-		settings: &s.settings,
-		harness:  s.harness,
-		idx:      s.idx,
-		chat:     s.sessionChat,
-		focus:    s.focus,
-		afk:      s.afk,
-		alerts:   s.chat,
-		host:     s,
-		watches:  newSessionWatches(),
-		prompter: serverPrompter{s},
-		designs:  s,
-		rollouts: s,
-	}
-}
-
 // Resumer brings sessions back: resume, restore, auto-resume, handoff, link,
 // step and the fix agent.
 type Resumer struct {
@@ -101,63 +73,33 @@ type Resumer struct {
 	host Host
 }
 
-// newResumer needs s.sessions set.
-func newResumer(s *Server) *Resumer {
-	return &Resumer{mg: s.sessions, host: s}
-}
-
 // Prompter is what the session watch loop needs from the prompt, turn and
 // auto-advance code. The root implements it; the move into server/sessions/prompt
 // keeps the hook.
 type Prompter interface {
-	newFirstPrompt(dir, id string, run int) FirstPrompt
-	markTurn(dir, id string) (turnMark, bool)
-	settleTurn(dir, id string, mark turnMark, design designRef, cancel <-chan struct{})
-	detectDesignActionable(dir, id string, design designRef)
-	sendAction(dir, label string, action []string)
-	cancelAutoAdvance(id, why string) bool
+	NewFirstPrompt(dir, id string, run int) FirstPrompt
+	MarkTurn(dir, id string) (chat.TurnMark, bool)
+	SettleTurn(dir, id string, mark chat.TurnMark, design chat.DesignRef, cancel <-chan struct{})
+	DetectDesignActionable(dir, id string, design chat.DesignRef)
+	SendAction(dir, label string, action []string)
+	CancelAutoAdvance(id, why string) bool
 }
 
 // FirstPrompt is the first-prompt tracker of one watch.
 type FirstPrompt interface {
-	observe(state string, ready harness.ReadySignal) string
-	noteState(state string)
-	personInput()
-	start(signal, prompt string)
-	stop()
+	Observe(state string, ready harness.ReadySignal) string
+	NoteState(state string)
+	PersonInput()
+	Start(signal, prompt string)
+	Stop()
 }
 
 // designCleaner is the designs back-call of the remove path.
 type designCleaner interface {
-	cleanupDesign(project, epic string)
+	CleanupDesign(project, epic string)
 }
 
 // codexRollouts is the sched back-call of the resume path.
 type codexRollouts interface {
-	codexRolloutExists(cwd, id string) bool
-}
-
-// serverPrompter is the root's Prompter.
-type serverPrompter struct{ s *Server }
-
-func (p serverPrompter) newFirstPrompt(dir, id string, run int) FirstPrompt {
-	return p.s.newFirstPrompt(dir, id, run)
-}
-
-func (p serverPrompter) markTurn(dir, id string) (turnMark, bool) { return p.s.markTurn(dir, id) }
-
-func (p serverPrompter) settleTurn(dir, id string, mark turnMark, design designRef, cancel <-chan struct{}) {
-	p.s.settleTurn(dir, id, mark, design, cancel)
-}
-
-func (p serverPrompter) detectDesignActionable(dir, id string, design designRef) {
-	p.s.detectDesignActionable(dir, id, design)
-}
-
-func (p serverPrompter) sendAction(dir, label string, action []string) {
-	p.s.sendAction(dir, label, action)
-}
-
-func (p serverPrompter) cancelAutoAdvance(id, why string) bool {
-	return p.s.cancelAutoAdvance(id, why)
+	CodexRolloutExists(cwd, id string) bool
 }

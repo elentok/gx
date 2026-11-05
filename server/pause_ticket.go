@@ -20,11 +20,11 @@ func (s *Server) PauseAs(address string, kind events.Kind, reason string) error 
 	if err != nil {
 		return err
 	}
-	ref, ok, err := s.findTicket(address)
+	ref, ok, err := s.FindTicket(address)
 	if err != nil || !ok {
 		return errors.Join(err, errors.New("no ticket "+address))
 	}
-	return s.pauseTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, runs.Run{})
+	return s.pauseTicket(ref.ProjectDir, addr, ref.Ticket.Path, kind, reason, runs.Run{})
 }
 
 // pauseTicket is the one way the server pauses a ticket: the write, the

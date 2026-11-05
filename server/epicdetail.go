@@ -73,7 +73,7 @@ func (s *Server) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tick
 		d.Deletable = deletable
 	}
 	d.Steps = mapSteps(e, byName)
-	step := mapProgress(e)
+	step := queue.MapProgress(e)
 	d.DesignSection = designSection(d.Address, e, step, s.designActivities()[d.Address])
 	d.RingProgress = designPercent(e, step)
 	d.Stats = epicStats(e, e.CompletedAt, now)
@@ -163,7 +163,7 @@ func epicFriction(f *schema.FrictionSummary) *wire.EpicFriction {
 // baseRow is the part of a row both epic kinds share; status is e.RenderedStatus(t).
 func baseRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) wire.EpicDetailRow {
 	return wire.EpicDetailRow{
-		Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
+		Address: root.TicketAddress(t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
 		Type: t.Type, Blockers: e.UnresolvedBlockers(t), ClosedAt: t.FinishedAt(), HadCodex: t.HadCodex,
 	}
 }
@@ -178,12 +178,12 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 	}
 	row.HarnessLabel = s.harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if t.Parent != nil {
-		row.Parent = ticketAddress(root, *t.Parent)
+		row.Parent = root.TicketAddress(*t.Parent)
 	}
 	if at, ok := s.registry.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
 	}
-	evs := readLogLenient(t)
+	evs := queue.ReadLogLenient(t)
 	if open := tickets.OpenQuestion(evs); open != nil && status == tickets.StatusPausedAnswer {
 		row.Asking, row.Question = true, open.Summary
 	}
@@ -195,8 +195,4 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 		row.Reason = t.PauseReason.Label()
 	}
 	return row
-}
-
-func ticketAddress(root queue.RootRef, id string) string {
-	return tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/queue"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
@@ -35,7 +36,7 @@ func (s *Server) designActivities() map[string]designActivity {
 		if !info.Design {
 			continue
 		}
-		addr := epicAddress(info.Ticket)
+		addr := queue.EpicAddress(info.Ticket)
 		a := out[addr]
 		exited := info.Status.State == wire.SessionExited
 		switch {

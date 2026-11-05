@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/server/queue"
 	"net/http"
 	"strings"
 
@@ -26,7 +27,7 @@ func repairState(evs []tickets.LogEvent, class schema.PauseClass) string {
 	if rounds := tickets.Rounds(evs); len(rounds) > 0 {
 		q = rounds[len(rounds)-1].Question
 	}
-	return answerState(q, class)
+	return queue.AnswerState(q, class)
 }
 
 func (rs *Resumer) fixAgentWrite(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +49,7 @@ func (rs *Resumer) fixAgentHandler(web bool) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }
 
@@ -125,20 +126,20 @@ func (rs *Resumer) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAg
 	if web && req.State == "" {
 		return fixAgentRefusal(wire.ReasonStale, "a state token is required; review the current pause"), nil
 	}
-	ref, ok, err := rs.host.findTicket(req.Address)
+	ref, ok, err := rs.host.FindTicket(req.Address)
 	if err != nil {
 		return fixAgentRefusal(wire.ReasonSessionBadRequest, err.Error()), nil
 	}
 	if !ok {
 		return fixAgentRefusal(wire.ReasonFixUnknownTicket, fmt.Sprintf("no ticket %s", req.Address)), nil
 	}
-	addr := ref.addr.String()
-	t := ref.ticket
+	addr := ref.Addr.String()
+	t := ref.Ticket
 	// The raw status, not the rendered one: an open investigate child renders
 	// the parent as waiting for children, which would hide this refusal.
-	for _, c := range ref.epic.Tickets {
+	for _, c := range ref.Epic.Tickets {
 		if c.Parent != nil && *c.Parent == t.DisplayNumber() && c.Type == string(schema.TypeInvestigate) && !c.IsTerminal() {
-			return fixAgentRefusal(wire.ReasonFixInvestigating, fmt.Sprintf("%s is already being investigated in %s", addr, ticketAddress(ref.root(), c.DisplayNumber()))), nil
+			return fixAgentRefusal(wire.ReasonFixInvestigating, fmt.Sprintf("%s is already being investigated in %s", addr, ref.Root().TicketAddress(c.DisplayNumber()))), nil
 		}
 	}
 	// The web button stays repair-only; the TUI's Investigate also takes an
@@ -147,23 +148,23 @@ func (rs *Resumer) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAg
 		if t.PausedClass() != schema.PauseClassRepair {
 			return fixAgentRefusal(wire.ReasonFixNotRepair, fmt.Sprintf("%s is not paused for repair", addr)), nil
 		}
-	} else if st := ref.epic.RenderedStatus(t); st != tickets.StatusPausedAnswer && st != tickets.StatusPausedRepair && st != tickets.StatusError {
+	} else if st := ref.Epic.RenderedStatus(t); st != tickets.StatusPausedAnswer && st != tickets.StatusPausedRepair && st != tickets.StatusError {
 		return fixAgentRefusal(wire.ReasonFixNotRepair, fmt.Sprintf("%s is not paused or in error", addr)), nil
 	}
-	if web && req.State != repairState(readLogLenient(t), t.PausedClass()) {
+	if web && req.State != repairState(queue.ReadLogLenient(t), t.PausedClass()) {
 		return fixAgentRefusal(wire.ReasonStale, "the pause changed; review the current one"), nil
 	}
-	checkout := tickets.TrunkCheckout(rs.mg.cfg.TicketStore, ref.addr.Project)
+	checkout := tickets.TrunkCheckout(rs.mg.cfg.TicketStore, ref.Addr.Project)
 	if checkout == "" {
-		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.addr.Project)), nil
+		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.Addr.Project)), nil
 	}
 	settings := rs.mg.settings.Load()
 	cs := wire.CreateSessionRequest{
-		Project:    ref.addr.Project,
+		Project:    ref.Addr.Project,
 		Dir:        checkout,
 		Name:       FixAgentName(addr),
 		UniqueName: true,
-		Prompt:     fixAgentPrompt(rs.mg.projects.LaunchHarness(ref.addr.Project), addr, t),
+		Prompt:     fixAgentPrompt(rs.mg.projects.LaunchHarness(ref.Addr.Project), addr, t),
 		Tier:       ralphloop.TierStrongest,
 	}
 	remote := settings.AgentsFixAgentRemoteControl && rs.mg.projects.LaunchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))

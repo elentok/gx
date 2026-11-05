@@ -15,25 +15,6 @@ import (
 	"github.com/elentok/gx/ralphloop"
 )
 
-// maxSessionPromptBytes caps the text one send types.
-const maxSessionPromptBytes = 32 * 1024
-
-// validatePromptText normalizes text typed into a session and refuses a
-// bang prefix and an oversized text. Empty text passes: each route
-// decides whether that is allowed. what names the text in refusal messages.
-func validatePromptText(text, what string) (string, *wire.SessionResult) {
-	text = strings.TrimSpace(normalizeAnswer(text))
-	switch {
-	case strings.HasPrefix(text, "!"):
-		res := sessionRefusal(wire.ReasonPromptPrefixNotAllowed, what+" may not start with !")
-		return text, &res
-	case len(text) > maxSessionPromptBytes:
-		res := sessionRefusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("%s is over %d bytes", what, maxSessionPromptBytes))
-		return text, &res
-	}
-	return text, nil
-}
-
 // Sources of a session prompt, as the event's source.
 const (
 	promptSourceWeb = "web"
@@ -80,7 +61,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if !s.settings.Load().HasChatReader(meta.Harness) {
 		return sessionRefusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
-	text, refusal := validatePromptText(req.Text, "text")
+	text, refusal := wire.ValidatePromptText(req.Text, "text")
 	if !req.Continue {
 		if refusal != nil {
 			return *refusal, nil

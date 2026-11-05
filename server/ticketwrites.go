@@ -31,43 +31,32 @@ func (s *Server) budgetRefusal() (wire.QueueResult, bool) {
 	return queue.Refusal(wire.ReasonBudgetLimit, "the daily budget limit is reached; raise it with `gx budget override`"), true
 }
 
-// ticketRef is a ticket found in the store, with where it lives.
-type ticketRef struct {
-	addr       tickets.Address
-	projectDir string
-	repo       string
-	ticket     tickets.Ticket
-	epic       tickets.Epic
-}
-
-func (r ticketRef) root() queue.RootRef { return queue.RootOf(r.addr) }
-
-// findTicket resolves a canonical address to its ticket, or reports it unknown.
-func (s *Server) findTicket(address string) (ticketRef, bool, error) {
+// FindTicket resolves a canonical address to its ticket, or reports it unknown.
+func (s *Server) FindTicket(address string) (queue.TicketRef, bool, error) {
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
-		return ticketRef{}, false, err
+		return queue.TicketRef{}, false, err
 	}
 	projectDir, repo, err := s.projects.Of(addr.Project)
 	if err != nil {
-		return ticketRef{}, false, nil
+		return queue.TicketRef{}, false, nil
 	}
 	epics, err := tickets.LoadResolved(addr.Project, projectDir)
 	if err != nil {
-		return ticketRef{}, false, err
+		return queue.TicketRef{}, false, err
 	}
-	find := func(addr tickets.Address) (ticketRef, bool) {
+	find := func(addr tickets.Address) (queue.TicketRef, bool) {
 		for _, e := range epics {
 			if filepath.Base(e.Path) != addr.Epic {
 				continue
 			}
 			for _, t := range e.Tickets {
 				if t.Identifier == addr.ID {
-					return ticketRef{addr: addr, projectDir: projectDir, repo: repo, ticket: t, epic: e}, true
+					return queue.TicketRef{Addr: addr, ProjectDir: projectDir, Repo: repo, Ticket: t, Epic: e}, true
 				}
 			}
 		}
-		return ticketRef{}, false
+		return queue.TicketRef{}, false
 	}
 	if ref, ok := find(addr); ok {
 		return ref, true, nil
@@ -75,7 +64,7 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 	// An archived one-off is still reachable by the address it was moved from.
 	moved, _, err := tickets.FindOriginal(addr.Project, projectDir, addr)
 	if err != nil {
-		return ticketRef{}, false, nil
+		return queue.TicketRef{}, false, nil
 	}
 	ref, ok := find(moved)
 	return ref, ok, nil
@@ -83,10 +72,10 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 
 // ticketWrite resolves the request's ticket and applies the refusals every
 // ticket write shares, before do runs.
-func (s *Server) ticketWrite(req wire.QueueRequest, do func(ticketRef) (wire.QueueResult, error)) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		if s.registry.Has(ref.addr.String()) {
-			return queue.Refusal(wire.ReasonIterationRunning, "an iteration is running in "+ref.addr.String()), nil
+func (s *Server) ticketWrite(req wire.QueueRequest, do func(queue.TicketRef) (wire.QueueResult, error)) (wire.QueueResult, error) {
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		if s.registry.Has(ref.Addr.String()) {
+			return queue.Refusal(wire.ReasonIterationRunning, "an iteration is running in "+ref.Addr.String()), nil
 		}
 		return do(ref)
 	})
@@ -94,12 +83,12 @@ func (s *Server) ticketWrite(req wire.QueueRequest, do func(ticketRef) (wire.Que
 
 // resolvedWrite is ticketWrite without the running-iteration refusal, for
 // writes that judge liveness themselves.
-func (s *Server) resolvedWrite(req wire.QueueRequest, do func(ticketRef) (wire.QueueResult, error)) (wire.QueueResult, error) {
+func (s *Server) resolvedWrite(req wire.QueueRequest, do func(queue.TicketRef) (wire.QueueResult, error)) (wire.QueueResult, error) {
 	addr, bad := queue.Canonical(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
-	ref, ok, err := s.findTicket(addr)
+	ref, ok, err := s.FindTicket(addr)
 	if err != nil {
 		return wire.QueueResult{}, err
 	}
@@ -116,20 +105,20 @@ func (s *Server) ticketPause(req wire.QueueRequest) (wire.QueueResult, error) {
 	if reason == "" {
 		return queue.Refusal(wire.ReasonReasonRequired, "a one-line reason is required"), nil
 	}
-	return s.ticketWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		if ref.ticket.Status == string(schema.StatusDone) {
-			return queue.Refusal(wire.ReasonTicketDone, ref.addr.String()+" is done"), nil
+	return s.ticketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		if ref.Ticket.Status == string(schema.StatusDone) {
+			return queue.Refusal(wire.ReasonTicketDone, ref.Addr.String()+" is done"), nil
 		}
-		switch schema.Status(ref.ticket.Status) {
+		switch schema.Status(ref.Ticket.Status) {
 		case schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
-			return queue.Refusal(wire.ReasonAlreadyPaused, ref.addr.String()+" is already paused"), nil
+			return queue.Refusal(wire.ReasonAlreadyPaused, ref.Addr.String()+" is already paused"), nil
 		}
-		if ref.epic.IsMap {
-			return queue.Refusal(wire.ReasonMapEpic, ref.addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
+		if ref.Epic.IsMap {
+			return queue.Refusal(wire.ReasonMapEpic, ref.Addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
 		}
-		run, _ := s.registry.Tracked(ref.addr.String())
-		if err := s.pauseTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.Manual, reason, run.Run); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("pause %s: %w", ref.addr, err)
+		run, _ := s.registry.Tracked(ref.Addr.String())
+		if err := s.pauseTicket(ref.ProjectDir, ref.Addr, ref.Ticket.Path, events.Manual, reason, run.Run); err != nil {
+			return wire.QueueResult{}, fmt.Errorf("pause %s: %w", ref.Addr, err)
 		}
 		return wire.QueueResult{}, nil
 	})
@@ -137,15 +126,15 @@ func (s *Server) ticketPause(req wire.QueueRequest) (wire.QueueResult, error) {
 
 // ticketUnmute clears a ticket's mutes and reopens it if the mute paused it.
 func (s *Server) ticketUnmute(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.ticketWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		if len(ref.ticket.Mutes) == 0 {
-			return queue.Refusal(wire.ReasonNotMuted, ref.addr.String()+" is not muted"), nil
+	return s.ticketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		if len(ref.Ticket.Mutes) == 0 {
+			return queue.Refusal(wire.ReasonNotMuted, ref.Addr.String()+" is not muted"), nil
 		}
-		if err := ralphloop.UnmuteTicket(ref.ticket.Path, time.Now()); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("unmute %s: %w", ref.addr, err)
+		if err := ralphloop.UnmuteTicket(ref.Ticket.Path, time.Now()); err != nil {
+			return wire.QueueResult{}, fmt.Errorf("unmute %s: %w", ref.Addr, err)
 		}
-		if err := tickets.EndOpenRound(ref.ticket.Path, req.Source, tickets.HowResume, ralphloop.CloseResumed); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
+		if err := tickets.EndOpenRound(ref.Ticket.Path, req.Source, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
 		}
 		s.idx.Rescan()
 		return wire.QueueResult{}, nil
@@ -209,9 +198,9 @@ func (s *Server) promptsOnRetry(address string) bool {
 // person's relaunch logs human-relaunch, which resets the recovery budget. A
 // late finish is adopted instead, with no launch.
 func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult, error) {
-	return s.ticketWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		if ref.ticket.Status == string(schema.StatusDone) {
-			return queue.Refusal(wire.ReasonTicketDone, ref.addr.String()+" is done"), nil
+	return s.ticketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		if ref.Ticket.Status == string(schema.StatusDone) {
+			return queue.Refusal(wire.ReasonTicketDone, ref.Addr.String()+" is done"), nil
 		}
 		var applied *recovery.Failure
 		if qc.Investigator != "" {
@@ -223,7 +212,7 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.Queue
 			qc.Actor = recovery.ActorInvestigate
 		}
 		if req.State != "" {
-			stale, err := ticketPauseStale(ref.ticket.Path, req.State)
+			stale, err := ticketPauseStale(ref.Ticket.Path, req.State)
 			if err != nil {
 				return wire.QueueResult{}, err
 			}
@@ -231,11 +220,11 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.Queue
 				return queue.Refusal(wire.ReasonStale, "the pause changed; review the current one"), nil
 			}
 		}
-		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
+		if s.adoptFirst(ref.ProjectDir, ref.Addr, ref.Ticket.Path) {
 			return wire.QueueResult{}, nil
 		}
-		agent := s.harness.ResolveTicket(ref.addr, ref.ticket).Harness
-		if reason, held := s.herdrHolds(s.harness.LaunchRunner(ref.addr.Project, agent)); held {
+		agent := s.harness.ResolveTicket(ref.Addr, ref.Ticket).Harness
+		if reason, held := s.herdrHolds(s.harness.LaunchRunner(ref.Addr.Project, agent)); held {
 			return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
 		}
 		if res, refused := s.budgetRefusal(); refused {
@@ -246,40 +235,40 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.Queue
 				return queue.Refusal(wire.ReasonUsageLimit, v), nil
 			}
 		}
-		if d, held := s.disks.FreshHeldDisk(ref.addr.Project); held {
+		if d, held := s.disks.FreshHeldDisk(ref.Addr.Project); held {
 			return queue.Refusal(wire.ReasonDiskLow, disk.LowReason(d)), nil
 		}
-		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, wire.ReasonAgentWorking, isWorking); refused || err != nil {
+		if res, refused, err := s.settleLive([]tickets.Address{ref.Addr}, req.Stop, wire.ReasonAgentWorking, isWorking); refused || err != nil {
 			return res, err
 		}
 		source := req.Source
 		if qc.Actor != "" {
 			source = tickets.SourceGx
 		}
-		if err := tickets.EndOpenRound(ref.ticket.Path, source, tickets.HowRelaunch, ralphloop.CloseRelaunch); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
+		if err := tickets.EndOpenRound(ref.Ticket.Path, source, tickets.HowRelaunch, ralphloop.CloseRelaunch); err != nil {
+			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
 		}
 		if qc.Actor == "" {
 			if err := s.cancelInvestigateChild(ref, req.Source); err != nil {
 				return wire.QueueResult{}, err
 			}
-			err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{
-				Time: time.Now(), Type: string(events.HumanRelaunch), Ticket: ref.addr.ID, Address: ref.addr.String(),
+			err := ralphloop.AppendEvent(ref.ProjectDir, ref.Addr.Epic, ralphloop.Event{
+				Time: time.Now(), Type: string(events.HumanRelaunch), Ticket: ref.Addr.ID, Address: ref.Addr.String(),
 			})
 			if err != nil {
-				return wire.QueueResult{}, fmt.Errorf("logging relaunch of %s: %w", ref.addr, err)
+				return wire.QueueResult{}, fmt.Errorf("logging relaunch of %s: %w", ref.Addr, err)
 			}
 		}
-		epics, err := tickets.LoadResolved(ref.addr.Project, ref.projectDir)
+		epics, err := tickets.LoadResolved(ref.Addr.Project, ref.ProjectDir)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
-		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, agent, epics); err != nil {
+		if _, err := s.claimAndLaunch(ref.Root(), ref.Addr, ref.Ticket, ref.Repo, agent, epics); err != nil {
 			return wire.QueueResult{}, err
 		}
 		if applied != nil {
 			s.appendRecoveryEvent(ref, *applied, ralphloop.Event{
-				Type: string(events.RecoveryApplied), Ticket: ref.addr.ID, Kind: string(applied.Kind),
+				Type: string(events.RecoveryApplied), Ticket: ref.Addr.ID, Kind: string(applied.Kind),
 				Reason: investigateRetryEntry, Outcome: "ok", Text: qc.Investigator,
 			})
 		}
@@ -291,22 +280,22 @@ func (s *Server) ticketRelaunch(req wire.QueueRequest, qc queue.Ctx) (wire.Queue
 // A claimed ticket with a live pane refuses ticket-live unless Stop closes the
 // pane first.
 func (s *Server) ticketCancel(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		if ref.ticket.Status == string(schema.StatusDone) {
-			return queue.Refusal(wire.ReasonTicketDone, ref.addr.String()+" is done"), nil
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		if ref.Ticket.Status == string(schema.StatusDone) {
+			return queue.Refusal(wire.ReasonTicketDone, ref.Addr.String()+" is done"), nil
 		}
 		// An archived one-off, found by its old address, is already over.
-		if ref.addr.Epic == queue.OneOffsArchivedEpic {
-			return queue.Refusal(wire.ReasonTicketDone, ref.addr.String()+" is archived"), nil
+		if ref.Addr.Epic == queue.OneOffsArchivedEpic {
+			return queue.Refusal(wire.ReasonTicketDone, ref.Addr.String()+" is archived"), nil
 		}
 		targets := cancelTargets(ref)
 		addrs := make([]tickets.Address, len(targets))
 		for i, t := range targets {
-			addrs[i] = tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}
+			addrs[i] = tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}
 		}
 		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
 		// A one-off is archived on cancel, so its run can't be left alive behind it.
-		stop := req.Stop || ref.addr.Epic == queue.OneOffsEpic
+		stop := req.Stop || ref.Addr.Epic == queue.OneOffsEpic
 		if res, refused, err := s.settleLive(addrs, stop, wire.ReasonTicketLive, anyLive); refused || err != nil {
 			return res, err
 		}
@@ -315,7 +304,7 @@ func (s *Server) ticketCancel(req wire.QueueRequest) (wire.QueueResult, error) {
 				return wire.QueueResult{}, err
 			}
 		}
-		if ref.addr.Epic == queue.OneOffsEpic {
+		if ref.Addr.Epic == queue.OneOffsEpic {
 			s.idx.Rescan()
 		}
 		return wire.QueueResult{}, nil
@@ -324,22 +313,22 @@ func (s *Server) ticketCancel(req wire.QueueRequest) (wire.QueueResult, error) {
 
 // markCancelled closes t's pause round and settles it as cancelled. Its live
 // agent is the caller's to stop.
-func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) error {
+func (s *Server) markCancelled(ref queue.TicketRef, t tickets.Ticket, source string) error {
 	if err := tickets.EndOpenRound(t.Path, source, tickets.HowCancel, "cancelled"); err != nil {
-		return fmt.Errorf("end pause round of %s: %w", ref.address(t), err)
+		return fmt.Errorf("end pause round of %s: %w", ref.Address(t), err)
 	}
 	if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
-		return fmt.Errorf("cancel %s: %w", ref.address(t), err)
+		return fmt.Errorf("cancel %s: %w", ref.Address(t), err)
 	}
-	s.stampFinished(tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}, t.Path, true)
+	s.stampFinished(tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}, t.Path, true)
 	// The branch stays: it holds the commits.
-	if ref.repo != "" && s.awaitRunSettled(ref.address(t)) {
+	if ref.Repo != "" && s.awaitRunSettled(ref.Address(t)) {
 		// The epic merge removes leftovers later, so a failed removal must not stop the cancel.
-		if err := ralphloop.RemoveIterationWorktree(s.projects.DefaultDeps(), ref.repo, ref.addr.Epic, t.Identifier); err != nil {
-			s.log.Warn("remove cancelled worktree", "ticket", ref.address(t), "err", err)
+		if err := ralphloop.RemoveIterationWorktree(s.projects.DefaultDeps(), ref.Repo, ref.Addr.Epic, t.Identifier); err != nil {
+			s.log.Warn("remove cancelled worktree", "ticket", ref.Address(t), "err", err)
 		}
 	}
-	s.events.Publish(wire.EventTicketCancelled, ref.address(t))
+	s.events.Publish(wire.EventTicketCancelled, ref.Address(t))
 	return nil
 }
 
@@ -353,14 +342,14 @@ func (s *Server) awaitRunSettled(addr string) bool {
 // cancelInvestigateChild is a person's recovery verb withdrawing ref's
 // unfinished investigate child, stopping its live agent, so an old investigation
 // does not act after the person. Investigate's own verbs never call it.
-func (s *Server) cancelInvestigateChild(ref ticketRef, source string) error {
-	forks := ref.epic.ForkParents()
-	for _, t := range ref.epic.Tickets {
+func (s *Server) cancelInvestigateChild(ref queue.TicketRef, source string) error {
+	forks := ref.Epic.ForkParents()
+	for _, t := range ref.Epic.Tickets {
 		parent, ok := forks.Of(t)
-		if !ok || parent.Identifier != ref.ticket.Identifier || t.Type != string(schema.TypeInvestigate) || isTerminal(t.Status) {
+		if !ok || parent.Identifier != ref.Ticket.Identifier || t.Type != string(schema.TypeInvestigate) || isTerminal(t.Status) {
 			continue
 		}
-		addr := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}
+		addr := tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}
 		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
 		if _, _, err := s.settleLive([]tickets.Address{addr}, true, wire.ReasonTicketLive, anyLive); err != nil {
 			return err
@@ -374,7 +363,7 @@ func (s *Server) cancelInvestigateChild(ref ticketRef, source string) error {
 
 // cancelInvestigateOf is cancelInvestigateChild for a ticket named by address.
 func (s *Server) cancelInvestigateOf(address, source string) error {
-	ref, ok, err := s.findTicket(address)
+	ref, ok, err := s.FindTicket(address)
 	if err != nil || !ok {
 		return err
 	}
@@ -420,11 +409,11 @@ func isWorking(r agentrunner.Runner, sess agentrunner.Session) bool {
 }
 
 // cancelTargets is the ticket plus its fork descendants that are not terminal.
-func cancelTargets(ref ticketRef) []tickets.Ticket {
-	forks := ref.epic.ForkParents()
-	targets := []tickets.Ticket{ref.ticket}
+func cancelTargets(ref queue.TicketRef) []tickets.Ticket {
+	forks := ref.Epic.ForkParents()
+	targets := []tickets.Ticket{ref.Ticket}
 	for i := 0; i < len(targets); i++ {
-		for _, t := range ref.epic.Tickets {
+		for _, t := range ref.Epic.Tickets {
 			if parent, ok := forks.Of(t); ok && parent.Identifier == targets[i].Identifier && !isTerminal(t.Status) {
 				targets = append(targets, t)
 			}
@@ -435,8 +424,4 @@ func cancelTargets(ref ticketRef) []tickets.Ticket {
 
 func isTerminal(status string) bool {
 	return status == string(schema.StatusDone) || status == string(schema.StatusCancelled)
-}
-
-func (r ticketRef) address(t tickets.Ticket) string {
-	return tickets.Address{Project: r.addr.Project, Epic: r.addr.Epic, ID: t.Identifier}.String()
 }

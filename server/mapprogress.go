@@ -2,25 +2,13 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"strings"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// mapProgress is a map's current Progress step. It comes from the epic's
-// design_step alone: status done always shows Done, and a missing or unknown
-// field shows Chart. It never looks at files or branch refs.
-func mapProgress(m tickets.Epic) wire.ProgressStep {
-	if m.Status == string(schema.StatusDone) {
-		return wire.ProgressDone
-	}
-	if step, ok := tickets.ParseDesignStep(m.DesignStep); ok {
-		return step
-	}
-	return wire.ProgressChart
-}
 
 // progressLabels is the label of each Progress step.
 var progressLabels = map[wire.ProgressStep]string{
@@ -37,7 +25,7 @@ var progressLabels = map[wire.ProgressStep]string{
 // mapSteps lists all Progress steps with their state. The steps before the
 // current one are done, and all of them are once the map is Done.
 func mapSteps(m tickets.Epic, byName map[string]tickets.Epic) []wire.MapStep {
-	current := mapProgress(m)
+	current := queue.MapProgress(m)
 	steps := make([]wire.MapStep, 0, len(tickets.DesignSteps))
 	state := wire.MapStepDone
 	for _, step := range tickets.DesignSteps {

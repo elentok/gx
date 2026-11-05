@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/queue"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -92,7 +93,7 @@ func (s *Server) resolveDesignDir(project, epic, excludeID string) (designDir, e
 		return designDir{Clash: msg}, nil
 	}
 	if c.afterBranch() {
-		s.cleanupDesign(project, epic)
+		s.CleanupDesign(project, epic)
 		path := tickets.TrunkCheckout(s.cfg.TicketStore, project)
 		if path == "" {
 			return designDir{}, fmt.Errorf("no trunk checkout for project %s", project)
@@ -106,11 +107,11 @@ func (s *Server) resolveDesignDir(project, epic, excludeID string) (designDir, e
 	return designDir{Path: path, Note: s.rebaseDesign(project, epic, path, excludeID)}, nil
 }
 
-// cleanupDesign removes the map's design worktree and branch once the Design is
+// CleanupDesign removes the map's design worktree and branch once the Design is
 // past Branch, no design session of the map is live, the worktree has no
 // uncommitted edits and every design patch is in <map>-impl. Anything else
 // keeps both and logs a warning; the next trigger checks again.
-func (s *Server) cleanupDesign(project, epic string) {
+func (s *Server) CleanupDesign(project, epic string) {
 	if err := s.tryCleanupDesign(project, epic); err != nil {
 		s.log.Warn("design cleanup kept the worktree and branch", "map", project+":"+epic, "err", err)
 		return
@@ -192,7 +193,7 @@ func (s *Server) scanDesignCleanups() {
 				if step == tickets.StepDone {
 					s.stopFinishedDesign(project, epic)
 				}
-				s.cleanupDesign(project, epic)
+				s.CleanupDesign(project, epic)
 			})
 		}
 	}
@@ -435,12 +436,12 @@ func (s *Server) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult, 
 	if !designSlugRe.MatchString(slug) {
 		return sessionRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", slug)), nil
 	}
-	idea := strings.TrimSpace(normalizeAnswer(req.Idea))
+	idea := strings.TrimSpace(wire.NormalizeAnswer(req.Idea))
 	switch {
 	case idea == "":
 		return sessionRefusal(wire.ReasonEmptyPrompt, "an idea is required"), nil
-	case len(idea) > maxSessionPromptBytes:
-		return sessionRefusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
+	case len(idea) > wire.MaxSessionPromptBytes:
+		return sessionRefusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", wire.MaxSessionPromptBytes)), nil
 	}
 	dir, err := s.projects.Dir(req.Project)
 	if err != nil {
@@ -600,7 +601,7 @@ func (s *Server) liveDesignSessionExcept(epicAddr, excludeID string) (*wire.Sess
 	var live *wire.SessionInfo
 	for i := range list {
 		in := &list[i]
-		if in.ID != excludeID && in.Design && in.Status.State != wire.SessionExited && epicAddress(in.Ticket) == epicAddr &&
+		if in.ID != excludeID && in.Design && in.Status.State != wire.SessionExited && queue.EpicAddress(in.Ticket) == epicAddr &&
 			(live == nil || !in.RunStartedAt.Before(live.RunStartedAt)) {
 			live = in
 		}

@@ -25,7 +25,7 @@ func (rs *Resumer) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // linkSession sets the session's Session ticket, qualifying a bare address
@@ -68,7 +68,7 @@ func (rs *Resumer) sessionStepWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // reportSessionStep saves the Design step an agent says it is running,

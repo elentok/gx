@@ -115,8 +115,8 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 		}
 		_ = stream.Close()
 	}()
-	first := mg.prompter.newFirstPrompt(dir, id, run)
-	defer first.stop()
+	first := mg.prompter.NewFirstPrompt(dir, id, run)
+	defer first.Stop()
 	poll := mg.chat.NewPoll(dir, id)
 	defer poll.Close()
 	// settle is closed to end the wait of the last idle edge's settleTurn.
@@ -141,7 +141,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 		case nativerunner.StreamStatus:
 			st := sessionStatusOf(msg.Status)
 			var prompt, signal string
-			var design designRef
+			var design chat.DesignRef
 			idleEdge := false
 			// An idle whose turn start this watch did not see (an idle-to-busy
 			// edge) is not Live, e.g. a turn already running at connect.
@@ -174,7 +174,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 					if st.Promptable() && !prev.Promptable() {
 						idleEdge = true
 						if m.Design {
-							design = designRef{m.ConversationID, m.Ticket, live}
+							design = chat.DesignRef{Conversation: m.ConversationID, Ticket: m.Ticket, Live: live}
 						}
 					}
 				}
@@ -190,38 +190,38 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 					changed = true
 				}
 				if m.FirstPrompt != "" {
-					if sig := first.observe(st.State, msg.Ready); sig != "" {
+					if sig := first.Observe(st.State, msg.Ready); sig != "" {
 						prompt, signal, m.FirstPrompt = m.FirstPrompt, sig, ""
 						changed = true
 					}
 				}
 				return changed
 			})
-			first.noteState(st.State)
+			first.NoteState(st.State)
 			mg.noteFailure(id)
 			poll.SetActive(st.State == wire.SessionStarting || st.State == wire.SessionWorking)
 			// Marked before the Design check reads the transcript.
-			mark, marked := turnMark{}, false
+			mark, marked := chat.TurnMark{}, false
 			if idleEdge {
-				mark, marked = mg.prompter.markTurn(dir, id)
+				mark, marked = mg.prompter.MarkTurn(dir, id)
 			}
 			if design.Conversation != "" {
-				mg.prompter.detectDesignActionable(dir, id, design)
+				mg.prompter.DetectDesignActionable(dir, id, design)
 			}
 			if marked {
 				endSettle()
 				cancel := make(chan struct{})
 				settle = cancel
-				mg.watches.start(func() { mg.prompter.settleTurn(dir, id, mark, design, cancel) })
+				mg.watches.start(func() { mg.prompter.SettleTurn(dir, id, mark, design, cancel) })
 			}
 			if prompt != "" {
-				first.start(signal, prompt)
+				first.Start(signal, prompt)
 			}
 		case nativerunner.StreamInput:
-			first.personInput()
+			first.PersonInput()
 			// Typing during a countdown stops only the countdown: the run-end
 			// Continue stays raised.
-			stopped := mg.prompter.cancelAutoAdvance(id, "Auto-advance stopped: you typed")
+			stopped := mg.prompter.CancelAutoAdvance(id, "Auto-advance stopped: you typed")
 			update(func(m *sessionMeta) bool {
 				changed := m.AutoSends != 0
 				m.AutoSends = 0
@@ -381,7 +381,7 @@ func sessionWriteAs(check func(wire.SessionRequest) (wire.SessionResult, error),
 				return
 			}
 			if res.Refused {
-				writeJSON(w, res)
+				wire.WriteJSON(w, res)
 				return
 			}
 		}
@@ -390,6 +390,6 @@ func sessionWriteAs(check func(wire.SessionRequest) (wire.SessionResult, error),
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }

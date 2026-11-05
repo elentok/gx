@@ -115,7 +115,7 @@ func TestSessionInfoModel_ReportedBeatsSavedAndNewestReplyWins(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"), replyWithModel("claude-sonnet-5-5"))
 	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "sonnet", Effort: "high"}
-	info := s.sessionInfo(meta)
+	info := s.SessionInfo(meta)
 	if info.Model != "claude-sonnet-5-5" || info.Tier != "worker" || info.Effort != "high" {
 		t.Errorf("tier/model/effort = %q/%q/%q, want worker/claude-sonnet-5-5/high", info.Tier, info.Model, info.Effort)
 	}
@@ -124,7 +124,7 @@ func TestSessionInfoModel_ReportedBeatsSavedAndNewestReplyWins(t *testing.T) {
 func TestSessionInfoModel_TierAloneUntilFirstReply(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`)
-	info := s.sessionInfo(sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "light"})
+	info := s.SessionInfo(sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "light"})
 	if info.Tier != "light" || info.Model != "" {
 		t.Errorf("tier/model = %q/%q, want light and no model", info.Tier, info.Model)
 	}
@@ -133,11 +133,11 @@ func TestSessionInfoModel_TierAloneUntilFirstReply(t *testing.T) {
 func TestSessionInfoModel_OldMetaShowsTheReportedModelOnceItReplies(t *testing.T) {
 	t.Parallel()
 	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
-	replied := modelTestServer(t, "/work/proj", replyWithModel("claude-sonnet-5-5")).sessionInfo(meta)
+	replied := modelTestServer(t, "/work/proj", replyWithModel("claude-sonnet-5-5")).SessionInfo(meta)
 	if replied.Model != "claude-sonnet-5-5" || replied.Tier != "" || replied.Effort != "" {
 		t.Errorf("tier/model/effort = %q/%q/%q, want no tier or effort and claude-sonnet-5-5", replied.Tier, replied.Model, replied.Effort)
 	}
-	quiet := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`).sessionInfo(meta)
+	quiet := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`).SessionInfo(meta)
 	if quiet.Model != "" {
 		t.Errorf("model = %q before the first reply, want empty", quiet.Model)
 	}
@@ -147,7 +147,7 @@ func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
 	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
-	if got := s.sessionInfo(meta).Model; got != "claude-opus-5-5" {
+	if got := s.SessionInfo(meta).Model; got != "claude-opus-5-5" {
 		t.Fatalf("model = %q, want claude-opus-5-5", got)
 	}
 	path, ok := s.sessionChat.ClaudeTranscript("s1", chatMeta(meta))
@@ -164,7 +164,7 @@ func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.sessionInfo(meta).Model; got != "claude-sonnet-5-5" {
+	if got := s.SessionInfo(meta).Model; got != "claude-sonnet-5-5" {
 		t.Errorf("model = %q after an appended reply, want claude-sonnet-5-5", got)
 	}
 }
@@ -172,7 +172,7 @@ func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 func TestSessionInfoModel_CodexKeepsSavedValues(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
-	info := s.sessionInfo(sessionMeta{Harness: "codex", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "gpt-5", Effort: "low"})
+	info := s.SessionInfo(sessionMeta{Harness: "codex", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "gpt-5", Effort: "low"})
 	if info.Model != "gpt-5" || info.Effort != "low" || info.ModelSwitched {
 		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-5/low/false", info.Model, info.Effort, info.ModelSwitched)
 	}
@@ -192,7 +192,7 @@ func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := withChat(withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}))
-	info := s.sessionInfo(sessionMeta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
+	info := s.SessionInfo(sessionMeta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
 	if info.Model != "gpt-6.1-terra" || info.Effort != "high" || !info.ModelSwitched {
 		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-6.1-terra/high/true", info.Model, info.Effort, info.ModelSwitched)
 	}
@@ -214,7 +214,7 @@ func TestSessionInfoModel_ModelSwitchedNote(t *testing.T) {
 		"before the first reply":       {"sonnet", []string{`{"type":"user","message":{"content":"hi"}}`}, false},
 	} {
 		s := modelTestServer(t, "/work/proj", tc.lines...)
-		if got := s.sessionInfo(meta(tc.launched)).ModelSwitched; got != tc.want {
+		if got := s.SessionInfo(meta(tc.launched)).ModelSwitched; got != tc.want {
 			t.Errorf("%s: ModelSwitched = %v, want %v", name, got, tc.want)
 		}
 	}

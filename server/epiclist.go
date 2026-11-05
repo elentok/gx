@@ -130,7 +130,7 @@ func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[
 		row := s.epicListRow(project, e, qidx)
 		row.BlockedByEpics = unmergedBlockers(project, e, merged)
 		if e.IsMap {
-			row.ProgressStep = mapProgress(e)
+			row.ProgressStep = queue.MapProgress(e)
 			var impl *wire.EpicListRow
 			if implEpic, ok := joined[e.Name]; ok {
 				r := s.epicListRow(project, implEpic, qidx)

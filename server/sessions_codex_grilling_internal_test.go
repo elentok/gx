@@ -8,6 +8,8 @@ import (
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/settings"
 )
 
 func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
@@ -16,9 +18,15 @@ func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 	codexHome := t.TempDir()
 	root := t.TempDir()
 	m := sessionMeta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
-	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{ConversationsDir: root, Env: []string{"HOME=" + home, "CODEX_HOME=" + codexHome}}})
-	s.sessions = newManager(s)
-	s.sessions.recordConversation(m)
+	env := []string{"HOME=" + home, "CODEX_HOME=" + codexHome}
+	log := slog.New(slog.DiscardHandler)
+	mg := &Manager{
+		cfg:      SessionsConfig{ConversationsDir: root, Env: env},
+		log:      log,
+		projects: projects.NewRegistry(func() projects.Env { return projects.Env{Env: env} }, log, nil, &settings.Holder{}, nil, nil),
+		watches:  newSessionWatches(),
+	}
+	mg.recordConversation(m)
 
 	dir := filepath.Join(codexHome, "sessions", "2026", "01", "02")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -32,7 +40,7 @@ func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.sessions.saveConversationTotals(m, m.ConversationID)
+	mg.saveConversationTotals(m, m.ConversationID)
 	rec, err := conversations.Read(root, m.ConversationID)
 	if err != nil {
 		t.Fatal(err)

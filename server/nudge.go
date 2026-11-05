@@ -57,9 +57,9 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 	if text == "" {
 		return queue.Refusal(wire.ReasonTextRequired, "text to type into the pane is required"), nil
 	}
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		address := ref.addr.String()
-		if r, err := s.harness.IterationRunner(ref.addr); err == nil {
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		address := ref.Addr.String()
+		if r, err := s.harness.IterationRunner(ref.Addr); err == nil {
 			if reason, held := s.herdrHolds(r); held {
 				return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
 			}
@@ -81,8 +81,8 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 			}
 			return wire.QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
 		}
-		err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{
-			Time: now, Type: string(events.Nudged), Ticket: ref.addr.ID, Address: address,
+		err := ralphloop.AppendEvent(ref.ProjectDir, ref.Addr.Epic, ralphloop.Event{
+			Time: now, Type: string(events.Nudged), Ticket: ref.Addr.ID, Address: address,
 			Pane: it.info.Pane, Text: text,
 		})
 		if err != nil {
@@ -107,10 +107,10 @@ const (
 // paused ticket's pane, as recovery's R7 nudges): until it settles it counts
 // as a run, so the budget meters it and the hard limit stops it. It is never
 // finished or merged; the paused ticket stays with whoever handles the pause.
-func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
+func (s *Server) watchNudgedPane(ref queue.TicketRef, it liveIter) {
 	t := runs.TrackedRun{
-		Run:  runs.Run{Address: ref.addr.String(), Runner: it.runner.Name(), Session: it.session},
-		Root: ref.root().String(), TicketPath: ref.ticket.Path, Cwd: it.info.Worktree, StartedAt: time.Now(), Watched: true,
+		Run:  runs.Run{Address: ref.Addr.String(), Runner: it.runner.Name(), Session: it.session},
+		Root: ref.Root().String(), TicketPath: ref.Ticket.Path, Cwd: it.info.Worktree, StartedAt: time.Now(), Watched: true,
 	}
 	r := it.runner
 	s.registry.Put(t)

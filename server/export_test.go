@@ -49,15 +49,15 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	ref, ok, err := s.findTicket(address)
+	ref, ok, err := s.FindTicket(address)
 	if err != nil || !ok {
 		return false, errors.Join(err, errors.New("no ticket "+address))
 	}
-	epics, err := tickets.Load(ref.projectDir)
+	epics, err := tickets.Load(ref.ProjectDir)
 	if err != nil {
 		return false, err
 	}
-	return s.claimAndLaunch(queue.RootOf(addr), addr, ref.ticket, ref.repo, ralphloop.AgentKind(agent), epics)
+	return s.claimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, ralphloop.AgentKind(agent), epics)
 }
 
 // SetMergeInto swaps the merge core a root merge calls.

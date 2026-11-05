@@ -44,7 +44,7 @@ func badRoundBlocks(text string) []badRoundBlock {
 // fileBadRoundBlocks files the unreadable blocks of a round into the one open
 // follow-up that collects them. A round already filed adds nothing. A missing
 // follow-ups project or a failed write only logs a warning.
-func (s *Server) fileBadRoundBlocks(id string, design designRef, text string) {
+func (s *Server) fileBadRoundBlocks(id string, design chat.DesignRef, text string) {
 	bad := badRoundBlocks(text)
 	if len(bad) == 0 {
 		return
@@ -64,7 +64,7 @@ func (s *Server) fileBadRoundBlocks(id string, design designRef, text string) {
 
 // writeBadBlockFollowUp adds the round to the open draft carrying badBlockKey,
 // or files a new one. It returns "" when the round is already filed.
-func (s *Server) writeBadBlockFollowUp(id string, design designRef, round string, bad []badRoundBlock) (string, error) {
+func (s *Server) writeBadBlockFollowUp(id string, design chat.DesignRef, round string, bad []badRoundBlock) (string, error) {
 	epicPath, err := s.followUpsEpicPath("")
 	if err != nil {
 		return "", err

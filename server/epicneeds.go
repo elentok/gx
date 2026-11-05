@@ -111,7 +111,7 @@ func (s *Server) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Tick
 	label := t.DisplayNumber() + " " + t.Title
 	switch {
 	case isPaused(e, t) && status != tickets.StatusDraft:
-		evs := readLogLenient(t)
+		evs := queue.ReadLogLenient(t)
 		n := needsYou{
 			Pill: PillPaused, Reason: label + ": " + tickets.PauseDetail(e, t),
 			Action: wire.CardAction{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: addr.String()},
@@ -131,7 +131,7 @@ func (s *Server) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Tick
 		}
 		return needsYou{
 			Pill: PillPermission, Reason: label + " wants to run: " + cmp.Or(card.Description, card.Tool),
-			Since:  permissionSince(readLogLenient(t)),
+			Since:  permissionSince(queue.ReadLogLenient(t)),
 			Action: wire.CardAction{Kind: wire.CardActionAnswer, Label: "Answer", Target: addr.String()},
 		}, true
 	}

@@ -24,7 +24,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 	if strings.TrimSpace(q.Handoff) == "" {
 		return queue.Refusal(wire.ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
 	}
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		ev := tickets.LogEvent{
 			Type:    tickets.EventPauseQuestion,
 			By:      askAuthorAgent,
@@ -33,23 +33,23 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 			Block:   tickets.QuestionBlock(req.Text),
 			Handoff: q.Handoff,
 		}
-		_, err := tickets.AppendLogIf(ref.ticket.Path, ev, func(events []tickets.LogEvent) error {
+		_, err := tickets.AppendLogIf(ref.Ticket.Path, ev, func(events []tickets.LogEvent) error {
 			if tickets.OpenQuestion(events) != nil {
 				return errQuestionOpen
 			}
 			return nil
 		})
 		if err == errQuestionOpen {
-			return queue.Refusal(wire.ReasonQuestionOpen, ref.addr.String()+" already has an open question"), nil
+			return queue.Refusal(wire.ReasonQuestionOpen, ref.Addr.String()+" already has an open question"), nil
 		}
 		if err != nil {
-			return wire.QueueResult{}, fmt.Errorf("ask %s: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("ask %s: %w", ref.Addr, err)
 		}
-		err = schema.UpdateTicket(ref.ticket.Path, func(t *schema.Ticket) {
+		err = schema.UpdateTicket(ref.Ticket.Path, func(t *schema.Ticket) {
 			t.IterationStatus = schema.IterationStatusAsking
 		})
 		if err != nil {
-			return wire.QueueResult{}, fmt.Errorf("ask %s: setting iteration_status: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("ask %s: setting iteration_status: %w", ref.Addr, err)
 		}
 		s.idx.Rescan()
 		return wire.QueueResult{}, nil

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/server/queue"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -69,7 +70,7 @@ func designActionable(text, ticket, agent string, final bool) (wire.SessionActio
 // designFinal reports whether the map behind a design ticket is at Branch or
 // Done, where no step follows. A map that cannot be read is not final.
 func (s *Server) designFinal(ticket string) bool {
-	addr := epicAddress(ticket)
+	addr := queue.EpicAddress(ticket)
 	project, name, _ := strings.Cut(addr, ":")
 	epics, err := s.projects.Epics(project)
 	if err != nil {
@@ -78,26 +79,11 @@ func (s *Server) designFinal(ticket string) bool {
 	}
 	for _, e := range epics {
 		if e.Name == name {
-			step := mapProgress(e)
+			step := queue.MapProgress(e)
 			return step == wire.ProgressBranch || step == wire.ProgressDone
 		}
 	}
 	return false
-}
-
-// epicAddress is the "project:epic" part of a ticket address, whatever project
-// the session itself runs in.
-func epicAddress(addr string) string {
-	epicPart, _, _ := strings.Cut(addr, "/")
-	return epicPart
-}
-
-// designRef names the conversation and ticket of a Design session that just
-// went idle. Live marks a turn that ended while this server watched it, the
-// only kind that auto-advances.
-type designRef struct {
-	Conversation, Ticket string
-	Live                 bool
 }
 
 // lastAssistantText reads the session's last assistant message from its claude
@@ -125,7 +111,7 @@ func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
 // its last assistant message: the newer turn supersedes an agent-raised one
 // and clears a derived one it no longer matches. A GxRaised one is never
 // touched.
-func (s *Server) detectDesignActionable(dir, id string, design designRef) {
+func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
 	meta, err := readSessionMeta(dir)
 	if err != nil {
 		meta = sessionMeta{}

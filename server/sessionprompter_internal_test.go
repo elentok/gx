@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/sessions/chat"
 	"slices"
 	"testing"
 	"time"
@@ -11,13 +12,13 @@ type fakePrompter struct {
 	sent chan []string
 }
 
-func (f fakePrompter) newFirstPrompt(string, string, int) FirstPrompt { return nil }
-func (f fakePrompter) markTurn(string, string) (turnMark, bool)       { return turnMark{}, false }
-func (f fakePrompter) settleTurn(string, string, turnMark, designRef, <-chan struct{}) {
+func (f fakePrompter) NewFirstPrompt(string, string, int) FirstPrompt { return nil }
+func (f fakePrompter) MarkTurn(string, string) (chat.TurnMark, bool)  { return chat.TurnMark{}, false }
+func (f fakePrompter) SettleTurn(string, string, chat.TurnMark, chat.DesignRef, <-chan struct{}) {
 }
-func (f fakePrompter) detectDesignActionable(string, string, designRef) {}
-func (f fakePrompter) cancelAutoAdvance(string, string) bool            { return false }
-func (f fakePrompter) sendAction(_, _ string, action []string)          { f.sent <- action }
+func (f fakePrompter) DetectDesignActionable(string, string, chat.DesignRef) {}
+func (f fakePrompter) CancelAutoAdvance(string, string) bool                 { return false }
+func (f fakePrompter) SendAction(_, _ string, action []string)               { f.sent <- action }
 
 var _ FirstPrompt = (*firstPrompt)(nil)
 

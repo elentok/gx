@@ -98,8 +98,8 @@ func (s *Server) newFirstPrompt(dir, id string, run int) *firstPrompt {
 	return f
 }
 
-// stop ends the Starting clock when the watch ends.
-func (f *firstPrompt) stop() { f.clock.stop() }
+// Stop ends the Starting clock when the watch ends.
+func (f *firstPrompt) Stop() { f.clock.stop() }
 
 // startTimedOut hands a still-pending prompt to a person when the session is
 // Starting at the deadline.
@@ -185,10 +185,10 @@ func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
 	return err == nil && known && empty, false
 }
 
-// observe takes each status while the prompt is pending and returns the signal
+// Observe takes each status while the prompt is pending and returns the signal
 // that lets it type: the ready report, else the first Idle. It never fires
 // while Blocked.
-func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
+func (f *firstPrompt) Observe(state string, ready harness.ReadySignal) string {
 	switch {
 	case state == wire.SessionBlocked:
 		return ""
@@ -200,17 +200,17 @@ func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
 	return ""
 }
 
-// noteState closes turnStarted on the first Working after gx typed: the watch
+// NoteState closes turnStarted on the first Working after gx typed: the watch
 // sees a turn start even where the holder's Turn counter does not move.
-func (f *firstPrompt) noteState(state string) {
+func (f *firstPrompt) NoteState(state string) {
 	f.clock.track(state)
 	if state == wire.SessionWorking && f.typed.Load() {
 		f.turnOnce.Do(func() { close(f.turnStarted) })
 	}
 }
 
-// personInput stops the remaining nudges once gx has typed the prompt.
-func (f *firstPrompt) personInput() {
+// PersonInput stops the remaining nudges once gx has typed the prompt.
+func (f *firstPrompt) PersonInput() {
 	if f.typed.Load() {
 		f.cancelOnce.Do(func() { close(f.cancel) })
 	}
@@ -222,9 +222,9 @@ func (f *firstPrompt) markTyped() {
 	}
 }
 
-// start types the prompt in the background, so the watch keeps reading the
+// Start types the prompt in the background, so the watch keeps reading the
 // person's input.
-func (f *firstPrompt) start(signal, prompt string) {
+func (f *firstPrompt) Start(signal, prompt string) {
 	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", promptHead(prompt))
 	f.s.sessions.watches.start(func() {
 		err := f.deliver(prompt)

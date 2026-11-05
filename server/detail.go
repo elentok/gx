@@ -32,7 +32,7 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no ticket "+address, http.StatusNotFound)
 		return
 	}
-	ref, ok, err := s.findTicket(address)
+	ref, ok, err := s.FindTicket(address)
 	switch {
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -49,42 +49,42 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, d)
 }
 
-func (s *Server) ticketDetail(ref ticketRef) (wire.TicketDetail, error) {
-	t, err := schema.ParseTicket(ref.ticket.Path)
+func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
+	t, err := schema.ParseTicket(ref.Ticket.Path)
 	if err != nil {
 		return brokenDetail(ref, err), nil
 	}
-	evs, err := tickets.ReadLog(ref.ticket.Path)
+	evs, err := tickets.ReadLog(ref.Ticket.Path)
 	if err != nil {
 		return wire.TicketDetail{}, err
 	}
 	d := newTicketDetail(ref)
 	fillHeader(&d, ref, t)
 	if t.Status == schema.StatusClaimed {
-		d.WaitingLabel = s.CheckWaitingLabel(ref.addr.String())
+		d.WaitingLabel = s.CheckWaitingLabel(ref.Addr.String())
 	}
 	if t.LongTicketTurns > 0 {
 		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns
 	}
-	if !ref.epic.IsMap {
+	if !ref.Epic.IsMap {
 		d.Stats = s.detailStats(ref)
-		_, d.HasScreen = s.sessionChat.TicketPtyDir(ref.addr)
+		_, d.HasScreen = s.sessionChat.TicketPtyDir(ref.Addr)
 		var writtenAt time.Time
 		if t.Status == schema.StatusCancelled {
-			writtenAt = ticketWrittenAt(ref.ticket.Path)
+			writtenAt = ticketWrittenAt(ref.Ticket.Path)
 		}
 		if d.Runs, err = s.ticketRuns(ref, t, evs, writtenAt); err != nil {
 			return wire.TicketDetail{}, err
 		}
 	}
-	epics, err := s.projects.Epics(ref.addr.Project)
+	epics, err := s.projects.Epics(ref.Addr.Project)
 	if err != nil {
 		return wire.TicketDetail{}, err
 	}
 	d.Related = relatedTickets(ref, epics)
 	// A blocked-pane pause keeps its agent's prompt, and Approve ends that pause.
 	if t.Status == schema.StatusClaimed || t.PauseReason == schema.PauseBlockedPane {
-		if d.Permission, err = s.permissionCard(ref.addr); err != nil {
+		if d.Permission, err = s.permissionCard(ref.Addr); err != nil {
 			return wire.TicketDetail{}, err
 		}
 	}
@@ -93,7 +93,7 @@ func (s *Server) ticketDetail(ref ticketRef) (wire.TicketDetail, error) {
 		d.Recommendation = &wire.DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
 	}
 	rounds := tickets.Rounds(evs)
-	if d.Actions, err = s.detailFor(ref.addr.String(), t, rounds, d.Permission); err != nil {
+	if d.Actions, err = s.detailFor(ref.Addr.String(), t, rounds, d.Permission); err != nil {
 		return wire.TicketDetail{}, err
 	}
 	d.ActionInfo = actionInfo(d.Actions)
@@ -113,7 +113,7 @@ func (s *Server) ticketDetail(ref ticketRef) (wire.TicketDetail, error) {
 	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == wire.RoundAnswered
 	d.Chat = roundChat(latest)
 	if t.PausedClass() == schema.PauseClassAnswer && t.PauseReason == schema.PauseAmbiguousBase {
-		d.Bases = s.ambiguousBlockers(ref.addr)
+		d.Bases = s.ambiguousBlockers(ref.Addr)
 	}
 	return d, nil
 }
@@ -137,42 +137,42 @@ func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseR
 
 // brokenDetail is the small payload of a file that fails to parse: nothing the
 // body or the log could add.
-func brokenDetail(ref ticketRef, parseErr error) wire.TicketDetail {
+func brokenDetail(ref queue.TicketRef, parseErr error) wire.TicketDetail {
 	d := newTicketDetail(ref)
 	d.Status = tickets.StatusError.Word()
 	d.ErrorReason = "ticket file format is invalid"
 	d.ParseError = parseErr.Error()
-	d.Path = ref.ticket.Path
+	d.Path = ref.Ticket.Path
 	return d
 }
 
 // newTicketDetail is the payload every ticket starts from: what the address
 // alone gives, with every list empty rather than null.
-func newTicketDetail(ref ticketRef) wire.TicketDetail {
+func newTicketDetail(ref queue.TicketRef) wire.TicketDetail {
 	return wire.TicketDetail{
-		Address: ref.addr.String(), Title: ref.ticket.Title, Epic: queue.RootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
+		Address: ref.Addr.String(), Title: ref.Ticket.Title, Epic: queue.RootOf(ref.Addr).String(), MapEpic: ref.Epic.IsMap,
 		Related: []wire.RelatedTicket{}, Rounds: []wire.DetailRound{}, Chat: []wire.ChatMessage{}, Actions: []string{}, Runs: []wire.DetailRun{},
 	}
 }
 
 // fillHeader sets the fields of a ticket that parsed: its status, pause, body
 // and, for an Error ticket, the reason.
-func fillHeader(d *wire.TicketDetail, ref ticketRef, t schema.Ticket) {
+func fillHeader(d *wire.TicketDetail, ref queue.TicketRef, t schema.Ticket) {
 	d.Status = string(storedStatus(t))
 	d.PauseReason = string(t.PauseReason)
 	d.PauseLabel = t.PauseReason.Label()
 	if t.PauseReason == schema.PauseModelMismatch {
 		d.ModelRan, d.ModelExpected = t.ModelRan, t.ModelExpected
 	}
-	d.Type = ref.ticket.Type
-	d.Body = ref.ticket.Body
-	if ref.epic.RenderedStatus(ref.ticket) == tickets.StatusError {
+	d.Type = ref.Ticket.Type
+	d.Body = ref.Ticket.Body
+	if ref.Epic.RenderedStatus(ref.Ticket) == tickets.StatusError {
 		d.Status = tickets.StatusError.Word()
-		d.ErrorReason = tickets.PauseDetail(ref.epic, ref.ticket)
-		d.Path = ref.ticket.Path
+		d.ErrorReason = tickets.PauseDetail(ref.Epic, ref.Ticket)
+		d.Path = ref.Ticket.Path
 	}
 	if t.PausedClass() != "" {
-		d.PauseText = schema.Section(ref.ticket.Body, "Paused")
+		d.PauseText = schema.Section(ref.Ticket.Body, "Paused")
 	}
 }
 

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/server/queue"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,12 +68,12 @@ func investigateRef(repo string, addr tickets.Address, t tickets.Ticket, epics [
 // investigate forks a commitless investigate ticket off the failed ticket and
 // queues it at the front. The parent stays paused; it waits on the child through
 // the ordinary parent edge. It returns the child's address.
-func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (string, error) {
+func (s *Server) investigate(ref queue.TicketRef, f recovery.Failure, entry string) (string, error) {
 	path, id, err := writeInvestigateTicket(ref, f, entry)
 	if err != nil {
 		return "", err
 	}
-	child := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: id}
+	child := tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: id}
 	// queueAdd checks the index, so it must see the new ticket first.
 	if err := s.idx.Refresh(); err != nil {
 		return "", fmt.Errorf("refresh after writing %s: %w", path, err)
@@ -89,16 +90,16 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 
 // writeInvestigateTicket forks the investigation off the failed ticket, or, for
 // an epic-level ref, adds it as a top-level ticket of the epic.
-func writeInvestigateTicket(ref ticketRef, f recovery.Failure, entry string) (path, id string, err error) {
-	subject, what, done := ref.addr.ID, "Ticket "+ref.addr.ID+" paused with", "the paused ticket recovered"
+func writeInvestigateTicket(ref queue.TicketRef, f recovery.Failure, entry string) (path, id string, err error) {
+	subject, what, done := ref.Addr.ID, "Ticket "+ref.Addr.ID+" paused with", "the paused ticket recovered"
 	var parent *schema.TicketID
-	if ref.addr.ID == "" {
-		subject, what, done = "epic "+ref.addr.Epic, "Epic "+ref.addr.Epic+" is", "the epic moving again"
+	if ref.Addr.ID == "" {
+		subject, what, done = "epic "+ref.Addr.Epic, "Epic "+ref.Addr.Epic+" is", "the epic moving again"
 	} else {
-		p := schema.TicketID(ref.addr.ID)
+		p := schema.TicketID(ref.Addr.ID)
 		parent = &p
 	}
-	return writeNewTicket(filepath.Join(ref.projectDir, ref.addr.Epic), ref.addr.ID, "investigate", func(id string) (schema.Ticket, string) {
+	return writeNewTicket(filepath.Join(ref.ProjectDir, ref.Addr.Epic), ref.Addr.ID, "investigate", func(id string) (schema.Ticket, string) {
 		child := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeInvestigate, Parent: parent}
 		body := fmt.Sprintf(
 			"\n# %s — Investigate %s\n\n## What to build\n\n%s %s (%s): %s\n\nFind out why and fix it or report what a person must do. This ticket is commitless: put any code fix in a follow-up ticket (`gx tickets add --parent`) instead of committing here.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and %s, or the findings reported\n",

@@ -10,10 +10,10 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func (s *Server) detailStats(ref ticketRef) *wire.DetailStats {
-	t := ref.ticket
+func (s *Server) detailStats(ref queue.TicketRef) *wire.DetailStats {
+	t := ref.Ticket
 	st := &wire.DetailStats{Elapsed: t.ElapsedTime, Cost: t.ActualCost, HadCodex: t.HadCodex, ContextWindow: t.ActualContextWindow}
-	if at, ok := s.registry.StartedAtOf(ref.addr.String()); ok && ref.epic.RenderedStatus(t) == tickets.StatusClaimed {
+	if at, ok := s.registry.StartedAtOf(ref.Addr.String()); ok && ref.Epic.RenderedStatus(t) == tickets.StatusClaimed {
 		st.ClaimedAt = at
 	}
 	return st
@@ -21,22 +21,22 @@ func (s *Server) detailStats(ref ticketRef) *wire.DetailStats {
 
 // relatedTickets lists one entry per blocked_by token, then the parent, then
 // each fork child.
-func relatedTickets(ref ticketRef, epics []tickets.Epic) []wire.RelatedTicket {
+func relatedTickets(ref queue.TicketRef, epics []tickets.Epic) []wire.RelatedTicket {
 	own := func(t tickets.Ticket, relation string) wire.RelatedTicket {
-		addr := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.DisplayNumber()}
-		return wire.RelatedTicket{Relation: relation, Address: addr.String(), Linkable: true, Title: t.Title, Status: ref.epic.RenderedStatus(t).Word()}
+		addr := tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.DisplayNumber()}
+		return wire.RelatedTicket{Relation: relation, Address: addr.String(), Linkable: true, Title: t.Title, Status: ref.Epic.RenderedStatus(t).Word()}
 	}
 	related := []wire.RelatedTicket{}
-	for _, token := range ref.ticket.BlockedBy {
+	for _, token := range ref.Ticket.BlockedBy {
 		related = append(related, blockerEntry(ref, epics, token))
 	}
-	if ref.ticket.Parent != nil {
-		if p, ok := findInEpic(ref.epic, *ref.ticket.Parent); ok {
+	if ref.Ticket.Parent != nil {
+		if p, ok := findInEpic(ref.Epic, *ref.Ticket.Parent); ok {
 			related = append(related, own(p, wire.RelationParent))
 		}
 	}
-	for _, t := range ref.epic.Tickets {
-		if t.Parent != nil && sameTicketID(*t.Parent, ref.ticket.DisplayNumber()) {
+	for _, t := range ref.Epic.Tickets {
+		if t.Parent != nil && sameTicketID(*t.Parent, ref.Ticket.DisplayNumber()) {
 			related = append(related, own(t, wire.RelationFork))
 		}
 	}
@@ -46,14 +46,14 @@ func relatedTickets(ref ticketRef, epics []tickets.Epic) []wire.RelatedTicket {
 // blockerEntry resolves one blocked_by token: bare ("04", "04a"), qualified
 // ("epic/06") or a whole epic ("epic"). A whole epic reads done once it has
 // merged and open before.
-func blockerEntry(ref ticketRef, epics []tickets.Epic, token string) wire.RelatedTicket {
+func blockerEntry(ref queue.TicketRef, epics []tickets.Epic, token string) wire.RelatedTicket {
 	entry := wire.RelatedTicket{Relation: wire.RelationBlocker, Address: token, Status: tickets.StatusError.Word()}
-	epic, id := ref.epic, token
+	epic, id := ref.Epic, token
 	if tickets.IsWholeEpicRef(token) {
 		name := epicNameOf(token)
 		for _, e := range epics {
 			if e.Name == name {
-				entry.Address = queue.RootRef{Project: ref.addr.Project, Epic: name}.String()
+				entry.Address = queue.RootRef{Project: ref.Addr.Project, Epic: name}.String()
 				entry.Linkable = true
 				entry.Title, entry.Status = e.Name, tickets.StatusOpen.Word()
 				if !e.MergedAt.IsZero() {
@@ -72,7 +72,7 @@ func blockerEntry(ref ticketRef, epics []tickets.Epic, token string) wire.Relate
 		epic = epics[i]
 	}
 	if t, ok := findInEpic(epic, id); ok {
-		entry.Address = tickets.Address{Project: ref.addr.Project, Epic: epic.Name, ID: t.DisplayNumber()}.String()
+		entry.Address = tickets.Address{Project: ref.Addr.Project, Epic: epic.Name, ID: t.DisplayNumber()}.String()
 		entry.Linkable = true
 		entry.Title, entry.Status = t.Title, epic.RenderedStatus(t).Word()
 	}

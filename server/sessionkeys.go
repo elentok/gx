@@ -244,8 +244,8 @@ func validateSessionKeys(req wire.SessionKeysRequest) (string, int, *wire.Sessio
 		return bad(wire.ReasonSessionBadRequest, "text may not hold a control character")
 	case strings.HasPrefix(req.Text, "!"):
 		return bad(wire.ReasonPromptPrefixNotAllowed, "text may not start with !")
-	case len(req.Text) > maxSessionPromptBytes:
-		return bad(wire.ReasonPromptTextTooLong, fmt.Sprintf("text is over %d bytes", maxSessionPromptBytes))
+	case len(req.Text) > wire.MaxSessionPromptBytes:
+		return bad(wire.ReasonPromptTextTooLong, fmt.Sprintf("text is over %d bytes", wire.MaxSessionPromptBytes))
 	case !utf8.ValidString(req.Text):
 		return bad(wire.ReasonSessionBadRequest, "text is not valid UTF-8")
 	}

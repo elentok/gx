@@ -425,7 +425,7 @@ func resumeAnswered(ticketPath, id string, req wire.RepairRequest, origin string
 			return tickets.LogEvent{}, err
 		}
 		open := tickets.OpenQuestion(evs)
-		if !t.PausedAsking() || open == nil || answerState(*open, t.PausedClass()) != req.State {
+		if !t.PausedAsking() || open == nil || queue.AnswerState(*open, t.PausedClass()) != req.State {
 			return tickets.LogEvent{}, resumeRefused{staleResumeRefusal()}
 		}
 		if err := ralphloop.ResumeTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {

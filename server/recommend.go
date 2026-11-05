@@ -20,36 +20,36 @@ func (s *Server) ticketRecommend(req wire.QueueRequest, qc queue.Ctx) (wire.Queu
 	if verb == "" || diagnosis == "" {
 		return queue.Refusal(wire.ReasonTextRequired, "a verb and a diagnosis are required"), nil
 	}
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		inv, ok, err := s.findTicket(qc.Investigator)
-		if err != nil || !ok || inv.ticket.Type != string(schema.TypeInvestigate) ||
-			inv.addr.Epic != ref.addr.Epic || inv.ticket.Parent == nil || *inv.ticket.Parent != ref.addr.ID {
-			return queue.Refusal(wire.ReasonInvestigateStop, qc.Investigator+" is not the investigate ticket of "+ref.addr.String()), nil
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		inv, ok, err := s.FindTicket(qc.Investigator)
+		if err != nil || !ok || inv.Ticket.Type != string(schema.TypeInvestigate) ||
+			inv.Addr.Epic != ref.Addr.Epic || inv.Ticket.Parent == nil || *inv.Ticket.Parent != ref.Addr.ID {
+			return queue.Refusal(wire.ReasonInvestigateStop, qc.Investigator+" is not the investigate ticket of "+ref.Addr.String()), nil
 		}
-		t, err := schema.ParseTicket(ref.ticket.Path)
+		t, err := schema.ParseTicket(ref.Ticket.Path)
 		if err != nil {
-			return queue.Refusal(wire.ReasonInvestigateStop, "cannot read "+ref.addr.String()+": "+err.Error()), nil
+			return queue.Refusal(wire.ReasonInvestigateStop, "cannot read "+ref.Addr.String()+": "+err.Error()), nil
 		}
 		if t.PausedClass() == "" {
-			return queue.Refusal(wire.ReasonNotPaused, ref.addr.String()+" is not paused"), nil
+			return queue.Refusal(wire.ReasonNotPaused, ref.Addr.String()+" is not paused"), nil
 		}
-		evs, err := tickets.ReadLog(ref.ticket.Path)
+		evs, err := tickets.ReadLog(ref.Ticket.Path)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
-		actions, err := s.detailFor(ref.addr.String(), t, tickets.Rounds(evs), nil)
+		actions, err := s.detailFor(ref.Addr.String(), t, tickets.Rounds(evs), nil)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
 		if !slices.Contains(actions, verb) {
-			return queue.Refusal(wire.ReasonVerbNotOffered, verb+" is not an action of "+ref.addr.String()), nil
+			return queue.Refusal(wire.ReasonVerbNotOffered, verb+" is not an action of "+ref.Addr.String()), nil
 		}
-		written, err := tickets.RecommendOpenRound(ref.ticket.Path, verb, diagnosis)
+		written, err := tickets.RecommendOpenRound(ref.Ticket.Path, verb, diagnosis)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
 		if !written {
-			return queue.Refusal(wire.ReasonNotPaused, ref.addr.String()+" has no open pause round"), nil
+			return queue.Refusal(wire.ReasonNotPaused, ref.Addr.String()+" has no open pause round"), nil
 		}
 		s.idx.Rescan()
 		return wire.QueueResult{}, nil

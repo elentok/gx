@@ -14,13 +14,13 @@ import (
 // agentVerb resolves a ticket to the runner session of its live iteration, so
 // prompt, interrupt and answer reach the agent whichever runner hosts it.
 func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (wire.QueueResult, error)) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		runner, sess, ok, err := s.harness.LiveSession(ref.addr)
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		runner, sess, ok, err := s.harness.LiveSession(ref.Addr)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
 		if !ok {
-			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.Addr.String()), nil
 		}
 		return do(runner, sess)
 	})
@@ -59,8 +59,8 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 	if decision != agentrunner.DecisionAllow && decision != agentrunner.DecisionDeny {
 		return queue.Refusal(wire.ReasonBadDecision, "decision must be allow or deny"), nil
 	}
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		runner, sess, ok, err := s.harness.LiveSession(ref.addr)
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		runner, sess, ok, err := s.harness.LiveSession(ref.Addr)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
@@ -68,7 +68,7 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			if req.RequestID != "" {
 				return queue.Refusal(wire.ReasonAgentGone, "the agent is gone; a lost prompt cannot be resumed"), nil
 			}
-			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.Addr.String()), nil
 		}
 		answer := agentrunner.Answer{Decision: decision, RequestID: req.RequestID}
 		var note string
@@ -92,14 +92,14 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if statusErr == nil {
 			ev.Shown = permissionShown(st.Pending)
 		}
-		if _, err := tickets.AppendLog(ref.ticket.Path, ev); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.addr, err)
+		if _, err := tickets.AppendLog(ref.Ticket.Path, ev); err != nil {
+			return wire.QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.Addr, err)
 		}
-		if err := s.leaveBlocked(ref.addr.String()); err != nil {
+		if err := s.leaveBlocked(ref.Addr.String()); err != nil {
 			return wire.QueueResult{}, err
 		}
 		// The prompt is gone, so open pages re-read the detail and the snapshot.
-		s.events.Publish(wire.EventTicketChanged, ref.addr.String())
+		s.events.Publish(wire.EventTicketChanged, ref.Addr.String())
 		return wire.QueueResult{}, nil
 	})
 }

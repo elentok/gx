@@ -123,7 +123,7 @@ func (mg *Manager) focusWrite(w http.ResponseWriter, r *http.Request, web bool) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // reportFocus saves a TUI's focus report; a focused TUI viewing a session

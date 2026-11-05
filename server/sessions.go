@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/server/queue"
 	"io/fs"
 	"net/http"
 	"os"
@@ -77,7 +78,7 @@ func (mg *Manager) sessionCreateWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // createSession makes the session's state dir, writes its meta and starts its
@@ -466,7 +467,7 @@ func (mg *Manager) ListSessions() ([]wire.SessionInfo, error) {
 	}
 	out := make([]wire.SessionInfo, len(metas))
 	for i, m := range metas {
-		out[i] = mg.host.sessionInfo(m)
+		out[i] = mg.host.SessionInfo(m)
 	}
 	return out, nil
 }
@@ -618,9 +619,9 @@ func (mg *Manager) removeSession(req wire.SessionRequest) (wire.SessionResult, e
 func (mg *Manager) updateSessionMeta(dir, id string, change func(*sessionMeta) bool) error {
 	meta, exitedDesign, err := mg.saveSessionMetaUpdate(dir, id, change)
 	if exitedDesign {
-		if project, epic, ok := strings.Cut(epicAddress(meta.Ticket), ":"); ok {
+		if project, epic, ok := strings.Cut(queue.EpicAddress(meta.Ticket), ":"); ok {
 			time.Sleep(mg.cfg.SessionExitCleanupDelay)
-			mg.designs.cleanupDesign(project, epic)
+			mg.designs.CleanupDesign(project, epic)
 		}
 	}
 	return err

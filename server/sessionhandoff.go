@@ -21,7 +21,7 @@ func (rs *Resumer) startContinue(dir string, meta sessionMeta, label string, act
 		rs.mg.watches.start(func() { rs.chartingHandoff(dir, meta.ID) })
 		return
 	}
-	rs.mg.watches.start(func() { rs.mg.prompter.sendAction(dir, label, action) })
+	rs.mg.watches.start(func() { rs.mg.prompter.SendAction(dir, label, action) })
 }
 
 // chartingHandoffDue reports whether action is the design Continue of a

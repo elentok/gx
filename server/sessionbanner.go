@@ -77,7 +77,7 @@ func (mg *Manager) noteFailure(id string) {
 	if res.Refused || err != nil {
 		return
 	}
-	f := mg.host.sessionInfo(m).Failure
+	f := mg.host.SessionInfo(m).Failure
 	kind := ""
 	if f != nil {
 		kind = f.Kind
@@ -130,7 +130,7 @@ func (mg *Manager) designDone(m sessionMeta) bool {
 	if !ok || !e.IsMap {
 		return false
 	}
-	step := mapProgress(e)
+	step := queue.MapProgress(e)
 	return step == wire.ProgressDone
 }
 

@@ -4,7 +4,7 @@ import "testing"
 
 func TestUpdateSessionMeta_UnreadableMetaIsAnError(t *testing.T) {
 	t.Parallel()
-	mg := newManager(&Server{})
+	mg := &Manager{watches: newSessionWatches()}
 	err := mg.updateSessionMeta(t.TempDir(), "abcdef", func(*sessionMeta) bool {
 		t.Error("change ran on an unreadable meta")
 		return false

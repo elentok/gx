@@ -37,13 +37,6 @@ func storedStatus(t schema.Ticket) schema.Status {
 	return t.Status
 }
 
-// answerState is the token a client sends back: it covers the latest
-// question's seq and the ticket's pause class, so an answer to a question that
-// was replaced, closed or re-paused is stale.
-func answerState(q tickets.LogEvent, class schema.PauseClass) string {
-	return fmt.Sprintf("%d:%s", q.Seq, class)
-}
-
 // detailState is the token the detail page carries. A paused ticket's token
 // names its latest round of any kind, so repair and manual pauses have one.
 func detailState(evs []tickets.LogEvent, t schema.Ticket) string {
@@ -54,13 +47,13 @@ func detailState(evs []tickets.LogEvent, t schema.Ticket) string {
 	if len(rounds) == 0 {
 		return ""
 	}
-	return answerState(rounds[len(rounds)-1].Question, t.PausedClass())
+	return queue.AnswerState(rounds[len(rounds)-1].Question, t.PausedClass())
 }
 
 // pauseStale reports whether state no longer names t's open pause round.
 func pauseStale(evs []tickets.LogEvent, t schema.Ticket, state string) bool {
 	open := tickets.OpenRound(evs)
-	return t.PausedClass() == "" || open == nil || answerState(*open, t.PausedClass()) != state
+	return t.PausedClass() == "" || open == nil || queue.AnswerState(*open, t.PausedClass()) != state
 }
 
 // ticketPauseStale is pauseStale for the ticket stored at ticketPath.
@@ -76,12 +69,6 @@ func ticketPauseStale(ticketPath, state string) (bool, error) {
 	return pauseStale(evs, t, state), nil
 }
 
-// normalizeAnswer turns every line ending into \n so a CR cannot submit the
-// prompt early.
-func normalizeAnswer(s string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
-}
-
 // answerFrame is the prompt the live agent receives: the choice first, the note
 // under it. A free-text answer prints the text and no note.
 func answerFrame(seq int, answer, note string) string {
@@ -95,10 +82,10 @@ func answerFrame(seq int, answer, note string) string {
 // validateAnswer checks the answer against the question's kind and returns the
 // text to deliver and log: the choice (or the free text) and the note.
 func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note string, bad *wire.QueueResult) {
-	note = strings.TrimSpace(normalizeAnswer(req.Note))
+	note = strings.TrimSpace(wire.NormalizeAnswer(req.Note))
 	switch q.Kind {
 	case tickets.QuestionText:
-		answer, note = strings.TrimSpace(normalizeAnswer(req.Text)), ""
+		answer, note = strings.TrimSpace(wire.NormalizeAnswer(req.Text)), ""
 		if req.Choice != "" {
 			r := queue.Refusal(wire.ReasonBadChoice, "this question takes free text, not a choice")
 			return "", "", &r
@@ -134,15 +121,15 @@ func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note str
 // ticket lock, so a refusal logs nothing and a stale reply never reaches the
 // agent.
 func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref ticketRef) (wire.QueueResult, error) {
-		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
+	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		if s.adoptFirst(ref.ProjectDir, ref.Addr, ref.Ticket.Path) {
 			return wire.QueueResult{Outcome: wire.OutcomeAdopted}, nil
 		}
-		address := ref.addr.String()
+		address := ref.Addr.String()
 		var run runs.TrackedRun
 		var queued bool
-		_, err := tickets.AppendLogFrom(ref.ticket.Path, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
-			t, err := schema.ParseTicket(ref.ticket.Path)
+		_, err := tickets.AppendLogFrom(ref.Ticket.Path, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
+			t, err := schema.ParseTicket(ref.Ticket.Path)
 			if err != nil {
 				return tickets.LogEvent{}, err
 			}
@@ -158,7 +145,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			case open == nil:
 				return refuse(queue.Refusal(wire.ReasonNotPaused, address+" has no open question"))
 			}
-			state := answerState(*open, t.PausedClass())
+			state := queue.AnswerState(*open, t.PausedClass())
 			if req.State != "" && req.State != state {
 				res := queue.Refusal(wire.ReasonStale, "the question changed; answer the current one")
 				res.Question, res.State = open, state
@@ -209,7 +196,7 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			return refused.res, nil
 		}
 		if err != nil {
-			return wire.QueueResult{}, fmt.Errorf("answer %s: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("answer %s: %w", ref.Addr, err)
 		}
 		if err := s.cancelInvestigateChild(ref, req.Source); err != nil {
 			return wire.QueueResult{}, err
@@ -217,17 +204,17 @@ func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if queued {
 			// Open again for gx to claim; the dead run has nothing to settle.
 			s.registry.Delete(address)
-			if err := ralphloop.ResumeTicket(ref.ticket.Path, time.Now()); err != nil {
-				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
+			if err := ralphloop.ResumeTicket(ref.Ticket.Path, time.Now()); err != nil {
+				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.Addr, err)
 			}
 			s.idx.Rescan()
 			return wire.QueueResult{Outcome: wire.OutcomeQueued}, nil
 		}
-		if err := ralphloop.Claim(ref.ticket.Path); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("claim %s: %w", ref.addr, err)
+		if err := ralphloop.Claim(ref.Ticket.Path); err != nil {
+			return wire.QueueResult{}, fmt.Errorf("claim %s: %w", ref.Addr, err)
 		}
 		if err := s.resettleWaiting(run); err != nil {
-			return wire.QueueResult{}, fmt.Errorf("settle %s: %w", ref.addr, err)
+			return wire.QueueResult{}, fmt.Errorf("settle %s: %w", ref.Addr, err)
 		}
 		s.idx.Rescan()
 		return wire.QueueResult{Outcome: wire.OutcomeDelivered}, nil

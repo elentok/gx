@@ -34,7 +34,7 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 		if i < 0 || epics[i].IsMap || !epics[i].MergedAt.IsZero() {
 			continue
 		}
-		sum := summarizeEpic(root, epics[i], s.registry.StartedAtOf, recoveryOf, readLogLenient)
+		sum := summarizeEpic(root, epics[i], s.registry.StartedAtOf, recoveryOf, queue.ReadLogLenient)
 		for j := range sum.Active {
 			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
 		}
@@ -53,13 +53,6 @@ func (s *Server) needsApproval(address string) bool {
 	}
 	card, err := s.permissionCard(addr)
 	return err == nil && card != nil
-}
-
-// readLogLenient reads a ticket's log for the snapshot, where an unreadable log
-// only costs the question details.
-func readLogLenient(t tickets.Ticket) []tickets.LogEvent {
-	evs, _ := tickets.ReadLog(t.Path)
-	return evs
 }
 
 // answeredLatest reports whether the latest question has an answer.
