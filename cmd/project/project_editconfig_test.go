@@ -1,4 +1,4 @@
-package cmd
+package project
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -19,7 +20,7 @@ const editConfigOrig = `{"name": "proj"}`
 type editConfigEnv struct {
 	store, live string
 	out, errOut bytes.Buffer
-	d           deps
+	d           Deps
 	edits       int
 	lastTmp     string
 }
@@ -36,17 +37,19 @@ func newEditConfigEnv(t *testing.T, tty bool, answers string, saves ...string) *
 	if err := os.WriteFile(e.live, []byte(editConfigOrig), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	e.d = deps{
-		stdin:  strings.NewReader(answers),
-		stdout: &e.out,
-		stderr: &e.errOut,
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-		getenv: func(string) string { return "vi" },
-		loadConfig: func() (config.Config, error) {
-			return config.Config{TicketStore: config.TicketStoreConfig{Path: e.store}}, nil
+	e.d = Deps{
+		Env: cmdbase.Env{
+			Stdin:  strings.NewReader(answers),
+			Stdout: &e.out,
+			Stderr: &e.errOut,
+			Getwd:  func() (string, error) { return t.TempDir(), nil },
+			Getenv: func(string) string { return "vi" },
+			LoadConfig: func() (config.Config, error) {
+				return config.Config{TicketStore: config.TicketStoreConfig{Path: e.store}}, nil
+			},
 		},
-		stdinIsTerminal: func() bool { return tty },
-		runEditor: func(_, path string, _ io.Reader, _, _ io.Writer) error {
+		StdinIsTerminal: func() bool { return tty },
+		RunEditor: func(_, path string, _ io.Reader, _, _ io.Writer) error {
 			if e.edits >= len(saves) {
 				t.Fatalf("editor opened %d times, scripted %d", e.edits+1, len(saves))
 			}
@@ -160,7 +163,7 @@ func TestProjectEditConfig_NonTTYInvalidFailsWithoutPrompt(t *testing.T) {
 func TestProjectEditConfig_ConcurrentChangeRefusedKeepsTemp(t *testing.T) {
 	e := newEditConfigEnv(t, false, "")
 	concurrent := `{"name": "proj", "repo": "/elsewhere"}`
-	e.d.runEditor = func(_, path string, _ io.Reader, _, _ io.Writer) error {
+	e.d.RunEditor = func(_, path string, _ io.Reader, _, _ io.Writer) error {
 		e.lastTmp = path
 		if err := os.WriteFile(e.live, []byte(concurrent), 0o644); err != nil {
 			return err
@@ -183,7 +186,7 @@ func TestProjectEditConfig_ConcurrentChangeRefusedKeepsTemp(t *testing.T) {
 func TestProjectEditConfig_UnregisteredRepoNeverCreatesProjectJSON(t *testing.T) {
 	e := newEditConfigEnv(t, false, "")
 	repo := testutil.TempRepo(t)
-	e.d.getwd = func() (string, error) { return repo, nil }
+	e.d.Getwd = func() (string, error) { return repo, nil }
 	if err := runProjectEditConfig(e.d, ""); !errors.Is(err, tickets.ErrNoProject) {
 		t.Errorf("err = %v, want ErrNoProject", err)
 	}
@@ -251,7 +254,7 @@ func TestProjectEditConfig_CwdProject(t *testing.T) {
 	if err := os.WriteFile(e.live, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	e.d.getwd = func() (string, error) { return repo, nil }
+	e.d.Getwd = func() (string, error) { return repo, nil }
 	if err := runProjectEditConfig(e.d, ""); err != nil {
 		t.Fatal(err)
 	}

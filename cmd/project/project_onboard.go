@@ -1,4 +1,4 @@
-package cmd
+package project
 
 import (
 	"bufio"
@@ -12,13 +12,12 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/check"
-	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
 
-func newProjectOnboardCmd(d deps) *cobra.Command {
+func newProjectOnboardCmd(d Deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "onboard [project]",
 		Short: "set up a project's check config (project defaults to the current repo's; asks the server)",
@@ -28,7 +27,7 @@ func newProjectOnboardCmd(d deps) *cobra.Command {
 			if len(args) == 1 {
 				name = args[0]
 			}
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
@@ -38,7 +37,7 @@ func newProjectOnboardCmd(d deps) *cobra.Command {
 }
 
 // runProjectOnboard defaults name to the current repo's project.
-func runProjectOnboard(ctx context.Context, cl *apiclient.Client, d deps, name string) error {
+func runProjectOnboard(ctx context.Context, cl *apiclient.Client, d Deps, name string) error {
 	if name == "" {
 		dir, err := projectDirFor(d, "")
 		if err != nil {
@@ -46,9 +45,9 @@ func runProjectOnboard(ctx context.Context, cl *apiclient.Client, d deps, name s
 		}
 		name = tickets.ProjectName(dir)
 	}
-	missing, err := onboardChecks(ctx, cl, d, d.stdout, name)
+	missing, err := onboardChecks(ctx, cl, d, d.Stdout, name)
 	if err == nil && !missing {
-		fmt.Fprintln(d.stdout, "nothing missing")
+		fmt.Fprintln(d.Stdout, "nothing missing")
 	}
 	return err
 }
@@ -56,12 +55,12 @@ func runProjectOnboard(ctx context.Context, cl *apiclient.Client, d deps, name s
 // onboardChecks reads the project's check state and, when config is missing,
 // asks in a terminal. Without one it asks nothing and prints how to run it
 // later. It reports whether config was missing.
-func onboardChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, project string) (bool, error) {
+func onboardChecks(ctx context.Context, cl *apiclient.Client, d Deps, w io.Writer, project string) (bool, error) {
 	pc, err := missingChecks(ctx, cl, project)
 	if err != nil || pc == nil {
 		return false, err
 	}
-	if !cmdbase.IsTerminal(d.stdinIsTerminal) {
+	if !isTerminal(d) {
 		fmt.Fprintf(w, "checks not configured: %s\nrun `%s` to set them up\n", strings.Join(missingKinds(*pc), ", "), onboardCommand(project))
 		return true, nil
 	}
@@ -94,8 +93,8 @@ func missingKinds(pc wire.ProjectChecks) []string {
 	return kinds
 }
 
-func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, project string, pc wire.ProjectChecks) error {
-	in := bufio.NewReader(d.stdin)
+func askChecks(ctx context.Context, cl *apiclient.Client, d Deps, w io.Writer, project string, pc wire.ProjectChecks) error {
+	in := bufio.NewReader(d.Stdin)
 	proposal := proposeChecks(pc)
 
 	fmt.Fprintf(w, "Check config is missing for %s. Recommended:\n", project)
@@ -187,8 +186,8 @@ func choose(in *bufio.Reader, w io.Writer, title string, options []string) int {
 
 // editChecks opens the proposal in $EDITOR until it passes check.ParseConfig.
 // ok is false when the user discarded the edit.
-func editChecks(d deps, in *bufio.Reader, w io.Writer, proposal []byte) (edited []byte, ok bool, err error) {
-	editor := d.getenv("EDITOR")
+func editChecks(d Deps, in *bufio.Reader, w io.Writer, proposal []byte) (edited []byte, ok bool, err error) {
+	editor := d.Getenv("EDITOR")
 	if strings.TrimSpace(editor) == "" {
 		return nil, false, fmt.Errorf("$EDITOR is not set")
 	}
@@ -206,7 +205,7 @@ func editChecks(d deps, in *bufio.Reader, w io.Writer, proposal []byte) (edited 
 		return nil, false, err
 	}
 	for {
-		if err := d.runEditor(editor, path, d.stdin, d.stdout, d.stderr); err != nil {
+		if err := d.RunEditor(editor, path, d.Stdin, d.Stdout, d.Stderr); err != nil {
 			return nil, false, err
 		}
 		data, err := os.ReadFile(path)
@@ -217,7 +216,7 @@ func editChecks(d deps, in *bufio.Reader, w io.Writer, proposal []byte) (edited 
 		if perr == nil {
 			return data, true, nil
 		}
-		fmt.Fprintf(d.stderr, "invalid checks: %v\n", perr)
+		fmt.Fprintf(d.Stderr, "invalid checks: %v\n", perr)
 		if !askEditAgain(in, w) {
 			fmt.Fprintln(w, "edits discarded; nothing saved")
 			return nil, false, nil

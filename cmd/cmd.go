@@ -15,6 +15,7 @@ import (
 	configcmd "github.com/elentok/gx/cmd/config"
 	"github.com/elentok/gx/cmd/doctor"
 	"github.com/elentok/gx/cmd/limits"
+	"github.com/elentok/gx/cmd/project"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
 	"github.com/elentok/gx/codexsession"
@@ -57,7 +58,6 @@ type deps struct {
 	getenv               func(string) string
 	goos                 string
 	userHomeDir          func() (string, error)
-	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
 	stdinIsTerminal      func() bool
 	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
 	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
@@ -126,6 +126,14 @@ func (d deps) codexDeps() codexcmd.Deps {
 	return codexcmd.Deps{Env: d.base(), StdinIsTerminal: d.stdinIsTerminal}
 }
 
+// projectDeps is the `gx project` hooks joined with the shared env. The editor
+// runs under the process env, so tests leave RunEditor to the package default.
+func (d deps) projectDeps() project.Deps {
+	s := project.DefaultDeps(d.env, d.stdinIsTerminal)
+	s.Env = d.base()
+	return s
+}
+
 // dirs resolves the config, data and state directories from the deps env.
 func (d deps) dirs() config.Dirs { return d.base().Dirs() }
 
@@ -158,10 +166,7 @@ func defaultDeps() deps {
 		getenv:               os.Getenv,
 		goos:                 runtime.GOOS,
 		userHomeDir:          dirs.Home,
-		runEditor: func(editor, path string, in io.Reader, out, errOut io.Writer) error {
-			return cmdbase.RunEditorCommand(env, editor, path, in, out, errOut)
-		},
-		stdinIsTerminal: func() bool { return isTerminalFile(os.Stdin) },
+		stdinIsTerminal:      func() bool { return isTerminalFile(os.Stdin) },
 		readClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return transcript.LastAssistantOccupancyIn(roots.Home, cwd, sessionID)
 		},
@@ -251,7 +256,7 @@ Run without a command to open the status UI.`,
 		newServerCmd(d),
 		newRecoveryCmd(d),
 		newEvolveCmd(d),
-		newProjectCmd(d),
+		project.New(d.projectDeps()),
 		limits.New(limits.Deps{Env: d.base()}),
 		limits.NewUsage(limits.Deps{Env: d.base()}),
 		limits.NewAFK(limits.Deps{Env: d.base()}),

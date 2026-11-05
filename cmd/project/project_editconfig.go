@@ -1,4 +1,4 @@
-package cmd
+package project
 
 import (
 	"bufio"
@@ -18,7 +18,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newProjectEditConfigCmd(d deps) *cobra.Command {
+func newProjectEditConfigCmd(d Deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "edit-config [project]",
 		Short: "edit a project's project.json in $EDITOR, validated before it is saved (project defaults to the current repo's)",
@@ -35,7 +35,7 @@ func newProjectEditConfigCmd(d deps) *cobra.Command {
 
 // runProjectEditConfig edits a temp copy of project.json so neither the server
 // nor a concurrent writer ever sees a half-written or invalid file.
-func runProjectEditConfig(d deps, name string) error {
+func runProjectEditConfig(d Deps, name string) error {
 	dir, err := projectDirFor(d, name)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func runProjectEditConfig(d deps, name string) error {
 	if err != nil {
 		return err
 	}
-	editor := d.getenv("EDITOR")
+	editor := d.Getenv("EDITOR")
 	if strings.TrimSpace(editor) == "" {
 		return fmt.Errorf("$EDITOR is not set")
 	}
@@ -71,10 +71,10 @@ func runProjectEditConfig(d deps, name string) error {
 		return err
 	}
 
-	tty := d.stdinIsTerminal != nil && d.stdinIsTerminal()
-	answers := bufio.NewReader(d.stdin)
+	tty := isTerminal(d)
+	answers := bufio.NewReader(d.Stdin)
 	for {
-		if err := d.runEditor(editor, tmpPath, d.stdin, d.stdout, d.stderr); err != nil {
+		if err := d.RunEditor(editor, tmpPath, d.Stdin, d.Stdout, d.Stderr); err != nil {
 			return err
 		}
 		edited, err := os.ReadFile(tmpPath)
@@ -82,7 +82,7 @@ func runProjectEditConfig(d deps, name string) error {
 			return err
 		}
 		if bytes.Equal(edited, orig) {
-			fmt.Fprintln(d.stdout, "no changes")
+			fmt.Fprintln(d.Stdout, "no changes")
 			return nil
 		}
 		if err := validateProjectConfig(edited); err != nil {
@@ -90,9 +90,9 @@ func runProjectEditConfig(d deps, name string) error {
 				keepTmp = true
 				return fmt.Errorf("invalid project.json, not saved; your edits are in %s: %w", tmpPath, err)
 			}
-			fmt.Fprintf(d.stderr, "invalid project.json: %v\n", err)
-			if !askEditAgain(answers, d.stdout) {
-				fmt.Fprintln(d.stdout, "edits discarded; project.json unchanged")
+			fmt.Fprintf(d.Stderr, "invalid project.json: %v\n", err)
+			if !askEditAgain(answers, d.Stdout) {
+				fmt.Fprintln(d.Stdout, "edits discarded; project.json unchanged")
 				return nil
 			}
 			continue
@@ -105,8 +105,8 @@ func runProjectEditConfig(d deps, name string) error {
 		if err := fsutil.WriteFileAtomic(livePath, edited); err != nil {
 			return err
 		}
-		fmt.Fprintf(d.stdout, "saved %s\n", livePath)
-		warnTrunkChange(d.stdout, dir, orig, edited)
+		fmt.Fprintf(d.Stdout, "saved %s\n", livePath)
+		warnTrunkChange(d.Stdout, dir, orig, edited)
 		return nil
 	}
 }
@@ -168,15 +168,15 @@ func branchUnmerged(repo, branch, trunk string) bool {
 }
 
 // projectDirFor resolves a bare project name, or with none the cwd's project.
-func projectDirFor(d deps, name string) (string, error) {
-	cfg, err := d.loadConfig()
+func projectDirFor(d Deps, name string) (string, error) {
+	cfg, err := d.LoadConfig()
 	if err != nil {
 		return "", err
 	}
 	if name != "" {
 		return tickets.ProjectDirByName(cfg.TicketStore.Path, name)
 	}
-	cwd, err := d.getwd()
+	cwd, err := d.Getwd()
 	if err != nil {
 		return "", err
 	}

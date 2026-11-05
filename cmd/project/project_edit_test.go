@@ -1,4 +1,4 @@
-package cmd
+package project
 
 import (
 	"bytes"
@@ -47,7 +47,7 @@ func TestProjectSetPath_ClearsVCSNoneOnlyForGitRepo(t *testing.T) {
 	h := servertest.Start(t)
 	ctx := context.Background()
 	outbox, repo := t.TempDir(), testutil.TempRepo(t)
-	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"}); err != nil {
+	if err := runProjectAdd(ctx, h.Client, Deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"}); err != nil {
 		t.Fatal(err)
 	}
 	setPath := func(path string) {
@@ -75,7 +75,7 @@ func TestProjectSetPath_ClearsVCSNoneOnlyForGitRepo(t *testing.T) {
 	}
 
 	// The clash hint only applies to a ticket-only project.
-	err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"})
+	err := runProjectAdd(ctx, h.Client, Deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: outbox, Name: "ob", VCS: "none"})
 	if err == nil || strings.Contains(err.Error(), "gx project set-path") {
 		t.Errorf("clash with a git project: err = %v, want no set-path hint", err)
 	}
@@ -84,10 +84,10 @@ func TestProjectSetPath_ClearsVCSNoneOnlyForGitRepo(t *testing.T) {
 func TestProjectAdd_ClashWithVCSNoneProjectHintsSetPath(t *testing.T) {
 	h := servertest.Start(t)
 	ctx := context.Background()
-	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: t.TempDir(), Name: "ob", VCS: "none"}); err != nil {
+	if err := runProjectAdd(ctx, h.Client, Deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: t.TempDir(), Name: "ob", VCS: "none"}); err != nil {
 		t.Fatal(err)
 	}
-	err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: testutil.TempRepo(t), Name: "ob"})
+	err := runProjectAdd(ctx, h.Client, Deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: testutil.TempRepo(t), Name: "ob"})
 	if err == nil || !strings.Contains(err.Error(), "gx project set-path ob <clone>") {
 		t.Errorf("err = %v, want set-path hint", err)
 	}
@@ -98,7 +98,7 @@ func TestProjectSetPath_ChangesResolvedPath(t *testing.T) {
 	ctx := context.Background()
 	a, b := testutil.TempRepo(t), testutil.TempRepo(t)
 	name := filepath.Base(a)
-	if err := runProjectAdd(ctx, h.Client, deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: a}); err != nil {
+	if err := runProjectAdd(ctx, h.Client, Deps{}, &bytes.Buffer{}, false, wire.AddProjectRequest{Path: a}); err != nil {
 		t.Fatal(err)
 	}
 	if err := runProjectEdit(ctx, &bytes.Buffer{}, false, "updated", h.Client.Reads.SetProjectPath, wire.ProjectRequest{Name: name, Path: b}); err != nil {

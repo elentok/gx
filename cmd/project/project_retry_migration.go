@@ -1,4 +1,4 @@
-package cmd
+package project
 
 import (
 	"context"
@@ -32,14 +32,14 @@ func runProjectRetryMigration(ctx context.Context, cl *apiclient.Client, w io.Wr
 	return err
 }
 
-func newProjectRetryMigrationCmd(d deps) *cobra.Command {
+func newProjectRetryMigrationCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "retry-migration <name>",
 		Short: "run a project's pending migration steps again in the server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}

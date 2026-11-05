@@ -1,4 +1,4 @@
-package cmd
+package project
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 
 	add := func(req wire.AddProjectRequest) (string, error) {
 		var out bytes.Buffer
-		err := runProjectAdd(ctx, h.Client, deps{}, &out, false, req)
+		err := runProjectAdd(ctx, h.Client, Deps{}, &out, false, req)
 		return out.String(), err
 	}
 
@@ -77,7 +77,7 @@ func TestProjectAdd_DefaultNameIsDirHoldingBare(t *testing.T) {
 	h := servertest.Start(t)
 	bare := testutil.TempDotBareRepoWithWorktrees(t)
 	var out bytes.Buffer
-	if err := runProjectAdd(context.Background(), h.Client, deps{}, &out, false, wire.AddProjectRequest{Path: bare}); err != nil {
+	if err := runProjectAdd(context.Background(), h.Client, Deps{}, &out, false, wire.AddProjectRequest{Path: bare}); err != nil {
 		t.Fatal(err)
 	}
 	want := filepath.Base(bare)

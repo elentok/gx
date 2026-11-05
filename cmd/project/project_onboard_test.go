@@ -1,4 +1,4 @@
-package cmd
+package project
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -37,19 +38,21 @@ func newOnboardEnv(t *testing.T) *onboardEnv {
 	return e
 }
 
-func (e *onboardEnv) deps(t *testing.T, tty bool, answers string, saves ...string) deps {
+func (e *onboardEnv) deps(t *testing.T, tty bool, answers string, saves ...string) Deps {
 	t.Helper()
-	return deps{
-		stdin:  strings.NewReader(answers),
-		stdout: &e.out,
-		stderr: &e.errs,
-		getwd:  func() (string, error) { return e.repo, nil },
-		getenv: func(string) string { return "vi" },
-		loadConfig: func() (config.Config, error) {
-			return config.Config{TicketStore: config.TicketStoreConfig{Path: e.h.TicketStore}}, nil
+	return Deps{
+		Env: cmdbase.Env{
+			Stdin:  strings.NewReader(answers),
+			Stdout: &e.out,
+			Stderr: &e.errs,
+			Getwd:  func() (string, error) { return e.repo, nil },
+			Getenv: func(string) string { return "vi" },
+			LoadConfig: func() (config.Config, error) {
+				return config.Config{TicketStore: config.TicketStoreConfig{Path: e.h.TicketStore}}, nil
+			},
 		},
-		stdinIsTerminal: func() bool { return tty },
-		runEditor: func(_, path string, _ io.Reader, _, _ io.Writer) error {
+		StdinIsTerminal: func() bool { return tty },
+		RunEditor: func(_, path string, _ io.Reader, _, _ io.Writer) error {
 			if e.edits >= len(saves) {
 				t.Fatalf("editor opened %d times, scripted %d", e.edits+1, len(saves))
 			}
@@ -59,7 +62,7 @@ func (e *onboardEnv) deps(t *testing.T, tty bool, answers string, saves ...strin
 	}
 }
 
-func (e *onboardEnv) add(t *testing.T, d deps, jsonOut bool) error {
+func (e *onboardEnv) add(t *testing.T, d Deps, jsonOut bool) error {
 	t.Helper()
 	return runProjectAdd(context.Background(), e.h.Client, d, &e.out, jsonOut, wire.AddProjectRequest{Path: e.repo})
 }
