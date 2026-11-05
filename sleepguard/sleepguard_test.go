@@ -47,6 +47,7 @@ var allowed = map[string]int{
 	"testutil/agentfake/codex/codexdesign_test.go":         1, // poll loop with a deadline
 	"testutil/agentfake/codex/codexhooks_test.go":          4, // poll loops with a deadline; negative waits: a held hook keeps the dialog open
 	"testutil/gxfixture/spend_test.go":                     1, // poll loop with a deadline
+	"cmd/cmdtest/cmdtest_test.go":                          1, // negative wait: a restored wait hook must not fire
 	"cmd/server_agents_test.go":                            1,
 	"cmd/server_disk_status_test.go":                       1,
 	"cmd/server_logs_test.go":                              1,

@@ -104,6 +104,7 @@ var allowed = map[string]allowance{
 	// Tests of the read shim, the hidden aliases and the kept wire names.
 	"cmd/server_parity_test.go":                  allow("lists the hidden drain, park and unpark routes", "drain", "park"),
 	"cmd/tickets_alias_test.go":                  allow("tests the retired land, reset, unpark and drain aliases", "park", "land", "reset", "drain"),
+	"cmd/cmdtest/fixtures.go":                    allow("LegacyStatusTicket is a migrate input with the legacy needs-answer status", "needsanswer"),
 	"cmd/tickets_migrate_test.go":                allow("migrate input uses the legacy statuses", "park", "needsanswer", "needsrepair"),
 	"cmd/tickets_migrate_pause_test.go":          allow("migrate input uses the legacy statuses, park_kind and headings", "park", "land", "needsanswer", "needsrepair"),
 	"cmd/tickets_migrate_question_test.go":       allow("migrates the legacy Needs Answer section", "park", "needsanswer"),
