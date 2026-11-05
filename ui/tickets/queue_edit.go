@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // e-prefix chords: edit the selected ticket's underlying file, mirroring the
@@ -40,7 +41,7 @@ func (m QueueModel) selectedEditTarget() (file string, ok bool) {
 	if !ok {
 		return "", false
 	}
-	file, _ = resolveTicketPath(m.settings.TicketStore, row.ticket.Path)
+	file, _ = rowactions.ResolveTicketPath(m.settings.TicketStore, row.ticket.Path)
 	return file, true
 }
 

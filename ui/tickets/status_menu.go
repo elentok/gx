@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -22,7 +23,7 @@ import (
 // guard — a person hand-closing a blocked ticket from the TUI is exactly the
 // silent-assertion this ticket exists to prevent.
 func statusChangeCmd(tix tabapi.TicketsAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
-	file, address := resolveTicketPath(store, ticket.Path)
+	file, address := rowactions.ResolveTicketPath(store, ticket.Path)
 
 	if status == schema.StatusOpen {
 		if err := checkTicketBodyBeforeOpen(file); err != nil {

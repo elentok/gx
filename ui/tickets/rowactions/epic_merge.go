@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -13,11 +13,11 @@ import (
 // actionMerge triggers the server's manual epic merge, the TUI's
 // `gx server epics merge`. Its menu result carries the epic address as
 // EpicName.
-const actionMerge = "merge"
+const ActionMerge = "merge"
 
 // cmdEpicMerge asks the server to merge epic ("project:epic") and toasts the
 // outcome: a direct merge, the forked merge ticket, a pause, or the refusal.
-func cmdEpicMerge(tix tabapi.TicketsAPI, epic string) tea.Cmd {
+func CmdEpicMerge(tix tabapi.TicketsAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
 		res, err := tix.EpicMerge(context.Background(), epic)
 		switch {
@@ -36,11 +36,11 @@ func cmdEpicMerge(tix tabapi.TicketsAPI, epic string) tea.Cmd {
 
 // actionStashMerge is the server's "Stash, merge and restore" on an epic paused
 // on a dirty trunk. Its menu result carries the epic address as EpicName.
-const actionStashMerge = "stash-merge-epic"
+const ActionStashMerge = "stash-merge-epic"
 
 // cmdEpicStashMerge asks the server to stash, merge epic ("project:epic") and
 // restore the stash, and toasts the outcome.
-func cmdEpicStashMerge(tix tabapi.TicketsAPI, epic string) tea.Cmd {
+func CmdEpicStashMerge(tix tabapi.TicketsAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
 		res, err := tix.EpicStashMerge(context.Background(), epic)
 		switch {

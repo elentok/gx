@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // The root half of rowMenus: each tab model adapts itself to menuTab and
@@ -49,7 +50,7 @@ func (t modelMenuTab) selection() menuSelection {
 	if r.isEpic() {
 		return menuSelection{
 			ok: true, isEpic: true, epic: epic, archived: r.archived,
-			session:   epicSession(m.vm.Sessions, epic.Path),
+			session:   rowactions.EpicSession(m.vm.Sessions, epic.Path),
 			queueable: epicQueueable(epic, m.vm.Queue),
 			actions:   epicSummaryActions(m.vm.Epics, epic.Name),
 		}
@@ -57,8 +58,8 @@ func (t modelMenuTab) selection() menuSelection {
 	ticket := epic.Tickets[r.ticketIdx]
 	return menuSelection{
 		ok: true, epic: epic, ticket: ticket, archived: r.archived,
-		session:    ticketSession(m.vm.Sessions, epic.Path, ticket),
-		queueAgent: queueAgentOf(m.vm.Sessions, ticket.Path),
+		session:    rowactions.TicketSession(m.vm.Sessions, epic.Path, ticket),
+		queueAgent: rowactions.QueueAgentOf(m.vm.Sessions, ticket.Path),
 	}
 }
 

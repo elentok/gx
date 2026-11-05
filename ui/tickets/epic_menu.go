@@ -16,13 +16,14 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // epicMenuPickMsg carries an epic Context menu pick back to Update. status is
 // set for a Status pick.
 type epicMenuPickMsg struct {
-	target ticketTarget
+	target rowactions.TicketTarget
 	action string
 	status schema.Status
 }
@@ -58,28 +59,28 @@ type epicMenuInput struct {
 // epicMenuItems lists every action for an epic, in the shape of
 // ticketMenuItems: an action that applies is Suggested, one that doesn't is
 // dim with the reason.
-func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
-	item := func(label, key string, group contextmenu.Group, disabled string, msg epicMenuPickMsg) contextmenu.Item[ticketTarget] {
-		return contextmenu.Item[ticketTarget]{
+func epicMenuItems(in epicMenuInput) []contextmenu.Item[rowactions.TicketTarget] {
+	item := func(label, key string, group contextmenu.Group, disabled string, msg epicMenuPickMsg) contextmenu.Item[rowactions.TicketTarget] {
+		return contextmenu.Item[rowactions.TicketTarget]{
 			Label: label, Key: key, Group: group, Disabled: disabled,
-			Run: func(t ticketTarget) tea.Cmd {
+			Run: func(t rowactions.TicketTarget) tea.Cmd {
 				msg := msg
 				msg.target = t
 				return func() tea.Msg { return msg }
 			},
 		}
 	}
-	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[ticketTarget] {
+	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[rowactions.TicketTarget] {
 		return item(label, key, group, disabled, epicMenuPickMsg{action: action})
 	}
 	epic := in.epic
 
-	var items []contextmenu.Item[ticketTarget]
+	var items []contextmenu.Item[rowactions.TicketTarget]
 	if epic.IsMap {
 		if in.session != "" {
-			items = append(items, goToSessionItem(in.session))
+			items = append(items, rowactions.GoToSessionItem(in.session))
 		}
-		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, ""))
+		items = append(items, pick(rowactions.StartSessionLabel, "", rowactions.ActionStartSession, contextmenu.Suggested, ""))
 	}
 	mergeWhy := firstReason(reasonIf(!epic.AllDone(), ticketsNotDone), reasonIf(!epic.MergedAt.IsZero(), alreadyMerged))
 	mergeGroup := contextmenu.Server
@@ -90,7 +91,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 	if in.branch != "" {
 		mergeLabel += " into " + in.branch
 	}
-	mergeItem := pick(mergeLabel, "", actionMerge, mergeGroup, firstReason(in.serverReason, mergeWhy))
+	mergeItem := pick(mergeLabel, "", rowactions.ActionMerge, mergeGroup, firstReason(in.serverReason, mergeWhy))
 	if len(in.actions) == 0 {
 		items = append(items, mergeItem)
 	}
@@ -105,7 +106,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 		v, ok := schema.VerbOfWord(word)
 		switch word {
 		case wire.ActionStashMerge:
-			it := pick(v.Label(), "", actionStashMerge, contextmenu.Suggested, blockedWhy)
+			it := pick(v.Label(), "", rowactions.ActionStashMerge, contextmenu.Suggested, blockedWhy)
 			it.Help = v.Tooltip()
 			items = append(items, it)
 		case wire.ActionMerge:
@@ -150,10 +151,10 @@ func epicSummaryActions(sums []wire.EpicSummary, address string) []string {
 	return nil
 }
 
-func openEpicContextMenu(menu contextmenu.Menu[ticketTarget], in epicMenuInput) contextmenu.Menu[ticketTarget] {
+func openEpicContextMenu(menu contextmenu.Menu[rowactions.TicketTarget], in epicMenuInput) contextmenu.Menu[rowactions.TicketTarget] {
 	// In server mode Name is the "project:epic" address the merge and start
 	// session want; Path is what the selection is matched against.
-	target := ticketTarget{address: in.epic.Path, epicName: in.epic.Name}
+	target := rowactions.TicketTarget{Address: in.epic.Path, EpicName: in.epic.Name}
 	return menu.Open(target, fmt.Sprintf("Epic %q", in.epic.Name), epicMenuItems(in))
 }
 

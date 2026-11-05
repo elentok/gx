@@ -18,7 +18,7 @@ var herdrImporters = []string{
 	"github.com/elentok/gx/runnerbuild",
 	"github.com/elentok/gx/server/sched",
 	"github.com/elentok/gx/testutil/herdrctl",
-	"github.com/elentok/gx/ui/tickets",
+	"github.com/elentok/gx/ui/tickets/rowactions",
 	"github.com/elentok/gx/ui/worktrees",
 }
 

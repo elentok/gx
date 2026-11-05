@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -63,7 +64,7 @@ func chooseQueueMenuItem(t *testing.T, m QueueModel, label string) (QueueModel, 
 	return updated.(QueueModel), cmd
 }
 
-func groupsOf(items []contextmenu.Item[ticketTarget]) []contextmenu.Group {
+func groupsOf(items []contextmenu.Item[rowactions.TicketTarget]) []contextmenu.Group {
 	var groups []contextmenu.Group
 	for _, it := range items {
 		if !slices.Contains(groups, it.Group) {
@@ -172,8 +173,8 @@ func TestQueueTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 
 	m, ready := requestQueueMenu(t, m)
 	for _, label := range append(orchestrationLabels(), "Approve recovery proposal") {
-		if got := itemByLabel(t, ready.items, label).Disabled; got != serverNotRunning {
-			t.Errorf("%s disabled = %q, want %q", label, got, serverNotRunning)
+		if got := itemByLabel(t, ready.items, label).Disabled; got != rowactions.ServerNotRunning {
+			t.Errorf("%s disabled = %q, want %q", label, got, rowactions.ServerNotRunning)
 		}
 	}
 	updated, _ := m.Update(ready)
@@ -275,10 +276,10 @@ func TestResolveTicketPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if file, address := resolveTicketPath(store, "gx:alpha/01"); file != want || address != "gx:alpha/01" {
+	if file, address := rowactions.ResolveTicketPath(store, "gx:alpha/01"); file != want || address != "gx:alpha/01" {
 		t.Errorf("address: got (%q, %q)", file, address)
 	}
-	if file, address := resolveTicketPath(store, "/some/01-x.md"); file != "/some/01-x.md" || address != "" {
+	if file, address := rowactions.ResolveTicketPath(store, "/some/01-x.md"); file != "/some/01-x.md" || address != "" {
 		t.Errorf("file: got (%q, %q)", file, address)
 	}
 }

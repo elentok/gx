@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
@@ -14,18 +15,15 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
-// ticketTarget is the ticket row a Context menu was opened on. epicName is
-// the bare epic the herdr launches want.
-type ticketTarget struct{ address, epicName, ticketID string }
-
 // ticketMenuPickMsg carries a menu pick back to Update: the actions need the
 // model, which an item's Run cannot reach. status is set for a Status pick.
 type ticketMenuPickMsg struct {
-	target ticketTarget
+	target rowactions.TicketTarget
 	action string
 	status schema.Status
 }
@@ -64,7 +62,6 @@ const (
 	notMuted       = "not muted"
 	herdrDownText  = "herdr not running"
 	holderGoneText = "agent is gone"
-	noAgentLog     = "no agent log"
 	archivedText   = "archived"
 	noProposal     = "no recovery proposal"
 )
@@ -74,56 +71,56 @@ const actionApprove = "approve"
 // ticketMenuItems lists every action for a ticket. Each is built once in its
 // own group and moved to Suggested when it is suggested; one that doesn't
 // apply is dim with the reason.
-func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
-	item := func(label, key string, group contextmenu.Group, disabled string, msg ticketMenuPickMsg) contextmenu.Item[ticketTarget] {
+func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[rowactions.TicketTarget] {
+	item := func(label, key string, group contextmenu.Group, disabled string, msg ticketMenuPickMsg) contextmenu.Item[rowactions.TicketTarget] {
 		if in.archived && !archivedAllowed(group, msg.action) {
 			disabled = archivedText
 		}
-		return contextmenu.Item[ticketTarget]{
+		return contextmenu.Item[rowactions.TicketTarget]{
 			Label: label, Key: key, Group: group, Disabled: disabled,
-			Run: func(t ticketTarget) tea.Cmd {
+			Run: func(t rowactions.TicketTarget) tea.Cmd {
 				msg := msg
 				msg.target = t
 				return func() tea.Msg { return msg }
 			},
 		}
 	}
-	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[ticketTarget] {
+	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[rowactions.TicketTarget] {
 		return item(label, key, group, disabled, ticketMenuPickMsg{action: action})
 	}
 	finished := ""
 	if in.rendered.Terminal() {
 		finished = ticketFinished
 	}
-	server := func(label, key, action, why string) contextmenu.Item[ticketTarget] {
+	server := func(label, key, action, why string) contextmenu.Item[rowactions.TicketTarget] {
 		return pick(label, key, action, contextmenu.Server, firstReason(in.serverReason, finished, why))
 	}
-	suggest := func(suggested bool, it contextmenu.Item[ticketTarget]) contextmenu.Item[ticketTarget] {
+	suggest := func(suggested bool, it contextmenu.Item[rowactions.TicketTarget]) contextmenu.Item[rowactions.TicketTarget] {
 		if suggested {
 			it.Group = contextmenu.Suggested
 		}
 		return it
 	}
 	paused := isRepairPause(in.ticket)
-	answer := resumeSuggested(in.rendered)
+	answer := rowactions.ResumeSuggested(in.rendered)
 	// The first recovery item is what "enter" runs on a repair pause; an answer
 	// pause's verbs need their own confirmation, so they get no hint.
-	var recovery []contextmenu.Item[ticketTarget]
-	for i, a := range recoveryActions(in.detail) {
-		it := server(a.label, reasonIf(paused && i == 0, "enter"), recoverPrefix+a.word, "")
-		it.Help = a.help
-		if a.recommended {
-			it.Label += recommendedMark
+	var recovery []contextmenu.Item[rowactions.TicketTarget]
+	for i, a := range rowactions.RecoveryActions(in.detail) {
+		it := server(a.Label, reasonIf(paused && i == 0, "enter"), rowactions.RecoverPrefix+a.Word, "")
+		it.Help = a.Help
+		if a.Recommended {
+			it.Label += rowactions.RecommendedMark
 		}
-		recovery = append(recovery, suggest(answer || a.recommended, it))
+		recovery = append(recovery, suggest(answer || a.Recommended, it))
 	}
 
-	var items []contextmenu.Item[ticketTarget]
+	var items []contextmenu.Item[rowactions.TicketTarget]
 	if in.isMap && in.session != "" {
-		items = append(items, goToSessionItem(in.session))
+		items = append(items, rowactions.GoToSessionItem(in.session))
 	}
 	if in.isMap && in.rendered == tickets.StatusOpen {
-		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, ""))
+		items = append(items, pick(rowactions.StartSessionLabel, "", rowactions.ActionStartSession, contextmenu.Suggested, ""))
 	}
 
 	current := schema.Status(strings.ToLower(strings.TrimSpace(in.ticket.Status)))
@@ -138,26 +135,26 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		items = append(items, item("Set "+string(status), "", contextmenu.Status, why, ticketMenuPickMsg{status: status}))
 	}
 
-	unmute := unmuteSuggested(in.ticket)
+	unmute := rowactions.UnmuteSuggested(in.ticket)
 	items = append(items, server("Pause", "", serverVerbPause, reasonIf(paused, alreadyPaused)))
 	items = append(items, recovery...)
 	items = append(items,
 		server("Cancel", "", serverVerbCancel, ""),
 		// A mute outlives the status (see actionUnmuteReopen), so a finished
 		// ticket keeps its Unmute.
-		suggest(unmute, pick("Unmute & Reopen", "", actionUnmuteReopen, contextmenu.Server,
+		suggest(unmute, pick("Unmute & Reopen", "", rowactions.ActionUnmuteReopen, contextmenu.Server,
 			firstReason(in.serverReason, reasonIf(!unmute, firstReason(finished, notMuted))))),
 		pick("Watch", "", actionWatch, contextmenu.Agent, in.watchReason),
 		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""),
-		suggest(investigateSuggested(in.rendered),
-			pick("Investigate", "", actionInvestigate, contextmenu.Agent, "")))
+		suggest(rowactions.InvestigateSuggested(in.rendered),
+			pick("Investigate", "", rowactions.ActionInvestigate, contextmenu.Agent, "")))
 	switch {
 	case in.queueAgent != "":
 		// A PTY pane is the Agents tab's live panel, so herdr being down is moot.
 		it := pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
 		if it.Disabled == "" {
 			id := in.queueAgent
-			it.Run = func(ticketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } }
+			it.Run = func(rowactions.TicketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } }
 		}
 		items = append(items, it)
 	case in.paneLive:
@@ -239,7 +236,7 @@ func firstReason(reasons ...string) string {
 // server takes them.
 func serverReason(api tabapi.ServerAPI, link tabapi.ServerLink) string {
 	if api == nil || link == tabapi.ServerLinkDown {
-		return serverNotRunning
+		return rowactions.ServerNotRunning
 	}
 	return link.DisabledReason()
 }
@@ -247,9 +244,9 @@ func serverReason(api tabapi.ServerAPI, link tabapi.ServerLink) string {
 // ticketMenuReadyMsg carries a ticket's Context menu whose agent liveness was
 // resolved off the Update goroutine.
 type ticketMenuReadyMsg struct {
-	target ticketTarget
+	target rowactions.TicketTarget
 	prompt string
-	items  []contextmenu.Item[ticketTarget]
+	items  []contextmenu.Item[rowactions.TicketTarget]
 	// detailErr is the failed detail read; the menu opens without recovery items.
 	detailErr error
 }
@@ -281,18 +278,18 @@ func cmdTicketMenu(api tabapi.ReadsAPI, dirs config.Dirs, in ticketMenuInput) te
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.
 	epicName, _, _ := tickets.SplitTrailerValue(address)
-	target := ticketTarget{address: address, epicName: epicName, ticketID: in.ticket.DisplayNumber()}
+	target := rowactions.TicketTarget{Address: address, EpicName: epicName, TicketID: in.ticket.DisplayNumber()}
 	prompt := fmt.Sprintf("Ticket %q", in.ticket.Title)
 	return func() tea.Msg {
-		api := snapshotIterations(api)
-		it, live := serverIteration(api, address)
+		api := rowactions.SnapshotIterations(api)
+		it, live := rowactions.ServerIteration(api, address)
 		in.paneLive = live && it.Tab != ""
 		if live && it.QueueAgent != "" {
 			in.queueAgent, in.ptyLive = it.QueueAgent, true
 		}
-		in.watchReason = watchReason(api, dirs, agentAddress(address, target.ticketID))
+		in.watchReason = watchReason(api, dirs, agentAddress(address, target.TicketID))
 		var err error
-		in.detail, err = ticketDetail(api, address)
+		in.detail, err = rowactions.TicketDetail(api, address)
 		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in), detailErr: err}
 	}
 }
@@ -300,14 +297,28 @@ func cmdTicketMenu(api tabapi.ReadsAPI, dirs config.Dirs, in ticketMenuInput) te
 // ticketMenuReadyApplies reports whether a resolved menu may open: the user
 // may have moved on, or opened another overlay, while ps ran.
 func ticketMenuReadyApplies(msg ticketMenuReadyMsg, pending, selected string, modalOpen bool) bool {
-	address := msg.target.address
+	address := msg.target.Address
 	return pending == address && selected == address && !modalOpen
 }
 
-func (t ticketTarget) result(action string) actionsMenuResult {
+// ticketHasSuggestedActions reports whether a row carries the "m" badge
+// (ui.IconSet.SuggestedAction): its Context menu has an enabled Suggested
+// item.
+func ticketHasSuggestedActions(in ticketMenuInput) bool {
+	// The row has no detail yet, so an answer pause's recovery items (suggested
+	// once the menu opens) are counted here.
+	if rowactions.ResumeSuggested(in.rendered) && in.serverReason == "" && !in.archived {
+		return true
+	}
+	return slices.ContainsFunc(ticketMenuItems(in), func(it contextmenu.Item[rowactions.TicketTarget]) bool {
+		return it.Group == contextmenu.Suggested && it.Disabled == ""
+	})
+}
+
+func targetResult(t rowactions.TicketTarget, action string) actionsMenuResult {
 	return actionsMenuResult{
 		Done: true, Accepted: true,
-		Path: t.address, EpicName: t.epicName, TicketID: t.ticketID,
+		Path: t.Address, EpicName: t.EpicName, TicketID: t.TicketID,
 		Action: action,
 	}
 }

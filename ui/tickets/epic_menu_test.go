@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -72,8 +73,8 @@ func TestEpicMenu_MergeDimReasons(t *testing.T) {
 		t.Errorf("open menu has no item dim for %q", ticketsNotDone)
 	}
 	m.serverAPI = nil
-	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), serverNotRunning) {
-		t.Errorf("open menu has no item dim for %q", serverNotRunning)
+	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), rowactions.ServerNotRunning) {
+		t.Errorf("open menu has no item dim for %q", rowactions.ServerNotRunning)
 	}
 }
 
@@ -162,9 +163,9 @@ func TestEpicMenu_AddEpicToQueueDimReasons(t *testing.T) {
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != nothingToQueue {
 		t.Errorf("no queueable tickets: disabled = %q, want %q", got, nothingToQueue)
 	}
-	items = epicMenuItems(epicMenuInput{epic: open, queueable: true, serverReason: serverNotRunning})
-	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != serverNotRunning {
-		t.Errorf("no server: disabled = %q, want %q", got, serverNotRunning)
+	items = epicMenuItems(epicMenuInput{epic: open, queueable: true, serverReason: rowactions.ServerNotRunning})
+	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != rowactions.ServerNotRunning {
+		t.Errorf("no server: disabled = %q, want %q", got, rowactions.ServerNotRunning)
 	}
 	items = epicMenuItems(epicMenuInput{epic: open, queueable: true})
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != "" {

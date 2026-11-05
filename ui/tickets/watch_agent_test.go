@@ -16,13 +16,16 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 const watchLogLine = `{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello from the agent"}]}}` + "\n"
 
 func fakeNativeLog(t *testing.T, log agentlog.Log, err error) {
 	t.Helper()
-	fakeAgentLog(t, func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error) { return log, err })
+	fakeAgentLog(t, func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error) {
+		return log, err
+	})
 }
 
 func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error)) {
@@ -439,16 +442,16 @@ func TestWatch_NoOrPrunedLogDims(t *testing.T) {
 		t.Run(name+"/tickets", func(t *testing.T) {
 			fakeNativeLog(t, c.log, c.err)
 			_, ready := requestTicketMenu(t, watchTicketTab(t, "claimed"))
-			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != noAgentLog {
-				t.Errorf("Watch disabled = %q, want %q", got, noAgentLog)
+			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NoAgentLog {
+				t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 			}
 		})
 		t.Run(name+"/queue", func(t *testing.T) {
 			fakeNativeLog(t, c.log, c.err)
 			m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
 			_, ready := requestQueueMenu(t, m)
-			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != noAgentLog {
-				t.Errorf("Watch disabled = %q, want %q", got, noAgentLog)
+			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NoAgentLog {
+				t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 			}
 		})
 	}
@@ -461,10 +464,10 @@ func TestWatchReason_NativeLog(t *testing.T) {
 		err  error
 		want string
 	}{
-		{"no native agent", agentlog.Log{}, agentlog.ErrNoAgent, noAgentLog},
+		{"no native agent", agentlog.Log{}, agentlog.ErrNoAgent, rowactions.NoAgentLog},
 		{"running", agentlog.Log{Path: "x", Ended: endedFunc(false)}, nil, ""},
 		{"ended", agentlog.Log{Path: "x", Ended: endedFunc(true)}, nil, ""},
-		{"pruned", agentlog.Log{Pruned: true}, nil, noAgentLog},
+		{"pruned", agentlog.Log{Pruned: true}, nil, rowactions.NoAgentLog},
 	}
 	for _, c := range cases {
 		fakeNativeLog(t, c.log, c.err)
@@ -519,8 +522,8 @@ func TestWatch_HerdrDimReasons(t *testing.T) {
 	t.Run("no server", func(t *testing.T) {
 		fakeHerdrOnlyLog(t)
 		_, ready := requestTicketMenu(t, selectTicketRow(t, loadedModelWithTicket(t)))
-		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != noAgentLog {
-			t.Errorf("Watch disabled = %q, want %q", got, noAgentLog)
+		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NoAgentLog {
+			t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 		}
 	})
 }
@@ -529,9 +532,9 @@ func TestWatch_HerdrDimReasons(t *testing.T) {
 func fakeFocus(t *testing.T) *[]string {
 	t.Helper()
 	var focused []string
-	prev := focusIterationTab
-	t.Cleanup(func() { focusIterationTab = prev })
-	focusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
+	prev := rowactions.FocusIterationTab
+	t.Cleanup(func() { rowactions.FocusIterationTab = prev })
+	rowactions.FocusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
 	return &focused
 }
 

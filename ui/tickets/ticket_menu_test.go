@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -56,9 +57,9 @@ func chooseTicketMenuItem(t *testing.T, m Model, label string) (Model, tea.Cmd) 
 	return updated.(Model), cmd
 }
 
-func itemByLabel(t *testing.T, items []contextmenu.Item[ticketTarget], label string) contextmenu.Item[ticketTarget] {
+func itemByLabel(t *testing.T, items []contextmenu.Item[rowactions.TicketTarget], label string) contextmenu.Item[rowactions.TicketTarget] {
 	t.Helper()
-	i := slices.IndexFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == label })
+	i := slices.IndexFunc(items, func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Label == label })
 	if i < 0 {
 		t.Fatalf("no %q item in %v", label, itemLabels(items))
 	}
@@ -67,10 +68,10 @@ func itemByLabel(t *testing.T, items []contextmenu.Item[ticketTarget], label str
 
 // menuHasReason reports whether an item of the open menu is dim for reason.
 func menuHasReason(m Model, reason string) bool {
-	return slices.ContainsFunc(m.menus.menu.Items(), func(it contextmenu.Item[ticketTarget]) bool { return it.Disabled == reason })
+	return slices.ContainsFunc(m.menus.menu.Items(), func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Disabled == reason })
 }
 
-func itemLabels(items []contextmenu.Item[ticketTarget]) []string {
+func itemLabels(items []contextmenu.Item[rowactions.TicketTarget]) []string {
 	labels := make([]string, len(items))
 	for i, it := range items {
 		labels[i] = it.Group.String() + "/" + it.Label
@@ -200,14 +201,14 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 
 			m, ready := requestTicketMenu(t, m)
 			for _, label := range orchestrationLabels() {
-				if got := itemByLabel(t, ready.items, label).Disabled; got != serverNotRunning {
-					t.Errorf("%s disabled = %q, want %q", label, got, serverNotRunning)
+				if got := itemByLabel(t, ready.items, label).Disabled; got != rowactions.ServerNotRunning {
+					t.Errorf("%s disabled = %q, want %q", label, got, rowactions.ServerNotRunning)
 				}
 			}
 			updated, _ := m.Update(ready)
 			m = updated.(Model)
-			if !menuHasReason(m, serverNotRunning) {
-				t.Errorf("open menu has no item dim for %q", serverNotRunning)
+			if !menuHasReason(m, rowactions.ServerNotRunning) {
+				t.Errorf("open menu has no item dim for %q", rowactions.ServerNotRunning)
 			}
 
 			before, _ := os.ReadFile(file)
@@ -271,8 +272,8 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 			t.Errorf("%s on a done ticket = %q, want %q", label, got, ticketFinished)
 		}
 	}
-	done.serverReason = serverNotRunning
-	if got := disabled(done, "Pause"); got != serverNotRunning {
+	done.serverReason = rowactions.ServerNotRunning
+	if got := disabled(done, "Pause"); got != rowactions.ServerNotRunning {
 		t.Errorf("pause with no server on a done ticket = %q, want the server reason first", got)
 	}
 
@@ -295,7 +296,7 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 
 func TestTicketMenuItems_StatusPickCarriesTheStatus(t *testing.T) {
 	item := itemByLabel(t, ticketMenuItems(ticketMenuInput{rendered: tickets.StatusOpen}), "Set draft")
-	target := ticketTarget{address: "gx:alpha/01"}
+	target := rowactions.TicketTarget{Address: "gx:alpha/01"}
 	if got := item.Run(target)(); got != (ticketMenuPickMsg{target: target, status: schema.StatusDraft}) {
 		t.Errorf("pick = %+v", got)
 	}
@@ -398,7 +399,7 @@ func TestTicketMenuItems_ArchivedKeepsReadActions(t *testing.T) {
 		if it.Disabled != "" {
 			continue
 		}
-		msg, _ := it.Run(ticketTarget{})().(ticketMenuPickMsg)
+		msg, _ := it.Run(rowactions.TicketTarget{})().(ticketMenuPickMsg)
 		if !slices.Contains(reads, msg.action) {
 			t.Errorf("%s (action %q) enabled on an archived row", it.Label, msg.action)
 		}
@@ -457,7 +458,7 @@ func TestTicketMenuItems_GoToPane(t *testing.T) {
 
 func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
 	item := itemByLabel(t, ticketMenuItems(ticketMenuInput{queueAgent: "queue-a", ptyLive: true}), "Go to pane")
-	if got := item.Run(ticketTarget{})(); got != (tabapi.GoToSessionMsg{ID: "queue-a"}) {
+	if got := item.Run(rowactions.TicketTarget{})(); got != (tabapi.GoToSessionMsg{ID: "queue-a"}) {
 		t.Fatalf("Go to pane sent %v, want tabapi.GoToSessionMsg{queue-a}", got)
 	}
 }
@@ -472,8 +473,8 @@ func TestCmdTicketMenu_PTYIterationOffersTheAgentRow(t *testing.T) {
 	}
 }
 
-func hasItem(items []contextmenu.Item[ticketTarget], label string) bool {
-	return slices.ContainsFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == label })
+func hasItem(items []contextmenu.Item[rowactions.TicketTarget], label string) bool {
+	return slices.ContainsFunc(items, func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Label == label })
 }
 
 func TestTicketsTab_StatusKeyOpensNothing(t *testing.T) {

@@ -15,12 +15,13 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // applyStatus runs the status write and returns the toast it produced, if any.
 func applyStatus(t *testing.T, m Model, status schema.Status) string {
 	t.Helper()
-	_, cmd := m.handleTicketMenuPick(ticketMenuPickMsg{target: ticketTarget{address: m.selectedTicketPath()}, status: status})
+	_, cmd := m.handleTicketMenuPick(ticketMenuPickMsg{target: rowactions.TicketTarget{Address: m.selectedTicketPath()}, status: status})
 	if cmd == nil {
 		t.Fatal("status change issued nothing")
 	}
@@ -97,8 +98,8 @@ func TestQueueModel_DeleteWithoutAServerWritesNothing(t *testing.T) {
 	if next.(QueueModel).confirm.IsOpen {
 		t.Fatal("x opened a confirm with no server")
 	}
-	if msg, ok := cmd().(notify.NotifyMsg); !ok || msg.Message != serverNotRunning {
-		t.Fatalf("result = %+v, want the %q toast", msg, serverNotRunning)
+	if msg, ok := cmd().(notify.NotifyMsg); !ok || msg.Message != rowactions.ServerNotRunning {
+		t.Fatalf("result = %+v, want the %q toast", msg, rowactions.ServerNotRunning)
 	}
 	if _, err := os.Stat(file); err != nil {
 		t.Fatalf("ticket file gone: %v", err)

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // runKey sends a key and feeds the command's message back once.
@@ -118,7 +119,7 @@ func TestDefaultHarness_NoServerWarnsAndOpensNothing(t *testing.T) {
 		t.Fatal("picker opened without a server")
 	}
 	got, ok := cmd().(notify.NotifyMsg)
-	if !ok || got.Message != serverNotRunning {
+	if !ok || got.Message != rowactions.ServerNotRunning {
 		t.Fatalf("toast = %#v", cmd())
 	}
 }

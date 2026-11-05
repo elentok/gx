@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
@@ -614,7 +615,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		case bindingQueueDelete:
 			if m.serverAPI == nil {
-				return m, notify.Warning(serverNotRunning)
+				return m, notify.Warning(rowactions.ServerNotRunning)
 			}
 			return m.handleServerDeleteKey()
 		case bindingQueueTicketMenu:

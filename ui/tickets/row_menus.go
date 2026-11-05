@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -72,7 +73,7 @@ type pickResult struct {
 // rowMenus is the Context menu of a tab's rows: the ticket menu, the epic menu
 // and the status writes they run. onQueue adds the Queue group.
 type rowMenus struct {
-	menu contextmenu.Menu[ticketTarget]
+	menu contextmenu.Menu[rowactions.TicketTarget]
 	// pending is the ticket path "m" is resolving the menu for; Esc or moving
 	// the selection forgets it, so a late result is dropped.
 	pending string
@@ -137,7 +138,7 @@ func (rm *rowMenus) handleReady(msg ticketMenuReadyMsg, tab menuTab) tea.Cmd {
 func (rm *rowMenus) handleTicketPick(msg ticketMenuPickMsg, tab menuTab) pickResult {
 	sel := tab.selection()
 	env := tab.env()
-	if msg.target.address != sel.ticketPath() {
+	if msg.target.Address != sel.ticketPath() {
 		return pickResult{}
 	}
 	switch {
@@ -149,14 +150,14 @@ func (rm *rowMenus) handleTicketPick(msg ticketMenuPickMsg, tab menuTab) pickRes
 	if cmd, ok := ticketMenuEditCopy(msg.action, tab.yankSummary, tab.yankFilePath, tab.editFile); ok {
 		return pickResult{cmd: cmd}
 	}
-	return pickResult{cmd: dispatchPick(env, msg.target.result(msg.action))}
+	return pickResult{cmd: dispatchPick(env, targetResult(msg.target, msg.action))}
 }
 
 // handleEpicPick runs a pick only while its epic is still the selected row.
 func (rm *rowMenus) handleEpicPick(msg epicMenuPickMsg, tab menuTab) tea.Cmd {
 	sel := tab.selection()
 	env := tab.env()
-	if !sel.ok || !sel.isEpic || sel.epic.Path != msg.target.address {
+	if !sel.ok || !sel.isEpic || sel.epic.Path != msg.target.Address {
 		return nil
 	}
 	if msg.status != "" {
@@ -170,7 +171,7 @@ func (rm *rowMenus) handleEpicPick(msg epicMenuPickMsg, tab menuTab) tea.Cmd {
 	case actionYankEpic:
 		return tab.yankSummary()
 	}
-	return dispatchPick(env, msg.target.result(msg.action))
+	return dispatchPick(env, targetResult(msg.target, msg.action))
 }
 
 // proposedRemedyHeading is the ticket section the server writes when a

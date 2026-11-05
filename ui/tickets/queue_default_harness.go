@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // harnessPicker is the Queue tab's "Default harness..." modal. project is ""
@@ -34,7 +35,7 @@ type defaultHarnessWroteMsg struct {
 
 func (m QueueModel) handleDefaultHarnessKey() (tea.Model, tea.Cmd) {
 	if m.serverAPI == nil || m.admin == nil || m.serverDown() {
-		return m, notify.Warning(serverNotRunning)
+		return m, notify.Warning(rowactions.ServerNotRunning)
 	}
 	admin := m.admin
 	return m, func() tea.Msg {
@@ -124,7 +125,7 @@ func (m QueueModel) updateDefaultHarness(msg tea.Msg) (QueueModel, tea.Cmd, bool
 
 func harnessErrorToast(prefix string, err error) tea.Cmd {
 	if apiclient.IsNotRunning(err) {
-		return notify.Warning(serverNotRunning)
+		return notify.Warning(rowactions.ServerNotRunning)
 	}
 	return notify.Error(prefix + err.Error())
 }

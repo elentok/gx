@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 func TestOpenHelp_TicketsOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
@@ -58,7 +59,7 @@ func TestOpenHelp_TicketsEndsPreviewSearch(t *testing.T) {
 func TestOpenHelp_TicketsIgnoredWhileModalOpen(t *testing.T) {
 	t.Parallel()
 	m := NewModel(t.TempDir(), ui.Settings{}, keys.New(nil))
-	m.menus.menu = m.menus.menu.Open(ticketTarget{}, "", nil)
+	m.menus.menu = m.menus.menu.Open(rowactions.TicketTarget{}, "", nil)
 	updated, _ := m.Update(nav.OpenHelp()())
 	if updated.(Model).help.IsOpen {
 		t.Fatal("OpenHelp opened help over the context menu")

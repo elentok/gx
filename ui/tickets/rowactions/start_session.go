@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -20,11 +20,11 @@ import (
 // actionStartSession hands a map epic or one of its open tickets to the
 // Agents tab's create form. Handled by dispatchMenuAction;
 // starting a session writes no ticket status.
-const actionStartSession = "start-session"
+const ActionStartSession = "start-session"
 
-const startSessionLabel = "Start session…"
+const StartSessionLabel = "Start session…"
 
-const goToSessionLabel = "Go to design session…"
+const GoToSessionLabel = "Go to design session…"
 
 // latestSession is the ID of the most recently changed session whose Session
 // ticket matches; "" when none does. Exited and Stopped sessions count.
@@ -43,7 +43,7 @@ func latestSession(sessions []wire.SessionInfo, matches func(ticket string) bool
 }
 
 // epicSession is the session linked to the epic or any of its tickets.
-func epicSession(sessions []wire.SessionInfo, epicAddress string) string {
+func EpicSession(sessions []wire.SessionInfo, epicAddress string) string {
 	return latestSession(sessions, func(ticket string) bool {
 		return ticket == epicAddress || strings.HasPrefix(ticket, epicAddress+"/")
 	})
@@ -51,7 +51,7 @@ func epicSession(sessions []wire.SessionInfo, epicAddress string) string {
 
 // ticketSession is the session linked to the ticket, or to its epic while the
 // ticket is claimed.
-func ticketSession(sessions []wire.SessionInfo, epicAddress string, ticket tickets.Ticket) string {
+func TicketSession(sessions []wire.SessionInfo, epicAddress string, ticket tickets.Ticket) string {
 	claimed := strings.EqualFold(strings.TrimSpace(ticket.Status), "claimed")
 	return latestSession(sessions, func(t string) bool {
 		return t == ticket.Path || (claimed && t == epicAddress)
@@ -59,7 +59,7 @@ func ticketSession(sessions []wire.SessionInfo, epicAddress string, ticket ticke
 }
 
 // queueAgentOf is the Queue agent row running address's ticket, "" when none.
-func queueAgentOf(sessions []wire.SessionInfo, address string) string {
+func QueueAgentOf(sessions []wire.SessionInfo, address string) string {
 	for _, s := range sessions {
 		if s.Queue && s.Ticket == address {
 			return s.ID
@@ -68,10 +68,10 @@ func queueAgentOf(sessions []wire.SessionInfo, address string) string {
 	return ""
 }
 
-func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
-	return contextmenu.Item[ticketTarget]{
-		Label: goToSessionLabel, Group: contextmenu.Suggested,
-		Run: func(ticketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } },
+func GoToSessionItem(id string) contextmenu.Item[TicketTarget] {
+	return contextmenu.Item[TicketTarget]{
+		Label: GoToSessionLabel, Group: contextmenu.Suggested,
+		Run: func(TicketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } },
 	}
 }
 
@@ -80,7 +80,7 @@ func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
 // the map's design worktree when the server hands one out, else in the
 // project's trunk checkout, resolved from storePath off the UI thread. A
 // refusal opens no form.
-func startSessionCmd(sessions tabapi.SessionsAPI, storePath, address string) tea.Cmd {
+func StartSessionCmd(sessions tabapi.SessionsAPI, storePath, address string) tea.Cmd {
 	project, short, _ := strings.Cut(address, ":")
 	epic, _, _ := strings.Cut(address, "/")
 	return func() tea.Msg {

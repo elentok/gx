@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 func TestTicketMenuItems_SuggestableItemsBuiltOnce(t *testing.T) {
@@ -66,11 +67,11 @@ func TestTicketHasSuggestedActions_AgreesWithMenu(t *testing.T) {
 		{"paused (repair) herdr down", ticketMenuInput{rendered: tickets.StatusPausedRepair, herdrDown: true}, true},
 		{"error herdr down", ticketMenuInput{rendered: tickets.StatusError, herdrDown: true}, true},
 		{"muted open", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}}, true},
-		{"muted open server down", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}, serverReason: serverNotRunning}, false},
+		{"muted open server down", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}, serverReason: rowactions.ServerNotRunning}, false},
 		{"open on a map", ticketMenuInput{rendered: tickets.StatusOpen, isMap: true}, true},
 		{"archived paused (repair)", ticketMenuInput{rendered: tickets.StatusPausedRepair, archived: true}, false},
 	} {
-		menu := slices.ContainsFunc(ticketMenuItems(tt.in), func(it contextmenu.Item[ticketTarget]) bool {
+		menu := slices.ContainsFunc(ticketMenuItems(tt.in), func(it contextmenu.Item[rowactions.TicketTarget]) bool {
 			return it.Group == contextmenu.Suggested && it.Disabled == ""
 		})
 		if got := ticketHasSuggestedActions(tt.in); got != tt.want || menu != tt.want {

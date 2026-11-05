@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -29,7 +30,7 @@ func goToSessionModel(t *testing.T, ticketStatus string, sessions ...wire.Sessio
 	return m
 }
 
-func menuLabels(items []contextmenu.Item[ticketTarget]) []string {
+func menuLabels(items []contextmenu.Item[rowactions.TicketTarget]) []string {
 	var labels []string
 	for _, it := range items {
 		labels = append(labels, it.Label)
@@ -57,7 +58,7 @@ func TestGoToSession_EpicMenuMatchesEpicOrAnyTicketSession(t *testing.T) {
 	} {
 		m := goToSessionModel(t, "open", wire.SessionInfo{ID: "s1", Ticket: tc.ticket})
 		m = openEpicMenuOn(t, m, "gx:map")
-		if got := m.menus.menu.IsOpen && menuViewHas(m, goToSessionLabel); got != tc.want {
+		if got := m.menus.menu.IsOpen && menuViewHas(m, rowactions.GoToSessionLabel); got != tc.want {
 			t.Errorf("%s: go to session offered = %v, want %v", tc.name, got, tc.want)
 		}
 	}
@@ -82,7 +83,7 @@ func TestGoToSession_TicketMenuMatching(t *testing.T) {
 		{"exited session", "open", wire.SessionInfo{ID: "s1", Ticket: "gx:map/01", Status: wire.SessionStatus{State: wire.SessionExited}}, true},
 	} {
 		labels := ticketMenuLabels(t, goToSessionModel(t, tc.status, tc.s), "gx:map/01")
-		if got := slices.Contains(labels, goToSessionLabel); got != tc.want {
+		if got := slices.Contains(labels, rowactions.GoToSessionLabel); got != tc.want {
 			t.Errorf("%s: offered = %v, want %v", tc.name, got, tc.want)
 		}
 	}
@@ -96,16 +97,16 @@ func TestGoToSession_NotOfferedOnNonMapTicket(t *testing.T) {
 	})
 	setCollapsedSection(&m, sectionOpenMaps, false)
 	labels := ticketMenuLabels(t, m, "gx:plain/01")
-	if slices.Contains(labels, goToSessionLabel) {
-		t.Errorf("labels = %v, want no %q on a non-map ticket", labels, goToSessionLabel)
+	if slices.Contains(labels, rowactions.GoToSessionLabel) {
+		t.Errorf("labels = %v, want no %q on a non-map ticket", labels, rowactions.GoToSessionLabel)
 	}
 }
 
 func TestGoToSession_ListedAboveStartSession(t *testing.T) {
 	labels := ticketMenuLabels(t, goToSessionModel(t, "open", wire.SessionInfo{ID: "s1", Ticket: "gx:map/01"}), "gx:map/01")
-	goTo, start := slices.Index(labels, goToSessionLabel), slices.Index(labels, startSessionLabel)
+	goTo, start := slices.Index(labels, rowactions.GoToSessionLabel), slices.Index(labels, rowactions.StartSessionLabel)
 	if goTo < 0 || start < 0 || goTo > start {
-		t.Errorf("labels = %v, want %q above %q", labels, goToSessionLabel, startSessionLabel)
+		t.Errorf("labels = %v, want %q above %q", labels, rowactions.GoToSessionLabel, rowactions.StartSessionLabel)
 	}
 }
 

@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 // focusIterationTab is a package-level seam so tests can fake herdr.
-var focusIterationTab = func(tabID string) error {
+var FocusIterationTab = func(tabID string) error {
 	_, err := herdr.TabFocus(tabID)
 	return err
 }
@@ -34,7 +34,7 @@ func (s iterationsSnapshot) Iterations(context.Context) ([]wire.IterationInfo, e
 }
 
 // snapshotIterations fetches api's iterations once. Nil stays nil: no server.
-func snapshotIterations(api tabapi.ReadsAPI) tabapi.ReadsAPI {
+func SnapshotIterations(api tabapi.ReadsAPI) tabapi.ReadsAPI {
 	if api == nil {
 		return nil
 	}
@@ -43,7 +43,7 @@ func snapshotIterations(api tabapi.ReadsAPI) tabapi.ReadsAPI {
 }
 
 // serverIteration is address's live iteration from the server's iterations read.
-func serverIteration(api tabapi.ReadsAPI, address string) (wire.IterationInfo, bool) {
+func ServerIteration(api tabapi.ReadsAPI, address string) (wire.IterationInfo, bool) {
 	if api == nil {
 		return wire.IterationInfo{}, false
 	}
@@ -74,7 +74,7 @@ func ticketFile(store, address string) (string, error) {
 
 // resolveTicketPath maps a row's Path, an address in server mode and a file
 // otherwise, to its ticket file. address is "" for a file.
-func resolveTicketPath(store, path string) (file, address string) {
+func ResolveTicketPath(store, path string) (file, address string) {
 	if f, err := ticketFile(store, path); err == nil {
 		return f, path
 	}
@@ -83,13 +83,13 @@ func resolveTicketPath(store, path string) (file, address string) {
 
 // cmdServerFocusPane focuses the herdr tab the iterations read names for
 // address.
-func cmdServerFocusPane(api tabapi.ReadsAPI, address string) tea.Cmd {
+func CmdServerFocusPane(api tabapi.ReadsAPI, address string) tea.Cmd {
 	return func() tea.Msg {
-		it, live := serverIteration(api, address)
+		it, live := ServerIteration(api, address)
 		if !live || it.Tab == "" {
 			return notify.Warning("the agent is no longer live")()
 		}
-		if err := focusIterationTab(it.Tab); err != nil {
+		if err := FocusIterationTab(it.Tab); err != nil {
 			return notify.Error("focus pane: " + err.Error())()
 		}
 		return nil

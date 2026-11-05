@@ -15,11 +15,12 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 func menuHasStartSession(m Model) bool {
-	return m.menus.menu.IsOpen && strings.Contains(m.menus.menu.View(), startSessionLabel)
+	return m.menus.menu.IsOpen && strings.Contains(m.menus.menu.View(), rowactions.StartSessionLabel)
 }
 
 func selectTicketByAddress(t *testing.T, m *Model, address string) {
@@ -56,8 +57,8 @@ func TestStartSession_OfferedOnMapEpicAndItsOpenTicketsOnly(t *testing.T) {
 	}{{"gx:map/01", true}, {"gx:map/02", false}, {"gx:loop/01", false}} {
 		selectTicketByAddress(t, &m, tc.address)
 		_, ready := requestTicketMenu(t, m)
-		got := slices.ContainsFunc(ready.items, func(it contextmenu.Item[ticketTarget]) bool {
-			return it.Label == startSessionLabel
+		got := slices.ContainsFunc(ready.items, func(it contextmenu.Item[rowactions.TicketTarget]) bool {
+			return it.Label == rowactions.StartSessionLabel
 		})
 		if got != tc.want {
 			t.Errorf("%s: start session offered = %v, want %v", tc.address, got, tc.want)
@@ -88,7 +89,7 @@ func TestStartSession_CompletedMapEpicSuggestsStartAndMerge(t *testing.T) {
 			suggested = append(suggested, it.Label)
 		}
 	}
-	if want := []string{startSessionLabel, "Merge"}; !slices.Equal(suggested, want) {
+	if want := []string{rowactions.StartSessionLabel, "Merge"}; !slices.Equal(suggested, want) {
 		t.Errorf("suggested = %v, want %v", suggested, want)
 	}
 }
@@ -219,7 +220,7 @@ func TestStartSession_CarriesTheTrunkCheckout(t *testing.T) {
 		if tc.name == "bare repo without one" {
 			testutil.MustGitExported(t, bare, "worktree", "remove", "--force", trunkWt)
 		}
-		msg, ok := startSessionCmd(nil, store, "gx:map")().(tabapi.StartSessionMsg)
+		msg, ok := rowactions.StartSessionCmd(nil, store, "gx:map")().(tabapi.StartSessionMsg)
 		if !ok {
 			t.Fatalf("%s: not a tabapi.StartSessionMsg", tc.name)
 		}

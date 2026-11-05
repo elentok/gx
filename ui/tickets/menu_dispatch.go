@@ -5,43 +5,41 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
-
-// serverNotRunning is the toast for an orchestration write with no server.
-const serverNotRunning = "server not running"
 
 // dispatchMenuAction runs an accepted "m" menu action for either tab, keyed by
 // the row's address (result.Path). Orchestration writes go only through the
 // server.
 func dispatchMenuAction(api tabapi.ServerAPI, admin tabapi.AdminAPI, reads tabapi.ReadsAPI, sessions tabapi.SessionsAPI, tix tabapi.TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
-	if word, ok := recoveryWord(result.Action); ok {
+	if word, ok := rowactions.RecoveryWord(result.Action); ok {
 		return cmdServerWrite(admin, tix, word, result.Path)
 	}
 	switch result.Action {
-	case actionResume, actionUnmuteReopen, serverVerbPause, serverVerbCancel:
+	case rowactions.ActionResume, rowactions.ActionUnmuteReopen, serverVerbPause, serverVerbCancel:
 		return cmdServerWrite(admin, tix, result.Action, result.Path)
-	case actionMerge:
+	case rowactions.ActionMerge:
 		if tix == nil {
-			return notify.Warning(serverNotRunning)
+			return notify.Warning(rowactions.ServerNotRunning)
 		}
-		return cmdEpicMerge(tix, result.EpicName)
-	case actionStashMerge:
+		return rowactions.CmdEpicMerge(tix, result.EpicName)
+	case rowactions.ActionStashMerge:
 		if tix == nil {
-			return notify.Warning(serverNotRunning)
+			return notify.Warning(rowactions.ServerNotRunning)
 		}
-		return cmdEpicStashMerge(tix, result.EpicName)
-	case actionStartSession:
-		return startSessionCmd(sessions, settings.TicketStore, result.Path)
-	case actionInvestigate:
-		return investigateCmd(api, sessions, result.Path)
+		return rowactions.CmdEpicStashMerge(tix, result.EpicName)
+	case rowactions.ActionStartSession:
+		return rowactions.StartSessionCmd(sessions, settings.TicketStore, result.Path)
+	case rowactions.ActionInvestigate:
+		return rowactions.InvestigateCmd(api, sessions, result.Path)
 	case actionTranscript:
-		file, address := resolveTicketPath(settings.TicketStore, result.Path)
+		file, address := rowactions.ResolveTicketPath(settings.TicketStore, result.Path)
 		return cmdTranscript(settings.Dirs, file, address, width)
 	case actionWatch:
 		return cmdWatchAgent(reads, settings.Dirs, agentAddress(result.Path, result.TicketID))
 	case actionGoToPane:
-		return cmdServerFocusPane(reads, result.Path)
+		return rowactions.CmdServerFocusPane(reads, result.Path)
 	}
 	return nil
 }

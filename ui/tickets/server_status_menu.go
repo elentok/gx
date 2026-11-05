@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -66,7 +67,7 @@ type serverWriteMsg struct {
 // it writes nothing: orchestration writes have no file fallback.
 func cmdServerWrite(admin tabapi.AdminAPI, tix tabapi.TicketsAPI, verb, address string) tea.Cmd {
 	if admin == nil || tix == nil {
-		return notify.Warning(serverNotRunning)
+		return notify.Warning(rowactions.ServerNotRunning)
 	}
 	if isWebOnlyVerb(verb) {
 		return notify.Warning(verb + " needs the web UI")

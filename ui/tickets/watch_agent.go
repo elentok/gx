@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -51,7 +52,7 @@ var agentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr
 }
 
 // errServerDown marks a herdr lookup whose server didn't answer.
-var errServerDown = errors.New(serverNotRunning)
+var errServerDown = errors.New(rowactions.ServerNotRunning)
 
 // serverHerdrLookup looks an address up in the server's iterations read. Nil
 // without a server: only the server knows herdr iterations, so herdr isn't in
@@ -95,9 +96,9 @@ func watchReason(api tabapi.ReadsAPI, dirs config.Dirs, address string) string {
 	case errors.Is(err, agentlog.ErrUnsupported):
 		return notForCodex
 	case errors.Is(err, errServerDown):
-		return serverNotRunning
+		return rowactions.ServerNotRunning
 	}
-	return noAgentLog
+	return rowactions.NoAgentLog
 }
 
 // watchTickInterval matches `gx server agents watch`'s follow interval.

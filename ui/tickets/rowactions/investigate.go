@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -15,9 +15,9 @@ import (
 // investigateCmd starts the server's Fix agent for address and lands on its
 // Agents-tab row. A second start finds the existing session by its name; any
 // other refusal is a toast.
-func investigateCmd(api tabapi.ServerAPI, sessions tabapi.SessionsAPI, address string) tea.Cmd {
+func InvestigateCmd(api tabapi.ServerAPI, sessions tabapi.SessionsAPI, address string) tea.Cmd {
 	if api == nil || sessions == nil {
-		return notify.Warning(serverNotRunning)
+		return notify.Warning(ServerNotRunning)
 	}
 	return func() tea.Msg {
 		ctx := context.Background()

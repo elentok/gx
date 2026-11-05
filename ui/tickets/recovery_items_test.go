@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // resumeLabel is the pause-to-verb table's label for resume.
@@ -34,7 +35,7 @@ func detailWith(actions ...string) wire.TicketDetail {
 
 var answerDetail = detailWith(wire.ActionAnswer, wire.ActionResume)
 
-func recoveryMenu(t *testing.T, status schema.Status, reason schema.PauseReason, d wire.TicketDetail) []contextmenu.Item[ticketTarget] {
+func recoveryMenu(t *testing.T, status schema.Status, reason schema.PauseReason, d wire.TicketDetail) []contextmenu.Item[rowactions.TicketTarget] {
 	t.Helper()
 	ticket := tickets.Ticket{Status: string(status), PauseReason: reason}
 	return ticketMenuItems(ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket, detail: &d})
@@ -55,14 +56,14 @@ func TestRecoveryItems_MatchDetailActions(t *testing.T) {
 			d := detailWith(tc.actions...)
 			items := recoveryMenu(t, tc.status, tc.reason, d)
 			for _, a := range tc.actions {
-				if it := itemByLabel(t, items, d.ActionInfo[a].Label); it.Disabled != "" && it.Disabled != serverNotRunning {
+				if it := itemByLabel(t, items, d.ActionInfo[a].Label); it.Disabled != "" && it.Disabled != rowactions.ServerNotRunning {
 					t.Errorf("%s disabled: %q", a, it.Disabled)
 				}
 			}
 			for _, label := range []string{"Cancel", "Investigate", "Set open"} {
 				itemByLabel(t, items, label)
 			}
-			if slices.ContainsFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == "Relaunch" }) {
+			if slices.ContainsFunc(items, func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Label == "Relaunch" }) {
 				t.Error("menu still offers Relaunch")
 			}
 			// A verb the detail does not list is not offered.
@@ -70,7 +71,7 @@ func TestRecoveryItems_MatchDetailActions(t *testing.T) {
 			if tc.name == "answer pause" {
 				unlisted = schema.VerbRetry.Label()
 			}
-			if slices.ContainsFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == unlisted }) {
+			if slices.ContainsFunc(items, func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Label == unlisted }) {
 				t.Errorf("menu offers %q, which detail.actions lacks", unlisted)
 			}
 		})
@@ -135,7 +136,7 @@ func TestServerMode_EnterSkipsWebOnlyActions(t *testing.T) {
 func TestRecoveryItems_NoDetailOffersNone(t *testing.T) {
 	ticket := tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseIterationError}
 	items := ticketMenuItems(ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})
-	if slices.ContainsFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == schema.VerbRetry.Label() }) {
+	if slices.ContainsFunc(items, func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Label == schema.VerbRetry.Label() }) {
 		t.Error("menu offers Retry without a detail")
 	}
 }
@@ -153,7 +154,7 @@ func TestCmdTicketMenu_ReportsAFailedDetailRead(t *testing.T) {
 		t.Fatalf("detailErr = %v, toast = %v; want both set", msg.detailErr, msg.toast())
 	}
 	for _, v := range []schema.PauseVerb{schema.VerbRetry, schema.VerbStartOver} {
-		if slices.ContainsFunc(msg.items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == v.Label() }) {
+		if slices.ContainsFunc(msg.items, func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Label == v.Label() }) {
 			t.Errorf("menu offers %q after a failed detail read", v.Label())
 		}
 	}
@@ -161,8 +162,8 @@ func TestCmdTicketMenu_ReportsAFailedDetailRead(t *testing.T) {
 
 // The TUI trusts the server's ActionInfo; a word without one shows as itself.
 func TestRecoveryActions_NoActionInfoFallsBackToTheWord(t *testing.T) {
-	got := recoveryActions(&wire.TicketDetail{Actions: []string{wire.ActionRetry}})
-	if len(got) != 1 || got[0].label != wire.ActionRetry || got[0].help != "" {
+	got := rowactions.RecoveryActions(&wire.TicketDetail{Actions: []string{wire.ActionRetry}})
+	if len(got) != 1 || got[0].Label != wire.ActionRetry || got[0].Help != "" {
 		t.Fatalf("got %+v, want the bare word as label and no help", got)
 	}
 }
@@ -180,7 +181,7 @@ func TestRecoveryItems_MarkTheRecommendedVerb(t *testing.T) {
 	d.Recommendation = &wire.DetailRecommendation{Verb: wire.ActionStartOver, Diagnosis: "bad branch"}
 	items := recoveryMenu(t, schema.StatusPaused, schema.PauseIterationError, d)
 
-	rec := itemByLabel(t, items, schema.VerbStartOver.Label()+recommendedMark)
+	rec := itemByLabel(t, items, schema.VerbStartOver.Label()+rowactions.RecommendedMark)
 	if rec.Group != contextmenu.Suggested {
 		t.Errorf("recommended group = %v, want Suggested", rec.Group)
 	}
