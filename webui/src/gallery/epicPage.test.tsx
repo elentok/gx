@@ -34,6 +34,16 @@ test("the dirty-trunk case lists its files and both buttons", async () => {
   expect(within(notice).getAllByRole("button").map((b) => b.textContent)).toEqual(["Stash, merge and restore", "Merge again"]);
 });
 
+test("the PageHeader gallery cases render", () => {
+  const headers = galleryEntries.find((e) => e.name === "PageHeader")?.cases ?? [];
+  expect(headers.map((c) => c.label)).toEqual(["desktop", "phone", "no line", "no meta bar"]);
+  for (const c of headers) {
+    const { getByRole, unmount } = renderThemed(<>{c.node}</>);
+    expect(getByRole("heading", { level: 1 }).textContent).toBe("slow-tests-impl");
+    unmount();
+  }
+});
+
 test("the needs-repair dialog case opens the fix dialog", async () => {
   renderThemed(<>{cases.find((c) => c.label === "needs-repair dialog")?.node}</>);
   expect(await screen.findByRole("dialog")).toBeTruthy();

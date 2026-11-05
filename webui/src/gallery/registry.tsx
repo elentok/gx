@@ -1,5 +1,6 @@
 import { Box, Menu, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ComponentProps, type ReactNode } from "react";
+import { PageHeader } from "../page/PageHeader";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
@@ -293,7 +294,33 @@ const MenuFrame = ({ children }: { children: ReactNode }) => (
 );
 
 // Add one entry per primitive; the gallery page renders every case.
+const headerLine = "Speed up the Go test suite: split the slow packages, share one fixture cache, and fail CI on any test over 5 seconds.";
+const headerCase = (label: string, wide: boolean, over: Partial<ComponentProps<typeof PageHeader>> = {}) => ({
+  label,
+  node: (
+    <WideContext.Provider value={wide}>
+      <PageHeader
+        title="slow-tests-impl"
+        ring={<ProgressRing progress={0.33} kind="implementation" label="33%" size="sm" />}
+        line={headerLine}
+        meta="Running · 3 of 9 done · 42m · 118k tokens"
+        right={<span>⋯</span>}
+        {...over}
+      />
+    </WideContext.Provider>
+  ),
+});
+
 export const galleryEntries: GalleryEntry[] = [
+  {
+    name: "PageHeader",
+    cases: [
+      headerCase("desktop", true),
+      headerCase("phone", false),
+      headerCase("no line", true, { line: undefined }),
+      headerCase("no meta bar", true, { meta: undefined }),
+    ],
+  },
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
   { name: "StickyTopContainer", cases: perTone((tone) => <StickyTopContainer ruled>{tone}</StickyTopContainer>) },
