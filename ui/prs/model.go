@@ -4,7 +4,7 @@ package prs
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
@@ -25,9 +25,9 @@ type Model struct {
 	openLoaded   bool
 	closedLoaded bool
 	err          error
-	prs          []git.PR
+	prs          []pr.PR
 	anyPRs       bool
-	closedPRs    []git.ClosedPR
+	closedPRs    []pr.ClosedPR
 	list         list.Model
 	scrollOffset int
 
@@ -193,13 +193,13 @@ func (m Model) totalItems() int {
 }
 
 // actionableCount returns how many leading entries of m.prs are actionable
-// (Marker() != MarkerNeutral). git.ListOpenPRs always sorts actionable PRs
+// (Marker() != MarkerNeutral). pr.ListOpenPRs always sorts actionable PRs
 // first, so this is the length of a contiguous prefix — see
 // issues/02-split-actionable-non-actionable.md.
 func (m Model) actionableCount() int {
 	n := 0
-	for _, pr := range m.prs {
-		if pr.Marker() == git.MarkerNeutral {
+	for _, p := range m.prs {
+		if p.Marker() == pr.MarkerNeutral {
 			break
 		}
 		n++

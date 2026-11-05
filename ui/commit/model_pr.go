@@ -2,7 +2,7 @@ package commit
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
@@ -23,15 +23,15 @@ func (m Model) cmdGotoPR() tea.Cmd {
 		if err != nil {
 			return gotoPRMsg{fatalErr: err}
 		}
-		merged, err := git.IsCommitMergedToTrunk(worktreeRoot, trunk, ref)
+		merged, err := pr.IsCommitMergedToTrunk(worktreeRoot, trunk, ref)
 		if err != nil {
 			return gotoPRMsg{fatalErr: err}
 		}
 		var url string
 		if merged {
-			url, err = git.CommitPRURL(worktreeRoot, ref)
+			url, err = pr.CommitPRURL(worktreeRoot, ref)
 		} else {
-			url, err = git.BranchPRURL(worktreeRoot)
+			url, err = pr.BranchPRURL(worktreeRoot)
 		}
 		return gotoPRMsg{url: url, err: err}
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
@@ -145,9 +146,9 @@ func (m Model) cmdGotoPR() tea.Cmd {
 		var url string
 		var err error
 		if selected.class == "" {
-			url, err = git.CommitPRURL(worktreeRoot, selected.commit.FullHash)
+			url, err = pr.CommitPRURL(worktreeRoot, selected.commit.FullHash)
 		} else {
-			url, err = git.BranchPRURL(worktreeRoot)
+			url, err = pr.BranchPRURL(worktreeRoot)
 		}
 		return gotoPRMsg{url: url, err: err}
 	}

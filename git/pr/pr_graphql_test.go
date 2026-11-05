@@ -1,4 +1,4 @@
-package git
+package pr
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"testing"
+
+	"github.com/elentok/gx/git/internal/run"
 )
 
 func TestClassifyPRListError(t *testing.T) {
@@ -25,7 +27,7 @@ func TestClassifyPRListError(t *testing.T) {
 	})
 
 	t.Run("gh unauthenticated", func(t *testing.T) {
-		runErr := &RunError{Stderr: "To get started with GitHub CLI, please run:  gh auth login"}
+		runErr := &run.RunError{Stderr: "To get started with GitHub CLI, please run:  gh auth login"}
 		err := classifyPRListError(runErr)
 		var prErr *PRListError
 		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorUnauthenticated {
@@ -34,7 +36,7 @@ func TestClassifyPRListError(t *testing.T) {
 	})
 
 	t.Run("generic failure", func(t *testing.T) {
-		runErr := &RunError{Stderr: "connection reset by peer"}
+		runErr := &run.RunError{Stderr: "connection reset by peer"}
 		err := classifyPRListError(runErr)
 		var prErr *PRListError
 		if !errors.As(err, &prErr) || prErr.Kind != PRListErrorGeneric {

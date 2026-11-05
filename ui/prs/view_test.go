@@ -6,14 +6,14 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
 
 func TestRenderClosedRow_SelectedDiffersFromUnselected(t *testing.T) {
 	m := Model{}
-	pr := git.ClosedPR{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()}
+	pr := pr.ClosedPR{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()}
 
 	unselected := m.renderClosedRow(pr, false, 40)
 	selected := m.renderClosedRow(pr, true, 40)
@@ -26,12 +26,12 @@ func TestRenderClosedRow_SelectedDiffersFromUnselected(t *testing.T) {
 func TestRenderCIFacet_Labels(t *testing.T) {
 	icons := ui.Icons(false)
 	cases := []struct {
-		state git.CIState
+		state pr.CIState
 		want  string
 	}{
-		{git.CIRunning, "checking"},
-		{git.CIFailed, "failing"},
-		{git.CIPassed, "passing"},
+		{pr.CIRunning, "checking"},
+		{pr.CIFailed, "failing"},
+		{pr.CIPassed, "passing"},
 	}
 	for _, c := range cases {
 		got := renderCIFacet(icons, c.state)
@@ -43,7 +43,7 @@ func TestRenderCIFacet_Labels(t *testing.T) {
 
 func TestRenderCIFacet_NoneStaysSilent(t *testing.T) {
 	icons := ui.Icons(false)
-	got := renderCIFacet(icons, git.CINone)
+	got := renderCIFacet(icons, pr.CINone)
 	if strings.Contains(got, "checking") || strings.Contains(got, "failing") || strings.Contains(got, "passing") {
 		t.Errorf("renderCIFacet(CINone) = %q, want no label", got)
 	}
@@ -52,13 +52,13 @@ func TestRenderCIFacet_NoneStaysSilent(t *testing.T) {
 func TestRenderApprovalFacet_Labels(t *testing.T) {
 	icons := ui.Icons(false)
 	cases := []struct {
-		state git.ApprovalState
+		state pr.ApprovalState
 		want  string
 	}{
-		{git.ApprovalApproved, "approved"},
-		{git.ApprovalChangesRequested, "changes requested"},
-		{git.ApprovalCommentedOnly, "commented"},
-		{git.ApprovalNotYet, "review needed"},
+		{pr.ApprovalApproved, "approved"},
+		{pr.ApprovalChangesRequested, "changes requested"},
+		{pr.ApprovalCommentedOnly, "commented"},
+		{pr.ApprovalNotYet, "review needed"},
 	}
 	for _, c := range cases {
 		got := renderApprovalFacet(icons, c.state)
@@ -71,11 +71,11 @@ func TestRenderApprovalFacet_Labels(t *testing.T) {
 func TestRenderMergeableFacet_Labels(t *testing.T) {
 	icons := ui.Icons(false)
 	cases := []struct {
-		state git.MergeableState
+		state pr.MergeableState
 		want  string
 	}{
-		{git.MergeableConflicting, "conflicts"},
-		{git.MergeableChecking, "checking"},
+		{pr.MergeableConflicting, "conflicts"},
+		{pr.MergeableChecking, "checking"},
 	}
 	for _, c := range cases {
 		got := renderMergeableFacet(icons, c.state)
@@ -87,7 +87,7 @@ func TestRenderMergeableFacet_Labels(t *testing.T) {
 
 func TestRenderMergeableFacet_CleanStaysSilent(t *testing.T) {
 	icons := ui.Icons(false)
-	if got := renderMergeableFacet(icons, git.MergeableClean); got != "" {
+	if got := renderMergeableFacet(icons, pr.MergeableClean); got != "" {
 		t.Errorf("renderMergeableFacet(MergeableClean) = %q, want empty", got)
 	}
 }
@@ -115,11 +115,11 @@ func TestRenderCommentFacet_UnchangedNumericFormat(t *testing.T) {
 func TestCombinedContentRangesMatchRenderedHighlight(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		greenPR(1, "Ready one"),
 		greenPR(2, "Ready two"),
 		neutralPR(3, "Waiting one"),
-	}, true, nil, []git.ClosedPR{
+	}, true, nil, []pr.ClosedPR{
 		{Number: 4, Title: "Closed one", State: "MERGED", ClosedAt: time.Now()},
 		{Number: 5, Title: "Closed two", State: "MERGED", ClosedAt: time.Now()},
 	})

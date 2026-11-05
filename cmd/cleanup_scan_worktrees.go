@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -142,7 +143,7 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 		scan.Kind = "other"
 	}
 
-	merged, err := git.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
+	merged, err := pr.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
 	if err != nil {
 		return WorktreeScan{}, err
 	}
@@ -182,7 +183,7 @@ func iterationMerged(repo git.Repo, branch, epicName string) (bool, error) {
 		}
 	}
 
-	return git.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
+	return pr.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
 }
 
 // isActiveWork reports whether branch has a commit within worktreeActiveWindow,

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -21,7 +21,7 @@ func sendModel(m Model, msg tea.Msg) Model {
 // separate messages the concurrent load pipeline actually produces (see
 // issues/09-load-time-batched-fetch.md), keeping call sites below as terse as
 // the old single-message form.
-func loadPRs(m Model, prs []git.PR, anyPRs bool, err error, closedPRs []git.ClosedPR) Model {
+func loadPRs(m Model, prs []pr.PR, anyPRs bool, err error, closedPRs []pr.ClosedPR) Model {
 	m = sendModel(m, openPRsLoadedMsg{prs: prs, anyPRs: anyPRs, err: err})
 	m = sendModel(m, closedPRsLoadedMsg{closedPRs: closedPRs})
 	return m
@@ -92,7 +92,7 @@ func TestModelRendersNoOpenPRsPlaceholder(t *testing.T) {
 func TestModelRendersPRRows(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now()},
 		{Number: 34, Title: "Draft feature", IsDraft: true, UpdatedAt: time.Now()},
 	}, true, nil, nil)
@@ -109,25 +109,25 @@ func TestModelRendersPRRows(t *testing.T) {
 // neutralPR returns a PR whose facets classify as MarkerNeutral (waiting on
 // others): CI passed, a comment-only review (not approved, not changes
 // requested), and a clean merge state.
-func neutralPR(number int, title string) git.PR {
-	return git.PR{
+func neutralPR(number int, title string) pr.PR {
+	return pr.PR{
 		Number:            number,
 		Title:             title,
 		UpdatedAt:         time.Now(),
-		StatusCheckRollup: []git.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
-		Reviews:           []git.PRReview{{State: "COMMENTED"}},
+		StatusCheckRollup: []pr.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
+		Reviews:           []pr.PRReview{{State: "COMMENTED"}},
 		Mergeable:         "MERGEABLE",
 	}
 }
 
 // greenPR returns a PR whose facets classify as MarkerGreen (actionable,
 // ready to merge): CI passed, approved, and mergeable-clean.
-func greenPR(number int, title string) git.PR {
-	return git.PR{
+func greenPR(number int, title string) pr.PR {
+	return pr.PR{
 		Number:            number,
 		Title:             title,
 		UpdatedAt:         time.Now(),
-		StatusCheckRollup: []git.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
+		StatusCheckRollup: []pr.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
 		ReviewDecision:    "APPROVED",
 		Mergeable:         "MERGEABLE",
 	}
@@ -136,7 +136,7 @@ func greenPR(number int, title string) git.PR {
 func TestModelSplitsActionableAndNonActionableSections(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		greenPR(1, "Ready PR"),
 		neutralPR(2, "Waiting PR"),
 	}, true, nil, nil)
@@ -160,7 +160,7 @@ func TestModelSplitsActionableAndNonActionableSections(t *testing.T) {
 func TestModelRendersEmptySectionStates(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{neutralPR(1, "Waiting PR")}, true, nil, nil)
+	m = loadPRs(m, []pr.PR{neutralPR(1, "Waiting PR")}, true, nil, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "── Actionable (0) ──") {
@@ -174,7 +174,7 @@ func TestModelRendersEmptySectionStates(t *testing.T) {
 func TestNavigationMovesFromActionableIntoNonActionable(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		greenPR(1, "Ready PR"),
 		neutralPR(2, "Waiting PR"),
 	}, true, nil, nil)
@@ -191,7 +191,7 @@ func TestNavigationMovesFromActionableIntoNonActionable(t *testing.T) {
 func TestModelRendersRepoNameInAllReposMode(t *testing.T) {
 	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now(), Repo: "acme/widgets"},
 	}, true, nil, nil)
 
@@ -207,7 +207,7 @@ func TestModelRendersRepoNameInAllReposMode(t *testing.T) {
 func TestModelTruncatesLongRepoName(t *testing.T) {
 	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now(), Repo: "acme/a-very-long-repository-name-indeed"},
 	}, true, nil, nil)
 
@@ -223,7 +223,7 @@ func TestModelTruncatesLongRepoName(t *testing.T) {
 func TestModelOmitsRepoNameInCurrentRepoMode(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now()},
 	}, true, nil, nil)
 
@@ -236,15 +236,15 @@ func TestModelOmitsRepoNameInCurrentRepoMode(t *testing.T) {
 func TestModelRendersFacetsAndMarker(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{
 			Number:            12,
 			Title:             "Add widget",
 			UpdatedAt:         time.Now(),
-			StatusCheckRollup: []git.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
+			StatusCheckRollup: []pr.PRStatusCheck{{Status: "COMPLETED", Conclusion: "SUCCESS"}},
 			ReviewDecision:    "APPROVED",
 			Mergeable:         "MERGEABLE",
-			Reviews:           []git.PRReview{{Body: "lgtm"}},
+			Reviews:           []pr.PRReview{{Body: "lgtm"}},
 		},
 	}, true, nil, nil)
 
@@ -257,7 +257,7 @@ func TestModelRendersFacetsAndMarker(t *testing.T) {
 func TestModelRendersMergeConflictFacet(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now(), Mergeable: "CONFLICTING"},
 	}, true, nil, nil)
 
@@ -281,7 +281,7 @@ func TestModelRendersLoadError(t *testing.T) {
 func TestModelRendersGHNotInstalledError(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, nil, false, &git.PRListError{Kind: git.PRListErrorGHNotInstalled, Err: errBoom}, nil)
+	m = loadPRs(m, nil, false, &pr.PRListError{Kind: pr.PRListErrorGHNotInstalled, Err: errBoom}, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "gh not found") || !strings.Contains(content, "install") {
@@ -292,7 +292,7 @@ func TestModelRendersGHNotInstalledError(t *testing.T) {
 func TestModelRendersGHUnauthenticatedError(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, nil, false, &git.PRListError{Kind: git.PRListErrorUnauthenticated, Err: errBoom}, nil)
+	m = loadPRs(m, nil, false, &pr.PRListError{Kind: pr.PRListErrorUnauthenticated, Err: errBoom}, nil)
 
 	content := m.View().Content
 	if !strings.Contains(content, "not authenticated") || !strings.Contains(content, "gh auth login") {
@@ -303,7 +303,7 @@ func TestModelRendersGHUnauthenticatedError(t *testing.T) {
 func TestModelRendersClosedPRSection(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
+	m = loadPRs(m, nil, false, nil, []pr.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
 		{Number: 6, Title: "Abandoned idea", State: "CLOSED", ClosedAt: time.Now()},
 	})
@@ -320,7 +320,7 @@ func TestModelRendersClosedPRSection(t *testing.T) {
 func TestModelRendersRepoNameOnClosedRowsInAllReposMode(t *testing.T) {
 	m := NewModelWithScope("/repo", ui.Settings{}, keys.Manager{}, true)
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
+	m = loadPRs(m, nil, false, nil, []pr.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now(), Repo: "acme/widgets"},
 	})
 
@@ -344,7 +344,7 @@ func TestModelRendersClosedSectionEmptyState(t *testing.T) {
 func TestModelRendersClosedSectionWhenOpenListEmpty(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
+	m = loadPRs(m, nil, false, nil, []pr.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
 	})
 
@@ -360,7 +360,7 @@ func TestModelRendersClosedSectionWhenOpenListEmpty(t *testing.T) {
 func TestModelRendersClosedSectionWhenOpenListErrors(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, nil, false, errBoom, []git.ClosedPR{
+	m = loadPRs(m, nil, false, errBoom, []pr.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
 	})
 
@@ -376,7 +376,7 @@ func TestModelRendersClosedSectionWhenOpenListErrors(t *testing.T) {
 func TestOpenSelectedReturnsOpenURLCmd(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", URL: "https://example.com/pull/12", UpdatedAt: time.Now()},
 	}, true, nil, nil)
 
@@ -393,9 +393,9 @@ func TestOpenSelectedReturnsOpenURLCmd(t *testing.T) {
 func TestNavigationMovesSelectionIntoClosedSection(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 1, Title: "Open one", URL: "https://example.com/pull/1", UpdatedAt: time.Now()},
-	}, true, nil, []git.ClosedPR{
+	}, true, nil, []pr.ClosedPR{
 		{Number: 2, Title: "Closed one", URL: "https://example.com/pull/2", State: "MERGED", ClosedAt: time.Now()},
 		{Number: 3, Title: "Closed two", URL: "https://example.com/pull/3", State: "MERGED", ClosedAt: time.Now()},
 	})
@@ -434,11 +434,11 @@ func TestNavigationIntoClosedSectionScrollsCombinedViewport(t *testing.T) {
 	// Default-facet PRs (no CI/reviews/mergeable info) classify as
 	// MarkerRed — actionable — so all 15 land in the Actionable section and
 	// the Non-actionable section renders empty.
-	openPRs := make([]git.PR, 15)
+	openPRs := make([]pr.PR, 15)
 	for i := range openPRs {
-		openPRs[i] = git.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
+		openPRs[i] = pr.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
 	}
-	m = loadPRs(m, openPRs, true, nil, []git.ClosedPR{
+	m = loadPRs(m, openPRs, true, nil, []pr.ClosedPR{
 		{Number: 100, Title: "Closed one", State: "MERGED", ClosedAt: time.Now()},
 	})
 
@@ -487,9 +487,9 @@ func TestNavigationIntoClosedSectionScrollsCombinedViewport(t *testing.T) {
 func TestOpenSelectedReturnsClosedURLCmd(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 1, Title: "Open one", URL: "https://example.com/pull/1", UpdatedAt: time.Now()},
-	}, true, nil, []git.ClosedPR{
+	}, true, nil, []pr.ClosedPR{
 		{Number: 2, Title: "Closed one", URL: "https://example.com/pull/2", State: "MERGED", ClosedAt: time.Now()},
 	})
 
@@ -530,9 +530,9 @@ func TestMouseWheelScrollsPRList(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 12})
 
-	openPRs := make([]git.PR, 15)
+	openPRs := make([]pr.PR, 15)
 	for i := range openPRs {
-		openPRs[i] = git.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
+		openPRs[i] = pr.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
 	}
 	m = loadPRs(m, openPRs, true, nil, nil)
 
@@ -575,9 +575,9 @@ func TestMouseWheelWithHelpOpenScrollsHelpNotList(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.New(extraBindings))
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 8})
 
-	openPRs := make([]git.PR, 15)
+	openPRs := make([]pr.PR, 15)
 	for i := range openPRs {
-		openPRs[i] = git.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
+		openPRs[i] = pr.PR{Number: i + 1, Title: "Open PR", UpdatedAt: time.Now()}
 	}
 	m = loadPRs(m, openPRs, true, nil, nil)
 	m = sendModel(m, tea.KeyPressMsg{Code: '?', Text: "?"})
@@ -598,7 +598,7 @@ func TestMouseWheelWithHelpOpenScrollsHelpNotList(t *testing.T) {
 func TestCKeyOnOpenPROpensCommentsPopupAndFetches(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", Repo: "acme/widgets", UpdatedAt: time.Now()},
 	}, true, nil, nil)
 
@@ -612,7 +612,7 @@ func TestCKeyOnOpenPROpensCommentsPopupAndFetches(t *testing.T) {
 	}
 
 	now := time.Now()
-	m = sendModel(m, commentsLoadedMsg{comments: []git.PRComment{
+	m = sendModel(m, commentsLoadedMsg{comments: []pr.PRComment{
 		{Author: "alice", Body: "looks good", CreatedAt: now},
 	}})
 	if m.comments.loading {
@@ -628,7 +628,7 @@ func TestCKeyOnOpenPROpensCommentsPopupAndFetches(t *testing.T) {
 func TestCKeyOnClosedPRIsNoOp(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, nil, false, nil, []git.ClosedPR{
+	m = loadPRs(m, nil, false, nil, []pr.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
 	})
 	m = m.navigateSelection(1) // move onto the closed row
@@ -648,7 +648,7 @@ func TestCommentsPopupDismissesViaEscQEnter(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 			m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 			m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-			m = loadPRs(m, []git.PR{
+			m = loadPRs(m, []pr.PR{
 				{Number: 12, Title: "Add widget", Repo: "acme/widgets", UpdatedAt: time.Now()},
 			}, true, nil, nil)
 			m = sendModel(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
@@ -676,14 +676,14 @@ func TestCommentsPopupDismissesViaEscQEnter(t *testing.T) {
 func TestCommentsPopupScrollsViaKeyboardAndWheel(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = loadPRs(m, []git.PR{
+	m = loadPRs(m, []pr.PR{
 		{Number: 12, Title: "Add widget", Repo: "acme/widgets", UpdatedAt: time.Now()},
 	}, true, nil, nil)
 	m = sendModel(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
 
-	comments := make([]git.PRComment, 20)
+	comments := make([]pr.PRComment, 20)
 	for i := range comments {
-		comments[i] = git.PRComment{Author: "alice", Body: fmt.Sprintf("comment %d", i), CreatedAt: time.Now()}
+		comments[i] = pr.PRComment{Author: "alice", Body: fmt.Sprintf("comment %d", i), CreatedAt: time.Now()}
 	}
 	m = sendModel(m, commentsLoadedMsg{comments: comments})
 	if m.comments.scrollOffset != 0 {
@@ -821,7 +821,7 @@ func TestInitBatchesOpenAndClosedLoad(t *testing.T) {
 func TestOpenSectionRendersBeforeClosedFetchCompletes(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, openPRsLoadedMsg{prs: []git.PR{
+	m = sendModel(m, openPRsLoadedMsg{prs: []pr.PR{
 		{Number: 12, Title: "Add widget", UpdatedAt: time.Now()},
 	}, anyPRs: true})
 
@@ -840,7 +840,7 @@ func TestOpenSectionRendersBeforeClosedFetchCompletes(t *testing.T) {
 func TestClosedSectionRendersBeforeOpenFetchCompletes(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = sendModel(m, closedPRsLoadedMsg{closedPRs: []git.ClosedPR{
+	m = sendModel(m, closedPRsLoadedMsg{closedPRs: []pr.ClosedPR{
 		{Number: 5, Title: "Merged fix", State: "MERGED", ClosedAt: time.Now()},
 	}})
 

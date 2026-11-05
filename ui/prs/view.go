@@ -8,7 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
 )
 
@@ -200,7 +200,7 @@ func (m Model) closedSectionLines() (lines []string, ranges []lineRange) {
 	return lines, ranges
 }
 
-func (m Model) renderClosedRow(pr git.ClosedPR, selected bool, width int) string {
+func (m Model) renderClosedRow(pr pr.ClosedPR, selected bool, width int) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 
 	marker := icons.Check
@@ -250,15 +250,15 @@ func padAndHighlight(line string, width int, selected bool) string {
 // failure modes, falling back to gh's raw wrapped message for everything
 // else (network, rate limit, no GitHub remote, ...).
 func (m Model) errorLines(err error) []string {
-	var prErr *git.PRListError
+	var prErr *pr.PRListError
 	if errors.As(err, &prErr) {
 		switch prErr.Kind {
-		case git.PRListErrorGHNotInstalled:
+		case pr.PRListErrorGHNotInstalled:
 			return []string{
 				ui.StyleWarning.Render("gh not found"),
 				ui.StyleMuted.Render("install: https://cli.github.com"),
 			}
-		case git.PRListErrorUnauthenticated:
+		case pr.PRListErrorUnauthenticated:
 			return []string{
 				ui.StyleWarning.Render("gh is not authenticated"),
 				ui.StyleMuted.Render("run: gh auth login"),
@@ -272,7 +272,7 @@ func (m Model) errorLines(err error) []string {
 // number, draft badge, title, age) and an indented facet line below it
 // (CI/approval/mergeable/comment icons), each truncated/padded to width and
 // background-styled uniformly so a selection highlight covers the full row.
-func (m Model) renderRow(pr git.PR, selected bool, width int) []string {
+func (m Model) renderRow(pr pr.PR, selected bool, width int) []string {
 	facets := pr.Facets()
 	rawLines := []string{
 		m.renderSubjectLine(pr, facets, width),
@@ -286,7 +286,7 @@ func (m Model) renderRow(pr git.PR, selected bool, width int) []string {
 	return lines
 }
 
-func (m Model) renderSubjectLine(pr git.PR, facets git.Facets, width int) string {
+func (m Model) renderSubjectLine(pr pr.PR, facets pr.Facets, width int) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 	markerState := markerPushState(icons, facets.Marker())
 	marker := ui.RenderFixedColumns([]ui.FixedColumn{{Text: markerState.Icon, Width: 2, Style: markerState.Style}})
@@ -317,7 +317,7 @@ func (m Model) renderSubjectLine(pr git.PR, facets git.Facets, width int) string
 	return marker + repo + number + " " + draft + title + " " + age
 }
 
-func (m Model) renderFacetLine(facets git.Facets) string {
+func (m Model) renderFacetLine(facets pr.Facets) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 
 	parts := []string{
@@ -335,48 +335,48 @@ func (m Model) renderFacetLine(facets git.Facets) string {
 
 // markerPushState renders a marker as a PushState-style {Icon, Label, Style}
 // value, following ui/pushstate.go's convention for compact status icons.
-func markerPushState(icons ui.IconSet, marker git.Marker) ui.PushState {
+func markerPushState(icons ui.IconSet, marker pr.Marker) ui.PushState {
 	switch marker {
-	case git.MarkerGreen:
+	case pr.MarkerGreen:
 		return ui.PushState{Icon: icons.MarkerReady, Label: "ready to merge", Style: markerReadyStyle}
-	case git.MarkerRed:
+	case pr.MarkerRed:
 		return ui.PushState{Icon: icons.MarkerBlocked, Label: "blocked on you", Style: markerBlockedStyle}
 	default:
 		return ui.PushState{Icon: icons.MarkerWaiting, Label: "waiting on others", Style: markerWaitingStyle}
 	}
 }
 
-func renderCIFacet(icons ui.IconSet, state git.CIState) string {
+func renderCIFacet(icons ui.IconSet, state pr.CIState) string {
 	switch state {
-	case git.CIRunning:
+	case pr.CIRunning:
 		return facetPendingStyle.Render(icons.CIRunning + " checking")
-	case git.CIFailed:
+	case pr.CIFailed:
 		return facetFailedStyle.Render(icons.Close + " failing")
-	case git.CIPassed:
+	case pr.CIPassed:
 		return facetPassedStyle.Render(icons.Check + " passing")
 	default:
 		return facetNoneStyle.Render(icons.Dot)
 	}
 }
 
-func renderApprovalFacet(icons ui.IconSet, state git.ApprovalState) string {
+func renderApprovalFacet(icons ui.IconSet, state pr.ApprovalState) string {
 	switch state {
-	case git.ApprovalApproved:
+	case pr.ApprovalApproved:
 		return facetPassedStyle.Render(icons.Check + " approved")
-	case git.ApprovalChangesRequested:
+	case pr.ApprovalChangesRequested:
 		return facetFailedStyle.Render(icons.Close + " changes requested")
-	case git.ApprovalCommentedOnly:
+	case pr.ApprovalCommentedOnly:
 		return facetPendingStyle.Render(icons.Commented + " commented")
 	default:
 		return facetNoneStyle.Render(icons.Dot + " review needed")
 	}
 }
 
-func renderMergeableFacet(icons ui.IconSet, state git.MergeableState) string {
+func renderMergeableFacet(icons ui.IconSet, state pr.MergeableState) string {
 	switch state {
-	case git.MergeableConflicting:
+	case pr.MergeableConflicting:
 		return facetConflictStyle.Render(icons.Warning + " conflicts")
-	case git.MergeableChecking:
+	case pr.MergeableChecking:
 		return facetCheckingStyle.Render(icons.Ellipsis + " checking")
 	default:
 		return ""

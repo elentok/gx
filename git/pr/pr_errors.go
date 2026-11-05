@@ -1,9 +1,11 @@
-package git
+package pr
 
 import (
 	"errors"
 	"os/exec"
 	"strings"
+
+	"github.com/elentok/gx/git/internal/run"
 )
 
 // PRListErrorKind classifies a gh pr list failure so callers can render
@@ -35,7 +37,7 @@ func classifyPRListError(err error) error {
 	if errors.Is(err, exec.ErrNotFound) {
 		return &PRListError{Kind: PRListErrorGHNotInstalled, Err: err}
 	}
-	var runErr *RunError
+	var runErr *run.RunError
 	if errors.As(err, &runErr) && isGHAuthFailure(runErr.Stderr) {
 		return &PRListError{Kind: PRListErrorUnauthenticated, Err: err}
 	}

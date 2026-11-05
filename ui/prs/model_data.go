@@ -2,19 +2,19 @@ package prs
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 )
 
 type openPRsLoadedMsg struct {
-	prs    []git.PR
+	prs    []pr.PR
 	anyPRs bool
 	err    error
 }
 
 type closedPRsLoadedMsg struct {
-	closedPRs []git.ClosedPR
+	closedPRs []pr.ClosedPR
 }
 
 // cmdLoad kicks off the open-PR and closed-PR fetches concurrently, each
@@ -28,7 +28,7 @@ func (m Model) cmdLoadOpen() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	allRepos := m.allRepos
 	return func() tea.Msg {
-		prs, err := git.ListOpenPRs(worktreeRoot, allRepos)
+		prs, err := pr.ListOpenPRs(worktreeRoot, allRepos)
 		if err != nil {
 			return openPRsLoadedMsg{err: err}
 		}
@@ -38,7 +38,7 @@ func (m Model) cmdLoadOpen() tea.Cmd {
 			// default to the less alarming "no open PRs" rather than falsely
 			// claiming the user has no PRs at all.
 			var probeErr error
-			anyPRs, probeErr = git.AnyPRsExist(worktreeRoot, allRepos)
+			anyPRs, probeErr = pr.AnyPRsExist(worktreeRoot, allRepos)
 			if probeErr != nil {
 				anyPRs = true
 			}
@@ -54,7 +54,7 @@ func (m Model) cmdLoadClosed() tea.Cmd {
 		// The closed-PR section is independent of the open-PR pipeline (no
 		// facets, no actionable marker), so a closed-fetch failure is treated
 		// as "no recently-closed PRs" rather than surfacing its own error UI.
-		closedPRs, _ := git.ListClosedPRs(worktreeRoot, allRepos)
+		closedPRs, _ := pr.ListClosedPRs(worktreeRoot, allRepos)
 		return closedPRsLoadedMsg{closedPRs: closedPRs}
 	}
 }
@@ -93,7 +93,7 @@ func (m Model) handleGotoPR(msg gotoPRMsg) (Model, tea.Cmd) {
 }
 
 type commentsLoadedMsg struct {
-	comments []git.PRComment
+	comments []pr.PRComment
 	err      error
 }
 
@@ -105,14 +105,14 @@ func (m *Model) cmdOpenComments() tea.Cmd {
 	if sel < 0 || sel >= len(m.prs) {
 		return nil
 	}
-	pr := m.prs[sel]
+	selected := m.prs[sel]
 	m.comments.open(m.width, m.height)
 
 	worktreeRoot := m.worktreeRoot
-	repo := pr.Repo
-	number := pr.Number
+	repo := selected.Repo
+	number := selected.Number
 	return func() tea.Msg {
-		comments, err := git.FetchPRComments(worktreeRoot, repo, number)
+		comments, err := pr.FetchPRComments(worktreeRoot, repo, number)
 		return commentsLoadedMsg{comments: comments, err: err}
 	}
 }

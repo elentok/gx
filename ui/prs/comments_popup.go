@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 )
@@ -17,7 +17,7 @@ type commentsPopup struct {
 	isOpen       bool
 	loading      bool
 	err          error
-	comments     []git.PRComment
+	comments     []pr.PRComment
 	width        int
 	height       int
 	scrollOffset int
@@ -41,7 +41,7 @@ func (p *commentsPopup) close() {
 }
 
 // loaded records a completed (successful or failed) comment fetch.
-func (p *commentsPopup) loaded(comments []git.PRComment, err error) {
+func (p *commentsPopup) loaded(comments []pr.PRComment, err error) {
 	p.loading = false
 	p.comments = comments
 	p.err = err

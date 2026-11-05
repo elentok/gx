@@ -1,9 +1,10 @@
-package git
+package pr
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"os/exec"
@@ -231,11 +232,11 @@ func CommitPRURL(worktreeRoot, hash string) (string, error) {
 // Returns false (not an error) when git exits with code 1.
 func IsCommitMergedToTrunk(dir, trunk, hash string) (bool, error) {
 	if trunk == "" {
-		return false, ErrTrunkNotResolved
+		return false, git.ErrTrunkNotResolved
 	}
 	_, _, err := run.Exec(dir, []string{"merge-base", "--is-ancestor", hash, trunk})
 	if err != nil {
-		if runErr, ok := err.(*RunError); ok && runErr.Code == 1 {
+		if runErr, ok := err.(*run.RunError); ok && runErr.Code == 1 {
 			return false, nil
 		}
 		return false, err
@@ -253,7 +254,7 @@ func runGH(dir string, args []string) (string, error) {
 	cmd.Stderr = &errBuf
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", &RunError{
+			return "", &run.RunError{
 				Args:   args,
 				Dir:    dir,
 				Stdout: strings.TrimSpace(outBuf.String()),

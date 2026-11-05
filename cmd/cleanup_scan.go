@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -157,7 +158,7 @@ func scanEpic(repo git.Repo, epic tickets.Epic) (EpicScan, error) {
 		}
 	}
 	if branchExists {
-		merged, err := git.IsCommitMergedToTrunk(repo.Root, repo.Trunk, epic.Name)
+		merged, err := pr.IsCommitMergedToTrunk(repo.Root, repo.Trunk, epic.Name)
 		if err != nil {
 			return EpicScan{}, err
 		}

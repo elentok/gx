@@ -117,8 +117,7 @@ func TestTrunkHelpers_RefuseEmptyTrunk(t *testing.T) {
 			_, err := git.BranchHistorySinceTrunk(repo, "main", "")
 			return err
 		},
-		"IsCommitMergedToTrunk": func() error { _, err := git.IsCommitMergedToTrunk(dir, "", "HEAD"); return err },
-		"MergeBranchInto":       func() error { _, err := git.MergeBranchInto(repo, nil, "main", ""); return err },
+		"MergeBranchInto": func() error { _, err := git.MergeBranchInto(repo, nil, "main", ""); return err },
 	}
 	for name, call := range calls {
 		if err := call(); !errors.Is(err, git.ErrTrunkNotResolved) {

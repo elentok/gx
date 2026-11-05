@@ -1,11 +1,13 @@
-package git_test
+package pr_test
 
 import (
+	"errors"
 	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -15,7 +17,7 @@ func TestIsCommitMergedToTrunk_merged(t *testing.T) {
 
 	hash := headHash(t, repoDir)
 
-	merged, err := git.IsCommitMergedToTrunk(repoDir, "main", hash)
+	merged, err := pr.IsCommitMergedToTrunk(repoDir, "main", hash)
 	if err != nil {
 		t.Fatalf("IsCommitMergedToTrunk: %v", err)
 	}
@@ -35,12 +37,21 @@ func TestIsCommitMergedToTrunk_unmerged(t *testing.T) {
 
 	hash := headHash(t, repoDir)
 
-	merged, err := git.IsCommitMergedToTrunk(repoDir, "main", hash)
+	merged, err := pr.IsCommitMergedToTrunk(repoDir, "main", hash)
 	if err != nil {
 		t.Fatalf("IsCommitMergedToTrunk: %v", err)
 	}
 	if merged {
 		t.Error("expected feature commit to not be merged to main")
+	}
+}
+
+func TestIsCommitMergedToTrunk_emptyTrunk(t *testing.T) {
+	repoDir := testutil.TempRepo(t)
+
+	_, err := pr.IsCommitMergedToTrunk(repoDir, "", "HEAD")
+	if !errors.Is(err, git.ErrTrunkNotResolved) {
+		t.Errorf("err = %v, want %v", err, git.ErrTrunkNotResolved)
 	}
 }
 
