@@ -144,15 +144,6 @@ func (q *Queue) save() error {
 	return os.Rename(tmp, q.path)
 }
 
-func (q *Queue) indexOf(address string) int {
-	for i, it := range q.items {
-		if it.Address == address {
-			return i
-		}
-	}
-	return -1
-}
-
 // List is a copy of the queued items, in order.
 func (q *Queue) List() []wire.QueueItem {
 	q.mu.Lock()

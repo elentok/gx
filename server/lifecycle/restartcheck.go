@@ -28,7 +28,7 @@ func (rs *Restarter) restartBinary() string {
 
 // ServeCheck handles GET /v1/restart/check.
 func (rs *Restarter) ServeCheck(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, rs.Check(r.Context()))
+	wire.WriteJSON(w, rs.Check(r.Context()))
 }
 
 // Check runs the restart check from the binary a restart would start.

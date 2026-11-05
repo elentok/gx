@@ -180,15 +180,10 @@ type clientErrorResult struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
-}
-
 // clientErrorReport logs one warn line per accepted report. It is public, so
 // it reads only the four body fields: never a cookie or other header.
 func (w *Web) clientErrorReport(rw http.ResponseWriter, r *http.Request) {
-	refuse := func(reason string) { writeJSON(rw, clientErrorResult{Refused: true, Reason: reason}) }
+	refuse := func(reason string) { wire.WriteJSON(rw, clientErrorResult{Refused: true, Reason: reason}) }
 	ip := webauth.RemoteIP(r)
 	if !w.errs.allow(ip, clientErrorRateLimit, clientErrorWindow) {
 		refuse("rate-limited")
@@ -212,5 +207,5 @@ func (w *Web) clientErrorReport(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.log.Warn("client error", "message", body.Message, "stack", body.Stack, "page_url", body.URL, "user_agent", body.UserAgent, "ip", ip)
-	writeJSON(rw, clientErrorResult{})
+	wire.WriteJSON(rw, clientErrorResult{})
 }

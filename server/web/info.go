@@ -12,42 +12,42 @@ import (
 
 // Info answers the CLI with the web UI's address, fingerprint and Setup code.
 func (w *Web) Info(rw http.ResponseWriter, _ *http.Request) {
-	writeJSON(rw, w.info())
+	wire.WriteJSON(rw, w.info())
 }
 
 // NewRoot makes a new root from the current allowed hosts and swaps root and
 // leaf live. A bad Host header or token is turned away before this runs.
 func (w *Web) NewRoot(rw http.ResponseWriter, _ *http.Request) {
 	if w.ln == nil {
-		writeJSON(rw, offInfo())
+		wire.WriteJSON(rw, offInfo())
 		return
 	}
 	if err := w.certs.NewRoot(); err != nil {
 		w.log.Error("new root failed", "err", err)
-		writeJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebNewRootFailed, Message: "could not make a new root: " + err.Error()})
+		wire.WriteJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebNewRootFailed, Message: "could not make a new root: " + err.Error()})
 		return
 	}
 	info := w.info()
 	w.log.Info("new root", "fingerprint", info.Fingerprint)
-	writeJSON(rw, info)
+	wire.WriteJSON(rw, info)
 }
 
 // Reset clears the web account, ends every web login's event streams and
 // answers with the new Setup code. The socket is the only way in.
 func (w *Web) Reset(rw http.ResponseWriter, _ *http.Request) {
 	if w.ln == nil {
-		writeJSON(rw, offInfo())
+		wire.WriteJSON(rw, offInfo())
 		return
 	}
 	removed, err := w.auth.WebReset()
 	if err != nil {
 		w.log.Error("web reset failed", "err", err)
-		writeJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
+		wire.WriteJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
 		return
 	}
 	w.auth.DropLogins(removed...)
 	w.auth.LogEvent("web reset", "cli", "", "")
-	writeJSON(rw, w.info())
+	wire.WriteJSON(rw, w.info())
 }
 
 // ResetAuthenticator is the CLI authenticator reset: it signs out every web
@@ -55,20 +55,20 @@ func (w *Web) Reset(rw http.ResponseWriter, _ *http.Request) {
 // holds no TOTP secret.
 func (w *Web) ResetAuthenticator(rw http.ResponseWriter, _ *http.Request) {
 	if w.ln == nil {
-		writeJSON(rw, offInfo())
+		wire.WriteJSON(rw, offInfo())
 		return
 	}
 	removed, _, err := w.auth.ClearAuthenticator()
 	if err != nil {
 		w.log.Error("web authenticator reset failed", "err", err)
-		writeJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
+		wire.WriteJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
 		return
 	}
 	w.auth.DropLogins(removed...)
 	w.auth.LogEvent("web authenticator reset", "cli", "", "")
 	info := w.info()
 	w.addResetCode(&info)
-	writeJSON(rw, info)
+	wire.WriteJSON(rw, info)
 }
 
 // addResetCode puts the pending authenticator reset's Setup code on info.
@@ -91,16 +91,16 @@ func offLogins() wire.WebLoginsResult {
 // LoginList answers the CLI with every web login.
 func (w *Web) LoginList(rw http.ResponseWriter, _ *http.Request) {
 	if w.ln == nil {
-		writeJSON(rw, offLogins())
+		wire.WriteJSON(rw, offLogins())
 		return
 	}
-	writeJSON(rw, wire.WebLoginsResult{Logins: w.auth.List()})
+	wire.WriteJSON(rw, wire.WebLoginsResult{Logins: w.auth.List()})
 }
 
 // LoginRevoke revokes one web login by id. An unknown id is a refusal.
 func (w *Web) LoginRevoke(rw http.ResponseWriter, r *http.Request) {
 	if w.ln == nil {
-		writeJSON(rw, offLogins())
+		wire.WriteJSON(rw, offLogins())
 		return
 	}
 	var body struct {
@@ -113,12 +113,12 @@ func (w *Web) LoginRevoke(rw http.ResponseWriter, r *http.Request) {
 	switch err := w.auth.Revoke(body.ID, "cli"); {
 	case errors.Is(err, webauth.ErrWebLoginNotFound):
 		w.auth.LogEvent("web login revoke refused", "cli", "", wire.ReasonLoginNotFound)
-		writeJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonLoginNotFound, Message: "no web login has that id"})
+		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonLoginNotFound, Message: "no web login has that id"})
 	case err != nil:
 		w.log.Error("web revoke failed", "err", err)
-		writeJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
+		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
 	default:
-		writeJSON(rw, wire.WebLoginsResult{})
+		wire.WriteJSON(rw, wire.WebLoginsResult{})
 	}
 }
 
@@ -126,7 +126,7 @@ func (w *Web) LoginRevoke(rw http.ResponseWriter, r *http.Request) {
 // every web login, ends their streams and logs a password change from "cli".
 func (w *Web) SetPassword(rw http.ResponseWriter, r *http.Request) {
 	if w.ln == nil {
-		writeJSON(rw, offLogins())
+		wire.WriteJSON(rw, offLogins())
 		return
 	}
 	var body struct {
@@ -140,14 +140,14 @@ func (w *Web) SetPassword(rw http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, webauth.ErrPasswordTooShort):
 		w.auth.LogEvent("web password change refused", "cli", "", wire.ReasonPasswordTooShort)
-		writeJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
+		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
 	case err != nil:
 		w.log.Error("web password change failed", "err", err)
-		writeJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
+		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
 	default:
 		w.auth.LogEvent("web password changed", "cli", "", "")
 		w.auth.DropLogins(removed...)
-		writeJSON(rw, wire.WebLoginsResult{})
+		wire.WriteJSON(rw, wire.WebLoginsResult{})
 	}
 }
 

@@ -1,16 +1,8 @@
 package server
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"github.com/elentok/gx/server/sched"
 )
-
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
-}
 
 func newExplainer(s *Server) *sched.Explainer {
 	return sched.NewExplainer(sched.ExplainerDeps{

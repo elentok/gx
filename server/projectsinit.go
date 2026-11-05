@@ -25,12 +25,6 @@ func (s *Server) initProjects() {
 	s.checks = projects.NewChecks(s.projectsEnvOf, s.projects, s.guards)
 }
 
-// withProjects is initProjects for a bare Server literal in a test.
-func withProjects(s *Server) *Server {
-	s.initProjects()
-	return s
-}
-
 // projectsBack is projects.RegistryBack and projects.MigratorBack.
 type projectsBack struct{ s *Server }
 

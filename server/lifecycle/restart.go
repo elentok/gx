@@ -52,11 +52,6 @@ func newInstanceID() string {
 // Instance is the id that changes on every server start.
 func (rs *Restarter) Instance() string { return rs.instanceID }
 
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
-}
-
 // ServeWrite handles POST /v1/restart.
 func (rs *Restarter) ServeWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.RestartRequest
@@ -67,7 +62,7 @@ func (rs *Restarter) ServeWrite(w http.ResponseWriter, r *http.Request) {
 	// The flag stays set after a start: the new server replaces this one, so a
 	// second request would race it. It is cleared only when the spawn fails.
 	if !rs.restarting.CompareAndSwap(false, true) {
-		writeJSON(w, wire.RestartResult{Refused: true, Reason: wire.ReasonRestartInProgress, Restarting: true,
+		wire.WriteJSON(w, wire.RestartResult{Refused: true, Reason: wire.ReasonRestartInProgress, Restarting: true,
 			Message: "a restart is already running"})
 		return
 	}
@@ -75,7 +70,7 @@ func (rs *Restarter) ServeWrite(w http.ResponseWriter, r *http.Request) {
 	if !res.Started {
 		rs.restarting.Store(false)
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 func (rs *Restarter) restart(r *http.Request, req wire.RestartRequest) wire.RestartResult {

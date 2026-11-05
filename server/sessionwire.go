@@ -1,15 +1,11 @@
 package server
 
 import (
-	"net/http"
-
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/sound"
 )
 
 // newManager copies the fields it needs from s at call time, so s must have
@@ -74,18 +70,6 @@ func (h sessionHost) SessionDir(id string) (string, sessions.Meta, wire.SessionR
 // reported iteration_status finished.
 func (h sessionHost) SessionFinished(sess agentrunner.Session) bool {
 	return h.sessions.SessionFinished(sess)
-}
-
-func (h sessionHost) triggerBanner(id string, snd sound.Name, reason string) {
-	h.sessions.TriggerBanner(id, snd, reason)
-}
-func (h sessionHost) noteFailure(id string)         { h.sessions.NoteFailure(id) }
-func (h sessionHost) onMapEpic(address string) bool { return h.sessions.Maps.OnMapEpic(address) }
-func (h sessionHost) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-	return h.sessions.SessionWriteDesignWeb(do)
-}
-func (h sessionHost) designLaunchTier(address string) agent.Tier {
-	return h.sessions.Maps.DesignLaunchTier(address)
 }
 
 // FindTicket is sessions.Host's lookup, served by the ticket writer.
