@@ -220,7 +220,7 @@ func TestContainerFocusDisablesCommitPaneActiveStyling(t *testing.T) {
 	}
 
 	inactive.focusDiff = true
-	if inactive.diffPaneBorderColor() != ui.ColorBorder {
+	if diffPaneBorderColor(!inactive.inactive && inactive.focusDiff) != ui.ColorBorder {
 		t.Fatal("expected inactive diff border even when diff has internal focus")
 	}
 

@@ -1,7 +1,6 @@
 package commit
 
 import (
-	"fmt"
 	"image/color"
 	"regexp"
 	"strings"
@@ -37,8 +36,7 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
-	_, contentH := m.layoutHeights()
-	out := m.contentView(contentH)
+	out := m.contentView(m.layout())
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
 		if len(hints) > 0 {
@@ -118,50 +116,24 @@ func normalizeCommitBody(body string) string {
 	return strings.TrimSpace(body)
 }
 
-func (m Model) contentView(contentH int) string {
+func (m Model) contentView(l layout) string {
 	if len(m.sidebar.fileTreeModel.Entries()) == 0 {
 		width := max(20, m.width)
 		lines := []string{ui.StyleMuted.Render("no changed files")}
-		return ui.RenderPanel(ui.PanelOptionsFor(width, contentH, "Changes", "", lines, false, ui.ColorBlue, nil, false))
+		return ui.RenderPanel(ui.PanelOptionsFor(width, l.contentH, "Changes", "", lines, false, ui.ColorBlue, nil, false))
 	}
 
-	if m.width < 90 {
-		filesH, diffH := m.narrowPaneHeights(contentH)
+	if l.narrow() {
+		filesH, diffH := l.narrowHeights()
 		files := m.sidebar.renderFilesPane(m.filesInput(), m.width, filesH)
 		diff := m.renderDiffPane(m.width, diffH)
 		return lipgloss.JoinVertical(lipgloss.Left, files, ui.RenderSeamRow(m.width, ui.SeamColor), diff)
 	}
-	mainH := contentH
-	width := m.width - 1
-	leftW := m.sidebar.filesPaneWidth(m.filesInput(), mainH)
-	rightW := width - leftW
-	left := m.sidebar.renderFilesPane(m.filesInput(), leftW, mainH)
+	mainH := l.contentH
+	rightW := m.width - 1 - l.filesW
+	left := m.sidebar.renderFilesPane(m.filesInput(), l.filesW, mainH)
 	right := m.renderDiffPane(rightW, mainH)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, ui.RenderSeamColumn(mainH, ui.SeamColor), right)
-}
-
-// narrowPaneHeights splits contentH (the full content area height, as returned
-// by layoutHeights) into the files pane and diff pane heights used in the
-// stacked/portrait layout (width < 90). It reserves one row for the seam
-// between the two panes. This must stay the single source of truth for that
-// split: diffPaneSize and filesInnerHeight derive the same values so the
-// files pane's rendered row count and its scroll-clamp height never diverge.
-func (m Model) narrowPaneHeights(contentH int) (filesH, diffH int) {
-	mainH := contentH - 1
-	filesH = max(5, mainH/3)
-	diffH = max(5, mainH-filesH)
-	return filesH, diffH
-}
-
-// layoutHeights returns the content area's height. bodyH is always 0: the
-// commit header no longer reserves inline layout space (it renders as a
-// popup instead, see renderHeaderPopup), so diff/file-tree get the full body
-// height. The two-value shape is kept because mouse hit-testing and the
-// image-diff overlay (model_mouse.go, image_diff.go) use bodyH as the row
-// offset where the content area begins.
-func (m Model) layoutHeights() (bodyH, contentH int) {
-	contentH = max(1, m.height)
-	return 0, contentH
 }
 
 func (m Model) renderDiffPane(width, height int) string {
@@ -185,33 +157,14 @@ func (m Model) renderDiffPane(width, height int) string {
 			lines = []string{ui.StyleMuted.Render("no diff")}
 		}
 	}
-	title, rightTitle := "Diff", m.diffTitle()
-	active := m.isContainerFocused() && m.focusDiff
-	titleColor := m.diffPaneTitleColor()
+	title, rightTitle := "Diff", m.diff.title(m.focusDiff, m.settings.UseNerdFontIcons)
+	active := !m.inactive && m.focusDiff
+	titleColor := diffPaneTitleColor(active)
 	accent := color.Color(nil)
 	if active {
 		accent = titleColor
 	}
 	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, false))
-}
-
-func (m Model) diffTitle() string {
-	ctx := fmt.Sprintf("Context: %d", m.diff.currentDiffContextLines())
-	return diffview.JoinDot(ctx, m.diff.diffModel.StatusText(m.focusDiff), m.diffSearchCounterText())
-}
-
-func (m Model) diffSearchCounterText() string {
-	s := m.diff.diffModel.Search()
-	if !s.HasQuery() || s.MatchesCount() == 0 || !m.focusDiff {
-		return ""
-	}
-	cursor := s.Cursor() + 1
-	total := s.MatchesCount()
-	icon := "⌕"
-	if m.settings.UseNerdFontIcons {
-		icon = ui.Icons(true).Search
-	}
-	return fmt.Sprintf("%s %d/%d", icon, cursor, total)
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
@@ -266,22 +219,18 @@ func isTrunkRef(decoration git.RefDecoration, trunk string) bool {
 	return name == trunk
 }
 
-func (m Model) diffPaneTitleColor() color.Color {
-	if m.isContainerFocused() && m.focusDiff {
+func diffPaneTitleColor(active bool) color.Color {
+	if active {
 		return ui.ColorOrange
 	}
 	return ui.ColorBlue
 }
 
-func (m Model) diffPaneBorderColor() color.Color {
-	if m.isContainerFocused() && m.focusDiff {
+func diffPaneBorderColor(active bool) color.Color {
+	if active {
 		return ui.ColorOrange
 	}
 	return ui.ColorBorder
-}
-
-func (m Model) isContainerFocused() bool {
-	return !m.inactive
 }
 
 func commitEntryMeta(entry tree.Entry[stage.CommitFile], useNerdFontIcons bool) string {

@@ -5,29 +5,15 @@ import (
 	"github.com/elentok/gx/ui"
 )
 
-func (m *Model) diffPaneSize() (int, int) {
-	_, contentH := m.layoutHeights()
-	if m.width < 90 {
-		_, diffH := m.narrowPaneHeights(contentH)
-		return m.width, diffH
-	}
-	leftW := m.sidebar.filesPaneWidth(m.filesInput(), contentH)
-	return m.width - leftW, contentH
-}
-
-func (m *Model) currentDiffRenderWidth() int {
-	diffW, _ := m.diffPaneSize()
-	return max(1, diffW-4)
-}
-
 func (m *Model) syncDiffViewport() {
-	_, diffH := m.diffPaneSize()
-	bodyW := m.currentDiffRenderWidth()
+	l := m.layout()
+	_, diffH := l.diffSize()
+	bodyW := l.diffRenderWidth()
 	bodyH := max(0, diffH-2)
 	m.diff.diffModel.Reflow(bodyW)
 	m.diff.diffModel.SyncViewport(bodyW, bodyH)
 	m.diff.ensureActiveVisible()
-	m.sidebar.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
+	m.sidebar.fileTreeModel.SetVisibleHeight(l.filesInnerHeight())
 }
 
 func (m *Model) moveToAdjacentFile(delta int) {
@@ -38,15 +24,6 @@ func (m *Model) moveToAdjacentFile(delta int) {
 	if m.focusDiff {
 		m.diff.ensureActiveVisible()
 	}
-}
-
-func (m *Model) filesInnerHeight() int {
-	_, contentH := m.layoutHeights()
-	if m.width < 90 {
-		filesH, _ := m.narrowPaneHeights(contentH)
-		return max(1, filesH-2)
-	}
-	return max(1, contentH-2)
 }
 
 func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {

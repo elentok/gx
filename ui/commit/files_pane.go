@@ -31,7 +31,7 @@ type filesInput struct {
 func (m Model) filesInput() filesInput {
 	return filesInput{
 		width:     m.width,
-		active:    m.isContainerFocused() && !m.focusDiff && !m.focusHeader,
+		active:    !m.inactive && !m.focusDiff && !m.focusHeader,
 		focusDiff: m.focusDiff,
 		nerdFont:  m.settings.UseNerdFontIcons,
 	}

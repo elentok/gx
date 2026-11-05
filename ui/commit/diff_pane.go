@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/elentok/gx/git/stage"
@@ -39,6 +40,23 @@ func (p *diffPane) adjustDiffContextLines(delta int) bool {
 	}
 	p.diffContextLines = next
 	return true
+}
+
+func (p diffPane) title(focusDiff, nerdFont bool) string {
+	ctx := fmt.Sprintf("Context: %d", p.currentDiffContextLines())
+	return diffview.JoinDot(ctx, p.diffModel.StatusText(focusDiff), p.searchCounterText(focusDiff, nerdFont))
+}
+
+func (p diffPane) searchCounterText(focusDiff, nerdFont bool) string {
+	s := p.diffModel.Search()
+	if !s.HasQuery() || s.MatchesCount() == 0 || !focusDiff {
+		return ""
+	}
+	icon := "⌕"
+	if nerdFont {
+		icon = ui.Icons(true).Search
+	}
+	return fmt.Sprintf("%s %d/%d", icon, s.Cursor()+1, s.MatchesCount())
 }
 
 func (p *diffPane) ensureActiveVisible() {

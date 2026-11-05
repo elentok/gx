@@ -44,7 +44,7 @@ func (m Model) headerInput() headerInput {
 		pushState: m.pushState,
 		width:     m.width,
 		height:    m.height,
-		focused:   m.isContainerFocused() && m.focusHeader,
+		focused:   !m.inactive && m.focusHeader,
 		nerdFont:  m.settings.UseNerdFontIcons,
 	}
 }

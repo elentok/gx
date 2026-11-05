@@ -196,7 +196,7 @@ func TestHeaderInfoPopupTogglesAndReclaimsSpace(t *testing.T) {
 	if strings.Contains(closedView, "popup-subject") {
 		t.Fatalf("expected subject hidden while popup is closed")
 	}
-	_, closedContentH := m.layoutHeights()
+	closedContentH := m.layout().contentH
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
 	m = updated.(Model)
@@ -213,7 +213,7 @@ func TestHeaderInfoPopupTogglesAndReclaimsSpace(t *testing.T) {
 	if m.focusHeader {
 		t.Fatalf("expected esc to close the popup")
 	}
-	_, reclaimedContentH := m.layoutHeights()
+	reclaimedContentH := m.layout().contentH
 	if reclaimedContentH != closedContentH {
 		t.Fatalf("expected content height unaffected by popup, got %d want %d", reclaimedContentH, closedContentH)
 	}

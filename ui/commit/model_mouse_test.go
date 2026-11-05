@@ -27,7 +27,8 @@ func TestMouseWheelScrollsDiffViewport(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 
-	bodyH, contentH := m.layoutHeights()
+	l := m.layout()
+	bodyH, contentH := l.bodyH, l.contentH
 	diffX := m.sidebar.filesPaneWidth(m.filesInput(), contentH) + 1
 	diffY := bodyH + 1
 
@@ -57,7 +58,7 @@ func TestMouseWheelOverFiletreeScrollsFiletree(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 
-	bodyH, _ := m.layoutHeights()
+	bodyH := m.layout().bodyH
 	filetreeX := 1
 	filetreeY := bodyH + 1
 
@@ -117,7 +118,8 @@ func TestMouseWheelWhileHelpOpenScrollsHelpNotDiff(t *testing.T) {
 	m.syncDiffViewport()
 	m.help.Open(m.width, m.height)
 
-	bodyH, contentH := m.layoutHeights()
+	l := m.layout()
+	bodyH, contentH := l.bodyH, l.contentH
 	diffX := m.sidebar.filesPaneWidth(m.filesInput(), contentH) + 1
 	diffY := bodyH + 1
 

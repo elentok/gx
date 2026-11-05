@@ -110,15 +110,14 @@ func (m Model) diffPaneBodyRect() (col, row, w, h int, ok bool) {
 	if !m.ready || len(m.sidebar.fileTreeModel.Entries()) == 0 {
 		return 0, 0, 0, 0, false
 	}
-	bodyH, contentH := m.layoutHeights()
+	l := m.layout()
 
 	var paneX, paneY, paneW, paneH int
-	if m.width < 90 {
-		filesH, diffH := m.narrowPaneHeights(contentH)
-		paneX, paneY, paneW, paneH = 0, bodyH+filesH+1, m.width, diffH
+	if l.narrow() {
+		filesH, diffH := l.narrowHeights()
+		paneX, paneY, paneW, paneH = 0, l.bodyH+filesH+1, l.width, diffH
 	} else {
-		leftW := m.sidebar.filesPaneWidth(m.filesInput(), contentH)
-		paneX, paneY, paneW, paneH = leftW, bodyH, m.width-leftW, contentH
+		paneX, paneY, paneW, paneH = l.filesW, l.bodyH, l.width-l.filesW, l.contentH
 	}
 	if paneW <= 2 || paneH <= 2 {
 		return 0, 0, 0, 0, false
