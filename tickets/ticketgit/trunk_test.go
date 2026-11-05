@@ -1,4 +1,4 @@
-package tickets
+package ticketgit
 
 import (
 	"errors"
@@ -9,6 +9,17 @@ import (
 
 	"github.com/elentok/gx/testutil"
 )
+
+// canonicalPath makes equal directories compare equal across symlinks (macOS
+// /var vs /private/var).
+func canonicalPath(t *testing.T, p string) string {
+	t.Helper()
+	resolved, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Clean(resolved)
+}
 
 // trunkFixture is a real repo registered as project "p" in a temp ticket
 // store; filepath.Dir(projectDir) is the store.
@@ -238,7 +249,7 @@ func TestTrunkCheckout(t *testing.T) {
 		wt := filepath.Join(t.TempDir(), "main-wt")
 		testutil.MustGitExported(t, bareDir, "worktree", "add", wt, "main")
 		got := TrunkCheckout(filepath.Dir(projectDir), "p")
-		if canonicalPath(got) != canonicalPath(wt) {
+		if canonicalPath(t, got) != canonicalPath(t, wt) {
 			t.Errorf("TrunkCheckout() = %q, want %q", got, wt)
 		}
 	})

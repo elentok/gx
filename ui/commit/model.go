@@ -7,7 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 
 	"github.com/elentok/gx/git/stage"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/imagediff"
@@ -117,7 +117,7 @@ func (m Model) cmdLoadTrunk() tea.Cmd {
 	store := m.settings.TicketStore
 	return func() tea.Msg {
 		// A trunk error only drops the trunk colour; the log and status views warn.
-		trunk, _ := tickets.TrunkIn(store, worktreeRoot)
+		trunk, _ := ticketgit.TrunkIn(store, worktreeRoot)
 		return TrunkLoadedMsg{trunk: trunk}
 	}
 }

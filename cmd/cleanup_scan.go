@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // EpicScan is one epic's classification, as reported by `gx cleanup scan`.
@@ -73,7 +74,7 @@ func runCleanupScan(dirs config.Dirs, cwd string, jsonOut bool, w io.Writer) err
 	}
 	// A "merged?" check against an unresolved trunk can't be trusted, so
 	// stop before reporting anything the gx-cleanup skill would delete on.
-	openRepo, err := tickets.OpenRepoDirs(dirs, cwd)
+	openRepo, err := ticketgit.OpenRepoDirs(dirs, cwd)
 	if err != nil {
 		return err
 	}

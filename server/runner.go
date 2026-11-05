@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // WaitSettled waits for every settle goroutine; see runs.Guards.WaitSettled.
@@ -299,7 +300,7 @@ func (s *Server) RootRefs(project string, epics []tickets.Epic, epic string, t t
 	if err != nil {
 		return "", "", err
 	}
-	trunk, trunkErr := tickets.Trunk(dir, repo)
+	trunk, trunkErr := ticketgit.Trunk(dir, repo)
 	derived, err := tickets.DeriveRootBase(project, epics, epic, t, s.projects.MergingOnMerged(project))
 	if err != nil {
 		return "", "", err

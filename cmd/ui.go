@@ -17,7 +17,7 @@ import (
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/health"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
 	"github.com/elentok/gx/ui/nav"
@@ -32,7 +32,7 @@ func runWorktrees(dirs config.Dirs, _ string) error {
 	}
 
 	// A trunk error still returns a repo; the worktrees view shows it as a warning.
-	repo, err := tickets.OpenRepoDirs(dirs, cwd)
+	repo, err := ticketgit.OpenRepoDirs(dirs, cwd)
 	if repo == nil {
 		return err
 	}

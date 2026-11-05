@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // storeProjectFor isolates the ticket store and registers repoDir as a project
@@ -333,7 +334,7 @@ func TestExecute_CleanupScan_MissingTrunkStopsBeforeReporting(t *testing.T) {
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }, env: envFor(t)}
 	err := execute([]string{"cleanup", "scan", "--json"}, d)
-	var missing *tickets.ErrTrunkMissing
+	var missing *ticketgit.ErrTrunkMissing
 	if !errors.As(err, &missing) {
 		t.Fatalf("err = %v, want ErrTrunkMissing", err)
 	}

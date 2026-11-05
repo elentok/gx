@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
@@ -499,7 +500,7 @@ func (s *Merger) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 
 // refsFailed is the pause for an epic whose refs can't be worked out.
 func (s *Merger) refsFailed(project, epic string, err error) mergePause {
-	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
+	if missing := (*ticketgit.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing merges; the project stops claiming until a person fixes trunk.
 		s.rec.enterTrunkMissing(project, err.Error())
 		return mergePause{reason: fmt.Sprintf("the trunk branch is missing: %v; fix the trunk, then merge again", err), kind: events.TrunkMissing}

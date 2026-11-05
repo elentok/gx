@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/pr"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -112,7 +112,7 @@ func fetchBranchHistoryClasses(store, worktreeRoot, startRef string) (classes ma
 	}
 
 	// Trunk is resolved on every reload, so a project.json edit applies at once.
-	repo, trunkErr := tickets.OpenRepoIn(store, worktreeRoot)
+	repo, trunkErr := ticketgit.OpenRepoIn(store, worktreeRoot)
 	if repo == nil || trunkErr != nil {
 		return nil, branchDiverged, trunkErr
 	}

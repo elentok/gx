@@ -3,7 +3,6 @@ package tickets
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -18,45 +17,6 @@ func writeEpic(t *testing.T, root, name, fm, body string) string {
 		t.Fatal(err)
 	}
 	return path
-}
-
-func TestMigrateDesignStep(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	trunk := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(trunk, "docs", "specs"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(trunk, "docs", "specs", "specced.md"), []byte("spec"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	chart := writeEpic(t, root, "charting", "kind: map\nstatus: draft\ndestination_unconfirmed: true\n", "# charting\n")
-	specced := writeEpic(t, root, "specced", "kind: map\nstatus: draft\n", "# specced\n")
-	has := writeEpic(t, root, "has", "kind: map\ndesign_step: grill-findings\ndestination_unconfirmed: true\n", "# has\n")
-	loop := "kind: loop\nstatus: open\n"
-	loopPath := writeEpic(t, root, "looping", loop, "# looping\n")
-	loopBefore, _ := os.ReadFile(loopPath)
-
-	changes, err := MigrateDesignStep(root, DesignProbe{TrunkDir: trunk})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(changes) != 2 {
-		t.Fatalf("changes = %v, want charting and specced", changes)
-	}
-	for path, want := range map[string]string{chart: "design_step: chart", specced: "design_step: review", has: "design_step: grill-findings"} {
-		if raw, _ := os.ReadFile(path); !strings.Contains(string(raw), want) {
-			t.Errorf("%s missing %q:\n%s", path, want, raw)
-		}
-	}
-	if raw, _ := os.ReadFile(loopPath); string(raw) != string(loopBefore) {
-		t.Errorf("loop epic rewritten:\n%s", raw)
-	}
-
-	again, err := MigrateDesignStep(root, DesignProbe{TrunkDir: trunk})
-	if err != nil || len(again) != 0 {
-		t.Errorf("rerun = %v, %v; want no changes", again, err)
-	}
 }
 
 func TestDesignStep_RoundTripsThroughLoader(t *testing.T) {

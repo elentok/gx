@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // EpicMerge is the manual merge trigger for an epic address: it merges the
@@ -197,7 +198,7 @@ func (s *Merger) EpicMergeTarget(a tickets.Address) string {
 	repo := *repoPtr
 	// The target is a function of the loaded epics (a new scan is a new slice),
 	// project.json and the repo's refs, so those make the cache stamp.
-	stamp, cacheable := tickets.RefsStamp(repo, filepath.Join(dir, config.ProjectFileName))
+	stamp, cacheable := ticketgit.RefsStamp(repo, filepath.Join(dir, config.ProjectFileName))
 	stamp += fmt.Sprintf("%p", &epics[0])
 	if cacheable {
 		if target, hit := s.mergeTargets.get(a, stamp); hit {

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 const (
@@ -137,7 +138,7 @@ func (s *Reconciler) trunkProblem(project string) (string, bool) {
 	if _, gone := projects.MissingPath(dir); gone {
 		return "", false
 	}
-	if _, err := tickets.Trunk(dir, *pf.Repo); err != nil {
+	if _, err := ticketgit.Trunk(dir, *pf.Repo); err != nil {
 		return err.Error(), true
 	}
 	return "", false

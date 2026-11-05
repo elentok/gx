@@ -2,7 +2,7 @@ package worktrees
 
 import (
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -12,7 +12,7 @@ import (
 func cmdLoadWorktrees(repo git.Repo, store string) tea.Cmd {
 	return func() tea.Msg {
 		wts, err := git.ListWorktrees(repo)
-		trunk, trunkErr := tickets.TrunkIn(store, repo.Root)
+		trunk, trunkErr := ticketgit.TrunkIn(store, repo.Root)
 		return worktreesLoadedMsg{worktrees: wts, err: err, trunk: trunk, trunkErr: trunkErr}
 	}
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -38,7 +38,7 @@ func newGrillingEnv(t *testing.T) grillingEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return grillingEnv{root: root, trunk: tickets.TrunkCheckout(store, "proj"), home: home, records: records, env: env}
+	return grillingEnv{root: root, trunk: ticketgit.TrunkCheckout(store, "proj"), home: home, records: records, env: env}
 }
 
 // writeGrillingTranscript writes a transcript of cwd that opens with the given

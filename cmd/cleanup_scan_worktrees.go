@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // worktreeActiveWindow is how recent a branch's tip commit (or a linked
@@ -112,7 +113,7 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 	}
 	scan.Active = active
 
-	if epicName, ticketID, ok := tickets.ParseIterationBranch(branch); ok {
+	if epicName, ticketID, ok := ticketgit.ParseIterationBranch(branch); ok {
 		scan.Kind = "iteration"
 		scan.Epic = epicName
 		scan.TicketID = ticketID

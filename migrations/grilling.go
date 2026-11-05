@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -61,7 +62,7 @@ func backfillGrilling(dirs config.Dirs, root string, dryRun bool) ([]tickets.Mig
 	}
 
 	store := filepath.Dir(root)
-	trunkDir := tickets.TrunkCheckout(store, project)
+	trunkDir := ticketgit.TrunkCheckout(store, project)
 	if trunkDir == "" {
 		return changes, nil
 	}

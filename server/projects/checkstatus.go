@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // Checks reads and saves a project's check configuration.
@@ -53,9 +54,9 @@ func (c *Checks) Project(dir string) wire.ProjectChecks {
 	if vcsNone {
 		pc.SaveTargets = []string{wire.SaveTargetProjectJSON}
 	}
-	root := tickets.TrunkCheckout(c.cfg().TicketStore, name)
-	if repo := tickets.ProjectRepoRoot(c.cfg().TicketStore, name); repo != "" {
-		pc.Trunk, _ = tickets.Trunk(dir, repo)
+	root := ticketgit.TrunkCheckout(c.cfg().TicketStore, name)
+	if repo := ticketgit.ProjectRepoRoot(c.cfg().TicketStore, name); repo != "" {
+		pc.Trunk, _ = ticketgit.Trunk(dir, repo)
 	}
 
 	cfg, hasConfig, cfgErr := loadChecks(root, pf)

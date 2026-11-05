@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -111,7 +112,7 @@ func startSessionCmd(api ServerAPI, storePath, address string) tea.Cmd {
 			}
 		}
 		if dir == "" {
-			dir = tickets.TrunkCheckout(storePath, project)
+			dir = ticketgit.TrunkCheckout(storePath, project)
 		}
 		return StartSessionMsg{
 			Project:      project,

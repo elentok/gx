@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
@@ -55,12 +55,12 @@ func saveChecksToProjectJSON(dir string, pf config.ProjectFile, req wire.SaveChe
 }
 
 func (c *Checks) SaveToRepo(dir string, req wire.SaveChecksRequest) (wire.SaveChecksResult, error) {
-	root := tickets.TrunkCheckout(c.cfg().TicketStore, req.Project)
-	repo := tickets.ProjectRepoRoot(c.cfg().TicketStore, req.Project)
+	root := ticketgit.TrunkCheckout(c.cfg().TicketStore, req.Project)
+	repo := ticketgit.ProjectRepoRoot(c.cfg().TicketStore, req.Project)
 	if root == "" || repo == "" {
 		return refuseSave(wire.ReasonNoTrunk, req.Project+" has no trunk checkout")
 	}
-	trunk, err := tickets.Trunk(dir, repo)
+	trunk, err := ticketgit.Trunk(dir, repo)
 	if err != nil {
 		return refuseSave(wire.ReasonNoTrunk, err.Error())
 	}

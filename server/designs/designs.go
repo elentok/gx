@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // designBranch is the branch and worktree name of a map's Design.
@@ -69,7 +70,7 @@ func pastBranchStep(step tickets.DesignStep) bool {
 // A deleted impl branch with design_step branch still counts.
 func (c designCtx) afterBranch() bool {
 	step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(c.projectDir, c.epic)).DesignStep)
-	return pastBranchStep(step) || tickets.BranchExists(c.repo.Root, c.epic+tickets.ImplEpicSuffix)
+	return pastBranchStep(step) || ticketgit.BranchExists(c.repo.Root, c.epic+tickets.ImplEpicSuffix)
 }
 
 // designDir is where a map's Design session runs: the trunk checkout once past
@@ -96,7 +97,7 @@ func (s *Designs) resolveDesignDir(project, epic, excludeID string) (designDir, 
 	}
 	if c.afterBranch() {
 		s.CleanupDesign(project, epic)
-		path := tickets.TrunkCheckout(s.ticketStore, project)
+		path := ticketgit.TrunkCheckout(s.ticketStore, project)
 		if path == "" {
 			return designDir{}, fmt.Errorf("no trunk checkout for project %s", project)
 		}
@@ -131,7 +132,7 @@ func (s *Designs) tryCleanupDesign(project, epic string) error {
 		return err
 	}
 	_, statErr := os.Stat(c.path)
-	if statErr != nil && !tickets.BranchExists(c.repo.Root, c.branch) {
+	if statErr != nil && !ticketgit.BranchExists(c.repo.Root, c.branch) {
 		return nil
 	}
 	if statErr == nil {
@@ -161,7 +162,7 @@ func (c designCtx) removeWorktreeAndBranch(force bool) error {
 			return err
 		}
 	}
-	if !tickets.BranchExists(c.repo.Root, c.branch) {
+	if !ticketgit.BranchExists(c.repo.Root, c.branch) {
 		return nil
 	}
 	return git.DeleteLocalBranch(*c.repo, c.branch, true)
@@ -222,10 +223,10 @@ func (s *Designs) ensureDesignWorktree(c designCtx) (string, error) {
 	if _, err := os.Stat(c.path); err == nil {
 		return c.path, nil
 	}
-	if tickets.BranchExists(c.repo.Root, c.branch) {
+	if ticketgit.BranchExists(c.repo.Root, c.branch) {
 		return c.path, git.AddWorktreeOnBranch(*c.repo, c.branch, c.path)
 	}
-	trunk, err := tickets.Trunk(c.projectDir, c.repo.Root)
+	trunk, err := ticketgit.Trunk(c.projectDir, c.repo.Root)
 	if err != nil {
 		return "", err
 	}
@@ -262,7 +263,7 @@ func (s *Designs) tryRebase(project, epic, worktree, excludeID string) error {
 	if err != nil {
 		return err
 	}
-	trunk, err := tickets.Trunk(c.projectDir, c.repo.Root)
+	trunk, err := ticketgit.Trunk(c.projectDir, c.repo.Root)
 	if err != nil {
 		return err
 	}

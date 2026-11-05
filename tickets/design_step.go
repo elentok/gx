@@ -2,13 +2,10 @@ package tickets
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/elentok/gx/tickets/schema"
-	"gopkg.in/yaml.v3"
 )
 
 // DesignStep is a value of a map epic's design_step. The values are also the
@@ -55,48 +52,6 @@ func CheckDesignStep(step string) error {
 	return nil
 }
 
-// DesignProbe is what the file-based design step guess reads outside the store:
-// the project's trunk checkout and repo root. Either may be empty.
-type DesignProbe struct {
-	TrunkDir string
-	Repo     string
-	// BranchExists reports whether the repo has a local branch of that name.
-	BranchExists func(repo, branch string) bool
-}
-
-// GuessDesignStep is the step a map has reached, judged from its tickets, body
-// and files. It checks from the last step back and stops at the first step that
-// is done, because the Branch step deletes the spec file from the trunk
-// checkout. Only MigrateDesignStep uses it: a stored design_step replaces it.
-func GuessDesignStep(m Epic, byName map[string]Epic, p DesignProbe) DesignStep {
-	impl, hasImpl := byName[m.Name+ImplEpicSuffix]
-	findings := schema.Section(m.Body, "Review findings")
-	hasFindings := schema.HasSection(m.Body, "Review findings")
-	open := HasOpenTicket(m)
-	switch {
-	case m.Status == string(schema.StatusDone),
-		!m.CompletedAt.IsZero() && !hasImpl,
-		p.Repo != "" && p.BranchExists != nil && p.BranchExists(p.Repo, m.Name+ImplEpicSuffix):
-		return StepDone
-	case hasImpl && impl.Status != string(schema.StatusDraft):
-		return StepBranch
-	case open && !m.DestinationUnconfirmed:
-		// A review that sent tickets back reopens the map's tickets.
-		return StepResolveTickets
-	case hasFindings && findingsChecked(findings):
-		return StepCreateTickets
-	case hasFindings:
-		return StepGrillFindings
-	case p.TrunkDir != "" && fileExists(filepath.Join(p.TrunkDir, "docs", "specs", m.Name+".md")):
-		return StepReview
-	case !open && schema.Section(m.Body, "Not yet specified") == "" && !m.DestinationUnconfirmed:
-		return StepSpec
-	case !m.DestinationUnconfirmed:
-		return StepResolveTickets
-	}
-	return StepChart
-}
-
 // HasOpenTicket reports whether any of m's tickets is open or claimed.
 func HasOpenTicket(m Epic) bool {
 	for _, t := range m.Tickets {
@@ -105,55 +60,4 @@ func HasOpenTicket(m Epic) bool {
 		}
 	}
 	return false
-}
-
-// findingsChecked reports whether every "- [ ]" or "- [x]" line of a findings
-// section is checked.
-func findingsChecked(section string) bool {
-	for line := range strings.SplitSeq(section, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "- [ ]") {
-			return false
-		}
-	}
-	return true
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// MigrateDesignStep writes design_step on every map epic under root that has
-// none, from GuessDesignStep. Epics that already have one and loop epics are
-// untouched, so a rerun is a no-op.
-func MigrateDesignStep(root string, probe DesignProbe) ([]MigrationChange, error) {
-	epics, err := Load(root)
-	if err != nil {
-		return nil, err
-	}
-	byName := make(map[string]Epic, len(epics))
-	for _, e := range epics {
-		byName[e.Name] = e
-	}
-	var changes []MigrationChange
-	for _, e := range epics {
-		if !e.IsMap || e.DesignStep != "" {
-			continue
-		}
-		step := GuessDesignStep(e, byName, probe)
-		err := EditEpicFrontmatterInner(e.Path, func(mapping *yaml.Node) (bool, error) {
-			if MappingKeyIndex(mapping, "design_step") >= 0 {
-				return false, nil
-			}
-			return true, setMappingValue(mapping, "design_step", string(step))
-		})
-		if err != nil {
-			return changes, err
-		}
-		changes = append(changes, MigrationChange{
-			Path:  filepath.Join(e.Path, "ticket.md"),
-			Notes: []string{"design_step set to " + string(step)},
-		})
-	}
-	return changes, nil
 }

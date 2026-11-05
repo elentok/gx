@@ -4,8 +4,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // verifyContextWindow is larger than the code-review stub's: verify drives a
@@ -26,7 +26,7 @@ func runTicketsEnsureVerify(epicPath string, w io.Writer) error {
 
 // epicSpecLine names the epic's spec, or is empty when there is none.
 func epicSpecLine(epicPath string) string {
-	if spec := tickets.EpicSpecPath(filepath.Clean(epicPath)); spec != "" {
+	if spec := ticketgit.EpicSpecPath(filepath.Clean(epicPath)); spec != "" {
 		return "Spec: `" + spec + "`\n\n"
 	}
 	return ""

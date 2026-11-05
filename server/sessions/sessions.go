@@ -28,7 +28,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // errSessionNameTaken is saveNewSession's refusal of a unique name that a live
@@ -235,7 +235,7 @@ func (mg *Manager) addSessionWorktree(project, name string) (string, string) {
 	if err != nil {
 		return "", err.Error()
 	}
-	trunk, err := tickets.Trunk(projectDir, repo.Root)
+	trunk, err := ticketgit.Trunk(projectDir, repo.Root)
 	if err != nil {
 		return "", err.Error()
 	}

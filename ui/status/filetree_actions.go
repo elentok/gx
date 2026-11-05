@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/stage"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/status/diffarea"
@@ -148,7 +148,7 @@ func (e rebaseTargetError) Unwrap() error { return e.error }
 // detectRebaseTarget resolves trunk on every call, so a project.json edit
 // applies at once. A missing trunk is an error, never a guessed branch.
 func detectRebaseTarget(store, root string) (string, error) {
-	repo, err := tickets.OpenRepoIn(store, root)
+	repo, err := ticketgit.OpenRepoIn(store, root)
 	if err != nil {
 		return "", err
 	}

@@ -1,11 +1,15 @@
-package tickets
+package ticketgit
 
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
 )
 
 // ErrTrunkMissing is the one error every caller reports when trunk can't be
@@ -56,9 +60,9 @@ func Trunk(projectDir, repoRoot string) (string, error) {
 		return "", fmt.Errorf("resolve trunk: %w", err)
 	}
 	if pf.Trunk != nil && *pf.Trunk != "" {
-		return checkTrunk(&ErrTrunkMissing{Project: ProjectName(projectDir), Repo: repoRoot, Trunk: *pf.Trunk, FromProjectFile: true})
+		return checkTrunk(&ErrTrunkMissing{Project: tickets.ProjectName(projectDir), Repo: repoRoot, Trunk: *pf.Trunk, FromProjectFile: true})
 	}
-	return checkTrunk(&ErrTrunkMissing{Project: ProjectName(projectDir), Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
+	return checkTrunk(&ErrTrunkMissing{Project: tickets.ProjectName(projectDir), Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
 }
 
 // TrunkIn resolves the trunk of dir's repo, finding its project in the ticket
@@ -99,8 +103,8 @@ func OpenRepoDirs(dirs config.Dirs, dir string) (*git.Repo, error) {
 }
 
 func trunkIn(storePath, repoRoot string) (string, error) {
-	projectDir, err := ProjectDir(storePath, repoRoot)
-	if errors.Is(err, ErrNoProject) {
+	projectDir, err := tickets.ProjectDir(storePath, repoRoot)
+	if errors.Is(err, tickets.ErrNoProject) {
 		return checkTrunk(&ErrTrunkMissing{Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
 	}
 	if err != nil {
@@ -127,7 +131,7 @@ func checkTrunk(candidate *ErrTrunkMissing) (string, error) {
 // ProjectRepoRoot is the root of the project's registered repo, or "" when the
 // project has none or the repo is gone.
 func ProjectRepoRoot(storePath, project string) string {
-	projectDir, err := ProjectDirByName(storePath, project)
+	projectDir, err := tickets.ProjectDirByName(storePath, project)
 	if err != nil {
 		return ""
 	}
@@ -153,7 +157,7 @@ func BranchExists(repo, branch string) bool {
 // when the project, its repo, its trunk or the trunk's worktree is missing, so
 // callers fall back to asking.
 func TrunkCheckout(storePath, project string) string {
-	projectDir, err := ProjectDirByName(storePath, project)
+	projectDir, err := tickets.ProjectDirByName(storePath, project)
 	if err != nil {
 		return ""
 	}
@@ -182,4 +186,35 @@ func TrunkCheckout(storePath, project string) string {
 		}
 	}
 	return ""
+}
+
+// EpicSpecPath names the spec of the epic at epicPath, or "" when there is
+// none. A repo spec (docs/specs/<epic>.md, or <map>.md for a <map>-impl epic)
+// is named repo-relative, the epic's own spec.md by its store path.
+func EpicSpecPath(epicPath string) string {
+	epic := filepath.Base(epicPath)
+	projectDir := filepath.Dir(epicPath)
+	store := filepath.Dir(projectDir)
+
+	if checkout := TrunkCheckout(store, filepath.Base(projectDir)); checkout != "" {
+		slugs := []string{epic}
+		if name, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok {
+			slugs = append(slugs, name)
+		}
+		for _, slug := range slugs {
+			rel := filepath.Join("docs", "specs", slug+".md")
+			if fileExists(filepath.Join(checkout, rel)) {
+				return rel
+			}
+		}
+	}
+	if own := filepath.Join(epicPath, "spec.md"); fileExists(own) {
+		return own
+	}
+	return ""
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

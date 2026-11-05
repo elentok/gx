@@ -3,7 +3,7 @@ package commit
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git/pr"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -19,7 +19,7 @@ func (m Model) cmdGotoPR() tea.Cmd {
 	ref := m.ref
 	store := m.settings.TicketStore
 	return func() tea.Msg {
-		trunk, err := tickets.TrunkIn(store, worktreeRoot)
+		trunk, err := ticketgit.TrunkIn(store, worktreeRoot)
 		if err != nil {
 			return gotoPRMsg{fatalErr: err}
 		}

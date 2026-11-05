@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 func fixAgentRefusal(reason, msg string) wire.FixAgentResult {
@@ -97,7 +98,7 @@ func (rs *Resumer) startFixProjectAgent(project string) (wire.FixAgentResult, er
 	if failure == nil {
 		return fixAgentRefusal(wire.ReasonFixNoFailure, fmt.Sprintf("project %s has no saved migration failure", project)), nil
 	}
-	checkout := tickets.TrunkCheckout(rs.mg.cfg.TicketStore, project)
+	checkout := ticketgit.TrunkCheckout(rs.mg.cfg.TicketStore, project)
 	if checkout == "" {
 		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", project)), nil
 	}
@@ -154,7 +155,7 @@ func (rs *Resumer) startFixAgent(req wire.FixAgentRequest, web bool) (wire.FixAg
 	if web && req.State != RepairState(queue.ReadLogLenient(t), t.PausedClass()) {
 		return fixAgentRefusal(wire.ReasonStale, "the pause changed; review the current one"), nil
 	}
-	checkout := tickets.TrunkCheckout(rs.mg.cfg.TicketStore, ref.Addr.Project)
+	checkout := ticketgit.TrunkCheckout(rs.mg.cfg.TicketStore, ref.Addr.Project)
 	if checkout == "" {
 		return fixAgentRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.Addr.Project)), nil
 	}

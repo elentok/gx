@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/terminalrun"
 )
@@ -211,7 +212,7 @@ func checkTrunk(dirs config.Dirs, cwd, repoRoot string) *git.Issue {
 		return nil
 	}
 	if err == nil {
-		_, err = tickets.Trunk(projectDir, repoRoot)
+		_, err = ticketgit.Trunk(projectDir, repoRoot)
 	}
 	if err != nil {
 		return &git.Issue{Description: err.Error()}

@@ -13,19 +13,20 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
 // designProbeUnder is the trunk checkout and repo of the project at root, for
 // the design step guess. A root that is not a store project has neither.
-func designProbeUnder(root string) tickets.DesignProbe {
-	probe := tickets.DesignProbe{BranchExists: tickets.BranchExists}
+func designProbeUnder(root string) ticketmigrate.DesignProbe {
+	probe := ticketmigrate.DesignProbe{BranchExists: ticketgit.BranchExists}
 	if _, err := config.ReadProjectFile(root); err != nil {
 		return probe
 	}
 	store, project := filepath.Dir(root), tickets.ProjectName(root)
-	probe.TrunkDir = tickets.TrunkCheckout(store, project)
-	probe.Repo = tickets.ProjectRepoRoot(store, project)
+	probe.TrunkDir = ticketgit.TrunkCheckout(store, project)
+	probe.Repo = ticketgit.ProjectRepoRoot(store, project)
 	return probe
 }
 
@@ -204,10 +205,10 @@ func epicTrailerLinesUnder(dirs config.Dirs, root string) func(tickets.Epic) (in
 // for a ticket-store project, else the repo holding an old .scratch tree.
 func trackerRepo(dirs config.Dirs, root string) (repoRoot, trunk string, err error) {
 	if pf, err := config.ReadProjectFile(root); err == nil && pf.Repo != nil && *pf.Repo != "" {
-		trunk, err := tickets.Trunk(root, *pf.Repo)
+		trunk, err := ticketgit.Trunk(root, *pf.Repo)
 		return *pf.Repo, trunk, err
 	}
-	repo, err := tickets.OpenRepoDirs(dirs, root)
+	repo, err := ticketgit.OpenRepoDirs(dirs, root)
 	if err != nil {
 		return "", "", err
 	}

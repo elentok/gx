@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // Retention is how long run records and run logs are kept.
@@ -143,9 +144,9 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result, lock *Fu
 	}
 	rec.Branch, _ = git.CurrentBranch(r.root)
 	rec.Head, _ = git.RevParse(r.root, "HEAD")
-	if epic, id, ok := tickets.ParseIterationBranch(rec.Branch); ok {
+	if epic, id, ok := ticketgit.ParseIterationBranch(rec.Branch); ok {
 		rec.Link, rec.Epic, rec.Ticket = LinkTicket, epic, id
-	} else if trunk, err := tickets.TrunkIn(r.ticketStore, r.root); err == nil && trunk == rec.Branch {
+	} else if trunk, err := ticketgit.TrunkIn(r.ticketStore, r.root); err == nil && trunk == rec.Branch {
 		rec.Link = LinkTrunk
 	}
 

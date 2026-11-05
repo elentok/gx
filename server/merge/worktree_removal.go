@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // RemoveMergedWorktree removes a merged epic's feature worktree, never its
@@ -39,7 +40,7 @@ func (s *Reconciler) RemoveMergedWorktree(root queue.RootRef) {
 	if _, err := os.Stat(path); err != nil {
 		return
 	}
-	if sameDir(path, tickets.TrunkCheckout(s.cfg.TicketStore, project)) {
+	if sameDir(path, ticketgit.TrunkCheckout(s.cfg.TicketStore, project)) {
 		return
 	}
 	s.waitOutStamping(root, project, dir, repoDir)

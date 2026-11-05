@@ -128,7 +128,7 @@ func warnTrunkChange(out io.Writer, dir string, orig, edited []byte) {
 	fmt.Fprintf(out, "%d tickets in flight will merge into %s\n", rootsInFlight(epics, repo, oldTrunk), newTrunk)
 }
 
-// effectiveTrunk mirrors tickets.Trunk without its existence check, so
+// effectiveTrunk mirrors ticketgit.Trunkwithout its existence check, so
 // setting trunk to the detected default is not a change.
 func effectiveTrunk(pf config.ProjectFile, repo string) string {
 	if pf.Trunk != nil && *pf.Trunk != "" {

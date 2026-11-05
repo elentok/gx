@@ -37,7 +37,7 @@ func init() {
 		return ticketmigrate.MigrateDestinationUnconfirmed(e.Root)
 	}})
 	Default.Register(Step{Name: "design-step", Run: func(e Env) ([]tickets.MigrationChange, error) {
-		return tickets.MigrateDesignStep(e.Root, designProbeUnder(e.LookupRoot))
+		return ticketmigrate.MigrateDesignStep(e.Root, designProbeUnder(e.LookupRoot))
 	}})
 	Default.Register(Step{Name: "map-done", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return ticketmigrate.MigrateMapDone(e.Root, false)

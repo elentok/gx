@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // rootRefsFixture is a repo with trunk develop and branches a (a stacked
@@ -174,7 +175,7 @@ func TestRootRefs_MissingTrunkFailsOnlyARootTargetingTrunk(t *testing.T) {
 	if base, target, err := s.RootRefs("proj", []tickets.Epic{blocker, stacked}, "b", stacked.Tickets[0], repo); err != nil || base != "a" || target != "a" {
 		t.Errorf("stacked root = (%q, %q, %v), want (a, a)", base, target, err)
 	}
-	var missing *tickets.ErrTrunkMissing
+	var missing *ticketgit.ErrTrunkMissing
 	if _, _, err := s.RootRefs("proj", []tickets.Epic{blocker}, "a", blocker.Tickets[0], repo); !errors.As(err, &missing) {
 		t.Errorf("top-level root err = %v, want ErrTrunkMissing", err)
 	}

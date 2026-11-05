@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // mergeTestRepo creates a plain bare repo with a linked worktree for main
@@ -317,7 +318,7 @@ func TestRunMerge_MissingTrunkFailsWithSharedError(t *testing.T) {
 
 	var stdout bytes.Buffer
 	err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout)
-	var missing *tickets.ErrTrunkMissing
+	var missing *ticketgit.ErrTrunkMissing
 	if !errors.As(err, &missing) || missing.Trunk != "develop" {
 		t.Fatalf("err = %v, want ErrTrunkMissing for develop", err)
 	}

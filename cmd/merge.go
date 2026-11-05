@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
 // MergeResult is the `gx merge <branch> --json` payload.
@@ -29,7 +30,7 @@ type MergeResult struct {
 // the outcome to w. It never rebases, never pushes, and stops without further
 // mutation on a non-fast-forward refusal.
 func runMerge(dirs config.Dirs, cwd, branchArg string, jsonOut bool, w io.Writer) error {
-	repo, err := tickets.OpenRepoDirs(dirs, cwd)
+	repo, err := ticketgit.OpenRepoDirs(dirs, cwd)
 	if repo == nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
 	}
