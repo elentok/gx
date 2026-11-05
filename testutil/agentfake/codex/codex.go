@@ -242,6 +242,9 @@ type codexFake struct {
 	// background is a background terminal still running; input is the key layer.
 	background bool
 	input      codexInput
+	// turnImages are the pasted images of the prompt being submitted; startTurn
+	// writes them into the user message.
+	turnImages []string
 }
 
 // openRollout finds the session's rollout under home, or creates it with its
@@ -406,7 +409,19 @@ func (c *codexFake) startTurn(prompt string) error {
 	if err := c.writeLine("event_msg", map[string]any{"type": "task_started", "turn_id": turnID}); err != nil {
 		return err
 	}
-	return c.writeLine("response_item", c.message("user", "input_text", prompt))
+	msg := c.message("user", "input_text", prompt)
+	if len(c.turnImages) > 0 {
+		var content []map[string]any
+		for i, img := range c.turnImages {
+			content = append(content,
+				map[string]any{"type": "input_text", "text": fmt.Sprintf("<image name=[Image #%d] path=%q>", i+1, img)},
+				map[string]any{"type": "input_image", "image_url": "data:" + agentfake.ImageMediaType(img) + ";base64,AA==", "detail": "high"},
+				map[string]any{"type": "input_text", "text": "</image>"})
+		}
+		msg["content"] = append(content, map[string]any{"type": "input_text", "text": prompt})
+		c.turnImages = nil
+	}
+	return c.writeLine("response_item", msg)
 }
 
 // finishTurn writes the turn's reply, token usage and completion, then ends

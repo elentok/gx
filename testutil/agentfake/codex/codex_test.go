@@ -273,6 +273,79 @@ func TestCodex_SlashCommandWritesAUserMessageAndNoTurn(t *testing.T) {
 	}
 }
 
+func TestCodex_PastedImagePathsBecomeChipsAndWrapperTriples(t *testing.T) {
+	dir := t.TempDir()
+	blue, red := filepath.Join(dir, "blue.png"), filepath.Join(dir, "red.jpg")
+	for _, f := range []string{blue, red} {
+		if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	home := t.TempDir()
+	p := startCodex(t, home, "paste-1", codexLaunchArgs...)
+	p.waitOut("state=idle")
+	send := func(s string) {
+		t.Helper()
+		if _, err := io.WriteString(p.stdin, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	send("\x1b[200~" + blue + "\x1b[201~")
+	p.waitOut("[Image #1] ")
+	send("\x1b[200~" + red + "\x1b[201~")
+	p.waitOut("[Image #1] [Image #2] ")
+	send("what color\r")
+	p.waitOut("state=working")
+
+	var files []string
+	testutil.WaitFor(t, 5*time.Second, "the user message in the rollout", func() bool {
+		files = rolloutFiles(t, home)
+		return len(files) > 0 && bytes.Contains(mustRead(t, files[0]), []byte("what color"))
+	})
+	var content []struct{ Type, Text string }
+	for _, line := range bytes.Split(bytes.TrimSpace(mustRead(t, files[0])), []byte("\n")) {
+		var l struct {
+			Payload struct {
+				Role    string
+				Content []struct{ Type, Text string }
+			}
+		}
+		if err := json.Unmarshal(line, &l); err != nil {
+			t.Fatal(err)
+		}
+		if l.Payload.Role == "user" {
+			content = l.Payload.Content
+		}
+	}
+	want := []struct{ Type, Text string }{
+		{"input_text", `<image name=[Image #1] path="` + blue + `">`}, {"input_image", ""}, {"input_text", "</image>"},
+		{"input_text", `<image name=[Image #2] path="` + red + `">`}, {"input_image", ""}, {"input_text", "</image>"},
+		{"input_text", "[Image #1] [Image #2] what color"},
+	}
+	if !slices.Equal(content, want) {
+		t.Errorf("content = %+v, want %+v", content, want)
+	}
+}
+
+func TestCodex_PasteOfTwoPathsStaysText(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a.png"), filepath.Join(dir, "b.png")
+	for _, f := range []string{a, b} {
+		if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := startCodex(t, t.TempDir(), "paste-2", codexLaunchArgs...)
+	p.waitOut("state=idle")
+	if _, err := io.WriteString(p.stdin, "\x1b[200~"+a+" "+b+"\x1b[201~"); err != nil {
+		t.Fatal(err)
+	}
+	p.waitOut(b)
+	if strings.Contains(p.out.String(), "[Image #") {
+		t.Errorf("two pasted paths became a chip: %q", p.out.String())
+	}
+}
+
 func mustRead(t *testing.T, path string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(path)

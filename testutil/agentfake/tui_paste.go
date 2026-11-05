@@ -71,7 +71,7 @@ func (t *tui) pasteKey(key byte) bool {
 // chip, anything else is text.
 func (t *tui) pasted(body string) {
 	path := strings.TrimSpace(body)
-	if !isImageFile(path) {
+	if !IsImageFile(path) {
 		t.typed.WriteString(body)
 		t.draw()
 		return
@@ -92,11 +92,19 @@ var imageMediaTypes = map[string]string{
 	".webp": "image/webp",
 }
 
-func isImageFile(path string) bool {
+// ImageMediaType is the media type of an image path's extension, empty for a
+// non-image.
+func ImageMediaType(path string) string {
+	return imageMediaTypes[strings.ToLower(filepath.Ext(path))]
+}
+
+// IsImageFile reports whether path is an absolute path to an existing PNG,
+// JPEG, GIF or WebP file.
+func IsImageFile(path string) bool {
 	if !filepath.IsAbs(path) || strings.ContainsAny(path, "\r\n") {
 		return false
 	}
-	if _, ok := imageMediaTypes[strings.ToLower(filepath.Ext(path))]; !ok {
+	if ImageMediaType(path) == "" {
 		return false
 	}
 	info, err := os.Stat(path)
@@ -112,7 +120,7 @@ func writeImagePrompt(path, text string, images []string) error {
 	sources := []map[string]any{}
 	for _, img := range images {
 		blocks = append(blocks, map[string]any{"type": "image", "source": map[string]any{
-			"type": "base64", "media_type": imageMediaTypes[strings.ToLower(filepath.Ext(img))], "data": "AA==",
+			"type": "base64", "media_type": ImageMediaType(img), "data": "AA==",
 		}})
 		sources = append(sources, map[string]any{"type": "text", "text": "[Image: source: " + img + "]"})
 	}
