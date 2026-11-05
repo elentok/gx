@@ -48,11 +48,11 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
 
-	if !m.confirmOpen {
+	if !m.modals.confirmOpen {
 		t.Fatalf("expected rebase key to open confirmation")
 	}
-	if !strings.Contains(m.confirmTitle, "Rebase branch feature/test on main?") {
-		t.Fatalf("unexpected rebase confirm title: %q", m.confirmTitle)
+	if !strings.Contains(m.modals.confirm.title, "Rebase branch feature/test on main?") {
+		t.Fatalf("unexpected rebase confirm title: %q", m.modals.confirm.title)
 	}
 }
 
@@ -173,19 +173,19 @@ func TestAppendRunningOutputStripsTerminalControlSequences(t *testing.T) {
 	m.ready = true
 	m.openRunning("Amend", newStageActionRunner(actionAmend, m.worktreeRoot, "", ""))
 
-	m.appendRunningOutput("\x1b[32mWriting objects: 100%\x1b[0m\r\n")
-	m.appendRunningOutput("remote: \x1b]8;;https://example.com\x07https://example.com\x1b]8;;\x07\n")
+	m.modals.appendRunningOutput("\x1b[32mWriting objects: 100%\x1b[0m\r\n")
+	m.modals.appendRunningOutput("remote: \x1b]8;;https://example.com\x07https://example.com\x1b]8;;\x07\n")
 
-	if strings.Contains(m.runningContent, "\x1b") {
-		t.Fatalf("expected running content to strip ANSI escapes, got %q", m.runningContent)
+	if strings.Contains(m.modals.runningContent, "\x1b") {
+		t.Fatalf("expected running content to strip ANSI escapes, got %q", m.modals.runningContent)
 	}
-	if strings.Contains(m.runningContent, "\r") {
-		t.Fatalf("expected running content to strip carriage returns, got %q", m.runningContent)
+	if strings.Contains(m.modals.runningContent, "\r") {
+		t.Fatalf("expected running content to strip carriage returns, got %q", m.modals.runningContent)
 	}
-	if !strings.Contains(m.runningContent, "Writing objects: 100%") {
-		t.Fatalf("expected sanitized progress text, got %q", m.runningContent)
+	if !strings.Contains(m.modals.runningContent, "Writing objects: 100%") {
+		t.Fatalf("expected sanitized progress text, got %q", m.modals.runningContent)
 	}
-	if !strings.Contains(m.runningContent, "remote: https://example.com") {
-		t.Fatalf("expected sanitized hyperlink text, got %q", m.runningContent)
+	if !strings.Contains(m.modals.runningContent, "remote: https://example.com") {
+		t.Fatalf("expected sanitized hyperlink text, got %q", m.modals.runningContent)
 	}
 }

@@ -200,11 +200,11 @@ func (m *Model) openDiscardStatusConfirm() {
 	}
 
 	m.openConfirm(title, lines, confirmDiscardStatus, "", "")
-	m.confirmDiscardUntracked = entry.Kind == statusEntryFile && entry.File.IsUntracked()
-	m.confirmPaths = uniqueNonEmpty(restorePaths)
-	m.confirmDeletePaths = uniqueNonEmpty(deletePaths)
-	m.confirmDisplayPath = entry.Path
-	m.confirmPreservePath = entry.Path
+	m.modals.confirm.discardUntracked = entry.Kind == statusEntryFile && entry.File.IsUntracked()
+	m.modals.confirm.paths = uniqueNonEmpty(restorePaths)
+	m.modals.confirm.deletePaths = uniqueNonEmpty(deletePaths)
+	m.modals.confirm.displayPath = entry.Path
+	m.modals.confirm.preservePath = entry.Path
 }
 
 func statusDiscardPathsForLeaves(files []stage.StageFileStatus) (restorePaths, deletePaths []string) {

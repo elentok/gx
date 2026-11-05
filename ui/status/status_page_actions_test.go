@@ -56,11 +56,11 @@ func TestOpenAmendConfirmOpensWithDetails(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'A', Text: "A", ShiftedCode: 'A'})
 	m = updated.(Model)
 
-	if !m.confirmOpen {
+	if !m.modals.confirmOpen {
 		t.Fatal("expected amend confirm dialog to be open after A key")
 	}
-	if !strings.Contains(m.confirmTitle, "Amend") {
-		t.Errorf("unexpected confirmTitle: %q", m.confirmTitle)
+	if !strings.Contains(m.modals.confirm.title, "Amend") {
+		t.Errorf("unexpected confirmTitle: %q", m.modals.confirm.title)
 	}
 }
 
@@ -81,14 +81,14 @@ func TestHandleActionResultRecordsOutput(t *testing.T) {
 func TestHandleActionResultWithErrorClosesRunning(t *testing.T) {
 	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
-	m.runningOpen = true
+	m.modals.runningOpen = true
 
 	_ = m.handleActionResult(stageActionResult{
 		kind: actionAmend,
 		err:  errors.New("git failed"),
 	})
 
-	if m.runningOpen {
+	if m.modals.runningOpen {
 		t.Fatal("expected runningOpen=false after error result")
 	}
 }
@@ -96,17 +96,17 @@ func TestHandleActionResultWithErrorClosesRunning(t *testing.T) {
 func TestHandleActionResultPromptPopStashOpensConfirm(t *testing.T) {
 	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
-	m.runningOpen = true
+	m.modals.runningOpen = true
 
 	_ = m.handleActionResult(stageActionResult{
 		kind:           actionRebase,
 		promptPopStash: true,
 	})
 
-	if !m.confirmOpen {
+	if !m.modals.confirmOpen {
 		t.Fatal("expected confirmOpen=true when promptPopStash is set")
 	}
-	if m.runningOpen {
+	if m.modals.runningOpen {
 		t.Fatal("expected runningOpen=false after promptPopStash")
 	}
 }
@@ -115,11 +115,11 @@ func TestHandleActionResultSuccessReturnsCmd(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
 	m.ready = true
-	m.runningOpen = true
+	m.modals.runningOpen = true
 
 	cmd := m.handleActionResult(stageActionResult{kind: actionRebase})
 
-	if m.runningOpen {
+	if m.modals.runningOpen {
 		t.Fatal("expected runningOpen=false after successful result")
 	}
 	if cmd == nil {
@@ -131,7 +131,7 @@ func TestHandleActionResultAmendNotifyCmd(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
 	m.ready = true
-	m.runningOpen = true
+	m.modals.runningOpen = true
 
 	cmd := m.handleActionResult(stageActionResult{kind: actionAmend})
 
@@ -144,7 +144,7 @@ func TestHandleActionResultPopStashNotifyCmd(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
 	m.ready = true
-	m.runningOpen = true
+	m.modals.runningOpen = true
 
 	cmd := m.handleActionResult(stageActionResult{kind: actionPopStashRebase})
 

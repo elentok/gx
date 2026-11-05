@@ -5,21 +5,8 @@ import (
 
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/status/diffarea"
 )
-
-func (m Model) errorModalView() string {
-	return components.RenderOutputModal(
-		"Error",
-		m.errorVP.View(),
-		ui.HintDismissAndScroll(),
-		ui.ColorRed,
-		ui.ColorRed,
-		ui.ColorSubtle,
-		m.errorVP.Width(),
-	)
-}
 
 func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool) string {
 	titleColor := ui.ColorBlue

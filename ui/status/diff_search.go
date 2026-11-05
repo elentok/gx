@@ -22,7 +22,7 @@ func (m Model) searchInputFocused() bool {
 }
 
 func (m Model) ModalOpen() bool {
-	return m.runningOpen || m.confirmOpen || m.errorOpen || m.credentialOpen ||
+	return m.modals.Open() ||
 		m.git.IsOpen() || m.help.IsOpen
 }
 

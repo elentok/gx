@@ -19,12 +19,12 @@ func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
 	}
 	if res.promptPopStash {
 		m.openConfirm("Pop stash after rebase failure?", []string{"The rebase failed after stashing changes.", "Pop the stash now?"}, confirmRebasePopStash, "", "")
-		m.runningOpen = false
+		m.modals.runningOpen = false
 		return nil
 	}
 	if res.err != nil {
 		m.showGitError(fmt.Errorf("%w\n%s", res.err, strings.TrimSpace(res.output)))
-		m.runningOpen = false
+		m.modals.runningOpen = false
 		return nil
 	}
 	var notifyCmd tea.Cmd
@@ -36,30 +36,27 @@ func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
 	case actionAmend:
 		notifyCmd = notify.Success("amended last commit")
 	}
-	m.runningOpen = false
+	m.modals.runningOpen = false
 	return tea.Batch(notifyCmd, m.refresh())
 }
 
-func (m Model) confirmAccept() (Model, tea.Cmd) {
-	if !m.confirmYes {
-		m.confirmOpen = false
-		m.confirmAction = confirmNone
+// confirmAccept runs the action of a confirm request the modal closed with an
+// accepted answer.
+func (m Model) confirmAccept(req confirmRequest) (Model, tea.Cmd) {
+	if !req.yes {
 		return m, nil
 	}
-	a := m.confirmAction
-	m.confirmOpen = false
-	m.confirmAction = confirmNone
 
-	switch a {
+	switch req.action {
 	case confirmRebase:
-		titleTarget := strings.TrimSpace(m.confirmRemote)
+		titleTarget := strings.TrimSpace(req.remote)
 		if titleTarget == "" {
 			var err error
 			if titleTarget, err = detectRebaseTarget(m.settings.TicketStore, m.worktreeRoot); err != nil {
 				return m, notify.Warning(err.Error())
 			}
 		}
-		runner := newStageActionRunner(actionRebase, m.worktreeRoot, titleTarget, m.confirmBranch)
+		runner := newStageActionRunner(actionRebase, m.worktreeRoot, titleTarget, req.branch)
 		runner.store = m.settings.TicketStore
 		m.openRunning("Rebase on "+titleTarget, runner)
 		return m, actionPollCmd()
@@ -72,47 +69,47 @@ func (m Model) confirmAccept() (Model, tea.Cmd) {
 		m.openRunning("Amend commit", runner)
 		return m, actionPollCmd()
 	case confirmDiscardStatus:
-		if m.confirmDiscardUntracked {
-			if err := stage.DiscardUntrackedPath(m.worktreeRoot, m.confirmPaths[0]); err != nil {
+		if req.discardUntracked {
+			if err := stage.DiscardUntrackedPath(m.worktreeRoot, req.paths[0]); err != nil {
 				m.showGitError(err)
 				return m, nil
 			}
 		} else {
-			if err := stage.RestorePaths(m.worktreeRoot, m.confirmPaths); err != nil {
+			if err := stage.RestorePaths(m.worktreeRoot, req.paths); err != nil {
 				m.showGitError(err)
 				return m, nil
 			}
 		}
-		if len(m.confirmDeletePaths) > 0 {
-			for _, path := range m.confirmDeletePaths {
+		if len(req.deletePaths) > 0 {
+			for _, path := range req.deletePaths {
 				if err := stage.DiscardUntrackedPath(m.worktreeRoot, path); err != nil {
 					m.showGitError(err)
 					return m, nil
 				}
 			}
 		}
-		displayPath := m.confirmDisplayPath
-		if displayPath == "" && len(m.confirmPaths) > 0 {
-			displayPath = m.confirmPaths[0]
+		displayPath := req.displayPath
+		if displayPath == "" && len(req.paths) > 0 {
+			displayPath = req.paths[0]
 		}
-		preservePath := m.confirmPreservePath
+		preservePath := req.preservePath
 		if preservePath == "" {
 			preservePath = displayPath
 		}
 		return m, tea.Batch(notify.Success("discarded "+displayPath), m.reload(preservePath))
 	case confirmDiscardUnstaged:
-		if err := stage.ApplyPatchToWorktree(m.worktreeRoot, m.confirmPatch, true, m.confirmPatchUnidiffZero); err != nil {
+		if err := stage.ApplyPatchToWorktree(m.worktreeRoot, req.patch, true, req.patchUnidiffZero); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
 		if m.diffarea.ActiveSection == diffarea.SectionUnstaged {
 			m.diffarea.DisableVisual()
 		}
-		cmd := m.reload(m.confirmPaths[0])
+		cmd := m.reload(req.paths[0])
 		if m.focus == focusDiff {
 			m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 		}
-		return m, tea.Batch(notify.Success("discarded "+m.confirmPaths[0]), cmd)
+		return m, tea.Batch(notify.Success("discarded "+req.paths[0]), cmd)
 	}
 	return m, nil
 }

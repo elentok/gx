@@ -9,7 +9,7 @@ import (
 )
 
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) bool {
-	if m.runningOpen || m.confirmOpen || m.errorOpen || m.help.IsOpen || m.searchActive() {
+	if m.modals.runningOpen || m.modals.confirmOpen || m.modals.errorOpen || m.help.IsOpen || m.searchActive() {
 		return false
 	}
 	mouse := msg.Mouse()

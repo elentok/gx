@@ -159,25 +159,17 @@ func (m Model) handleStartupLoad() (Model, tea.Cmd) {
 }
 
 func (m Model) handleActionPoll() (Model, tea.Cmd) {
-	var actionCmd tea.Cmd
-	if m.runningRunner != nil {
-		if chunk := m.runningRunner.Consume(); chunk != "" {
-			m.appendRunningOutput(chunk)
-		}
-		if !m.runningDone {
-			if !m.credentialOpen {
-				if prompt, ok := m.runningRunner.Prompt(); ok {
-					m.openCredentialPrompt(prompt)
-				}
-			}
-			if res, done := m.runningRunner.Result(); done {
-				m.runningDone = true
-				actionCmd = m.handleActionResult(res)
-			}
-		}
+	var pollCmd, actionCmd tea.Cmd
+	var res ModalResult
+	m.modals, pollCmd, res = m.modals.Poll()
+	if res.CredentialOpened {
+		m.keys.Reset()
 	}
-	if m.runningOpen && !m.runningDone {
-		return m, tea.Batch(actionCmd, actionPollCmd())
+	if res.Finished {
+		actionCmd = m.handleActionResult(res.Action)
+	}
+	if pollCmd != nil {
+		return m, tea.Batch(actionCmd, pollCmd)
 	}
 	return m, actionCmd
 }
@@ -215,8 +207,8 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
-		if m.runningOpen && !m.runningDone && m.runningRunner != nil {
-			m.runningRunner.Cancel()
+		if m.modals.runningOpen && !m.modals.runningDone && m.modals.runningRunner != nil {
+			m.modals.runningRunner.Cancel()
 			return m, notify.Info("cancel requested")
 		}
 		if m.settings.EnableNavigation {
@@ -225,8 +217,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	if msg.String() == "q" && !m.settings.EnableNavigation {
-		if m.runningRunner != nil && !m.runningDone {
-			m.runningRunner.Cancel()
+		if m.modals.runningRunner != nil && !m.modals.runningDone {
+			m.modals.runningRunner.Cancel()
 		}
 		return m, tea.Quit
 	}
@@ -235,22 +227,19 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.keys.Reset()
 		return m, nil
 	}
-	if m.credentialOpen {
-		return m.handleCredentialKey(msg)
-	}
-	if m.runningOpen {
-		return m.handleRunningKey(msg)
+	if m.modals.Open() {
+		var cmd tea.Cmd
+		var res ModalResult
+		m.modals, cmd, res = m.modals.Update(msg)
+		if res.Accepted {
+			return m.confirmAccept(res.Confirm)
+		}
+		return m, cmd
 	}
 	if m.git.OutputOpen() {
 		var cmd tea.Cmd
 		m.git, cmd, _ = m.git.Update(msg)
 		return m, cmd
-	}
-	if m.confirmOpen {
-		return m.handleConfirmKey(msg)
-	}
-	if m.errorOpen {
-		return m.handleErrorKey(msg)
 	}
 	if m.help.IsOpen {
 		var cmd tea.Cmd
@@ -352,15 +341,4 @@ func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (Model, tea
 		return m, notify.Info("opened " + msg.splitApp + " split: comment editor")
 	}
 	return m, m.refresh()
-}
-
-func (m Model) handleErrorKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "enter":
-		m.errorOpen = false
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.errorVP, cmd = m.errorVP.Update(msg)
-	return m, cmd
 }

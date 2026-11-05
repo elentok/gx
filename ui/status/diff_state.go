@@ -251,9 +251,9 @@ func (m *Model) openDiscardDiffConfirm() tea.Cmd {
 	}
 
 	m.openConfirm(title, lines, confirmDiscardUnstaged, "", "")
-	m.confirmPaths = []string{file.Path}
-	m.confirmPatch = patch
-	m.confirmPatchUnidiffZero = unidiffZero
+	m.modals.confirm.paths = []string{file.Path}
+	m.modals.confirm.patch = patch
+	m.modals.confirm.patchUnidiffZero = unidiffZero
 	return nil
 }
 

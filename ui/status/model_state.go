@@ -15,9 +15,6 @@ import (
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/status/diffarea"
 	"github.com/elentok/gx/ui/tree"
-
-	"charm.land/bubbles/v2/textinput"
-	"charm.land/bubbles/v2/viewport"
 )
 
 type Model struct {
@@ -37,39 +34,14 @@ type Model struct {
 	fileTreeModel    tree.Model[stage.StageFileStatus]
 
 	err            error
-	errorOpen      bool
-	errorVP        viewport.Model
 	help           help.Model
 	activeFilePath string
 	diffReloadSeq  int
 
 	git gitops.Model
 
-	confirmOpen             bool
-	confirmTitle            string
-	confirmLines            []string
-	confirmYes              bool
-	confirmAction           stageConfirmAction
-	confirmRemote           string
-	confirmBranch           string
-	confirmPaths            []string
-	confirmDeletePaths      []string
-	confirmPatch            string
-	confirmPatchUnidiffZero bool
-	confirmDiscardUntracked bool
-	confirmDisplayPath      string
-	confirmPreservePath     string
-	runningOpen             bool
-	runningTitle            string
-	runningVP               viewport.Model
-	runningContent          string
-	runningRunner           *stageActionRunner
-	runningDone             bool
-	credentialOpen          bool
-	credentialPrompt        string
-	credentialInput         textinput.Model
-	credentialSecret        bool
-	keys                    keys.Manager
+	modals stageModals
+	keys   keys.Manager
 
 	overlay             imagediff.Overlay
 	fetchImageDiffBlobs func(file stage.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool)

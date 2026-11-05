@@ -5,15 +5,11 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
 
-	"charm.land/bubbles/v2/textinput"
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -209,126 +205,6 @@ func actionPollCmd() tea.Cmd {
 	})
 }
 
-func (m *Model) appendRunningOutput(chunk string) {
-	if chunk == "" {
-		return
-	}
-	m.runningContent += sanitizeTerminalOutputForViewport(chunk)
-	m.runningVP.SetContent(m.runningContent)
-	m.runningVP.GotoBottom()
-}
-
-func sanitizeTerminalOutputForViewport(s string) string {
-	s = ansiOSCRe.ReplaceAllString(s, "")
-	s = ansiCSIRe.ReplaceAllString(s, "")
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.ReplaceAll(s, "\r", "")
-
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		if r == '\n' || r == '\t' || !unicode.IsControl(r) {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-func (m Model) handleRunningKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if m.runningDone {
-		switch msg.String() {
-		case "esc", "enter":
-			m.runningOpen = false
-			m.runningRunner = nil
-			return m, nil
-		}
-	}
-	var cmd tea.Cmd
-	m.runningVP, cmd = m.runningVP.Update(msg)
-	return m, cmd
-}
-
-func newCredentialInput(secret bool) textinput.Model {
-	ti := textinput.New()
-	ti.Focus()
-	if secret {
-		ti.EchoMode = textinput.EchoPassword
-		ti.EchoCharacter = '*'
-	}
-	return ti
-}
-
-func (m *Model) openCredentialPrompt(prompt components.CredentialPrompt) {
-	m.credentialPrompt = prompt.Text
-	m.credentialSecret = prompt.Kind == components.PromptKindSecret
-	m.credentialInput = newCredentialInput(m.credentialSecret)
-	m.credentialOpen = true
-	m.keys.Reset()
-}
-
-func (m Model) handleCredentialKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		if m.runningRunner != nil {
-			m.runningRunner.Cancel()
-		}
-		m.credentialOpen = false
-		m.credentialPrompt = ""
-		return m, nil
-	case "enter":
-		if m.runningRunner != nil {
-			_ = m.runningRunner.SubmitPromptInput(m.credentialInput.Value())
-		}
-		m.credentialOpen = false
-		m.credentialPrompt = ""
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.credentialInput, cmd = m.credentialInput.Update(msg)
-	return m, cmd
-}
-
-func (m Model) handleConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.confirmYes)
-	if !handled {
-		return m, nil
-	}
-	m.confirmYes = nextYes
-	if !decided {
-		return m, nil
-	}
-	if accepted {
-		return m.confirmAccept()
-	}
-	m.confirmOpen = false
-	m.confirmAction = confirmNone
-	return m, nil
-}
-
-func (m *Model) openRunning(title string, runner *stageActionRunner) {
-	vpW := m.width * 2 / 3
-	if vpW < 56 {
-		vpW = 56
-	}
-	if vpW > 110 {
-		vpW = 110
-	}
-	vpH := m.height/2 - 4
-	if vpH < 8 {
-		vpH = 8
-	}
-	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
-	vp.SetContent("")
-	m.runningVP = vp
-	m.runningContent = ""
-	m.runningOpen = true
-	m.runningDone = false
-	m.runningTitle = title
-	m.runningRunner = runner
-	m.keys.Reset()
-	runner.Start()
-}
-
 func stageActionOutputTitle(kind stageActionKind) string {
 	switch kind {
 	case actionRebase:
@@ -352,73 +228,11 @@ func (m *Model) openOutputModal() {
 }
 
 func (m *Model) openConfirm(title string, lines []string, action stageConfirmAction, remote, branch string) {
-	m.confirmOpen = true
 	m.keys.Reset()
-	m.confirmTitle = title
-	m.confirmLines = append([]string{}, lines...)
-	m.confirmAction = action
-	m.confirmRemote = remote
-	m.confirmBranch = branch
-	m.confirmPaths = nil
-	m.confirmDeletePaths = nil
-	m.confirmPatch = ""
-	m.confirmPatchUnidiffZero = false
-	m.confirmDiscardUntracked = false
-	m.confirmDisplayPath = ""
-	m.confirmPreservePath = ""
-	m.confirmYes = true
+	m.modals.openConfirm(confirmRequest{title: title, lines: lines, action: action, remote: remote, branch: branch})
 }
 
-func (m Model) runningModalView() string {
-	title := m.runningTitle
-	if title == "" {
-		title = "Running"
-	}
-	hint := ui.HintCancelScroll()
-	if m.runningDone {
-		hint = ui.HintDismissAndScroll()
-	}
-	return components.RenderOutputModal(
-		title,
-		m.runningVP.View(),
-		hint,
-		ui.ColorYellow,
-		ui.ColorYellow,
-		ui.ColorSubtle,
-		m.runningVP.Width(),
-	)
-}
-
-func (m Model) credentialModalView() string {
-	title := "Credential Required"
-	input := m.credentialInput.View()
-	if input == "" {
-		input = " "
-	}
-	return components.RenderInputModal(
-		title,
-		m.credentialPrompt,
-		input,
-		ui.HintSubmitCancel(),
-		ui.ColorBlue,
-		ui.ColorBlue,
-		ui.ColorSubtle,
-		0,
-	)
-}
-
-func (m Model) confirmModalView() string {
-	prompt := m.confirmTitle
-	if len(m.confirmLines) > 0 {
-		prompt = prompt + "\n\n" + strings.Join(m.confirmLines, "\n")
-	}
-	return components.RenderConfirmModal(
-		prompt,
-		m.confirmYes,
-		ui.ColorYellow,
-		ui.ColorGreen,
-		ui.ColorRed,
-		ui.ColorSubtle,
-		maxInt(56, m.width/2),
-	)
+func (m *Model) openRunning(title string, runner *stageActionRunner) {
+	m.keys.Reset()
+	m.modals.openRunning(m.width, m.height, title, runner)
 }

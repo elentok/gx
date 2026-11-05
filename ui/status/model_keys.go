@@ -110,8 +110,8 @@ func newStatusManager() keys.Manager {
 func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch id {
 	case bindingQuit:
-		if m.runningRunner != nil && !m.runningDone {
-			m.runningRunner.Cancel()
+		if m.modals.runningRunner != nil && !m.modals.runningDone {
+			m.modals.runningRunner.Cancel()
 		}
 		return m, tea.Quit
 	case bindingLazygitLog:

@@ -61,7 +61,7 @@ func TestOpenHelpFromSearchEndsSearch(t *testing.T) {
 func TestOpenHelpWithModalOpenDoesNothing(t *testing.T) {
 	t.Parallel()
 	m := newOpenHelpModel(t)
-	m.confirmOpen = true
+	m.modals.confirmOpen = true
 
 	if m = sendOpenHelp(m); m.help.IsOpen {
 		t.Fatal("expected help to stay closed while a modal is open")
