@@ -1598,12 +1598,6 @@ func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (tra
 	}
 }
 
-// idleRunner hosts one idle session under label, with ID "pane-1" and
-// SessionID "sess-1".
-func idleRunner(label string) *runnerfake.Runner {
-	return paneRunner(label, "pane-1", "sess-1")
-}
-
 // blockedRunner is idleRunner with its session blocked.
 func blockedRunner(label string) *runnerfake.Runner {
 	r := idleRunner(label)

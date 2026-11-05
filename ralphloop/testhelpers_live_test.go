@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/git"
@@ -14,10 +13,6 @@ func readyTimer(time.Duration) <-chan time.Time {
 	ch := make(chan time.Time, 1)
 	ch <- time.Time{}
 	return ch
-}
-
-func ticketPath(scratchDir, epicName, file string) string {
-	return filepath.Join(scratchDir, epicName, "issues", file)
 }
 
 // realGitDeps wires IsAncestor/RevParse/WorktreeExists to the real git

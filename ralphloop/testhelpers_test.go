@@ -15,6 +15,38 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// setHomeEnv points $HOME at dir for the rest of the test, restored on
+// cleanup via a manual os.Setenv/os.Unsetenv pair rather than t.Setenv, which
+// panics once a test has called t.Parallel(). Production code in this
+// package that still reads $HOME from the process env sees dir, so
+// this remains a process-wide mutation — a test using it must stay
+// non-parallel with any other test that also touches $HOME.
+func setHomeEnv(t *testing.T, dir string) {
+	t.Helper()
+	setTestDepsHome(t, dir)
+	prev, had := os.LookupEnv("HOME")
+	if err := os.Setenv("HOME", dir); err != nil {
+		t.Fatalf("Setenv HOME: %v", err)
+	}
+	t.Cleanup(func() {
+		if had {
+			os.Setenv("HOME", prev)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	})
+}
+
+func ticketPath(scratchDir, epicName, file string) string {
+	return filepath.Join(scratchDir, epicName, "issues", file)
+}
+
+// idleRunner hosts one idle session under label, with ID "pane-1" and
+// SessionID "sess-1".
+func idleRunner(label string) *runnerfake.Runner {
+	return paneRunner(label, "pane-1", "sess-1")
+}
+
 // writeEpic builds a fixture epic directory under a fresh t.TempDir()'s
 // .scratch/{name}/issues/, with one ticket file per entry in tickets (each a
 // "NN-slug.md" -> content pair), and returns the scratch dir.

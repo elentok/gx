@@ -16,28 +16,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// setHomeEnv points $HOME at dir for the rest of the test, restored on
-// cleanup via a manual os.Setenv/os.Unsetenv pair rather than t.Setenv, which
-// panics once a test has called t.Parallel(). Production code in this
-// package that still reads $HOME from the process env sees dir, so
-// this remains a process-wide mutation — a test using it must stay
-// non-parallel with any other test that also touches $HOME.
-func setHomeEnv(t *testing.T, dir string) {
-	t.Helper()
-	setTestDepsHome(t, dir)
-	prev, had := os.LookupEnv("HOME")
-	if err := os.Setenv("HOME", dir); err != nil {
-		t.Fatalf("Setenv HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if had {
-			os.Setenv("HOME", prev)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	})
-}
-
 // compactedMergingFixture writes a transcript whose occupancy peaks before a
 // compaction and ends far lower, and wires d's live readers to report the
 // post-compaction (last) value, so a test can tell peak from last.
