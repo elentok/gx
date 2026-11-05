@@ -30,6 +30,7 @@ import { LargeEditor } from "../ui/expandable-text/LargeEditor";
 import { ModeText } from "../ui/expandable-text/ModeText";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { BottomSheet } from "../ui/modal/BottomSheet";
+import { MoreActionsMenu } from "../ui/more-actions/MoreActionsMenu";
 import { Modal } from "../ui/modal/Modal";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -320,6 +321,13 @@ export const galleryEntries: GalleryEntry[] = [
       headerCase("no line", true, { line: undefined }),
       headerCase("no meta bar", true, { meta: undefined }),
     ],
+  },
+  {
+    name: "MoreActionsMenu",
+    cases: (["rest", "hover", "focus", "open"] as const).map((state) => ({
+      label: state,
+      node: <MoreActionsMenu pinned={state === "rest" ? undefined : state} sections={[[{ value: "copy", label: "Copy ID", onSelect: () => {} }]]} />,
+    })),
   },
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },

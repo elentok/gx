@@ -29,7 +29,8 @@ it("shows every exported primitive in the gallery", () => {
 // Coloured by harness, not by tone: its cases are the harness and the label states.
 // The text fields have no tone: their cases are the closed, disabled and with-text states.
 // ModeText takes a vi mode, which picks its tone: its cases are the three modes.
-const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText"];
+// MoreActionsMenu's cases are the button's four states.
+const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor", "ModeText", "MoreActionsMenu"];
 
 it("shows every primitive in every tone", () => {
   for (const name of primitiveNames.filter((n) => !untoned.includes(n))) {
@@ -54,6 +55,11 @@ it("shows the TopBar in every state the spec lists", () => {
   for (const label of ["Epics active", "Stats active", "none active", "Paused", "Offline", "no build string", "menu closed", "menu open, AFK off", "menu open, AFK on", "menu open, with block", "limits fresh", "limits weekly delta + Codex", "limits few days", "limits stale", "limits past reset", "limits one window", "spend normal", "spend short ledger", "spend empty"]) {
     expect(labels, label).toContain(label);
   }
+});
+
+it("shows the MoreActionsMenu button in its four states", () => {
+  const labels = galleryEntries.find((e) => e.name === "MoreActionsMenu")?.cases.map((c) => c.label) ?? [];
+  expect(labels).toEqual(["rest", "hover", "focus", "open"]);
 });
 
 it("shows the InfoTip as chip, closed and open", () => {
