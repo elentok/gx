@@ -128,9 +128,9 @@ func (w *programWatcher) Status() harness.Status {
 func (w *programWatcher) ConversationID() string {
 	dir := w.dir
 	if dir == "" {
-		dir = programDir()
+		dir = ProgramDir()
 	}
-	data, err := os.ReadFile(programConversationPath(dir, w.pid))
+	data, err := os.ReadFile(ProgramConversationPath(dir, w.pid))
 	if err != nil {
 		return ""
 	}

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -41,35 +40,18 @@ var tuiLaunchArgs = []string{
 	"--disallowedTools", "AskUserQuestion",
 }
 
-type syncBuffer struct {
-	mu  sync.Mutex
-	buf strings.Builder
-}
-
-func (b *syncBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.Write(p)
-}
-
-func (b *syncBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.String()
-}
-
 type tuiFake struct {
 	t      *testing.T
 	home   string
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
-	screen *syncBuffer
+	screen *SyncBuffer
 	done   chan struct{}
 }
 
 func startTUIFake(t *testing.T, args []string, env ...string) *tuiFake {
 	t.Helper()
-	f := &tuiFake{t: t, home: t.TempDir(), screen: &syncBuffer{}, done: make(chan struct{})}
+	f := &tuiFake{t: t, home: t.TempDir(), screen: &SyncBuffer{}, done: make(chan struct{})}
 	f.cmd = exec.Command(os.Args[0], args...)
 	f.cmd.Dir = t.TempDir()
 	f.cmd.Env = append(os.Environ(), append(env, TUIEnv+"=1", "HOME="+f.home)...)
@@ -304,7 +286,7 @@ func TestTUIClaude_ChatSlowMarkerStaysBusyUntilFinished(t *testing.T) {
 
 	f.typeLine("take your time " + ChatSlowMarker)
 	f.waitStatus(StatusBusy, "")
-	time.Sleep(designTurnTime + 300*time.Millisecond)
+	time.Sleep(DesignTurnTime + 300*time.Millisecond)
 	if m := f.pidFile(); m["status"] != StatusBusy {
 		t.Fatalf("status = %v, want busy", m["status"])
 	}

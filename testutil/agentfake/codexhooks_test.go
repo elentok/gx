@@ -267,24 +267,24 @@ func TestCodexDialogs_BlockReadyUntilAKeyArrives(t *testing.T) {
 		{CodexModelNudgeEnv, CodexModelNudgeDialog},
 	} {
 		t.Run(d.env, func(t *testing.T) {
-			conv := newConversationID(t)
-			p := holdProgram(t, harness.Command{Name: os.Args[0], Args: codexLaunchArgs}, conv,
+			conv := NewConversationID(t)
+			p := HoldProgram(t, harness.Command{Name: os.Args[0], Args: codexLaunchArgs}, conv,
 				CodexEnv+"=1", CodexIDEnv+"="+conv, "CODEX_HOME="+t.TempDir(), d.env+"=1")
-			p.waitScreen(d.text)
+			p.WaitScreen(d.text)
 			time.Sleep(100 * time.Millisecond)
-			if p.watcher.Status().State == harness.Idle {
+			if p.Watcher.Status().State == harness.Idle {
 				t.Fatal("Ready before the dialog was answered")
 			}
 			if err := p.client.SendKeys("\r"); err != nil {
 				t.Fatal(err)
 			}
-			p.waitStatus(harness.Status{State: harness.Idle})
+			p.WaitStatus(harness.Status{State: harness.Idle})
 		})
 	}
 }
 
 func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSees(t *testing.T) {
-	cfg, _ := workerEnv(t)
+	cfg, _ := WorkerEnv(t)
 	resetsAt := time.Now().Add(72 * time.Hour).Unix()
 	cfg.CodexUsage = &UsageWindow{UsedPercentage: 99, ResetsAt: resetsAt}
 	repo, err := os.Getwd()
@@ -309,7 +309,7 @@ func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSe
 }
 
 func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesOnTheNext(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"gx:epic/01": BehaviourError}
 	repo, err := os.Getwd()
 	if err != nil {
@@ -351,7 +351,7 @@ func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesO
 }
 
 func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	repo, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -363,7 +363,7 @@ func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, WorkerConfigFile), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	before := commitCount(t)
+	before := CommitCount(t)
 	p := startCodexIn(t, repo, t.TempDir(), "worker1")
 	p.startTurn("$gx-implement gx:epic/01")
 	p.waitOut("state=done")
@@ -374,7 +374,7 @@ func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
 	if !strings.Contains(string(log), "tickets set gx:epic/01 --iteration-status finished") {
 		t.Errorf("gx log = %q", log)
 	}
-	if got := commitCount(t); got != before+1 {
+	if got := CommitCount(t); got != before+1 {
 		t.Errorf("commits = %d, want %d", got, before+1)
 	}
 }

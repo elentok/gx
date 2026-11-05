@@ -123,7 +123,6 @@ var allowed = map[string]int{
 	"server/merge/trunklock_test.go":                       1,
 	"server/unavailable_test.go":                           1,
 	"storecommit/storecommit_test.go":                      3,
-	"testutil/agentfake/harness_test.go":                   1,
 	"testutil/agentfake/tui_test.go":                       10, // poll loop with a deadline; negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open; a lone Esc leaves the turn alone; a stall lands before the prompt; the registry delay (1s) must pass before the retry; the launch-record opt-out writes no user record
 	"testutil/agentfake/worker_test.go":                    1,
 	"testutil/gxfixture/cachegate_test.go":                 5, // two poll loops with a deadline; negative waits: the gate holds the clean

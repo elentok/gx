@@ -93,18 +93,18 @@ func NewProgramDir(t testing.TB) string {
 	return dir
 }
 
-// programDir is the dir of the process's own side channels.
-func programDir() string {
+// ProgramDir is the dir of the process's own side channels.
+func ProgramDir() string {
 	if dir := os.Getenv(ProgramDirEnv); dir != "" {
 		return dir
 	}
 	return filepath.Join(os.TempDir(), "gx-agentfake")
 }
 
-// testDir is the dir of the program running conversationID, found by the
+// TestDir is the dir of the program running conversationID, found by the
 // ready file the program leaves. Before the program started it is the newest
 // dir: the file the caller wants does not exist yet in any of them.
-func testDir(conversationID string) string {
+func TestDir(conversationID string) string {
 	dirsMu.Lock()
 	defer dirsMu.Unlock()
 	for _, dir := range dirs {
@@ -115,25 +115,25 @@ func testDir(conversationID string) string {
 	if len(dirs) > 0 {
 		return dirs[len(dirs)-1]
 	}
-	return programDir()
+	return ProgramDir()
 }
 
 // ProgramControlPath is the side-channel FIFO of the fake program running
 // conversationID.
 func ProgramControlPath(conversationID string) string {
-	return filepath.Join(testDir(conversationID), conversationID+".ctl")
+	return filepath.Join(TestDir(conversationID), conversationID+".ctl")
 }
 
-// programReadyPath marks that the program running conversationID has opened
+// ProgramReadyPath marks that the program running conversationID has opened
 // its control FIFO. It stays after the program exits, so a test can still find
 // the program's dir.
-func programReadyPath(dir, conversationID string) string {
+func ProgramReadyPath(dir, conversationID string) string {
 	return filepath.Join(dir, conversationID+".ready")
 }
 
-// programConversationPath is where the fake program running as pid writes
+// ProgramConversationPath is where the fake program running as pid writes
 // its conversation id for the Watch, which knows only the pid.
-func programConversationPath(dir string, pid int) string {
+func ProgramConversationPath(dir string, pid int) string {
 	return filepath.Join(dir, strconv.Itoa(pid)+".conversation")
 }
 
@@ -141,10 +141,10 @@ func programConversationPath(dir string, pid int) string {
 // running conversationID, waiting for the program to open it.
 func SendProgramControl(conversationID string, c Control) error {
 	return sendControlWhenReady(func() (string, bool) {
-		dir := testDir(conversationID)
+		dir := TestDir(conversationID)
 		ctl := filepath.Join(dir, conversationID+".ctl")
 		// The ready file outlives the program; the FIFO does not.
-		_, readyErr := os.Stat(programReadyPath(dir, conversationID))
+		_, readyErr := os.Stat(ProgramReadyPath(dir, conversationID))
 		_, ctlErr := os.Stat(ctl)
 		return ctl, readyErr == nil && ctlErr == nil
 	}, c)
@@ -181,24 +181,24 @@ func runProgram() (int, error) {
 			return 0, err
 		}
 	}
-	dir := programDir()
+	dir := ProgramDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, err
 	}
-	convPath := programConversationPath(dir, os.Getpid())
+	convPath := ProgramConversationPath(dir, os.Getpid())
 	if err := os.WriteFile(convPath, []byte(id), 0o644); err != nil {
 		return 0, err
 	}
 	defer os.Remove(convPath)
 	_ = os.Remove(programSubmittedPath(id))
-	ctl, closeCtl, err := openProgramChannel(dir, id)
+	ctl, closeCtl, err := OpenProgramChannel(dir, id)
 	if err != nil {
 		return 0, err
 	}
 	defer closeCtl()
 	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1", convPath: convPath, convID: id}
 	if os.Getenv(ProgramInputEnv) == "1" {
-		p.box = newInputBox(os.Stdout, os.Getenv(ProgramDraftEnv))
+		p.box = NewInputBox(os.Stdout, os.Getenv(ProgramDraftEnv))
 		// A person's vim mode starts in NORMAL unless the launch asked for normal editing.
 		p.box.vim = launchEditorMode(os.Args[1:]) == "vim"
 		p.box.normal = p.box.vim
@@ -217,11 +217,11 @@ func runProgram() (int, error) {
 	return p.run(os.Stdin, ctl)
 }
 
-// openProgramChannel makes the control FIFO and the ready file of the fake
+// OpenProgramChannel makes the control FIFO and the ready file of the fake
 // running id under dir, and returns the open FIFO and a func that closes and
 // removes it.
-func openProgramChannel(dir, id string) (*os.File, func(), error) {
-	readyPath := programReadyPath(dir, id)
+func OpenProgramChannel(dir, id string) (*os.File, func(), error) {
+	readyPath := ProgramReadyPath(dir, id)
 	ctlPath := filepath.Join(dir, id+".ctl")
 	// A crashed or earlier run with the same id leaves its marker and FIFO
 	// behind; a sender must not take them for this run's.
@@ -266,7 +266,7 @@ type program struct {
 	// reply to the probe is not echoed as typed text.
 	esc, osc, csi bool
 	// box is nil unless ProgramInputEnv is set. It takes keys once ready.
-	box        *inputBox
+	box        *InputBox
 	ready      bool
 	readyDelay time.Duration
 	readyC     <-chan time.Time
@@ -277,7 +277,7 @@ type program struct {
 }
 
 func (p *program) run(in, ctl io.Reader) (int, error) {
-	events := tuiEvents(in, ctl)
+	events := TuiEvents(in, ctl)
 	if p.trust {
 		fmt.Fprint(p.out, "\x1b[2J\x1b[H"+ProgramTrustPrompt+"\r\n❯ 1. Yes, proceed\r\n  2. No, exit")
 	} else {
@@ -306,26 +306,26 @@ func (p *program) run(in, ctl io.Reader) (int, error) {
 }
 
 // event handles one event; done means the program exits with code.
-func (p *program) event(ev tuiEvent) (code int, done bool, err error) {
+func (p *program) event(ev TuiEvent) (code int, done bool, err error) {
 	switch {
-	case ev.err != nil:
-		if ptyClosed(ev.err) {
+	case ev.Err != nil:
+		if PtyClosed(ev.Err) {
 			return 0, true, nil
 		}
-		return 0, false, ev.err
-	case ev.control != nil:
-		if ev.control.Action == ActionExit {
+		return 0, false, ev.Err
+	case ev.Control != nil:
+		if ev.Control.Action == ActionExit {
 			p.report("clear", "", "")
-			return ev.control.Code, true, nil
+			return ev.Control.Code, true, nil
 		}
-		return 0, false, p.control(*ev.control)
+		return 0, false, p.control(*ev.Control)
 	case p.trust:
-		if ev.key == '\r' || ev.key == '\n' {
+		if ev.Key == '\r' || ev.Key == '\n' {
 			p.trust = false
 			p.start()
 		}
 	default:
-		return 0, false, p.key(ev.key)
+		return 0, false, p.key(ev.Key)
 	}
 	return 0, false, nil
 }
@@ -346,7 +346,7 @@ func (p *program) start() {
 
 func (p *program) becomeReady() {
 	p.ready = true
-	p.box.draw()
+	p.box.Draw()
 }
 
 // key takes a typed key, skipping OSC sequences: into the input box if there
@@ -378,7 +378,7 @@ func (p *program) key(b byte) error {
 				return err
 			}
 		}
-	case b == escKey:
+	case b == EscKey:
 		p.esc = true
 		if p.dialog {
 			p.escC = time.After(loneEscWait)
@@ -393,24 +393,24 @@ func (p *program) key(b byte) error {
 			return nil
 		}
 		switch b {
-		case ctrlC:
-			return logSubmitted(p.convID, ProgramInterruptEntry)
+		case CtrlC:
+			return LogSubmitted(p.convID, ProgramInterruptEntry)
 		case '\t':
-			return logSubmitted(p.convID, "<tab>")
+			return LogSubmitted(p.convID, "<tab>")
 		case 0x7f:
-			return logSubmitted(p.convID, "<backspace>")
+			return LogSubmitted(p.convID, "<backspace>")
 		case ctrlU:
 			if p.box.logClear {
-				if err := logSubmitted(p.convID, ProgramClearEntry); err != nil {
+				if err := LogSubmitted(p.convID, ProgramClearEntry); err != nil {
 					return err
 				}
 			}
 		}
-		text, submitted := p.box.key(b)
+		text, submitted := p.box.Key(b)
 		if !submitted {
 			return nil
 		}
-		if err := logSubmitted(p.convID, text); err != nil {
+		if err := LogSubmitted(p.convID, text); err != nil {
 			return err
 		}
 		if text == ProgramClearCommand {
@@ -431,7 +431,7 @@ func (p *program) logNamedKey(entry string) error {
 	if p.box == nil || !p.ready {
 		return nil
 	}
-	return logSubmitted(p.convID, entry)
+	return LogSubmitted(p.convID, entry)
 }
 
 func (p *program) setConversation(id string) error {
@@ -481,10 +481,10 @@ func (p *program) closeDialog(entry string) error {
 	}
 	p.dialog = false
 	if p.box != nil {
-		p.box.draw()
+		p.box.Draw()
 	}
 	p.report("idle", "", "")
-	return logSubmitted(p.convID, entry)
+	return LogSubmitted(p.convID, entry)
 }
 
 func (p *program) report(state, kind, msg string) {
@@ -492,10 +492,10 @@ func (p *program) report(state, kind, msg string) {
 }
 
 func writeReport(out io.Writer, state, kind, msg string) {
-	writeAppReport(out, "agentfake", state, kind, msg)
+	WriteAppReport(out, "agentfake", state, kind, msg)
 }
 
-func writeAppReport(out io.Writer, app, state, kind, msg string) {
+func WriteAppReport(out io.Writer, app, state, kind, msg string) {
 	s := "\x1b]7501;state=" + state + ":app=" + app
 	if kind != "" {
 		s += ":kind=" + kind

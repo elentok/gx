@@ -58,38 +58,38 @@ type tui struct {
 	// count the wheel events read.
 	seq                []byte
 	wheelUp, wheelDown int
-	design             designState
+	design             DesignState
 	// resume is the ticket a ratelimit or question-menu worker finishes on the
 	// next prompt, whatever that prompt says.
-	resume *pendingWork
+	resume *PendingWork
 }
 
-type pendingWork struct {
-	cfg     WorkerConfig
-	address string
+type PendingWork struct {
+	Cfg     WorkerConfig
+	Address string
 }
 
-// designState is set once a /gx-design prompt arrives; rounds counts the ones
+// DesignState is set once a /gx-design prompt arrives; rounds counts the ones
 // played.
-type designState struct {
-	active bool
+type DesignState struct {
+	Active bool
 	rounds int
-	turns  int
+	Turns  int
 	// script is the turn script of the map this session designs, from
 	// WorkerConfig.DesignByMap; nil falls back to WorkerConfig.Design.
 	script []string
 }
 
-// tuiEvent is one key from the terminal, one control, or the end of input.
-type tuiEvent struct {
-	key     byte
-	control *Control
-	resized bool
-	err     error
+// TuiEvent is one key from the terminal, one control, or the end of input.
+type TuiEvent struct {
+	Key     byte
+	Control *Control
+	Resized bool
+	Err     error
 }
 
 func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
-	events := tuiEvents(in, ctl)
+	events := TuiEvents(in, ctl)
 	if t.opts.mouse {
 		fmt.Fprint(t.out, "\x1b[?1049h\x1b[?1000h\x1b[?1006h")
 	}
@@ -100,33 +100,33 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	}
 	for ev := range events {
 		switch {
-		case ev.err != nil:
+		case ev.Err != nil:
 			// The PTY closed: claude exits cleanly.
-			if ptyClosed(ev.err) {
+			if PtyClosed(ev.Err) {
 				return 0, t.exit(0)
 			}
-			return 0, ev.err
-		case ev.resized:
+			return 0, ev.Err
+		case ev.Resized:
 			t.draw()
-		case ev.control != nil:
-			if ev.control.Action == ActionExit {
-				return ev.control.Code, t.exit(ev.control.Code)
+		case ev.Control != nil:
+			if ev.Control.Action == ActionExit {
+				return ev.Control.Code, t.exit(ev.Control.Code)
 			}
-			if err := t.handleControl(*ev.control); err != nil {
+			if err := t.handleControl(*ev.Control); err != nil {
 				return 0, err
 			}
 			if _, err := t.ack.Write([]byte{'.'}); err != nil {
 				return 0, err
 			}
 		case t.opts.trust:
-			if quit, err := t.trustKey(ev.key); quit || err != nil {
+			if quit, err := t.trustKey(ev.Key); quit || err != nil {
 				return 1, err
 			}
-		case t.opts.mouse && (ev.key == escKey || len(t.seq) > 0):
-			if err := t.mouseSeqKey(ev.key); err != nil {
+		case t.opts.mouse && (ev.Key == EscKey || len(t.seq) > 0):
+			if err := t.mouseSeqKey(ev.Key); err != nil {
 				return 0, err
 			}
-		case ev.key == '\r':
+		case ev.Key == '\r':
 			// A raw LF is a line break in the input, as in claude, not Enter.
 			if err := t.submit(); err != nil {
 				return 0, err
@@ -134,15 +134,15 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if t.quit {
 				return 0, t.exit(0)
 			}
-		case ev.key == escKey:
+		case ev.Key == EscKey:
 			if err := t.interrupt(); err != nil {
 				return 0, err
 			}
-		case ev.key == ctrlC:
+		case ev.Key == CtrlC:
 			if err := t.cancel(); err != nil {
 				return 0, err
 			}
-		case ev.key == ctrlU:
+		case ev.Key == ctrlU:
 			t.typed.Reset()
 			if t.opts.clearLeavesI {
 				t.opts.clearLeavesI = false
@@ -150,7 +150,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			}
 			t.draw()
 		default:
-			t.typed.WriteByte(ev.key)
+			t.typed.WriteByte(ev.Key)
 			// Echoed as claude does, the terminal's cursor after it.
 			t.draw()
 		}
@@ -158,22 +158,22 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	return 0, nil
 }
 
-func ptyClosed(err error) bool {
+func PtyClosed(err error) bool {
 	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EIO)
 }
 
-// tuiEvents merges the keys read from in with the controls read from ctl.
-func tuiEvents(in io.Reader, ctl io.Reader) <-chan tuiEvent {
-	events := make(chan tuiEvent)
+// TuiEvents merges the keys read from in with the controls read from ctl.
+func TuiEvents(in io.Reader, ctl io.Reader) <-chan TuiEvent {
+	events := make(chan TuiEvent)
 	go func() {
 		r := bufio.NewReader(in)
 		for {
 			b, err := r.ReadByte()
 			if err != nil {
-				events <- tuiEvent{err: err}
+				events <- TuiEvent{Err: err}
 				return
 			}
-			events <- tuiEvent{key: b}
+			events <- TuiEvent{Key: b}
 		}
 	}()
 	go func() {
@@ -181,17 +181,17 @@ func tuiEvents(in io.Reader, ctl io.Reader) <-chan tuiEvent {
 		for scanner.Scan() {
 			var c Control
 			if err := json.Unmarshal(scanner.Bytes(), &c); err != nil {
-				events <- tuiEvent{err: fmt.Errorf("bad control line %q: %w", scanner.Text(), err)}
+				events <- TuiEvent{Err: fmt.Errorf("bad control line %q: %w", scanner.Text(), err)}
 				return
 			}
-			events <- tuiEvent{control: &c}
+			events <- TuiEvent{Control: &c}
 		}
 	}()
 	winch := make(chan os.Signal, 1)
 	signal.Notify(winch, syscall.SIGWINCH)
 	go func() {
 		for range winch {
-			events <- tuiEvent{resized: true}
+			events <- TuiEvent{Resized: true}
 		}
 	}()
 	return events
@@ -226,7 +226,7 @@ func (t *tui) trustKey(key byte) (bool, error) {
 		t.opts.dropKey = false
 		return false, nil
 	}
-	if key == escKey || len(t.arrow) > 0 {
+	if key == EscKey || len(t.arrow) > 0 {
 		t.arrow = append(t.arrow, key)
 		if len(t.arrow) == len("\x1b[B") {
 			if s := string(t.arrow); s == "\x1b[A" || s == "\x1b[B" {

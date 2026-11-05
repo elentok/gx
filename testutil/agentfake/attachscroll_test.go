@@ -12,14 +12,14 @@ import (
 
 // writeLines makes the program write lines "L<from>   x" up to, not
 // including, to, and waits for the screen to show the last.
-func (p *heldProgram) writeLines(from, to int) {
+func (p *HeldProgram) writeLines(from, to int) {
 	p.t.Helper()
 	var b strings.Builder
 	for i := from; i < to; i++ {
 		fmt.Fprintf(&b, "L%03d   x\r\n", i)
 	}
 	p.control(Control{Action: ActionWrite, Output: b.String()})
-	p.waitScreen(fmt.Sprintf("L%03d", to-1))
+	p.WaitScreen(fmt.Sprintf("L%03d", to-1))
 }
 
 // row returns the view's row i without styles or padding.
@@ -51,13 +51,13 @@ func TestAttachScroll_ViewsScrollbackPerViewerAndStaysPutWhileOutputArrives(t *t
 	if err := a.Scroll(5); err != nil {
 		t.Fatal(err)
 	}
-	p.waitFor("a scrolled view starting at L086", func() bool {
+	p.WaitFor("a scrolled view starting at L086", func() bool {
 		f := va.frame()
 		return va.row(0) == "L086   x" && va.row(9) == "L095   x" && f.ScrollOffset == 5 && f.ScrollMax > 86
 	})
 
 	p.writeLines(100, 103)
-	p.waitFor("a's offset and new-lines count grown by 3", func() bool {
+	p.WaitFor("a's offset and new-lines count grown by 3", func() bool {
 		f := va.frame()
 		return f.ScrollOffset == 8 && f.NewLines == 3
 	})
@@ -87,7 +87,7 @@ func TestAttachScroll_ViewsScrollbackPerViewerAndStaysPutWhileOutputArrives(t *t
 	if err := a.Scroll(0); err != nil {
 		t.Fatal(err)
 	}
-	p.waitFor("a back at the live bottom", func() bool {
+	p.WaitFor("a back at the live bottom", func() bool {
 		f := va.frame()
 		return f.ScrollOffset == 0 && f.NewLines == 0 && va.row(8) == "L102   x"
 	})

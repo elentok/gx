@@ -302,7 +302,7 @@ func (c *codexFake) toolCall(tool, command string) error {
 // given. The fake stays blocked while the PermissionRequest hooks run; with
 // none configured it stays blocked until a key arrives. A deny ends the turn.
 func (c *codexFake) permission(command string, allowed func()) error {
-	writeAppReport(c.out, codexAppName, "blocked", "permission", "")
+	WriteAppReport(c.out, codexAppName, "blocked", "permission", "")
 	resume := func() {
 		c.report("working")
 		if allowed != nil {
@@ -358,7 +358,7 @@ func (c *codexFake) permissionScreen(command string, rows []string, resume func(
 // screenPermission is ActionPermissionScreen: the permission dialog with no
 // PermissionRequest hook run, even where hooks are configured.
 func (c *codexFake) screenPermission(ctl Control) {
-	writeAppReport(c.out, codexAppName, "blocked", "permission", "")
+	WriteAppReport(c.out, codexAppName, "blocked", "permission", "")
 	c.permissionScreen(ctl.Command, ctl.Dialog, func() { c.report("working") })
 }
 
@@ -403,7 +403,7 @@ func (c *codexFake) taskError(message, info string) error {
 		return err
 	}
 	c.setTitle(c.title)
-	writeAppReport(c.out, codexAppName, "error", "", "")
+	WriteAppReport(c.out, codexAppName, "error", "", "")
 	return nil
 }
 
@@ -429,7 +429,7 @@ func (c *codexFake) submit(text string) error {
 		if err := c.startTurn(text); err != nil {
 			return err
 		}
-		go c.work(w.cfg, w.address)
+		go c.work(w.Cfg, w.Address)
 		return nil
 	}
 	if strings.HasPrefix(text, "/") {
@@ -437,7 +437,7 @@ func (c *codexFake) submit(text string) error {
 		// user message.
 		return c.writeLine("response_item", c.message("user", "input_text", text))
 	}
-	if isDesignPrompt(text) || (c.design.active && !strings.HasPrefix(text, "$")) {
+	if IsDesignPrompt(text) || (c.design.Active && !strings.HasPrefix(text, "$")) {
 		return c.designTurn(text)
 	}
 	address, cfg, ok := c.workerPrompt(text)
@@ -451,7 +451,7 @@ func (c *codexFake) submit(text string) error {
 	case BehaviourPermission:
 		return c.permission(PermissionCommand, func() { go c.work(cfg, address) })
 	case BehaviourRateLimit:
-		c.resumeWork = &pendingWork{cfg, address}
+		c.resumeWork = &PendingWork{cfg, address}
 		reset := DefaultRateLimitReset
 		if d, err := time.ParseDuration(cfg.RateLimitReset); err == nil {
 			reset = d
@@ -461,7 +461,7 @@ func (c *codexFake) submit(text string) error {
 		}
 		return c.taskError("You've hit your usage limit.", "usage_limit_exceeded")
 	case BehaviourError:
-		c.resumeWork = &pendingWork{cfg, address}
+		c.resumeWork = &PendingWork{cfg, address}
 		return c.taskError(CodexModelError, "model_not_found")
 	}
 	if u := cfg.CodexUsage; u != nil {
@@ -476,15 +476,15 @@ func (c *codexFake) submit(text string) error {
 // designTurn plays the next scripted gx-design turn: its message is the reply
 // the turn ends with, a moment after it starts.
 func (c *codexFake) designTurn(text string) error {
-	script := c.design.turnScript(c.cwd, text)
-	if isDesignPrompt(text) {
-		c.design.active = true
+	script := c.design.TurnScript(c.cwd, text)
+	if IsDesignPrompt(text) {
+		c.design.Active = true
 	}
-	busy := designTurnTime
-	if c.design.turns < len(script) && script[c.design.turns] == DesignTurnSlow {
-		busy = designSlowTime
+	busy := DesignTurnTime
+	if c.design.Turns < len(script) && script[c.design.Turns] == DesignTurnSlow {
+		busy = DesignSlowTime
 	}
-	reply := c.design.message(text, script)
+	reply := c.design.Message(text, script)
 	if err := c.startTurn(text); err != nil {
 		return err
 	}

@@ -38,7 +38,7 @@ type codexProc struct {
 	cwd   string
 	cmd   *exec.Cmd
 	stdin io.WriteCloser
-	out   *syncBuffer
+	out   *SyncBuffer
 	done  chan error
 }
 
@@ -55,7 +55,7 @@ func startCodexIn(t *testing.T, dir, home, id string, args ...string) *codexProc
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &codexProc{t: t, id: id, home: home, cwd: cwd, out: &syncBuffer{}, done: make(chan error, 1)}
+	p := &codexProc{t: t, id: id, home: home, cwd: cwd, out: &SyncBuffer{}, done: make(chan error, 1)}
 	p.cmd = exec.Command(os.Args[0], args...)
 	p.cmd.Dir = cwd
 	p.cmd.Env = append(os.Environ(), CodexEnv+"=1", CodexIDEnv+"="+id, "CODEX_HOME="+home, ProgramDirEnv+"="+NewProgramDir(t))
@@ -133,26 +133,26 @@ func rolloutPairs(t *testing.T, path string) map[[2]string]bool {
 
 func TestCodex_WatcherFollowsATurnTitleAndExit(t *testing.T) {
 	home := t.TempDir()
-	conv := newConversationID(t)
+	conv := NewConversationID(t)
 	cmd := harness.Command{Name: os.Args[0], Args: codexLaunchArgs}
-	p := holdProgram(t, cmd, conv, CodexEnv+"=1", CodexIDEnv+"="+conv, "CODEX_HOME="+home)
+	p := HoldProgram(t, cmd, conv, CodexEnv+"=1", CodexIDEnv+"="+conv, "CODEX_HOME="+home)
 
-	p.waitStatus(harness.Status{State: harness.Idle})
-	p.waitFor("the conversation id", func() bool { return p.watcher.ConversationID() == conv })
+	p.WaitStatus(harness.Status{State: harness.Idle})
+	p.WaitFor("the conversation id", func() bool { return p.Watcher.ConversationID() == conv })
 	if err := p.client.SendKeys("fix it\r"); err != nil {
 		t.Fatal(err)
 	}
-	p.waitStatus(harness.Status{State: harness.Working})
+	p.WaitStatus(harness.Status{State: harness.Working})
 	p.control(Control{Action: ActionFinish})
-	p.waitStatus(harness.Status{State: harness.Idle})
+	p.WaitStatus(harness.Status{State: harness.Idle})
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := "fix it | " + filepath.Base(cwd)
-	p.waitFor("the display name", func() bool {
-		raw, err := os.ReadFile(filepath.Join(p.dir, nativerunner.RawLogFile))
+	p.WaitFor("the display name", func() bool {
+		raw, err := os.ReadFile(filepath.Join(p.Dir, nativerunner.RawLogFile))
 		name, ok := Harness{}.DisplayName(raw)
 		return err == nil && ok && name == want
 	})
@@ -162,7 +162,7 @@ func TestCodex_WatcherFollowsATurnTitleAndExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.done <- nil
-	code, err := os.ReadFile(filepath.Join(p.dir, nativerunner.ExitCodeFile))
+	code, err := os.ReadFile(filepath.Join(p.Dir, nativerunner.ExitCodeFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,9 +201,9 @@ func TestCodex_ReportsFollowTheRecordedStreamOrder(t *testing.T) {
 
 func TestCodex_InputRowIsCodexMarkerAndEmptyReadsAsEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	box := newInputBox(&buf, "")
-	box.marker = codexMarker
-	box.draw()
+	box := NewInputBox(&buf, "")
+	box.Marker = codexMarker
+	box.Draw()
 	rows := strings.Split(strings.TrimPrefix(buf.String(), "\x1b[2J\x1b[H"), "\r\n")
 	typing, err := harness.LookupTyping(harness.Codex)
 	if err != nil {
@@ -214,7 +214,7 @@ func TestCodex_InputRowIsCodexMarkerAndEmptyReadsAsEmpty(t *testing.T) {
 	}
 	for _, k := range []byte("hi") {
 		buf.Reset()
-		box.key(k)
+		box.Key(k)
 	}
 	rows = strings.Split(strings.TrimPrefix(buf.String(), "\x1b[2J\x1b[H"), "\r\n")
 	if got := typing.InputIsEmpty(rows); got != harness.InputNotEmpty {
@@ -366,7 +366,7 @@ func TestCodex_ResumeKeepsTheIDAndAppendsToTheRollout(t *testing.T) {
 	first := startCodex(t, home, "resume-1", codexLaunchArgs...)
 	first.turnAndExit("one")
 	// The ready file outlives its program, and a sender takes the first dir that has one.
-	_ = os.Remove(programReadyPath(testDir("resume-1"), "resume-1"))
+	_ = os.Remove(ProgramReadyPath(TestDir("resume-1"), "resume-1"))
 
 	second := startCodex(t, home, "ignored", append([]string{"resume", "resume-1"}, codexLaunchArgs...)...)
 	second.id = "resume-1"

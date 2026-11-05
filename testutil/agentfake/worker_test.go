@@ -2,43 +2,11 @@ package agentfake
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/elentok/gx/testutil"
 )
-
-// workerEnv is a repo to commit in and a gx stand-in that logs its arguments
-// and stdin.
-func workerEnv(t *testing.T) (cfg WorkerConfig, gxLog string) {
-	t.Helper()
-	repo := testutil.TempRepo(t)
-	t.Chdir(repo)
-	dir := t.TempDir()
-	gxLog = filepath.Join(dir, "gx.log")
-	gx := filepath.Join(dir, "gx")
-	script := "#!/bin/sh\necho \"$@\" >> " + gxLog + "\ncat >> " + gxLog + "\n"
-	if err := os.WriteFile(gx, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return WorkerConfig{Gx: gx}, gxLog
-}
-
-func commitCount(t *testing.T) int {
-	t.Helper()
-	out, err := exec.Command("git", "rev-list", "--count", "HEAD").Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := 0
-	for _, c := range strings.TrimSpace(string(out)) {
-		n = n*10 + int(c-'0')
-	}
-	return n
-}
 
 func readLog(t *testing.T, path string) string {
 	t.Helper()
@@ -47,12 +15,12 @@ func readLog(t *testing.T, path string) string {
 }
 
 func TestWorkTicket_FinishCommitsAndReports(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
-	before := commitCount(t)
+	cfg, gxLog := WorkerEnv(t)
+	before := CommitCount(t)
 	if err := WorkTicket(cfg, "p:e/01"); err != nil {
 		t.Fatal(err)
 	}
-	if got := commitCount(t); got != before+1 {
+	if got := CommitCount(t); got != before+1 {
 		t.Errorf("commits = %d, want %d", got, before+1)
 	}
 	if got := readLog(t, gxLog); !strings.Contains(got, "tickets set p:e/01 --iteration-status finished") {
@@ -63,7 +31,7 @@ func TestWorkTicket_FinishCommitsAndReports(t *testing.T) {
 // The finish guard (cmd/tickets_finish_guard.go) wants a passing `gx check` on
 // the committed tree before a finished report.
 func TestWorkTicket_FinishChecksTheCommittedTreeBeforeReporting(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	if err := WorkTicket(cfg, "p:e/01"); err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +42,7 @@ func TestWorkTicket_FinishChecksTheCommittedTreeBeforeReporting(t *testing.T) {
 }
 
 func TestWorkTicket_FinishAcceptsACheckWithNothingToRun(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	script := "#!/bin/sh\necho \"$@\" >> " + gxLog + "\n[ \"$1\" = check ] && exit 3\nexit 0\n"
 	if err := os.WriteFile(cfg.Gx, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
@@ -88,13 +56,13 @@ func TestWorkTicket_FinishAcceptsACheckWithNothingToRun(t *testing.T) {
 }
 
 func TestWorkTicket_FailCommitsAndReportsNothing(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourFail}
-	before := commitCount(t)
+	before := CommitCount(t)
 	if err := WorkTicket(cfg, "p:e/01"); err != nil {
 		t.Fatal(err)
 	}
-	if got := commitCount(t); got != before {
+	if got := CommitCount(t); got != before {
 		t.Errorf("commits = %d, want %d", got, before)
 	}
 	if got := readLog(t, gxLog); got != "" {
@@ -103,13 +71,13 @@ func TestWorkTicket_FailCommitsAndReportsNothing(t *testing.T) {
 }
 
 func TestWorkTicket_AskSendsAQuestionAndCommitsNothing(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourAsk}
-	before := commitCount(t)
+	before := CommitCount(t)
 	if err := WorkTicket(cfg, "p:e/01"); err != nil {
 		t.Fatal(err)
 	}
-	if got := commitCount(t); got != before {
+	if got := CommitCount(t); got != before {
 		t.Errorf("commits = %d, want %d", got, before)
 	}
 	got := readLog(t, gxLog)
@@ -119,17 +87,17 @@ func TestWorkTicket_AskSendsAQuestionAndCommitsNothing(t *testing.T) {
 }
 
 func TestWorkTicket_RefuseAskCommitsGetsRefusedThenAsks(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourRefuseAsk}
 	script := "#!/bin/sh\necho \"$@\" >> " + gxLog + "\n[ \"$2\" = set ] && { echo refused >&2; exit 1; }\ncat >> " + gxLog + "\n"
 	if err := os.WriteFile(cfg.Gx, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	before := commitCount(t)
+	before := CommitCount(t)
 	if err := WorkTicket(cfg, "p:e/01"); err != nil {
 		t.Fatal(err)
 	}
-	if got := commitCount(t); got != before+1 {
+	if got := CommitCount(t); got != before+1 {
 		t.Errorf("commits = %d, want %d", got, before+1)
 	}
 	lines := strings.Split(strings.TrimSpace(readLog(t, gxLog)), "\n")
@@ -139,7 +107,7 @@ func TestWorkTicket_RefuseAskCommitsGetsRefusedThenAsks(t *testing.T) {
 }
 
 func TestWorkTicket_RefuseAskFailsWhenTheFinishIsAccepted(t *testing.T) {
-	cfg, _ := workerEnv(t)
+	cfg, _ := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourRefuseAsk}
 	if err := WorkTicket(cfg, "p:e/01"); err == nil {
 		t.Fatal("want an error when the finish guard does not refuse")
@@ -147,7 +115,7 @@ func TestWorkTicket_RefuseAskFailsWhenTheFinishIsAccepted(t *testing.T) {
 }
 
 func TestWorkTicket_HoldDelaysOnlyTheFinishAndTimesOut(t *testing.T) {
-	cfg, gxLog := workerEnv(t)
+	cfg, gxLog := WorkerEnv(t)
 	cfg.Hold = filepath.Join(t.TempDir(), "hold")
 	cfg.HoldTimeout = "600ms"
 	if err := os.WriteFile(cfg.Hold, nil, 0o644); err != nil {

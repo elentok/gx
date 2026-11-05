@@ -39,7 +39,7 @@ func (c *codexFake) key(b byte) error {
 	if in.seq != nil {
 		return c.sequenceKey(b)
 	}
-	if b == escKey {
+	if b == EscKey {
 		in.seq = []byte{b}
 		in.escTimer = time.AfterFunc(codexEscWait, func() {
 			_ = SendControl(c.ctlPath, Control{Action: actionInterrupt})
@@ -51,17 +51,17 @@ func (c *codexFake) key(b byte) error {
 		return nil
 	}
 	switch b {
-	case ctrlC:
+	case CtrlC:
 		return c.interrupt()
 	case tabKey:
-		if c.working && c.box.text() != "" {
-			in.queue = append(in.queue, c.box.text())
-			c.box.lines = []string{""}
-			c.box.draw()
+		if c.working && c.box.Text() != "" {
+			in.queue = append(in.queue, c.box.Text())
+			c.box.Lines = []string{""}
+			c.box.Draw()
 		}
 		return nil
 	}
-	text, submitted := c.box.key(b)
+	text, submitted := c.box.Key(b)
 	// Real Codex queues a prompt typed mid-turn with Tab; Enter alone drops it.
 	if submitted && text != "" && !c.working {
 		return c.submitLogged(text)
@@ -109,12 +109,12 @@ func (c *codexFake) pasteKey(b byte) {
 	if b == '\r' {
 		b = '\n'
 	}
-	c.box.key(b)
+	c.box.Key(b)
 }
 
 // submitLogged logs a submitted entry as the Claude fake does, then starts it.
 func (c *codexFake) submitLogged(text string) error {
-	if err := logSubmitted(c.id, text); err != nil {
+	if err := LogSubmitted(c.id, text); err != nil {
 		return err
 	}
 	return c.submit(text)
@@ -123,7 +123,7 @@ func (c *codexFake) submitLogged(text string) error {
 // interrupt is Ctrl+C or Esc: it ends a running turn, leaving a background
 // terminal and its Ready title in place.
 func (c *codexFake) interrupt() error {
-	if err := logSubmitted(c.id, ProgramInterruptEntry); err != nil {
+	if err := LogSubmitted(c.id, ProgramInterruptEntry); err != nil {
 		return err
 	}
 	if !c.working {

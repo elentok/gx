@@ -66,12 +66,12 @@ const ProgramClearedSuffix = "-cleared"
 // ProgramSubmittedPath is the log of every submitted input of the fake
 // program running conversationID, one %q-quoted entry per line.
 func ProgramSubmittedPath(conversationID string) string {
-	return filepath.Join(testDir(conversationID), conversationID+".submitted")
+	return filepath.Join(TestDir(conversationID), conversationID+".submitted")
 }
 
 // programSubmittedPath is the same log, as the program itself finds it.
 func programSubmittedPath(conversationID string) string {
-	return filepath.Join(programDir(), conversationID+".submitted")
+	return filepath.Join(ProgramDir(), conversationID+".submitted")
 }
 
 // ProgramInterruptEntry is what a Ctrl+C logs to ProgramSubmittedPath, so a
@@ -88,12 +88,12 @@ const ProgramEscEntry = "<esc>"
 // screen: a read with no styling at all cannot tell a draft from a placeholder.
 const promptMarker = "\x1b[35m❯\x1b[0m "
 
-// inputBox is claude's input box: lines of a draft, the last one being edited.
-type inputBox struct {
+// InputBox is claude's input box: lines of a draft, the last one being edited.
+type InputBox struct {
 	out io.Writer
-	// marker starts the first row: promptMarker unless a fake draws its own.
-	marker    string
-	lines     []string
+	// Marker starts the first row: promptMarker unless a fake draws its own.
+	Marker    string
+	Lines     []string
 	swallow   int
 	vim       bool
 	normal    bool
@@ -107,26 +107,26 @@ type inputBox struct {
 	configPath string
 }
 
-func newInputBox(out io.Writer, draft string) *inputBox {
-	return &inputBox{out: out, marker: promptMarker, lines: strings.Split(draft, "\n")}
+func NewInputBox(out io.Writer, draft string) *InputBox {
+	return &InputBox{out: out, Marker: promptMarker, Lines: strings.Split(draft, "\n")}
 }
 
-func (b *inputBox) text() string { return strings.Join(b.lines, "\n") }
+func (b *InputBox) Text() string { return strings.Join(b.Lines, "\n") }
 
-func (b *inputBox) draw() {
+func (b *InputBox) Draw() {
 	var sb strings.Builder
 	sb.WriteString("\x1b[2J\x1b[H")
-	if b.normal && b.text() == "" {
+	if b.normal && b.Text() == "" {
 		// The placeholder's text, unstyled, so a draft check that reads the
 		// screen before the INSERT switch sees a draft, while the vim probe sees
 		// the same text before and after its `i`.
-		sb.WriteString(b.marker + ProgramPlaceholder)
-	} else if b.text() == "" {
-		sb.WriteString(b.marker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m")
+		sb.WriteString(b.Marker + ProgramPlaceholder)
+	} else if b.Text() == "" {
+		sb.WriteString(b.Marker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m")
 	} else {
-		for i, line := range b.lines {
+		for i, line := range b.Lines {
 			if i == 0 {
-				sb.WriteString(b.marker + line)
+				sb.WriteString(b.Marker + line)
 			} else {
 				sb.WriteString("\r\n  " + line)
 			}
@@ -138,9 +138,9 @@ func (b *inputBox) draw() {
 	fmt.Fprint(b.out, sb.String())
 }
 
-// key applies a typed key and reports the text it submitted, if any.
-func (b *inputBox) key(k byte) (submitted string, ok bool) {
-	last := len(b.lines) - 1
+// Key applies a typed Key and reports the text it submitted, if any.
+func (b *InputBox) Key(k byte) (submitted string, ok bool) {
+	last := len(b.Lines) - 1
 	switch {
 	case b.normal:
 		if k == 'i' {
@@ -151,49 +151,49 @@ func (b *inputBox) key(k byte) (submitted string, ok bool) {
 			b.swallow--
 			return "", false
 		}
-		submitted = b.text()
-		b.lines = []string{""}
+		submitted = b.Text()
+		b.Lines = []string{""}
 		ok = true
 	case k == '\n':
-		b.lines = append(b.lines, "")
+		b.Lines = append(b.Lines, "")
 	case k == 0x15:
 		// One press clears the line; the next removes the break before it.
 		switch {
 		case b.leaveI:
 			b.leaveI = false
-			b.lines = []string{"i"}
-		case b.lines[last] != "":
-			b.lines[last] = ""
+			b.Lines = []string{"i"}
+		case b.Lines[last] != "":
+			b.Lines[last] = ""
 		case last > 0:
-			b.lines = b.lines[:last]
+			b.Lines = b.Lines[:last]
 		}
 	case k == 0x7f:
-		if line := b.lines[last]; line != "" {
-			b.lines[last] = line[:len(line)-1]
+		if line := b.Lines[last]; line != "" {
+			b.Lines[last] = line[:len(line)-1]
 		}
 	case k >= ' ' && k != 0x7f:
 		// Appended bytewise, so a multi-byte rune is whole once its last byte lands.
-		b.lines[last] += string([]byte{k})
+		b.Lines[last] += string([]byte{k})
 	default:
 		return "", false
 	}
-	b.draw()
+	b.Draw()
 	return submitted, ok
 }
 
-func (b *inputBox) control(c Control) bool {
+func (b *InputBox) control(c Control) bool {
 	switch c.Action {
 	case ActionSwallowEnter:
 		b.swallow++
 	case ActionVimNormal:
 		b.vim, b.normal = true, true
-		b.draw()
+		b.Draw()
 	case ActionVimToggle:
 		b.vim, b.normal = true, false
 		if err := b.writeEditorMode(); err != nil {
 			fmt.Fprintln(os.Stderr, "fakeclaude:", err)
 		}
-		b.draw()
+		b.Draw()
 	default:
 		return false
 	}
@@ -202,7 +202,7 @@ func (b *inputBox) control(c Control) bool {
 
 // writeEditorMode records editorMode vim in the settings file, keeping its
 // other keys, where launchEditorMode (and gx's claudeVimMode) read it.
-func (b *inputBox) writeEditorMode() error { return writeVimSetting(b.configPath) }
+func (b *InputBox) writeEditorMode() error { return writeVimSetting(b.configPath) }
 
 // writeVimSetting records editorMode vim in the settings file at path.
 func writeVimSetting(path string) error {
@@ -221,7 +221,7 @@ func writeVimSetting(path string) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func logSubmitted(conversationID, text string) error {
+func LogSubmitted(conversationID, text string) error {
 	f, err := os.OpenFile(programSubmittedPath(conversationID), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err

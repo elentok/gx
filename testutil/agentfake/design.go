@@ -95,17 +95,17 @@ func DesignRoundText(turn string) string {
 // Without a script a /gx-design prompt gets the next round and any other text
 // the run-end message; a script that has run out falls back to the same.
 func (t *tui) designMessage(text string, script []string) string {
-	return t.design.message(text, script)
+	return t.design.Message(text, script)
 }
 
-// turnScript is the turn script a prompt plays under. A design prompt naming a
+// TurnScript is the turn script a prompt plays under. A design prompt naming a
 // map in WorkerConfig.DesignByMap pins that map's script for the session.
-func (d *designState) turnScript(cwd, text string) []string {
+func (d *DesignState) TurnScript(cwd, text string) []string {
 	cfg, err := LoadWorkerConfig(cwd)
 	if err != nil {
 		return nil
 	}
-	if isDesignPrompt(text) {
+	if IsDesignPrompt(text) {
 		for addr, s := range cfg.DesignByMap {
 			if strings.Contains(text, addr) {
 				d.script = s
@@ -118,14 +118,14 @@ func (d *designState) turnScript(cwd, text string) []string {
 	return cfg.Design
 }
 
-func (d *designState) message(text string, script []string) string {
+func (d *DesignState) Message(text string, script []string) string {
 	kind := ""
-	if d.turns < len(script) {
-		kind = script[d.turns]
-	} else if isDesignPrompt(text) {
+	if d.Turns < len(script) {
+		kind = script[d.Turns]
+	} else if IsDesignPrompt(text) {
 		kind = DesignTurnRound
 	}
-	d.turns++
+	d.Turns++
 	switch kind {
 	case DesignTurnRound:
 		msg := designRounds[min(d.rounds, len(designRounds)-1)]
@@ -153,13 +153,13 @@ func (d *designState) message(text string, script []string) string {
 // Actionable.
 func (t *tui) designTurn(text string) error {
 	t.prompt = text
-	script := t.design.turnScript(t.pid.Cwd, text)
-	if isDesignPrompt(text) {
-		t.design.active = true
+	script := t.design.TurnScript(t.pid.Cwd, text)
+	if IsDesignPrompt(text) {
+		t.design.Active = true
 	}
-	busy := designTurnTime
-	if t.design.turns < len(script) && script[t.design.turns] == DesignTurnSlow {
-		busy = designSlowTime
+	busy := DesignTurnTime
+	if t.design.Turns < len(script) && script[t.design.Turns] == DesignTurnSlow {
+		busy = DesignSlowTime
 	}
 	msg := t.designMessage(text, script)
 	// Busy comes first: a message that appears while the session still reads
@@ -173,7 +173,7 @@ func (t *tui) designTurn(text string) error {
 	}
 	// An answer is a person message in the transcript, as in claude: it ends
 	// the round the answer is for.
-	if !isDesignPrompt(text) {
+	if !IsDesignPrompt(text) {
 		if err := appendMessage(path, "user", text); err != nil {
 			return err
 		}
@@ -215,7 +215,7 @@ func (t *tui) chatTurn(text string) error {
 		return err
 	}
 	go func() {
-		time.Sleep(designTurnTime)
+		time.Sleep(DesignTurnTime)
 		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 	}()
 	return nil
@@ -283,7 +283,7 @@ func (t *tui) rateLimit(cfg WorkerConfig) error {
 		return err
 	}
 	go func() {
-		time.Sleep(designTurnTime)
+		time.Sleep(DesignTurnTime)
 		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 	}()
 	return nil
@@ -297,11 +297,11 @@ func (t *tui) transcriptPath() (string, error) {
 	return transcript.PathIn(home, t.pid.Cwd, t.pid.SessionID), nil
 }
 
-// designTurnTime is how long a scripted turn stays busy; designSlowTime is how
+// DesignTurnTime is how long a scripted turn stays busy; DesignSlowTime is how
 // long a DesignTurnSlow turn does, enough for a test to report steps meanwhile.
 const (
-	designTurnTime = 500 * time.Millisecond
-	designSlowTime = 20 * time.Second
+	DesignTurnTime = 500 * time.Millisecond
+	DesignSlowTime = 20 * time.Second
 )
 
 // appendMessage appends a transcript line of the given role to the file at path.
@@ -356,6 +356,6 @@ func appendLine(path string, entry map[string]any) error {
 // skill with `$`.
 const codexDesignPromptPrefix = "$gx-design "
 
-func isDesignPrompt(text string) bool {
+func IsDesignPrompt(text string) bool {
 	return strings.HasPrefix(text, DesignPromptPrefix) || strings.HasPrefix(text, codexDesignPromptPrefix)
 }

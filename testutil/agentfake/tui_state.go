@@ -13,10 +13,10 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
-const escKey = 0x1b
+const EscKey = 0x1b
 
 const (
-	ctrlC = 0x03
+	CtrlC = 0x03
 	ctrlU = 0x15
 )
 

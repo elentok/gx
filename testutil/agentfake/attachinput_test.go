@@ -14,13 +14,13 @@ import (
 // shows how the holder encoded the input: "[A" for a plain arrow, "OA" for
 // one in application cursor mode.
 
-func holdProgramAttach(t *testing.T) (*heldProgram, *nativerunner.HolderAttach) {
+func holdProgramAttach(t *testing.T) (*HeldProgram, *nativerunner.HolderAttach) {
 	t.Helper()
-	conv := newConversationID(t)
-	p := holdProgram(t, Harness{}.Launch(harness.LaunchOptions{SessionID: conv}), conv)
+	conv := NewConversationID(t)
+	p := HoldProgram(t, Harness{}.Launch(harness.LaunchOptions{SessionID: conv}), conv)
 	// The program records its conversation once its tty is raw; input before
 	// that is echoed by the tty itself and then read again.
-	p.waitFor("the conversation id", func() bool { return p.watcher.ConversationID() == conv })
+	p.WaitFor("the conversation id", func() bool { return p.Watcher.ConversationID() == conv })
 	a, err := p.client.Attach()
 	if err != nil {
 		t.Fatal(err)
@@ -31,10 +31,10 @@ func holdProgramAttach(t *testing.T) (*heldProgram, *nativerunner.HolderAttach) 
 
 // writeOutput makes the program write out and waits for the holder's screen
 // to take it in, so input sent next meets the new modes.
-func (p *heldProgram) writeOutput(out, marker string) {
+func (p *HeldProgram) writeOutput(out, marker string) {
 	p.t.Helper()
 	p.control(Control{Action: ActionWrite, Output: out + marker})
-	p.waitScreen(marker)
+	p.WaitScreen(marker)
 }
 
 func TestAttachInput_KeyReachesChildAndNextFrameShowsIt(t *testing.T) {
@@ -76,13 +76,13 @@ func TestAttachInput_KeysAreEncodedForTheChildsModes(t *testing.T) {
 	if err := a.SendKey(screen.Key{Code: screen.KeyUp}); err != nil {
 		t.Fatal(err)
 	}
-	p.waitScreen("[A")
+	p.WaitScreen("[A")
 
 	p.writeOutput("\x1b[?1h", "app-cursor")
 	if err := a.SendKey(screen.Key{Code: screen.KeyUp}); err != nil {
 		t.Fatal(err)
 	}
-	p.waitScreen("app-cursorOA")
+	p.WaitScreen("app-cursorOA")
 }
 
 func TestAttachInput_PasteIsBracketedOnlyWhenChildEnabledIt(t *testing.T) {
@@ -90,7 +90,7 @@ func TestAttachInput_PasteIsBracketedOnlyWhenChildEnabledIt(t *testing.T) {
 	if err := a.Paste("plain"); err != nil {
 		t.Fatal(err)
 	}
-	p.waitScreen("plain")
+	p.WaitScreen("plain")
 	if s := strings.Join(p.rows(), "\n"); strings.Contains(s, "200~") {
 		t.Errorf("paste without bracketed paste mode = %q; want it plain", s)
 	}
@@ -99,14 +99,14 @@ func TestAttachInput_PasteIsBracketedOnlyWhenChildEnabledIt(t *testing.T) {
 	if err := a.Paste("wrapped"); err != nil {
 		t.Fatal(err)
 	}
-	p.waitScreen("[200~wrapped[201~")
+	p.WaitScreen("[200~wrapped[201~")
 }
 
 func TestAttachInput_TerminalQueryGetsReply(t *testing.T) {
 	p, _ := holdProgramAttach(t)
 	// A primary device attributes reply is CSI ? ... c.
 	p.control(Control{Action: ActionWrite, Output: "\x1b[c"})
-	p.waitScreen("[?")
+	p.WaitScreen("[?")
 }
 
 func TestAttachInput_KeyEmitsInputEventOnWatch(t *testing.T) {

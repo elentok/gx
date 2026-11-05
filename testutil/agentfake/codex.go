@@ -18,10 +18,6 @@ import (
 	"github.com/elentok/gx/harness"
 )
 
-// CodexEnv, set to "1", makes a test binary that calls TUICodex from its
-// TestMain act as interactive Codex on a PTY.
-const CodexEnv = "GX_AGENTFAKE_CODEX"
-
 // CodexIDEnv, when not empty, is the session id a fresh fake launch takes
 // instead of a random one. A test needs it to address the fake's control FIFO,
 // since real Codex has no --session-id to pass.
@@ -149,7 +145,7 @@ func runCodex() (int, error) {
 		return 0, nil
 	}
 	if len(args) == 1 && args[0] == "app-server" {
-		return runCodexProbe()
+		return RunCodexProbe()
 	}
 	opts, err := parseCodexArgs(args)
 	if err != nil {
@@ -180,17 +176,17 @@ func runCodex() (int, error) {
 		return 0, err
 	}
 
-	dir := programDir()
+	dir := ProgramDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, err
 	}
 	// The generic fake Watch finds a program's conversation by pid.
-	convPath := programConversationPath(dir, os.Getpid())
+	convPath := ProgramConversationPath(dir, os.Getpid())
 	if err := os.WriteFile(convPath, []byte(id), 0o644); err != nil {
 		return 0, err
 	}
 	defer os.Remove(convPath)
-	ctl, closeCtl, err := openProgramChannel(dir, id)
+	ctl, closeCtl, err := OpenProgramChannel(dir, id)
 	if err != nil {
 		return 0, err
 	}
@@ -202,12 +198,12 @@ func runCodex() (int, error) {
 		home:    home,
 		cwd:     cwd,
 		title:   filepath.Base(cwd),
-		box:     newInputBox(os.Stdout, ""),
+		box:     NewInputBox(os.Stdout, ""),
 		hooks:   opts.hooks,
 		dialogs: codexDialogs(),
 		ctlPath: filepath.Join(dir, id+".ctl"),
 	}
-	c.box.marker = codexMarker
+	c.box.Marker = codexMarker
 	if err := c.openRollout(home, opts.resume != ""); err != nil {
 		return 0, err
 	}
@@ -220,7 +216,7 @@ type codexFake struct {
 	home  string
 	cwd   string
 	title string
-	box   *inputBox
+	box   *InputBox
 	hooks map[string][]codexHook
 	// dialogs are the startup dialogs still waiting for a key; ctlPath is this
 	// fake's own control channel, for work that runs off the input loop.
@@ -230,10 +226,10 @@ type codexFake struct {
 	onKey func(key byte) error
 	// resumeWork is a ticket whose first prompt ended in a rate-limit error; the
 	// next prompt does its work.
-	resumeWork *pendingWork
+	resumeWork *PendingWork
 	// design plays a gx-design session's scripted turns; reply is the assistant
 	// message the running turn ends with, empty for the default.
-	design designState
+	design DesignState
 	reply  string
 	// rollout is the session file; ordinal numbers its next line.
 	rollout string
@@ -330,10 +326,10 @@ func (c *codexFake) message(role, contentType, text string) map[string]any {
 
 func (c *codexFake) setTitle(title string) { fmt.Fprint(c.out, "\x1b]0;"+title+"\a") }
 
-func (c *codexFake) report(state string) { writeAppReport(c.out, codexAppName, state, "", "") }
+func (c *codexFake) report(state string) { WriteAppReport(c.out, codexAppName, state, "", "") }
 
 func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
-	events := tuiEvents(in, ctl)
+	events := TuiEvents(in, ctl)
 	c.setTitle(c.title)
 	// Codex turns bracketed paste on, so a paste keeps its newlines.
 	fmt.Fprint(c.out, "\x1b[?2004h")
@@ -343,22 +339,22 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 	c.showNext()
 	for ev := range events {
 		switch {
-		case ev.err != nil:
-			if ptyClosed(ev.err) {
+		case ev.Err != nil:
+			if PtyClosed(ev.Err) {
 				c.exit()
 				return 0, nil
 			}
-			return 0, ev.err
-		case ev.resized:
+			return 0, ev.Err
+		case ev.Resized:
 			if len(c.dialogs) == 0 {
-				c.box.draw()
+				c.box.Draw()
 			}
-		case ev.control != nil:
-			if ev.control.Action == ActionExit {
+		case ev.Control != nil:
+			if ev.Control.Action == ActionExit {
 				c.exit()
-				return ev.control.Code, nil
+				return ev.Control.Code, nil
 			}
-			if err := c.control(*ev.control); err != nil {
+			if err := c.control(*ev.Control); err != nil {
 				return 0, err
 			}
 		case len(c.dialogs) > 0:
@@ -367,11 +363,11 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 		case c.onKey != nil:
 			next := c.onKey
 			c.onKey = nil
-			if err := next(ev.key); err != nil {
+			if err := next(ev.Key); err != nil {
 				return 0, err
 			}
 		default:
-			if err := c.key(ev.key); err != nil {
+			if err := c.key(ev.Key); err != nil {
 				return 0, err
 			}
 		}
@@ -387,7 +383,7 @@ func (c *codexFake) showNext() {
 		return
 	}
 	c.report("idle")
-	c.box.draw()
+	c.box.Draw()
 }
 
 func (c *codexFake) exit() {
@@ -467,7 +463,7 @@ func (c *codexFake) control(ctl Control) error {
 	case ActionFinish:
 		return c.finishTurn()
 	case ActionReport:
-		writeAppReport(c.out, codexAppName, ctl.State, ctl.Kind, ctl.Message)
+		WriteAppReport(c.out, codexAppName, ctl.State, ctl.Kind, ctl.Message)
 	case ActionTitle:
 		c.setTitle(ctl.Title)
 	case ActionBackground:

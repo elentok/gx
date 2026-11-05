@@ -26,7 +26,7 @@ func (t *tui) submit() error {
 		if w := t.resume; w != nil && text != "" {
 			t.resume = nil
 			t.prompt = text
-			go t.work(w.cfg, w.address)
+			go t.work(w.Cfg, w.Address)
 			return t.setStatus(StatusBusy, "")
 		}
 		kind, address, cfg := t.classify(text)
@@ -49,14 +49,14 @@ func (t *tui) submit() error {
 				t.dialog = BashPermissionDialog(PermissionCommand)
 				return t.setStatus(StatusWaiting, "permission prompt")
 			case BehaviourQuestionMenu:
-				t.resume = &pendingWork{cfg, address}
+				t.resume = &PendingWork{cfg, address}
 				t.dialog = QuestionMenuDialog()
 				return t.setStatus(StatusWaiting, "question menu")
 			case BehaviourRateLimit:
-				t.resume = &pendingWork{cfg, address}
+				t.resume = &PendingWork{cfg, address}
 				return t.rateLimit(cfg)
 			case BehaviourStall, BehaviourStallNoRecord:
-				t.resume = &pendingWork{cfg, address}
+				t.resume = &PendingWork{cfg, address}
 				dropRecord := cfg.Behaviour[address] == BehaviourStallNoRecord
 				go func() {
 					// Long enough for a poll to see the turn start, and the launch
@@ -75,7 +75,7 @@ func (t *tui) submit() error {
 				// A kept agent gets the answer as its next prompt and finishes on it;
 				// a relaunch sees the file and finishes at once.
 				if !fileExists(UncommittedFile) {
-					t.resume = &pendingWork{cfg, address}
+					t.resume = &PendingWork{cfg, address}
 				}
 			}
 			go t.work(cfg, address)
@@ -158,7 +158,7 @@ const (
 // worker prompt is also a slash command. For a worker prompt it returns the
 // ticket address and the worker config.
 func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
-	if isDesignPrompt(text) || (t.design.active && text != "" && !strings.HasPrefix(text, "/")) {
+	if IsDesignPrompt(text) || (t.design.Active && text != "" && !strings.HasPrefix(text, "/")) {
 		return promptDesign, "", WorkerConfig{}
 	}
 	if address, cfg, ok := t.workerPrompt(text); ok {

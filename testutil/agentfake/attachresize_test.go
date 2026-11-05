@@ -25,7 +25,7 @@ type attachView struct {
 
 // viewResized skips a's first frame, which predates its size, resizes it and
 // follows its frames from there.
-func (p *heldProgram) viewResized(a *nativerunner.HolderAttach, cols, rows int) *attachView {
+func (p *HeldProgram) viewResized(a *nativerunner.HolderAttach, cols, rows int) *attachView {
 	p.t.Helper()
 	if _, err := a.Next(); err != nil {
 		p.t.Fatal(err)
@@ -86,19 +86,19 @@ func (v *attachView) String() string {
 	return b.String()
 }
 
-func (p *heldProgram) waitView(v *attachView, width, height int, text string) {
+func (p *HeldProgram) waitView(v *attachView, width, height int, text string) {
 	p.t.Helper()
-	p.waitFor(fmt.Sprintf("a %dx%d view showing %s", width, height, text), func() bool { return v.shows(width, height, text) })
+	p.WaitFor(fmt.Sprintf("a %dx%d view showing %s", width, height, text), func() bool { return v.shows(width, height, text) })
 }
 
 // waitSize makes the program clear the screen, draw a line wider than any
 // view here, and report its terminal size, until it reports want. It asks
 // again because a resize or key sent just before can reach the holder after
 // the program answered.
-func (p *heldProgram) waitSize(want string) {
+func (p *HeldProgram) waitSize(want string) {
 	p.t.Helper()
 	var asked time.Time
-	p.waitFor("the screen shows size="+want, func() bool {
+	p.WaitFor("the screen shows size="+want, func() bool {
 		if time.Since(asked) > 200*time.Millisecond {
 			p.control(Control{Action: ActionWrite, Output: "\x1b[2J\x1b[H" + strings.Repeat("-", 99) + "\r\n"})
 			p.control(Control{Action: ActionSize})

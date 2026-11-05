@@ -19,6 +19,10 @@ const CommandsFileEnv = "GX_AGENTFAKE_COMMANDS_FILE"
 // CommandsCwdFile is the per-directory override of the global commands file.
 const CommandsCwdFile = ".agentfake-commands.json"
 
+// CodexEnv, set to "1", makes a test binary that calls TUICodex from its
+// TestMain act as interactive Codex on a PTY.
+const CodexEnv = "GX_AGENTFAKE_CODEX"
+
 // ProbeEntry is one command (fakeclaude) or skill (fakecodex) to list.
 type ProbeEntry struct {
 	Name         string   `json:"name"`
@@ -133,9 +137,9 @@ func runClaudeProbe() (int, error) {
 	return 0, nil
 }
 
-// runCodexProbe speaks the slice of `codex app-server` that
+// RunCodexProbe speaks the slice of `codex app-server` that
 // commandlist.ProbeCodexSkills uses: initialize, initialized, skills/list.
-func runCodexProbe() (int, error) {
+func RunCodexProbe() (int, error) {
 	cfg, err := loadProbeConfig()
 	if err != nil {
 		return 0, err
