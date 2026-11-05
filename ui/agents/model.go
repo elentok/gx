@@ -248,7 +248,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.copy = nil
 		}
 		if res.Copied != nil {
-			cmd = tea.Batch(m.writeCopied(*res.Copied), cmd)
+			cmd = tea.Batch(writeCopied(m.clipWrite, *res.Copied), cmd)
 		}
 		return m, cmd
 	case formProjectsMsg:
@@ -453,7 +453,11 @@ func (m Model) termView() terminalView {
 		focused: m.terminalFocused, covered: m.ModalOpen() || m.leaderPending, selected: m.selectedID(),
 	}
 	if m.copy != nil {
-		v.in.copyRows = m.copyRows
+		c, a := m.copy, m.attach
+		v.in.copyRows = func(rows []string) []string {
+			cols, h := v.screenSize()
+			return c.copyRows(rows, attachScreen{attachment: a, cols: cols, rows: h}.screen())
+		}
 	}
 	return v
 }
