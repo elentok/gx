@@ -121,7 +121,7 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 			<-release
 			return errors.New("remedy refused")
 		})
-		if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 			t.Fatal(err)
 		}
 		waitRecoveryState(t, h, wire.RecoveryPending)
@@ -137,7 +137,7 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 		// Registered after the server, so it runs before the server's
 		// cleanup waits for this remedy to end.
 		t.Cleanup(func() { close(release) })
-		if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 			t.Fatal(err)
 		}
 		waitRecoveryState(t, h, "")
@@ -175,7 +175,7 @@ func TestRecoveryNotify_SnapshotFollowsTheInvestigation(t *testing.T) {
 	t.Parallel()
 	unmatched := recovery.Entry{ID: "TEST", Type: events.Paused, Kind: events.Spinning, Executor: recovery.ExecutorRule, Enabled: true}
 	h, _ := startNotifyRecoveryWith(t, time.Minute, unmatched)
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	waitRecoveryState(t, h, wire.RecoveryEscalated)
@@ -195,7 +195,7 @@ func TestRecoveryNotify_RecoveredPauseSendsNothingAndIsCounted(t *testing.T) {
 		close(done)
 		return nil
 	})
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	<-done
@@ -221,7 +221,7 @@ func TestRecoveryNotify_PauseOfDoneTicketIsRefusedAndLogged(t *testing.T) {
 	if err := schema.UpdateTicket(path, func(tk *schema.Ticket) { tk.Status = schema.StatusDone }); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatalf("PauseTicket = %v, want nil", err)
 	}
 	time.Sleep(1500 * time.Millisecond) // a wrongly sent message would show by now
@@ -243,7 +243,7 @@ func TestRecoveryNotify_FailedRemedySendsOneMessageNamingTheEntry(t *testing.T) 
 	h, sent := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error {
 		return errors.New("remedy refused")
 	})
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	got := waitPauseMessages(t, sent, events.IterationError)
@@ -255,7 +255,7 @@ func TestRecoveryNotify_FailedRemedySendsOneMessageNamingTheEntry(t *testing.T) 
 func TestRecoveryNotify_OkRemedyThatLeavesTheTicketPausedSendsTheMessage(t *testing.T) {
 	t.Parallel()
 	h, sent := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error { return nil })
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	got := waitPauseMessages(t, sent, events.IterationError)
@@ -269,7 +269,7 @@ func TestRecoveryNotify_RecognizedPauseStillNotifiesAndIsNotCounted(t *testing.T
 	entries := recovery.Default().Entries
 	r1 := entries[slices.IndexFunc(entries, func(e recovery.Entry) bool { return e.ID == "R1" })]
 	h, sent := startNotifyRecoveryWith(t, time.Minute, r1)
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.Spinning, "paused and re-claimed 3 times within 5m0s"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.Spinning, "paused and re-claimed 3 times within 5m0s"); err != nil {
 		t.Fatal(err)
 	}
 	if got := waitPauseMessages(t, sent, events.Spinning); len(got) != 1 {
@@ -329,7 +329,7 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 			if tc.setup != nil {
 				tc.setup(t, h)
 			}
-			if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+			if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 				t.Fatal(err)
 			}
 			servertest.Poll(10*time.Second, func() bool { return len(escalationMessages(sent())) > 0 })
@@ -346,7 +346,7 @@ func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigatio
 	t.Parallel()
 	entry := recovery.Entry{ID: "AGENT", Type: events.Paused, Kind: events.IterationError, Executor: recovery.ExecutorAgent, Enabled: true}
 	h, _ := startNotifyRecoveryWith(t, time.Minute, entry)
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
@@ -377,7 +377,7 @@ func TestRecoveryNotify_SlowRecoverySendsTheOriginalPauseAfterTheHold(t *testing
 	// Registered after the server, so it runs before the server's cleanup
 	// waits for this remedy to end.
 	t.Cleanup(func() { close(release) })
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	var got []string

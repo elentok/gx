@@ -27,6 +27,11 @@ func (h ticketWriteHost) WriteFollowUp(from tickets.Address, f ticketwrite.Follo
 	return h.s.writeFollowUp(from, followUp(f))
 }
 
+func (h ticketWriteHost) FindTicket(address string) (string, string, bool, error) {
+	ref, ok, err := h.s.FindTicket(address)
+	return ref.ProjectDir, ref.Ticket.Path, ok, err
+}
+
 func (h ticketWriteHost) HerdrUnavailable() bool { return h.s.herdr.isUnavailable() }
 
 func (h ticketWriteHost) StopRun(run runs.Run) error {

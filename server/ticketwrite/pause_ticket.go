@@ -33,6 +33,19 @@ func (w *Writer) Pause(scratchDir string, addr tickets.Address, ticketPath strin
 	return nil
 }
 
+// PauseAs pauses the ticket at address, resolving its project and file first.
+func (w *Writer) PauseAs(address string, kind events.Kind, reason string) error {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return err
+	}
+	dir, path, ok, err := w.d.Host.FindTicket(address)
+	if err != nil || !ok {
+		return errors.Join(err, errors.New("no ticket "+address))
+	}
+	return w.Pause(dir, addr, path, kind, reason, runs.Run{})
+}
+
 // AnnouncePause is the one place that routes a pause already written: held for
 // recovery, held for herdr's digest, or sent to chat now. Every caller that has
 // just written a pause goes through it; a recovery hold's release is the only

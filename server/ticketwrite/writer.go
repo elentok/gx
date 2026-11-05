@@ -29,6 +29,8 @@ type Host interface {
 	HoldPauseForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool
 	// WriteFollowUp files the follow-up, or notes a repeat on the open one.
 	WriteFollowUp(from tickets.Address, f FollowUp) (string, error)
+	// FindTicket resolves a ticket address to its project dir and ticket file.
+	FindTicket(address string) (projectDir, ticketPath string, ok bool, err error)
 	// HerdrUnavailable reports whether herdr is down.
 	HerdrUnavailable() bool
 	// StopRun stops the run's session.

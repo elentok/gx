@@ -3,67 +3,19 @@ package server_test
 import (
 	"context"
 	"path/filepath"
-	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// turnRunner runs turn once per session, in its cwd, before the prompt
-// settles: the agent's work.
-type turnRunner struct {
-	*runnerfake.Runner
-	turn func(label, cwd string)
-
-	mu     sync.Mutex
-	cwds   map[string]string
-	labels []string
-	turned map[string]bool
-}
-
-func newTurnRunner(turn func(label, cwd string)) *turnRunner {
-	r := &turnRunner{Runner: runnerfake.NewRunner(), turn: turn, cwds: map[string]string{}, turned: map[string]bool{}}
-	r.PromptState = agentrunner.StateIdle
-	return r
-}
-
-func (r *turnRunner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
-	r.mu.Lock()
-	r.cwds[opts.Label] = opts.Cwd
-	r.labels = append(r.labels, opts.Label)
-	r.mu.Unlock()
-	return r.Runner.Start(opts)
-}
-
-func (r *turnRunner) Prompt(s agentrunner.Session, text string) error {
-	r.mu.Lock()
-	cwd, first := r.cwds[s.Label], !r.turned[s.Label]
-	r.turned[s.Label] = true
-	r.mu.Unlock()
-	if first {
-		r.turn(s.Label, cwd)
-	}
-	return r.Runner.Prompt(s, text)
-}
-
-func (r *turnRunner) started(prefix string) (string, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	i := slices.IndexFunc(r.labels, func(l string) bool { return strings.HasPrefix(l, prefix) })
-	if i < 0 {
-		return "", false
-	}
-	return r.labels[i], true
-}
+type turnRunner = servertest.TurnRunner
 
 var (
+	newTurnRunner      = servertest.NewTurnRunner
 	writeProjectAgents = servertest.WriteProjectAgents
 	hasFlag            = servertest.HasFlag
 )
@@ -95,7 +47,7 @@ func runToConflict(t *testing.T, agents string, midRun func(store, repo string))
 	var label string
 	servertest.WaitFor(t, 20*time.Second, "a conflict agent to start", func() bool {
 		var ok bool
-		label, ok = fake.started("conflict-")
+		label, ok = fake.Started("conflict-")
 		return ok
 	})
 	// Let the merge settle before teardown.
@@ -103,7 +55,7 @@ func runToConflict(t *testing.T, agents string, midRun func(store, repo string))
 		tk, err := schema.ParseTicket(ticketPath)
 		return err == nil && tk.Status != schema.StatusClaimed
 	})
-	iterLabel, _ := fake.started("epic-a-iter-")
+	iterLabel, _ := fake.Started("epic-a-iter-")
 	return fake.Args(iterLabel), fake.Args(label)
 }
 

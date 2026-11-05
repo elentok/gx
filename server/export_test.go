@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/runs"
 
-	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -39,24 +37,6 @@ func (s *Server) LiveDesignSessionID(epicAddr, excludeID string) string {
 // RebaseDesign is rebaseDesign: the skip note, or "" when it rebased.
 func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string {
 	return s.rebaseDesign(project, epic, worktree, excludeID)
-}
-
-// ClaimTicket claims and launches one ticket the way a claim pass would, but
-// without asking the frontier, and reports whether an iteration launched.
-func (s *Server) ClaimTicket(address, agent string) (bool, error) {
-	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
-	if err != nil {
-		return false, err
-	}
-	ref, ok, err := s.FindTicket(address)
-	if err != nil || !ok {
-		return false, errors.Join(err, errors.New("no ticket "+address))
-	}
-	epics, err := tickets.Load(ref.ProjectDir)
-	if err != nil {
-		return false, err
-	}
-	return s.claimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, ralphloop.AgentKind(agent), epics)
 }
 
 // SetMergeInto swaps the merge core a root merge calls.
@@ -88,14 +68,6 @@ func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairRes
 func (s *Server) AgentWaiting(project, epic, id string) bool {
 	_, idle, err := s.agentState(tickets.Address{Project: project, Epic: epic, ID: id})
 	return err == nil && idle
-}
-
-// PauseTicket pauses a ticket the way a failed iteration does: the write, the
-// event, then the chat message (or its hold while recovery runs).
-func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason string) error {
-	dir := filepath.Join(s.cfg.TicketStore, project)
-	path := filepath.Join(dir, epic, "issues", id+"-first.md")
-	return s.writer.Pause(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, runs.Run{})
 }
 
 // PruneBackups runs the backup-ref prune as of now.
