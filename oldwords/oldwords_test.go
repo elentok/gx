@@ -66,12 +66,12 @@ var allowed = map[string]allowance{
 	"tickets/schema/frontmatter.go":          allow("read shim", "park", "needsanswer", "needsrepair"),
 	"events/legacy.go":                       allow("read shim", "park", "needsanswer", "needsrepair", "land", "reset"),
 	// Hidden aliases.
-	"config/config.go":             allow("resume-on-start alias", "resumeonstart"),
-	"apiclient/queue.go":           allow("QueueDrain alias client for the hidden drain route", "drain"),
+	"config/config.go":              allow("resume-on-start alias", "resumeonstart"),
+	"apiclient/queue.go":            allow("QueueDrain alias client for the hidden drain route", "drain"),
 	"cmd/serverapi/server_reads.go": allow("hidden drain and park command aliases", "drain", "park"),
-	"server/ticketops/routes.go":   allow("hidden /v1/tickets/unpark route", "park"),
-	"server/ticketwrite/routes.go": allow("hidden /v1/tickets/park route", "park"),
-	"server/queue/routes.go":       allow("hidden /v1/queue/drain route", "drain"),
+	"server/ticketops/routes.go":    allow("hidden /v1/tickets/unpark route", "park"),
+	"server/ticketwrite/routes.go":  allow("hidden /v1/tickets/park route", "park"),
+	"server/queue/routes.go":        allow("hidden /v1/queue/drain route", "drain"),
 	// Legacy section headings and statuses that old tickets still carry; the
 	// code demotes, migrates or recognises them.
 	"ralphloop/ticketops/claim.go":                allow("demotes the legacy Needs Repair section", "needsrepair"),
