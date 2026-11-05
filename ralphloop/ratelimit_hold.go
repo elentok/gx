@@ -32,7 +32,7 @@ func codexBlocked(d deps.Deps, p launchAndPromptParams) bool {
 // returns when a turn ends without the runner reporting a limit. It asks the
 // runner after each turn, not the transcript alone: on PTY an idle agent's
 // transcript keeps the old error as its newest entry.
-func holdRateLimit(d deps.Deps, o OneIteration, p launchAndPromptParams, waitStates []agentrunner.State, resetAt time.Time) error {
+func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time), p launchAndPromptParams, waitStates []agentrunner.State, resetAt time.Time) error {
 	sessionID := ""
 	if status, err := d.Runner.Status(p.session()); err == nil {
 		sessionID = status.SessionID
@@ -44,8 +44,8 @@ func holdRateLimit(d deps.Deps, o OneIteration, p launchAndPromptParams, waitSta
 	p.sink().IterationPaused(p.Ticket, p.Label, runlog.PauseRateLimit, reason)
 	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
 	for {
-		if o.OnRateLimit != nil {
-			o.OnRateLimit(true, resetAt)
+		if onRateLimit != nil {
+			onRateLimit(true, resetAt)
 		}
 		if resetAt.IsZero() {
 			d.Sleep(rateLimitPollInterval)
@@ -77,8 +77,8 @@ func holdRateLimit(d deps.Deps, o OneIteration, p launchAndPromptParams, waitSta
 			break
 		}
 	}
-	if o.OnRateLimit != nil {
-		o.OnRateLimit(false, time.Time{})
+	if onRateLimit != nil {
+		onRateLimit(false, time.Time{})
 	}
 	p.sink().IterationResumed(p.Ticket, p.Label, runlog.PauseRateLimit)
 	p.logLifecycleEvent(string(events.Resumed), sessionID)

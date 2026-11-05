@@ -342,7 +342,7 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 		}
 		// A limit holds the agent in place before any blocked pause or finish check.
 		if resetAt, limited, _, _ := runnerRateLimit(d, p); limited {
-			if err := holdRateLimit(d, o, p, waitStates, resetAt); err != nil {
+			if err := holdRateLimit(d, o.OnRateLimit, p, waitStates, resetAt); err != nil {
 				return err
 			}
 			continue
