@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 )
@@ -30,6 +31,11 @@ func newManager(s *Server) *sessions.Manager {
 		Designs:  s,
 		Rollouts: s,
 	})
+}
+
+// FindTicket is sessions.Host's lookup, served by the ticket writer.
+func (s *Server) FindTicket(address string) (queue.TicketRef, bool, error) {
+	return s.writer.FindTicket(address)
 }
 
 // newResumer needs s.sessions set.

@@ -16,7 +16,7 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	ref, ok, err := s.FindTicket(address)
+	ref, ok, err := s.writer.FindTicket(address)
 	if err != nil || !ok {
 		return false, errors.Join(err, errors.New("no ticket "+address))
 	}

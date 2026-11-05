@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/stats"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -44,6 +45,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		stats.Routes(func() *stats.Stats { return s.stats }),
 		chat.Routes(func() *chat.Chat { return s.sessionChat }),
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),
+		ticketwrite.Routes(func() *ticketwrite.Writer { return s.writer }),
 	)
 }
 

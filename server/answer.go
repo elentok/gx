@@ -50,25 +50,6 @@ func detailState(evs []tickets.LogEvent, t schema.Ticket) string {
 	return queue.AnswerState(rounds[len(rounds)-1].Question, t.PausedClass())
 }
 
-// pauseStale reports whether state no longer names t's open pause round.
-func pauseStale(evs []tickets.LogEvent, t schema.Ticket, state string) bool {
-	open := tickets.OpenRound(evs)
-	return t.PausedClass() == "" || open == nil || queue.AnswerState(*open, t.PausedClass()) != state
-}
-
-// ticketPauseStale is pauseStale for the ticket stored at ticketPath.
-func ticketPauseStale(ticketPath, state string) (bool, error) {
-	t, err := schema.ParseTicket(ticketPath)
-	if err != nil {
-		return false, err
-	}
-	evs, err := tickets.ReadLog(ticketPath)
-	if err != nil {
-		return false, fmt.Errorf("read log of %s: %w", ticketPath, err)
-	}
-	return pauseStale(evs, t, state), nil
-}
-
 // answerFrame is the prompt the live agent receives: the choice first, the note
 // under it. A free-text answer prints the text and no note.
 func answerFrame(seq int, answer, note string) string {
@@ -121,7 +102,7 @@ func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note str
 // ticket lock, so a refusal logs nothing and a stale reply never reaches the
 // agent.
 func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		if s.adoptFirst(ref.ProjectDir, ref.Addr, ref.Ticket.Path) {
 			return wire.QueueResult{Outcome: wire.OutcomeAdopted}, nil
 		}

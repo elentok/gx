@@ -163,14 +163,12 @@ type Server struct {
 	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
 	mergedProbe  func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts     verdictLog
-	nudges       ticketwrite.NudgeLimiter
 	trunkMissing missingTrunks
 	// sessions creates, stops and watches the sessions; resumer brings them back.
 	sessions    *sessions.Manager
 	resumer     *sessions.Resumer
 	designOpens sync.Map // epic address -> *sync.Mutex, serializing designs open
 	focus       *sessions.FocusReports
-	unblockMu   sync.Mutex // makes leaving a headless block happen once, whoever sees it first
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -489,18 +487,13 @@ var routeTable = []struct {
 	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/verify", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairVerify)(w, r) }},
-	{"POST /v1/tickets/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketPause)(w, r) }},
-	{"POST /v1/tickets/park", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketPause)(w, r) }},
 	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketUnmute)(w, r) }},
 	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketCancel)(w, r) }},
 	{"POST /v1/tickets/recommend", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.HandlerCtx(s.ticketRecommend)(w, r) }},
-	{"POST /v1/tickets/nudge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketNudge)(w, r) }},
 	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAnswer)(w, r) }},
 	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/approve", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketApprove)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
-	// relaunch is the old name of retry, kept for one release.
-	{"POST /v1/tickets/relaunch", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.HandlerCtx(s.ticketRelaunch)(w, r) }},
 	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicMerge)(w, r) }},
 	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicStashMerge)(w, r) }},
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},

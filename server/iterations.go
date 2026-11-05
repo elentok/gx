@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/ticketwrite"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
@@ -23,36 +24,29 @@ func (s *Server) iterations(w http.ResponseWriter, _ *http.Request) {
 			continue
 		}
 		if it, ok := s.liveIteration(t.Address); ok {
-			list = append(list, it.info)
+			list = append(list, it.Info)
 		}
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Address < list[j].Address })
 	writeJSON(w, list)
 }
 
-// liveIter is a live iteration with the runner and session hosting it.
-type liveIter struct {
-	info    wire.IterationInfo
-	runner  agentrunner.Runner
-	session agentrunner.Session
-}
-
 // liveIteration resolves a claimed ticket's iteration through the run's
 // runner. It is live when that runner finds the label and the session has not
 // exited; blocked is live.
-func (s *Server) liveIteration(address string) (liveIter, bool) {
+func (s *Server) liveIteration(address string) (ticketwrite.LiveIter, bool) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
-		return liveIter{}, false
+		return ticketwrite.LiveIter{}, false
 	}
 	runner, sess, ok, err := s.harness.LiveSession(a)
 	if err != nil || !ok || sess.ID == "" {
-		return liveIter{}, false
+		return ticketwrite.LiveIter{}, false
 	}
 	st, err := runner.Status(sess)
 	// herdr's done is a finished turn resting in its pane, not an exit.
 	if err != nil || (st.State == agentrunner.StateDone && runner.Name() != runs.RunnerHerdr) {
-		return liveIter{}, false
+		return ticketwrite.LiveIter{}, false
 	}
 	if sess.SessionID == "" {
 		sess.SessionID = st.SessionID
@@ -82,7 +76,7 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 			it.Transcript = p
 		}
 	}
-	return liveIter{info: it, runner: runner, session: sess}, true
+	return ticketwrite.LiveIter{Info: it, Runner: runner, Session: sess}, true
 }
 
 func (s *Server) queueView(w http.ResponseWriter, _ *http.Request) {

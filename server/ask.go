@@ -24,7 +24,7 @@ func (s *Server) ticketAsk(req wire.QueueRequest) (wire.QueueResult, error) {
 	if strings.TrimSpace(q.Handoff) == "" {
 		return queue.Refusal(wire.ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
 	}
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		ev := tickets.LogEvent{
 			Type:    tickets.EventPauseQuestion,
 			By:      askAuthorAgent,

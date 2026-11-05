@@ -95,7 +95,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	if f.DiagnosisOnly() {
 		return s.planEpicRecovery(f, catalog)
 	}
-	ref, ok, err := s.FindTicket(f.Address)
+	ref, ok, err := s.writer.FindTicket(f.Address)
 	// An investigate ticket's own failure is a person's to handle, never another
 	// investigation: recovery must not recurse.
 	if err != nil || !ok || ref.Ticket.NoRecover || ref.Ticket.Type == string(schema.TypeInvestigate) {
@@ -250,7 +250,7 @@ func (s *Server) holdPauseForRecovery(addr tickets.Address, ticketPath string, k
 
 // stillPaused re-reads the ticket: a remedy's verbs may have moved it on.
 func (s *Server) stillPaused(address string) bool {
-	ref, ok, err := s.FindTicket(address)
+	ref, ok, err := s.writer.FindTicket(address)
 	if err != nil || !ok {
 		return false
 	}
@@ -315,7 +315,7 @@ func fileFingerprint(path string) (string, error) {
 // ticketApprove runs the ticket's latest recovery proposal, or refuses when
 // there is none left to run or the ticket changed since it was proposed.
 func (s *Server) ticketApprove(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.ticketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.TicketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		f := recovery.Failure{Address: ref.Addr.String()}
 		var proposal *ralphloop.Event
 		for _, ev := range s.ticketEvents(ref, f) {
@@ -383,7 +383,7 @@ const investigateRetryEntry = "investigate-retry"
 // pause and a zero-commit one, within the guard rail; every other pause
 // (blocked-pane included) is for a person.
 func (s *Server) investigateRetryFailure(qc queue.Ctx, ref queue.TicketRef) (recovery.Failure, wire.QueueResult, bool) {
-	inv, ok, err := s.FindTicket(qc.Investigator)
+	inv, ok, err := s.writer.FindTicket(qc.Investigator)
 	if err != nil || !ok || inv.Ticket.Type != string(schema.TypeInvestigate) {
 		return recovery.Failure{}, queue.Refusal(wire.ReasonInvestigateStop, qc.Investigator+" is not an investigate ticket"), false
 	}
@@ -541,17 +541,17 @@ var recoveryCtx = queue.Ctx{Actor: recovery.ActorRecovery}
 var recoveryVerbHandlers = map[string]func(s *Server, req wire.QueueRequest, c recovery.Call) (wire.QueueResult, error){
 	recovery.VerbPause: func(s *Server, req wire.QueueRequest, c recovery.Call) (wire.QueueResult, error) {
 		req.PauseReason = c.Text
-		return s.ticketPause(req)
+		return s.writer.PauseRequest(req)
 	},
 	recovery.VerbRelaunch: func(s *Server, req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
-		return s.ticketRelaunch(req, recoveryCtx)
+		return s.writer.Relaunch(req, recoveryCtx)
 	},
 	recovery.VerbCommitlessDone: func(s *Server, req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
 		return s.ticketCommitlessDone(req)
 	},
 	recovery.VerbNudge: func(s *Server, req wire.QueueRequest, c recovery.Call) (wire.QueueResult, error) {
 		req.Text = c.Text
-		return s.ticketNudge(req)
+		return s.writer.Nudge(req)
 	},
 	recovery.VerbClosePane:   (*Server).recoveryClosePane,
 	recovery.VerbWait:        (*Server).recoveryWait,
@@ -570,15 +570,15 @@ func (v recoveryVerbs) Do(c recovery.Call) (recovery.Result, error) {
 }
 
 func (s *Server) recoveryClosePane(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		it, live := s.liveIteration(ref.Addr.String())
 		if !live {
 			return wire.QueueResult{}, nil
 		}
-		if err := it.runner.Stop(it.session); err != nil {
+		if err := it.Runner.Stop(it.Session); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("close pane of %s: %w", ref.Addr, err)
 		}
-		if err := agentrunner.Cleanup(it.runner, it.session.Label); err != nil {
+		if err := agentrunner.Cleanup(it.Runner, it.Session.Label); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("clean up %s: %w", ref.Addr, err)
 		}
 		return wire.QueueResult{}, nil
@@ -590,7 +590,7 @@ func (s *Server) recoveryClosePane(req wire.QueueRequest, _ recovery.Call) (wire
 const DefaultCompactRewaitTimeout = 15 * time.Minute
 
 func (s *Server) recoveryWait(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		it, live := s.liveIteration(ref.Addr.String())
 		if !live {
 			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.Addr.String()), nil
@@ -599,7 +599,7 @@ func (s *Server) recoveryWait(req wire.QueueRequest, _ recovery.Call) (wire.Queu
 		if timeout == 0 {
 			timeout = DefaultCompactRewaitTimeout
 		}
-		if _, err := it.runner.Wait(it.session, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, timeout); err != nil {
+		if _, err := it.Runner.Wait(it.Session, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, timeout); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("wait for %s: %w", ref.Addr, err)
 		}
 		return wire.QueueResult{}, nil
@@ -625,7 +625,7 @@ func (s *Server) agentState(addr tickets.Address) (state agentrunner.State, idle
 // paused zero-commit, or merged. A dirty worktree with commits ahead must not
 // merge unfinished work, so its finish pauses background-task-gate instead.
 func (s *Server) recoveryReleaseGate(req wire.QueueRequest, _ recovery.Call) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		run, ok := s.registry.Tracked(ref.Addr.String())
 		if !ok {
 			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+ref.Addr.String()), nil
@@ -699,7 +699,7 @@ func (s *Server) recoveryFinish(req wire.QueueRequest, _ recovery.Call) (wire.Qu
 // clobbered.
 func (s *Server) recoverySetParent(req wire.QueueRequest, c recovery.Call) (wire.QueueResult, error) {
 	address, parent := req.Address, c.Parent
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		epic, unlock, err := tickets.LoadLockedEpic(ref.Epic.Path)
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("lock epic of %s: %w", ref.Addr, err)
@@ -729,7 +729,7 @@ func (s *Server) recoverySetParent(req wire.QueueRequest, c recovery.Call) (wire
 }
 
 func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
-	ref, ok, err := v.s.FindTicket(address)
+	ref, ok, err := v.s.writer.FindTicket(address)
 	if err != nil {
 		return "", err
 	}
@@ -743,7 +743,7 @@ func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
 // that merged inside another ticket's commits. Commitless takes it out of
 // reconcile's hands for good, which is why only an approved proposal calls it.
 func (s *Server) ticketCommitlessDone(req wire.QueueRequest) (wire.QueueResult, error) {
-	return s.ticketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.TicketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		err := schema.UpdateTicket(ref.Ticket.Path, func(t *schema.Ticket) {
 			t.Status, t.IterationStatus, t.Commitless = schema.StatusDone, schema.IterationStatusFinished, true
 		})

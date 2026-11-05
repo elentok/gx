@@ -39,11 +39,11 @@ func (w *Writer) PauseAs(address string, kind events.Kind, reason string) error 
 	if err != nil {
 		return err
 	}
-	dir, path, ok, err := w.d.Host.FindTicket(address)
+	ref, ok, err := w.FindTicket(address)
 	if err != nil || !ok {
 		return errors.Join(err, errors.New("no ticket "+address))
 	}
-	return w.Pause(dir, addr, path, kind, reason, runs.Run{})
+	return w.Pause(ref.ProjectDir, addr, ref.Ticket.Path, kind, reason, runs.Run{})
 }
 
 // AnnouncePause is the one place that routes a pause already written: held for

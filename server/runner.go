@@ -646,7 +646,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		s.registry.MarkWaiting(ticketAddr, time.Now())
 		s.events.Publish(wire.EventIterationPaused, ticketAddr)
 		s.writer.AnnouncePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
-		go s.watchUnblock(deps.Runner, run.Session, ticketAddr)
+		go s.writer.WatchUnblock(deps.Runner, run.Session, ticketAddr)
 		return
 	}
 	var mismatch *ralphloop.ModelMismatchError

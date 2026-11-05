@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/ticketwrite"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -380,7 +381,7 @@ func takeTierOverride(ticketPath string) ralphloop.Tier {
 // pause round and class; a pause without an open round has nothing to name.
 // Callers check repairCtx.RequireState first.
 func webStale(ticketPath string, req wire.RepairRequest) (wire.RepairResult, bool, error) {
-	stale, err := ticketPauseStale(ticketPath, req.State)
+	stale, err := ticketwrite.PauseStale(ticketPath, req.State)
 	if err != nil || !stale {
 		return wire.RepairResult{}, false, err
 	}
@@ -525,7 +526,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 	selfReported := tk.PauseReason == schema.PauseSelfReported
 	dir := filepath.Dir(epicPath)
 	address := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}.String()
-	if !selfReported && !s.waitsOnBlockedPause(tk, address) {
+	if !selfReported && !s.writer.WaitsOnBlockedPause(tk, address) {
 		return wire.RepairResult{}, false, nil
 	}
 	if s.registry != nil {
@@ -537,7 +538,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (wire.RepairRes
 			// A PTY or herdr run has no approvable card for a question menu, so
 			// Retry is the way out: end the pause, interrupt, and let the caller
 			// send the retry prompt.
-			interrupted, err := s.retryBlocked(address)
+			interrupted, err := s.writer.RetryBlocked(address)
 			if errors.Is(err, agentrunner.ErrNotReady) {
 				return repairRefusal(&repair.RefusalError{Reason: wire.ReasonAgentNotReady, Message: err.Error()}), true, nil
 			}

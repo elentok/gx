@@ -1,18 +1,27 @@
 package server
 
 import (
+	"time"
+
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketwrite"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
-// newTicketWriter needs s.log, idx, events, projects and chat set.
+// newTicketWriter needs s.log, idx, events, projects, chat, registry, guards,
+// harness and budget set. Limits and disks come later in New, so the host
+// reads them per call.
 func newTicketWriter(s *Server) *ticketwrite.Writer {
 	return ticketwrite.New(ticketwrite.Deps{
 		Log: s.log, Index: s.idx, Events: s.events, Projects: s.projects, Chat: s.chat,
-		Host: ticketWriteHost{s},
+		Registry: s.registry, Guards: s.guards, Harness: s.harness, Budget: s.budget,
+		Host: ticketWriteHost{s}, BlockWatchPoll: blockWatchPoll,
 	})
 }
 
@@ -25,11 +34,6 @@ func (h ticketWriteHost) HoldPauseForRecovery(addr tickets.Address, ticketPath s
 
 func (h ticketWriteHost) WriteFollowUp(from tickets.Address, f ticketwrite.FollowUp) (string, error) {
 	return h.s.writeFollowUp(from, followUp(f))
-}
-
-func (h ticketWriteHost) FindTicket(address string) (string, string, bool, error) {
-	ref, ok, err := h.s.FindTicket(address)
-	return ref.ProjectDir, ref.Ticket.Path, ok, err
 }
 
 func (h ticketWriteHost) HerdrUnavailable() bool { return h.s.herdr.isUnavailable() }
@@ -45,3 +49,48 @@ func (h ticketWriteHost) StopRun(run runs.Run) error {
 func (h ticketWriteHost) TakeTierOverride(ticketPath string) ralphloop.Tier {
 	return takeTierOverride(ticketPath)
 }
+
+func (h ticketWriteHost) HerdrHolds(r agentrunner.Runner) (string, bool) { return h.s.herdrHolds(r) }
+
+func (h ticketWriteHost) UsageGate(agent ralphloop.AgentKind, now time.Time) (string, bool) {
+	return h.s.limits.UsageGate(agent, now)
+}
+
+func (h ticketWriteHost) FreshHeldDisk(project string) (wire.DiskStatus, bool) {
+	return h.s.disks.FreshHeldDisk(project)
+}
+
+func (h ticketWriteHost) BudgetRefusal() (wire.QueueResult, bool) { return h.s.budgetRefusal() }
+
+func (h ticketWriteHost) SettleLive(addrs []tickets.Address, stop bool, reason string, blocks func(agentrunner.Runner, agentrunner.Session) bool) (wire.QueueResult, bool, error) {
+	return h.s.settleLive(addrs, stop, reason, blocks)
+}
+
+func (h ticketWriteHost) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (bool, error) {
+	return h.s.claimAndLaunch(root, queued, t, repo, agent, epics)
+}
+
+func (h ticketWriteHost) CancelInvestigateChild(ref queue.TicketRef, source string) error {
+	return h.s.cancelInvestigateChild(ref, source)
+}
+
+func (h ticketWriteHost) AdoptFirst(dir string, addr tickets.Address, path string) bool {
+	return h.s.adoptFirst(dir, addr, path)
+}
+
+func (h ticketWriteHost) InvestigateRetryFailure(qc queue.Ctx, ref queue.TicketRef) (recovery.Failure, wire.QueueResult, bool) {
+	return h.s.investigateRetryFailure(qc, ref)
+}
+
+func (h ticketWriteHost) AppendRecoveryApplied(ref queue.TicketRef, f recovery.Failure, investigator string) {
+	h.s.appendRecoveryEvent(ref, f, ralphloop.Event{
+		Type: string(events.RecoveryApplied), Ticket: ref.Addr.ID, Kind: string(f.Kind),
+		Reason: investigateRetryEntry, Outcome: "ok", Text: investigator,
+	})
+}
+
+func (h ticketWriteHost) LiveIteration(address string) (ticketwrite.LiveIter, bool) {
+	return h.s.liveIteration(address)
+}
+
+func (h ticketWriteHost) ResettleWaiting(t runs.TrackedRun) error { return h.s.resettleWaiting(t) }

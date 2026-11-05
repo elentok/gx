@@ -32,7 +32,7 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no ticket "+address, http.StatusNotFound)
 		return
 	}
-	ref, ok, err := s.FindTicket(address)
+	ref, ok, err := s.writer.FindTicket(address)
 	switch {
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusBadRequest)

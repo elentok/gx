@@ -1,4 +1,4 @@
-package server
+package ticketwrite
 
 import (
 	"errors"
@@ -6,43 +6,42 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/ticketwrite"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 )
 
-// ticketNudge types req.Text into the live pane of a ticket's iteration. It is
+// Nudge types req.Text into the live pane of a ticket's iteration. It is
 // the only way to nudge a pane: every nudge is rate-limited, written to the
 // epic's run log and streamed.
-func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
+func (w *Writer) Nudge(req wire.QueueRequest) (wire.QueueResult, error) {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
 		return queue.Refusal(wire.ReasonTextRequired, "text to type into the pane is required"), nil
 	}
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	h := w.d.Host
+	return w.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		address := ref.Addr.String()
-		if r, err := s.harness.IterationRunner(ref.Addr); err == nil {
-			if reason, held := s.herdrHolds(r); held {
+		if r, err := w.d.Harness.IterationRunner(ref.Addr); err == nil {
+			if reason, held := h.HerdrHolds(r); held {
 				return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
 			}
 		}
-		if res, refused := s.budgetRefusal(); refused {
+		if res, refused := h.BudgetRefusal(); refused {
 			return res, nil
 		}
-		it, live := s.liveIteration(address)
+		it, live := h.LiveIteration(address)
 		if !live {
 			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+address), nil
 		}
 		now := time.Now()
-		if !s.nudges.Allow(address, now) {
-			return queue.Refusal(wire.ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", ticketwrite.NudgeLimit, address, ticketwrite.NudgeWindow)), nil
+		if !w.nudges.Allow(address, now) {
+			return queue.Refusal(wire.ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", NudgeLimit, address, NudgeWindow)), nil
 		}
-		if err := it.runner.Prompt(it.session, text); err != nil {
+		if err := it.Runner.Prompt(it.Session, text); err != nil {
 			if errors.Is(err, agentrunner.ErrNotReady) {
 				return queue.Refusal(wire.ReasonAgentNotReady, err.Error()), nil
 			}
@@ -50,14 +49,14 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		err := ralphloop.AppendEvent(ref.ProjectDir, ref.Addr.Epic, ralphloop.Event{
 			Time: now, Type: string(events.Nudged), Ticket: ref.Addr.ID, Address: address,
-			Pane: it.info.Pane, Text: text,
+			Pane: it.Info.Pane, Text: text,
 		})
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("logging nudge of %s: %w", address, err)
 		}
-		s.events.Publish(wire.EventTicketNudged, address)
-		if !s.registry.Has(address) {
-			s.watchNudgedPane(ref, it)
+		w.d.Events.Publish(wire.EventTicketNudged, address)
+		if !w.d.Registry.Has(address) {
+			w.WatchNudgedPane(ref, it)
 		}
 		return wire.QueueResult{}, nil
 	})
@@ -70,19 +69,19 @@ const (
 	nudgeWatchPoll  = 5 * time.Minute
 )
 
-// watchNudgedPane tracks a pane a nudge set working after its run ended (a
+// WatchNudgedPane tracks a pane a nudge set working after its run ended (a
 // paused ticket's pane, as recovery's R7 nudges): until it settles it counts
 // as a run, so the budget meters it and the hard limit stops it. It is never
 // finished or merged; the paused ticket stays with whoever handles the pause.
-func (s *Server) watchNudgedPane(ref queue.TicketRef, it liveIter) {
+func (w *Writer) WatchNudgedPane(ref queue.TicketRef, it LiveIter) {
 	t := runs.TrackedRun{
-		Run:  runs.Run{Address: ref.Addr.String(), Runner: it.runner.Name(), Session: it.session},
-		Root: ref.Root().String(), TicketPath: ref.Ticket.Path, Cwd: it.info.Worktree, StartedAt: time.Now(), Watched: true,
+		Run:  runs.Run{Address: ref.Addr.String(), Runner: it.Runner.Name(), Session: it.Session},
+		Root: ref.Root().String(), TicketPath: ref.Ticket.Path, Cwd: it.Info.Worktree, StartedAt: time.Now(), Watched: true,
 	}
-	r := it.runner
-	s.registry.Put(t)
-	s.guards.GoSettle(func() {
-		defer s.registry.DeleteWatched(t)
+	r := it.Runner
+	w.d.Registry.Put(t)
+	w.d.Guards.GoSettle(func() {
+		defer w.d.Registry.DeleteWatched(t)
 		// The nudge may not have shown as working yet; a pane already idle
 		// again by the deadline simply settles below.
 		_, err := r.Wait(t.Session, []agentrunner.State{agentrunner.StateWorking}, nudgeWatchStart)
@@ -91,9 +90,9 @@ func (s *Server) watchNudgedPane(ref queue.TicketRef, it liveIter) {
 				break
 			}
 		}
-		if stopping, first := s.registry.ClaimBudgetStop(t.Address); stopping && first {
-			if perr := s.budget.PauseKilled(t); perr != nil {
-				s.log.Error("budget kill", "ticket", t.Address, "err", perr)
+		if stopping, first := w.d.Registry.ClaimBudgetStop(t.Address); stopping && first {
+			if perr := w.d.Budget.PauseKilled(t); perr != nil {
+				w.d.Log.Error("budget kill", "ticket", t.Address, "err", perr)
 			}
 		}
 	})

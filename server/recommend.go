@@ -20,8 +20,8 @@ func (s *Server) ticketRecommend(req wire.QueueRequest, qc queue.Ctx) (wire.Queu
 	if verb == "" || diagnosis == "" {
 		return queue.Refusal(wire.ReasonTextRequired, "a verb and a diagnosis are required"), nil
 	}
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
-		inv, ok, err := s.FindTicket(qc.Investigator)
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+		inv, ok, err := s.writer.FindTicket(qc.Investigator)
 		if err != nil || !ok || inv.Ticket.Type != string(schema.TypeInvestigate) ||
 			inv.Addr.Epic != ref.Addr.Epic || inv.Ticket.Parent == nil || *inv.Ticket.Parent != ref.Addr.ID {
 			return queue.Refusal(wire.ReasonInvestigateStop, qc.Investigator+" is not the investigate ticket of "+ref.Addr.String()), nil

@@ -14,7 +14,7 @@ import (
 // agentVerb resolves a ticket to the runner session of its live iteration, so
 // prompt, interrupt and answer reach the agent whichever runner hosts it.
 func (s *Server) agentVerb(req wire.QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (wire.QueueResult, error)) (wire.QueueResult, error) {
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		runner, sess, ok, err := s.harness.LiveSession(ref.Addr)
 		if err != nil {
 			return wire.QueueResult{}, err
@@ -59,7 +59,7 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 	if decision != agentrunner.DecisionAllow && decision != agentrunner.DecisionDeny {
 		return queue.Refusal(wire.ReasonBadDecision, "decision must be allow or deny"), nil
 	}
-	return s.resolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
+	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		runner, sess, ok, err := s.harness.LiveSession(ref.Addr)
 		if err != nil {
 			return wire.QueueResult{}, err
@@ -95,7 +95,7 @@ func (s *Server) agentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if _, err := tickets.AppendLog(ref.Ticket.Path, ev); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.Addr, err)
 		}
-		if err := s.leaveBlocked(ref.Addr.String()); err != nil {
+		if err := s.writer.LeaveBlocked(ref.Addr.String()); err != nil {
 			return wire.QueueResult{}, err
 		}
 		// The prompt is gone, so open pages re-read the detail and the snapshot.
