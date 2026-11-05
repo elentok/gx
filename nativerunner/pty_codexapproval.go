@@ -35,7 +35,7 @@ func (p *Pty) answerer(ss *ptySession) holderAnswerer {
 		Poll:      p.pollInterval(),
 		Grace:     p.promptGrace(),
 		Died:      func(err error) error { return p.died(ss, err) },
-		MarkDied:  func(err error) { p.markDied(ss, err) },
+		MarkDied:  func(err error) { p.reg.markDied(ss, err) },
 		Exited:    ss.exited,
 		Prompt:    func(text string) error { return p.Prompt(ss.session, text) },
 		AwaitIdle: func() error { return p.awaitIdle(ss) },

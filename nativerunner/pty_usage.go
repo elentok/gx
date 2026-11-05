@@ -14,7 +14,7 @@ import (
 // RateLimit reads the limit from the transcript fact the holder reports, not
 // the screen. A message without a parseable reset time gives a zero time.
 func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
-	ss, err := p.live(s)
+	ss, err := p.reg.live(s)
 	if err != nil {
 		return time.Time{}, false, err
 	}

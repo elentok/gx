@@ -68,10 +68,7 @@ type Pty struct {
 	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
 	log *slog.Logger
 
-	mu       sync.Mutex
-	sessions map[string]*ptySession
-	// starting holds labels whose Start is still launching.
-	starting map[string]struct{}
+	reg ptyRegistry
 
 	envProbeOnce sync.Once
 	envProbe     func(agentrunner.Session) bool
@@ -111,10 +108,10 @@ func (p *Pty) Name() string { return ptyRunnerName }
 func (p *Pty) SetLog(l *slog.Logger) { p.log = l }
 
 func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
-	if err := p.reserve(opts.Label); err != nil {
+	if err := p.reg.reserve(opts.Label); err != nil {
 		return agentrunner.Session{}, err
 	}
-	defer p.release(opts.Label)
+	defer p.reg.release(opts.Label)
 
 	if s, adopted, err := p.heldLabel(opts); adopted || err != nil {
 		return s, err
@@ -155,12 +152,7 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 		<-ss.exited
 		return agentrunner.Session{}, err
 	}
-	p.mu.Lock()
-	if p.sessions == nil {
-		p.sessions = map[string]*ptySession{}
-	}
-	p.sessions[opts.Label] = ss
-	p.mu.Unlock()
+	p.reg.put(ss)
 	return ss.session, nil
 }
 
@@ -258,44 +250,6 @@ func (p *Pty) awaitHolderGone(ss *ptySession, grace time.Duration) error {
 	}
 }
 
-func (p *Pty) reserve(label string) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if _, starting := p.starting[label]; starting {
-		return fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, label)
-	}
-	if p.starting == nil {
-		p.starting = map[string]struct{}{}
-	}
-	p.starting[label] = struct{}{}
-	return nil
-}
-
-func (p *Pty) release(label string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	delete(p.starting, label)
-}
-
-func (p *Pty) live(s agentrunner.Session) (*ptySession, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	ss, ok := p.sessions[s.Label]
-	if !ok || ss.session.ID != s.ID {
-		return nil, fmt.Errorf("%w: %s", agentrunner.ErrNotFound, s.Label)
-	}
-	if ss.died != nil {
-		return nil, ss.died
-	}
-	return ss, nil
-}
-
-func (p *Pty) markDied(ss *ptySession, err error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	ss.died = err
-}
-
 // died maps a failed holder call to ErrNotReady when the holder refused keys
 // during a deny-reason, else to ErrSessionDied: claude's exit code when
 // the holder reported or saved one, so claude exited, else the holder failure
@@ -320,7 +274,7 @@ func (p *Pty) died(ss *ptySession, err error) error {
 
 // Status maps claude's pid status file, as the holder last read it.
 func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
-	ss, err := p.live(s)
+	ss, err := p.reg.live(s)
 	if err != nil {
 		return agentrunner.Status{}, err
 	}
@@ -412,14 +366,10 @@ func (p *Pty) Wait(s agentrunner.Session, states []agentrunner.State, timeout ti
 // Stop asks the holder to end claude; a holder that doesn't exit in time is
 // killed along with claude.
 func (p *Pty) Stop(s agentrunner.Session) error {
-	p.mu.Lock()
-	ss, ok := p.sessions[s.Label]
-	if !ok || ss.session.ID != s.ID || ss.stopped {
-		p.mu.Unlock()
+	ss := p.reg.claimStop(s)
+	if ss == nil {
 		return nil
 	}
-	ss.stopped = true
-	p.mu.Unlock()
 
 	grace := p.StopGrace
 	if grace <= 0 {
@@ -431,7 +381,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		// wait on the pid itself.
 		p.killSessions(ss)
 		if err := p.awaitHolderGone(ss, grace); err != nil {
-			return p.stopFailed(ss, err)
+			return p.reg.stopFailed(ss, err)
 		}
 	} else {
 		wait := grace
@@ -443,23 +393,13 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		case <-time.After(wait):
 			p.killSessions(ss)
 			if err := awaitExit(ss.exited, grace, ss.holderPID); err != nil {
-				return p.stopFailed(ss, err)
+				return p.reg.stopFailed(ss, err)
 			}
 		}
 	}
 
-	p.mu.Lock()
-	delete(p.sessions, s.Label)
-	p.mu.Unlock()
+	p.reg.remove(s.Label)
 	return p.Cleanup(s.Label)
-}
-
-// stopFailed lets a later Stop retry after err and returns err.
-func (p *Pty) stopFailed(ss *ptySession, err error) error {
-	p.mu.Lock()
-	ss.stopped = false
-	p.mu.Unlock()
-	return err
 }
 
 // Cleanup removes label's holder.sock, which a crashed holder leaves behind.
@@ -492,7 +432,7 @@ func (p *Pty) Prompt(s agentrunner.Session, text string) error {
 }
 
 func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
-	ss, err := p.live(s)
+	ss, err := p.reg.live(s)
 	if err != nil {
 		return err
 	}
@@ -612,7 +552,7 @@ func (p *Pty) awaitNotBusy(ss *ptySession) (int, error) {
 // quits claude. The session is kept, so smart-zone can send /compact next with
 // no further wait.
 func (p *Pty) Interrupt(s agentrunner.Session) error {
-	ss, err := p.live(s)
+	ss, err := p.reg.live(s)
 	if err != nil {
 		return err
 	}
@@ -694,7 +634,7 @@ const permissionPrompt = "permission prompt"
 // Answer answers the session's dialog; see holderAnswerer.AnswerClaude and
 // AnswerCodex.
 func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
-	ss, err := p.live(s)
+	ss, err := p.reg.live(s)
 	if err != nil {
 		return err
 	}

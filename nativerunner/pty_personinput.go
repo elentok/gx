@@ -23,7 +23,7 @@ var (
 // PersonInput watches the holder for a person's keys and pastes. A holder
 // without the watch op returns an error.
 func (p *Pty) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error) {
-	ss, err := p.live(s)
+	ss, err := p.reg.live(s)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -28,7 +28,7 @@ var _ agentrunner.LaunchPrompter = (*Pty)(nil)
 // without a Claude home keep the PromptNudged path.
 func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
 	home := envValue(p.Env, "HOME")
-	ss, err := p.live(s)
+	ss, err := p.reg.live(s)
 	if err != nil {
 		return err
 	}
