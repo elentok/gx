@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -19,7 +20,7 @@ func TestMergeTicket_TicketInTrackerLayout_StampsCanonicalAddress(t *testing.T) 
 	dir, lp := mergeFixture(t, false)
 	lp.TicketPath = filepath.Join(t.TempDir(), "proj", "main", "issues", "03-x.md")
 
-	res, err := MergeTicket(mergeDepsFor(testDeps()), lp)
+	res, err := MergeTicket(mergeDepsFor(fakes.TestDeps()), lp)
 	if err != nil {
 		t.Fatalf("MergeTicket: %v", err)
 	}

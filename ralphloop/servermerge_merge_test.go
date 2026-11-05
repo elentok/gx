@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -27,7 +28,7 @@ func serverMergeFixture(t *testing.T) (deps.Deps, iterationParams, *builtAwaitin
 		t.Fatalf("tickets.Load: %v", err)
 	}
 	tk := epics[0].Tickets[0]
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	p := iterationParams{
 		WorkspaceID: "ws1", RepoDir: "/fake/repo", WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature",
 		FeatureBranch: "epic", Agent: agent.AgentClaude, Skill: "implement", Ticket: tk, ScratchDir: scratchDir,
@@ -56,7 +57,7 @@ func TestMergeBuilt_UnresolvedConflictPausesParentAsMergeConflict(t *testing.T) 
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	assertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseMergeConflict)
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseMergeConflict)
 	if !strings.Contains(string(raw), "01a") {
 		t.Errorf("parent ticket missing %q:\n%s", "01a", raw)
 	}

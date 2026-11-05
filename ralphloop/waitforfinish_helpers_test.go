@@ -3,31 +3,21 @@ package ralphloop
 import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 // blockedRunner is idleRunner with its session blocked.
 func blockedRunner(label string) *runnerfake.Runner {
-	r := idleRunner(label)
+	r := fakes.IdleRunner(label)
 	r.SetState(label, agentrunner.StateBlocked, "")
-	return r
-}
-
-// paneRunner hosts one idle session of label on pane, so a Wait aimed at any
-// other pane fails with ErrNotFound.
-func paneRunner(label, pane, sessionID string) *runnerfake.Runner {
-	r := runnerfake.NewRunner()
-	r.IDs = func(string) (string, string) { return pane, sessionID }
-	if _, err := r.Start(agentrunner.StartOptions{Label: label}); err != nil {
-		panic(err)
-	}
 	return r
 }
 
 // idlePromptRunner is paneRunner on pane-1 whose agent reports idle the moment
 // it is prompted, so a wait after "/compact" never blocks in real time.
 func idlePromptRunner(label, sessionID string) *runnerfake.Runner {
-	r := paneRunner(label, "pane-1", sessionID)
+	r := fakes.PaneRunner(label, "pane-1", sessionID)
 	r.PromptState = agentrunner.StateIdle
 	return r
 }

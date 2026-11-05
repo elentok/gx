@@ -1,11 +1,13 @@
 package ralphloop
 
 import (
-	"github.com/elentok/gx/ralphloop/deps"
-	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
+	"github.com/elentok/gx/ralphloop/ticketops"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets/schema"
@@ -17,7 +19,7 @@ import (
 // tickets in a multi-item run are unaffected.
 func reportIterationStatus(t *testing.T, d deps.Deps, path, label, value string) {
 	t.Helper()
-	onRunnerWait(d, func(s agentrunner.Session) {
+	fakes.OnRunnerWait(d, func(s agentrunner.Session) {
 		if s.Label != label {
 			return
 		}
@@ -41,7 +43,7 @@ func reportIterationStatus(t *testing.T, d deps.Deps, path, label, value string)
 func TestFinishIteration_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, _, removed := fakeDeps()
+	d, _, removed := fakes.FakeDeps()
 
 	cherryPickCalled := false
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
@@ -58,7 +60,7 @@ func TestFinishIteration_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *
 	// reported.
 	reportIterationStatus(t, d, path, "epic-iter-01", string(schema.IterationStatusAsking))
 
-	driveIteration(t, d, scratchDir, path, &recordingSink{})
+	driveIteration(t, d, scratchDir, path, &fakes.RecordingSink{})
 
 	if cherryPickCalled {
 		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted asking report")
@@ -74,7 +76,7 @@ func TestFinishIteration_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done after an adopted asking report:\n%s", raw)
 	}
@@ -91,13 +93,13 @@ func TestFinishIteration_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *
 func TestFinishIteration_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
 	reportIterationStatus(t, d, path, "epic-iter-01", "finished")
 
-	driveIteration(t, d, scratchDir, path, &recordingSink{})
+	driveIteration(t, d, scratchDir, path, &fakes.RecordingSink{})
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -106,5 +108,5 @@ func TestFinishIteration_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("a finished report with zero commits must not reach done through the report alone:\n%s", raw)
 	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseZeroCommit)
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseZeroCommit)
 }

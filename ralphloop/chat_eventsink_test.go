@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,8 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/ticketops"
+
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 
@@ -94,7 +96,7 @@ func newFakeChatSink(t *testing.T, inner runlog.EventSink) (*chatEventSink, *fak
 // sleeping in sendWithRetry's backoff when Close is called must be cancelled
 // promptly, not waited out.
 func TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBackoff(t *testing.T) {
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 	transport.timeoutOverride = 5 * time.Second
 	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
 		<-ctx.Done()
@@ -117,7 +119,7 @@ func TestChatEventSink_Close_CancelsInFlightSendPromptlyInsteadOfWaitingOutBacko
 // covers the ticket's third required seam: closeFlush's consolidated send
 // must retry like the normal async path, not make a single attempt.
 func TestChatEventSink_CloseFlush_ConsolidatedSend_RetriesOnceLikeNormalPath(t *testing.T) {
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 	var attempts atomic.Int32
 	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
 		if attempts.Add(1) == 1 {
@@ -146,7 +148,7 @@ func TestChatEventSink_CloseFlush_ConsolidatedSend_RetriesOnceLikeNormalPath(t *
 // point; it would fail against a naive stopFlushLoop that only closes
 // flushDone without waiting for the tick's flush() to actually return.
 func TestChatEventSink_Close_WaitsForInProgressFlush_BeforeCancellingInFlight(t *testing.T) {
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	hookEntered := make(chan struct{})
 	release := make(chan struct{})
@@ -188,7 +190,7 @@ func TestChatEventSink_Close_TotalShutdownDeadline_ReturnsWithinBound(t *testing
 	shutdownTotalBudget = 200 * time.Millisecond
 	defer func() { shutdownTotalBudget = original }()
 
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 	transport.timeoutOverride = time.Minute
 	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
 		<-ctx.Done()
@@ -233,7 +235,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			sink, transport := newFakeChatSink(t, &recordingSink{})
+			sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 			c.fire(sink)
 			sink.flush()
 			if got := waitForSentCount(transport, 1); len(got) != 1 {
@@ -245,7 +247,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 
 func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.TicketReverted("01")
 	sink.TicketReattached("01", "iter-01", "/repo", "sess-1")
@@ -271,7 +273,7 @@ func TestChatEventSink_NonMembers_SendNoMessage(t *testing.T) {
 
 func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 	t.Parallel()
-	inner := &recordingSink{}
+	inner := &fakes.RecordingSink{}
 	sink, _ := newFakeChatSink(t, inner)
 
 	sink.EpicStarted("epic", 0, 3)
@@ -287,7 +289,7 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 		"EpicStarted", "IterationStarted", "IterationPaused", "IterationResumed",
 		"IterationFinished", "TicketNeedsHuman", "EpicPaused", "EpicComplete",
 	}
-	if got := inner.snapshot(); len(got) != len(want) {
+	if got := inner.Snapshot(); len(got) != len(want) {
 		t.Fatalf("inner events = %v, want %v", got, want)
 	} else {
 		for i, w := range want {
@@ -304,7 +306,7 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 // reach chat — otherwise a single pause would read as two messages.
 func TestChatEventSink_Pause_ProducesExactlyOneChatMessage(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.IterationPaused("04", "iter-04", runlog.PauseRepair, "agent blocked on permission prompt")
 	sink.TicketNeedsHuman("04", "epic", ticketops.PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt")
@@ -322,7 +324,7 @@ func TestChatEventSink_Pause_ProducesExactlyOneChatMessage(t *testing.T) {
 
 func TestChatEventSink_IterationPausedResumed_RepairKindNeverReachesChat(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.IterationPaused("04", "iter-04", runlog.PauseRepair, "blocked")
 	sink.IterationResumed("04", "iter-04", runlog.PauseRepair)
@@ -335,7 +337,7 @@ func TestChatEventSink_IterationPausedResumed_RepairKindNeverReachesChat(t *test
 
 func TestChatEventSink_IterationPausedResumed_RateLimitKindReachesChat(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.IterationPaused("04", "iter-04", runlog.PauseRateLimit, "rate limited")
 	sink.IterationResumed("04", "iter-04", runlog.PauseRateLimit)
@@ -381,7 +383,7 @@ func writeChatGateTicket(t *testing.T, scratchDir, epicName, identifier string) 
 func newGateChatSink(t *testing.T, scratchDir, epicName string) (*chatEventSink, *fakeChatTransport) {
 	t.Helper()
 	transport := &fakeChatTransport{}
-	sink := newChatEventSink(&recordingSink{}, slackStyle, transport, scratchDir, epicName)
+	sink := newChatEventSink(&fakes.RecordingSink{}, slackStyle, transport, scratchDir, epicName)
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 	return sink, transport
 }
@@ -419,7 +421,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 	if err != nil {
 		t.Fatalf("ParseTicket: %v", err)
 	}
-	assertPaused(t, ticket, schema.PauseClassRepair, "")
+	fakes.AssertPaused(t, ticket, schema.PauseClassRepair, "")
 	if t.Failed() {
 		t.FailNow()
 	}
@@ -481,7 +483,7 @@ func TestChatEventSink_NonTrippingSequence_SendsNormallyThroughGate(t *testing.T
 // as one send, joined by a separator line.
 func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessage(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.EpicComplete("epic", 1, 10)
@@ -502,7 +504,7 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 // from the gate-storm scenario the RepeatedEvent test also covers.
 func TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.EpicStarted("epic", 0, 3)
@@ -523,7 +525,7 @@ func TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount(t *
 // seam: a flush with nothing queued sends nothing.
 func TestChatEventSink_EmptyQueue_FlushSendsNothing(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.flush()
 
@@ -538,7 +540,7 @@ func TestChatEventSink_EmptyQueue_FlushSendsNothing(t *testing.T) {
 // with no need to poll like the async sendRaw path.
 func TestChatEventSink_Close_FlushesQueuedMessageSynchronously(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.Close()
@@ -557,7 +559,7 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 	t.Parallel()
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	epicName := "epic"
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 	sink.scratchDir = scratchDir
 	sink.epicName = epicName
 
@@ -605,7 +607,7 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 // breaker — only sustained flush volume can.
 func TestChatEventSink_BurstOfEventsCoalescedIntoOneFlush_CountsOneSendAgainstBudget(t *testing.T) {
 	t.Parallel()
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	for i := range globalThreshold + 5 {
 		sink.EpicStarted(fmt.Sprintf("epic-%d", i), 0, 3)
@@ -635,7 +637,7 @@ func TestChatEventSink_BurstOfEventsCoalescedIntoOneFlush_CountsOneSendAgainstBu
 // retry) must put its items back on the queue, marked requeued, rather than
 // lose them.
 func TestChatEventSink_Flush_FailedSend_RequeuesItems(t *testing.T) {
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
 		return sendResult{}, errors.New("boom")
 	}
@@ -660,7 +662,7 @@ func TestChatEventSink_Flush_FailedSend_RequeuesItems(t *testing.T) {
 // while the failed batch was being requeued must end up as one merged entry
 // with a combined count, not two separate ×N groups.
 func TestChatEventSink_Requeue_MergesWithNewlyQueuedDuplicate(t *testing.T) {
-	sink, _ := newFakeChatSink(t, &recordingSink{})
+	sink, _ := newFakeChatSink(t, &fakes.RecordingSink{})
 	textA := slackStyle.chatStyle.Escape("a")
 	textB := slackStyle.chatStyle.Escape("b")
 	sink.queue = []batchedMessage{{text: textB, kind: "k", count: 1}}
@@ -685,7 +687,7 @@ func TestChatEventSink_Requeue_MergesWithNewlyQueuedDuplicate(t *testing.T) {
 // failures past maxRequeueSize leave the queue bounded, not growing
 // unboundedly.
 func TestChatEventSink_Requeue_CapsSize(t *testing.T) {
-	sink, _ := newFakeChatSink(t, &recordingSink{})
+	sink, _ := newFakeChatSink(t, &fakes.RecordingSink{})
 
 	items := make([]batchedMessage, maxRequeueSize+10)
 	for i := range items {
@@ -703,7 +705,7 @@ func TestChatEventSink_Requeue_CapsSize(t *testing.T) {
 // second recordSend=true gate call for the same logical batch, or a
 // sustained outage could trip the global-mute breaker purely from retrying.
 func TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget(t *testing.T) {
-	sink, transport := newFakeChatSink(t, &recordingSink{})
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
 	transport.sendSyncFunc = func(ctx context.Context, text chatmarkup.Text) (sendResult, error) {
 		return sendResult{}, errors.New("boom")
 	}
@@ -732,7 +734,7 @@ func TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget(t *testin
 func TestChatEventSink_Requeue_SkippedAfterClose_LogsSuppression(t *testing.T) {
 	scratchDir := fixture.EpicScratchDir(t, "epic")
 	epicName := "epic"
-	sink, _ := newFakeChatSink(t, &recordingSink{})
+	sink, _ := newFakeChatSink(t, &fakes.RecordingSink{})
 	sink.scratchDir = scratchDir
 	sink.epicName = epicName
 

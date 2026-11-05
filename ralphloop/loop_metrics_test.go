@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -30,7 +31,7 @@ func compactedMergingFixture(t *testing.T, home, cwd, sessionID string) (d deps.
 		[3]any{"claude-sonnet-5", 1000, 129000},
 		[3]any{"claude-sonnet-5", 1000, 69000},
 	)
-	d, _, _ = fakeDeps()
+	d, _, _ = fakes.FakeDeps()
 	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) { return 70000, true, nil }
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 1, true, nil }
@@ -123,7 +124,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
 
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	p := iterationParams{
 		WorktreeDir:     "/fake/worktrees",
@@ -178,7 +179,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 
 	repoDir := testutil.TempRepo(t)
 
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	d.SessionHomes = metrics.SessionHomes{Claude: home}
 	d.AppendTrailers = history.AppendTrailers
 	d.RevParse = git.RevParse

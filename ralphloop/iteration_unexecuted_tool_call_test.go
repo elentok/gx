@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -77,14 +78,14 @@ func retryThenMergeCommits(d *deps.Deps) {
 func TestFinishIteration_UnexecutedToolCallDetected_RetryMergesCommits(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, prompts, _ := fakeDeps()
+	d, prompts, _ := fakes.FakeDeps()
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	fakeRunner(d).PromptState = agentrunner.StateIdle
+	fakes.FakeRunner(d).PromptState = agentrunner.StateIdle
 	retryThenMergeCommits(&d)
 
-	out := driveIteration(t, d, scratchDir, path, newRecordingEventSink())
+	out := driveIteration(t, d, scratchDir, path, fakes.NewRecordingEventSink())
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
@@ -103,7 +104,7 @@ func TestFinishIteration_UnexecutedToolCallDetected_RetryMergesCommits(t *testin
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done after the retry merged commits:\n%s", raw)
 	}
-	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
+	if fakes.RawIsPaused(t, string(raw), schema.PauseClassAnswer) {
 		t.Errorf("ticket must not be paused for an answer once the retry merged commits:\n%s", raw)
 	}
 }
@@ -115,13 +116,13 @@ func TestFinishIteration_UnexecutedToolCallDetected_RetryMergesCommits(t *testin
 func TestFinishIteration_UnexecutedToolCallNotDetected_GoesStraightToAsking(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, prompts, _ := fakeDeps()
+	d, prompts, _ := fakes.FakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
 	// d.ReadUnexecutedToolCall keeps fakeDeps' default: return false, nil.
 
-	driveIteration(t, d, scratchDir, path, &recordingSink{})
+	driveIteration(t, d, scratchDir, path, &fakes.RecordingSink{})
 
 	wantPrompts := 1
 	if len(*prompts) != wantPrompts {
@@ -131,7 +132,7 @@ func TestFinishIteration_UnexecutedToolCallNotDetected_GoesStraightToAsking(t *t
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseZeroCommit)
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseZeroCommit)
 }
 
 // TestFinishIteration_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsToAsking
@@ -142,16 +143,16 @@ func TestFinishIteration_UnexecutedToolCallNotDetected_GoesStraightToAsking(t *t
 func TestFinishIteration_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsToAsking(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, prompts, _ := fakeDeps()
+	d, prompts, _ := fakes.FakeDeps()
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	fakeRunner(d).PromptState = agentrunner.StateIdle
+	fakes.FakeRunner(d).PromptState = agentrunner.StateIdle
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
 
-	driveIteration(t, d, scratchDir, path, &recordingSink{})
+	driveIteration(t, d, scratchDir, path, &fakes.RecordingSink{})
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
@@ -161,7 +162,7 @@ func TestFinishIteration_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsT
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 }
 
 // TestFinishIteration_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry pins
@@ -171,17 +172,17 @@ func TestFinishIteration_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsT
 func TestFinishIteration_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, prompts, _ := fakeDeps()
+	d, prompts, _ := fakes.FakeDeps()
 	// The agent blocks after finishing its turn, by the time the check runs.
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
-		fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "approval")
+		fakes.FakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "approval")
 		return true, nil
 	}
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
 
-	driveIteration(t, d, scratchDir, path, &recordingSink{})
+	driveIteration(t, d, scratchDir, path, &fakes.RecordingSink{})
 
 	wantPrompts := 1
 	if len(*prompts) != wantPrompts {
@@ -191,7 +192,7 @@ func TestFinishIteration_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveR
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 }
 
 // TestFinishIteration_UnexecutedToolCallRetry_PromptRefusedWhileBusy_KeepsWaiting pins
@@ -201,21 +202,21 @@ func TestFinishIteration_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveR
 func TestFinishIteration_UnexecutedToolCallRetry_PromptRefusedWhileBusy_KeepsWaiting(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) { return true, nil }
-	fakeRunner(d).PromptState = agentrunner.StateIdle
+	fakes.FakeRunner(d).PromptState = agentrunner.StateIdle
 	retryThenMergeCommits(&d)
-	onRunnerPrompt(d, func(s agentrunner.Session, text string) error {
+	fakes.OnRunnerPrompt(d, func(s agentrunner.Session, text string) error {
 		if text != unexecutedToolCallCorrection {
 			return nil
 		}
-		r := fakeRunner(d)
+		r := fakes.FakeRunner(d)
 		r.SetState(s.Label, agentrunner.StateWorking, "")
 		time.AfterFunc(200*time.Millisecond, func() { r.SetState(s.Label, agentrunner.StateDone, "") })
 		return agentrunner.ErrNotReady
 	})
 
-	out := driveIteration(t, d, scratchDir, path, newRecordingEventSink())
+	out := driveIteration(t, d, scratchDir, path, fakes.NewRecordingEventSink())
 
 	if !out.Merged {
 		t.Errorf("outcome = %+v, want merged after waiting out the busy agent", out)

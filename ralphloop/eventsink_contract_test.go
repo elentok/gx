@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 )
 
@@ -24,7 +25,7 @@ func TestEpicComplete_ChatSinkIsNotificationOnly(t *testing.T) {
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 
 	before := snapshotDir(t, issuesDir)
-	sink, _ := newFakeChatSink(t, &recordingSink{})
+	sink, _ := newFakeChatSink(t, &fakes.RecordingSink{})
 	sink.scratchDir = scratchDir
 	sink.EpicComplete("epic", 1, 5)
 	sink.Close()

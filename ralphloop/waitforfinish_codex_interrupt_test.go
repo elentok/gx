@@ -11,6 +11,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
@@ -139,7 +140,7 @@ func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfPausing
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if rawIsPaused(t, string(raw), "") {
+	if fakes.RawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket was paused despite recoverable context exhaustion:\n%s", raw)
 	}
 }

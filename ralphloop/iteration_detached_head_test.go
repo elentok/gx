@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -22,7 +23,7 @@ func TestIterationCommitsAhead_CountsCommitsOnDetachedHead(t *testing.T) {
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
 
-	ahead, err := iterationCommitsAhead(testDeps(), dir, base, "ralph-loop/epic-item-04")
+	ahead, err := iterationCommitsAhead(fakes.TestDeps(), dir, base, "ralph-loop/epic-item-04")
 	if err != nil {
 		t.Fatalf("iterationCommitsAhead: %v", err)
 	}

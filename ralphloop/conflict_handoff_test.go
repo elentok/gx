@@ -2,13 +2,15 @@ package ralphloop
 
 import (
 	"errors"
-	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/ticketops"
+
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets/schema"
@@ -61,7 +63,7 @@ func TestConflictResolutionHandoff(t *testing.T) {
 		for _, path := range []string{"fresh", "reattached"} {
 			t.Run(path+"/"+tc.name, func(t *testing.T) {
 				t.Parallel()
-				d, _, _ := fakeDeps()
+				d, _, _ := fakes.FakeDeps()
 				p := conflictParams(t, t.TempDir())
 				label := conflictLabel(p.Ticket.Identifier)
 				issuesDir := filepath.Join(p.ScratchDir, "main", "issues")
@@ -93,7 +95,7 @@ func TestConflictResolutionHandoff(t *testing.T) {
 
 				var err error
 				if path == "fresh" {
-					onRunnerPrompt(d, func(agentrunner.Session, string) error {
+					fakes.OnRunnerPrompt(d, func(agentrunner.Session, string) error {
 						agentWorks()
 						return nil
 					})
@@ -106,12 +108,12 @@ func TestConflictResolutionHandoff(t *testing.T) {
 					if err := os.WriteFile(childPath, []byte(childFrontmatter), 0644); err != nil {
 						t.Fatalf("WriteFile: %v", err)
 					}
-					hostLiveAgent(t, d, label)
-					fakeRunner(d).SetState(label, agentrunner.StateWorking, "")
-					onRunnerWait(d, func(s agentrunner.Session) {
+					fakes.HostLiveAgent(t, d, label)
+					fakes.FakeRunner(d).SetState(label, agentrunner.StateWorking, "")
+					fakes.OnRunnerWait(d, func(s agentrunner.Session) {
 						if s.Label == label {
 							agentWorks()
-							fakeRunner(d).SetState(label, agentrunner.StateIdle, "")
+							fakes.FakeRunner(d).SetState(label, agentrunner.StateIdle, "")
 						}
 					})
 					live, found, findErr := d.Runner.Find(label)
@@ -134,7 +136,7 @@ func TestConflictResolutionHandoff(t *testing.T) {
 
 				child := fixture.MustParse(t, childPath)
 				if tc.stillConflicted && path == "fresh" {
-					assertPaused(t, child, schema.PauseClassRepair, "")
+					fakes.AssertPaused(t, child, schema.PauseClassRepair, "")
 				} else if child.Status != tc.wantChild {
 					t.Errorf("child status = %q, want %q", child.Status, tc.wantChild)
 				}
@@ -168,9 +170,9 @@ func TestFinishIteration_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPau
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
-	onRunnerPrompt(d, func(agentrunner.Session, string) error {
+	fakes.OnRunnerPrompt(d, func(agentrunner.Session, string) error {
 		return ticketops.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
 			tk.IterationStatus = schema.IterationStatusFinished
 			tk.Commitless = true

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -11,7 +12,7 @@ import (
 func TestRecordLiveSession_AppendsOnceAndReturnsSession(t *testing.T) {
 	t.Parallel()
 	path := fixture.WriteFrontmatterTicket(t, "claimed")
-	d := deps.Deps{Runner: idleRunner("iter-01")}
+	d := deps.Deps{Runner: fakes.IdleRunner("iter-01")}
 
 	for range 2 { // a reclaimed run finishes twice
 		if got := recordLiveSession(d, "iter-01", path); got != "sess-1" {

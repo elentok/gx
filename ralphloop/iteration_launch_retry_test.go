@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 )
 
 const launchEpic = "my-epic"
@@ -61,7 +62,7 @@ func (n nudgingRunner) PromptNudged(s agentrunner.Session, text string, onNudge 
 
 func TestStartAndPrompt_ReportsEveryNudgeDecision(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 
 	res := launchOn(t, nudgingRunner{Runner: d.Runner, decisions: []string{"retype", "enter"}})
 
@@ -98,7 +99,7 @@ func (unknownSkillRunner) PromptLaunch(_ context.Context, _ agentrunner.Session,
 
 func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	var kinds []events.Kind
 	_, err := startAndPrompt(context.Background(), unknownSkillRunner{d.Runner}, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
 		func(_ int, kind events.Kind, _ error) { kinds = append(kinds, kind) }, func(int, string) {})
@@ -118,7 +119,7 @@ func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 
 func TestStartAndPrompt_LaunchPromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	launches := 0
 
 	res := launchOn(t, launchRunner{Runner: d.Runner, rejects: 1, launches: &launches})
@@ -133,7 +134,7 @@ func TestStartAndPrompt_LaunchPromptNotDelivered_RetriesOnFreshSession(t *testin
 
 func TestStartAndPrompt_LaunchPromptNotDeliveredTwice_FailsPromptStalled(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	launches := 0
 
 	res := launchOn(t, launchRunner{Runner: d.Runner, rejects: 2, launches: &launches})
@@ -146,8 +147,8 @@ func TestStartAndPrompt_LaunchPromptNotDeliveredTwice_FailsPromptStalled(t *test
 
 func TestStartAndPrompt_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.FailNextPrompts(launchLabel, 1, agentrunner.ErrNotDelivered)
 
 	res := launchOn(t, r)
@@ -162,8 +163,8 @@ func TestStartAndPrompt_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 
 func TestStartAndPrompt_PromptNotDeliveredTwice_FailsPromptStalledAndStopsBoth(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.FailNextPrompts(launchLabel, 2, agentrunner.ErrNotDelivered)
 
 	res := launchOn(t, r)
@@ -176,8 +177,8 @@ func TestStartAndPrompt_PromptNotDeliveredTwice_FailsPromptStalledAndStopsBoth(t
 
 func TestStartAndPrompt_MissingCapability_CarriesDoctorHint(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.FailNextPrompts(launchLabel, 1, fmt.Errorf("%w: msg_lifecycle_v1", agentrunner.ErrMissingCapability))
 
 	res := launchOn(t, r)
@@ -194,8 +195,8 @@ func TestStartAndPrompt_MissingCapability_CarriesDoctorHint(t *testing.T) {
 
 func TestStartAndPrompt_MissingCapabilityOnStart_FailsIterationErrorWithDoctorHint(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
 
 	res := launchOn(t, r)
@@ -210,8 +211,8 @@ func TestStartAndPrompt_MissingCapabilityOnStart_FailsIterationErrorWithDoctorHi
 
 func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
 
 	_, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel}, "/go", func(int, string) {})
@@ -223,8 +224,8 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 
 func TestWaitIterationFinished_SessionDied_ReturnsDiedReason(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.DieAfterPrompt(launchLabel, agentrunner.SessionDied("claude exited (code 1)"))
 	res := launchOn(t, r)
 	if res.err != nil {
@@ -240,8 +241,8 @@ func TestWaitIterationFinished_SessionDied_ReturnsDiedReason(t *testing.T) {
 
 func TestStartAndPrompt_HolderStartFailure_FailsIterationErrorWithStderr(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.SetStartErr(launchLabel, errors.New("pty start: holder exited: Error: listen unix: invalid argument"))
 
 	res := launchOn(t, r)
@@ -254,8 +255,8 @@ func TestStartAndPrompt_HolderStartFailure_FailsIterationErrorWithStderr(t *test
 
 func TestStartAndPrompt_OtherPromptError_ReturnsWithoutRetryAndKeepsSession(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
-	r := fakeRunner(d)
+	d, _, _ := fakes.FakeDeps()
+	r := fakes.FakeRunner(d)
 	r.FailNextPrompts(launchLabel, 1, errors.New("boom"))
 
 	res := launchOn(t, r)

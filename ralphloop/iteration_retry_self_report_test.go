@@ -1,11 +1,13 @@
 package ralphloop
 
 import (
-	"github.com/elentok/gx/ralphloop/deps"
-	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
+	"github.com/elentok/gx/ralphloop/ticketops"
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
@@ -21,7 +23,7 @@ import (
 // original unexecuted-tool-call glitch that triggered the retry.
 func retryTurnSelfReport(t *testing.T, d deps.Deps, path string, mutate func(*schema.Ticket)) {
 	t.Helper()
-	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
+	fakes.OnRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
 		if strings.Contains(text, unexecutedToolCallCorrection) {
 			if err := ticketops.UpdateTicket(path, mutate); err != nil {
 				t.Errorf("seeding retry-turn self-report on %s: %v", path, err)
@@ -40,11 +42,11 @@ func retryTurnSelfReport(t *testing.T, d deps.Deps, path string, mutate func(*sc
 func TestFinishIteration_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, prompts, _ := fakeDeps()
+	d, prompts, _ := fakes.FakeDeps()
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	fakeRunner(d).PromptState = agentrunner.StateIdle
+	fakes.FakeRunner(d).PromptState = agentrunner.StateIdle
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
@@ -52,7 +54,7 @@ func TestFinishIteration_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReport
 		tk.IterationStatus = schema.IterationStatusAsking
 	})
 
-	sink := &recordingSink{}
+	sink := &fakes.RecordingSink{}
 	driveIteration(t, d, scratchDir, path, sink)
 
 	wantPrompts := 2
@@ -64,12 +66,12 @@ func TestFinishIteration_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReport
 		t.Fatalf("ReadFile: %v", err)
 	}
 	// Self-reported, not zero-commit: the retry's own self-report takes precedence.
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
 
-	if len(sink.ticketNeedsHumanCalls) != 1 {
-		t.Fatalf("TicketNeedsHuman calls = %v, want exactly 1", sink.ticketNeedsHumanCalls)
+	if len(sink.TicketNeedsHumanCalls) != 1 {
+		t.Fatalf("TicketNeedsHuman calls = %v, want exactly 1", sink.TicketNeedsHumanCalls)
 	}
-	if got := sink.ticketNeedsHumanCalls[0][3]; got != "agent asked via iteration_status" {
+	if got := sink.TicketNeedsHumanCalls[0][3]; got != "agent asked via iteration_status" {
 		t.Errorf("TicketNeedsHuman reason = %q, want the self-reported message, not a zero-commit message", got)
 	}
 }
@@ -83,11 +85,11 @@ func TestFinishIteration_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReport
 func TestFinishIteration_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, prompts, _ := fakeDeps()
+	d, prompts, _ := fakes.FakeDeps()
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	fakeRunner(d).PromptState = agentrunner.StateIdle
+	fakes.FakeRunner(d).PromptState = agentrunner.StateIdle
 	retryThenMergeCommits(&d)
 	cherryPickCalled := false
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
@@ -98,7 +100,7 @@ func TestFinishIteration_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentl
 		tk.IterationStatus = schema.IterationStatusAsking
 	})
 
-	out := driveIteration(t, d, scratchDir, path, &recordingSink{})
+	out := driveIteration(t, d, scratchDir, path, &fakes.RecordingSink{})
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
@@ -111,7 +113,7 @@ func TestFinishIteration_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentl
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
+	fakes.AssertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done while the retry's self-reported question is unanswered:\n%s", raw)
 	}
@@ -124,11 +126,11 @@ func TestFinishIteration_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentl
 func TestFinishIteration_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := finishFixture(t)
-	d, prompts, _ := fakeDeps()
+	d, prompts, _ := fakes.FakeDeps()
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	fakeRunner(d).PromptState = agentrunner.StateIdle
+	fakes.FakeRunner(d).PromptState = agentrunner.StateIdle
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
@@ -171,7 +173,7 @@ func TestFinishIteration_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *te
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done for the retry's commitless-and-finished self-report:\n%s", raw)
 	}
-	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
+	if fakes.RawIsPaused(t, string(raw), schema.PauseClassAnswer) {
 		t.Errorf("ticket must not be paused (answer) for a declared-commitless retry finish:\n%s", raw)
 	}
 }

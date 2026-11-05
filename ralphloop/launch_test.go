@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -32,7 +33,7 @@ func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccup
 	}
 
 	d := deps.Deps{
-		Runner: paneRunner("iter-01", "pane-1", "sess-1"),
+		Runner: fakes.PaneRunner("iter-01", "pane-1", "sess-1"),
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 4200, true, nil
 		},
@@ -81,7 +82,7 @@ func TestPromptedLaunch_CodexAdoptsSessionIDFromStatusAfterPrompt(t *testing.T) 
 	}
 
 	d := deps.Deps{
-		Runner: paneRunner("iter-09", "pane-9", "codex-session-1"),
+		Runner: fakes.PaneRunner("iter-09", "pane-9", "codex-session-1"),
 		ReadCodexContext: func(_, sessionID string) (int, bool, error) {
 			observedSessionID = sessionID
 			return 4200, true, nil

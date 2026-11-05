@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
@@ -35,7 +36,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	testutil.WriteFile(t, repo, "other.txt", "something else\n")
 	testutil.CommitAll(t, repo, "something else\n\n"+ticketTrailerKey+": "+ticketTrailerValue("epic", "01"))
 
-	d := testDeps()
+	d := fakes.TestDeps()
 	d.Runner = runnerfake.NewRunner()
 	lp := mergeQueueParams{
 		RepoDir: repo, FeatureWorktree: repo, FeatureBranch: "epic", ScratchDir: scratchDir,
@@ -49,7 +50,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseAmbiguousMerge)
+	fakes.AssertPaused(t, tk, schema.PauseClassRepair, schema.PauseAmbiguousMerge)
 	if t.Failed() {
 		t.FailNow()
 	}

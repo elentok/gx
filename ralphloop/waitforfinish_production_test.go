@@ -15,6 +15,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -34,7 +35,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	testStateDir = state
+	fakes.StateDir = state
 	code := m.Run()
 	os.RemoveAll(state)
 	if code == 0 {
@@ -198,7 +199,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	s.AdvanceVirtualTime(3 * time.Minute)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(deps.DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
+	deps := fakes.TestDepsWithOverrides(deps.DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -305,7 +306,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 	_, fakeEnv := herdrfake.StartStateEnv(t, s)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
+	deps := fakes.TestDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
@@ -526,7 +527,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	s.AdvanceVirtualTime(8 * time.Minute)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
+	deps := fakes.TestDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }

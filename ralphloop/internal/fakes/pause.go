@@ -1,4 +1,4 @@
-package ralphloop
+package fakes
 
 import (
 	"testing"
@@ -6,8 +6,8 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// parseRawTicket parses ticket file text (through the legacy shim).
-func parseRawTicket(t *testing.T, raw string) schema.Ticket {
+// ParseRawTicket parses ticket file text (through the legacy shim).
+func ParseRawTicket(t *testing.T, raw string) schema.Ticket {
 	t.Helper()
 	tk, err := schema.ParseTicketFromRaw(raw, "ticket.md")
 	if err != nil {
@@ -16,17 +16,17 @@ func parseRawTicket(t *testing.T, raw string) schema.Ticket {
 	return tk
 }
 
-// rawIsPaused reports whether ticket file text is a paused ticket of the
+// RawIsPaused reports whether ticket file text is a paused ticket of the
 // given class. An empty class matches either class.
-func rawIsPaused(t *testing.T, raw string, class schema.PauseClass) bool {
+func RawIsPaused(t *testing.T, raw string, class schema.PauseClass) bool {
 	t.Helper()
-	tk := parseRawTicket(t, raw)
+	tk := ParseRawTicket(t, raw)
 	return tk.Status == schema.StatusPaused && (class == "" || tk.PausedClass() == class)
 }
 
-// assertPaused checks a parsed ticket is paused with the given class and, when
+// AssertPaused checks a parsed ticket is paused with the given class and, when
 // reason is non-empty, the given reason.
-func assertPaused(t *testing.T, tk schema.Ticket, class schema.PauseClass, reason schema.PauseReason) {
+func AssertPaused(t *testing.T, tk schema.Ticket, class schema.PauseClass, reason schema.PauseReason) {
 	t.Helper()
 	if tk.Status != schema.StatusPaused {
 		t.Errorf("Status = %q, want %q", tk.Status, schema.StatusPaused)
@@ -40,11 +40,11 @@ func assertPaused(t *testing.T, tk schema.Ticket, class schema.PauseClass, reaso
 	}
 }
 
-// assertRawPaused is assertPaused for ticket file text.
-func assertRawPaused(t *testing.T, raw string, class schema.PauseClass, reason schema.PauseReason) {
+// AssertRawPaused is AssertPaused for ticket file text.
+func AssertRawPaused(t *testing.T, raw string, class schema.PauseClass, reason schema.PauseReason) {
 	t.Helper()
-	tk := parseRawTicket(t, raw)
-	assertPaused(t, tk, class, reason)
+	tk := ParseRawTicket(t, raw)
+	AssertPaused(t, tk, class, reason)
 	if t.Failed() {
 		t.Logf("ticket:\n%s", raw)
 	}

@@ -9,6 +9,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
@@ -20,7 +21,7 @@ import (
 // waitForFinish's conclusion open.
 func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error), sleeps *int) deps.Deps {
 	return deps.Deps{
-		Runner:              idleRunner("iter-30"),
+		Runner:              fakes.IdleRunner("iter-30"),
 		ReadBackgroundTasks: readBackgroundTasks,
 		Sleep:               func(time.Duration) { *sleeps++ },
 	}
@@ -238,7 +239,7 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	// once the agent is genuinely done; 5 = that second idle's own
 	// confirmFinished recheck (idle; no gate re-hold since ReadBackgroundTasks
 	// already reports resolved).
-	r := &blipRunner{Runner: idleRunner("iter-30"), timeoutOn: 3}
+	r := &blipRunner{Runner: fakes.IdleRunner("iter-30"), timeoutOn: 3}
 	d := deps.Deps{
 		Runner:              r,
 		ReadBackgroundTasks: readBackgroundTasks,

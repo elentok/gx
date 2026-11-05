@@ -11,6 +11,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
@@ -77,7 +78,7 @@ func waitForSlackRequests(get func() []slackRequest, want int) []slackRequest {
 func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
-	inner := &recordingSink{}
+	inner := &fakes.RecordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
@@ -85,7 +86,7 @@ func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 	sink.EpicComplete("epic", 5, 300)
 	sink.flush()
 
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
+	if got := inner.Snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
 	}
 
@@ -108,7 +109,7 @@ func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T) {
 	t.Parallel()
 	server, getRequests := fakeSlackServer(t, http.StatusOK)
-	inner := &recordingSink{}
+	inner := &fakes.RecordingSink{}
 	sink := newSlackEventSink(inner, server.URL, "", "")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
@@ -168,7 +169,7 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")
 	server, getRequests := fakeSlackServer(t, http.StatusInternalServerError)
-	inner := &recordingSink{}
+	inner := &fakes.RecordingSink{}
 	sink := newSlackEventSink(inner, server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
@@ -189,7 +190,7 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")
-	inner := &recordingSink{}
+	inner := &fakes.RecordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
 	// what a broken/unreachable Slack webhook looks like to the client.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -205,7 +206,7 @@ func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 		t.Errorf("EpicComplete blocked for %s, want near-instant return", elapsed)
 	}
 
-	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
+	if got := inner.Snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
 	}
 	// Empty the retry-and-log goroutine sendNotification spawns (it sleeps
@@ -294,7 +295,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")
 	server, _ := fakeSlackServer(t, http.StatusOK)
-	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
+	sink := newSlackEventSink(&fakes.RecordingSink{}, server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
@@ -319,7 +320,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
-	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
+	sink := newSlackEventSink(&fakes.RecordingSink{}, server.URL, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
@@ -351,7 +352,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 	// including the secret Slack webhook path segment.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	server.Close()
-	sink := newSlackEventSink(&recordingSink{}, server.URL+"/services/"+secretPath, dir, "epic")
+	sink := newSlackEventSink(&fakes.RecordingSink{}, server.URL+"/services/"+secretPath, dir, "epic")
 	defer sink.Close()
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 

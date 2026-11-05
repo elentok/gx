@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -256,7 +257,7 @@ func writeFakeExecutable(t *testing.T, name, body string) string {
 // checks in Run (see loop.go) — verified structurally by the same feature-
 // worktree assertion rather than separately, since no tab can exist without
 // the workspace/worktree that would have to precede it.
-func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFilename string, sink *recordingEventSink) {
+func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFilename string, sink *fakes.RecordingEventSink) {
 	t.Helper()
 
 	if _, err := os.Stat(filepath.Join(testWorktreeDir(t, repoDir), epicName)); !os.IsNotExist(err) {
@@ -281,8 +282,8 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 		t.Errorf("ReadEvents = ok:%v err:%v, want no run-log written for a failure caught before claim", ok, readErr)
 	}
 
-	if hasEvent(sink, LiveEventIterationFinished, func(LiveEvent) bool { return true }) ||
-		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == string(schema.StatusLegacyAnswer) }) {
+	if fakes.HasEvent(sink, fakes.LiveEventIterationFinished, func(fakes.LiveEvent) bool { return true }) ||
+		fakes.HasEvent(sink, fakes.LiveEventTicketNeedsHuman, func(ev fakes.LiveEvent) bool { return ev.Status == string(schema.StatusLegacyAnswer) }) {
 		t.Errorf("launch failure events = %+v, must not report successful/generic completion", sink.Events())
 	}
 }

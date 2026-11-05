@@ -12,6 +12,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -186,7 +187,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
+	deps := fakes.TestDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -381,7 +382,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	deps := testDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
+	deps := fakes.TestDepsWithOverrides(deps.DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }

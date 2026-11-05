@@ -12,6 +12,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
@@ -327,7 +328,7 @@ func (s *occupancySink) ContextOccupancy(identifier string, tokens int) {
 func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 	t.Parallel()
 	sink := &occupancySink{}
-	r := &blipRunner{Runner: idleRunner("iter-01"), timeoutIf: func(wait int) bool { return wait <= 2 }}
+	r := &blipRunner{Runner: fakes.IdleRunner("iter-01"), timeoutIf: func(wait int) bool { return wait <= 2 }}
 	d := deps.Deps{
 		Runner: r,
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
@@ -362,7 +363,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 	t.Parallel()
 	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 	var readCompactionsCalls int
-	fake := idleRunner("iter-01")
+	fake := fakes.IdleRunner("iter-01")
 	fake.PromptState = agentrunner.StateIdle
 	d := deps.Deps{
 		Runner: &blipRunner{Runner: fake, finishPollsOnly: true, timeoutIf: func(wait int) bool {
@@ -407,7 +408,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if rawIsPaused(t, string(raw), "") {
+	if fakes.RawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket was paused off a pane blocked by gx's own smart-zone recovery:\n%s", raw)
 	}
 }
@@ -429,7 +430,7 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	if readErr != nil {
 		t.Fatalf("ReadFile: %v", readErr)
 	}
-	if !strings.Contains(string(raw), "claimed") || rawIsPaused(t, string(raw), "") {
+	if !strings.Contains(string(raw), "claimed") || fakes.RawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket status = %s, want claimed without a pause", raw)
 	}
 }

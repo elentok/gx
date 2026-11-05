@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -36,7 +37,7 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 		}
 		return transcript.BackgroundTaskReading{Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}}}, nil
 	}, &sleeps)
-	d.Runner = idleRunner("iter-27")
+	d.Runner = fakes.IdleRunner("iter-27")
 
 	one := OneIteration{Agent: agent.AgentClaude}
 	wt := IterationWorktree{Label: "iter-27", Path: "/repo/iter-27"}
@@ -52,7 +53,7 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 // not end the wait.
 func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 	t.Parallel()
-	r := &blipRunner{Runner: idleRunner("iter-27"), timeoutOn: 2}
+	r := &blipRunner{Runner: fakes.IdleRunner("iter-27"), timeoutOn: 2}
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 	one := OneIteration{Agent: agent.AgentClaude}
 	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-27"}, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
@@ -72,7 +73,7 @@ func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration
 		front += "iteration_status: " + iterationStatus + "\n"
 	}
 	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{"01-a.md": front + "---\n# A\n"})
-	r := idleRunner("iter-01")
+	r := fakes.IdleRunner("iter-01")
 	r.PromptState = agentrunner.StateIdle
 	var sleeps []time.Duration
 	d := deps.Deps{Runner: r, Sleep: func(d time.Duration) { sleeps = append(sleeps, d) }}
@@ -416,7 +417,7 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	var sleeps int
 	d.Sleep = func(time.Duration) {
 		sleeps++
@@ -462,7 +463,7 @@ func TestMergeBuilt_LockHeld_DefersThenMergesOnceReleased(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	picks := 0
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
 		picks++
@@ -500,7 +501,7 @@ func TestMergeBuilt_MergeMarkerPresent_SkipsStaleAbort(t *testing.T) {
 	if err := WriteMergeMarker(lockDir, MergeMarker{Epic: "epic", Ticket: "01"}); err != nil {
 		t.Fatal(err)
 	}
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	inProgress := true
 	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress, nil }
 	aborts := 0
@@ -538,7 +539,7 @@ func TestMergeBuilt_LockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 
 	const holds = 20
 	_, retries := driveDeferredMerge(t, d, scratchDir, path, func(n int) {

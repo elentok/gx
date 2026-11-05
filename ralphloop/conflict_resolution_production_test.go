@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -231,9 +232,9 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	d := realMergingDeps()
 	d.Sleep = func(time.Duration) {}
 	d.Now = func() time.Time { return time.Unix(0, 0) }
-	onRunnerStart(d, resolver.onStart)
-	onRunnerPrompt(d, resolver.onPrompt)
-	runner := fakeRunner(d)
+	fakes.OnRunnerStart(d, resolver.onStart)
+	fakes.OnRunnerPrompt(d, resolver.onPrompt)
+	runner := fakes.FakeRunner(d)
 	runner.IDs = func(label string) (string, string) { return "pane-" + label, resolutionSessionID }
 
 	p := conflictParams(t, dir)
@@ -330,12 +331,12 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 
 func TestResolveCherryPickConflict_StopFailure_FailsTheResolution(t *testing.T) {
 	t.Parallel()
-	d, _, _ := fakeDeps()
+	d, _, _ := fakes.FakeDeps()
 	p := conflictParams(t, t.TempDir())
 	label := conflictLabel(p.Ticket.Identifier)
 	stopErr := errors.New("stop failed")
-	onRunnerPrompt(d, func(agentrunner.Session, string) error {
-		fakeRunner(d).SetStopErr(label, stopErr)
+	fakes.OnRunnerPrompt(d, func(agentrunner.Session, string) error {
+		fakes.FakeRunner(d).SetStopErr(label, stopErr)
 		return nil
 	})
 
