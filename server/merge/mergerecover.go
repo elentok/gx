@@ -7,10 +7,10 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 
-	"github.com/elentok/gx/ralphloop"
 	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/verify"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 )
@@ -82,7 +82,7 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 	v := res.Tickets[0]
 	s.log.Info("verified interrupted merge", "ticket", addr, "merging", v.Merging, "evidence", v.Evidence)
 	switch v.Merging {
-	case ralphloop.MergingMerged:
+	case verify.MergingMerged:
 		ev := runlog.Event{Outcome: string(rlmerge.Merged), SHA: v.SHA}
 		if err := tickets.EndOpenRound(t.Path, tickets.SourceGx, tickets.HowManualMerge, "manual-merge"); err != nil {
 			return fmt.Errorf("end pause round of %s: %w", addr, err)
@@ -91,7 +91,7 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 			return fmt.Errorf("finishing merge of %s: %w", addr, err)
 		}
 		s.events.Publish(wire.EventTicketDone, addr)
-	case ralphloop.MergingRecoverable:
+	case verify.MergingRecoverable:
 		if err := s.abortHalfPick(run.FeatureWorktree); err != nil {
 			return fmt.Errorf("rolling back merge of %s: %w", addr, err)
 		}

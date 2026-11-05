@@ -1,4 +1,6 @@
-package ralphloop
+// Package verify gathers each ticket's merging truth: whether its iteration
+// commits reached the feature branch, and what iteration state is left over.
+package verify
 
 import (
 	"fmt"
@@ -106,6 +108,13 @@ type VerifyParams struct {
 	WorkspaceID     string
 	Tickets         []tickets.Ticket
 	Events          []runlog.Event
+}
+
+// reconcilePaths bundles the filesystem locations verify needs: the feature
+// worktree (to run git checks in) and the iteration worktree directory.
+type reconcilePaths struct {
+	FeatureWorktree string
+	WorktreeDir     string
 }
 
 // VerifyEpic is the single merging-truth gatherer: for each ticket it climbs

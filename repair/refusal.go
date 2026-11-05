@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/verify"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -126,6 +126,6 @@ func DefaultVerifyRun(epicPath, cwd string, runner agentrunner.Runner) (VerifyRu
 		EpicPath:        epicPath,
 		FeatureWorktree: filepath.Join(repo.WorktreeDir, filepath.Base(epicPath)),
 		WorktreeDir:     repo.WorktreeDir,
-		Deps:            ralphloop.DefaultVerifyDeps(runner),
+		Deps:            verify.DefaultVerifyDeps(runner),
 	}, nil
 }

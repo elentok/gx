@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/verify"
 	"github.com/elentok/gx/tickets"
 )
 
 // VerifyResult is the --json payload of `gx server tickets verify`: always the full,
 // unfiltered list, with a landing in flight reported beside it.
 type VerifyResult struct {
-	Tickets         []ralphloop.TicketVerification `json:"tickets"`
-	LandingInFlight *merge.MergeMarker             `json:"landing_in_flight"`
+	Tickets         []verify.TicketVerification `json:"tickets"`
+	LandingInFlight *merge.MergeMarker          `json:"landing_in_flight"`
 	// OrphanLandLock is a land lock with no marker: a land mid-flight, or a
 	// crash leftover when its owner is not running.
 	OrphanLandLock *merge.MergeLockOwner `json:"orphan_land_lock"`
@@ -30,7 +30,7 @@ type VerifyRun struct {
 	WorkspaceID     string
 	// MergeLockStateDir is the state dir the epic's merge lock lives under.
 	MergeLockStateDir string
-	Deps              ralphloop.VerifyDeps
+	Deps              verify.VerifyDeps
 }
 
 // Verify is write-free and takes no land lock: reading owns nothing, so it
@@ -69,7 +69,7 @@ func Verify(run VerifyRun) (VerifyResult, error) {
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("reading run log: %w", err)
 	}
-	verifications, err := ralphloop.VerifyEpic(run.Deps, ralphloop.VerifyParams{
+	verifications, err := verify.VerifyEpic(run.Deps, verify.VerifyParams{
 		Epic:            epicName,
 		FeatureWorktree: run.FeatureWorktree,
 		WorktreeDir:     run.WorktreeDir,
@@ -81,7 +81,7 @@ func Verify(run VerifyRun) (VerifyResult, error) {
 		return VerifyResult{}, err
 	}
 	if verifications == nil {
-		verifications = []ralphloop.TicketVerification{}
+		verifications = []verify.TicketVerification{}
 	}
 
 	lockDir, err := merge.MergeLockDirIn(run.MergeLockStateDir, epicPath)
