@@ -14,7 +14,7 @@ import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
-import { agentDetails } from "./agentDetails";
+import { AgentLine } from "./AgentLine";
 import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink, summaryLine } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { DesignActionsMenu, Failure, StartDesignButton } from "./SessionControls";
@@ -45,20 +45,6 @@ interface SessionStripProps {
   startFailure?: string;
   /** The map has no Destination and no tickets yet, so it can still be deleted. */
   deletable?: boolean;
-}
-
-/** The meta bar's agent part: `<Harness> <Model> · <effort>`, without the effort on a phone. */
-function AgentLine({ session, wide }: { session: SessionInfo; wide: boolean }) {
-  const { model, effort } = agentDetails(session);
-  if (!model) return null;
-  return (
-    <Text fontFamily="mono" fontSize="12px" color="text.dim">
-      <Text as="span" color="text">
-        {model}
-      </Text>
-      {wide && effort && ` · ${effort}`}
-    </Text>
-  );
 }
 
 // The right of the title row: the failed-start message, the first Start button, and the menu.

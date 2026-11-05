@@ -17,7 +17,7 @@ import { AgentChat } from "./AgentChat";
 import { AgentComposer } from "./AgentComposer";
 import { PromoteButton } from "./PromoteButton";
 import { stateLabel, statusMark } from "./rules";
-import { SessionHarnessLabel } from "./SessionHarnessLabel";
+import { AgentLine } from "../design/AgentLine";
 import { StatusMark } from "./SessionGlyphs";
 import { SessionActions } from "./SessionActions";
 import { SessionSwitcher } from "./SessionSwitcher";
@@ -59,7 +59,7 @@ function SessionHeader({
           <Text as="span" fontSize="sm" color="text.dim">
             {s.project} · {stateLabel(s)}
           </Text>
-          <SessionHarnessLabel session={s} />
+          <AgentLine session={s} wide={false} />
         </Box>
         {map && <DesignLink map={map} ml="auto" />}
         <Box ml={map ? undefined : "auto"}>{actions}</Box>
@@ -74,7 +74,7 @@ function SessionHeader({
       <Chip tone={tone} fontSize="12.5px" outlined={false}>
         {stateLabel(s)}
       </Chip>
-      <SessionHarnessLabel session={s} />
+      <AgentLine session={s} wide />
       <Text as="span" fontSize="sm" color="text.dim">
         {s.dir}
       </Text>

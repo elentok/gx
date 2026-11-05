@@ -1,16 +1,16 @@
-import { Box, chakra, Menu, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { postStopSession, stateToken, type StopSession } from "../design/open";
-import { MenuFrame, menuItemStyle } from "../design/SessionControls";
+import { agentSection } from "../design/SessionControls";
 import type { SessionInfo } from "../generated/server";
 import { useWrite } from "../useWrite";
 import { Button } from "../ui/button/Button";
-import { GrabHandle, sheetPanel } from "../ui/modal/BottomSheet";
 import { Modal } from "../ui/modal/Modal";
+import { MoreActionsMenu, type MoreActionsItem, type MoreActionsSection } from "../ui/more-actions/MoreActionsMenu";
 import { useWide } from "../useWide";
 import { canManage, isExited, postRemoveSession, removeSession, type RemoveSession } from "./sessionWrites";
 
-/** The "⋯" menu with Stop (while live) and Remove for the selected agent. Nothing for a Queue agent. */
+/** The "⋯" menu: the Agent block, plus Stop (while live) and Remove for a session a person manages. */
 export function SessionActions({
   session,
   onRemoved,
@@ -24,48 +24,24 @@ export function SessionActions({
 }) {
   const { run, pending } = useWrite();
   const [confirming, setConfirming] = useState(false);
-  const sheetMode = !useWide();
-  if (!canManage(session)) return null;
+  const wide = useWide();
   const live = !isExited(session);
   const name = session.name || session.id;
-  const item = menuItemStyle(sheetMode);
+  const sections: MoreActionsSection[] = [];
+  const agent = agentSection(session, wide);
+  if (agent) sections.push(agent);
+  if (canManage(session)) {
+    const items: MoreActionsItem[] = [];
+    if (live)
+      items.push({ value: "stop", label: "Stop", danger: true, disabled: pending, onSelect: () => run(() => stop({ id: session.id, state: stateToken(session) })) });
+    items.push({ value: "remove", label: "Remove", danger: true, disabled: pending, onSelect: () => setConfirming(true) });
+    sections.push(items);
+  }
+  // A queue session with no tier, model or effort has nothing to put in the menu.
+  if (sections.length === 0) return null;
   return (
     <Box>
-      <Menu.Root lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
-        <Menu.Trigger asChild>
-          <chakra.button
-            type="button"
-            aria-label="More actions"
-            cursor="pointer"
-            color="text.muted"
-            fontSize="xl"
-            lineHeight="1"
-            w="44px"
-            h="44px"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="md"
-            display="inline-flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            ⋯
-          </chakra.button>
-        </Menu.Trigger>
-        <MenuFrame sheet={sheetMode}>
-          <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW={sheetMode ? "64" : "200px"} {...(sheetMode && { ...sheetPanel, pb: "6" })}>
-            {sheetMode && <GrabHandle my="2" />}
-            {live && (
-              <Menu.Item value="stop" disabled={pending} onClick={() => run(() => stop({ id: session.id, state: stateToken(session) }))} {...item} color="tone.deadlocked.fg">
-                Stop
-              </Menu.Item>
-            )}
-            <Menu.Item value="remove" disabled={pending} onClick={() => setConfirming(true)} {...item} color="tone.paused.fg">
-              Remove
-            </Menu.Item>
-          </Menu.Content>
-        </MenuFrame>
-      </Menu.Root>
+      <MoreActionsMenu sections={sections} />
       {confirming && (
         <Modal label={`Remove ${name}`} onClose={() => setConfirming(false)} maxW="sm">
           <Text>{live ? `Stop and remove ${name}? Its session is deleted.` : `Remove ${name}? Its session is deleted.`}</Text>

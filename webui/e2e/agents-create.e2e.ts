@@ -1,4 +1,4 @@
-import { expect, test } from "./fixture";
+import { expect, nav, test } from "./fixture";
 import {
   ask,
   composer,
@@ -77,10 +77,21 @@ test("85. Create session", async ({ page, start }) => {
   await sidebar(page).getByRole("button", { name: "New session in other" }).click();
   await createButton(page).click();
   const interactive = await created(fixture, beforeOther);
-  const label = page.getByText("Claude Sonnet · medium",{ exact: true });
-  await expect(label).toHaveAttribute("title", "Worker tier");
+  const label = page.getByText("Claude Sonnet · medium", { exact: true });
+  const tierShown = async () => {
+    await page.getByRole("button", nav("More actions")).click();
+    await expect(page.getByRole("menu", nav("More actions")).getByText("Worker", { exact: true })).toBeVisible();
+    // Escape goes to the menu once focus is inside it.
+    await expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("menu", nav("More actions"))).toHaveCount(0, { timeout: 500 });
+    }).toPass();
+  };
+  await expect(label).toBeVisible();
+  await tierShown();
   await ask(fixture, interactive.id, "hello");
-  await expect(label).toHaveAttribute("title", "Worker tier");
+  await expect(label).toBeVisible();
+  await tierShown();
 
   // 90. Offline comes last: the server stops. The create form and the composer are disabled.
   const idle = before[0];

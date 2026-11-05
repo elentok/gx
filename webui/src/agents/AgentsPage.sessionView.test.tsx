@@ -1,21 +1,20 @@
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import type { SessionChatResponse } from "../generated/server";
 import { chat, chatOf, render, session, useAgentsPageHooks } from "./agentsTestKit";
 
 useAgentsPageHooks();
 
-test("the header names the session, status, dir and ticket, with a harness chip for Claude and Codex", async () => {
+test("the header names the session, status, dir and ticket, with the joined model name", async () => {
   render([session("s-1", "p", { name: "one", dir: "/work/one", ticket: "gx:m/01" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
   expect(header.getByText("Idle")).toBeTruthy();
   expect(header.getByText("/work/one")).toBeTruthy();
   expect(header.getByText("gx:m/01")).toBeTruthy();
-  expect(header.getByText("Claude")).toBeTruthy();
-  expect(header.queryByText("Codex")).toBeNull();
+  expect(header.getByText("Claude CLI default")).toBeTruthy();
   cleanup();
   render([session("s-2", "p", { name: "two", harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
-  expect(await screen.findByText("Codex")).toBeTruthy();
+  expect(await screen.findByText("Codex CLI default")).toBeTruthy();
 });
 
 test("renders messages, the truncation note and the background strip", async () => {
@@ -46,46 +45,33 @@ test("a round in the chat shows no question sheet", async () => {
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
-test("the header shows tier and model chips with a tier tooltip, and CLI default until a model is reported", async () => {
+test("the header reads the model and effort as one line, with no tier pill, and the menu's Agent block holds the tier", async () => {
   render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5", effort: "high" })], "/agents/s-1", true, chatOf(chat()));
-  const label = await screen.findByText("Claude Opus 5 · high");
-  expect(label.getAttribute("title")).toBe("Strongest tier");
-  expect(screen.getByText("Strongest")).toBeTruthy();
-  expect(screen.queryByText("switched by hand")).toBeNull();
-  cleanup();
-  render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5" })], "/agents/s-1", true, chatOf(chat()));
-  expect(await screen.findByText("Claude Opus 5")).toBeTruthy();
-  cleanup();
-  render([session("s-1", "p", { name: "one", tier: "worker" })], "/agents/s-1", true, chatOf(chat()));
-  expect(await screen.findByText("Claude CLI default")).toBeTruthy();
-  expect(screen.getByText("Worker")).toBeTruthy();
-});
-
-test.each([
-  ["strongest", "opus", "Claude Opus", "max", "Strongest tier"],
-  ["worker", "sonnet", "Claude Sonnet", "medium", "Worker tier"],
-])("the %s tier shows %s · %s with the %s tooltip", async (tier, model, name, effort, title) => {
-  render([session("s-1", "p", { name: "one", tier, model, effort })], "/agents/s-1", true, chatOf(chat()));
-  expect((await screen.findByText(`${name} · ${effort}`, { selector: "[title]" })).getAttribute("title")).toBe(title);
-});
-
-test("the header of a Codex session with a hand-switched model says so", async () => {
-  render([session("s-1", "p", { name: "one", harness: "codex", tier: "worker", model: "gpt-5.5", effort: "xhigh", model_switched: true })], "/agents/s-1", true, chatOf(chat()));
-  expect(await screen.findByText("Codex GPT-5.5 · xhigh")).toBeTruthy();
-  expect(screen.getByText("switched by hand")).toBeTruthy();
-});
-
-test("a session with a model and no tier has a tooltip that names no tier", async () => {
-  render([session("s-1", "p", { name: "one", model: "claude-sonnet-5-5" })], "/agents/s-1", true, chatOf(chat()));
-  const label = await screen.findByText("Claude Sonnet 5.5");
-  expect(label.getAttribute("title")).toBeNull();
-});
-
-test("the header shows no model label when tier, model and effort are all empty", async () => {
-  render([session("s-1", "p", { name: "one" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
-  expect(header.getByText("Claude")).toBeTruthy();
-  expect(header.queryByText(/CLI default|·/)).toBeNull();
+  expect(header.getByText("Claude Opus 5").parentElement!.textContent).toBe("Claude Opus 5 · high");
+  expect(header.queryByText("Strongest")).toBeNull();
+  expect(header.queryByText("switched by hand")).toBeNull();
+  fireEvent.click(header.getByRole("button", { name: "More actions" }));
+  expect(await screen.findByText("Agent")).toBeTruthy();
+  expect(screen.getByText("Strongest")).toBeTruthy();
+  expect(screen.queryByText("Effort")).toBeNull();
+});
+
+test("the header of a Codex session with a hand-switched model says so in the menu", async () => {
+  render([session("s-1", "p", { name: "one", harness: "codex", tier: "worker", model: "gpt-5.5", effort: "xhigh", model_switched: true })], "/agents/s-1", true, chatOf(chat()));
+  expect(await screen.findByText("Codex GPT-5.5")).toBeTruthy();
+  expect(screen.queryByText("switched by hand")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  expect(await screen.findByText("switched by hand")).toBeTruthy();
+});
+
+test("a Queue agent's header still has the menu, with its Agent block and no Stop or Remove", async () => {
+  render([session("s-1", "p", { name: "q", queue: true, tier: "worker" })], "/agents/s-1", true, chatOf(chat()));
+  await screen.findByRole("heading", { name: /q/ });
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  expect(await screen.findByText("Tier")).toBeTruthy();
+  expect(screen.queryByRole("menuitem", { name: "Stop" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Remove" })).toBeNull();
 });
 
 test("a Queue agent's session offers no Screen and no Type field", async () => {

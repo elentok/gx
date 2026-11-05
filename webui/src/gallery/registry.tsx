@@ -672,10 +672,9 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "HarnessLabel",
     cases: [
-      { label: "claude full", node: <HarnessLabel harness="claude" tierLabel="Worker" model={modelName("claude-sonnet-4-6", "claude")} effort="high" switched={false} /> },
-      { label: "codex full", node: <HarnessLabel harness="codex" tierLabel="Strongest" model={modelName("gpt-5.5", "codex")} effort="xhigh" switched={false} /> },
-      { label: "no reply yet", node: <HarnessLabel harness="codex" tierLabel="Worker" model={modelName("", "codex")} effort="" switched={false} /> },
-      { label: "switched", node: <HarnessLabel harness="claude" tierLabel="Worker" model={modelName("claude-opus-4-7", "claude")} effort="high" switched /> },
+      { label: "claude full", node: <HarnessLabel harness="claude" tierLabel="Worker" model={modelName("claude-sonnet-4-6", "claude")} effort="high" /> },
+      { label: "codex full", node: <HarnessLabel harness="codex" tierLabel="Strongest" model={modelName("gpt-5.5", "codex")} effort="xhigh" /> },
+      { label: "no reply yet", node: <HarnessLabel harness="codex" tierLabel="Worker" model={modelName("", "codex")} effort="" /> },
     ],
   },
   {

@@ -236,16 +236,9 @@ export function DesignActionsMenu({
   const item = menuItemStyle(!wide);
   const canDelete = deletable && live.length === 0;
 
-  const agent = shown && agentDetails(shown);
-  const agentRows = agent
-    ? [
-        agent.tier && ["Tier", agent.tier],
-        !wide && agent.effort && ["Effort", agent.effort],
-        agent.switched && ["", "switched by hand"],
-      ].filter((row): row is string[] => !!row)
-    : [];
   const sections: MoreActionsSection[] = [];
-  if (agentRows.length > 0) sections.push({ content: <AgentBlock rows={agentRows} /> });
+  const agent = shown && agentSection(shown, wide);
+  if (agent) sections.push(agent);
   const sessionItems: MoreActionsItem[] = [];
   if (shown)
     sessionItems.push({
@@ -291,7 +284,18 @@ export function DesignActionsMenu({
   return <MoreActionsMenu sections={sections} onClosed={() => setConfirming(false)} />;
 }
 
-/** The menu's key-value rows for what the header leaves out; a row with no key is a note. */
+/** The menu's Agent block for what the header leaves out (Tier, Effort on a phone, the switched note); none when it has no rows. */
+export function agentSection(session: SessionInfo, wide: boolean): MoreActionsSection | undefined {
+  const agent = agentDetails(session);
+  const rows = [
+    agent.tier && ["Tier", agent.tier],
+    !wide && agent.effort && ["Effort", agent.effort],
+    agent.switched && ["", "switched by hand"],
+  ].filter((row): row is string[] => !!row);
+  return rows.length > 0 ? { content: <AgentBlock rows={rows} /> } : undefined;
+}
+
+/** Key-value rows; a row with no key is a note. */
 function AgentBlock({ rows }: { rows: string[][] }) {
   return (
     <Box>

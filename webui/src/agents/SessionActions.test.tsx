@@ -46,9 +46,22 @@ test("an exited session offers Remove but no Stop", async () => {
   expect(screen.queryByRole("menuitem", { name: "Stop" })).toBeNull();
 });
 
-test("a Queue agent has no Stop or Remove", () => {
-  renderThemed(<SessionActions session={session({ queue: true })} onRemoved={() => {}} />);
-  expect(screen.queryByRole("button")).toBeNull();
+test("a Queue agent's menu holds the Agent block but no Stop or Remove", async () => {
+  renderThemed(<SessionActions session={session({ queue: true, tier: "worker", model_switched: true })} onRemoved={() => {}} />);
+  await openMenu();
+  expect(await screen.findByText("Agent")).toBeTruthy();
+  expect(screen.getByText("Tier")).toBeTruthy();
+  expect(screen.getByText("switched by hand")).toBeTruthy();
+  expect(screen.queryByRole("menuitem", { name: "Stop" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Remove" })).toBeNull();
+});
+
+test("a managed session's menu holds the Agent block above Stop and Remove", async () => {
+  renderThemed(<SessionActions session={session({ tier: "worker" })} onRemoved={() => {}} />);
+  await openMenu();
+  expect(await screen.findByText("Tier")).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Stop" })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Remove" })).toBeTruthy();
 });
 
 test("a refused stop skips the removal", async () => {

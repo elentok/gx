@@ -59,21 +59,32 @@ test("117. Default harness setting", async ({ page, start }) => {
   const fresh = await created(fixture, before);
   expect(fresh.harness).toBe("codex");
 
-  // Every row names its harness, tier and model; a model switched by hand says so.
+  // On a phone the header reads the model name alone; the menu's Agent block holds the tier and effort, and a model switched by hand says so.
   const label = (s: { id: string }) => go(page, `#/agents/${s.id}`);
+  const menu = async () => {
+    await page.getByRole("button", nav("More actions")).click();
+    return page.getByRole("menu", nav("More actions"));
+  };
+  const closeMenu = async () => {
+    // Escape goes to the menu once focus is inside it.
+    await expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("menu", nav("More actions"))).toHaveCount(0, { timeout: 500 });
+    }).toPass();
+  };
   const all = await sessions(fixture);
   const claude = all.find((s) => s.project === "demo" && !s.queue && s.model)!;
   const switched = all.find((s) => s.project === "dotfiles")!;
   await label(claude);
-  await expect(page.getByText("Claude", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Worker", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(`${claude.model} · ${claude.effort}`).first()).toBeVisible();
+  await expect(page.getByText(new RegExp(`^Claude ${claude.model}$`, "i"))).toBeVisible();
+  await expect(await menu()).toContainText(new RegExp(`Worker.*Effort.*${claude.effort}`));
+  await closeMenu();
   await label(fresh);
-  await expect(page.getByText("Codex", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Worker", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(`${fresh.model} · ${fresh.effort}`).first()).toBeVisible();
+  await expect(page.getByText(new RegExp(`^Codex ${fresh.model}$`, "i"))).toBeVisible();
+  await expect(await menu()).toContainText(new RegExp(`Worker.*Effort.*${fresh.effort}`));
+  await closeMenu();
   await label(switched);
-  await expect(page.getByText("switched by hand").first()).toBeVisible();
+  await expect(await menu()).toContainText("switched by hand");
 });
 
 // 117b (tier without a model) and 117c (headless note) are vitest cases:
