@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/help"
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -34,11 +35,11 @@ func pasteModeHelpSection() help.KeySection {
 // pasteModal holds the yanked files while the user picks the destination
 // worktree. It draws nothing itself: the page shows the PASTE chip.
 type pasteModal struct {
-	clipboard clipboardState
+	clipboard modal.Clipboard
 }
 
 // enterPasteMode holds cb as the clipboard and announces the paste keys once.
-func (m Model) enterPasteMode(cb clipboardState) (Model, tea.Cmd) {
+func (m Model) enterPasteMode(cb modal.Clipboard) (Model, tea.Cmd) {
 	hints := make([]string, len(pasteModeBindings))
 	for i, b := range pasteModeBindings {
 		hints[i] = b.Keys() + " " + b.Title
@@ -48,20 +49,20 @@ func (m Model) enterPasteMode(cb clipboardState) (Model, tea.Cmd) {
 
 // Update handles keys while the clipboard waits for a destination. Only
 // navigation (j/k/arrows), paste (p), and cancel (esc) are active.
-func (p pasteModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+func (p pasteModal) Update(msg tea.Msg) (modal.Modal, tea.Cmd, modal.Result) {
 	k, ok := msg.(tea.KeyPressMsg)
 	if !ok {
-		return p, nil, modalResult{unhandled: true}
+		return p, nil, modal.Result{Unhandled: true}
 	}
 	switch k.String() {
 	case "esc", "q":
-		return p, nil, modalResult{close: true}
+		return p, nil, modal.Result{Close: true}
 	case "p":
-		return p, nil, modalResult{close: true, action: pasteHere{clipboard: p.clipboard}}
+		return p, nil, modal.Result{Close: true, Action: modal.PasteHere{Clipboard: p.clipboard}}
 	case "up", "k", "down", "j":
-		return p, nil, modalResult{action: moveCursor{key: k}}
+		return p, nil, modal.Result{Action: modal.MoveCursor{Key: k}}
 	}
-	return p, nil, modalResult{}
+	return p, nil, modal.Result{}
 }
 
 func (p pasteModal) InputFocused() bool { return false }
@@ -69,15 +70,15 @@ func (p pasteModal) InputFocused() bool { return false }
 func (p pasteModal) View(_, _ int) string { return "" }
 
 // cmdPaste copies clipboard files from their source into the destination worktree.
-func cmdPaste(cb clipboardState, dst git.Worktree) tea.Cmd {
+func cmdPaste(cb modal.Clipboard, dst git.Worktree) tea.Cmd {
 	return func() tea.Msg {
-		for _, relPath := range cb.files {
-			src := filepath.Join(cb.srcPath, relPath)
+		for _, relPath := range cb.Files {
+			src := filepath.Join(cb.SrcPath, relPath)
 			dstPath := filepath.Join(dst.Path, relPath)
 			if err := copyPath(src, dstPath); err != nil {
 				return pasteResultMsg{err: fmt.Errorf("copy %s: %w", relPath, err)}
 			}
 		}
-		return pasteResultMsg{n: len(cb.files)}
+		return pasteResultMsg{n: len(cb.Files)}
 	}
 }

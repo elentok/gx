@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -15,7 +16,7 @@ func TestPasteMsgUpdatesNewWorktreeInput(t *testing.T) {
 	updated, _ := m.Update(tea.PasteMsg{Content: "feature-pasted"})
 	m = updated.(Model)
 
-	if got := m.modal.(textPrompt).input.Value(); got != "feature-pasted" {
+	if got := m.modal.(modal.TextPrompt).Value(); got != "feature-pasted" {
 		t.Fatalf("new mode paste value = %q, want %q", got, "feature-pasted")
 	}
 }
@@ -30,7 +31,7 @@ func TestPasteMsgUpdatesRenameInput(t *testing.T) {
 	updated, _ := m.Update(tea.PasteMsg{Content: "feature-renamed"})
 	m = updated.(Model)
 
-	if got := m.modal.(textPrompt).input.Value(); got != "feature-afeature-renamed" {
+	if got := m.modal.(modal.TextPrompt).Value(); got != "feature-afeature-renamed" {
 		t.Fatalf("rename mode paste value = %q, want %q", got, "feature-afeature-renamed")
 	}
 }

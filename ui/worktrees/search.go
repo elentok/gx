@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 	uisearch "github.com/elentok/gx/ui/search"
@@ -39,7 +40,7 @@ func (m Model) searchQuery() string {
 	return ""
 }
 
-func (searchModal) bottomAnchored() {}
+func (searchModal) BottomAnchored() {}
 
 func (searchModal) InputFocused() bool { return true }
 
@@ -51,50 +52,50 @@ func (s searchModal) View(width, _ int) string {
 
 // Update closes on esc/enter, steps through matches on ctrl+n/ctrl+p, and
 // feeds every other key to the search input.
-func (s searchModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+func (s searchModal) Update(msg tea.Msg) (modal.Modal, tea.Cmd, modal.Result) {
 	switch msg := msg.(type) {
 	case tea.PasteMsg:
 		s.model.Start(msg.Content)
-		return s, nil, modalResult{action: searchQueryChanged{}}
+		return s, nil, modal.Result{Action: modal.SearchQueryChanged{}}
 	case tea.KeyPressMsg:
 		return s.updateKey(msg)
 	}
-	return s, nil, modalResult{unhandled: true}
+	return s, nil, modal.Result{Unhandled: true}
 }
 
-func (s searchModal) updateKey(msg tea.KeyPressMsg) (modal, tea.Cmd, modalResult) {
+func (s searchModal) updateKey(msg tea.KeyPressMsg) (modal.Modal, tea.Cmd, modal.Result) {
 	switch msg.String() {
 	case "esc", "enter":
-		return s, nil, modalResult{close: true, action: searchClosed{}}
+		return s, nil, modal.Result{Close: true, Action: modal.SearchClosed{}}
 	case "ctrl+n":
 		if n := s.model.MatchesCount(); n > 0 {
 			return s.stepTo((s.model.Cursor() + 1) % n)
 		}
-		return s, nil, modalResult{}
+		return s, nil, modal.Result{}
 	case "ctrl+p":
 		if n := s.model.MatchesCount(); n > 0 {
 			return s.stepTo((s.model.Cursor() - 1 + n) % n)
 		}
-		return s, nil, modalResult{}
+		return s, nil, modal.Result{}
 	}
 
 	next, cmd, result := s.model.Update(msg)
 	s.model = next
 	if !result.Handled {
-		return s, nil, modalResult{}
+		return s, nil, modal.Result{}
 	}
 	if result.QueryChanged {
-		return s, nil, modalResult{action: searchQueryChanged{}}
+		return s, nil, modal.Result{Action: modal.SearchQueryChanged{}}
 	}
 	if result.CursorChanged {
-		return s, nil, modalResult{action: searchCursorMoved{}}
+		return s, nil, modal.Result{Action: modal.SearchCursorMoved{}}
 	}
-	return s, cmd, modalResult{}
+	return s, cmd, modal.Result{}
 }
 
-func (s searchModal) stepTo(idx int) (modal, tea.Cmd, modalResult) {
+func (s searchModal) stepTo(idx int) (modal.Modal, tea.Cmd, modal.Result) {
 	s.model.SetCursor(idx)
-	return s, nil, modalResult{action: searchCursorMoved{}}
+	return s, nil, modal.Result{Action: modal.SearchCursorMoved{}}
 }
 
 func computeSearchMatches(worktrees []git.Worktree, query string) []uisearch.Match {

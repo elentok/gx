@@ -11,6 +11,7 @@ import (
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -77,7 +78,7 @@ func TestGOOpensLogsMode(t *testing.T) {
 		t.Fatalf("go should not launch command")
 	}
 	m = updated.(Model)
-	if _, ok := m.modal.(logsModal); !ok {
+	if _, ok := m.modal.(modal.Logs); !ok {
 		t.Fatalf("expected go to open logs modal, got %T", m.modal)
 	}
 }
@@ -207,7 +208,7 @@ func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
 	m.table.SetRows(m.buildRows())
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
-	if _, ok := updated.(Model).modal.(terminalMenu); ok {
+	if _, ok := updated.(Model).modal.(modal.TerminalMenu); ok {
 		t.Fatalf("o entered the terminal menu with herdr unavailable")
 	}
 }
@@ -240,7 +241,7 @@ func TestTerminalMenuItemsHideSessionOnGhosttyOnly(t *testing.T) {
 	t.Parallel()
 	values := func(term ui.Terminal) []string {
 		var out []string
-		for _, it := range terminalMenuItems(term) {
+		for _, it := range modal.TerminalMenuItems(term) {
 			out = append(out, it.Value)
 		}
 		return out
@@ -264,12 +265,12 @@ func TestGhosttyTerminalMenuActionsUseSplitShell(t *testing.T) {
 	}
 	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalGhostty}, keymgr.Manager{})
 	m = m.enterTerminalMenuFor("main", filepath.Join(repoDir, "main"))
-	tm := m.modal.(terminalMenu)
-	if len(tm.menu.Items) != 3 {
-		t.Fatalf("expected 3 ghostty items, got %d", len(tm.menu.Items))
+	tm := m.modal.(modal.TerminalMenu)
+	if len(tm.Menu().Items) != 3 {
+		t.Fatalf("expected 3 ghostty items, got %d", len(tm.Menu().Items))
 	}
 	for _, action := range []string{"hsplit", "vsplit", "tab"} {
-		cmd := tm.action(action)
+		cmd := tm.Action(action)
 		if cmd == nil {
 			t.Errorf("%s: expected a command", action)
 		}
@@ -295,7 +296,7 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 		t.Fatalf("o should not launch command")
 	}
 	m = updated.(Model)
-	if _, ok := m.modal.(terminalMenu); !ok {
+	if _, ok := m.modal.(modal.TerminalMenu); !ok {
 		t.Fatalf("expected o to open the terminal menu, got %T", m.modal)
 	}
 	if !m.InputFocused() {
@@ -307,8 +308,8 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 		t.Fatalf("s should filter the menu, not launch a session")
 	}
 	m = updated.(Model)
-	tm, ok := m.modal.(terminalMenu)
-	if !ok || tm.menu.Filter != "s" {
+	tm, ok := m.modal.(modal.TerminalMenu)
+	if !ok || tm.Menu().Filter != "s" {
 		t.Fatalf("expected s to filter the open menu, got modal=%T", m.modal)
 	}
 }

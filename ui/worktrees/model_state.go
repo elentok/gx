@@ -7,6 +7,7 @@ import (
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/pull"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	"github.com/elentok/gx/ui/help"
 
@@ -49,8 +50,8 @@ type Model struct {
 	pull   pull.Model
 	pullWT *git.Worktree // worktree being pulled, set when pull.Open is called
 
-	modal     modal      // nil in normal mode
-	helpModel help.Model // closed template; each open copies it into a helpModal
+	modal     modal.Modal // nil in normal mode
+	helpModel help.Model  // closed template; each open copies it into a helpModal
 	jobs      jobs
 
 	lastJobLog   string

@@ -1,8 +1,7 @@
-package worktrees
+package modal
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -13,11 +12,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// moreOptionsInfo is shown when the terminal has no menu to offer.
-const moreOptionsInfo = "use tmux, kitty, herdr or ghostty for more options"
+// MoreOptionsInfo is shown when the terminal has no menu to offer.
+const MoreOptionsInfo = "use tmux, kitty, herdr or ghostty for more options"
 
-// terminalMenuItems hides "session" on Ghostty, which has no session concept.
-func terminalMenuItems(terminal ui.Terminal) []components.MenuItem {
+// TerminalMenuItems hides "session" on Ghostty, which has no session concept.
+func TerminalMenuItems(terminal ui.Terminal) []components.MenuItem {
 	items := []components.MenuItem{
 		{Label: "hsplit", Value: "hsplit", Detail: "horizontal split (stacked, top/bottom)"},
 		{Label: "vsplit", Value: "vsplit", Detail: "vertical split (side-by-side)"},
@@ -30,14 +29,8 @@ func terminalMenuItems(terminal ui.Terminal) []components.MenuItem {
 	return append([]components.MenuItem{session}, items...)
 }
 
-// herdrTerminalDown reports a herdr terminal whose herdr is missing or
-// unreachable: its splits and tabs would fail, so the menu stays hidden.
-func (m Model) herdrTerminalDown() bool {
-	return m.settings.Terminal == ui.TerminalHerdr && m.settings.HerdrUnavailable
-}
-
-// terminalMenu offers the ways to open a worktree in the terminal.
-type terminalMenu struct {
+// TerminalMenu offers the ways to open a worktree in the terminal.
+type TerminalMenu struct {
 	menu     components.MenuState
 	name     string
 	path     string
@@ -47,45 +40,47 @@ type terminalMenu struct {
 	aliases  map[string]string
 }
 
-func (m Model) enterTerminalMenuFor(name, path string) Model {
-	title := "Open in Terminal"
-	if wt := m.cursorWorktree(); wt != nil {
-		title = "Open: " + wt.Name
-	}
-	return m.openModal(terminalMenu{
+// NewTerminalMenu offers the ways to open the worktree name at path in
+// terminal.
+func NewTerminalMenu(terminal ui.Terminal, name, path, title, repoName string, aliases map[string]string) TerminalMenu {
+	return TerminalMenu{
 		menu: components.MenuState{
-			Items:  terminalMenuItems(m.settings.Terminal),
+			Items:  TerminalMenuItems(terminal),
 			Cursor: 0,
 		},
 		name:     name,
 		path:     path,
 		title:    title,
-		terminal: m.settings.Terminal,
-		repoName: filepath.Base(m.repo.LinkedWorktreeDir()),
-		aliases:  m.settings.NameAliases,
-	})
+		terminal: terminal,
+		repoName: repoName,
+		aliases:  aliases,
+	}
 }
 
-func (t terminalMenu) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+// Menu is the menu's current state.
+func (t TerminalMenu) Menu() components.MenuState { return t.menu }
+
+func (t TerminalMenu) Update(msg tea.Msg) (Modal, tea.Cmd, Result) {
 	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
-		return t, nil, modalResult{unhandled: true}
+		return t, nil, Result{Unhandled: true}
 	}
 	newState, done, selected, handled := components.UpdateMenu(key, t.menu)
 	t.menu = newState
 	if !handled || !done {
-		return t, nil, modalResult{}
+		return t, nil, Result{}
 	}
 	if selected {
 		item, _ := t.menu.Selected()
-		return t, t.action(item.Value), modalResult{close: true}
+		return t, t.Action(item.Value), Result{Close: true}
 	}
-	return t, nil, modalResult{close: true}
+	return t, nil, Result{Close: true}
 }
 
-func (t terminalMenu) InputFocused() bool { return true }
+func (t TerminalMenu) InputFocused() bool { return true }
 
-func (t terminalMenu) action(action string) tea.Cmd {
+// Action is the command for one menu choice.
+func (t TerminalMenu) Action(action string) tea.Cmd {
 	name, path := t.name, t.path
 
 	shell := os.Getenv("SHELL")
@@ -142,12 +137,12 @@ func (t terminalMenu) action(action string) tea.Cmd {
 	case ui.TerminalKitty:
 		return notify.Info("enable kitty remote control for this to work")
 	default:
-		return notify.Info(moreOptionsInfo)
+		return notify.Info(MoreOptionsInfo)
 	}
 	return nil
 }
 
-func (t terminalMenu) View(_, _ int) string {
+func (t TerminalMenu) View(_, _ int) string {
 	return components.RenderMenuModal(
 		t.title, "",
 		t.menu,

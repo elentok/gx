@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -32,27 +32,16 @@ func cmdNewWorktreeAndOpen(repo git.Repo, newName string) tea.Cmd {
 	}
 }
 
-func newWorktreeInput() textinput.Model {
-	ti := textinput.New()
-	ti.Placeholder = "worktree-name"
-	ti.Focus()
-	return ti
-}
-
 func (m Model) enterNewMode() Model {
-	return m.openNewPrompt(nameNew)
+	return m.openNewPrompt(modal.NameNew)
 }
 
 func (m Model) enterNewAndOpenMode() Model {
-	return m.openNewPrompt(nameNewAndOpen)
+	return m.openNewPrompt(modal.NameNewAndOpen)
 }
 
 // openNewPrompt opens the new-worktree prompt; kind picks the command a
 // submitted name runs.
-func (m Model) openNewPrompt(kind nameKind) Model {
-	return m.openModal(textPrompt{
-		title: "New Worktree",
-		input: newWorktreeInput(),
-		kind:  kind,
-	})
+func (m Model) openNewPrompt(kind modal.NameKind) Model {
+	return m.openModal(modal.NewWorktreePrompt(kind))
 }

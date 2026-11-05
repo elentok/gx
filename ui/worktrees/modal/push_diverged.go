@@ -1,4 +1,4 @@
-package worktrees
+package modal
 
 import (
 	"fmt"
@@ -13,8 +13,8 @@ import (
 	humanize "github.com/dustin/go-humanize"
 )
 
-// pushDivergedModal asks how to resolve a push that the remote has diverged from.
-type pushDivergedModal struct {
+// PushDiverged asks how to resolve a push that the remote has diverged from.
+type PushDiverged struct {
 	divergence *git.PushDivergence
 	wt         git.Worktree
 	menu       components.MenuState
@@ -22,11 +22,13 @@ type pushDivergedModal struct {
 	log string
 }
 
-func (m Model) enterPushDivergedMode(wt git.Worktree, div *git.PushDivergence) Model {
-	return m.openModal(pushDivergedModal{
+// NewPushDiverged builds the menu for wt's divergence; log is the last job
+// output, handed on to the follow-up command.
+func NewPushDiverged(wt git.Worktree, div *git.PushDivergence, log string) PushDiverged {
+	return PushDiverged{
 		divergence: div,
 		wt:         wt,
-		log:        m.lastJobLog,
+		log:        log,
 		menu: components.MenuState{
 			Items: []components.MenuItem{
 				{Label: "Rebase", Value: "rebase"},
@@ -35,39 +37,39 @@ func (m Model) enterPushDivergedMode(wt git.Worktree, div *git.PushDivergence) M
 			},
 			Cursor: 0,
 		},
-	})
+	}
 }
 
-func (p pushDivergedModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+func (p PushDiverged) Update(msg tea.Msg) (Modal, tea.Cmd, Result) {
 	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
-		return p, nil, modalResult{unhandled: true}
+		return p, nil, Result{Unhandled: true}
 	}
 	next, decided, accepted, handled := components.UpdateMenu(key, p.menu)
 	if !handled {
-		return p, nil, modalResult{}
+		return p, nil, Result{}
 	}
 	p.menu = next
 	if !decided {
-		return p, nil, modalResult{}
+		return p, nil, Result{}
 	}
 	if !accepted {
-		return p, notify.Info(ui.MessageAborted("push")), modalResult{close: true}
+		return p, notify.Info(ui.MessageAborted("push")), Result{Close: true}
 	}
 	item, _ := p.menu.Selected()
 	switch item.Value {
 	case "rebase":
-		return p, nil, modalResult{close: true, spinner: "Rebasing " + p.wt.Name + "...", action: rebase{wt: p.wt, upstream: p.divergence.Upstream, log: p.log}}
+		return p, nil, Result{Close: true, Spinner: "Rebasing " + p.wt.Name + "...", Action: Rebase{Wt: p.wt, Upstream: p.divergence.Upstream, Log: p.log}}
 	case "force":
-		return p, nil, modalResult{close: true, action: forcePush{wt: p.wt, log: p.log}}
+		return p, nil, Result{Close: true, Action: ForcePush{Wt: p.wt, Log: p.log}}
 	default:
-		return p, notify.Info(ui.MessageAborted("push")), modalResult{close: true}
+		return p, notify.Info(ui.MessageAborted("push")), Result{Close: true}
 	}
 }
 
-func (p pushDivergedModal) InputFocused() bool { return true }
+func (p PushDiverged) InputFocused() bool { return true }
 
-func (p pushDivergedModal) View(_, _ int) string {
+func (p PushDiverged) View(_, _ int) string {
 	d := p.divergence
 	prompt := fmt.Sprintf(
 		"Branch %s has diverged from the remote branch:\n\nLast local commit: %s\n  %s %s\n\nLast remote commit: %s\n  %s %s",

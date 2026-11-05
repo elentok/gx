@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/worktrees/launch"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -222,7 +223,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingOpenTerminal:
 		if m.settings.Terminal == ui.TerminalPlain || m.herdrTerminalDown() {
-			return m, notify.Info(moreOptionsInfo)
+			return m, notify.Info(modal.MoreOptionsInfo)
 		}
 		wt := m.cursorWorktree()
 		if wt != nil {

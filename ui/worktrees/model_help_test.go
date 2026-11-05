@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	keymgr "github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -31,12 +32,12 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 		t.Fatalf("expected no command when opening help")
 	}
 	m = updated.(Model)
-	hm, ok := m.modal.(helpModal)
+	hm, ok := m.modal.(modal.Help)
 	if !ok {
 		t.Fatalf("expected help modal after ?, got %T", m.modal)
 	}
-	if hm.model.Viewport.Width() == 0 || hm.model.Viewport.Height() == 0 {
-		t.Fatalf("expected initialized help viewport, got %dx%d", hm.model.Viewport.Width(), hm.model.Viewport.Height())
+	if hm.Model().Viewport.Width() == 0 || hm.Model().Viewport.Height() == 0 {
+		t.Fatalf("expected initialized help viewport, got %dx%d", hm.Model().Viewport.Width(), hm.Model().Viewport.Height())
 	}
 
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})

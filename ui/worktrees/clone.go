@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -50,26 +50,13 @@ func cmdClone(repo git.Repo, src git.Worktree, newName string) tea.Cmd {
 	}
 }
 
-// newCloneInput creates a focused textinput pre-filled with the source name.
-func newCloneInput(sourceName string) textinput.Model {
-	ti := textinput.New()
-	ti.SetValue(sourceName)
-	ti.CursorEnd()
-	ti.Focus()
-	return ti
-}
-
 // enterCloneMode opens the clone prompt.
 func (m Model) enterCloneMode() Model {
 	wt := m.cursorWorktree()
 	if wt == nil {
 		return m
 	}
-	return m.openModal(textPrompt{
-		title: "Clone Worktree",
-		input: newCloneInput(wt.Name),
-		kind:  nameClone,
-	})
+	return m.openModal(modal.NewClonePrompt(wt.Name))
 }
 
 // ── file copy helpers ─────────────────────────────────────────────────────────

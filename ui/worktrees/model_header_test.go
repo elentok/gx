@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -31,7 +32,7 @@ func worktreesHeader(m Model) string {
 }
 
 func withPaste(m Model) Model {
-	m.modal = pasteModal{clipboard: clipboardState{srcName: "feat-x", files: []string{"a", "b", "c"}}}
+	m.modal = pasteModal{clipboard: modal.Clipboard{SrcName: "feat-x", Files: []string{"a", "b", "c"}}}
 	return m
 }
 

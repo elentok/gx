@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -52,7 +53,7 @@ func (m Model) modalOverlay(bg string) string {
 	if view == "" {
 		return bg
 	}
-	if _, ok := m.modal.(bottomAnchored); ok {
+	if _, ok := m.modal.(modal.BottomAnchored); ok {
 		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(view))
 		return ui.OverlayBottomCenter(bg, view, m.width, y)
 	}
@@ -110,7 +111,7 @@ func (m Model) headerStatus(avail int, bg color.Color) string {
 	switch {
 	case pasting:
 		fixed = ui.RenderChip("PASTE", ui.ColorBlue)
-		text = fmt.Sprintf("%d files from %s", len(paste.clipboard.files), paste.clipboard.srcName)
+		text = fmt.Sprintf("%d files from %s", len(paste.clipboard.Files), paste.clipboard.SrcName)
 	case m.spinnerActive:
 		fixed = dim.Render(strings.TrimSpace(m.spinner.View()))
 		text = m.spinnerLabel

@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -28,25 +28,11 @@ func cmdRename(repo git.Repo, wt git.Worktree, newName string) tea.Cmd {
 	}
 }
 
-// newRenameInput creates a focused textinput pre-filled with the current name.
-func newRenameInput(currentName string) textinput.Model {
-	ti := textinput.New()
-	ti.SetValue(currentName)
-	// Position cursor at end so the user can backspace or edit inline
-	ti.CursorEnd()
-	ti.Focus()
-	return ti
-}
-
 // enterRenameMode opens the rename prompt.
 func (m Model) enterRenameMode() Model {
 	wt := m.cursorWorktree()
 	if wt == nil {
 		return m
 	}
-	return m.openModal(textPrompt{
-		title: "Rename Worktree",
-		input: newRenameInput(wt.Name),
-		kind:  nameRename,
-	})
+	return m.openModal(modal.NewRenamePrompt(wt.Name))
 }

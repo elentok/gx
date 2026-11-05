@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -134,11 +135,11 @@ func (m Model) enterDeleteProgress(worktrees []git.Worktree) (Model, tea.Cmd) {
 
 // Update swallows keys while the batch runs and leaves everything else to the
 // page.
-func (d deleteProgress) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+func (d deleteProgress) Update(msg tea.Msg) (modal.Modal, tea.Cmd, modal.Result) {
 	if _, ok := msg.(tea.KeyPressMsg); ok {
-		return d, nil, modalResult{}
+		return d, nil, modal.Result{}
 	}
-	return d, nil, modalResult{unhandled: true}
+	return d, nil, modal.Result{Unhandled: true}
 }
 
 func (d deleteProgress) InputFocused() bool { return false }

@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -16,13 +17,6 @@ type yankDataMsg struct {
 	worktreePath string
 	changes      []git.Change
 	err          error
-}
-
-// clipboardState holds the yanked file paths and their source worktree.
-type clipboardState struct {
-	srcPath string   // absolute path of source worktree
-	srcName string   // display name
-	files   []string // relative file paths
 }
 
 // cmdLoadYankData loads uncommitted changes for the given worktree.
@@ -52,27 +46,27 @@ func (m Model) enterYankMode() (Model, tea.Cmd) {
 
 // Update toggles checklist items, closes on esc, and on enter hands the
 // checked files on as the paste clipboard.
-func (y yankModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+func (y yankModal) Update(msg tea.Msg) (modal.Modal, tea.Cmd, modal.Result) {
 	k, ok := msg.(tea.KeyPressMsg)
 	if !ok {
-		return y, nil, modalResult{unhandled: true}
+		return y, nil, modal.Result{Unhandled: true}
 	}
 	switch k.String() {
 	case "esc":
-		return y, nil, modalResult{close: true}
+		return y, nil, modal.Result{Close: true}
 	case "enter":
 		files := y.checklist.Checked()
 		if len(files) == 0 {
-			return y, nil, modalResult{close: true}
+			return y, nil, modal.Result{Close: true}
 		}
-		return y, nil, modalResult{close: true, action: openPaste{clipboard: clipboardState{
-			srcPath: y.source.Path,
-			srcName: y.source.Name,
-			files:   files,
+		return y, nil, modal.Result{Close: true, Action: modal.OpenPaste{Clipboard: modal.Clipboard{
+			SrcPath: y.source.Path,
+			SrcName: y.source.Name,
+			Files:   files,
 		}}}
 	}
 	y.checklist = y.checklist.Update(k.String())
-	return y, nil, modalResult{}
+	return y, nil, modal.Result{}
 }
 
 func (y yankModal) InputFocused() bool { return false }

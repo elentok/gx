@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -33,7 +34,7 @@ func newUpdateTestModel(t *testing.T) Model {
 func TestInputFocused_TrueInRenameMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.modal = textPrompt{}
+	m.modal = modal.NewRenamePrompt("")
 	if !m.InputFocused() {
 		t.Error("expected InputFocused=true with the rename prompt open")
 	}
@@ -42,7 +43,7 @@ func TestInputFocused_TrueInRenameMode(t *testing.T) {
 func TestInputFocused_TrueInCloneMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.modal = textPrompt{}
+	m.modal = modal.NewRenamePrompt("")
 	if !m.InputFocused() {
 		t.Error("expected InputFocused=true with the clone prompt open")
 	}
@@ -51,7 +52,7 @@ func TestInputFocused_TrueInCloneMode(t *testing.T) {
 func TestInputFocused_TrueInNewMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.modal = textPrompt{}
+	m.modal = modal.NewRenamePrompt("")
 	if !m.InputFocused() {
 		t.Error("expected InputFocused=true with the new prompt open")
 	}
@@ -80,7 +81,7 @@ func TestUpdate_RenameResultMsg_Error(t *testing.T) {
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(renameResultMsg{err: errTest})
 	next := updated.(Model)
-	if _, ok := next.modal.(errorModal); !ok {
+	if _, ok := next.modal.(modal.Error); !ok {
 		t.Errorf("expected error modal after rename error, got %T", next.modal)
 	}
 }
@@ -90,7 +91,7 @@ func TestUpdate_CloneResultMsg_Error(t *testing.T) {
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(cloneResultMsg{err: errTest})
 	next := updated.(Model)
-	if _, ok := next.modal.(errorModal); !ok {
+	if _, ok := next.modal.(modal.Error); !ok {
 		t.Errorf("expected error modal after clone error, got %T", next.modal)
 	}
 }
@@ -100,7 +101,7 @@ func TestUpdate_NewResultMsg_Error(t *testing.T) {
 	m := newUpdateTestModel(t)
 	updated, _ := m.Update(newResultMsg{err: errTest})
 	next := updated.(Model)
-	if _, ok := next.modal.(errorModal); !ok {
+	if _, ok := next.modal.(modal.Error); !ok {
 		t.Errorf("expected error modal after new error, got %T", next.modal)
 	}
 }

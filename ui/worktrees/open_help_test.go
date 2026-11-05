@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -30,7 +31,7 @@ func TestOpenHelpOpensHelp(t *testing.T) {
 
 	updated, _ := m.Update(nav.OpenHelp()())
 	m = updated.(Model)
-	if hm, ok := m.modal.(helpModal); !ok || !hm.model.IsOpen {
+	if hm, ok := m.modal.(modal.Help); !ok || !hm.Model().IsOpen {
 		t.Fatalf("expected help open, got modal %T", m.modal)
 	}
 }
@@ -46,7 +47,7 @@ func TestOpenHelpFromSearchTypesNothing(t *testing.T) {
 
 	updated, _ = m.Update(nav.OpenHelp()())
 	m = updated.(Model)
-	if hm, ok := m.modal.(helpModal); !ok || !hm.model.IsOpen {
+	if hm, ok := m.modal.(modal.Help); !ok || !hm.Model().IsOpen {
 		t.Fatalf("expected help open, got modal %T", m.modal)
 	}
 	if got := m.searchQuery(); got != "" {
@@ -66,10 +67,10 @@ func TestOpenHelpWithModalOpenDoesNothing(t *testing.T) {
 	}
 
 	m.confirm.IsOpen = false
-	m.modal = textPrompt{}
+	m.modal = modal.NewRenamePrompt("")
 	updated, _ = m.Update(nav.OpenHelp()())
 	m = updated.(Model)
-	if _, ok := m.modal.(textPrompt); !ok {
+	if _, ok := m.modal.(modal.TextPrompt); !ok {
 		t.Fatalf("expected rename dialog kept, got modal %T", m.modal)
 	}
 }
