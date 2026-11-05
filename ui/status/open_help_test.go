@@ -48,7 +48,7 @@ func TestOpenHelpFromSearchEndsSearch(t *testing.T) {
 	if !m.help.IsOpen {
 		t.Fatal("expected help open")
 	}
-	if s := m.filetree.model.Search(); s.Mode() != search.SearchModeNone || s.Query() != "" {
+	if s := m.filetree.Model.Search(); s.Mode() != search.SearchModeNone || s.Query() != "" {
 		t.Fatalf("search not ended: mode %v query %q", s.Mode(), s.Query())
 	}
 

@@ -5,11 +5,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git/stage"
+	"github.com/elentok/gx/ui/status/filetree"
 	"github.com/elentok/gx/ui/status/stagemodal"
 )
 
 func (m *Model) reload(preservePath string) tea.Cmd {
-	m.filetree.reloadBranchState(m.worktreeRoot)
+	m.filetree.ReloadBranchState(m.worktreeRoot)
 	m.reloadFileList(preservePath)
 	return m.reloadDiffsForSelection()
 }
@@ -18,19 +19,19 @@ func (m *Model) reloadFileList(preservePath string) {
 	files, err := stage.ListStageFiles(m.worktreeRoot)
 	if err != nil {
 		m.err = err
-		m.filetree.clearFiles()
+		m.filetree.ClearFiles()
 		m.diffarea.ResetSections()
 		return
 	}
 	m.err = nil
-	m.filetree.setFiles(files)
-	if m.filetree.model.Search().HasQuery() {
-		matches := m.filetree.computeSearchMatches(m.filetree.model.Search().Query())
-		_ = m.filetree.model.SetSearchMatchesAndJump(matches)
+	m.filetree.SetFiles(files)
+	if m.filetree.Model.Search().HasQuery() {
+		matches := m.filetree.ComputeSearchMatches(m.filetree.Model.Search().Query())
+		_ = m.filetree.Model.SetSearchMatchesAndJump(matches)
 	}
 
-	if len(m.filetree.data.statusEntries) == 0 {
-		m.filetree.setSelection(0)
+	if len(m.filetree.Data.Entries) == 0 {
+		m.filetree.SetSelection(0)
 		m.diffLoader.activeFilePath = ""
 		m.diffarea.ResetSections()
 		m.focus = focusFiletree
@@ -44,18 +45,18 @@ func (m *Model) reloadFileList(preservePath string) {
 	}
 
 	if targetPath != "" {
-		for i, entry := range m.filetree.data.statusEntries {
+		for i, entry := range m.filetree.Data.Entries {
 			if entry.Path == targetPath {
-				m.filetree.setSelection(i)
+				m.filetree.SetSelection(i)
 				break
 			}
 		}
 	}
-	m.filetree.setSelection(m.filetree.data.listState.Selected())
+	m.filetree.SetSelection(m.filetree.Data.ListState.Selected())
 }
 
 func moveToAdjacentFile(m *Model, delta int) (bool, tea.Cmd) {
-	if !m.filetree.moveToAdjacent(delta) {
+	if !m.filetree.MoveToAdjacent(delta) {
 		return false, nil
 	}
 	onFiletreeSelectionChanged(m)
@@ -67,7 +68,7 @@ func moveToAdjacentFile(m *Model, delta int) (bool, tea.Cmd) {
 }
 
 func toggleStageStatusEntry(m *Model) tea.Cmd {
-	entry, ok := m.filetree.selectedEntry()
+	entry, ok := m.filetree.SelectedEntry()
 	if !ok {
 		return nil
 	}
@@ -90,11 +91,11 @@ func toggleStageStatusEntry(m *Model) tea.Cmd {
 }
 
 func openDiscardStatusConfirm(m *Model) {
-	entry, ok := m.filetree.selectedEntry()
+	entry, ok := m.filetree.SelectedEntry()
 	if !ok {
 		return
 	}
-	row, ok := m.filetree.selectedRow()
+	row, ok := m.filetree.SelectedRow()
 	if !ok {
 		return
 	}
@@ -105,7 +106,7 @@ func openDiscardStatusConfirm(m *Model) {
 	lines := []string{}
 
 	switch entry.Kind {
-	case statusEntryDir:
+	case filetree.EntryDir:
 		restorePaths, deletePaths = statusDiscardPathsForLeaves(row.Leaves)
 		hasUntracked := len(deletePaths) > 0
 		switch {
@@ -119,7 +120,7 @@ func openDiscardStatusConfirm(m *Model) {
 		default:
 			lines = append(lines, "This will discard all tracked changes in this directory.")
 		}
-	case statusEntryFile:
+	case filetree.EntryFile:
 		switch {
 		case entry.File.IsUntracked():
 			lines = append(lines, "This will delete the untracked file.")
@@ -144,7 +145,7 @@ func openDiscardStatusConfirm(m *Model) {
 		Title:            title,
 		Lines:            lines,
 		Action:           stagemodal.ConfirmDiscardStatus,
-		DiscardUntracked: entry.Kind == statusEntryFile && entry.File.IsUntracked(),
+		DiscardUntracked: entry.Kind == filetree.EntryFile && entry.File.IsUntracked(),
 		Paths:            uniqueNonEmpty(restorePaths),
 		DeletePaths:      uniqueNonEmpty(deletePaths),
 		DisplayPath:      entry.Path,

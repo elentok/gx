@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/status/filetree"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -28,7 +29,7 @@ func (m Model) View() tea.View {
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		out = m.renderDiffPane(m.width, mainH)
 	} else {
-		filetreePanel := m.renderFiletreePane(filetreeW, maxInt(minFiletreePaneHeight, filetreeH))
+		filetreePanel := m.renderFiletreePane(filetreeW, maxInt(filetree.MinPaneHeight, filetreeH))
 		diffPanel := m.renderDiffPane(diffW, diffH)
 		if useStackedLayout(m.width) {
 			seam := ui.RenderSeamRow(m.width, ui.SeamColor)

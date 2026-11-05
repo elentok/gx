@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/status/filetree"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,8 +91,8 @@ func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 	if _, err := os.Stat(repo + "/new.txt"); err == nil {
 		t.Fatalf("expected untracked file to be deleted after discard confirm")
 	}
-	if len(m.filetree.data.statusEntries) != 0 {
-		t.Fatalf("expected no status entries after discard, got %d", len(m.filetree.data.statusEntries))
+	if len(m.filetree.Data.Entries) != 0 {
+		t.Fatalf("expected no status entries after discard, got %d", len(m.filetree.Data.Entries))
 	}
 }
 
@@ -109,8 +110,8 @@ func TestFiletreeDDiscardsDirectoryAfterConfirm(t *testing.T) {
 	m.ready = true
 	m.focus = focusFiletree
 
-	entry, ok := m.filetree.selectedEntry()
-	if !ok || entry.Kind != statusEntryDir || entry.Path != "dir" {
+	entry, ok := m.filetree.SelectedEntry()
+	if !ok || entry.Kind != filetree.EntryDir || entry.Path != "dir" {
 		t.Fatalf("expected selected directory entry, got %+v ok=%v", entry, ok)
 	}
 
@@ -133,8 +134,8 @@ func TestFiletreeDDiscardsDirectoryAfterConfirm(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, "dir/new.txt")); err == nil {
 		t.Fatalf("expected untracked file inside directory to be deleted after discard confirm")
 	}
-	if len(m.filetree.data.statusEntries) != 0 {
-		t.Fatalf("expected no status entries after directory discard, got %d", len(m.filetree.data.statusEntries))
+	if len(m.filetree.Data.Entries) != 0 {
+		t.Fatalf("expected no status entries after directory discard, got %d", len(m.filetree.Data.Entries))
 	}
 }
 
@@ -547,7 +548,7 @@ func TestDiffDotMovesToNextFile(t *testing.T) {
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
 
-	before, ok := m.filetree.selectedFile()
+	before, ok := m.filetree.SelectedFile()
 	if !ok {
 		t.Fatalf("expected selected file before navigation")
 	}
@@ -555,7 +556,7 @@ func TestDiffDotMovesToNextFile(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
 	m = updated.(Model)
 
-	after, ok := m.filetree.selectedFile()
+	after, ok := m.filetree.SelectedFile()
 	if !ok {
 		t.Fatalf("expected selected file after navigation")
 	}
@@ -578,7 +579,7 @@ func TestDiffCommaMovesToPreviousFile(t *testing.T) {
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
 
-	first, ok := m.filetree.selectedFile()
+	first, ok := m.filetree.SelectedFile()
 	if !ok {
 		t.Fatalf("expected selected file")
 	}
@@ -589,7 +590,7 @@ func TestDiffCommaMovesToPreviousFile(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
 	m = updated.(Model)
 
-	back, ok := m.filetree.selectedFile()
+	back, ok := m.filetree.SelectedFile()
 	if !ok {
 		t.Fatalf("expected selected file after ','")
 	}

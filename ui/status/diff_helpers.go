@@ -12,7 +12,7 @@ type statusDiffFileSelection struct {
 }
 
 func (m Model) selectedStatusFile() (statusDiffFileSelection, bool) {
-	file, ok := m.filetree.selectedFile()
+	file, ok := m.filetree.SelectedFile()
 	if !ok {
 		return statusDiffFileSelection{}, false
 	}

@@ -27,7 +27,7 @@ func handleMouseWheel(m *Model, msg tea.MouseWheelMsg) bool {
 }
 
 func searchActive(m Model) bool {
-	return m.filetree.model.Search().IsActive() ||
+	return m.filetree.Model.Search().IsActive() ||
 		m.diffarea.Unstaged.Search().IsActive() ||
 		m.diffarea.Staged.Search().IsActive()
 }
@@ -58,8 +58,8 @@ func scrollFiletreeByMouse(m *Model, x, y, dir int) bool {
 	if !(ui.Rect{X: filetreeX, Y: filetreeY, W: filetreeW, H: filetreeH}).Contains(x, y) {
 		return false
 	}
-	m.filetree.model.SetVisibleHeight(m.filetree.innerHeight(filetreeH, filetreeViewOf(*m)))
-	m.filetree.model.ScrollViewport(dir * 3)
+	m.filetree.Model.SetVisibleHeight(m.filetree.InnerHeight(filetreeH, filetreeViewOf(*m)))
+	m.filetree.Model.ScrollViewport(dir * 3)
 	return true
 }
 

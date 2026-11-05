@@ -3,8 +3,6 @@ package status
 import (
 	"time"
 
-	"github.com/elentok/gx/git"
-
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/gitops"
@@ -12,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/status/filetree"
 	"github.com/elentok/gx/ui/status/stagemodal"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -28,7 +27,7 @@ type Model struct {
 
 	focus    focusPane
 	diffarea diffarea.Model
-	filetree filetreePane
+	filetree filetree.Pane
 
 	err  error
 	help help.Model
@@ -53,11 +52,6 @@ type flashTickMsg struct{}
 type renderTickMsg struct{}
 type diffReloadMsg struct{ seq int }
 type statusStartupLoadMsg struct{}
-
-type branchSyncLoadedMsg struct {
-	branchName string
-	sync       git.SyncStatus
-}
 
 type commitFinishedMsg struct {
 	err      error
@@ -96,7 +90,7 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 		keys:         statusKeys,
 		focus:        focusFiletree,
 		diffarea:     diffarreaModel,
-		filetree:     filetreePane{model: fileTreeModel},
+		filetree:     filetree.Pane{Model: fileTreeModel},
 		git:          gitops.New(),
 
 		overlay: imagediff.NewOverlay(imagediff.WriteToStdout, imagediff.DefaultDetectCapability),

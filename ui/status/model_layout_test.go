@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/status/filetree"
 	"github.com/elentok/gx/ui/tree"
 	"strings"
 	"testing"
@@ -40,10 +41,10 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		width: 180,
-		filetree: filetreePane{
-			data: statusData{
-				statusEntries: []statusEntry{{
-					Kind:        statusEntryFile,
+		filetree: filetree.Pane{
+			Data: filetree.Data{
+				Entries: []filetree.Entry{{
+					Kind:        filetree.EntryFile,
 					DisplayName: "renamed.go",
 					File: stage.StageFileStatus{
 						Path:         "new/renamed.go",
@@ -54,10 +55,10 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 					HasStaged: true,
 				}},
 			},
-			model: tree.NewModel[stage.StageFileStatus](),
+			Model: tree.NewModel[stage.StageFileStatus](),
 		},
 	}
-	m.filetree.model.SetEntries([]tree.Entry[stage.StageFileStatus]{
+	m.filetree.Model.SetEntries([]tree.Entry[stage.StageFileStatus]{
 		{DisplayName: "renamed.go", Value: stage.StageFileStatus{Path: "new/renamed.go", RenameFrom: "old/name.go", IndexStatus: 'R', WorktreeCode: ' '}},
 	})
 
@@ -78,10 +79,10 @@ func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		width: 200,
-		filetree: filetreePane{data: statusData{
-			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
-			branchBaseRef: "origin/release/very-long-train-name",
-			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+		filetree: filetree.Pane{Data: filetree.Data{
+			BranchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
+			BranchBaseRef: "origin/release/very-long-train-name",
+			BranchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
 		}},
 	}
 
@@ -98,10 +99,10 @@ func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		width: 101,
-		filetree: filetreePane{data: statusData{
-			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
-			branchBaseRef: "origin/release/very-long-train-name",
-			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
+		filetree: filetree.Pane{Data: filetree.Data{
+			BranchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
+			BranchBaseRef: "origin/release/very-long-train-name",
+			BranchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
 		}},
 	}
 

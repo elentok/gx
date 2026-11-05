@@ -4,20 +4,18 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/filetree"
 
 	tea "charm.land/bubbletea/v2"
 )
 
 const (
-	bindingToggleStage keys.BindingID = "toggle-stage"
-	bindingDiscard     keys.BindingID = "discard"
-
 	filetreeCat = "Filetree"
 )
 
 var (
-	toggleStageBinding = keys.Binding{ID: bindingToggleStage, Seq: []string{"space"}, Categories: []string{filetreeCat}, Title: "toggle stage"}
-	discardBinding     = keys.Binding{ID: bindingDiscard, Seq: []string{"d"}, Categories: []string{filetreeCat}, Title: "discard"}
+	toggleStageBinding = keys.Binding{ID: filetree.BindingToggleStage, Seq: []string{"space"}, Categories: []string{filetreeCat}, Title: "toggle stage"}
+	discardBinding     = keys.Binding{ID: filetree.BindingDiscard, Seq: []string{"d"}, Categories: []string{filetreeCat}, Title: "discard"}
 )
 
 func delegateToChild(m Model, msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -29,7 +27,7 @@ func delegateToChild(m Model, msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 func delegateToFiletree(m Model, msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var childCmd tea.Cmd
-	var result FiletreeResult
+	var result filetree.Result
 	m.filetree, childCmd, result = m.filetree.Update(msg)
 
 	switch {
@@ -56,7 +54,7 @@ func delegateToFiletree(m Model, msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 	selectionChanged := result.SelectionChanged
 	if selectionChanged {
-		m.filetree.syncListSelection()
+		m.filetree.SyncListSelection()
 		onFiletreeSelectionChanged(&m)
 	}
 	if childCmd != nil {

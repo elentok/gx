@@ -189,13 +189,13 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		}
 		return m, nil
 	case bindingStashAll:
-		if !m.filetree.hasStashableChanges(false) {
+		if !m.filetree.HasStashableChanges(false) {
 			return m, notify.Info("nothing to stash")
 		}
 		m.keys.Reset()
 		return m, m.git.OpenStash(m.worktreeRoot, false)
 	case bindingStashStaged:
-		if !m.filetree.hasStashableChanges(true) {
+		if !m.filetree.HasStashableChanges(true) {
 			return m, notify.Info("nothing staged to stash")
 		}
 		m.keys.Reset()

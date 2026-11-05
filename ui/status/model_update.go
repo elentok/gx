@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/filetree"
 	"github.com/elentok/gx/ui/status/stagemodal"
 
 	tea "charm.land/bubbletea/v2"
@@ -22,7 +23,7 @@ func (m Model) Init() tea.Cmd {
 	if m.settings.EnableNavigation {
 		return tea.Batch(heartbeatCmd, statusStartupLoadCmd())
 	}
-	return tea.Batch(heartbeatCmd, m.filetree.cmdLoadBranchSync(m.worktreeRoot))
+	return tea.Batch(heartbeatCmd, m.filetree.CmdLoadBranchSync(m.worktreeRoot))
 }
 
 func renderTickCmd() tea.Cmd {
@@ -94,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return handleActionPoll(m)
 	case diffReloadMsg:
 		return handleDiffReload(m, msg)
-	case branchSyncLoadedMsg:
+	case filetree.BranchSyncLoadedMsg:
 		return handleBranchSyncLoaded(m, msg)
 	case tea.MouseWheelMsg:
 		return handleMouseWheelMsg(m, msg)
@@ -121,16 +122,16 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 }
 
 func openSelectedFile(m *Model) tea.Cmd {
-	entry, ok := m.filetree.selectedEntry()
-	if ok && entry.Kind == statusEntryFile {
+	entry, ok := m.filetree.SelectedEntry()
+	if ok && entry.Kind == filetree.EntryFile {
 		return m.enterDiffFromStatus(false)
 	}
 	return nil
 }
 
 func handleSearchQueryUpdated(m Model, msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
-	matches := m.filetree.computeSearchMatches(msg.Query)
-	return m, m.filetree.model.SetSearchMatchesAndJump(matches)
+	matches := m.filetree.ComputeSearchMatches(msg.Query)
+	return m, m.filetree.Model.SetSearchMatchesAndJump(matches)
 }
 
 func handleWindowSize(m Model, msg tea.WindowSizeMsg) (Model, tea.Cmd) {
@@ -150,9 +151,9 @@ func handleWindowSize(m Model, msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 }
 
 func handleStartupLoad(m Model) (Model, tea.Cmd) {
-	m.filetree.reloadBranchState(m.worktreeRoot)
+	m.filetree.ReloadBranchState(m.worktreeRoot)
 	reloadCmd := m.reloadDiffsForSelection()
-	return m, tea.Batch(reloadCmd, m.filetree.cmdLoadBranchSync(m.worktreeRoot))
+	return m, tea.Batch(reloadCmd, m.filetree.CmdLoadBranchSync(m.worktreeRoot))
 }
 
 func handleActionPoll(m Model) (Model, tea.Cmd) {
@@ -178,8 +179,8 @@ func handleDiffReload(m Model, msg diffReloadMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func handleBranchSyncLoaded(m Model, msg branchSyncLoadedMsg) (Model, tea.Cmd) {
-	m.filetree.applyBranchSync(msg.branchName, msg.sync)
+func handleBranchSyncLoaded(m Model, msg filetree.BranchSyncLoadedMsg) (Model, tea.Cmd) {
+	m.filetree.ApplyBranchSync(msg.BranchName, msg.Sync)
 	return m, nil
 }
 

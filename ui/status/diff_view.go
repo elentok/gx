@@ -2,8 +2,6 @@ package status
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/status/diffarea"
@@ -32,7 +30,7 @@ func (m *Model) syncDiffViewports() {
 		diffW = m.width
 	}
 	m.diffarea.SyncForSize(diffW, diffH)
-	m.filetree.model.SetVisibleHeight(m.filetree.innerHeight(filetreeH, filetreeViewOf(*m)))
+	m.filetree.Model.SetVisibleHeight(m.filetree.InnerHeight(filetreeH, filetreeViewOf(*m)))
 }
 
 func (m Model) binarySummaryLine() string {
@@ -45,17 +43,6 @@ func (m Model) binarySummaryLine() string {
 		return "binary file"
 	}
 	return fmt.Sprintf("binary file (prev size: %s, new size: %s)", formatSize(prevSize, prevOK), formatSize(newSize, newOK))
-}
-
-// isWorktreeSymlink reports whether the file at relPath inside worktreeRoot is a
-// symlink in the working tree. Returns false if the file does not exist or any
-// error occurs (e.g. deleted files).
-func isWorktreeSymlink(worktreeRoot, relPath string) bool {
-	info, err := os.Lstat(filepath.Join(worktreeRoot, filepath.FromSlash(relPath)))
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeSymlink != 0
 }
 
 func formatSize(size int64, ok bool) string {

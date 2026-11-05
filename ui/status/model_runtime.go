@@ -74,7 +74,7 @@ func (m *Model) refreshPreserveScroll() tea.Cmd {
 
 func (m *Model) refreshWithBehavior(preserveScroll bool) tea.Cmd {
 	preserve := ""
-	if entry, ok := m.filetree.selectedEntry(); ok {
+	if entry, ok := m.filetree.SelectedEntry(); ok {
 		preserve = entry.Path
 	}
 	unstagedOffset := m.diffarea.Unstaged.Viewport().YOffset()

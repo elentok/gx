@@ -382,14 +382,14 @@ func TestRefreshesOnFocusMsg(t *testing.T) {
 	m := newTestModelDefault(repo)
 	m.ready = true
 
-	countBefore := len(m.filetree.data.statusEntries)
+	countBefore := len(m.filetree.Data.Entries)
 	testutil.WriteFile(t, repo, "b.txt", "two\n")
 
 	updated, _ := m.Update(tea.FocusMsg{})
 	m = updated.(Model)
 
-	if len(m.filetree.data.statusEntries) <= countBefore {
-		t.Fatalf("expected refresh on focus to include new file; before=%d after=%d", countBefore, len(m.filetree.data.statusEntries))
+	if len(m.filetree.Data.Entries) <= countBefore {
+		t.Fatalf("expected refresh on focus to include new file; before=%d after=%d", countBefore, len(m.filetree.Data.Entries))
 	}
 }
 
