@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 )
 
@@ -26,7 +27,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
+		Label: "iter-20", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "20",
 		SessionCwd: "/repo/iter-20", SmartZone: 150_000, ScratchDir: scratchDir,
 		EpicName: "epic", Gate: NewGate(),
 	}, "codex-session-20")
@@ -57,7 +58,7 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
+		Label: "iter-20", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "20",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-20")
 	if err != nil {
@@ -76,7 +77,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
+		Label: "iter-21", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "21",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-21")
 	if err == nil {
@@ -101,7 +102,7 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
+		Label: "iter-21", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "21",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-21")
 	if err == nil || !strings.Contains(err.Error(), "recovery failed") {
@@ -120,7 +121,7 @@ func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfPausing
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-22", Agent: AgentCodex, Pane: "pane-1", Ticket: "22", TicketPath: ticketPath,
+		Label: "iter-22", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "22", TicketPath: ticketPath,
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-22")
 	if err != nil {
@@ -168,20 +169,20 @@ func TestWaitForFinish_InterruptNotReadyRetriesNextPoll(t *testing.T) {
 	const banner = "■ Codex ran out of room in the model's context window."
 	cases := []struct {
 		name  string
-		agent AgentKind
+		agent agent.AgentKind
 		setup func(r *blipRunner)
 		zone  bool
 	}{
-		{name: "codex blocked", agent: AgentCodex, setup: func(r *blipRunner) {
+		{name: "codex blocked", agent: agent.AgentCodex, setup: func(r *blipRunner) {
 			r.contextExhausted = banner
 			r.SetState("iter-30", agentrunner.StateBlocked, "")
 		}},
-		{name: "codex idle", agent: AgentCodex, setup: func(r *blipRunner) { r.contextExhausted = banner }},
-		{name: "codex timeout while working", agent: AgentCodex, setup: func(r *blipRunner) {
+		{name: "codex idle", agent: agent.AgentCodex, setup: func(r *blipRunner) { r.contextExhausted = banner }},
+		{name: "codex timeout while working", agent: agent.AgentCodex, setup: func(r *blipRunner) {
 			r.contextExhausted = banner
 			r.timeoutIf = func(n int) bool { return n <= 2 }
 		}},
-		{name: "smart zone", agent: AgentCodex, zone: true, setup: func(r *blipRunner) { r.timeoutIf = func(n int) bool { return n <= 2 } }},
+		{name: "smart zone", agent: agent.AgentCodex, zone: true, setup: func(r *blipRunner) { r.timeoutIf = func(n int) bool { return n <= 2 } }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -220,7 +221,7 @@ func TestWaitForFinish_InterruptOtherErrorStillFails(t *testing.T) {
 		Sleep:            func(time.Duration) {},
 	}
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-31", Agent: AgentCodex, Pane: "pane-1", Ticket: "31", SmartZone: 150_000, Gate: NewGate(),
+		Label: "iter-31", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "31", SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-31")
 	if err == nil || !strings.Contains(err.Error(), "pane gone") {
 		t.Fatalf("waitForFinish() = %v, want the interrupt error", err)

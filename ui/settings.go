@@ -2,7 +2,7 @@ package ui
 
 import (
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 // Settings holds configuration shared across all views.
@@ -99,12 +99,12 @@ func (s Settings) ImplementSkill() string {
 // is no way to tell those two apart from s.Agents' value alone. This
 // accessor resolves that one ambiguous case in favor of the
 // never-loaded/defensive reading (built-in defaults), the same as before.
-func (s Settings) AgentConfig(agent ralphloop.AgentKind) config.AgentConfig {
+func (s Settings) AgentConfig(agentKind agent.AgentKind) config.AgentConfig {
 	agents := s.Agents
 	if agents.Claude == (config.AgentConfig{}) && agents.Codex == (config.AgentConfig{}) {
 		agents = config.DefaultAgentsConfig()
 	}
-	if agent == ralphloop.AgentCodex {
+	if agentKind == agent.AgentCodex {
 		return agents.Codex
 	}
 	return agents.Claude
@@ -112,11 +112,11 @@ func (s Settings) AgentConfig(agent ralphloop.AgentKind) config.AgentConfig {
 
 // ResolvedAgents returns s.Agents with each agent kind's AgentConfig run
 // through AgentConfig's zero-value fallback — the shape ralph-loop's
-// agents config expects (see ralphloop.ResolveTier, which applies
+// agents config expects (see agent.ResolveTier, which applies
 // no fallback of its own).
 func (s Settings) ResolvedAgents() config.AgentsConfig {
 	return config.AgentsConfig{
-		Claude: s.AgentConfig(ralphloop.AgentClaude),
-		Codex:  s.AgentConfig(ralphloop.AgentCodex),
+		Claude: s.AgentConfig(agent.AgentClaude),
+		Codex:  s.AgentConfig(agent.AgentCodex),
 	}
 }

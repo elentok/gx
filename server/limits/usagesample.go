@@ -18,7 +18,7 @@ import (
 	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -196,11 +196,11 @@ func (u *usageSamples) lift(now time.Time) ([]string, time.Time, error) {
 
 // usageFor is the sample and verdict prefix of a harness; nil for a harness
 // with no usage gate.
-func (l *Limits) usageFor(agent ralphloop.AgentKind) (*usageSamples, string) {
-	switch agent {
-	case ralphloop.AgentClaude:
+func (l *Limits) usageFor(agentKind agent.AgentKind) (*usageSamples, string) {
+	switch agentKind {
+	case agent.AgentClaude:
 		return l.usage, wire.VerdictUsagePrefixClaude
-	case ralphloop.AgentCodex:
+	case agent.AgentCodex:
 		return l.usageCodex, wire.VerdictUsagePrefixCodex
 	}
 	return nil, ""
@@ -209,8 +209,8 @@ func (l *Limits) usageFor(agent ralphloop.AgentKind) (*usageSamples, string) {
 // UsageGate holds a new claim of a harness while one of that harness's usage
 // windows is at its limit. Extra usage does not lift it. The verdict is the
 // whole phrase, like rateLimitVerdict.
-func (l *Limits) UsageGate(agent ralphloop.AgentKind, now time.Time) (string, bool) {
-	samples, prefix := l.usageFor(agent)
+func (l *Limits) UsageGate(agentKind agent.AgentKind, now time.Time) (string, bool) {
+	samples, prefix := l.usageFor(agentKind)
 	if samples == nil {
 		return "", false
 	}
@@ -224,8 +224,8 @@ func (l *Limits) UsageGate(agent ralphloop.AgentKind, now time.Time) (string, bo
 
 // usageOverride lets new claims of a harness start until its gating windows
 // reset. It lifts that harness only.
-func (l *Limits) usageOverride(now time.Time, agent ralphloop.AgentKind) (wire.UsageOverrideResult, error) {
-	samples, prefix := l.usageFor(agent)
+func (l *Limits) usageOverride(now time.Time, agentKind agent.AgentKind) (wire.UsageOverrideResult, error) {
+	samples, prefix := l.usageFor(agentKind)
 	var names []string
 	var until time.Time
 	if samples != nil {
@@ -249,15 +249,15 @@ func (l *Limits) overrideWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	agent := harnesschoice.DefaultOrClaude(l.settings.Load().AgentsDefaultHarness)
+	agentKind := harnesschoice.DefaultOrClaude(l.settings.Load().AgentsDefaultHarness)
 	if req.Harness != "" {
-		agent = ralphloop.AgentKind(req.Harness)
-		if samples, _ := l.usageFor(agent); samples == nil {
+		agentKind = agent.AgentKind(req.Harness)
+		if samples, _ := l.usageFor(agentKind); samples == nil {
 			http.Error(w, fmt.Sprintf("harness %q has no usage gate", req.Harness), http.StatusBadRequest)
 			return
 		}
 	}
-	res, err := l.usageOverride(time.Now(), agent)
+	res, err := l.usageOverride(time.Now(), agentKind)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

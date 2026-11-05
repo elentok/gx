@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -48,12 +49,12 @@ func (w *Writer) PauseModelMismatch(scratchDir, ticketPath string, addr tickets.
 // LaunchModel resolves the model and effort a launch runs on, honouring a
 // one-shot tier override. ok is false when an implement launch resolved to no
 // model: it is refused and paused, and no agent may start.
-func (w *Writer) LaunchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) (model, effort string, ok bool) {
+func (w *Writer) LaunchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agentKind agent.AgentKind) (model, effort string, ok bool) {
 	var tierRun runs.Run
 	if tier := w.d.Host.TakeTierOverride(t.Path); tier != "" {
-		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(w.d.Projects.AgentsConfig(addr.Project), agent, tier)
+		tierRun.Model, tierRun.Effort = agent.ResolveTier(w.d.Projects.AgentsConfig(addr.Project), agentKind, tier)
 	}
-	model, effort = w.d.Projects.RunAgentConfig(addr.Project, agent, tierRun)
+	model, effort = w.d.Projects.RunAgentConfig(addr.Project, agentKind, tierRun)
 	if model == "" && ralphloop.IsImplementType(t.Type) {
 		w.refuseEmptyModel(scratchDir, t.Path, addr)
 		return "", "", false

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
@@ -453,7 +454,7 @@ func (f *fixture) seedRanOnClaude(addr string) error {
 		Time:         time.Now(),
 		Type:         string(events.IterationStarted),
 		Ticket:       id,
-		Agent:        ralphloop.AgentClaude,
+		Agent:        agent.AgentClaude,
 		AgentSession: session,
 		Cwd:          filepath.Join(f.root, "repo"),
 	}

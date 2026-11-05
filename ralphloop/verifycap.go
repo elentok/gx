@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 // verifyCapMargin is how far below the smart zone a verify session is stopped,
@@ -61,7 +62,7 @@ func (c *verifyCap) tick(d Deps, p launchAndPromptParams, sessionID string) (sto
 	prompt := fmt.Sprintf(
 		"I stopped you because you exceeded %d tokens in the context window, the verify token cap. "+
 			"Follow the cap-stop step in the `%s` skill for your role (part, collect or lone) and finish up now.",
-		c.limit, verifySkill,
+		c.limit, agent.VerifySkill,
 	)
 	if err := d.Runner.Prompt(p.session(), prompt); err != nil {
 		p.logAgentEvent(string(events.VerifyCapStopped), sessionID, fmt.Sprintf("sending the verify cap prompt to %s: %v", p.Label, err))

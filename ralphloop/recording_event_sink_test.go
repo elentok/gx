@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -59,7 +60,7 @@ type LiveEvent struct {
 	MergedSHA  string
 	Cwd        string
 	SessionID  string
-	AgentKind  AgentKind
+	AgentKind  agent.AgentKind
 	PaneID     string
 	// Tokens is ContextOccupancy's context-window token count.
 	Tokens int
@@ -128,7 +129,7 @@ func (s *recordingEventSink) TicketClaimed(ticket tickets.Ticket) {
 	s.record(LiveEvent{Kind: LiveEventTicketClaimed, Identifier: ticket.Identifier, Ticket: ticket})
 }
 
-func (s *recordingEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID string) {
+func (s *recordingEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
 	s.record(LiveEvent{Kind: LiveEventIterationStarted, Identifier: ticket.Identifier, Ticket: ticket, Label: label, Cwd: cwd, SessionID: sessionID, AgentKind: agent, PaneID: paneID})
 }
 

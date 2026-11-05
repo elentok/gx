@@ -8,6 +8,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 )
 
@@ -28,7 +29,7 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label:      "iter-01",
-		Agent:      AgentCodex,
+		Agent:      agent.AgentCodex,
 		Pane:       "pane-1",
 		Ticket:     "01",
 		TicketPath: ticketPath,
@@ -255,54 +256,54 @@ func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
 	}
 	cases := []struct {
 		name      string
-		agent     AgentKind
+		agent     agent.AgentKind
 		sessionID string
 		read      func(string, string) (int, bool, error)
 		want      compactBoundarySnapshot
 	}{
 		{
 			name:  "Codex read count is confirmed",
-			agent: AgentCodex, sessionID: "sess-19", read: reads(4, true, nil),
+			agent: agent.AgentCodex, sessionID: "sess-19", read: reads(4, true, nil),
 			want: compactBoundarySnapshot{state: compactBoundaryConfirmed, count: 4},
 		},
 		{
 			name:  "Codex read error is unavailable",
-			agent: AgentCodex, sessionID: "sess-19", read: reads(0, false, errors.New("read failed")),
+			agent: agent.AgentCodex, sessionID: "sess-19", read: reads(0, false, errors.New("read failed")),
 			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
 		},
 		{
 			name:  "Codex empty session id is unavailable",
-			agent: AgentCodex, sessionID: "", read: reads(4, true, nil),
+			agent: agent.AgentCodex, sessionID: "", read: reads(4, true, nil),
 			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
 		},
 		{
 			name:  "Codex nil read dependency is unsupported",
-			agent: AgentCodex, sessionID: "sess-19", read: nil,
+			agent: agent.AgentCodex, sessionID: "sess-19", read: nil,
 			want: compactBoundarySnapshot{state: compactBoundaryUnsupported},
 		},
 		{
 			name:  "nil read dependency is unsupported",
-			agent: AgentClaude, sessionID: "sess-19", read: nil,
+			agent: agent.AgentClaude, sessionID: "sess-19", read: nil,
 			want: compactBoundarySnapshot{state: compactBoundaryUnsupported},
 		},
 		{
 			name:  "empty session id is unavailable, not unsupported",
-			agent: AgentClaude, sessionID: "", read: reads(4, true, nil),
+			agent: agent.AgentClaude, sessionID: "", read: reads(4, true, nil),
 			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
 		},
 		{
 			name:  "read error is unavailable",
-			agent: AgentClaude, sessionID: "sess-19", read: reads(0, false, errors.New("read failed")),
+			agent: agent.AgentClaude, sessionID: "sess-19", read: reads(0, false, errors.New("read failed")),
 			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
 		},
 		{
 			name:  "transcript that does not exist yet is unavailable",
-			agent: AgentClaude, sessionID: "sess-19", read: reads(0, false, nil),
+			agent: agent.AgentClaude, sessionID: "sess-19", read: reads(0, false, nil),
 			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
 		},
 		{
 			name:  "a read count is confirmed",
-			agent: AgentClaude, sessionID: "sess-19", read: reads(4, true, nil),
+			agent: agent.AgentClaude, sessionID: "sess-19", read: reads(4, true, nil),
 			want: compactBoundarySnapshot{state: compactBoundaryConfirmed, count: 4},
 		},
 	}
@@ -311,7 +312,7 @@ func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			d := Deps{ReadCompactions: tc.read}
-			if tc.agent == AgentCodex {
+			if tc.agent == agent.AgentCodex {
 				d = Deps{ReadCodexCompactions: tc.read}
 			}
 			got := readCompactBoundaries(d, tc.agent, "/repo/iter-19", tc.sessionID)

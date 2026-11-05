@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
@@ -38,7 +39,7 @@ func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccup
 
 	sessionID, err := promptedLaunch(d, launchAndPromptParams{
 		Label:      "iter-01",
-		Agent:      AgentClaude,
+		Agent:      agent.AgentClaude,
 		Session:    agentrunner.Session{Label: "iter-01", ID: "pane-1"},
 		Pane:       "pane-1",
 		Prompt:     "go",
@@ -88,7 +89,7 @@ func TestPromptedLaunch_CodexAdoptsSessionIDFromStatusAfterPrompt(t *testing.T) 
 
 	sessionID, err := promptedLaunch(d, launchAndPromptParams{
 		Label:      "iter-09",
-		Agent:      AgentCodex,
+		Agent:      agent.AgentCodex,
 		Session:    agentrunner.Session{Label: "iter-09", ID: "pane-9"},
 		Pane:       "pane-9",
 		Prompt:     "go",
@@ -202,7 +203,7 @@ type recordingSinkWithArgs struct {
 	onIterationStarted func(ticket tickets.Ticket, label, cwd, sessionID string)
 }
 
-func (s *recordingSinkWithArgs) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID string) {
+func (s *recordingSinkWithArgs) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
 	if s.onIterationStarted != nil {
 		s.onIterationStarted(ticket, label, cwd, sessionID)
 	}

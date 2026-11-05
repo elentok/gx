@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -281,7 +282,7 @@ func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairRes
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if req.Tier != "" && !ralphloop.Tier(req.Tier).Valid() {
+	if req.Tier != "" && !agent.Tier(req.Tier).Valid() {
 		msg := fmt.Sprintf("tier %q is not one of light, worker, strongest", req.Tier)
 		return repairRefusal(&repair.RefusalError{Reason: wire.ReasonBadTier, Message: msg}), nil
 	}
@@ -392,15 +393,15 @@ func clearTierOverride(ticketPath, tier string) {
 
 // TakeTierOverride returns the ticket's one-time tier and clears it, so only
 // the launch that reads it runs on it. An unreadable ticket has none.
-func TakeTierOverride(ticketPath string) ralphloop.Tier {
+func TakeTierOverride(ticketPath string) agent.Tier {
 	var tier string
 	err := schema.UpdateTicketWithBody(ticketPath, func(t *schema.Ticket, _ *string) {
 		tier, t.TierOverride = t.TierOverride, ""
 	})
-	if err != nil || !ralphloop.Tier(tier).Valid() {
+	if err != nil || !agent.Tier(tier).Valid() {
 		return ""
 	}
-	return ralphloop.Tier(tier)
+	return agent.Tier(tier)
 }
 
 // webStale refuses a web verb whose token no longer names the ticket's open

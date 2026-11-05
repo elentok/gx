@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
-
-	"github.com/elentok/gx/ralphloop"
 )
 
 // WebCreateSessionRequest is the body of POST /v1/sessions/create on the web
@@ -24,7 +23,7 @@ type WebCreateSessionRequest struct {
 	// Prompt is typed at the session's first Idle.
 	Prompt string `json:"prompt,omitempty"`
 	// Tier is light, worker or strongest; empty means worker.
-	Tier ralphloop.Tier `json:"tier,omitempty"`
+	Tier agent.Tier `json:"tier,omitempty"`
 }
 
 // SessionCreateWeb is sessionCreateWrite for the web mux. A body with any

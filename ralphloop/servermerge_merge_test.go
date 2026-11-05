@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -27,8 +28,8 @@ func serverMergeFixture(t *testing.T) (Deps, iterationParams, *builtAwaitingMerg
 	d, _, _ := fakeDeps()
 	p := iterationParams{
 		WorkspaceID: "ws1", RepoDir: "/fake/repo", WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature",
-		FeatureBranch: "epic", Agent: AgentClaude, Skill: "implement", Ticket: tk, ScratchDir: scratchDir,
-		WorktreeLock: &sync.Mutex{}, SmartZone: defaultSmartZone, Gate: NewGate(), Sink: noopEventSink{},
+		FeatureBranch: "epic", Agent: agent.AgentClaude, Skill: "implement", Ticket: tk, ScratchDir: scratchDir,
+		WorktreeLock: &sync.Mutex{}, SmartZone: agent.DefaultSmartZone, Gate: NewGate(), Sink: noopEventSink{},
 	}
 	built := &builtAwaitingMergeError{job: mergeJob{
 		ticket: tk, base: "base", branch: iterBranch("epic", "01"), path: iterationWorktreePath("/fake/worktrees", "epic", "01"),

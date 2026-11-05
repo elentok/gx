@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
@@ -22,7 +23,7 @@ import (
 // ticket stuck rather than leaving a claim with no agent behind it.
 // launched is false when the ticket paused on an ambiguous base: no agent runs.
 // epics is the project's loaded epics, for the base derivation.
-func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
+func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agentKind agent.AgentKind, epics []tickets.Epic) (launched bool, err error) {
 	ticket := tickets.Address{Project: queued.Project, Epic: queued.Epic, ID: t.Identifier}
 	ticketAddr := ticket.String()
 	// The project dir, not the store root: the run log, merge lock and
@@ -53,22 +54,22 @@ func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t 
 	if err := budget.ClearLongTicketMark(t.Path); err != nil {
 		l.Log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
 	}
-	model, effort, ok := l.Writer.LaunchModel(dir, t, ticket, agent)
+	model, effort, ok := l.Writer.LaunchModel(dir, t, ticket, agentKind)
 	if !ok {
 		return false, nil
 	}
 	one := ralphloop.OneIteration{
-		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
+		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 		Model: model, Effort: effort, Sink: l.Writer.FinishSink(ticket, t.Path), StallNudgeDelay: l.Host.StalledNudgeDelay(),
 	}
-	deps := l.Projects.DepsWith(l.Harness.LaunchRunner(ticket.Project, agent))
+	deps := l.Projects.DepsWith(l.Harness.LaunchRunner(ticket.Project, agentKind))
 	deps.GateReleased = l.Registry.GateReleased(ticketAddr)
 	// Only Claude and Codex on the pty runner resume; every other claim starts
 	// cold, and so does one under another harness than the answered session's:
 	// the Handoff carries it over. launch drops a Codex id whose rollout is gone.
 	earlier := l.Harness.EarlierRunHarness(ticket)
-	switchedHarness := earlier != "" && earlier != string(agent)
-	if (agent == ralphloop.AgentClaude || agent == ralphloop.AgentCodex) && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
+	switchedHarness := earlier != "" && earlier != string(agentKind)
+	if (agentKind == agent.AgentClaude || agentKind == agent.AgentCodex) && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
 		one.ResumeSessionID = answered
 	}
 	mode := l.Landing.IterationModeFor(ticket, t)
@@ -83,7 +84,7 @@ func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t 
 		}
 	}
 	entry := runs.TrackedRun{
-		Run:  runs.Run{Address: ticketAddr, Agent: string(agent), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
+		Run:  runs.Run{Address: ticketAddr, Agent: string(agentKind), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
 		Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runs.Launching,
 	}
 	if !l.Registry.PutIfAbsent(entry) {
@@ -316,9 +317,9 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 // Herdr-hosted runs clean up as before.
 func keepsAskedAgent(run runs.Run) bool {
 	switch run.Agent {
-	case string(ralphloop.AgentClaude):
+	case string(agent.AgentClaude):
 		return run.Runner != "" && run.Runner != runs.RunnerHerdr
-	case string(ralphloop.AgentCodex):
+	case string(agent.AgentCodex):
 		return run.Runner == string(agentrunner.ChoicePTY)
 	}
 	return false

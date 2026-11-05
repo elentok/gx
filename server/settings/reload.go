@@ -11,7 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -111,7 +111,7 @@ func reloadableSettings(old, next Settings) Settings {
 	next.ChatHarness, next.RemoteControlHarness = old.ChatHarness, old.RemoteControlHarness
 	// Config only holds claude or codex, so any other default is a test's fake
 	// harness and survives a reload like the other seams.
-	if old.AgentsDefaultHarness != "" && ralphloop.ValidateAgentKind(ralphloop.AgentKind(old.AgentsDefaultHarness)) != nil {
+	if old.AgentsDefaultHarness != "" && agent.ValidateAgentKind(agent.AgentKind(old.AgentsDefaultHarness)) != nil {
 		next.AgentsDefaultHarness = old.AgentsDefaultHarness
 	}
 	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval

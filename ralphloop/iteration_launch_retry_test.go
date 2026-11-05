@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 const launchEpic = "my-epic"
@@ -230,7 +231,7 @@ func TestWaitIterationFinished_SessionDied_ReturnsDiedReason(t *testing.T) {
 		t.Fatalf("StartAndPrompt = %v", res.err)
 	}
 
-	err := WaitIterationFinished(d, OneIteration{Agent: AgentClaude, Epic: launchEpic}, IterationWorktree{Label: launchLabel}, res.session)
+	err := WaitIterationFinished(d, OneIteration{Agent: agent.AgentClaude, Epic: launchEpic}, IterationWorktree{Label: launchLabel}, res.session)
 
 	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.Contains(err.Error(), "claude exited (code 1)") {
 		t.Errorf("WaitIterationFinished = %v, want ErrSessionDied carrying the died reason", err)

@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -267,7 +268,7 @@ func TestAgentLog_HerdrClaude(t *testing.T) {
 }
 
 func TestAgentLog_HerdrCodex(t *testing.T) {
-	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: string(ralphloop.AgentCodex)}, true)}
+	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: string(agent.AgentCodex)}, true)}
 	if _, err := loc.AgentLog(context.Background(), addr); !errors.Is(err, agentlog.ErrUnsupported) {
 		t.Errorf("got %v, want ErrUnsupported", err)
 	}

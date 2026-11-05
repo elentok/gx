@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
@@ -196,13 +197,13 @@ func (p *Registry) AgentsConfig(project string) config.AgentsConfig {
 // unregistered name, so createSession refuses it instead of silently running
 // Claude.
 func (p *Registry) LaunchHarness(project string) string {
-	return cmp.Or(p.AgentsConfig(project).DefaultHarness, string(ralphloop.AgentClaude))
+	return cmp.Or(p.AgentsConfig(project).DefaultHarness, string(agent.AgentClaude))
 }
 
 // RunAgentConfig is the model and effort run's agent launched under, else
 // the project's agents.* config. Every launch, finish and adoption resolves
 // them here.
-func (p *Registry) RunAgentConfig(project string, agent ralphloop.AgentKind, run runs.Run) (model, effort string) {
-	model, effort = ralphloop.ResolveTier(p.AgentsConfig(project), agent, ralphloop.TierWorker)
+func (p *Registry) RunAgentConfig(project string, agentKind agent.AgentKind, run runs.Run) (model, effort string) {
+	model, effort = agent.ResolveTier(p.AgentsConfig(project), agentKind, agent.TierWorker)
 	return cmp.Or(run.Model, model), cmp.Or(run.Effort, effort)
 }

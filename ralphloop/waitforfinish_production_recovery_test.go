@@ -10,6 +10,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -190,7 +191,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 
 	err := waitForFinish(deps, launchAndPromptParams{
 		Label:      "iter-07",
-		Agent:      AgentClaude,
+		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
@@ -385,7 +386,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 
 	err := waitForFinish(deps, launchAndPromptParams{
 		Label:      "iter-08",
-		Agent:      AgentClaude,
+		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,

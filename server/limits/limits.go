@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
@@ -92,5 +92,5 @@ func (l *Limits) Stop() { l.throttle.Stop() }
 // Only Claude has a dollar cost for the budget to count. An unset agent counts
 // as Claude.
 func IsCodexRun(r runs.Run) bool {
-	return r.Agent != "" && r.Agent != string(ralphloop.AgentClaude)
+	return r.Agent != "" && r.Agent != string(agent.AgentClaude)
 }

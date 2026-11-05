@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
 
 // serverVerifyCapWait runs WaitIterationFinished on a pane whose first polls
 // time out, with the occupancy reader fixed at occupancy.
-func serverVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, polls, occupancy int) verifyCapFixture {
+func serverVerifyCapWait(t *testing.T, ticketType string, agent agent.AgentKind, polls, occupancy int) verifyCapFixture {
 	t.Helper()
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= polls })
 	// The server's wait does not stop on blocked here, so every Wait is a poll.
@@ -31,9 +32,9 @@ func serverVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, polls
 
 func TestWaitIterationFinished_VerifyCap_StopsVerifyOnceButNotImplement(t *testing.T) {
 	t.Parallel()
-	above := defaultSmartZone - verifyCapMargin + 1
+	above := agent.DefaultSmartZone - verifyCapMargin + 1
 
-	v := serverVerifyCapWait(t, "verify", AgentClaude, 3, above)
+	v := serverVerifyCapWait(t, "verify", agent.AgentClaude, 3, above)
 	if v.err != nil {
 		t.Fatal(v.err)
 	}
@@ -45,7 +46,7 @@ func TestWaitIterationFinished_VerifyCap_StopsVerifyOnceButNotImplement(t *testi
 		t.Errorf("verify-cap-stopped events = %d, want 1", n)
 	}
 
-	i := serverVerifyCapWait(t, "implement", AgentClaude, 3, above)
+	i := serverVerifyCapWait(t, "implement", agent.AgentClaude, 3, above)
 	if i.err != nil {
 		t.Fatal(i.err)
 	}
@@ -56,7 +57,7 @@ func TestWaitIterationFinished_VerifyCap_StopsVerifyOnceButNotImplement(t *testi
 
 func TestWaitIterationFinished_VerifyCap_BelowCapAndCodex(t *testing.T) {
 	t.Parallel()
-	below := serverVerifyCapWait(t, "verify", AgentClaude, 2, defaultSmartZone-verifyCapMargin)
+	below := serverVerifyCapWait(t, "verify", agent.AgentClaude, 2, agent.DefaultSmartZone-verifyCapMargin)
 	if below.err != nil {
 		t.Fatal(below.err)
 	}
@@ -64,7 +65,7 @@ func TestWaitIterationFinished_VerifyCap_BelowCapAndCodex(t *testing.T) {
 		t.Errorf("below the cap: interrupts=%d prompts=%q, want neither", below.r.interrupts, below.r.Prompts("iter-19"))
 	}
 
-	codex := serverVerifyCapWait(t, "verify", AgentCodex, 2, defaultSmartZone-verifyCapMargin+1)
+	codex := serverVerifyCapWait(t, "verify", agent.AgentCodex, 2, agent.DefaultSmartZone-verifyCapMargin+1)
 	if codex.err != nil {
 		t.Fatal(codex.err)
 	}

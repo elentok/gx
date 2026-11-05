@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -357,7 +358,7 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	return markDoneWithCompactions(d, agent, p.Ticket.Path, sessionCwd, sessionID)
 }
 
-func markDoneWithCompactions(d Deps, agent AgentKind, path, cwd, sessionID string) error {
+func markDoneWithCompactions(d Deps, agent agent.AgentKind, path, cwd, sessionID string) error {
 	compactions, ok, err := sessionCompactions(d, agent, cwd, sessionID)
 	if err != nil || !ok {
 		return MarkDone(path)
@@ -368,7 +369,7 @@ func markDoneWithCompactions(d Deps, agent AgentKind, path, cwd, sessionID strin
 // recoverIterationSession finds the session of p.Ticket's last
 // iteration-started run-log event, for a reattached close that has no live
 // session of its own.
-func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent AgentKind, ok bool) {
+func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent agent.AgentKind, ok bool) {
 	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
 	if err != nil || !ok {
 		return "", "", "", false
@@ -766,14 +767,14 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	}
 
 	label := conflictLabel(p.Ticket.Identifier)
-	prompt := skillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
+	prompt := agent.SkillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
 
 	l, err := startAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
 		Kind:  agentrunner.Kind(p.Agent),
-		Args:  agentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
+		Args:  agent.AgentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
 	}, prompt, func(attempt int, kind events.Kind, err error) {
 		p.logLaunchFailed(label, attempt, kind, err)
 	}, func(attempt int, decision string) {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
@@ -58,8 +59,8 @@ func TestSessionsTotals(t *testing.T) {
 
 	t.Run("two readable sessions add up", func(t *testing.T) {
 		tokens, cost, err := SessionsTotals(homes, []SessionRef{
-			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-a"},
-			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-b"},
+			{Agent: agent.AgentClaude, Cwd: cwd, SessionID: "sess-a"},
+			{Agent: agent.AgentClaude, Cwd: cwd, SessionID: "sess-b"},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -78,7 +79,7 @@ func TestSessionsTotals(t *testing.T) {
 		if err := os.WriteFile(path, []byte(line), 0644); err != nil {
 			t.Fatal(err)
 		}
-		tokens, _, err := SessionsTotals(homes, []SessionRef{{Agent: AgentClaude, Cwd: cwd, SessionID: session}})
+		tokens, _, err := SessionsTotals(homes, []SessionRef{{Agent: agent.AgentClaude, Cwd: cwd, SessionID: session}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,8 +90,8 @@ func TestSessionsTotals(t *testing.T) {
 
 	t.Run("one missing transcript fails the whole sum", func(t *testing.T) {
 		tokens, cost, err := SessionsTotals(homes, []SessionRef{
-			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-a"},
-			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-missing"},
+			{Agent: agent.AgentClaude, Cwd: cwd, SessionID: "sess-a"},
+			{Agent: agent.AgentClaude, Cwd: cwd, SessionID: "sess-missing"},
 		})
 		if err == nil {
 			t.Fatal("want error")
@@ -109,8 +110,8 @@ func TestSessionsTotals(t *testing.T) {
 			t.Fatal(err)
 		}
 		tokens, cost, err := SessionsTotals(homes, []SessionRef{
-			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-a"},
-			{Agent: AgentCodex, Cwd: cwd, SessionID: "codex-1"},
+			{Agent: agent.AgentClaude, Cwd: cwd, SessionID: "sess-a"},
+			{Agent: agent.AgentCodex, Cwd: cwd, SessionID: "codex-1"},
 		})
 		if err != nil {
 			t.Fatal(err)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -90,11 +90,11 @@ func TestUsageGate_CodexWindowsGateCodexOnly(t *testing.T) {
 			s := r.server()
 			r.writeCodexAgent("a", now, codexWindowJSON(tc.pct, tc.minutes, resets), "")
 			s.scanUsage()
-			got, held := s.UsageGate(ralphloop.AgentCodex, now)
+			got, held := s.UsageGate(agent.AgentCodex, now)
 			if got != tc.want || held != (tc.want != "") {
 				t.Fatalf("codex gate = %q, %v; want %q", got, held, tc.want)
 			}
-			if v, held := s.UsageGate(ralphloop.AgentClaude, now); held {
+			if v, held := s.UsageGate(agent.AgentClaude, now); held {
 				t.Errorf("a Codex sample gated Claude: %q", v)
 			}
 		})
@@ -121,7 +121,7 @@ func TestUsageGate_CodexRolloutIsFoundByTheHookSessionID(t *testing.T) {
 		}
 	}
 	s.scanUsage()
-	if _, held := s.UsageGate(ralphloop.AgentCodex, now); !held {
+	if _, held := s.UsageGate(agent.AgentCodex, now); !held {
 		t.Fatal("codex gate not held: the rollout was not found by the hook's session id")
 	}
 }
@@ -133,10 +133,10 @@ func TestUsageGate_ClaudeSampleDoesNotGateCodex(t *testing.T) {
 	now := time.Unix(1_000_000, 0)
 	r.write("a", usageRecord(now, 99, now.Add(time.Hour)))
 	s.scanUsage()
-	if v, held := s.UsageGate(ralphloop.AgentCodex, now); held {
+	if v, held := s.UsageGate(agent.AgentCodex, now); held {
 		t.Fatalf("a Claude sample gated Codex: %q", v)
 	}
-	if _, held := s.UsageGate(ralphloop.AgentClaude, now); !held {
+	if _, held := s.UsageGate(agent.AgentClaude, now); !held {
 		t.Fatal("the Claude sample did not gate Claude")
 	}
 }
@@ -148,10 +148,10 @@ func TestUsageSample_CodexGateLiftsAtResetsAtWithNoNewSample(t *testing.T) {
 	resets := time.Unix(2_000_000, 0)
 	r.writeCodexAgent("a", resets.Add(-2*time.Hour), codexWindowJSON(98, 300, resets), "")
 	s.scanUsage()
-	if _, held := s.UsageGate(ralphloop.AgentCodex, resets.Add(-time.Second)); !held {
+	if _, held := s.UsageGate(agent.AgentCodex, resets.Add(-time.Second)); !held {
 		t.Fatal("not gated before resets_at")
 	}
-	if _, held := s.UsageGate(ralphloop.AgentCodex, resets); held {
+	if _, held := s.UsageGate(agent.AgentCodex, resets); held {
 		t.Fatal("still gated at resets_at")
 	}
 }
@@ -165,7 +165,7 @@ func TestUsageSample_CodexNewestSampleWins(t *testing.T) {
 	r.writeCodexAgent("old", now.Add(-time.Hour), codexWindowJSON(99, 300, resets), "")
 	r.writeCodexAgent("new", now, codexWindowJSON(40, 300, resets), codexWindowJSON(50, 10080, resets))
 	s.scanUsage()
-	if v, held := s.UsageGate(ralphloop.AgentCodex, now); held {
+	if v, held := s.UsageGate(agent.AgentCodex, now); held {
 		t.Fatalf("an older 99%% sample gated over a newer 40%%: %q", v)
 	}
 }
@@ -180,21 +180,21 @@ func TestUsageOverride_CodexLiftsOnlyCodexAndSurvivesRestart(t *testing.T) {
 	r.writeCodexAgent("codex", now, codexWindowJSON(99, 10080, resets), "")
 	s.scanUsage()
 
-	res, err := s.usageOverride(now, ralphloop.AgentCodex)
+	res, err := s.usageOverride(now, agent.AgentCodex)
 	if err != nil || res.Refused || len(res.Windows) != 1 || res.Windows[0] != "weekly" || !res.Until.Equal(resets) {
 		t.Fatalf("codex override = %+v, %v", res, err)
 	}
-	if _, held := s.UsageGate(ralphloop.AgentCodex, now); held {
+	if _, held := s.UsageGate(agent.AgentCodex, now); held {
 		t.Error("Codex still gated after its override")
 	}
-	if _, held := s.UsageGate(ralphloop.AgentClaude, now); !held {
+	if _, held := s.UsageGate(agent.AgentClaude, now); !held {
 		t.Error("the Codex override lifted Claude")
 	}
 	if _, _, ok := openUsageFiles(r.stateDir, usageSampleFileCodex, usageLiftFileCodex).limitWindow(now); ok {
 		t.Error("the Codex override was lost across a restart")
 	}
 
-	res, err = s.usageOverride(now, ralphloop.AgentCodex)
+	res, err = s.usageOverride(now, agent.AgentCodex)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
 		t.Errorf("second Codex override = %+v, %v; want refused %s", res, err, wire.ReasonNotGated)
 	}
@@ -204,9 +204,9 @@ func TestUsageOverride_RefusalNamesTheHarness(t *testing.T) {
 	t.Parallel()
 	s := newCodexUsageRig(t).server()
 	now := time.Unix(1_000_000, 0)
-	for agent, want := range map[ralphloop.AgentKind]string{
-		ralphloop.AgentClaude: "no Claude usage window is at its limit",
-		ralphloop.AgentCodex:  "no Codex usage window is at its limit",
+	for agent, want := range map[agent.AgentKind]string{
+		agent.AgentClaude: "no Claude usage window is at its limit",
+		agent.AgentCodex:  "no Codex usage window is at its limit",
 	} {
 		res, err := s.usageOverride(now, agent)
 		if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated || res.Message != want {

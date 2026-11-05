@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 // stickyBaselineDeps is the premature-idle pane the sticky-baseline tests
@@ -204,7 +206,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		var sleeps int
 		d := Deps{Runner: r, Sleep: func(time.Duration) { sleeps++ }}
 		p := gatedBreachParams(t.TempDir())
-		p.Agent = AgentCodex
+		p.Agent = agent.AgentCodex
 		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
 		if err != nil {
 			t.Fatalf("recoverSmartZoneBreach: %v", err)
@@ -228,7 +230,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 			Sleep:                     func(time.Duration) { sleeps++ },
 		}
 		p := gatedBreachParams(t.TempDir())
-		p.Agent = AgentCodex
+		p.Agent = agent.AgentCodex
 		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
 		if !errors.Is(err, errCompactNeverConfirmed) {
 			t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
@@ -260,7 +262,7 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 			Sleep: func(time.Duration) { sleeps++ },
 		}
 		p := gatedBreachParams(t.TempDir())
-		p.Agent = AgentCodex
+		p.Agent = agent.AgentCodex
 		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
 		if err != nil || !recovered {
 			t.Fatalf("recovered = %v, err = %v; want true, nil", recovered, err)

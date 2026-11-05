@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -27,13 +28,13 @@ import (
 type Deps struct {
 	// PreflightAgent verifies that the selected agent can be launched before
 	// the loop creates Herdr state or claims a ticket.
-	PreflightAgent func(agent AgentKind) error
+	PreflightAgent func(agentKind agent.AgentKind) error
 	// VerifySkill confirms opts.Skill is installed for agent before the loop
 	// creates Herdr state or claims a ticket — like PreflightAgent, a missing
 	// skill is otherwise only discovered mid-iteration, after the ticket is
 	// already claimed and the agent has been prompted with a skill invocation
 	// it can't resolve.
-	VerifySkill func(agent AgentKind, skill string) error
+	VerifySkill func(agentKind agent.AgentKind, skill string) error
 	// WorktreeDir returns the directory linked worktrees for repoDir's repo
 	// are created in (see git.Repo.LinkedWorktreeDir).
 	WorktreeDir func(repoDir string) (string, error)
@@ -154,7 +155,7 @@ type Deps struct {
 	// backgrounded-shell-command markers, used to gate confirmFinished against
 	// a pane that looks idle while a background task it started is still
 	// running (see waitForBackgroundTasks). Codex has no equivalent transcript
-	// signal, so callers only ever invoke this for AgentClaude.
+	// signal, so callers only ever invoke this for agent.AgentClaude.
 	ReadBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error)
 	// GateReleased reports whether recovery force-released this iteration's
 	// held background-task gate. Nil never releases.
@@ -211,7 +212,7 @@ func DefaultDeps() Deps {
 // transcript is found, VerifySkill fails). Path still falls back to the
 // process PATH when empty.
 type DepsOverrides struct {
-	// Home is the home for verifySkill's skill-file lookup and the transcript
+	// Home is the home for agent.VerifySkill's skill-file lookup and the transcript
 	// lookup.
 	Home string
 	// CodexHome is the resolved ~/.codex-equivalent directory (not $HOME) for
@@ -253,11 +254,11 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
 	}
 	return Deps{
-		PreflightAgent: func(agent AgentKind) error {
-			return preflightAgentWith(agent, lookPathFor(pathEnv), commandOutputIn(overrides.Env))
+		PreflightAgent: func(agentKind agent.AgentKind) error {
+			return preflightAgentWith(agentKind, lookPathFor(pathEnv), commandOutputIn(overrides.Env))
 		},
-		VerifySkill: func(agent AgentKind, skill string) error {
-			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
+		VerifySkill: func(agentKind agent.AgentKind, skill string) error {
+			return verifySkillWith(agentKind, skill, userHomeDirFor(overrides.Home), os.Stat)
 		},
 		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
 			if overrides.CodexHome == "" {
@@ -477,11 +478,11 @@ func commandOutputIn(env []string) func(string, ...string) ([]byte, error) {
 }
 
 func preflightAgentWith(
-	agent AgentKind,
+	agentKind agent.AgentKind,
 	lookPath func(string) (string, error),
 	commandOutput func(string, ...string) ([]byte, error),
 ) error {
-	if agent != AgentCodex {
+	if agentKind != agent.AgentCodex {
 		return nil
 	}
 	codexPath, err := lookPath("codex")
@@ -511,7 +512,7 @@ func preflightAgentWith(
 		values := string(help)[start+len(valuesPrefix):]
 		if end := strings.IndexByte(values, ']'); end >= 0 {
 			for _, value := range strings.Split(values[:end], ",") {
-				if strings.TrimSpace(value) == string(AgentCodex) {
+				if strings.TrimSpace(value) == string(agent.AgentCodex) {
 					return nil
 				}
 			}
@@ -537,7 +538,7 @@ func isCodexUnauthenticated(output string) bool {
 // ~/.codex/prompts/<skill>.md. lookPath/commandOutput-style injected
 // userHomeDir/stat keep this testable without touching the real filesystem.
 func verifySkillWith(
-	agent AgentKind,
+	agentKind agent.AgentKind,
 	skill string,
 	userHomeDir func() (string, error),
 	stat func(string) (os.FileInfo, error),
@@ -547,7 +548,7 @@ func verifySkillWith(
 		return fmt.Errorf("resolving home directory to verify skill %q: %w", skill, err)
 	}
 	path := filepath.Join(home, ".claude", "skills", skill, "SKILL.md")
-	if agent == AgentCodex {
+	if agentKind == agent.AgentCodex {
 		path = filepath.Join(home, ".codex", "prompts", skill+".md")
 	}
 	if _, err := stat(path); err != nil {

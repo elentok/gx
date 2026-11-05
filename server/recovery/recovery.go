@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
@@ -502,7 +503,7 @@ func (rec *Recovery) failureSequence(log []ralphloop.Event, f recovery.Failure) 
 // names, or "" when it names none or the transcript cannot be read. A Codex
 // agent that died before its first prompt has no rollout, which also reads "".
 func (rec *Recovery) lastLoggedAssistantText(ev ralphloop.Event) string {
-	if ev.AgentSession != "" && ev.Agent == ralphloop.AgentCodex {
+	if ev.AgentSession != "" && ev.Agent == agent.AgentCodex {
 		home, err := rec.d.Projects.CodexHome()
 		if err != nil {
 			return ""
@@ -510,7 +511,7 @@ func (rec *Recovery) lastLoggedAssistantText(ev ralphloop.Event) string {
 		text, _, _ := codexsession.LastAssistantTextIn(home, ev.AgentSession)
 		return text
 	}
-	if ev.AgentSession == "" || ev.Cwd == "" || (ev.Agent != "" && ev.Agent != ralphloop.AgentClaude) {
+	if ev.AgentSession == "" || ev.Cwd == "" || (ev.Agent != "" && ev.Agent != agent.AgentClaude) {
 		return ""
 	}
 	path, err := rec.d.Projects.TranscriptPath(ev.Cwd, ev.AgentSession)

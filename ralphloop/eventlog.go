@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/logger"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -97,10 +98,10 @@ type Event struct {
 	// Ticket is the ticket's Identifier (the filename's full "NN[letter]"
 	// prefix), not its Number, so lettered split siblings sharing a Number
 	// (e.g. "04a"/"04b") remain distinguishable in the run log.
-	Ticket       string    `json:"ticket"`
-	Agent        AgentKind `json:"agent,omitempty"`
-	Pane         string    `json:"pane,omitempty"`
-	AgentSession string    `json:"agent_session,omitempty"`
+	Ticket       string          `json:"ticket"`
+	Agent        agent.AgentKind `json:"agent,omitempty"`
+	Pane         string          `json:"pane,omitempty"`
+	AgentSession string          `json:"agent_session,omitempty"`
 	// Cwd is the directory the agent session was launched in and is the local
 	// session-data lookup key alongside AgentSession.
 	Cwd    string `json:"cwd,omitempty"`
@@ -518,9 +519,9 @@ func sanitizeSendError(err error) error {
 // aren't cross-attributed) with a recorded AgentSession — the session
 // id/cwd/agent to backfill a reattached ticket close's metadata with (ticket
 // 06a), since the reattaching run never captured a fresh session of its own.
-// Agent defaults to AgentClaude for historical logs that omitted it (see
+// Agent defaults to agent.AgentClaude for historical logs that omitted it (see
 // Event.Agent).
-func lastIterationSession(evs []Event, identifier string) (agentSession, cwd string, agent AgentKind, ok bool) {
+func lastIterationSession(evs []Event, identifier string) (agentSession, cwd string, agentKind agent.AgentKind, ok bool) {
 	all := IterationSessions(evs, identifier)
 	if len(all) == 0 {
 		return "", "", "", false
@@ -532,11 +533,11 @@ func lastIterationSession(evs []Event, identifier string) (agentSession, cwd str
 type IterationSession struct {
 	Session string
 	Cwd     string
-	Agent   AgentKind
+	Agent   agent.AgentKind
 }
 
 // IterationSessions lists identifier's recorded iteration sessions, newest
-// first. Agent defaults to AgentClaude for historical logs that omitted it.
+// first. Agent defaults to agent.AgentClaude for historical logs that omitted it.
 func IterationSessions(evs []Event, identifier string) []IterationSession {
 	var out []IterationSession
 	for i := len(evs) - 1; i >= 0; i-- {
@@ -544,11 +545,11 @@ func IterationSessions(evs []Event, identifier string) []IterationSession {
 		if ev.Ticket != identifier || ev.Type != string(events.IterationStarted) || ev.AgentSession == "" {
 			continue
 		}
-		agent := ev.Agent
-		if agent == "" {
-			agent = AgentClaude
+		agentKind := ev.Agent
+		if agentKind == "" {
+			agentKind = agent.AgentClaude
 		}
-		out = append(out, IterationSession{Session: ev.AgentSession, Cwd: ev.Cwd, Agent: agent})
+		out = append(out, IterationSession{Session: ev.AgentSession, Cwd: ev.Cwd, Agent: agentKind})
 	}
 	return out
 }

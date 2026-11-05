@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -30,7 +30,7 @@ var stepGrowth = map[tickets.DesignStep]int{
 // runAgentFits prints the used tokens, the step's growth and the ceiling, and
 // returns an ExitError{1} when the step would not stay under the ceiling.
 // Any other error means the caller should treat the answer as "stop".
-func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) error {
+func runAgentFits(d deps, out io.Writer, agentKind, session, cwd, stepName string) error {
 	step, ok := tickets.ParseDesignStep(stepName)
 	if !ok {
 		return tickets.CheckDesignStep(stepName)
@@ -45,7 +45,7 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 			return &ExitError{Code: 1}
 		}
 	}
-	used, err := runAgentContextWindow(d, agent, session, cwd)
+	used, err := runAgentContextWindow(d, agentKind, session, cwd)
 	if errors.Is(err, errCodexNoUsage) {
 		// A fresh Codex session has made no model call yet: it has used nothing.
 		used, err = 0, nil
@@ -54,7 +54,7 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 		return err
 	}
 	growth := stepGrowth[step]
-	ceiling := ralphloop.SmartZoneCeiling
+	ceiling := agent.SmartZoneCeiling
 	fmt.Fprintf(out, "used=%d growth=%d ceiling=%d\n", used, growth, ceiling)
 	// A session that has used nothing always fits: stopping cannot save any context.
 	if step != tickets.StepDone && used > 0 && used+growth >= ceiling {

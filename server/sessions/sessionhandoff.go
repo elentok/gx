@@ -5,13 +5,13 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
 )
 
 // StartContinue runs a design Continue's action in the background: the
@@ -31,9 +31,9 @@ func (rs *Resumer) StartContinue(dir string, meta Meta, label string, action []s
 func (rs *Resumer) chartingHandoffDue(meta Meta, action []string) bool {
 	return meta.LaunchDesign && meta.Design &&
 		rs.mg.settings.Load().HasChatReader(meta.Harness) &&
-		meta.Tier == ralphloop.TierStrongest &&
+		meta.Tier == agent.TierStrongest &&
 		slices.Equal(action, chat.DesignContinueAction(meta.Ticket, meta.Harness)) &&
-		rs.mg.Maps.DesignLaunchTier(meta.Ticket) == ralphloop.TierWorker
+		rs.mg.Maps.DesignLaunchTier(meta.Ticket) == agent.TierWorker
 }
 
 // HandoffRefusal is why a Continue of action must not start: it is a charting
@@ -107,7 +107,7 @@ func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
 		return err
 	}
 	meta.ConversationID = conv
-	rs.mg.applyTier(meta, ralphloop.TierWorker)
+	rs.mg.applyTier(meta, agent.TierWorker)
 	meta.HandoffTier = true
 	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
 	meta.Actionable = wire.SessionActionable{}

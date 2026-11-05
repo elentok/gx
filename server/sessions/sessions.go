@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/queue"
 	"io/fs"
 	"net/http"
@@ -26,7 +27,6 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
@@ -120,7 +120,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 			req.Name = req.Worktree
 		}
 	}
-	tier := cmp.Or(req.Tier, ralphloop.TierWorker)
+	tier := cmp.Or(req.Tier, agent.TierWorker)
 	if sc.LaunchDesign {
 		tier = mg.Maps.DesignLaunchTier(req.Ticket)
 	}
@@ -172,9 +172,9 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 
 // applyTier sets the session's tier and the model and effort it resolves to for
 // the session's harness and project.
-func (mg *Manager) applyTier(meta *Meta, tier ralphloop.Tier) {
+func (mg *Manager) applyTier(meta *Meta, tier agent.Tier) {
 	meta.Tier = tier
-	meta.Model, meta.Effort = ralphloop.ResolveTier(mg.projects.AgentsConfig(meta.Project), ralphloop.AgentFor(meta.Harness), tier)
+	meta.Model, meta.Effort = agent.ResolveTier(mg.projects.AgentsConfig(meta.Project), agent.AgentFor(meta.Harness), tier)
 }
 
 // addSessionWorktree makes worktree name from the project's trunk, as the

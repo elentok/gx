@@ -73,6 +73,7 @@ var allowed = map[site]entry{
 	{"testutil/gxfixture/build.go", ruleChildEnv}:            {1, reasonStartup},
 	{"testutil/gxfixture/serve.go", ruleChildEnv}:            {1, reasonStartup},
 	{"testutil/gxfixture/env.go", ruleEnvRead}:               {1, reasonStartup},
+	{"ralphloop/internal/fixture/fixture.go", ruleEnvRead}:   {1, reasonChild},
 	{"testutil/gxfixture/env.go", ruleHomeDir}:               {1, reasonStartup},
 	{"testutil/herdrfake/herdrfake.go", ruleEnvRead}:         {2, reasonChild},
 	{"ui/history/conversations_actions.go", ruleChildEnv}:    {1, reasonTool},

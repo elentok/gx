@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -359,7 +360,7 @@ func (r *Reclaimer) ResolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralph
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, merge.IterationMode{}, err
 	}
 	one := ralphloop.OneIteration{
-		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: ralphloop.AgentKind(t.Agent),
+		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: agent.AgentKind(t.Agent),
 		StallNudgeDelay: r.host.StalledNudgeDelay(),
 	}
 	for _, e := range epics {

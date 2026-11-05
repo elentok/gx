@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 // rateLimitPollInterval is how often holdRateLimit re-checks a pane when the
@@ -52,7 +53,7 @@ func holdRateLimit(d Deps, o OneIteration, p launchAndPromptParams, waitStates [
 		// A Codex pane back on its own dialog is not waiting for "continue": that
 		// is a prompt, not a dialog answer. Release the hold and let the caller's
 		// blocked rule pause it.
-		if !(p.Agent == AgentCodex && codexBlocked(d, p)) {
+		if !(p.Agent == agent.AgentCodex && codexBlocked(d, p)) {
 			// A refused prompt means the agent is already working (claude's own
 			// auto-continue) or blocked; the wait below and the caller handle both.
 			if err := d.Runner.Prompt(p.session(), "continue"); err != nil && !errors.Is(err, agentrunner.ErrNotReady) {

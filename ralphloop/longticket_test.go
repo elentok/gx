@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -25,7 +26,7 @@ func runLongTicketWait(t *testing.T, ticketType string, threshold int, counts []
 		}
 	}
 	p := boundGiveUpParams()
-	p.Agent = AgentClaude
+	p.Agent = agent.AgentClaude
 	p.Model = "sonnet"
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: ticketType}
 	p.ScratchDir = fixture.EpicScratchDir(t, "epic")

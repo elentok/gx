@@ -1,7 +1,7 @@
 package recovery
 
 import (
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -40,8 +40,8 @@ func LaunchSkill(t tickets.Ticket) string {
 }
 
 // LaunchPrompt is the first prompt of an agent: the skill command, then the note.
-func LaunchPrompt(agent ralphloop.AgentKind, skill, note, address string) string {
-	prompt := ralphloop.SkillPrompt(agent, skill, address)
+func LaunchPrompt(agentKind agent.AgentKind, skill, note, address string) string {
+	prompt := agent.SkillPrompt(agentKind, skill, address)
 	if note != "" {
 		prompt += "\n\n" + note
 	}

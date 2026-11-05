@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
@@ -83,7 +84,7 @@ func (s *Scheduler) ClaimNext() {
 // ClaimTicket claims and launches one ticket the way a claim pass would, but
 // without asking the frontier, and reports whether an iteration launched. For
 // tests.
-func (s *Scheduler) ClaimTicket(address, agent string) (bool, error) {
+func (s *Scheduler) ClaimTicket(address, agentKind string) (bool, error) {
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return false, err
@@ -96,7 +97,7 @@ func (s *Scheduler) ClaimTicket(address, agent string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return s.Launcher.ClaimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, ralphloop.AgentKind(agent), epics)
+	return s.Launcher.ClaimAndLaunch(queue.RootOf(addr), addr, ref.Ticket, ref.Repo, agent.AgentKind(agentKind), epics)
 }
 
 // releaseWaitingSlots frees the slots of agents that waited past the grace

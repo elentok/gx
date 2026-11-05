@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -44,7 +45,7 @@ const (
 func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	smartZone := p.SmartZone
 	if smartZone <= 0 {
-		smartZone = defaultSmartZone
+		smartZone = agent.DefaultSmartZone
 	}
 
 	elapsedMs := 0
@@ -76,7 +77,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					elapsedMs = 0
 					continue
 				}
-				if p.Agent == AgentCodex {
+				if p.Agent == agent.AgentCodex {
 					_, _, evidence, limitErr := runnerRateLimit(d, p)
 					if limitErr != nil {
 						return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
@@ -99,7 +100,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			// ordinary finish checks below run regardless. Rate limits are
 			// not acted on here, only Codex context exhaustion.
 			_, _, evidence, _ := runnerRateLimit(d, p)
-			if p.Agent == AgentCodex && evidence != "" {
+			if p.Agent == agent.AgentCodex && evidence != "" {
 				// Wait returns at once on an idle pane, so pace the retry.
 				elapsedMs, err = recoverCodexContextExhaustionPoll(d, p, sessionID, evidence, smartZone, elapsedMs, true)
 				if err != nil {
@@ -168,7 +169,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		}
 		elapsedMs += pollMs
 
-		if p.Agent == AgentCodex {
+		if p.Agent == agent.AgentCodex {
 			_, _, evidence, checkErr := runnerRateLimit(d, p)
 			if checkErr != nil {
 				return fmt.Errorf("detecting %s Codex quota: %w", p.Label, checkErr)
@@ -375,8 +376,8 @@ type compactBoundarySnapshot struct {
 // session exists and will be identified shortly, and calling it unsupported
 // would fail a Claude agent open — the single most likely way one merges in the
 // trust-the-pane bucket by accident.
-func readCompactBoundaries(d Deps, agent AgentKind, cwd, sessionID string) compactBoundarySnapshot {
-	read := compactionReader(d, agent)
+func readCompactBoundaries(d Deps, agentKind agent.AgentKind, cwd, sessionID string) compactBoundarySnapshot {
+	read := compactionReader(d, agentKind)
 	if read == nil {
 		return compactBoundarySnapshot{state: compactBoundaryUnsupported}
 	}
@@ -392,16 +393,16 @@ func readCompactBoundaries(d Deps, agent AgentKind, cwd, sessionID string) compa
 
 // compactionReader picks the agent's own boundary-count read; nil means the
 // agent has no boundary signal wired.
-func compactionReader(d Deps, agent AgentKind) func(cwd, sessionID string) (int, bool, error) {
-	if agent == AgentCodex {
+func compactionReader(d Deps, agentKind agent.AgentKind) func(cwd, sessionID string) (int, bool, error) {
+	if agentKind == agent.AgentCodex {
 		return d.ReadCodexCompactions
 	}
 	return d.ReadCompactions
 }
 
 // compactionAfterReader is compactionReader for the "written since" read.
-func compactionAfterReader(d Deps, agent AgentKind) func(cwd, sessionID string, since time.Time) (int, bool, error) {
-	if agent == AgentCodex {
+func compactionAfterReader(d Deps, agentKind agent.AgentKind) func(cwd, sessionID string, since time.Time) (int, bool, error) {
+	if agentKind == agent.AgentCodex {
 		return d.ReadCodexCompactionsAfter
 	}
 	return d.ReadCompactionsAfter
@@ -638,7 +639,7 @@ func confirmFinished(d Deps, in *personInput, s agentrunner.Session, until []age
 // smartZonePollMs instead of spinning — same reasoning as
 // waitForCompactionSignal's own pacing.
 func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
-	if p.Agent != AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
+	if p.Agent != agent.AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
 		return true, nil
 	}
 
@@ -711,11 +712,11 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 // contextOccupancy reads the selected agent's own local session data. A
 // missing observer is treated like incomplete session data, keeping the
 // running iteration alive instead of falsely pausing it.
-func contextOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (int, bool, error) {
+func contextOccupancy(d Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
 	if sessionID == "" {
 		return 0, false, nil
 	}
-	if agent == AgentCodex {
+	if agentKind == agent.AgentCodex {
 		if d.ReadCodexContext == nil {
 			return 0, false, nil
 		}
@@ -736,15 +737,15 @@ func contextOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (int, bool
 // work the first recovery just asked for. Agents (Codex) and wirings without
 // the staleness-aware reader fall back to the general read, where every found
 // number is decidable.
-func smartZoneOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (occupancy int, found, decidable bool, err error) {
-	if agent == AgentClaude && sessionID != "" && d.ReadOccupancyReading != nil {
+func smartZoneOccupancy(d Deps, agentKind agent.AgentKind, cwd, sessionID string) (occupancy int, found, decidable bool, err error) {
+	if agentKind == agent.AgentClaude && sessionID != "" && d.ReadOccupancyReading != nil {
 		reading, err := d.ReadOccupancyReading(cwd, sessionID)
 		if err != nil {
 			return 0, false, false, err
 		}
 		return reading.Usage.Occupancy(), reading.Found, reading.Found && !reading.Stale, nil
 	}
-	occupancy, found, err = contextOccupancy(d, agent, cwd, sessionID)
+	occupancy, found, err = contextOccupancy(d, agentKind, cwd, sessionID)
 	return occupancy, found, found, err
 }
 
@@ -755,8 +756,8 @@ func smartZoneOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (occupan
 // smartZonePollMs after starting/reattaching. A missing/unreadable occupancy
 // (occErr != nil or !ok, e.g. no session id yet) is silently skipped rather
 // than emitting a misleading zero.
-func emitContextOccupancy(d Deps, sink EventSink, agent AgentKind, identifier, cwd, sessionID string) {
-	occupancy, ok, err := contextOccupancy(d, agent, cwd, sessionID)
+func emitContextOccupancy(d Deps, sink EventSink, agentKind agent.AgentKind, identifier, cwd, sessionID string) {
+	occupancy, ok, err := contextOccupancy(d, agentKind, cwd, sessionID)
 	if err != nil || !ok {
 		return
 	}
@@ -767,8 +768,8 @@ func emitContextOccupancy(d Deps, sink EventSink, agent AgentKind, identifier, c
 // agent's transcript recorded. A missing observer or read failure is treated
 // as "unknown" (count 0, omitted from frontmatter) rather than blocking the
 // ticket close it's stamped alongside.
-func sessionCompactions(d Deps, agent AgentKind, cwd, sessionID string) (int, bool, error) {
-	read := compactionReader(d, agent)
+func sessionCompactions(d Deps, agentKind agent.AgentKind, cwd, sessionID string) (int, bool, error) {
+	read := compactionReader(d, agentKind)
 	if sessionID == "" || read == nil {
 		return 0, false, nil
 	}

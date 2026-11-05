@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets/schema"
 
@@ -209,7 +210,7 @@ func appliedSessionFixture(t *testing.T, cost string) (lp MergeParams, d MergeDe
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
 	lp.TicketPath = ticketPath
-	lp.Session = MergeSession{Agent: AgentClaude, Cwd: cwd, ID: "sess-applied"}
+	lp.Session = MergeSession{Agent: agent.AgentClaude, Cwd: cwd, ID: "sess-applied"}
 	return lp, d, ticketPath
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
@@ -290,13 +291,13 @@ func TestContextOccupancy_UnaffectedByStaleness(t *testing.T) {
 		return transcript.OccupancyReading{}, nil
 	}
 
-	occupancy, ok, err := contextOccupancy(d, AgentClaude, "/repo/iter-19", "sess-19")
+	occupancy, ok, err := contextOccupancy(d, agent.AgentClaude, "/repo/iter-19", "sess-19")
 	if err != nil || !ok || occupancy != 200 {
 		t.Fatalf("contextOccupancy() = %d, %v, %v; want the stamped/displayed value reported regardless", occupancy, ok, err)
 	}
 
 	sink := &occupancySink{}
-	emitContextOccupancy(d, sink, AgentClaude, "19", "/repo/iter-19", "sess-19")
+	emitContextOccupancy(d, sink, agent.AgentClaude, "19", "/repo/iter-19", "sess-19")
 	if len(sink.calls) != 1 || sink.calls[0].tokens != 200 {
 		t.Errorf("ContextOccupancy calls = %+v, want the iteration-started emission unaffected", sink.calls)
 	}
@@ -334,7 +335,7 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 	}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01",
+		Label: "iter-01", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "01",
 		SessionCwd: "/repo/iter-01", SmartZone: 1_000_000, Gate: NewGate(), Sink: sink,
 	}, "sess-1")
 	if err != nil {
@@ -394,7 +395,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 	}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
+		Label: "iter-01", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		SmartZone: 1_000_000, Gate: NewGate(),
 	}, "sess-1")
 	if err != nil {
@@ -417,7 +418,7 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	d := Deps{Runner: r}
 
 	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
+		Label: "iter-01", Agent: agent.AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
 	}, "session-1")
 	if err == nil || !strings.Contains(err.Error(), "rollout unreadable") {
 		t.Fatalf("waitForFinish error = %v, want rollout read failure", err)

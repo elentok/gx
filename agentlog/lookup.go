@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -97,7 +98,7 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 			live, err := d.Alive(l.Procs)
 			return err == nil && !live
 		}
-		if d.ReadsTranscript() && string(d.Meta.Harness) == string(ralphloop.AgentCodex) {
+		if d.ReadsTranscript() && string(d.Meta.Harness) == string(agent.AgentCodex) {
 			if l.CodexHome == "" {
 				return Log{}, errNoHome
 			}
@@ -132,7 +133,7 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 	if !ok {
 		return Log{}, fmt.Errorf("%w for %s", ErrNoAgent, a)
 	}
-	if it.Agent == string(ralphloop.AgentCodex) {
+	if it.Agent == string(agent.AgentCodex) {
 		return Log{}, ErrUnsupported
 	}
 	if it.Transcript == "" {

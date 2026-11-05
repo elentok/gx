@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -135,7 +136,7 @@ func codexBlockedLimitFixture(t *testing.T, onReset func(r *runnerfake.Runner)) 
 		r.SetState("iter-01", agentrunner.StateBlocked, "Approve command?")
 		r.SetRateLimit("iter-01", rateLimitClock.Add(time.Minute))
 	}, func(*runnerfake.Runner, int) {})
-	one.Agent, one.Runner = AgentCodex, "herdr"
+	one.Agent, one.Runner = agent.AgentCodex, "herdr"
 	d.Sleep = func(dur time.Duration) {
 		*sleeps = append(*sleeps, dur)
 		r.SetRateLimit("iter-01", time.Time{})
@@ -193,7 +194,7 @@ func TestWaitIterationFinished_RateLimitedBlockedAgentHolds(t *testing.T) {
 		r.SetState("iter-01", agentrunner.StateBlocked, "usage limit")
 		r.SetRateLimit("iter-01", rateLimitClock.Add(time.Minute))
 	}, func(*runnerfake.Runner, int) {})
-	one.Agent, one.Runner = AgentClaude, string(agentrunner.ChoiceHeadless)
+	one.Agent, one.Runner = agent.AgentClaude, string(agentrunner.ChoiceHeadless)
 	d.Sleep = func(dur time.Duration) {
 		*sleeps = append(*sleeps, dur)
 		r.SetState("iter-01", agentrunner.StateIdle, "")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -540,7 +541,7 @@ func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
 	s.send(s.style.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)), notifyKindEpicStarted, epicSource(epicName), "")
 }
 
-func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID string) {
+func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
 	s.EventSink.IterationStarted(ticket, label, cwd, sessionID, agent, paneID)
 	s.send(s.style.iterationStartedText(ticket, s.epicName), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
 }

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 func TestExecutionQueueConcurrencyDefaults(t *testing.T) {
@@ -48,10 +48,10 @@ func TestAgentConfigDefaultsOnZeroValueSettings(t *testing.T) {
 	settings := Settings{}
 	defaults := config.DefaultAgentsConfig()
 
-	if got := settings.AgentConfig(ralphloop.AgentClaude); got != defaults.Claude {
+	if got := settings.AgentConfig(agent.AgentClaude); got != defaults.Claude {
 		t.Fatalf("AgentConfig(claude) = %+v, want %+v", got, defaults.Claude)
 	}
-	if got := settings.AgentConfig(ralphloop.AgentCodex); got != defaults.Codex {
+	if got := settings.AgentConfig(agent.AgentCodex); got != defaults.Codex {
 		t.Fatalf("AgentConfig(codex) = %+v, want %+v", got, defaults.Codex)
 	}
 }
@@ -62,10 +62,10 @@ func TestAgentConfigUsesConfiguredValues(t *testing.T) {
 		Codex:  config.AgentConfig{Model: "gpt-5.6-sol", Effort: "high"},
 	}}
 
-	if got := settings.AgentConfig(ralphloop.AgentClaude); got != (config.AgentConfig{Model: "opus", Effort: ""}) {
+	if got := settings.AgentConfig(agent.AgentClaude); got != (config.AgentConfig{Model: "opus", Effort: ""}) {
 		t.Fatalf("AgentConfig(claude) = %+v, want Model=opus Effort=\"\" (deliberately empty, not defaulted)", got)
 	}
-	if got := settings.AgentConfig(ralphloop.AgentCodex); got != (config.AgentConfig{Model: "gpt-5.6-sol", Effort: "high"}) {
+	if got := settings.AgentConfig(agent.AgentCodex); got != (config.AgentConfig{Model: "gpt-5.6-sol", Effort: "high"}) {
 		t.Fatalf("AgentConfig(codex) = %+v, want Model=gpt-5.6-sol Effort=high", got)
 	}
 }

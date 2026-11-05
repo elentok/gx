@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -31,7 +32,7 @@ func finishFixture(t *testing.T) (scratchDir, path string) {
 func driveIteration(t *testing.T, d Deps, scratchDir, path string, sink EventSink) FinishOutcome {
 	t.Helper()
 	one := OneIteration{
-		RepoDir: "/fake/repo", Epic: "epic", ScratchDir: scratchDir, Agent: AgentClaude, Sink: sink,
+		RepoDir: "/fake/repo", Epic: "epic", ScratchDir: scratchDir, Agent: agent.AgentClaude, Sink: sink,
 		Ticket: tickets.Ticket{Identifier: "01", Path: path},
 	}
 	w, err := PrepareIteration(d, one)

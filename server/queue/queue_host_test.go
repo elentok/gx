@@ -5,20 +5,20 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 )
 
 // fakeHost is a Host that answers from fields and counts the extra-usage checks.
 type fakeHost struct {
-	harness     ralphloop.AgentKind
+	harness     agent.AgentKind
 	extraUsage  bool
 	extraChecks int
 	live        []runs.Run
 }
 
-func (f *fakeHost) DefaultHarness(string) ralphloop.AgentKind { return f.harness }
+func (f *fakeHost) DefaultHarness(string) agent.AgentKind     { return f.harness }
 func (f *fakeHost) RunnerForRun(runs.Run) agentrunner.Runner  { return nil }
 func (f *fakeHost) Runs() []runs.Run                          { return f.live }
 func (f *fakeHost) CheckWaitingLabel(string) string           { return "" }
@@ -34,14 +34,14 @@ func TestQueue_ExtraUsageAsksTheHostOnlyForClaudeItems(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name    string
-		harness ralphloop.AgentKind
+		harness agent.AgentKind
 		agents  []string
 		checks  int
 	}{
-		{"explicit claude", ralphloop.AgentCodex, []string{"claude"}, 1},
-		{"empty follows a Claude default", ralphloop.AgentClaude, []string{""}, 1},
-		{"empty follows a Codex default", ralphloop.AgentCodex, []string{""}, 0},
-		{"codex only", ralphloop.AgentClaude, []string{"codex"}, 0},
+		{"explicit claude", agent.AgentCodex, []string{"claude"}, 1},
+		{"empty follows a Claude default", agent.AgentClaude, []string{""}, 1},
+		{"empty follows a Codex default", agent.AgentCodex, []string{""}, 0},
+		{"codex only", agent.AgentClaude, []string{"codex"}, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

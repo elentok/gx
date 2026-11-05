@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -63,9 +64,9 @@ type mergeQueueParams struct {
 	WorktreeDir     string
 	FeatureWorktree string
 	FeatureBranch   string
-	Agent           AgentKind
+	Agent           agent.AgentKind
 	// Model and Effort are the resolved per-agent config a merged
-	// conflict-resolution agent starts under (see ResolveTier); empty
+	// conflict-resolution agent starts under (see agent.ResolveTier); empty
 	// omits that one flag from the launch argv.
 	Model        string
 	Effort       string

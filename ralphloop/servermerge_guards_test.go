@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -36,7 +37,7 @@ func serverGuardsWait(t *testing.T, ticketType, expected, ranModel string, thres
 		}
 	}
 	one := OneIteration{
-		Agent: AgentClaude, Epic: "epic", ScratchDir: fixture.EpicScratchDir(t, "epic"), Model: expected,
+		Agent: agent.AgentClaude, Epic: "epic", ScratchDir: fixture.EpicScratchDir(t, "epic"), Model: expected,
 		Ticket:          tickets.Ticket{Identifier: "19", Type: ticketType},
 		LongTicketTurns: threshold,
 		OnLongTicket:    func(turns int) { f.fired = append(f.fired, turns) },

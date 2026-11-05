@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -50,7 +50,7 @@ func ignoreCtx(do func(wire.QueueRequest) (wire.QueueResult, error)) func(wire.Q
 // rest of the server: the back edges to harness, sched, sessions, budget, merge
 // and recovery. The root implements it; tests use a fake.
 type Host interface {
-	DefaultHarness(project string) ralphloop.AgentKind
+	DefaultHarness(project string) agent.AgentKind
 	RunnerForRun(run runs.Run) agentrunner.Runner
 	Runs() []runs.Run
 	CheckWaitingLabel(address string) string
@@ -230,8 +230,8 @@ func (q *Queue) WithExtraUsage(project string, agents []string, res wire.QueueRe
 	if err != nil || res.Refused {
 		return res, err
 	}
-	for _, agent := range agents {
-		if agent == "" && q.host.DefaultHarness(project) == ralphloop.AgentClaude || agent == string(ralphloop.AgentClaude) {
+	for _, agentKind := range agents {
+		if agentKind == "" && q.host.DefaultHarness(project) == agent.AgentClaude || agentKind == string(agent.AgentClaude) {
 			res.ExtraUsage = q.host.CheckExtraUsage(time.Now())
 			break
 		}
@@ -247,16 +247,16 @@ func (q *Queue) Add(req wire.QueueRequest) (wire.QueueResult, error) {
 
 // resolveAgent keeps an empty agent empty (it follows the Default harness) and
 // refuses an unknown one.
-func resolveAgent(name string) (ralphloop.AgentKind, *wire.QueueResult) {
-	agent := ralphloop.AgentKind(name)
+func resolveAgent(name string) (agent.AgentKind, *wire.QueueResult) {
+	agentKind := agent.AgentKind(name)
 	if name == "" {
 		return "", nil
 	}
-	if err := ralphloop.ValidateAgentKind(agent); err != nil {
+	if err := agent.ValidateAgentKind(agentKind); err != nil {
 		r := Refusal(wire.ReasonInvalidAgent, err.Error())
 		return "", &r
 	}
-	return agent, nil
+	return agentKind, nil
 }
 
 // queueTarget is what a queue request names: one ticket, or a whole epic.
@@ -322,7 +322,7 @@ func (q *Queue) addItem(req wire.QueueRequest) (wire.QueueResult, error) {
 		return *bad, nil
 	}
 	addr := target.address
-	agent, badAgent := resolveAgent(req.Agent)
+	agentKind, badAgent := resolveAgent(req.Agent)
 	if badAgent != nil {
 		return *badAgent, nil
 	}
@@ -336,7 +336,7 @@ func (q *Queue) addItem(req wire.QueueRequest) (wire.QueueResult, error) {
 				return nil, &r
 			}
 		}
-		item := NewItem(addr, agent)
+		item := NewItem(addr, agentKind)
 		if req.Front {
 			return append([]wire.QueueItem{item}, items...), nil
 		}
@@ -407,7 +407,7 @@ func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 		if bad != nil {
 			return *bad, nil
 		}
-		agent, badAgent := resolveAgent(it.Agent)
+		agentKind, badAgent := resolveAgent(it.Agent)
 		if badAgent != nil {
 			return *badAgent, nil
 		}
@@ -418,7 +418,7 @@ func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 			return Refusal(wire.ReasonAlreadyQueued, addr+" is listed twice"), nil
 		}
 		seen[addr] = true
-		items = append(items, NewItem(addr, agent))
+		items = append(items, NewItem(addr, agentKind))
 	}
 	return q.Write("", func(cur []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {
@@ -457,8 +457,8 @@ func (q *Queue) replaceItems(req wire.QueueRequest) (wire.QueueResult, error) {
 }
 
 // NewItem is the one place an enqueue time is stamped.
-func NewItem(addr string, agent ralphloop.AgentKind) wire.QueueItem {
-	return wire.QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()}
+func NewItem(addr string, agentKind agent.AgentKind) wire.QueueItem {
+	return wire.QueueItem{Address: addr, Agent: string(agentKind), EnqueuedAt: time.Now()}
 }
 
 func projectOfAddress(addr string) string {

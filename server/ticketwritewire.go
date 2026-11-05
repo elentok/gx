@@ -5,7 +5,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -48,13 +48,13 @@ func (h ticketWriteHost) StopRun(run runs.Run) error {
 	return r.Stop(run.Session)
 }
 
-func (h ticketWriteHost) TakeTierOverride(ticketPath string) ralphloop.Tier {
+func (h ticketWriteHost) TakeTierOverride(ticketPath string) agent.Tier {
 	return ticketops.TakeTierOverride(ticketPath)
 }
 
 func (h ticketWriteHost) HerdrHolds(r agentrunner.Runner) (string, bool) { return h.s.herdr.Holds(r) }
 
-func (h ticketWriteHost) UsageGate(agent ralphloop.AgentKind, now time.Time) (string, bool) {
+func (h ticketWriteHost) UsageGate(agent agent.AgentKind, now time.Time) (string, bool) {
 	return h.s.limits.UsageGate(agent, now)
 }
 
@@ -68,7 +68,7 @@ func (h ticketWriteHost) SettleLive(addrs []tickets.Address, stop bool, reason s
 	return h.s.ops.SettleLive(addrs, stop, reason, blocks)
 }
 
-func (h ticketWriteHost) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (bool, error) {
+func (h ticketWriteHost) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent agent.AgentKind, epics []tickets.Epic) (bool, error) {
 	return h.s.launcher.ClaimAndLaunch(root, queued, t, repo, agent, epics)
 }
 

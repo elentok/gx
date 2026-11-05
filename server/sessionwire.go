@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/settings"
@@ -84,7 +84,7 @@ func (h sessionHost) onMapEpic(address string) bool { return h.sessions.Maps.OnM
 func (h sessionHost) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 	return h.sessions.SessionWriteDesignWeb(do)
 }
-func (h sessionHost) designLaunchTier(address string) ralphloop.Tier {
+func (h sessionHost) designLaunchTier(address string) agent.Tier {
 	return h.sessions.Maps.DesignLaunchTier(address)
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -20,7 +21,7 @@ func SeedEarlierClaudeRun(t *testing.T, h *Harness, store, project, epic, id, se
 	const cwd = "/work/earlier-run"
 	err := ralphloop.AppendEvent(filepath.Join(store, project), epic, ralphloop.Event{
 		Time: time.Now(), Type: string(events.IterationStarted), Ticket: id,
-		Agent: ralphloop.AgentClaude, AgentSession: session, Cwd: cwd,
+		Agent: agent.AgentClaude, AgentSession: session, Cwd: cwd,
 	})
 	if err != nil {
 		t.Fatal(err)

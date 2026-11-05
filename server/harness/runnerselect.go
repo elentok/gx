@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/tickets"
 )
@@ -18,8 +19,8 @@ func (h *Harness) RunnerFor(project string) agentrunner.Runner {
 // LaunchRunner is the runner a new launch of agent in project uses. The
 // headless runner hosts only Claude, so Codex runs on pty unless herdr is
 // configured.
-func (h *Harness) LaunchRunner(project string, agent ralphloop.AgentKind) agentrunner.Runner {
-	if agent == ralphloop.AgentCodex && h.cfg.Runner.Name() != runs.RunnerHerdr {
+func (h *Harness) LaunchRunner(project string, agentKind agent.AgentKind) agentrunner.Runner {
+	if agentKind == agent.AgentCodex && h.cfg.Runner.Name() != runs.RunnerHerdr {
 		return h.RunnerNamed(string(agentrunner.ChoicePTY), project)
 	}
 	return h.RunnerFor(project)
@@ -70,11 +71,11 @@ func (h *Harness) IterationRunner(addr tickets.Address) (agentrunner.Runner, err
 	if run, ok := h.registry.RunOf(addr.String()); ok {
 		return h.RunnerOf(run)
 	}
-	agent := h.DefaultHarness(addr.Project)
+	agentKind := h.DefaultHarness(addr.Project)
 	if _, t, ok := h.host.FreshTicket(addr); ok {
-		agent = h.ResolveTicket(addr, t).Harness
+		agentKind = h.ResolveTicket(addr, t).Harness
 	}
-	return h.LaunchRunner(addr.Project, agent), nil
+	return h.LaunchRunner(addr.Project, agentKind), nil
 }
 
 // GiveLog hands the server logger to a runner that logs the vim probe's

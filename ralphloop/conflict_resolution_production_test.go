@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -202,7 +203,7 @@ func conflictParams(t *testing.T, dir string) iterationParams {
 		WorkspaceID:     "ws-1",
 		FeatureWorktree: dir,
 		FeatureBranch:   "main",
-		Agent:           AgentClaude,
+		Agent:           agent.AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "03"},
 		ScratchDir:      scratchDir,
 		SmartZone:       1_000_000,

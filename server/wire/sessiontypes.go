@@ -3,7 +3,7 @@ package wire
 import (
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 // SessionInfo is an interactive session on the wire: everything the Agents
@@ -54,9 +54,9 @@ type SessionInfo struct {
 	RebaseNote string `json:"rebase_note,omitempty"`
 	// Tier, Model and Effort are what the session launched under. For a Claude
 	// session Model is the one its newest reply reports, once there is a reply.
-	Tier   ralphloop.Tier `json:"tier,omitempty"`
-	Model  string         `json:"model,omitempty"`
-	Effort string         `json:"effort,omitempty"`
+	Tier   agent.Tier `json:"tier,omitempty"`
+	Model  string     `json:"model,omitempty"`
+	Effort string     `json:"effort,omitempty"`
 	// ModelSwitched is set when Model is not the one the launch tier chose, so
 	// the person switched it by hand. Never set for a launch with no explicit model.
 	ModelSwitched bool `json:"model_switched,omitempty"`
@@ -162,7 +162,7 @@ type CreateSessionRequest struct {
 	// RebaseNote is saved in the meta as RebaseNote.
 	RebaseNote string `json:"rebase_note,omitempty"`
 	// Tier is the model tier; empty means worker.
-	Tier ralphloop.Tier `json:"tier,omitempty"`
+	Tier agent.Tier `json:"tier,omitempty"`
 }
 
 // SessionResult is a session write's outcome: the session, or a refusal.

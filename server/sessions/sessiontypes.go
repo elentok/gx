@@ -4,11 +4,10 @@ import (
 	"cmp"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/sessions/convrecord"
 	"github.com/elentok/gx/server/wire"
-
-	"github.com/elentok/gx/ralphloop"
 )
 
 // sessionCtx is what the server's own callers set on a session create that the
@@ -53,9 +52,9 @@ type Meta struct {
 	// Tier, Model and Effort are what the session launched under, saved so a
 	// resume keeps them whatever the settings say by then. A session from before
 	// tiers has none, and its resume passes no model or effort flag.
-	Tier   ralphloop.Tier `json:"tier,omitempty"`
-	Model  string         `json:"model,omitempty"`
-	Effort string         `json:"effort,omitempty"`
+	Tier   agent.Tier `json:"tier,omitempty"`
+	Model  string     `json:"model,omitempty"`
+	Effort string     `json:"effort,omitempty"`
 	// FirstPrompt waits for the ready report or the first Idle; it is cleared
 	// once typed or on exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`

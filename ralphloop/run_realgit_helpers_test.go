@@ -51,11 +51,11 @@ func recordLaunchPrompt(home, cwd, sessionID, text string) error {
 
 // ticketIDFromImplementPrompt extracts a ticket identifier ("01", "02", ...)
 // from a "/<skill> <ticket-path>" (Claude) or "$<skill> <ticket-path>"
-// (Codex, see skillPrompt) prompt's ticket path, or ok=false if text isn't a
+// (Codex, see agent.SkillPrompt) prompt's ticket path, or ok=false if text isn't a
 // skill-launch prompt — the fake agent's cue for which iteration worktree to
 // do (simulated) work in. The skill name itself isn't checked: production
 // launches type: code-review tickets under "gx-code-review" rather than the
-// run's configured Skill (see launchSkill), and the fake only cares which
+// run's configured Skill (see agent.LaunchSkill), and the fake only cares which
 // ticket the prompt is for.
 func ticketIDFromImplementPrompt(text string) (id string, ok bool) {
 	if !strings.HasPrefix(text, "/") && !strings.HasPrefix(text, "$") {

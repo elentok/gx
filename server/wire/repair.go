@@ -48,7 +48,7 @@ type RepairResult struct {
 // ReasonBadBase refuses an resume whose base is not one of the competing blockers.
 const ReasonBadBase = "bad-base"
 
-// ReasonBadTier refuses a resume whose tier is not one of ralphloop.AllTiers.
+// ReasonBadTier refuses a resume whose tier is not one of agent.AllTiers.
 const ReasonBadTier = "bad-tier"
 
 // ViaDirect marks a repair verb the CLI ran without a server.

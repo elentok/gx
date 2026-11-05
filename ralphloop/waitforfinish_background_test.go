@@ -7,6 +7,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
@@ -25,7 +26,7 @@ func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (tra
 
 func backgroundTaskGateParams(scratchDir string) launchAndPromptParams {
 	return launchAndPromptParams{
-		Label: "iter-30", Agent: AgentClaude, Pane: "pane-1", Ticket: "30",
+		Label: "iter-30", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "30",
 		SessionCwd: "/repo/iter-30", Gate: NewGate(),
 		ScratchDir: scratchDir, EpicName: "epic",
 	}
@@ -188,7 +189,7 @@ func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
 	}
 	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 	p := backgroundTaskGateParams(scratchDir)
-	p.Agent = AgentCodex
+	p.Agent = agent.AgentCodex
 
 	if err := waitForFinish(d, p, "sess-30"); err != nil {
 		t.Fatalf("waitForFinish: %v, want a plain finish", err)
@@ -327,7 +328,7 @@ func TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate(t *te
 		}
 		d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
 		p := backgroundTaskGateParams(scratchDir)
-		p.Agent = AgentCodex
+		p.Agent = agent.AgentCodex
 
 		if err := waitForFinish(d, p, "sess-30"); err != nil {
 			t.Fatalf("waitForFinish: %v", err)

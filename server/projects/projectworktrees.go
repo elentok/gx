@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -15,10 +15,10 @@ import (
 // launches.
 func (p *Registry) TierModels(project string) map[string]string {
 	agents := p.AgentsConfig(project)
-	agent := ralphloop.AgentFor(p.LaunchHarness(project))
+	agentKind := agent.AgentFor(p.LaunchHarness(project))
 	out := map[string]string{}
-	for _, t := range ralphloop.AllTiers {
-		out[string(t)], _ = ralphloop.ResolveTier(agents, agent, t)
+	for _, t := range agent.AllTiers {
+		out[string(t)], _ = agent.ResolveTier(agents, agentKind, t)
 	}
 	return out
 }

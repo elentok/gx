@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -35,7 +36,7 @@ type OneIteration struct {
 	WorkspaceID string
 	Epic        string
 	ScratchDir  string
-	Agent       AgentKind
+	Agent       agent.AgentKind
 	Ticket      tickets.Ticket
 	// RootBase is the ref the epic's feature branch is created from when it
 	// does not exist yet; "" starts it at the repo's HEAD.
@@ -63,7 +64,7 @@ type OneIteration struct {
 	// It picks how a block pauses: see PausesAtOnce.
 	Runner string
 	// SmartZone is the context-token ceiling the iteration's agent is held to,
-	// the same as the SmartZone run option; zero means defaultSmartZone.
+	// the same as the SmartZone run option; zero means agent.DefaultSmartZone.
 	SmartZone int
 	// OnRateLimit hears the wait loop's rate-limit hold: (true, resetAt) when it
 	// starts or the reset changes (zero resetAt: no known reset), (false, zero)
@@ -79,12 +80,12 @@ type OneIteration struct {
 // headless Claude agent's block is a tracker fact, not a pane guess. Every
 // other runner and agent dwells first, since its block is read off a screen.
 func (o OneIteration) PausesAtOnce() bool {
-	return o.Agent == AgentClaude && o.Runner == string(agentrunner.ChoiceHeadless)
+	return o.Agent == agent.AgentClaude && o.Runner == string(agentrunner.ChoiceHeadless)
 }
 
 func (o OneIteration) smartZone() int {
 	if o.SmartZone <= 0 {
-		return defaultSmartZone
+		return agent.DefaultSmartZone
 	}
 	return o.SmartZone
 }
@@ -221,7 +222,7 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 		Label:           w.Label,
 		Model:           o.Model,
 		Effort:          o.Effort,
-		Skill:           defaultWorkerSkill,
+		Skill:           agent.DefaultWorkerSkill,
 		KeepAskedAgent:  o.KeepAskedAgent,
 		Ticket:          o.Ticket,
 		ScratchDir:      o.ScratchDir,
@@ -486,7 +487,7 @@ func stallNudgeText(d Deps, o OneIteration, w IterationWorktree, s agentrunner.S
 	if err != nil || !known || has {
 		return StallNudgeText
 	}
-	return skillPrompt(o.Agent, launchSkill(o.Ticket, defaultWorkerSkill), ticketAddress(o.Ticket))
+	return agent.SkillPrompt(o.Agent, agent.LaunchSkill(o.Ticket, agent.DefaultWorkerSkill), ticketAddress(o.Ticket))
 }
 
 // agentReported reports whether the ticket carries an agent report: a question

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -107,8 +108,8 @@ func (l *Launcher) evolveDirs(ticket tickets.Address) []string {
 // agentEnv is the tab env, plus the run's agent (see AgentEnv) and, for an
 // investigate agent, its ticket's address so its CLI calls identify it (see
 // InvestigateEnv).
-func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) []string {
-	env := append(slices.Clone(tabEnv), projects.AgentEnv+"="+string(agent))
+func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agentKind agent.AgentKind) []string {
+	env := append(slices.Clone(tabEnv), projects.AgentEnv+"="+string(agentKind))
 	if t.Type == string(schema.TypeInvestigate) {
 		env = append(env, wire.InvestigateEnv+"="+addr.String())
 	}
@@ -118,7 +119,7 @@ func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address, agent ral
 // launch starts one's agent in cwd. Its Codex sandbox gets one.ScratchDir, the
 // project dir where the epic's tickets live.
 func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (runs.Run, error) {
-	t, agent := one.Ticket, one.Agent
+	t, agentKind := one.Ticket, one.Agent
 	var extraDirs []string
 	if t.Type == string(schema.TypeEvolve) {
 		extraDirs = l.evolveDirs(ticket)
@@ -126,7 +127,7 @@ func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralph
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
 	resumeID := one.ResumeSessionID
-	if agent == ralphloop.AgentCodex && !l.CodexRolloutExists(cwd, resumeID) {
+	if agentKind == agent.AgentCodex && !l.CodexRolloutExists(cwd, resumeID) {
 		resumeID = ""
 	}
 	// A server stop ends the launch prompt's wait, which Serve would otherwise
@@ -138,11 +139,11 @@ func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralph
 			Label:           label,
 			Epic:            ticket.Epic,
 			Cwd:             cwd,
-			Kind:            agentrunner.Kind(agent),
-			Args:            ralphloop.AgentArgs(agent, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
-			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agent),
+			Kind:            agentrunner.Kind(agentKind),
+			Args:            agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
+			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agentKind),
 			ResumeSessionID: resumeID,
-		}, srvrecovery.LaunchPrompt(agent, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
+		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
 			l.LogEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
 	}
@@ -181,10 +182,10 @@ func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralph
 		path = "resumed"
 	}
 	l.LogEvent(ticket, ralphloop.Event{
-		Type: string(events.IterationStarted), Agent: agent, Label: label, Cwd: cwd,
+		Type: string(events.IterationStarted), Agent: agentKind, Label: label, Cwd: cwd,
 		AgentSession: session.SessionID, Path: path, TargetTip: one.TargetTip,
 	})
-	run := runs.Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
+	run := runs.Run{Address: ticket.String(), Agent: string(agentKind), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
 }
 

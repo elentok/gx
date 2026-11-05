@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -33,7 +34,7 @@ type SourceRange struct {
 // MergeSession locates the agent session whose metrics a merging stamps. A
 // zero ID means no session is recoverable, so no metrics are stamped.
 type MergeSession struct {
-	Agent AgentKind
+	Agent agent.AgentKind
 	Cwd   string
 	ID    string
 }

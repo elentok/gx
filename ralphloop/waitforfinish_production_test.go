@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
@@ -202,7 +203,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 
 	err := waitForFinish(deps, launchAndPromptParams{
 		Label:      "iter-05",
-		Agent:      AgentClaude,
+		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
@@ -308,7 +309,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 
 	recovered, err := recoverSmartZoneBreach(deps, launchAndPromptParams{
 		Label:      "iter-09",
-		Agent:      AgentCodex,
+		Agent:      agent.AgentCodex,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
@@ -530,7 +531,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 
 	err := waitForFinish(deps, launchAndPromptParams{
 		Label:      "iter-06",
-		Agent:      AgentClaude,
+		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,

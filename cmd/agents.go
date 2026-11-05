@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/spf13/cobra"
 )
@@ -257,7 +257,7 @@ func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command
 				}
 				req.Dir = dir
 			}
-			req.Tier = ralphloop.Tier(tier)
+			req.Tier = agent.Tier(tier)
 			cl, err := client()
 			if err != nil {
 				return err
@@ -273,7 +273,7 @@ func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command
 	cmd.Flags().StringVar(&req.Name, "name", "", "the session's name")
 	cmd.Flags().StringVar(&req.Ticket, "ticket", "", "the Session ticket's address")
 	cmd.Flags().StringVar(&req.Harness, "harness", "", "the harness for this session (default: the configured Default harness)")
-	cmd.Flags().StringVar(&tier, "tier", string(ralphloop.TierWorker), "the model tier: light, worker or strongest")
+	cmd.Flags().StringVar(&tier, "tier", string(agent.TierWorker), "the model tier: light, worker or strongest")
 	cmd.Flags().IntVar(&req.Cols, "cols", 0, "the terminal's width (default the loop's)")
 	cmd.Flags().IntVar(&req.Rows, "rows", 0, "the terminal's height (default the loop's)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")

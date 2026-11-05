@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
@@ -45,7 +46,7 @@ func TestVerifySkillWith(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name     string
-		agent    AgentKind
+		agent    agent.AgentKind
 		skill    string
 		statErr  error
 		homeErr  error
@@ -54,12 +55,12 @@ func TestVerifySkillWith(t *testing.T) {
 	}{
 		{
 			name:  "claude skill installed",
-			agent: AgentClaude,
+			agent: agent.AgentClaude,
 			skill: "implement",
 		},
 		{
 			name:     "claude skill missing",
-			agent:    AgentClaude,
+			agent:    agent.AgentClaude,
 			skill:    "implement",
 			statErr:  os.ErrNotExist,
 			wantErr:  `skill "implement" not found`,
@@ -67,12 +68,12 @@ func TestVerifySkillWith(t *testing.T) {
 		},
 		{
 			name:  "codex prompt installed",
-			agent: AgentCodex,
+			agent: agent.AgentCodex,
 			skill: "implement",
 		},
 		{
 			name:     "codex prompt missing",
-			agent:    AgentCodex,
+			agent:    agent.AgentCodex,
 			skill:    "implement",
 			statErr:  os.ErrNotExist,
 			wantErr:  `skill "implement" not found`,
@@ -80,7 +81,7 @@ func TestVerifySkillWith(t *testing.T) {
 		},
 		{
 			name:    "home directory unresolvable",
-			agent:   AgentClaude,
+			agent:   agent.AgentClaude,
 			skill:   "implement",
 			homeErr: errors.New("no home"),
 			wantErr: "resolving home directory",
@@ -169,10 +170,10 @@ func TestDefaultDepsWithOverrides_HomeOverridesVerifySkillLookup(t *testing.T) {
 	}
 
 	deps := DefaultDepsWithOverrides(DepsOverrides{Home: overrideHome})
-	if err := deps.VerifySkill(AgentClaude, "implement"); err != nil {
+	if err := deps.VerifySkill(agent.AgentClaude, "implement"); err != nil {
 		t.Errorf("VerifySkill() error = %v, want nil: override home has the skill file", err)
 	}
-	if err := deps.VerifySkill(AgentClaude, "missing"); err == nil {
+	if err := deps.VerifySkill(agent.AgentClaude, "missing"); err == nil {
 		t.Error("VerifySkill() error = nil, want error for a skill absent from the override home")
 	}
 }
@@ -189,7 +190,7 @@ func TestDefaultDepsWithOverrides_NoHomeReadsNoTranscript(t *testing.T) {
 	if _, ok, err := DefaultDepsWithOverrides(DepsOverrides{}).ReadOccupancy(cwd, session); err != nil || ok {
 		t.Errorf("ReadOccupancy() with no home = ok %v, err %v; want not found", ok, err)
 	}
-	if err := DefaultDepsWithOverrides(DepsOverrides{}).VerifySkill(AgentClaude, "implement"); err == nil {
+	if err := DefaultDepsWithOverrides(DepsOverrides{}).VerifySkill(agent.AgentClaude, "implement"); err == nil {
 		t.Error("VerifySkill() with no home = nil, want an error")
 	}
 	if ok, err := DefaultDepsWithOverrides(DepsOverrides{}).VerifyCodexSession(cwd, session); err != nil || ok {
@@ -243,7 +244,7 @@ func TestDefaultDepsWithOverrides_PathOverridesPreflightLookup(t *testing.T) {
 	}
 
 	deps := DefaultDepsWithOverrides(DepsOverrides{Path: binDir})
-	err := deps.PreflightAgent(AgentCodex)
+	err := deps.PreflightAgent(agent.AgentCodex)
 	if err == nil || !strings.Contains(err.Error(), "Herdr executable not found") {
 		t.Errorf("PreflightAgent() error = %v, want a Herdr-not-found error (codex resolved via override PATH, herdr did not)", err)
 	}

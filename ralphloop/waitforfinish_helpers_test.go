@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -36,7 +37,7 @@ func idlePromptRunner(label, sessionID string) *runnerfake.Runner {
 func gatedBreachParams(scratchDir string) launchAndPromptParams {
 	return launchAndPromptParams{
 		Label:      "iter-19",
-		Agent:      AgentClaude,
+		Agent:      agent.AgentClaude,
 		Pane:       "pane-1",
 		Ticket:     "19",
 		SessionCwd: "/repo/iter-19",
@@ -56,7 +57,7 @@ func breachRunner(timeoutIf func(wait int) bool) *blipRunner {
 // tick that times out drives one full recovery attempt.
 func boundGiveUpParams() launchAndPromptParams {
 	return launchAndPromptParams{
-		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
+		Label: "iter-19", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "19",
 		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
 	}
 }

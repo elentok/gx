@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
@@ -86,7 +86,7 @@ func FixAgentName(addr string) string {
 
 // FixAgentPrompt is the prompt the fix agent starts from; a pause label
 // follows the colon, none leaves the sentence at the state name.
-func FixAgentPrompt(agent, addr string, t tickets.Ticket) string {
+func FixAgentPrompt(agentKind, addr string, t tickets.Ticket) string {
 	state := "paused for repair"
 	switch t.RawStatus() {
 	case tickets.StatusPausedAnswer:
@@ -94,7 +94,7 @@ func FixAgentPrompt(agent, addr string, t tickets.Ticket) string {
 	case tickets.StatusError:
 		state = "in error"
 	}
-	prompt := harness.SkillCommand(agent, "gx-investigate", addr+" is "+state)
+	prompt := harness.SkillCommand(agentKind, "gx-investigate", addr+" is "+state)
 	if label := t.PauseReason.Label(); label != "" {
 		prompt += ": " + label
 	}
@@ -102,8 +102,8 @@ func FixAgentPrompt(agent, addr string, t tickets.Ticket) string {
 }
 
 // fixProjectPrompt is the prompt of an agent fixing a project's failed migration.
-func fixProjectPrompt(agent string, f wire.MigrationFailure) string {
-	return harness.SkillCommand(agent, "gx-investigate", fmt.Sprintf(
+func fixProjectPrompt(agentKind string, f wire.MigrationFailure) string {
+	return harness.SkillCommand(agentKind, "gx-investigate", fmt.Sprintf(
 		"the migration of project %s failed with: %s\nAfter fixing it, run `%s` to retry.",
 		f.Project, f.Error, f.RetryCommand))
 }
@@ -130,7 +130,7 @@ func (fa *FixAgent) startProject(project string) (wire.FixAgentResult, error) {
 		Name:       FixAgentName(project),
 		UniqueName: true,
 		Prompt:     fixProjectPrompt(fa.host.LaunchHarness(project), *failure),
-		Tier:       ralphloop.TierStrongest,
+		Tier:       agent.TierStrongest,
 	}
 	res, err := fa.host.CreateSession(cs, "")
 	if res.Refused && res.Reason == wire.ReasonSessionNameTaken {
@@ -182,16 +182,16 @@ func (fa *FixAgent) start(req wire.FixAgentRequest, web bool) (wire.FixAgentResu
 		return refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.Addr.Project)), nil
 	}
 	settings := fa.host.Settings()
-	agent := fa.host.LaunchHarness(ref.Addr.Project)
+	agentKind := fa.host.LaunchHarness(ref.Addr.Project)
 	cs := wire.CreateSessionRequest{
 		Project:    ref.Addr.Project,
 		Dir:        checkout,
 		Name:       FixAgentName(addr),
 		UniqueName: true,
-		Prompt:     FixAgentPrompt(agent, addr, t),
-		Tier:       ralphloop.TierStrongest,
+		Prompt:     FixAgentPrompt(agentKind, addr, t),
+		Tier:       agent.TierStrongest,
 	}
-	remote := settings.AgentsFixAgentRemoteControl && agent == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
+	remote := settings.AgentsFixAgentRemoteControl && agentKind == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
 	remoteControl := ""
 	if remote {
 		remoteControl = addr

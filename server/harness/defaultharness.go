@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 
@@ -15,7 +16,6 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/fsutil"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -112,7 +112,7 @@ func (h *Harness) SetDefault(req wire.SetDefaultHarnessRequest) (wire.SetDefault
 
 // effectiveDefault is the Default harness in effect: project's, or the global
 // one when project is empty.
-func (h *Harness) effectiveDefault(project string) ralphloop.AgentKind {
+func (h *Harness) effectiveDefault(project string) agent.AgentKind {
 	if project == "" {
 		return DefaultOrClaude(h.settings.Load().AgentsDefaultHarness)
 	}
@@ -170,7 +170,7 @@ func setAgentsKey(path, key, value string) error {
 // switchCounts counts, in scope, the waiting tickets that will use the new
 // Default and the running agents that keep another harness. An empty project is
 // the global scope: only projects that inherit count.
-func (h *Harness) switchCounts(project string, now ralphloop.AgentKind) (waiting, running int) {
+func (h *Harness) switchCounts(project string, now agent.AgentKind) (waiting, running int) {
 	inScope := func(p string) bool {
 		if project != "" {
 			return p == project
@@ -227,7 +227,7 @@ func (h *Harness) waitingOnDefault(epic tickets.Address) int {
 }
 
 // defaultHarnessNotice is the one sentence web, TUI and CLI show after a switch.
-func defaultHarnessNotice(project string, now ralphloop.AgentKind, waiting, running int) string {
+func defaultHarnessNotice(project string, now agent.AgentKind, waiting, running int) string {
 	head := "Default is now " + harnessDisplayName(now) + "."
 	if project != "" {
 		head = "Default for " + project + " is now " + harnessDisplayName(now) + "."
@@ -238,9 +238,9 @@ func defaultHarnessNotice(project string, now ralphloop.AgentKind, waiting, runn
 	}
 	notice := head + " " + use
 	if running > 0 {
-		other := ralphloop.AgentClaude
-		if now == ralphloop.AgentClaude {
-			other = ralphloop.AgentCodex
+		other := agent.AgentClaude
+		if now == agent.AgentClaude {
+			other = agent.AgentCodex
 		}
 		notice += fmt.Sprintf(" %d running %s %s %s.", running, plural(running, "agent", "agents"), plural(running, "keeps", "keep"), harnessDisplayName(other))
 	}

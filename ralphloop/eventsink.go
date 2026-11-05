@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -103,7 +104,7 @@ type EventSink interface {
 	// client-side. agent/paneID identify which agent kind and herdr
 	// pane/tab this iteration is running on, so a consumer outside ralphloop
 	// (the Queue tab's registry) can locate the live iteration itself.
-	IterationStarted(ticket tickets.Ticket, label string, cwd string, sessionID string, agent AgentKind, paneID string)
+	IterationStarted(ticket tickets.Ticket, label string, cwd string, sessionID string, agent agent.AgentKind, paneID string)
 	// IterationPaused reports that identifier's iteration label paused for
 	// reason, of the given kind. identifier is the ticket's Identifier (see
 	// TicketReverted) — label alone is barred from a message's identity line,
@@ -217,7 +218,7 @@ func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string) 
 func (noopEventSink) TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string) {
 }
 func (noopEventSink) TicketClaimed(ticket tickets.Ticket) {}
-func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID string) {
+func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
 }
 func (noopEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {}
 func (noopEventSink) IterationResumed(identifier, label string, kind PauseKind)               {}

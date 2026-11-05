@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -31,15 +32,15 @@ type Inputs struct {
 
 // ResolvedHarness is the harness a ticket launches under and what decided it.
 type ResolvedHarness struct {
-	Harness ralphloop.AgentKind
+	Harness agent.AgentKind
 	Source  HarnessSource
 }
 
 // DiffersFromEarlierRun reports that the harness is not the one the ticket
 // last ran under, so the caller starts the new session from the Handoff.
 func (r ResolvedHarness) DiffersFromEarlierRun(earlierRun string) bool {
-	return earlierRun != "" && ralphloop.ValidateAgentKind(ralphloop.AgentKind(earlierRun)) == nil &&
-		ralphloop.AgentKind(earlierRun) != r.Harness
+	return earlierRun != "" && agent.ValidateAgentKind(agent.AgentKind(earlierRun)) == nil &&
+		agent.AgentKind(earlierRun) != r.Harness
 }
 
 // Resolve decides a ticket's harness: frontmatter > queue item > earlier run >
@@ -54,24 +55,24 @@ func Resolve(in Inputs) ResolvedHarness {
 		{in.EarlierRun, HarnessFromEarlierRun},
 	}
 	for _, l := range levels {
-		if l.value != "" && ralphloop.ValidateAgentKind(ralphloop.AgentKind(l.value)) == nil {
-			return ResolvedHarness{Harness: ralphloop.AgentKind(l.value), Source: l.source}
+		if l.value != "" && agent.ValidateAgentKind(agent.AgentKind(l.value)) == nil {
+			return ResolvedHarness{Harness: agent.AgentKind(l.value), Source: l.source}
 		}
 	}
 	return ResolvedHarness{Harness: DefaultOrClaude(in.Default), Source: HarnessFromDefault}
 }
 
 // DefaultOrClaude is name as a harness, claude when it is empty or unknown.
-func DefaultOrClaude(name string) ralphloop.AgentKind {
-	if name != "" && ralphloop.ValidateAgentKind(ralphloop.AgentKind(name)) == nil {
-		return ralphloop.AgentKind(name)
+func DefaultOrClaude(name string) agent.AgentKind {
+	if name != "" && agent.ValidateAgentKind(agent.AgentKind(name)) == nil {
+		return agent.AgentKind(name)
 	}
-	return ralphloop.AgentClaude
+	return agent.AgentClaude
 }
 
 // DefaultHarness is the Default harness for project: its agents.default-harness
 // over the global one, claude when neither is set.
-func (h *Harness) DefaultHarness(project string) ralphloop.AgentKind {
+func (h *Harness) DefaultHarness(project string) agent.AgentKind {
 	return DefaultOrClaude(h.projects.AgentsConfig(project).DefaultHarness)
 }
 
@@ -148,14 +149,14 @@ func (h *Harness) sessionRecorded(r ralphloop.IterationSession) bool {
 
 func (h *Harness) sessionRecordedUncached(r ralphloop.IterationSession) bool {
 	switch r.Agent {
-	case ralphloop.AgentClaude:
+	case agent.AgentClaude:
 		home, err := h.projects.EnvHome()
 		if err != nil {
 			return false
 		}
 		found, err := transcript.FindByID(home, r.Session)
 		return err == nil && len(found) > 0
-	case ralphloop.AgentCodex:
+	case agent.AgentCodex:
 		home, err := h.projects.CodexHome()
 		if err != nil {
 			return false

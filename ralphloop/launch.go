@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -27,13 +28,13 @@ type iterationParams struct {
 	WorktreeDir     string
 	FeatureWorktree string
 	FeatureBranch   string
-	Agent           AgentKind
+	Agent           agent.AgentKind
 	// Runner and Label name the agentrunner and iteration label hosting the
 	// agent, recorded on the server finish path's pause events.
 	Runner string
 	Label  string
 	// Model and Effort are the resolved per-agent config the launched agent
-	// process starts under (see ResolveTier); empty omits that one
+	// process starts under (see agent.ResolveTier); empty omits that one
 	// flag from the launch argv.
 	Model  string
 	Effort string
@@ -153,7 +154,7 @@ func (p launchAndPromptParams) session() agentrunner.Session {
 // launchAndPromptParams are the per-call inputs to launchAndPrompt.
 type launchAndPromptParams struct {
 	Label string // agent name/tab label, used in error messages
-	Agent AgentKind
+	Agent agent.AgentKind
 	// Model and Effort are the resolved per-agent config the launched agent
 	// process starts under; empty omits that one flag from the launch argv.
 	Model  string

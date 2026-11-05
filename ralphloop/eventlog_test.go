@@ -14,6 +14,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 )
 
@@ -170,19 +171,19 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 	t.Parallel()
 	events := []Event{
-		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
+		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: agent.AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
 		{Type: string(eventsc.IterationFinished), Ticket: "01"},
 		{Type: string(eventsc.Paused), Ticket: "01"},
-		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
-		{Type: string(eventsc.IterationStarted), Ticket: "02", Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
+		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: agent.AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
+		{Type: string(eventsc.IterationStarted), Ticket: "02", Agent: agent.AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
 	}
 
-	session, cwd, agent, ok := lastIterationSession(events, "01")
+	session, cwd, agentKind, ok := lastIterationSession(events, "01")
 	if !ok {
 		t.Fatal("ok = false, want true")
 	}
-	if session != "sess-1b" || cwd != "/cwd-1b" || agent != AgentClaude {
-		t.Errorf("got (session=%q, cwd=%q, agent=%q), want the most recent iteration-started for ticket 1 (sess-1b/cwd-1b)", session, cwd, agent)
+	if session != "sess-1b" || cwd != "/cwd-1b" || agentKind != agent.AgentClaude {
+		t.Errorf("got (session=%q, cwd=%q, agent=%q), want the most recent iteration-started for ticket 1 (sess-1b/cwd-1b)", session, cwd, agentKind)
 	}
 }
 
@@ -191,12 +192,12 @@ func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 	events := []Event{
 		{Type: string(eventsc.IterationStarted), Ticket: "01", AgentSession: "sess-1"},
 	}
-	_, _, agent, ok := lastIterationSession(events, "01")
+	_, _, agentKind, ok := lastIterationSession(events, "01")
 	if !ok {
 		t.Fatal("ok = false, want true")
 	}
-	if agent != AgentClaude {
-		t.Errorf("agent = %q, want AgentClaude default for an event with no recorded Agent", agent)
+	if agentKind != agent.AgentClaude {
+		t.Errorf("agent = %q, want agent.AgentClaude default for an event with no recorded Agent", agentKind)
 	}
 }
 

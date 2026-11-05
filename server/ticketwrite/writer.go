@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
@@ -50,7 +51,7 @@ type PauseHost interface {
 	// StopRun stops the run's session.
 	StopRun(run runs.Run) error
 	// TakeTierOverride returns the ticket's one-time tier and clears it.
-	TakeTierOverride(ticketPath string) ralphloop.Tier
+	TakeTierOverride(ticketPath string) agent.Tier
 }
 
 // LaunchHost is what relaunching a ticket needs.
@@ -58,7 +59,7 @@ type LaunchHost interface {
 	// HerdrHolds reports why r cannot take work now: herdr is down.
 	HerdrHolds(r agentrunner.Runner) (reason string, held bool)
 	// UsageGate reports why agent is held by a usage limit now.
-	UsageGate(agent ralphloop.AgentKind, now time.Time) (verdict string, held bool)
+	UsageGate(agent agent.AgentKind, now time.Time) (verdict string, held bool)
 	// FreshHeldDisk reports the held disk status of project, if any.
 	FreshHeldDisk(project string) (wire.DiskStatus, bool)
 	// BudgetRefusal refuses new agent work past the daily soft limit.
@@ -66,7 +67,7 @@ type LaunchHost interface {
 	// SettleLive refuses (or, with stop, stops) the live agents of addrs that block.
 	SettleLive(addrs []tickets.Address, stop bool, reason string, blocks func(agentrunner.Runner, agentrunner.Session) bool) (wire.QueueResult, bool, error)
 	// ClaimAndLaunch claims the ticket and starts its iteration.
-	ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (bool, error)
+	ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent agent.AgentKind, epics []tickets.Epic) (bool, error)
 	// CancelInvestigateChild withdraws ref's unfinished investigate child.
 	CancelInvestigateChild(ref queue.TicketRef, source string) error
 	// AdoptFirst adopts a late finish of the ticket and reports whether it ended adopted.

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -35,7 +36,7 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 	}, &sleeps)
 	d.Runner = idleRunner("iter-27")
 
-	one := OneIteration{Agent: AgentClaude}
+	one := OneIteration{Agent: agent.AgentClaude}
 	wt := IterationWorktree{Label: "iter-27", Path: "/repo/iter-27"}
 	if err := WaitIterationFinished(d, one, wt, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
@@ -51,7 +52,7 @@ func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 	t.Parallel()
 	r := &blipRunner{Runner: idleRunner("iter-27"), timeoutOn: 2}
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
-	one := OneIteration{Agent: AgentClaude}
+	one := OneIteration{Agent: agent.AgentClaude}
 	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-27"}, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
 	}
@@ -74,7 +75,7 @@ func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration
 	var sleeps []time.Duration
 	d := Deps{Runner: r, Sleep: func(d time.Duration) { sleeps = append(sleeps, d) }}
 	one := OneIteration{
-		Agent: AgentClaude, Epic: "epic", ScratchDir: scratchDir, StallNudgeDelay: delay,
+		Agent: agent.AgentClaude, Epic: "epic", ScratchDir: scratchDir, StallNudgeDelay: delay,
 		Ticket: tickets.Ticket{Identifier: "01", Path: filepath.Join(scratchDir, "epic", "issues", "01-a.md")},
 	}
 	return d, r, one, &sleeps
@@ -143,7 +144,7 @@ func TestWaitIterationFinished_NoNudgeWhileQuestionOpenOrFinished(t *testing.T) 
 func TestWaitIterationFinished_NudgesIdleCodexAgentOnce(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
-	one.Agent = AgentCodex
+	one.Agent = agent.AgentCodex
 	waitStallFixture(t, d, one)
 	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
 		t.Errorf("prompts = %q, want exactly the stall nudge", got)
@@ -182,7 +183,7 @@ func (r *busyAfterWaitRunner) Status(s agentrunner.Session) (agentrunner.Status,
 func TestWaitIterationFinished_CodexBackToWorkDuringDelayGetsNoErrorAndOneNudge(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
-	one.Agent = AgentCodex
+	one.Agent = agent.AgentCodex
 	d.Runner = &busyAfterWaitRunner{Runner: r}
 	waitStallFixture(t, d, one)
 	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
@@ -200,7 +201,7 @@ func TestWaitIterationFinished_NoUserRecordResendsSkillPrompt(t *testing.T) {
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
 	d.ReadHasUserRecord = func(string, string) (bool, bool, error) { return false, true, nil }
 	waitStallFixture(t, d, one)
-	want := skillPrompt(one.Agent, launchSkill(one.Ticket, defaultWorkerSkill), ticketAddress(one.Ticket))
+	want := agent.SkillPrompt(one.Agent, agent.LaunchSkill(one.Ticket, agent.DefaultWorkerSkill), ticketAddress(one.Ticket))
 	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != want {
 		t.Errorf("prompts = %q, want the launch prompt %q", got, want)
 	}
@@ -566,7 +567,7 @@ func TestMergeBuilt_LockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 
 // blockedWaitFixture is a blocked agent on the named runner; onSleep runs when
 // the loop sleeps (the dwell).
-func blockedWaitFixture(t *testing.T, agent AgentKind, runner string, onSleep func(*runnerfake.Runner)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
+func blockedWaitFixture(t *testing.T, agent agent.AgentKind, runner string, onSleep func(*runnerfake.Runner)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
 	t.Helper()
 	d, r, one, sleeps := stallNudgeFixture(t, "", 0)
 	one.Agent, one.Runner = agent, runner
@@ -586,7 +587,7 @@ func waitBlocked(t *testing.T, d Deps, one OneIteration) error {
 }
 
 func TestWaitIterationFinished_HeadlessBlockedPausesAtOnce(t *testing.T) {
-	d, _, one, sleeps := blockedWaitFixture(t, AgentClaude, string(agentrunner.ChoiceHeadless), nil)
+	d, _, one, sleeps := blockedWaitFixture(t, agent.AgentClaude, string(agentrunner.ChoiceHeadless), nil)
 	var paused *BlockedPausedError
 	if err := waitBlocked(t, d, one); !errors.As(err, &paused) {
 		t.Fatalf("err = %v, want *BlockedPausedError", err)
@@ -599,14 +600,14 @@ func TestWaitIterationFinished_HeadlessBlockedPausesAtOnce(t *testing.T) {
 func TestWaitIterationFinished_DwellingRunnersPauseOnlyIfStillBlocked(t *testing.T) {
 	cases := []struct {
 		name   string
-		agent  AgentKind
+		agent  agent.AgentKind
 		runner string
 		want   []string
 	}{
-		{"pty claude", AgentClaude, "pty", []string{"Approve", "Retry", "gx server agents answer", "Agents tab live panel"}},
-		{"pty codex", AgentCodex, "pty", []string{"Approve", "Retry", "gx server agents answer", "Agents tab live panel"}},
-		{"herdr claude", AgentClaude, "herdr", []string{"gx server agents answer", "or in the pane"}},
-		{"herdr codex", AgentCodex, "herdr", []string{"gx server agents answer", "or in the pane"}},
+		{"pty claude", agent.AgentClaude, "pty", []string{"Approve", "Retry", "gx server agents answer", "Agents tab live panel"}},
+		{"pty codex", agent.AgentCodex, "pty", []string{"Approve", "Retry", "gx server agents answer", "Agents tab live panel"}},
+		{"herdr claude", agent.AgentClaude, "herdr", []string{"gx server agents answer", "or in the pane"}},
+		{"herdr codex", agent.AgentCodex, "herdr", []string{"gx server agents answer", "or in the pane"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name+" still blocked", func(t *testing.T) {

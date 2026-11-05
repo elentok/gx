@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
@@ -120,7 +121,7 @@ func (l *Limits) tokenSessionOf(address string) (tokenSession, bool) {
 			return tokenSession{}, false
 		}
 		ts.harness, ts.path = string(harness.Codex), path
-		ts.ref = ralphloop.SessionRef{Agent: ralphloop.AgentCodex, Cwd: worktree, SessionID: id}
+		ts.ref = ralphloop.SessionRef{Agent: agent.AgentCodex, Cwd: worktree, SessionID: id}
 	} else {
 		it, ok := l.tokenHost.BudgetIteration(address)
 		home, err := l.projects.EnvHome()
@@ -128,7 +129,7 @@ func (l *Limits) tokenSessionOf(address string) (tokenSession, bool) {
 			return tokenSession{}, false
 		}
 		ts.harness, ts.path = string(harness.Claude), transcript.PathIn(home, it.Worktree, it.Session)
-		ts.ref = ralphloop.SessionRef{Agent: ralphloop.AgentClaude, Cwd: it.Worktree, SessionID: it.Session}
+		ts.ref = ralphloop.SessionRef{Agent: agent.AgentClaude, Cwd: it.Worktree, SessionID: it.Session}
 	}
 	ts.key = address + "@" + ts.ref.SessionID
 	return ts, true
@@ -240,7 +241,7 @@ func (l *Limits) interactiveTokenSession(m InteractiveSession) (tokenSession, bo
 		key:     "session/" + m.ID + "@" + m.ConversationID,
 		project: m.Project,
 		harness: m.Harness,
-		ref:     ralphloop.SessionRef{Agent: ralphloop.AgentFor(m.Harness), Cwd: m.Dir, SessionID: m.ConversationID},
+		ref:     ralphloop.SessionRef{Agent: agent.AgentFor(m.Harness), Cwd: m.Dir, SessionID: m.ConversationID},
 	}
 	if agentrunner.Kind(m.Harness) == harness.Codex {
 		home, err := l.projects.CodexHome()

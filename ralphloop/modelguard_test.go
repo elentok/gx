@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -61,7 +62,7 @@ func runModelGuardWait(t *testing.T, ticketType, expected string, read func(sinc
 		tw(&d)
 	}
 	p := boundGiveUpParams()
-	p.Agent = AgentClaude
+	p.Agent = agent.AgentClaude
 	p.Model = expected
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: ticketType}
 	p.ScratchDir = f.scratchDir

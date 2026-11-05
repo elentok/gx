@@ -11,6 +11,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -46,7 +47,7 @@ func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	d, peak := compactedMergingFixture(t, t.TempDir(), cwd, sessionID)
 	p := iterationParams{
-		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: AgentClaude,
+		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: agent.AgentClaude,
 		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
 	}
 
@@ -75,12 +76,12 @@ func TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T)
 	cwd := "/fake/worktrees/epic-item-01"
 	d, peak := compactedMergingFixture(t, t.TempDir(), cwd, sessionID)
 	if err := logEvent(scratchDir, "epic", Event{
-		Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: sessionID, Cwd: cwd,
+		Type: string(eventsc.IterationStarted), Ticket: "01", Agent: agent.AgentClaude, AgentSession: sessionID, Cwd: cwd,
 	}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	p := iterationParams{
-		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: AgentClaude,
+		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: agent.AgentClaude,
 		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
 	}
 
@@ -125,7 +126,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 		WorktreeDir:     "/fake/worktrees",
 		FeatureWorktree: "/fake/feature",
 		FeatureBranch:   "epic",
-		Agent:           AgentClaude,
+		Agent:           agent.AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
 		Sink:            noopEventSink{},
@@ -183,7 +184,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 		WorktreeDir:     "/fake/worktrees",
 		FeatureWorktree: repoDir,
 		FeatureBranch:   "epic",
-		Agent:           AgentClaude,
+		Agent:           agent.AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
 		Sink:            noopEventSink{},
@@ -243,7 +244,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 
 	p := iterationParams{
 		WorktreeDir: "/fake/worktrees",
-		Agent:       AgentClaude,
+		Agent:       agent.AgentClaude,
 		Ticket:      tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:  scratchDir,
 	}
@@ -281,7 +282,7 @@ func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutErr
 	p := iterationParams{
 		WorktreeDir:   "/fake/worktrees",
 		FeatureBranch: "epic",
-		Agent:         AgentClaude,
+		Agent:         agent.AgentClaude,
 		Ticket:        tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:    scratchDir,
 	}

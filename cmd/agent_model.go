@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
@@ -36,15 +36,15 @@ func newAgentModelCmd(d deps) *cobra.Command {
 }
 
 func tierNames() []string {
-	names := make([]string, len(ralphloop.AllTiers))
-	for i, t := range ralphloop.AllTiers {
+	names := make([]string, len(agent.AllTiers))
+	for i, t := range agent.AllTiers {
 		names[i] = string(t)
 	}
 	return names
 }
 
 func runAgentModel(d deps, out io.Writer, tierName string) error {
-	tier := ralphloop.Tier(tierName)
+	tier := agent.Tier(tierName)
 	if !tier.Valid() {
 		return fmt.Errorf("unknown tier %q (want light, worker or strongest)", tierName)
 	}
@@ -59,11 +59,11 @@ func runAgentModel(d deps, out io.Writer, tierName string) error {
 			}
 		}
 	}
-	agent := currentAgent(d)
-	model, effort := ralphloop.ResolveTier(cfg.Agents, agent, tier)
+	agentKind := currentAgent(d)
+	model, effort := agent.ResolveTier(cfg.Agents, agentKind, tier)
 	switch {
 	case model == "":
-	case effort == "" || agent != ralphloop.AgentCodex:
+	case effort == "" || agentKind != agent.AgentCodex:
 		fmt.Fprintln(out, model)
 	default:
 		fmt.Fprintln(out, model, effort)
@@ -74,13 +74,13 @@ func runAgentModel(d deps, out io.Writer, tierName string) error {
 // currentAgent is the agent the caller runs under: its gx server session's
 // harness, else GX_AGENT, else Claude. A session the server cannot tell us
 // about falls through to the next source.
-func currentAgent(d deps) ralphloop.AgentKind {
+func currentAgent(d deps) agent.AgentKind {
 	if id := d.getenv(holder.AgentSessionEnv); id != "" {
 		if h, ok := sessionHarness(d, id); ok {
-			return ralphloop.AgentFor(h)
+			return agent.AgentFor(h)
 		}
 	}
-	return ralphloop.AgentFor(d.getenv(projects.AgentEnv))
+	return agent.AgentFor(d.getenv(projects.AgentEnv))
 }
 
 func sessionHarness(d deps, id string) (string, bool) {

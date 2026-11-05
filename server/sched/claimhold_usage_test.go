@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/runs"
@@ -49,14 +49,14 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	}
 	h.Server.Limits().ScanUsage()
 
-	rh := harnesschoice.ResolvedHarness{Harness: ralphloop.AgentClaude}
+	rh := harnesschoice.ResolvedHarness{Harness: agent.AgentClaude}
 	hold, held := x.ClaimHold("proj", tickets.Ticket{}, rh)
 	if !held || !strings.HasPrefix(hold.Verdict, "Claude usage: 99% of the 5-hour limit") {
 		t.Fatalf("gate alone = %+v, %v", hold, held)
 	}
 
 	reset := now.Add(2 * time.Hour)
-	h.Server.Registry().Put(runs.TrackedRun{Run: runs.Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}})
+	h.Server.Registry().Put(runs.TrackedRun{Run: runs.Run{Address: "proj:e/01", Agent: string(agent.AgentClaude)}})
 	h.Server.Registry().MarkRateLimit("proj:e/01", true, reset)
 	hold, held = x.ClaimHold("proj", tickets.Ticket{}, rh)
 	if !held || hold.Verdict != sched.RateLimitVerdict(reset) {

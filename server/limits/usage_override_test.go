@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -15,7 +15,7 @@ func TestUsageOverride_HoldsUntilResetsAtThenGatesAgain(t *testing.T) {
 	now := time.Unix(1_000_000, 0)
 	resets := now.Add(time.Hour)
 	gated := func(at time.Time) bool {
-		_, held := s.UsageGate(ralphloop.AgentClaude, at)
+		_, held := s.UsageGate(agent.AgentClaude, at)
 		return held
 	}
 
@@ -24,7 +24,7 @@ func TestUsageOverride_HoldsUntilResetsAtThenGatesAgain(t *testing.T) {
 	if !gated(now) {
 		t.Fatal("99% did not gate")
 	}
-	res, err := s.usageOverride(now, ralphloop.AgentClaude)
+	res, err := s.usageOverride(now, agent.AgentClaude)
 	if err != nil || res.Refused {
 		t.Fatalf("override = %+v, %v", res, err)
 	}
@@ -57,7 +57,7 @@ func TestUsageOverride_SurvivesRestart(t *testing.T) {
 	now := time.Unix(1_000_000, 0)
 	r.write("a", usageRecord(now, 99, now.Add(time.Hour)))
 	s.scanUsage()
-	if res, err := s.usageOverride(now, ralphloop.AgentClaude); err != nil || res.Refused {
+	if res, err := s.usageOverride(now, agent.AgentClaude); err != nil || res.Refused {
 		t.Fatalf("override = %+v, %v", res, err)
 	}
 	if _, _, ok := openUsageSamples(r.stateDir).limitWindow(now); ok {
@@ -70,13 +70,13 @@ func TestUsageOverride_RefusesWhenNothingGates(t *testing.T) {
 	r := newUsageRig(t)
 	s := r.server()
 	now := time.Unix(1_000_000, 0)
-	res, err := s.usageOverride(now, ralphloop.AgentClaude)
+	res, err := s.usageOverride(now, agent.AgentClaude)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
 		t.Fatalf("no sample: %+v, %v", res, err)
 	}
 	r.write("a", usageRecord(now, 50, now.Add(time.Hour)))
 	s.scanUsage()
-	res, err = s.usageOverride(now, ralphloop.AgentClaude)
+	res, err = s.usageOverride(now, agent.AgentClaude)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
 		t.Fatalf("50%%: %+v, %v", res, err)
 	}

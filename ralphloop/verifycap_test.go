@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
@@ -23,7 +24,7 @@ type verifyCapFixture struct {
 	err        error
 }
 
-func runVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, smartZone, polls int, occupancy func(prompts []string) int, tweak ...func(*blipRunner)) verifyCapFixture {
+func runVerifyCapWait(t *testing.T, ticketType string, agent agent.AgentKind, smartZone, polls int, occupancy func(prompts []string) int, tweak ...func(*blipRunner)) verifyCapFixture {
 	t.Helper()
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= polls })
 	for _, f := range tweak {
@@ -69,7 +70,7 @@ func TestWaitForFinish_VerifyCap_StopsVerifyButNotImplement(t *testing.T) {
 	t.Parallel()
 	above := constOccupancy(verifyCapTestZone - verifyCapMargin + 1)
 
-	v := runVerifyCapWait(t, "verify", AgentClaude, verifyCapTestZone, 2, above)
+	v := runVerifyCapWait(t, "verify", agent.AgentClaude, verifyCapTestZone, 2, above)
 	if v.err != nil {
 		t.Fatal(v.err)
 	}
@@ -77,14 +78,14 @@ func TestWaitForFinish_VerifyCap_StopsVerifyButNotImplement(t *testing.T) {
 		t.Errorf("verify interrupts = %d, want 1", v.r.interrupts)
 	}
 	prompts := v.r.Prompts("iter-19")
-	if len(prompts) != 1 || !strings.Contains(prompts[0], "cap-stop step") || !strings.Contains(prompts[0], verifySkill) {
-		t.Errorf("verify prompts = %q, want one finish-up prompt naming the %s cap-stop step", prompts, verifySkill)
+	if len(prompts) != 1 || !strings.Contains(prompts[0], "cap-stop step") || !strings.Contains(prompts[0], agent.VerifySkill) {
+		t.Errorf("verify prompts = %q, want one finish-up prompt naming the %s cap-stop step", prompts, agent.VerifySkill)
 	}
 	if got := capStopEvents(t, v.scratchDir); got != 1 {
 		t.Errorf("verify-cap-stopped events = %d, want 1", got)
 	}
 
-	i := runVerifyCapWait(t, "implement", AgentClaude, verifyCapTestZone, 2, above)
+	i := runVerifyCapWait(t, "implement", agent.AgentClaude, verifyCapTestZone, 2, above)
 	if i.err != nil {
 		t.Fatal(i.err)
 	}
@@ -116,7 +117,7 @@ func TestWaitForFinish_VerifyCap_FiredStateSurvivesASecondWait(t *testing.T) {
 
 func TestWaitForFinish_VerifyCap_FailedPromptSendLogsCapStop(t *testing.T) {
 	t.Parallel()
-	got := runVerifyCapWait(t, "verify", AgentClaude, verifyCapTestZone, 3, constOccupancy(verifyCapTestZone),
+	got := runVerifyCapWait(t, "verify", agent.AgentClaude, verifyCapTestZone, 3, constOccupancy(verifyCapTestZone),
 		func(r *blipRunner) { r.promptErr = errors.New("send failed") })
 	if got.err != nil {
 		t.Fatal(got.err)
@@ -145,7 +146,7 @@ func TestWaitForFinish_VerifyCap_FailedPromptSendLogsCapStop(t *testing.T) {
 func TestWaitForFinish_VerifyCap_FollowsSmartZone(t *testing.T) {
 	t.Parallel()
 	const zone = 50_000
-	got := runVerifyCapWait(t, "verify", AgentClaude, zone, 1, constOccupancy(zone-verifyCapMargin+1))
+	got := runVerifyCapWait(t, "verify", agent.AgentClaude, zone, 1, constOccupancy(zone-verifyCapMargin+1))
 	if got.err != nil {
 		t.Fatal(got.err)
 	}
@@ -157,7 +158,7 @@ func TestWaitForFinish_VerifyCap_FollowsSmartZone(t *testing.T) {
 func TestWaitForFinish_VerifyCap_AbsentAtSmallSmartZone(t *testing.T) {
 	t.Parallel()
 	// Occupancy is below the smart zone, so only a cap could act.
-	got := runVerifyCapWait(t, "verify", AgentClaude, verifyCapMargin, 2, constOccupancy(verifyCapMargin-1))
+	got := runVerifyCapWait(t, "verify", agent.AgentClaude, verifyCapMargin, 2, constOccupancy(verifyCapMargin-1))
 	if got.err != nil {
 		t.Fatal(got.err)
 	}
@@ -166,7 +167,7 @@ func TestWaitForFinish_VerifyCap_AbsentAtSmallSmartZone(t *testing.T) {
 	}
 
 	// Past the smart zone, normal recovery still runs.
-	got = runVerifyCapWait(t, "verify", AgentClaude, verifyCapMargin, 1, func(prompts []string) int {
+	got = runVerifyCapWait(t, "verify", agent.AgentClaude, verifyCapMargin, 1, func(prompts []string) int {
 		if slices.Contains(prompts, "/compact") {
 			return 1
 		}
@@ -182,7 +183,7 @@ func TestWaitForFinish_VerifyCap_AbsentAtSmallSmartZone(t *testing.T) {
 
 func TestWaitForFinish_VerifyCap_Codex(t *testing.T) {
 	t.Parallel()
-	got := runVerifyCapWait(t, "verify", AgentCodex, verifyCapTestZone, 2, constOccupancy(verifyCapTestZone-verifyCapMargin+1))
+	got := runVerifyCapWait(t, "verify", agent.AgentCodex, verifyCapTestZone, 2, constOccupancy(verifyCapTestZone-verifyCapMargin+1))
 	if got.err != nil {
 		t.Fatal(got.err)
 	}
@@ -193,7 +194,7 @@ func TestWaitForFinish_VerifyCap_Codex(t *testing.T) {
 
 func TestWaitForFinish_VerifyCap_FiresOncePerSession(t *testing.T) {
 	t.Parallel()
-	got := runVerifyCapWait(t, "verify", AgentClaude, verifyCapTestZone, 4, constOccupancy(verifyCapTestZone-verifyCapMargin+1))
+	got := runVerifyCapWait(t, "verify", agent.AgentClaude, verifyCapTestZone, 4, constOccupancy(verifyCapTestZone-verifyCapMargin+1))
 	if got.err != nil {
 		t.Fatal(got.err)
 	}
@@ -208,7 +209,7 @@ func TestWaitForFinish_VerifyCap_FiresOncePerSession(t *testing.T) {
 
 func TestWaitForFinish_VerifyCap_SmartZoneStillAppliesAfterwards(t *testing.T) {
 	t.Parallel()
-	got := runVerifyCapWait(t, "verify", AgentClaude, verifyCapTestZone, 3, func(prompts []string) int {
+	got := runVerifyCapWait(t, "verify", agent.AgentClaude, verifyCapTestZone, 3, func(prompts []string) int {
 		switch {
 		case slices.Contains(prompts, "/compact"):
 			return 10_000
@@ -243,14 +244,14 @@ func TestVerifyCap_OptInOnly(t *testing.T) {
 
 func TestWaitIterationFinished_VerifyCap_FollowsOneIterationSmartZone(t *testing.T) {
 	t.Parallel()
-	zone := defaultSmartZone + 40_000
+	zone := agent.DefaultSmartZone + 40_000
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
 	r.finishPollsOnly = false
 	scratchDir := fixture.EpicScratchDir(t, "epic")
-	read := func(string, string) (int, bool, error) { return defaultSmartZone, true, nil }
+	read := func(string, string) (int, bool, error) { return agent.DefaultSmartZone, true, nil }
 	d := Deps{Runner: r, ReadOccupancy: read, ReadCodexContext: read, Sleep: func(time.Duration) {}}
 	one := OneIteration{
-		Agent: AgentClaude, Epic: "epic", ScratchDir: scratchDir, SmartZone: zone,
+		Agent: agent.AgentClaude, Epic: "epic", ScratchDir: scratchDir, SmartZone: zone,
 		Ticket: tickets.Ticket{Identifier: "19", Type: "verify"},
 	}
 	err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-19", Path: "/repo/iter-19"}, agentrunner.Session{Label: "iter-19", ID: "pane-1"})

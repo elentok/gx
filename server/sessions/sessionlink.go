@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -128,16 +128,16 @@ func (me *MapEpics) epicDir(address string) (dir string, ok bool, err error) {
 // DesignLaunchTier is the tier of a design-launched session on the map behind
 // address: strongest while charting or while the destination is unconfirmed,
 // worker at every later step. An unreadable map charts.
-func (me *MapEpics) DesignLaunchTier(address string) ralphloop.Tier {
+func (me *MapEpics) DesignLaunchTier(address string) agent.Tier {
 	dir, ok, err := me.epicDir(address)
 	if err != nil || !ok {
-		return ralphloop.TierStrongest
+		return agent.TierStrongest
 	}
 	m := tickets.LoadEpicTicketMD(dir)
 	if m.DestinationUnconfirmed || m.DesignStep == "" || m.DesignStep == string(tickets.StepChart) {
-		return ralphloop.TierStrongest
+		return agent.TierStrongest
 	}
-	return ralphloop.TierWorker
+	return agent.TierWorker
 }
 
 // OnMapEpic reports whether address ("project:epic" or "project:epic/NN")

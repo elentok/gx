@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/conversations"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/sessions/convrecord"
 )
 
@@ -21,7 +21,7 @@ func TestSaveTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 	t.Parallel()
 	codexHome := t.TempDir()
 	root := t.TempDir()
-	s := convrecord.Session{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
+	s := convrecord.Session{ID: "s1", Dir: "/work/dir", Harness: string(agent.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
 	rec := &convrecord.Recorder{Dir: root, Log: slog.New(slog.DiscardHandler), Host: fakeHost{claude: t.TempDir(), codex: codexHome}}
 	rec.Record(s)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/agent"
 )
 
 // Host is what the Recorder needs from the root: the harness homes and whether
@@ -58,7 +59,7 @@ func (r *Recorder) SaveTotals(s Session, conversation string) {
 	if s.Ticket == "" || conversation == "" {
 		return
 	}
-	agent := ralphloop.AgentFor(s.Harness)
+	agent := agent.AgentFor(s.Harness)
 	home, err := r.Host.EnvHome()
 	if err != nil {
 		r.Log.Warn("read conversation totals", "session", s.ID, "conversation", conversation, "err", err)

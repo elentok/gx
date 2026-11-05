@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -73,12 +73,12 @@ func TestProjectWorktrees_TiersFollowProjectDefaultHarness(t *testing.T) {
 		t.Fatalf("worktrees = %+v, %v", list, err)
 	}
 	for _, p := range list {
-		agent := ralphloop.AgentCodex
+		agentKind := agent.AgentCodex
 		if p.Project == "claude" {
-			agent = ralphloop.AgentClaude
+			agentKind = agent.AgentClaude
 		}
-		for _, tier := range ralphloop.AllTiers {
-			want, _ := ralphloop.ResolveTier(config.DefaultAgentsConfig(), agent, tier)
+		for _, tier := range agent.AllTiers {
+			want, _ := agent.ResolveTier(config.DefaultAgentsConfig(), agentKind, tier)
 			if p.Tiers[string(tier)] != want {
 				t.Errorf("%s %s model = %q, want %q", p.Project, tier, p.Tiers[string(tier)], want)
 			}
