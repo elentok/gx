@@ -26,7 +26,7 @@ type Result struct {
 
 // Read reads a conversation of harness kind from r. Every kind but Codex
 // writes the Claude format.
-func Read(kind agentrunner.Kind, r io.Reader) (Result, error) {
+func Read(kind agentrunner.Kind, r io.Reader, opts ...transcript.ChatOption) (Result, error) {
 	if kind == harness.Codex {
 		chat, err := codexsession.ReadChat(r)
 		if err != nil {
@@ -34,7 +34,7 @@ func Read(kind agentrunner.Kind, r io.Reader) (Result, error) {
 		}
 		return Result{Messages: chat.Messages, Unreadable: chat.Unreadable(), CodexVersion: chat.Version}, nil
 	}
-	msgs, err := transcript.ReadChatFrom(r)
+	msgs, err := transcript.ReadChatFrom(r, opts...)
 	return Result{Messages: msgs}, err
 }
 
@@ -43,7 +43,7 @@ const maxArchiveBytes = 256 << 20
 
 // ReadZstdFile decodes the zstd file at path in memory and reads it as Read
 // does. A corrupt file is an error; a decode stops at maxArchiveBytes.
-func ReadZstdFile(kind agentrunner.Kind, path string) (Result, error) {
+func ReadZstdFile(kind agentrunner.Kind, path string, opts ...transcript.ChatOption) (Result, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return Result{}, err
@@ -54,12 +54,12 @@ func ReadZstdFile(kind agentrunner.Kind, path string) (Result, error) {
 		return Result{}, err
 	}
 	defer dec.Close()
-	return Read(kind, io.LimitReader(dec, maxArchiveBytes))
+	return Read(kind, io.LimitReader(dec, maxArchiveBytes), opts...)
 }
 
 // ReadFile is Read over the file at path. ok is false if the file doesn't
 // exist yet.
-func ReadFile(kind agentrunner.Kind, path string) (res Result, ok bool, err error) {
+func ReadFile(kind agentrunner.Kind, path string, opts ...transcript.ChatOption) (res Result, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -68,6 +68,6 @@ func ReadFile(kind agentrunner.Kind, path string) (res Result, ok bool, err erro
 		return Result{}, false, err
 	}
 	defer f.Close()
-	res, err = Read(kind, f)
+	res, err = Read(kind, f, opts...)
 	return res, err == nil, err
 }

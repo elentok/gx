@@ -2,9 +2,11 @@ package transcript
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -42,7 +44,28 @@ type ChatMessage struct {
 	LastTool  string
 	// Calls is one short line per tool call of a tools entry: the tool and its command or target.
 	Calls []string
-	At    time.Time
+	// Images are the Prompt images a person message carries, in chip order.
+	Images []ChatImage
+	At     time.Time
+}
+
+// ChatImage is one image of a person message. ID names the saved image gx can
+// serve; Placeholder is set instead when the file is outside the images folder
+// or gone.
+type ChatImage struct {
+	ID          string
+	Placeholder bool
+}
+
+// ChatOption configures a chat read.
+type ChatOption func(*chatOptions)
+
+type chatOptions struct{ imagesDir string }
+
+// WithImagesDir sets the session's images folder, which a pasted image's source
+// path must sit in to count as a saved image.
+func WithImagesDir(dir string) ChatOption {
+	return func(o *chatOptions) { o.imagesDir = dir }
 }
 
 // TrailingAgentTexts lists the agent text messages after the person's last
@@ -68,6 +91,7 @@ type chatLine struct {
 	IsSidechain      bool   `json:"isSidechain"`
 	IsMeta           bool   `json:"isMeta"`
 	IsCompactSummary bool   `json:"isCompactSummary"`
+	PromptID         string `json:"promptId"`
 	Message          struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
@@ -78,6 +102,10 @@ var (
 	commandArgsRE = regexp.MustCompile(`(?s)<command-args>(.*?)</command-args>`)
 	// commandOutputRE matches the whole stdout line of a built-in command.
 	commandOutputRE = regexp.MustCompile(`(?s)^<local-command-stdout>(.*?)</local-command-stdout>$`)
+	imageChipRE     = regexp.MustCompile(`\[Image #\d+\]`)
+	imageSourceRE   = regexp.MustCompile(`\[Image: source: ([^\]]+)\]`)
+	// savedImageNameRE is the name gx gives a saved image: img-<n>-<id><ext>.
+	savedImageNameRE = regexp.MustCompile(`^img-\d+-([0-9a-f]+)\.[A-Za-z0-9]+$`)
 )
 
 // MaxCommandOutputBytes caps one output entry; a cut entry ends with
@@ -119,7 +147,7 @@ const taskNotificationPrefix = "<task-notification>"
 // hidden. Each run of tool calls between two visible messages folds into one
 // tools entry, and a compaction becomes a compacted entry. ok is false if the
 // file doesn't exist yet.
-func ReadChat(path string) (msgs []ChatMessage, ok bool, err error) {
+func ReadChat(path string, opts ...ChatOption) (msgs []ChatMessage, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -128,7 +156,7 @@ func ReadChat(path string) (msgs []ChatMessage, ok bool, err error) {
 		return nil, false, err
 	}
 	defer f.Close()
-	msgs, err = ReadChatFrom(f)
+	msgs, err = ReadChatFrom(f, opts...)
 	if err != nil {
 		return nil, false, err
 	}
@@ -136,30 +164,40 @@ func ReadChat(path string) (msgs []ChatMessage, ok bool, err error) {
 }
 
 // ReadChatFrom is ReadChat over an open transcript, for callers that hold the
-// bytes in memory.
-func ReadChatFrom(r io.Reader) (msgs []ChatMessage, err error) {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+// bytes in memory. Lines have no size cap: an image line is megabytes of base64.
+func ReadChatFrom(r io.Reader, opts ...ChatOption) (msgs []ChatMessage, err error) {
+	var o chatOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	br := bufio.NewReaderSize(r, 64*1024)
 	var run *ChatMessage
+	// pending is the image message whose source-path line (isMeta, same
+	// promptId) may still follow; its images start as placeholders.
+	var pendingIdx = -1
+	var pendingPrompt string
 	flush := func() {
 		if run != nil {
 			msgs = append(msgs, *run)
 			run = nil
 		}
 	}
-	for scanner.Scan() {
-		var line chatLine
-		if json.Unmarshal([]byte(strings.TrimSpace(scanner.Text())), &line) != nil {
-			continue
+	handle := func(line chatLine) {
+		if line.IsMeta && pendingIdx >= 0 && line.PromptID == pendingPrompt {
+			resolveImages(&msgs[pendingIdx], line, o.imagesDir)
+			pendingIdx = -1
 		}
 		if line.Type == "system" && line.Subtype == compactBoundarySubtype {
 			flush()
 			msgs = append(msgs, ChatMessage{ID: line.UUID, Kind: ChatKindCompacted, At: line.at()})
-			continue
+			return
 		}
 		if msg, visible := line.message(); visible {
 			flush()
 			msgs = append(msgs, msg)
+			if len(msg.Images) > 0 {
+				pendingIdx, pendingPrompt = len(msgs)-1, line.PromptID
+			}
 		}
 		for _, call := range line.toolCalls() {
 			if run == nil {
@@ -170,11 +208,51 @@ func ReadChatFrom(r io.Reader) (msgs []ChatMessage, err error) {
 			run.Calls = append(run.Calls, call.Summary())
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	for {
+		raw, readErr := br.ReadBytes('\n')
+		if readErr != nil && readErr != io.EOF {
+			return nil, readErr
+		}
+		var line chatLine
+		if json.Unmarshal(bytes.TrimSpace(raw), &line) == nil {
+			handle(line)
+		}
+		if readErr == io.EOF {
+			break
+		}
 	}
 	flush()
 	return msgs, nil
+}
+
+// resolveImages pairs the Nth image of msg with the Nth "[Image: source: path]"
+// entry of the meta line. A path outside imagesDir, or a file that is gone,
+// leaves the placeholder.
+func resolveImages(msg *ChatMessage, meta chatLine, imagesDir string) {
+	n := 0
+	for _, b := range decodeContentBlocks(meta.Message.Content) {
+		for _, m := range imageSourceRE.FindAllStringSubmatch(b.Text, -1) {
+			if n < len(msg.Images) {
+				msg.Images[n] = savedImage(strings.TrimSpace(m[1]), imagesDir)
+			}
+			n++
+		}
+	}
+}
+
+func savedImage(path, imagesDir string) ChatImage {
+	placeholder := ChatImage{Placeholder: true}
+	if imagesDir == "" || filepath.Dir(filepath.Clean(path)) != filepath.Clean(imagesDir) {
+		return placeholder
+	}
+	m := savedImageNameRE.FindStringSubmatch(filepath.Base(path))
+	if m == nil {
+		return placeholder
+	}
+	if _, err := os.Stat(path); err != nil {
+		return placeholder
+	}
+	return ChatImage{ID: m[1]}
 }
 
 func (l chatLine) at() time.Time {
@@ -228,16 +306,26 @@ func (l chatLine) message() (ChatMessage, bool) {
 		return ChatMessage{}, false
 	}
 	var texts []string
+	var images []ChatImage
 	for _, b := range decodeContentBlocks(l.Message.Content) {
-		if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
-			texts = append(texts, strings.TrimSpace(b.Text))
+		switch {
+		case b.Type == "image" && l.Type == "user":
+			images = append(images, ChatImage{Placeholder: true})
+		case b.Type == "text":
+			t := b.Text
+			if l.Type == "user" {
+				t = imageChipRE.ReplaceAllString(t, "")
+			}
+			if t = strings.TrimSpace(t); t != "" {
+				texts = append(texts, t)
+			}
 		}
 	}
-	if len(texts) == 0 {
+	if len(texts) == 0 && len(images) == 0 {
 		return ChatMessage{}, false
 	}
 	text := strings.Join(texts, "\n\n")
-	msg := ChatMessage{ID: l.UUID, Text: text, At: l.at()}
+	msg := ChatMessage{ID: l.UUID, Text: text, Images: images, At: l.at()}
 	if l.Type == "assistant" {
 		msg.Role, msg.Kind = ChatRoleAgent, ChatKindText
 		return msg, true

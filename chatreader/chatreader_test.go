@@ -1,6 +1,8 @@
 package chatreader_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -126,6 +128,25 @@ func TestClaude_ReadsThroughTheDispatcher(t *testing.T) {
 	}
 	if got, want := summary(res.Messages), "a1:agent:text:hi"; got != want {
 		t.Errorf("messages = %s, want %s", got, want)
+	}
+}
+
+func TestClaude_ImagesDirOptionReachesTheParser(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "img-1-aa11.png")
+	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := chatreader.Read(harness.Claude, strings.NewReader(
+		`{"type":"user","uuid":"u1","promptId":"p","message":{"content":[{"type":"text","text":"[Image #1] hi"},{"type":"image","source":{}}]}}`+"\n"+
+			`{"type":"user","isMeta":true,"promptId":"p","message":{"content":[{"type":"text","text":"[Image: source: `+path+`]"}]}}`+"\n"),
+		transcript.WithImagesDir(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Messages) != 1 || len(res.Messages[0].Images) != 1 || res.Messages[0].Images[0].ID != "aa11" {
+		t.Errorf("messages = %+v", res.Messages)
 	}
 }
 
