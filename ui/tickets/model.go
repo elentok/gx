@@ -87,10 +87,9 @@ type Model struct {
 	hideDone bool
 	search   search.Model
 
-	// previewFocus backs the preview panel's own focus/scroll/search state
-	// (see preview_focus.go and model_preview_focus.go); embedded so callers
-	// keep reading/writing its fields as m.focus, m.previewVP, etc.
-	previewFocus
+	// preview backs the preview panel's own focus/scroll/search state
+	// (see preview_focus.go and model_preview_focus.go).
+	preview previewPane
 
 	confirm confirm.Model
 
@@ -144,7 +143,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		sidebarTree:       sidebarTree,
 		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys), settings.About),
 		search:            search.NewModel(),
-		previewFocus:      newPreviewFocus(),
+		preview:           newPreviewPane(),
 		confirm:           confirm.New(),
 		explicitCollapsed: map[string]bool{},
 		archivedLazy:      archivedLazy,
@@ -405,9 +404,9 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
-	if m.previewFocus.inPreview(mouse, m.width, m.contentHeight()) {
+	if m.preview.inPreview(mouse, m.width, m.contentHeight()) {
 		if mouse.Button == tea.MouseLeft {
-			m.previewFocus.focusPreviewPane()
+			m.preview.focusPreviewPane()
 		}
 		return m, nil
 	}
@@ -431,11 +430,11 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 		if _, ok := rowFromEntry(m.sidebarTree.Entries()[idx]); !ok {
 			return m, nil
 		}
-		m.focus = focusSidebar
+		m.preview.focus = focusSidebar
 		m.sidebarTree.SetSelectedIndex(idx)
 		return m.handleSuggestedActionsKey()
 	}
-	m.focus = focusSidebar
+	m.preview.focus = focusSidebar
 	if idx, ok := m.sidebarTree.EntryAtBodyLine(bodyLine); ok {
 		entry := m.sidebarTree.Entries()[idx]
 		if rowfmt.OnTreeIcon(mouse.X, entry, 0, m.icons()) && m.sidebarTree.ToggleEntry(idx) {
@@ -462,7 +461,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		return m.handleSidebarMouseWheel(msg)
 	}
 	var cmd tea.Cmd
-	m.previewVP, cmd = m.previewVP.Update(msg)
+	m.preview.previewVP, cmd = m.preview.previewVP.Update(msg)
 	return m, cmd
 }
 
@@ -520,8 +519,8 @@ func (m Model) activeInputSearch() (search.Model, bool) {
 	if m.search.Mode() == search.SearchModeInput {
 		return m.search, true
 	}
-	if m.previewSearch.Mode() == search.SearchModeInput {
-		return m.previewSearch, true
+	if m.preview.previewSearch.Mode() == search.SearchModeInput {
+		return m.preview.previewSearch, true
 	}
 	return search.Model{}, false
 }
@@ -535,10 +534,10 @@ func (m Model) normalView() string {
 	sidebarH, previewH := m.splitHeight(h)
 
 	sidebarViewportH := m.sidebarViewportHeight()
-	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.focus == focusSidebar, true)
-	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
+	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.preview.focus == focusSidebar, true)
+	previewView := m.renderPanel(previewW, previewH, "Preview", previewSearchMatchStatus(m.preview.previewSearch), renderViewportWithScrollbar(m.preview.previewVP), m.preview.focus == focusPreview, false)
 
-	return m.joinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
+	return m.preview.joinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
 }
 
 func (m Model) renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {
@@ -565,13 +564,13 @@ func (m Model) useStackedLayout() bool {
 }
 
 func (m Model) splitWidth() (sidebarW, previewW int) {
-	return m.panelWidths(m.width)
+	return m.preview.panelWidths(m.width)
 }
 
 // splitHeight divides a stacked tickets view evenly between its selection-
 // driving list and preview. Wide views remain a full-height side-by-side split.
 func (m Model) splitHeight(total int) (sidebarH, previewH int) {
-	return m.panelHeights(m.width, total)
+	return m.preview.panelHeights(m.width, total)
 }
 
 // useStackedLayout, splitPanelWidth and splitPanelHeight are free functions
@@ -607,7 +606,7 @@ func splitPanelHeight(width, total int) (sidebarH, previewH int) {
 // mirroring normalView's layout math so mouse hit-testing (click-to-focus,
 // wheel routing) stays in sync with what's actually rendered.
 func (m Model) previewRect() (x, y, w, h int) {
-	return m.previewFocus.previewRect(m.width, m.contentHeight())
+	return m.preview.previewRect(m.width, m.contentHeight())
 }
 
 // sidebarRect returns the sidebar panel's absolute on-screen bounds,

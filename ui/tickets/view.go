@@ -69,7 +69,7 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 
 	return tree.RenderOpts[sidebarNode]{
 		AccentColor: ui.ColorBlue,
-		Active:      m.focus == focusSidebar,
+		Active:      m.preview.focus == focusSidebar,
 		Width:       width,
 		EmptyLine:   ui.StyleDim.Render("  loading…"),
 		Label: func(entry tree.Entry[sidebarNode]) string {

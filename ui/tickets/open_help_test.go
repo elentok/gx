@@ -41,16 +41,16 @@ func TestOpenHelp_TicketsEndsPreviewSearch(t *testing.T) {
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	m.focus = focusPreview
-	m.previewSearch.Start("body")
+	m.preview.focus = focusPreview
+	m.preview.previewSearch.Start("body")
 	updated, _ = m.Update(nav.OpenHelp()())
 	m = updated.(Model)
 
 	if !m.help.IsOpen {
 		t.Fatal("OpenHelp did not open help")
 	}
-	if m.previewSearch.Mode() != search.SearchModeNone || m.previewSearch.Query() != "" {
-		t.Fatalf("preview search not ended: mode %v query %q", m.previewSearch.Mode(), m.previewSearch.Query())
+	if m.preview.previewSearch.Mode() != search.SearchModeNone || m.preview.previewSearch.Query() != "" {
+		t.Fatalf("preview search not ended: mode %v query %q", m.preview.previewSearch.Mode(), m.preview.previewSearch.Query())
 	}
 }
 

@@ -194,8 +194,8 @@ func TestModel_EnterOnExpandedEpicFocusesPreview(t *testing.T) {
 	if !strings.Contains(m.View().Content, "First ticket") {
 		t.Fatalf("expected epic to stay expanded after enter, got:\n%s", m.View().Content)
 	}
-	if m.focus != focusPreview {
-		t.Fatalf("expected enter on already-expanded epic to focus preview, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected enter on already-expanded epic to focus preview, got focus=%v", m.preview.focus)
 	}
 }
 
@@ -224,14 +224,14 @@ func TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview(t *testing.T) {
 	if !strings.Contains(m.View().Content, "First ticket") {
 		t.Fatalf("expected first enter to expand the collapsed epic, got:\n%s", m.View().Content)
 	}
-	if m.focus != focusSidebar {
-		t.Fatalf("expected first enter on collapsed epic to keep sidebar focus, got focus=%v", m.focus)
+	if m.preview.focus != focusSidebar {
+		t.Fatalf("expected first enter on collapsed epic to keep sidebar focus, got focus=%v", m.preview.focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.focus != focusPreview {
-		t.Fatalf("expected second enter on now-expanded epic to focus preview, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected second enter on now-expanded epic to focus preview, got focus=%v", m.preview.focus)
 	}
 }
 

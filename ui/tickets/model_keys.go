@@ -83,7 +83,7 @@ func newTicketsManager() keys.Manager {
 // that entirely since neither manager's Process is ever called twice for the
 // same keystroke.
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if m.focus == focusPreview {
+	if m.preview.focus == focusPreview {
 		return m.handlePreviewKey(msg)
 	}
 
@@ -137,14 +137,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsToggleProjectScope:
 			return m.toggleProjectScope()
 		case bindingTicketsTogglePreview:
-			m.togglePreview()
+			m.preview.togglePreview()
 			m.sidebarTree.SetVisibleHeight(m.sidebarViewportHeight())
 		case bindingTicketsSelectFirst:
 			m.selectFirstRow()
 		case bindingTicketsSelectLast:
 			m.selectLastRow()
 		case bindingTicketsPreviewBottom:
-			m.previewVP.GotoBottom()
+			m.preview.previewVP.GotoBottom()
 		case bindingTicketsSuggestedActions:
 			return m.handleSuggestedActionsKey()
 		case bindingTicketsYankSummary:
@@ -179,7 +179,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	next, cmd, result := m.sidebarTree.Update(msg)
 	if result.ExpandNoop {
-		m.focusPreviewPane()
+		m.preview.focusPreviewPane()
 		return m, cmd
 	}
 	m.sidebarTree = next
@@ -187,7 +187,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd = m.afterSidebarToggle(selectedID, cmd)
 	}
 	if result.OpenSelected {
-		m.focusPreviewPane()
+		m.preview.focusPreviewPane()
 	}
 	// BindingMoveDown/BindingMoveUp already self-skip non-selectable rows
 	// inside tree.Model.Update (see SetIsSelectable/SkipUnselectable) — no

@@ -252,10 +252,10 @@ func TestModel_BJumpsPreviewToBottomFromListFocus(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
-	if m.focus != focusSidebar {
-		t.Fatalf("expected 'b' to leave focus on the sidebar, got focus=%v", m.focus)
+	if m.preview.focus != focusSidebar {
+		t.Fatalf("expected 'b' to leave focus on the sidebar, got focus=%v", m.preview.focus)
 	}
-	content := ansi.Strip(m.previewVP.View())
+	content := ansi.Strip(m.preview.previewVP.View())
 	if !strings.Contains(content, "BOTTOMMARKERXYZ") {
 		t.Fatalf("expected preview scrolled to bottom marker, got:\n%s", content)
 	}
@@ -280,16 +280,16 @@ func TestModel_BJumpsPreviewToBottomFromPreviewFocus(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.focus != focusPreview {
-		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.preview.focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
-	if m.focus != focusPreview {
-		t.Fatalf("expected 'b' to leave focus on the preview, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected 'b' to leave focus on the preview, got focus=%v", m.preview.focus)
 	}
-	content := ansi.Strip(m.previewVP.View())
+	content := ansi.Strip(m.preview.previewVP.View())
 	if !strings.Contains(content, "BOTTOMMARKERXYZ") {
 		t.Fatalf("expected preview scrolled to bottom marker, got:\n%s", content)
 	}
@@ -317,8 +317,8 @@ func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.focus != focusPreview {
-		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected preview focus after enter on ticket row, got focus=%v", m.preview.focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Text: "/"})
@@ -330,7 +330,7 @@ func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 
-	content := m.previewVP.GetContent()
+	content := m.preview.previewVP.GetContent()
 	if !strings.Contains(ansi.Strip(content), "distinctive body prose") {
 		t.Fatalf("expected body text still present in preview, got:\n%s", ansi.Strip(content))
 	}

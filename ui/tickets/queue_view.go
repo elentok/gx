@@ -29,17 +29,17 @@ func (m QueueModel) View() tea.View {
 		// didn't change, rather than always rebuilding from scratch.
 		m.queueTree.SetEntries(m.buildQueueEntriesCached())
 	}
-	sidebarW, previewW := m.panelWidths(m.width)
-	sidebarH, previewH := m.panelHeights(m.width, m.contentHeight())
+	sidebarW, previewW := m.preview.panelWidths(m.width)
+	sidebarH, previewH := m.preview.panelHeights(m.width, m.contentHeight())
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.focus == focusSidebar, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.preview.focus == focusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
-		previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, ui.ColorBlue, nil, false,
+		previewW, previewH, "Preview", previewSearchMatchStatus(m.preview.previewSearch), renderViewportWithScrollbar(m.preview.previewVP), m.preview.focus == focusPreview, ui.ColorBlue, nil, false,
 	))
 
-	content := m.joinPanels(m.width, sidebarW, sidebarH, queueView, previewView)
+	content := m.preview.joinPanels(m.width, sidebarW, sidebarH, queueView, previewView)
 
 	if m.ticketMenu.IsOpen {
 		content = m.ticketMenu.Overlay(content, m.menuAnchor(), m.width, m.height)
@@ -120,7 +120,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 	}
 	return tree.RenderOpts[queueNode]{
 		AccentColor: ui.ColorBlue,
-		Active:      m.focus == focusSidebar,
+		Active:      m.preview.focus == focusSidebar,
 		Width:       width,
 		// EmptyLine is blank: the header banner's queueIdleBodyLine (queue_header.go)
 		// already covers the empty-selection case with "No selected tickets...".

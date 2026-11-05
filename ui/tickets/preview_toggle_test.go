@@ -29,7 +29,7 @@ func TestModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 		updated, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 		m = pressKeys(t, updated, 't', 'v').(Model)
 
-		if !m.previewHidden {
+		if !m.preview.previewHidden {
 			t.Fatalf("width %d: expected \"tv\" to hide the preview", width)
 		}
 		if _, _, w, h := m.sidebarRect(); w != width || h != m.contentHeight() {
@@ -42,16 +42,16 @@ func TestModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 		// rows: [section header, epic (selected), ticket] - "l" on the leaf
 		// ticket would normally focus the preview.
 		m = pressKeys(t, m, 'j', 'l').(Model)
-		if m.focus != focusSidebar {
-			t.Fatalf("width %d: expected focus to stay on the list while preview hidden, got %v", width, m.focus)
+		if m.preview.focus != focusSidebar {
+			t.Fatalf("width %d: expected focus to stay on the list while preview hidden, got %v", width, m.preview.focus)
 		}
 		updated, _ = m.Update(tea.MouseClickMsg{X: width - 2, Y: m.contentHeight() - 2, Button: tea.MouseLeft})
-		if updated.(Model).focus != focusSidebar {
+		if updated.(Model).preview.focus != focusSidebar {
 			t.Fatalf("width %d: expected a click to never focus the hidden preview", width)
 		}
 
 		m = pressKeys(t, m, 't', 'v').(Model)
-		if m.previewHidden || !strings.Contains(m.View().Content, "Preview") {
+		if m.preview.previewHidden || !strings.Contains(m.View().Content, "Preview") {
 			t.Fatalf("width %d: expected a second \"tv\" to show the preview again", width)
 		}
 	}
@@ -59,7 +59,7 @@ func TestModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 
 func TestPreviewFocus_HidingFocusedPreviewReturnsFocusToList(t *testing.T) {
 	t.Parallel()
-	p := newPreviewFocus()
+	p := newPreviewPane()
 	p.focus = focusPreview
 	p.togglePreview()
 	if p.focus != focusSidebar {
@@ -77,7 +77,7 @@ func TestQueueModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = pressKeys(t, updated, 't', 'v').(QueueModel)
 
-	if !m.previewHidden {
+	if !m.preview.previewHidden {
 		t.Fatal("expected \"tv\" to hide the preview")
 	}
 	if r := m.queueTreeRect(); r.W != 120 {
@@ -88,12 +88,12 @@ func TestQueueModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 	}
 
 	m = pressKeys(t, m, 'l').(QueueModel)
-	if m.focus != focusSidebar {
-		t.Fatalf("expected focus to stay on the list while preview hidden, got %v", m.focus)
+	if m.preview.focus != focusSidebar {
+		t.Fatalf("expected focus to stay on the list while preview hidden, got %v", m.preview.focus)
 	}
 
 	m = pressKeys(t, m, 't', 'v').(QueueModel)
-	if m.previewHidden || !strings.Contains(m.View().Content, "Preview") {
+	if m.preview.previewHidden || !strings.Contains(m.View().Content, "Preview") {
 		t.Fatal("expected a second \"tv\" to show the preview again")
 	}
 }

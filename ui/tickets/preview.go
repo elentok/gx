@@ -68,28 +68,6 @@ func renderViewportWithScrollbar(vp viewport.Model) []string {
 	return lines
 }
 
-// previewContent builds the selected row's preview. Nothing selected (e.g.
-// an empty `.scratch/`) falls back to the tab's empty-preview placeholder. A
-// ticket row is rendered by renderTicketPreview, shared with the Queue tab's
-// own preview pane (see queue_preview.go). An epic row gets its own header
-// (name + optional [map] badge + open/total count) followed by its ticket.md
-// body. The second and
-// third return values are the pause-section scroll target line index and
-// whether one exists — always false for an epic row.
-func (m Model) previewContent(width int) (string, int, bool) {
-	r, ok := m.selectedRow()
-	if !ok {
-		return ui.StyleDim.Render("  no ticket selected"), 0, false
-	}
-	if r.isEpic() {
-		return previewEpicContent(withEpicTicketMD(m.epicAt(r)), width), 0, false
-	}
-
-	epic := m.epicAt(r)
-	t := epic.Tickets[r.ticketIdx]
-	return renderTicketPreview(epic, t, width)
-}
-
 // renderTicketPreview builds one ticket row's preview: its formatted
 // frontmatter block (renderFrontmatterBlock), a thin rule, then the ticket
 // body rendered verbatim through glamour (or a read-error message), with the

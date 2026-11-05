@@ -6,7 +6,7 @@ import (
 )
 
 func TestPreviewFocusSync_ReusesContentForSameKeyAndWidth(t *testing.T) {
-	p := newPreviewFocus()
+	p := newPreviewPane()
 	calls := 0
 	contentFor := func(width int) (string, int, bool) {
 		calls++
@@ -31,7 +31,7 @@ func TestPreviewFocusSync_ReusesContentForSameKeyAndWidth(t *testing.T) {
 }
 
 func TestPreviewFocusSync_EmptyKeyNeverCaches(t *testing.T) {
-	p := newPreviewFocus()
+	p := newPreviewPane()
 	calls := 0
 	contentFor := func(width int) (string, int, bool) {
 		calls++
@@ -45,7 +45,7 @@ func TestPreviewFocusSync_EmptyKeyNeverCaches(t *testing.T) {
 }
 
 func TestPreviewFocusSync_CachedContentStillShownAfterSelectionChange(t *testing.T) {
-	p := newPreviewFocus()
+	p := newPreviewPane()
 	contentFor := func(width int) (string, int, bool) { return "one\ntwo\nthree", 2, true }
 
 	p.Sync(40, 2, "a", "key1", contentFor)

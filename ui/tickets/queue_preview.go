@@ -67,7 +67,7 @@ func (m *QueueModel) syncQueuePreviewViewport() {
 	_, previewH := splitPanelHeight(m.width, m.contentHeight())
 	width, ht := previewInnerSize(previewW, previewH)
 	contentW := max(width-previewScrollbarGutter, 1)
-	m.previewFocus.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContentKey(), m.queuePreviewContent)
+	m.preview.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContentKey(), m.queuePreviewContent)
 }
 
 // queuePreviewContentKey is everything queuePreviewContent's output depends
@@ -93,24 +93,9 @@ func (m QueueModel) queuePreviewContentKey() string {
 // "b" jumping to the bottom, and everything else delegated to the viewport's
 // own scrolling.
 func (m QueueModel) handleQueuePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if handled, cmd := m.previewFocus.updatePreviewKey(msg); handled {
-		return m, cmd
-	}
-
-	if msg.String() == "q" {
+	cmd, res := m.preview.update(msg)
+	if res == previewBack {
 		return m, nav.Back()
 	}
-
-	switch msg.String() {
-	case "h", "left", "esc":
-		m.focus = focusSidebar
-		return m, nil
-	case "b":
-		m.previewVP.GotoBottom()
-		return m, nil
-	}
-
-	var cmd tea.Cmd
-	m.previewVP, cmd = m.previewVP.Update(msg)
 	return m, cmd
 }

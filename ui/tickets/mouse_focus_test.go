@@ -31,26 +31,26 @@ func TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
-	if m.focus != focusSidebar {
-		t.Fatalf("expected initial focus on sidebar, got focus=%v", m.focus)
+	if m.preview.focus != focusSidebar {
+		t.Fatalf("expected initial focus on sidebar, got focus=%v", m.preview.focus)
 	}
 
 	px, py, _, _ := m.previewRect()
 	updated, _ = m.Update(tea.MouseClickMsg{X: px + 1, Y: py + 1, Button: tea.MouseLeft})
 	m = updated.(Model)
 
-	if m.focus != focusPreview {
-		t.Fatalf("expected preview focus after click inside preview bounds, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected preview focus after click inside preview bounds, got focus=%v", m.preview.focus)
 	}
 
-	initialOffset := m.previewVP.YOffset()
+	initialOffset := m.preview.previewVP.YOffset()
 	updated, _ = m.Update(tea.MouseWheelMsg{X: px + 1, Y: py + 1, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
 	if m.sidebarTree.ScrollOffset() != 0 {
 		t.Fatalf("expected sidebar scroll offset to stay at 0, got %d", m.sidebarTree.ScrollOffset())
 	}
-	if m.previewVP.YOffset() == initialOffset {
+	if m.preview.previewVP.YOffset() == initialOffset {
 		t.Fatalf("expected preview viewport to scroll on wheel event while focused, offset stayed at %d", initialOffset)
 	}
 }
@@ -68,14 +68,14 @@ func TestModel_ClickInsideSidebarRestoresFocus(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	m.focus = focusPreview
+	m.preview.focus = focusPreview
 
 	line := selectedSidebarLine(t, m)
 	updated, _ = m.Update(tea.MouseClickMsg{X: 1, Y: line + 1, Button: tea.MouseLeft})
 	m = updated.(Model)
 
-	if m.focus != focusSidebar {
-		t.Fatalf("expected sidebar focus after click inside sidebar bounds, got focus=%v", m.focus)
+	if m.preview.focus != focusSidebar {
+		t.Fatalf("expected sidebar focus after click inside sidebar bounds, got focus=%v", m.preview.focus)
 	}
 }
 
@@ -96,8 +96,8 @@ func TestModel_WheelOverSidebarScrollsItRegardlessOfFocus(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
 	m = updated.(Model)
 
-	m.focus = focusPreview
-	previewOffsetBefore := m.previewVP.YOffset()
+	m.preview.focus = focusPreview
+	previewOffsetBefore := m.preview.previewVP.YOffset()
 	sidebarOffsetBefore := m.sidebarTree.ScrollOffset()
 
 	sx, sy, _, _ := m.sidebarRect()
@@ -107,11 +107,11 @@ func TestModel_WheelOverSidebarScrollsItRegardlessOfFocus(t *testing.T) {
 	if m.sidebarTree.ScrollOffset() <= sidebarOffsetBefore {
 		t.Fatalf("expected sidebar scroll offset to increase from %d, got %d", sidebarOffsetBefore, m.sidebarTree.ScrollOffset())
 	}
-	if m.previewVP.YOffset() != previewOffsetBefore {
-		t.Fatalf("expected preview scroll offset to stay at %d, got %d", previewOffsetBefore, m.previewVP.YOffset())
+	if m.preview.previewVP.YOffset() != previewOffsetBefore {
+		t.Fatalf("expected preview scroll offset to stay at %d, got %d", previewOffsetBefore, m.preview.previewVP.YOffset())
 	}
-	if m.focus != focusPreview {
-		t.Fatalf("expected focus to remain on preview, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected focus to remain on preview, got focus=%v", m.preview.focus)
 	}
 }
 
@@ -133,22 +133,22 @@ func TestModel_WheelOverPreviewScrollsItRegardlessOfFocus(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
-	m.focus = focusSidebar
-	previewOffsetBefore := m.previewVP.YOffset()
+	m.preview.focus = focusSidebar
+	previewOffsetBefore := m.preview.previewVP.YOffset()
 	sidebarOffsetBefore := m.sidebarTree.ScrollOffset()
 
 	px, py, _, _ := m.previewRect()
 	updated, _ = m.Update(tea.MouseWheelMsg{X: px + 1, Y: py + 1, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
-	if m.previewVP.YOffset() <= previewOffsetBefore {
-		t.Fatalf("expected preview scroll offset to increase from %d, got %d", previewOffsetBefore, m.previewVP.YOffset())
+	if m.preview.previewVP.YOffset() <= previewOffsetBefore {
+		t.Fatalf("expected preview scroll offset to increase from %d, got %d", previewOffsetBefore, m.preview.previewVP.YOffset())
 	}
 	if m.sidebarTree.ScrollOffset() != sidebarOffsetBefore {
 		t.Fatalf("expected sidebar scroll offset to stay at %d, got %d", sidebarOffsetBefore, m.sidebarTree.ScrollOffset())
 	}
-	if m.focus != focusSidebar {
-		t.Fatalf("expected focus to remain on sidebar, got focus=%v", m.focus)
+	if m.preview.focus != focusSidebar {
+		t.Fatalf("expected focus to remain on sidebar, got focus=%v", m.preview.focus)
 	}
 }
 
@@ -165,8 +165,8 @@ func TestModel_WheelOverPaneWithNoOverflowIsNoop(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	m.focus = focusPreview
-	previewOffsetBefore := m.previewVP.YOffset()
+	m.preview.focus = focusPreview
+	previewOffsetBefore := m.preview.previewVP.YOffset()
 	sidebarOffsetBefore := m.sidebarTree.ScrollOffset()
 
 	sx, sy, _, _ := m.sidebarRect()
@@ -176,8 +176,8 @@ func TestModel_WheelOverPaneWithNoOverflowIsNoop(t *testing.T) {
 	if m.sidebarTree.ScrollOffset() != sidebarOffsetBefore {
 		t.Fatalf("expected sidebar scroll offset to stay at %d, got %d", sidebarOffsetBefore, m.sidebarTree.ScrollOffset())
 	}
-	if m.previewVP.YOffset() != previewOffsetBefore {
-		t.Fatalf("expected preview scroll offset to stay at %d, got %d", previewOffsetBefore, m.previewVP.YOffset())
+	if m.preview.previewVP.YOffset() != previewOffsetBefore {
+		t.Fatalf("expected preview scroll offset to stay at %d, got %d", previewOffsetBefore, m.preview.previewVP.YOffset())
 	}
 }
 
@@ -204,15 +204,15 @@ func TestModel_MouseWheelWhileHelpOpenScrollsHelpNotPreview(t *testing.T) {
 
 	m.help.Open(m.width, m.height)
 
-	prevPreviewOffset := m.previewVP.YOffset()
+	prevPreviewOffset := m.preview.previewVP.YOffset()
 	prevSidebarOffset := m.sidebarTree.ScrollOffset()
 	prevHelpOffset := m.help.Viewport.YOffset()
 
 	updated, _ = m.Update(tea.MouseWheelMsg{X: px + 1, Y: py + 1, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
-	if m.previewVP.YOffset() != prevPreviewOffset {
-		t.Fatalf("expected preview not to scroll while help is open, before=%d after=%d", prevPreviewOffset, m.previewVP.YOffset())
+	if m.preview.previewVP.YOffset() != prevPreviewOffset {
+		t.Fatalf("expected preview not to scroll while help is open, before=%d after=%d", prevPreviewOffset, m.preview.previewVP.YOffset())
 	}
 	if m.sidebarTree.ScrollOffset() != prevSidebarOffset {
 		t.Fatalf("expected sidebar not to scroll while help is open, before=%d after=%d", prevSidebarOffset, m.sidebarTree.ScrollOffset())

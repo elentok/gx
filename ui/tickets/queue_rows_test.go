@@ -377,14 +377,14 @@ func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
 
-	if m.focus != focusSidebar {
-		t.Fatalf("expected initial focus on the list, got focus=%v", m.focus)
+	if m.preview.focus != focusSidebar {
+		t.Fatalf("expected initial focus on the list, got focus=%v", m.preview.focus)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(QueueModel)
-	if m.focus != focusPreview {
-		t.Fatalf("expected \"l\" on a leaf row to focus the preview, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected \"l\" on a leaf row to focus the preview, got focus=%v", m.preview.focus)
 	}
 }
 
@@ -412,8 +412,8 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
-	if m.focus != focusPreview {
-		t.Fatalf("expected enter on already-expanded parent row to focus preview, got focus=%v", m.focus)
+	if m.preview.focus != focusPreview {
+		t.Fatalf("expected enter on already-expanded parent row to focus preview, got focus=%v", m.preview.focus)
 	}
 	rows := queueTicketEntries(m)
 	if len(rows) != 2 {
@@ -442,14 +442,14 @@ func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 		m = updated.(QueueModel)
-		if m.focus != focusPreview {
-			t.Fatalf("setup: expected \"l\" to focus preview, got focus=%v", m.focus)
+		if m.preview.focus != focusPreview {
+			t.Fatalf("setup: expected \"l\" to focus preview, got focus=%v", m.preview.focus)
 		}
 
 		updated, _ = m.Update(key)
 		m = updated.(QueueModel)
-		if m.focus != focusSidebar {
-			t.Fatalf("expected %+v to return focus to the list, got focus=%v", key, m.focus)
+		if m.preview.focus != focusSidebar {
+			t.Fatalf("expected %+v to return focus to the list, got focus=%v", key, m.preview.focus)
 		}
 	}
 }

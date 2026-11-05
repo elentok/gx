@@ -40,7 +40,28 @@ func (m *Model) syncPreviewViewport() {
 	width, height := previewInnerSize(previewW, previewH)
 	contentW := max(width-previewScrollbarGutter, 1)
 
-	m.previewFocus.Sync(contentW, height, m.previewSelectionKey(), "", m.previewContent)
+	m.preview.Sync(contentW, height, m.previewSelectionKey(), "", m.previewContent)
+}
+
+// previewContent builds the selected row's preview. Nothing selected (e.g.
+// an empty `.scratch/`) falls back to the tab's empty-preview placeholder. A
+// ticket row is rendered by renderTicketPreview, shared with the Queue tab's
+// own preview pane (see queue_preview.go). An epic row gets its own header
+// (name + optional [map] badge + open/total count) followed by its ticket.md
+// body. The second and third return values are the pause-section scroll
+// target line index and whether one exists — always false for an epic row.
+func (m Model) previewContent(width int) (string, int, bool) {
+	r, ok := m.selectedRow()
+	if !ok {
+		return ui.StyleDim.Render("  no ticket selected"), 0, false
+	}
+	if r.isEpic() {
+		return previewEpicContent(withEpicTicketMD(m.epicAt(r)), width), 0, false
+	}
+
+	epic := m.epicAt(r)
+	t := epic.Tickets[r.ticketIdx]
+	return renderTicketPreview(epic, t, width)
 }
 
 // highlightPreviewLine wraps query's first match on an already
@@ -111,31 +132,11 @@ func highlightPreviewLine(line, query string, current bool) string {
 	return prefix.String() + style.Render(matched.String()) + suffix.String()
 }
 
-// handlePreviewKey processes key input while the preview panel has focus:
-// its own search overlay, "h"/"left"/"esc" handing focus back to the
-// sidebar, "b" jumping straight to the bottom (overriding the viewport's own
-// "b" default of a page-up — see bubbles/viewport's DefaultKeyMap), and
-// everything else delegated to the viewport's own scrolling (j/k, up/down,
-// pgup/pgdn, ctrl+u/d, etc.).
+// handlePreviewKey routes a key to the preview pane while it has focus.
 func (m Model) handlePreviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if handled, cmd := m.previewFocus.updatePreviewKey(msg); handled {
-		return m, cmd
-	}
-
-	if msg.String() == "q" {
+	cmd, res := m.preview.update(msg)
+	if res == previewBack {
 		return m, nav.Back()
 	}
-
-	switch msg.String() {
-	case "h", "left", "esc":
-		m.focus = focusSidebar
-		return m, nil
-	case "b":
-		m.previewVP.GotoBottom()
-		return m, nil
-	}
-
-	var cmd tea.Cmd
-	m.previewVP, cmd = m.previewVP.Update(msg)
 	return m, cmd
 }
