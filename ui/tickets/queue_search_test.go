@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
@@ -51,9 +52,9 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 	var ticketRows []int
-	var ticketValues []queueNode
-	for i, e := range m.rows.queueTree.Entries() {
-		if e.Value.kind == nodeQueueTicket {
+	var ticketValues []queue.Node
+	for i, e := range m.rows.Tree.Entries() {
+		if e.Value.Kind == queue.NodeTicket {
 			ticketRows = append(ticketRows, i)
 			ticketValues = append(ticketValues, e.Value)
 		}
@@ -61,8 +62,8 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 	if len(ticketRows) != 2 {
 		t.Fatalf("expected 2 ticket rows, got %d: %v", len(ticketRows), ticketRows)
 	}
-	matchedLine := m.rows.renderQueueTicketRow(m.rowsEnv(), ticketValues[0].ticket, ticketRows[0])
-	nonMatchedLine := m.rows.renderQueueTicketRow(m.rowsEnv(), ticketValues[1].ticket, ticketRows[1])
+	matchedLine := m.rows.RenderTicketRow(m.rowsEnv(), ticketValues[0].Ticket, ticketRows[0])
+	nonMatchedLine := m.rows.RenderTicketRow(m.rowsEnv(), ticketValues[1].Ticket, ticketRows[1])
 	if strings.Contains(matchedLine, dimPrefix) {
 		t.Fatalf("expected matching row undimmed, got: %q", matchedLine)
 	}
@@ -91,13 +92,13 @@ func TestQueueSearch_MatchesEpicHeaderRows(t *testing.T) {
 	if m.search.MatchesCount() != 2 {
 		t.Fatalf("expected the alpha epic header and its ticket to match, got %d", m.search.MatchesCount())
 	}
-	entries := m.rows.queueTree.Entries()
+	entries := m.rows.Tree.Entries()
 	first, _ := m.search.Match(0)
 	second, _ := m.search.Match(1)
-	if e := entries[first.DataIndex].Value; e.kind != nodeEpicName || e.epic.Name != "alpha" {
+	if e := entries[first.DataIndex].Value; e.Kind != queue.NodeEpicName || e.Epic.Name != "alpha" {
 		t.Fatalf("expected first match to be the alpha epic header, got %+v", e)
 	}
-	if e := entries[second.DataIndex].Value; e.kind != nodeQueueTicket || e.ticket.ticket.Title != "Alpha tweak" {
+	if e := entries[second.DataIndex].Value; e.Kind != queue.NodeTicket || e.Ticket.Ticket.Title != "Alpha tweak" {
 		t.Fatalf("expected second match to be the alpha-tweak ticket, got %+v", e)
 	}
 }

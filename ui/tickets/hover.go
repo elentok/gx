@@ -54,9 +54,9 @@ func (m QueueModel) queueHoverTarget(msg tea.MouseMotionMsg) (int, bool) {
 	if m.ModalOpen() || !rect.Contains(mouse.X, mouse.Y) {
 		return -1, false
 	}
-	return m.rows.queueTree.EntryAtBodyLine(mouse.Y - rect.Y - 1 - queue.HeaderReservedLines)
+	return m.rows.Tree.EntryAtBodyLine(mouse.Y - rect.Y - 1 - queue.HeaderReservedLines)
 }
 
 func (m QueueModel) HoverChanges(msg tea.MouseMotionMsg) bool {
-	return m.rows.queueTree.SetHoveredIndex(m.queueHoverTarget(msg))
+	return m.rows.Tree.SetHoveredIndex(m.queueHoverTarget(msg))
 }

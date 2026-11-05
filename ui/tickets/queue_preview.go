@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 // selectedQueueRow returns the queue row under m.rows.queueTree's current
@@ -18,17 +19,17 @@ import (
 // header/separator/error row, a deliberate minor behavior change from the
 // old rows()-only selection (05's "Real gap" section): those rows are left
 // selectable but read as "nothing selected" to the preview.
-func (m QueueModel) selectedQueueRow() (queueRow, bool) {
-	entries := m.rows.queueTree.Entries()
-	idx := m.rows.queueTree.SelectedIndex()
+func (m QueueModel) selectedQueueRow() (queue.Row, bool) {
+	entries := m.rows.Tree.Entries()
+	idx := m.rows.Tree.SelectedIndex()
 	if idx < 0 || idx >= len(entries) {
-		return queueRow{}, false
+		return queue.Row{}, false
 	}
 	entry := entries[idx]
-	if entry.Value.kind != nodeQueueTicket {
-		return queueRow{}, false
+	if entry.Value.Kind != queue.NodeTicket {
+		return queue.Row{}, false
 	}
-	return entry.Value.ticket, true
+	return entry.Value.Ticket, true
 }
 
 // queuePreviewContent builds the Queue tab's preview pane body for the
@@ -40,7 +41,7 @@ func (m QueueModel) queuePreviewContent(width int) (string, int, bool) {
 	if !ok {
 		return ui.StyleDim.Render("  no ticket selected"), 0, false
 	}
-	return preview.RenderTicket(row.epic, row.ticket, width)
+	return preview.RenderTicket(row.Epic, row.Ticket, width)
 }
 
 // queuePreviewSelectionKey identifies which row the preview is currently
@@ -52,7 +53,7 @@ func (m QueueModel) queuePreviewSelectionKey() string {
 	if !ok {
 		return ""
 	}
-	return row.ticket.Path
+	return row.Ticket.Path
 }
 
 // syncQueuePreviewViewport keeps the shared previewFocus's viewport size and
@@ -80,12 +81,12 @@ func (m QueueModel) queuePreviewContentKey() string {
 	if !ok {
 		return ""
 	}
-	t := row.ticket
+	t := row.Ticket
 	var mtime int64
 	if info, err := os.Stat(t.FilePath()); err == nil {
 		mtime = info.ModTime().UnixNano()
 	}
-	return fmt.Sprintf("%s|%d|%d|%d|%v", t.Path, mtime, len(t.Body), len(t.ReadErr), row.epic.RenderedStatus(t))
+	return fmt.Sprintf("%s|%d|%d|%d|%v", t.Path, mtime, len(t.Body), len(t.ReadErr), row.Epic.RenderedStatus(t))
 }
 
 // handleQueuePreviewKey processes key input while the Queue tab's preview

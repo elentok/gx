@@ -45,7 +45,7 @@ func TestOlderServer_QueueTabShowsNoticeAndNoTickets(t *testing.T) {
 	if !strings.Contains(view, olderServerNotice) || strings.Contains(view, "First") {
 		t.Fatalf("view = %s", view)
 	}
-	if got := len(next.(QueueModel).rows.epics); got != 0 {
+	if got := len(next.(QueueModel).rows.Epics); got != 0 {
 		t.Fatalf("epics = %d, want none", got)
 	}
 }

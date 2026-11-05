@@ -83,7 +83,7 @@ func (t queueMenuTab) Selection() rowactions.Selection {
 	if !ok {
 		return rowactions.Selection{}
 	}
-	return rowactions.Selection{OK: true, Epic: r.epic, Ticket: r.ticket}
+	return rowactions.Selection{OK: true, Epic: r.Epic, Ticket: r.Ticket}
 }
 
 // handleSuggestedActionsKey applies the "m" keymap.
@@ -159,23 +159,23 @@ func (m QueueModel) handleQueueTicketMenuKey() (tea.Model, tea.Cmd) {
 // selectedQueuePath is the selected ticket row's path, or "" off a ticket.
 func (m QueueModel) selectedQueuePath() string {
 	r, _ := m.selectedQueueRow()
-	return r.ticket.Path
+	return r.Ticket.Path
 }
 
 // selectedQueueEpic is the selected epic header's epic; ok is false off one.
 func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
-	entries := m.rows.queueTree.Entries()
-	idx := m.rows.queueTree.SelectedIndex()
-	if idx < 0 || idx >= len(entries) || entries[idx].Value.kind != nodeEpicName {
+	entries := m.rows.Tree.Entries()
+	idx := m.rows.Tree.SelectedIndex()
+	if idx < 0 || idx >= len(entries) || entries[idx].Value.Kind != queue.NodeEpicName {
 		return tickets.Epic{}, false
 	}
-	return entries[idx].Value.epic, true
+	return entries[idx].Value.Epic, true
 }
 
 // menuAnchor is the selected queue row on screen, under the panel's header
 // line and the queue header, for the Context menu to open next to.
 func (m QueueModel) menuAnchor() contextmenu.Anchor {
-	line, h, ok := m.rows.queueTree.SelectedBodyLine()
+	line, h, ok := m.rows.Tree.SelectedBodyLine()
 	if !ok {
 		return contextmenu.Anchor{}
 	}

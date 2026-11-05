@@ -17,33 +17,7 @@ import (
 )
 
 var (
-	// statusOpenStyle deliberately has no Foreground override (ticket 02):
-	// open is the default/no-signal state, so it renders in the terminal's
-	// own default foreground rather than drawing the eye with a color.
-	statusOpenStyle = lipgloss.NewStyle()
-	// statusDraftStyle reads as paused, not idle: a draft is outstanding work
-	// nobody can pick up, so it sits between open's default foreground and
-	// done's near-invisible dim.
-	statusDraftStyle        = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	statusClaimedStyle      = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	statusBlockedStyle      = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	statusPausedAnswerStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	// statusWaitingForChildrenStyle uses the same color family as claimed —
-	// this ticket's own work is finished, but the epic still has live work
-	// underneath it, so it reads as active rather than settled/dim like done.
-	statusWaitingForChildrenStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	// statusDoneStyle is deliberately dimmer than ui.StyleDim/StyleMuted
-	// (used elsewhere for transient states like search-fade or loading
-	// text): "done" is a permanent, low-priority state that should read as
-	// clearly less prominent than everything else in the row, not merely
-	// muted.
-	statusDoneStyle = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
-
-	// suggestedActionBadgeStyle renders the "m"-menu badge (ticketHasSuggestedActions)
-	// distinct from every status color so it reads as an affordance, not a
-	// status signal.
-	suggestedActionBadgeStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
-	sessionMarkerStyle        = lipgloss.NewStyle().Foreground(ui.ColorTeal)
+	sessionMarkerStyle = lipgloss.NewStyle().Foreground(ui.ColorTeal)
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 )
@@ -129,7 +103,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	// a fully-done epic stays dimmed even if manually expanded, and a
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
 	if epic.AllDone() {
-		line = statusDoneStyle.Render(line)
+		line = rowfmt.StatusDoneStyle.Render(line)
 	}
 	if dur, ok := epic.CompletionDuration(); ok {
 		text := "took " + rowfmt.FormatDuration(dur)
@@ -158,7 +132,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	t := epic.Tickets[r.ticketIdx]
 	status := rowfmt.TicketStatus(epic, t)
 
-	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
+	triangle := strings.Repeat(" ", rowfmt.TriangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {
 		glyph := m.icons().TriangleExpanded
 		if !r.expanded {
@@ -167,7 +141,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		triangle = glyph + " "
 	}
 
-	icon, style := statusIconAndStyle(m.icons(), status)
+	icon, style := rowfmt.StatusIconAndStyle(m.icons(), status)
 
 	matched, _ := m.searchMatch(rowIdx)
 	searchDim := m.search.HasQuery() && !matched
@@ -180,7 +154,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	titleStyle := lipgloss.NewStyle()
 	if !matched {
 		if doneDim {
-			titleStyle = statusDoneStyle
+			titleStyle = rowfmt.StatusDoneStyle
 		} else if searchDim {
 			titleStyle = ui.StyleDim
 		}
@@ -191,14 +165,14 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 
 	line := triangle + style.Render(icon)
 	if m.rowHasSuggestedActions(epic, t, r.archived) {
-		badgeStyle := suggestedActionBadgeStyle
+		badgeStyle := rowfmt.SuggestedActionBadgeStyle
 		if searchDim {
 			badgeStyle = ui.StyleDim
 		}
 		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
 	}
 	line += " " + titleStyle.Render(title) + m.sessionMarker(t.Path)
-	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
+	if suffix := rowfmt.BlockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := rowfmt.BlockedBySuffixStyle
 		if searchDim {
 			suffixStyle = ui.StyleDim
@@ -228,61 +202,4 @@ func (m Model) sessionMarker(address string) string {
 
 func (m Model) icons() ui.IconSet {
 	return ui.Icons(m.settings.UseNerdFontIcons)
-}
-
-// triangleColumnWidth is the fixed column width every row reserves for its
-// triangle glyph (ticket 10), so a childless row's blank placeholder lines
-// up with a sibling's actual triangle regardless of which collapse-state
-// glyph (up or right) is wider.
-func triangleColumnWidth(icons ui.IconSet) int {
-	w := lipgloss.Width(icons.TriangleExpanded)
-	if cw := lipgloss.Width(icons.TriangleCollapsed); cw > w {
-		w = cw
-	}
-	return w
-}
-
-// statusIconAndStyle maps a ticket's rendered status to its dedicated glyph
-// and color, distinct from the PRs tab's facet icon set.
-func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string, lipgloss.Style) {
-	switch status {
-	case tickets.StatusDraft:
-		return icons.TicketDraft, statusDraftStyle
-	case tickets.StatusOpen:
-		return icons.TicketOpen, statusOpenStyle
-	case tickets.StatusClaimed:
-		return icons.TicketClaimed, statusClaimedStyle
-	case tickets.StatusBlocked:
-		return icons.TicketBlocked, statusBlockedStyle
-	case tickets.StatusPausedAnswer:
-		return icons.TicketPausedAnswer, statusPausedAnswerStyle
-	case tickets.StatusPausedRepair:
-		return icons.TicketPausedRepair, rowfmt.StatusPausedRepairStyle
-	case tickets.StatusWaitingForChildren:
-		return icons.TicketWaitingForChildren, statusWaitingForChildrenStyle
-	case tickets.StatusDone, tickets.StatusCancelled:
-		return icons.TicketDone, statusDoneStyle
-	default: // tickets.StatusError
-		return icons.TicketError, ui.StyleError
-	}
-}
-
-// blockedBySuffix renders the "(blocked by NN[, NN...])" suffix for a
-// blocked/paused (answer) ticket, filtered to still-unresolved blockers. Empty
-// for any other status or once every blocker has resolved.
-func blockedBySuffix(epic tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) string {
-	if status != tickets.StatusBlocked && status != tickets.StatusPausedAnswer {
-		return ""
-	}
-	unresolved := epic.UnresolvedBlockers(t)
-	if len(unresolved) == 0 {
-		return ""
-	}
-	if len(unresolved) > 3 {
-		return fmt.Sprintf("(blocked by %d tickets)", len(unresolved))
-	}
-	for i, ref := range unresolved {
-		unresolved[i] = t.BlockerLabel(ref)
-	}
-	return fmt.Sprintf("(blocked by %s)", strings.Join(unresolved, ", "))
 }

@@ -65,8 +65,8 @@ func TestRenderTicketRow_CancelledRendersAsTerminal(t *testing.T) {
 	if !strings.Contains(lines[0], "Cancelled ticket") || !strings.Contains(lines[0], icons.TicketDone) {
 		t.Fatalf("row line = %q, want title and terminal icon", lines[0])
 	}
-	icon, style := statusIconAndStyle(icons, tickets.StatusCancelled)
-	if icon != icons.TicketDone || style.GetForeground() != statusDoneStyle.GetForeground() {
+	icon, style := rowfmt.StatusIconAndStyle(icons, tickets.StatusCancelled)
+	if icon != icons.TicketDone || style.GetForeground() != rowfmt.StatusDoneStyle.GetForeground() {
 		t.Fatalf("StatusCancelled = (%q, %v), want done icon and style", icon, style.GetForeground())
 	}
 }
@@ -117,34 +117,34 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 		status tickets.RenderedStatus
 		want   lipgloss.Style
 	}{
-		{tickets.StatusOpen, statusOpenStyle},
-		{tickets.StatusClaimed, statusClaimedStyle},
+		{tickets.StatusOpen, rowfmt.StatusOpenStyle},
+		{tickets.StatusClaimed, rowfmt.StatusClaimedStyle},
 		{tickets.StatusPausedRepair, rowfmt.StatusPausedRepairStyle},
-		{tickets.StatusPausedAnswer, statusPausedAnswerStyle},
-		{tickets.StatusDone, statusDoneStyle},
-		{tickets.StatusBlocked, statusBlockedStyle},
-		{tickets.StatusWaitingForChildren, statusWaitingForChildrenStyle},
+		{tickets.StatusPausedAnswer, rowfmt.StatusPausedAnswerStyle},
+		{tickets.StatusDone, rowfmt.StatusDoneStyle},
+		{tickets.StatusBlocked, rowfmt.StatusBlockedStyle},
+		{tickets.StatusWaitingForChildren, rowfmt.StatusWaitingForChildrenStyle},
 	}
 	for _, c := range cases {
-		_, style := statusIconAndStyle(icons, c.status)
+		_, style := rowfmt.StatusIconAndStyle(icons, c.status)
 		if style.GetForeground() != c.want.GetForeground() {
 			t.Errorf("status %v: foreground = %v, want %v", c.status, style.GetForeground(), c.want.GetForeground())
 		}
 	}
 
-	if icon, _ := statusIconAndStyle(icons, tickets.StatusWaitingForChildren); icon != icons.TicketWaitingForChildren {
+	if icon, _ := rowfmt.StatusIconAndStyle(icons, tickets.StatusWaitingForChildren); icon != icons.TicketWaitingForChildren {
 		t.Errorf("StatusWaitingForChildren icon = %q, want icons.TicketWaitingForChildren %q", icon, icons.TicketWaitingForChildren)
 	}
 
 	// Open renders with no foreground override — the terminal's own default.
-	if _, style := statusIconAndStyle(icons, tickets.StatusOpen); style.GetForeground() != (lipgloss.NoColor{}) {
+	if _, style := rowfmt.StatusIconAndStyle(icons, tickets.StatusOpen); style.GetForeground() != (lipgloss.NoColor{}) {
 		t.Errorf("StatusOpen foreground = %v, want lipgloss.NoColor{} (no override)", style.GetForeground())
 	}
 	// Claimed is orange, paused (repair) is red, matching each other's new colors.
-	if _, style := statusIconAndStyle(icons, tickets.StatusClaimed); style.GetForeground() != ui.ColorOrange {
+	if _, style := rowfmt.StatusIconAndStyle(icons, tickets.StatusClaimed); style.GetForeground() != ui.ColorOrange {
 		t.Errorf("StatusClaimed foreground = %v, want ColorOrange", style.GetForeground())
 	}
-	if _, style := statusIconAndStyle(icons, tickets.StatusPausedRepair); style.GetForeground() != ui.ColorRed {
+	if _, style := rowfmt.StatusIconAndStyle(icons, tickets.StatusPausedRepair); style.GetForeground() != ui.ColorRed {
 		t.Errorf("StatusPausedRepair foreground = %v, want ColorRed", style.GetForeground())
 	}
 }
@@ -170,7 +170,7 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	m := newModelForTicketRowTests(epic)
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	wantSuffix := " " + statusDoneStyle.Italic(true).Render(rowfmt.FormatMetricsLine(5, 100, 0, false))
+	wantSuffix := " " + rowfmt.StatusDoneStyle.Italic(true).Render(rowfmt.FormatMetricsLine(5, 100, 0, false))
 	if !strings.HasSuffix(lines[0], wantSuffix) {
 		t.Fatalf("row line = %q, want it to end with %q", lines[0], wantSuffix)
 	}

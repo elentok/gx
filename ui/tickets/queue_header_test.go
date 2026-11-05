@@ -116,7 +116,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	rowRunes := []rune(rowLine)
 	rowRest := string(rowRunes[1:])
 	rowIndent := 1 + len(rowRest) - len(strings.TrimLeft(rowRest, " "))
-	triangleColumn := triangleColumnWidth(m.icons()) + 1
+	triangleColumn := rowfmt.TriangleColumnWidth(m.icons()) + 1
 	if headerIndent != 2 || rowIndent != headerIndent+triangleColumn {
 		t.Fatalf("got headerIndent=%d rowIndent=%d, want headerIndent=2 rowIndent=%d", headerIndent, rowIndent, 2+triangleColumn)
 	}

@@ -151,8 +151,8 @@ func (m Model) pendingSubtext(entry tree.Entry[sidebarNode]) (string, bool) {
 		text += ": " + p.Reason
 	}
 	icons := m.icons()
-	icon, _ := statusIconAndStyle(icons, rowfmt.TicketStatus(m.epicAt(r), t))
-	width := triangleColumnWidth(icons) + 1 + lipgloss.Width(icon) + 1
+	icon, _ := rowfmt.StatusIconAndStyle(icons, rowfmt.TicketStatus(m.epicAt(r), t))
+	width := rowfmt.TriangleColumnWidth(icons) + 1 + lipgloss.Width(icon) + 1
 	return strings.Repeat(" ", width) + rowfmt.BlockedBySuffixStyle.Render(rowfmt.Ellipsize(text, rowfmt.PauseReasonMaxRunes, icons.Ellipsis)), true
 }
 

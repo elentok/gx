@@ -95,7 +95,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 			t.Fatalf("body line = %q, want orange-styled %q", lines[0], wantStyled)
 		}
 
-		emptyLine := m.rows.queueRenderOpts(m.rowsEnv(), 80).EmptyLine
+		emptyLine := m.rows.RenderOpts(m.rowsEnv(), 80).EmptyLine
 		if emptyLine != "" {
 			t.Fatalf("tree EmptyLine = %q, want empty (header banner already covers no-selection case)", emptyLine)
 		}
@@ -152,7 +152,7 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 	m = updated.(QueueModel)
 
 	rows := queueTicketEntries(m)
-	if len(rows) != 1 || rows[0].Value.ticket.ticket.Path != second {
+	if len(rows) != 1 || rows[0].Value.Ticket.Ticket.Path != second {
 		t.Fatalf("expected only the non-done ticket in Entries() after tc, got %+v", rows)
 	}
 	content := m.View().Content
@@ -189,15 +189,15 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	checked := map[string]bool{done: true, open: true}
 	m := selectFirstQueueTicketRow(t, loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)))
 
-	start := m.rows.queueTree.SelectedIndex()
+	start := m.rows.Tree.SelectedIndex()
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(QueueModel)
-	if want := start + 1; m.rows.queueTree.SelectedIndex() != want {
-		t.Fatalf("expected \"t\",\"j\" to still move the selection down, got %d, want %d", m.rows.queueTree.SelectedIndex(), want)
+	if want := start + 1; m.rows.Tree.SelectedIndex() != want {
+		t.Fatalf("expected \"t\",\"j\" to still move the selection down, got %d, want %d", m.rows.Tree.SelectedIndex(), want)
 	}
-	if m.rows.hideComplete {
+	if m.rows.HideComplete {
 		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
 	}
 
@@ -205,7 +205,7 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	m = updated.(QueueModel)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	m = updated.(QueueModel)
-	if m.rows.hideComplete {
+	if m.rows.HideComplete {
 		t.Fatal("expected \"t\" followed by an unrelated key not to toggle hideComplete")
 	}
 	if m.confirm.IsOpen {
@@ -217,7 +217,7 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(QueueModel)
-	if m.rows.hideComplete {
+	if m.rows.HideComplete {
 		t.Fatal("expected plain \"c\" not to toggle hideComplete")
 	}
 }

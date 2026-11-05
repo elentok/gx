@@ -105,7 +105,7 @@ func (k serverKeys) deleteConfirm(t tickets.Ticket) confirm.Options {
 // ticket menu: confirm the selected ticket's pending recovery proposal.
 func (m QueueModel) handleServerApproveKey() (tea.Model, tea.Cmd) {
 	if row, ok := m.selectedQueueRow(); ok {
-		if opts, ok := m.srv.approveConfirm(row.ticket); ok {
+		if opts, ok := m.srv.approveConfirm(row.Ticket); ok {
 			m.confirm = m.confirm.Open(opts)
 		}
 	}

@@ -7,13 +7,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 func queueRowPaths(m QueueModel) []string {
 	var paths []string
-	for _, e := range m.rows.buildQueueEntries(m.rowsEnv()) {
-		if e.Value.kind == nodeQueueTicket {
-			paths = append(paths, e.Value.ticket.ticket.Path)
+	for _, e := range m.rows.BuildEntries(m.rowsEnv()) {
+		if e.Value.Kind == queue.NodeTicket {
+			paths = append(paths, e.Value.Ticket.Ticket.Path)
 		}
 	}
 	return paths
@@ -48,7 +49,7 @@ func TestQueueWholeEpic_EpicWithNoQueuedItemRendersNothing(t *testing.T) {
 
 func TestQueueWholeEpic_HideCompleteHidesDoneExtraTicket(t *testing.T) {
 	m, _ := deliverQueue(t, wholeEpicSnapshot("done"), []wire.QueueItem{{Address: "gx:alpha/01"}})
-	m.rows.hideComplete = true
+	m.rows.HideComplete = true
 
 	got := queueRowPaths(m)
 	if !slices.Equal(got, []string{"gx:alpha/01"}) {
@@ -58,9 +59,9 @@ func TestQueueWholeEpic_HideCompleteHidesDoneExtraTicket(t *testing.T) {
 
 func TestQueueWholeEpic_DeleteIsNotOfferedOnNonItemRow(t *testing.T) {
 	m, _ := deliverQueue(t, wholeEpicSnapshot("open"), []wire.QueueItem{{Address: "gx:alpha/01"}})
-	for i, e := range m.rows.queueTree.Entries() {
-		if e.Value.kind == nodeQueueTicket && e.Value.ticket.ticket.Path == "gx:alpha/02" {
-			m.rows.queueTree.SetSelectedIndex(i)
+	for i, e := range m.rows.Tree.Entries() {
+		if e.Value.Kind == queue.NodeTicket && e.Value.Ticket.Ticket.Path == "gx:alpha/02" {
+			m.rows.Tree.SetSelectedIndex(i)
 		}
 	}
 

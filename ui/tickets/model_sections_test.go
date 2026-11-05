@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 func TestNewModel_RendersEmptyStateWithNoScratchDir(t *testing.T) {
@@ -535,7 +536,7 @@ func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	dimPrefix := strings.SplitN(statusDoneStyle.Render("PROBE"), "PROBE", 2)[0]
+	dimPrefix := strings.SplitN(rowfmt.StatusDoneStyle.Render("PROBE"), "PROBE", 2)[0]
 
 	doneEpic := findEpic(t, m, "done-epic")
 	openEpic := findEpic(t, m, "open-epic")

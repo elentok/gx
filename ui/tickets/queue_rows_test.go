@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -82,7 +83,7 @@ func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 
 	indexOf := func(id string) int {
 		for i, r := range rows {
-			if r.Value.ticket.ticket.Identifier == id {
+			if r.Value.Ticket.Ticket.Identifier == id {
 				return i
 			}
 		}
@@ -122,13 +123,13 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	if len(rows) != 3 {
 		t.Fatalf("expected 3 rows, got %d: %+v", len(rows), rows)
 	}
-	if rows[0].Value.ticket.ticket.Identifier != "01" || rows[0].Depth != 0 || !rows[0].HasChildren || !rows[0].Expanded {
+	if rows[0].Value.Ticket.Ticket.Identifier != "01" || rows[0].Depth != 0 || !rows[0].HasChildren || !rows[0].Expanded {
 		t.Fatalf("expected parent 01 at depth 0 with children, got %+v", rows[0])
 	}
-	if rows[1].Value.ticket.ticket.Identifier != "02" || rows[1].Depth != 1 {
+	if rows[1].Value.Ticket.Ticket.Identifier != "02" || rows[1].Depth != 1 {
 		t.Fatalf("expected child 02 nested at depth 1 right after its parent, got %+v", rows[1])
 	}
-	if rows[2].Value.ticket.ticket.Identifier != "03" || rows[2].Depth != 0 {
+	if rows[2].Value.Ticket.Ticket.Identifier != "03" || rows[2].Depth != 0 {
 		t.Fatalf("expected unrelated ticket 03 at depth 0, got %+v", rows[2])
 	}
 
@@ -142,7 +143,7 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(QueueModel)
 	rows = queueTicketEntries(m)
-	if len(rows) != 2 || rows[0].Value.ticket.ticket.Identifier != "01" || rows[1].Value.ticket.ticket.Identifier != "03" {
+	if len(rows) != 2 || rows[0].Value.Ticket.Ticket.Identifier != "01" || rows[1].Value.Ticket.Ticket.Identifier != "03" {
 		t.Fatalf("expected only 01 and 03 after collapsing 01's children, got %+v", rows)
 	}
 	if strings.Contains(m.View().Content, "Child") {
@@ -175,10 +176,10 @@ func TestQueueModelNestsInvestigateChildUnderOneOff(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("expected 2 rows, got %d: %+v", len(rows), rows)
 	}
-	if rows[0].Value.ticket.ticket.Identifier != "01" || rows[0].Depth != 0 || !rows[0].HasChildren {
+	if rows[0].Value.Ticket.Ticket.Identifier != "01" || rows[0].Depth != 0 || !rows[0].HasChildren {
 		t.Fatalf("expected one-off 01 at depth 0 with children, got %+v", rows[0])
 	}
-	if rows[1].Value.ticket.ticket.Identifier != "02" || rows[1].Depth != 1 {
+	if rows[1].Value.Ticket.Ticket.Identifier != "02" || rows[1].Depth != 1 {
 		t.Fatalf("expected investigate child 02 nested at depth 1, got %+v", rows[1])
 	}
 }
@@ -189,10 +190,10 @@ func TestQueueModelNestsInvestigateChildUnderOneOff(t *testing.T) {
 // Expanded on each Entry (not queueRow's mirrored fields, which only exist to
 // drive the fold-glyph render) is the nesting truth these tests assert
 // against, per ticket 19's live-render-path rewrite.
-func queueTicketEntries(m QueueModel) []tree.Entry[queueNode] {
-	var out []tree.Entry[queueNode]
-	for _, e := range m.rows.queueTree.Entries() {
-		if e.Value.kind == nodeQueueTicket {
+func queueTicketEntries(m QueueModel) []tree.Entry[queue.Node] {
+	var out []tree.Entry[queue.Node]
+	for _, e := range m.rows.Tree.Entries() {
+		if e.Value.Kind == queue.NodeTicket {
 			out = append(out, e)
 		}
 	}
@@ -227,8 +228,8 @@ func TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T
 		t.Fatalf("got %d rows, want %d: %+v", len(rows), len(wantIDs), rows)
 	}
 	for i, r := range rows {
-		if r.Value.ticket.ticket.Identifier != wantIDs[i] {
-			t.Fatalf("row %d ticket = %q, want %q", i, r.Value.ticket.ticket.Identifier, wantIDs[i])
+		if r.Value.Ticket.Ticket.Identifier != wantIDs[i] {
+			t.Fatalf("row %d ticket = %q, want %q", i, r.Value.Ticket.Ticket.Identifier, wantIDs[i])
 		}
 		if r.Depth != wantDepths[i] {
 			t.Fatalf("row %d (%s) depth = %d, want %d", i, wantIDs[i], r.Depth, wantDepths[i])
@@ -247,8 +248,8 @@ func TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T
 		t.Fatalf("expected %d rows after collapsing 01, got %d: %+v", len(wantAfterCollapse), len(rows), rows)
 	}
 	for i, want := range wantAfterCollapse {
-		if rows[i].Value.ticket.ticket.Identifier != want {
-			t.Fatalf("row %d after collapse = %q, want %q", i, rows[i].Value.ticket.ticket.Identifier, want)
+		if rows[i].Value.Ticket.Ticket.Identifier != want {
+			t.Fatalf("row %d after collapse = %q, want %q", i, rows[i].Value.Ticket.Ticket.Identifier, want)
 		}
 	}
 	if rows[0].Expanded {
@@ -279,19 +280,19 @@ func TestQueueModelInjectsNonCandidateAncestorDimmedInsteadOfPromotingToRoot(t *
 	if len(rows) != 3 {
 		t.Fatalf("expected 3 rows (injected 01 + checked 02/03), got %d: %+v", len(rows), rows)
 	}
-	if rows[0].Value.ticket.ticket.Identifier != "01" || rows[0].Depth != 0 {
+	if rows[0].Value.Ticket.Ticket.Identifier != "01" || rows[0].Depth != 0 {
 		t.Fatalf("expected injected ancestor 01 at depth 0, got %+v", rows[0])
 	}
-	if rows[0].Value.ticket.actionable {
-		t.Fatalf("expected injected ancestor 01 to be marked non-actionable, got %+v", rows[0].Value.ticket)
+	if rows[0].Value.Ticket.Actionable {
+		t.Fatalf("expected injected ancestor 01 to be marked non-actionable, got %+v", rows[0].Value.Ticket)
 	}
-	if rows[1].Value.ticket.ticket.Identifier != "02" || rows[1].Depth != 1 {
+	if rows[1].Value.Ticket.Ticket.Identifier != "02" || rows[1].Depth != 1 {
 		t.Fatalf("expected checked ticket 02 nested under injected 01 at depth 1, got %+v", rows[1])
 	}
-	if !rows[1].Value.ticket.actionable {
-		t.Fatalf("expected checked ticket 02 to stay marked actionable, got %+v", rows[1].Value.ticket)
+	if !rows[1].Value.Ticket.Actionable {
+		t.Fatalf("expected checked ticket 02 to stay marked actionable, got %+v", rows[1].Value.Ticket)
 	}
-	if rows[2].Value.ticket.ticket.Identifier != "03" || rows[2].Depth != 0 {
+	if rows[2].Value.Ticket.Ticket.Identifier != "03" || rows[2].Depth != 0 {
 		t.Fatalf("expected unrelated checked ticket 03 at depth 0, got %+v", rows[2])
 	}
 
@@ -325,8 +326,8 @@ func TestQueueModelSharedNonCandidateAncestorInjectedOnce(t *testing.T) {
 		t.Fatalf("expected a single injected 01 with both 02 and 03 nested under it, got %d rows: %+v", len(rows), rows)
 	}
 	for i, want := range wantIDs {
-		if rows[i].Value.ticket.ticket.Identifier != want {
-			t.Fatalf("row %d = %q, want %q: %+v", i, rows[i].Value.ticket.ticket.Identifier, want, rows)
+		if rows[i].Value.Ticket.Ticket.Identifier != want {
+			t.Fatalf("row %d = %q, want %q: %+v", i, rows[i].Value.Ticket.Ticket.Identifier, want, rows)
 		}
 		if rows[i].Depth != wantDepths[i] {
 			t.Fatalf("row %d (%s) depth = %d, want %d", i, want, rows[i].Depth, wantDepths[i])
@@ -357,7 +358,7 @@ func TestQueueModelDoneParentWithOpenForkChildStaysVisible(t *testing.T) {
 	m = updated.(QueueModel)
 
 	rows := queueTicketEntries(m)
-	if len(rows) != 2 || rows[0].Value.ticket.ticket.Identifier != "01" || rows[1].Value.ticket.ticket.Identifier != "02" {
+	if len(rows) != 2 || rows[0].Value.Ticket.Ticket.Identifier != "01" || rows[1].Value.Ticket.Ticket.Identifier != "02" {
 		t.Fatalf("expected 01 (waiting-for-children) and nested 02, got %+v", rows)
 	}
 	if rows[1].Depth != 1 {
@@ -409,7 +410,7 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
-	m.server.runningEpics =map[string]bool{"already-running": true}
+	m.server.runningEpics = map[string]bool{"already-running": true}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
@@ -520,7 +521,7 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 // withChecked seeds a local-mode QueueModel's checked set, standing in for
 // the queue a server load would supply.
 func withChecked(m QueueModel, checked map[string]bool) QueueModel {
-	m.rows.checked = checked
+	m.rows.Checked = checked
 	return m
 }
 
@@ -559,8 +560,8 @@ func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 // a hardcoded 0.
 func firstSelectableQueueIndex(t *testing.T, m QueueModel) int {
 	t.Helper()
-	for i, e := range m.rows.queueTree.Entries() {
-		if isSelectableQueueKind(e.Value.kind) {
+	for i, e := range m.rows.Tree.Entries() {
+		if isSelectableQueueKind(e.Value.Kind) {
 			return i
 		}
 	}
@@ -569,15 +570,15 @@ func firstSelectableQueueIndex(t *testing.T, m QueueModel) int {
 }
 
 // isSelectableQueueKind is a ticket row or an epic header.
-func isSelectableQueueKind(kind queueNodeKind) bool {
-	return kind == nodeQueueTicket || kind == nodeEpicName
+func isSelectableQueueKind(kind queue.NodeKind) bool {
+	return kind == queue.NodeTicket || kind == queue.NodeEpicName
 }
 
 func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
-	for i, e := range m.rows.queueTree.Entries() {
-		if e.Value.kind == nodeQueueTicket {
-			m.rows.queueTree.SetSelectedIndex(i)
+	for i, e := range m.rows.Tree.Entries() {
+		if e.Value.Kind == queue.NodeTicket {
+			m.rows.Tree.SetSelectedIndex(i)
 			// syncQueuePreviewViewport normally runs inside Update; moving
 			// selection directly on queueTree bypasses that, so re-run it
 			// here to keep previewVP in sync with the new selection.

@@ -41,7 +41,7 @@ func (m QueueModel) selectedEditTarget() (file string, ok bool) {
 	if !ok {
 		return "", false
 	}
-	file, _ = rowactions.ResolveTicketPath(m.settings.TicketStore, row.ticket.Path)
+	file, _ = rowactions.ResolveTicketPath(m.settings.TicketStore, row.Ticket.Path)
 	return file, true
 }
 

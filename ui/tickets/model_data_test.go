@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 // TestDeriveCollapsedSidebar_EveryEpicDefaultsCollapsed covers the default
@@ -114,7 +115,7 @@ func TestSortedTicketIndexes_PlanOrderIgnoresStatus(t *testing.T) {
 		{Number: 2, Identifier: "02", Status: "done", Commitless: true},
 	}}
 
-	got := sortedTicketIndexes(epic)
+	got := rowfmt.SortedTicketIndexes(epic)
 	want := []string{"01", "02", "03", "04"}
 	for i, id := range want {
 		if epic.Tickets[got[i]].Identifier != id {
@@ -135,7 +136,7 @@ func TestSortedTicketIndexes_LetteredSiblingsFollowOriginalInFilenameOrder(t *te
 		{Number: 4, Identifier: "04a", Status: "done"},
 	}}
 
-	got := sortedTicketIndexes(epic)
+	got := rowfmt.SortedTicketIndexes(epic)
 	want := []string{"04", "04a", "04b", "05"}
 	for i, id := range want {
 		if epic.Tickets[got[i]].Identifier != id {

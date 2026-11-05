@@ -183,7 +183,7 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link tabapi.ServerLink)
 	m.server = m.server.withLink(st, link)
 	if m.server.down() || m.server.olderServer {
 		// Whatever the queue showed is stale; it refills on reconnect.
-		m.rows.epics, m.server.summaries, m.server.finished = nil, nil, nil
+		m.rows.Epics, m.server.summaries, m.server.finished = nil, nil, nil
 		m.loaded = m.loaded || m.server.olderServer
 		m.clampSelected()
 		return m, nil
@@ -199,15 +199,15 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link tabapi.ServerLink)
 func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) {
 	hadFinished := len(m.server.finished) > 0
 	m.server = m.server.applyState(st)
-	m.rows.checked = make(map[string]bool, len(st.Queue))
-	m.rows.checkOrder = make(map[string]uint64, len(st.Queue))
+	m.rows.Checked = make(map[string]bool, len(st.Queue))
+	m.rows.CheckOrder = make(map[string]uint64, len(st.Queue))
 	for i, addr := range st.Queue {
-		m.rows.checked[addr] = true
-		m.rows.checkOrder[addr] = uint64(i + 1)
+		m.rows.Checked[addr] = true
+		m.rows.CheckOrder[addr] = uint64(i + 1)
 	}
 	m.applyEpics(tabapi.EpicsFromViewModel(*st, viewmodel.Scope{}), true)
 	var cmd tea.Cmd
-	m.server, cmd = m.server.syncRunState(m.rows.epics, m.implementSpinner)
+	m.server, cmd = m.server.syncRunState(m.rows.Epics, m.implementSpinner)
 	if !hadFinished && len(m.server.finished) > 0 {
 		// The first finished entry has no chain yet; a delivery only reaches the
 		// tab that is on screen.
@@ -225,18 +225,18 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 // the epic's own address.
 func (m *QueueModel) applyEpics(epics []gxtickets.Epic, wholeEpic bool) {
 	m.loaded = true
-	m.rows.epics = epics
-	m.rows.candidates = make(map[string]bool, len(m.rows.checked))
-	for path := range m.rows.checked {
-		m.rows.candidates[path] = true
+	m.rows.Epics = epics
+	m.rows.Candidates = make(map[string]bool, len(m.rows.Checked))
+	for path := range m.rows.Checked {
+		m.rows.Candidates[path] = true
 	}
 	for _, epic := range epics {
-		queued := m.rows.checked[epic.Name] || slices.ContainsFunc(epic.Tickets, func(t gxtickets.Ticket) bool { return m.rows.checked[t.Path] })
+		queued := m.rows.Checked[epic.Name] || slices.ContainsFunc(epic.Tickets, func(t gxtickets.Ticket) bool { return m.rows.Checked[t.Path] })
 		if !wholeEpic || !queued {
 			continue
 		}
 		for _, t := range epic.Tickets {
-			m.rows.candidates[t.Path] = true
+			m.rows.Candidates[t.Path] = true
 		}
 	}
 	if m.search.HasQuery() {

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 // InputFocused reports whether the search box is mid-input, so the app
@@ -30,18 +31,18 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 	q := strings.ToLower(strings.TrimSpace(rawQuery))
 	if q == "" {
 		m.search.SetMatches(nil)
-		m.rows.queueTree.Search().SetPassiveResults("", nil)
+		m.rows.Tree.Search().SetPassiveResults("", nil)
 		return
 	}
 
 	matches := make([]search.Match, 0)
-	for i, e := range m.rows.queueTree.Entries() {
+	for i, e := range m.rows.Tree.Entries() {
 		matched := false
-		switch e.Value.kind {
-		case nodeQueueTicket:
-			matched = ticketMatchesQuery(e.Value.ticket.epic, e.Value.ticket.ticket, q)
-		case nodeEpicName:
-			matched = epicMatchesQuery(e.Value.epic, q)
+		switch e.Value.Kind {
+		case queue.NodeTicket:
+			matched = ticketMatchesQuery(e.Value.Ticket.Epic, e.Value.Ticket.Ticket, q)
+		case queue.NodeEpicName:
+			matched = epicMatchesQuery(e.Value.Epic, q)
 		}
 		if matched {
 			matches = append(matches, search.Match{DataIndex: i})
@@ -52,7 +53,7 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 	// tree's own search state (including HasQuery, keyed off its own query
 	// string) — keep it in step with m.search or every row dims as a false
 	// non-match.
-	m.rows.queueTree.Search().SetPassiveResults(rawQuery, matches)
+	m.rows.Tree.Search().SetPassiveResults(rawQuery, matches)
 }
 
 // jumpToCurrentQueueMatch moves the selection to the search cursor's current
@@ -62,8 +63,8 @@ func (m *QueueModel) jumpToCurrentQueueMatch() {
 	if !ok {
 		return
 	}
-	if match.DataIndex >= 0 && match.DataIndex < len(m.rows.queueTree.Entries()) {
-		m.rows.queueTree.SetSelectedIndex(match.DataIndex)
+	if match.DataIndex >= 0 && match.DataIndex < len(m.rows.Tree.Entries()) {
+		m.rows.Tree.SetSelectedIndex(match.DataIndex)
 	}
 }
 

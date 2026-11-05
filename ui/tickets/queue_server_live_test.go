@@ -163,9 +163,9 @@ func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
 	}}, []wire.QueueItem{{Address: "gx:alpha"}})
 
 	var shown []string
-	for _, e := range m.rows.buildQueueEntries(m.rowsEnv()) {
-		if e.Value.kind == nodeQueueTicket {
-			shown = append(shown, e.Value.ticket.ticket.Path)
+	for _, e := range m.rows.BuildEntries(m.rowsEnv()) {
+		if e.Value.Kind == queue.NodeTicket {
+			shown = append(shown, e.Value.Ticket.Ticket.Path)
 		}
 	}
 	if want := []string{"gx:alpha/01", "gx:alpha/02"}; !slices.Equal(shown, want) {
@@ -190,7 +190,7 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 	if !parent.Running || parent.WaitingOn != "01a" {
 		t.Errorf("live[01] = %+v, want running and waiting on 01a", parent)
 	}
-	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.epics[0].Tickets[0], parent, "")
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.Epics[0].Tickets[0], parent, "")
 	if suffix != "(waiting on 01a...)" {
 		t.Errorf("parent suffix = %q, want %q", suffix, "(waiting on 01a...)")
 	}
@@ -206,7 +206,7 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 	if !live.Running || live.Phase != rowfmt.LivePhaseMerging {
 		t.Errorf("live[02] = %+v, want running and merging", live)
 	}
-	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.epics[0].Tickets[1], live, "")
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.Epics[0].Tickets[1], live, "")
 	if suffix != "(merging...)" {
 		t.Errorf("suffix = %q, want %q", suffix, "(merging...)")
 	}
@@ -223,10 +223,10 @@ func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 			ExternalBlockers: []string{"epic3"}},
 	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
-	epic := m.rows.epics[0]
+	epic := m.rows.Epics[0]
 	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
 		tk := epic.Tickets[i]
-		if got := blockedBySuffix(epic, tk, rowfmt.TicketStatus(epic, tk)); got != want {
+		if got := rowfmt.BlockedBySuffix(epic, tk, rowfmt.TicketStatus(epic, tk)); got != want {
 			t.Errorf("blockedBySuffix(%s) = %q, want %q", tk.Identifier, got, want)
 		}
 	}

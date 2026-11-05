@@ -65,19 +65,19 @@ func queueHoverFixture(t *testing.T) hoverFixture {
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	other := -1
-	for i, e := range m.rows.queueTree.Entries() {
-		if e.Value.kind == nodeQueueTicket && i != m.rows.queueTree.SelectedIndex() {
+	for i, e := range m.rows.Tree.Entries() {
+		if e.Value.Kind == queue.NodeTicket && i != m.rows.Tree.SelectedIndex() {
 			other = i
 		}
 	}
 	return hoverFixture{
 		model:    m,
-		selected: m.rows.queueTree.SelectedIndex(),
+		selected: m.rows.Tree.SelectedIndex(),
 		other:    other,
 		outside:  m.layout().previewRect(),
 		rowY:     func(entry int) int { return 1 + queue.HeaderReservedLines + entry },
 		state: func(tm tea.Model) (int, int, bool) {
-			tree := tm.(QueueModel).rows.queueTree
+			tree := tm.(QueueModel).rows.Tree
 			hovered, ok := tree.HoveredIndex()
 			return tree.SelectedIndex(), hovered, ok
 		},

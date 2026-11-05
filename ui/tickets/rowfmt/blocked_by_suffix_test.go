@@ -1,4 +1,4 @@
-package tickets
+package rowfmt
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestBlockedBySuffix_FewBlockersListsIds(t *testing.T) {
 	}}
 	ticket := epic.Tickets[2]
 
-	got := blockedBySuffix(epic, ticket, tickets.StatusBlocked)
+	got := BlockedBySuffix(epic, ticket, tickets.StatusBlocked)
 
 	want := "(blocked by 01, 02)"
 	if got != want {
@@ -34,7 +34,7 @@ func TestBlockedBySuffix_ManyBlockersCollapsesToCount(t *testing.T) {
 	}}
 	ticket := epic.Tickets[4]
 
-	got := blockedBySuffix(epic, ticket, tickets.StatusBlocked)
+	got := BlockedBySuffix(epic, ticket, tickets.StatusBlocked)
 
 	want := "(blocked by 4 tickets)"
 	if got != want {

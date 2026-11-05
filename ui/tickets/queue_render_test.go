@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
@@ -69,7 +70,7 @@ func TestRenderQueueTicketRow_CommitlessSuffix(t *testing.T) {
 		{Identifier: "01", Title: "Open ticket", Status: "open", Commitless: true},
 	}}
 
-	line := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
+	line := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[0]}, 0)
 	if !strings.Contains(line, "Open ticket (commitless)") {
 		t.Fatalf("title line = %q, want title followed by \" (commitless)\"", line)
 	}
@@ -88,8 +89,8 @@ func TestRenderQueueTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T)
 		{Identifier: "02", Title: "Leaf ticket", Status: "open"},
 	}}
 
-	withChildren := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[0], hasChildren: true, expanded: true}, 0)
-	childless := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[1]}, 1)
+	withChildren := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[0], HasChildren: true, Expanded: true}, 0)
+	childless := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[1]}, 1)
 
 	iconOffset := func(line string) int {
 		stripped := ansi.Strip(line)
@@ -114,17 +115,17 @@ func leadingWhitespace(s string) string {
 func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
 	t.Parallel()
 	var m QueueModel
-	m.server.runningEpics =map[string]bool{"epic": true}
+	m.server.runningEpics = map[string]bool{"epic": true}
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 		{Identifier: "01", Title: "Normal ticket", Status: "open"},
 		{Identifier: "02", Title: "Running ticket", Status: "claimed"},
 	}}
-	m.server.live =map[string]map[string]rowfmt.LiveTicketState{
+	m.server.live = map[string]map[string]rowfmt.LiveTicketState{
 		"epic": {"02": {Running: true, Label: "iter-01"}},
 	}
 
-	normalLine := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
-	liveLine := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[1]}, 1)
+	normalLine := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[0]}, 0)
+	liveLine := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[1]}, 1)
 
 	normalIndent := leadingWhitespace(ansi.Strip(normalLine))
 	liveIndent := leadingWhitespace(ansi.Strip(liveLine))
@@ -140,8 +141,8 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 		{Identifier: "01", Title: "Done ticket", Status: "done", ElapsedTime: 5, ActualContextWindow: 100},
 	}}
 
-	line := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
-	wantSuffix := " " + statusDoneStyle.Italic(true).Render(rowfmt.FormatMetricsLine(5, 100, 0, false))
+	line := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[0]}, 0)
+	wantSuffix := " " + rowfmt.StatusDoneStyle.Italic(true).Render(rowfmt.FormatMetricsLine(5, 100, 0, false))
 	if !strings.HasSuffix(line, wantSuffix) {
 		t.Fatalf("row line = %q, want it to end with %q", line, wantSuffix)
 	}
@@ -158,7 +159,7 @@ func TestRenderQueueTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
 		{Identifier: "01", Title: "Paused ticket", Status: string(schema.StatusPaused), PauseReason: schema.PauseBlockedPane, ElapsedTime: 5, ActualContextWindow: 100},
 	}}
 
-	line := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
+	line := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[0]}, 0)
 	if !strings.Contains(line, rowfmt.FormatMetricsLine(5, 100, 0, false)) {
 		t.Fatalf("row line = %q, want it to contain metrics %q", line, rowfmt.FormatMetricsLine(5, 100, 0, false))
 	}
@@ -173,7 +174,7 @@ func TestRenderQueueTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
 		{Identifier: "01", Title: "Paused ticket", Status: string(schema.StatusPaused), PauseReason: schema.PauseSpinning},
 	}}
 
-	line := m.rows.renderQueueTicketRow(m.rowsEnv(), queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
+	line := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[0]}, 0)
 	if strings.Contains(line, "tok") {
 		t.Fatalf("row line = %q, want no metrics suffix", line)
 	}
@@ -192,10 +193,10 @@ func TestRenderQueueTicketRow_SearchDimWinsOverNonCandidateDim(t *testing.T) {
 		{Identifier: "01", Title: "Ancestor ticket", Status: "open"},
 	}}
 	m.search.Start("no-match")
-	m.rows.queueTree.Search().SetPassiveResults("no-match", nil)
+	m.rows.Tree.Search().SetPassiveResults("no-match", nil)
 
-	row := queueRow{epic: epic, ticket: epic.Tickets[0], actionable: false}
-	line := m.rows.renderQueueTicketRow(m.rowsEnv(), row, 0)
+	row := queue.Row{Epic: epic, Ticket: epic.Tickets[0], Actionable: false}
+	line := m.rows.RenderTicketRow(m.rowsEnv(), row, 0)
 	stripped := ansi.Strip(line)
 
 	title := epic.Tickets[0].DisplayNumber() + " " + epic.Tickets[0].Title
@@ -203,7 +204,7 @@ func TestRenderQueueTicketRow_SearchDimWinsOverNonCandidateDim(t *testing.T) {
 	if !strings.Contains(line, wantTitle) {
 		t.Fatalf("row line = %q, want title rendered in ui.StyleDim (matching icon/badge/suffix), got literal stripped text %q", line, stripped)
 	}
-	if strings.Contains(line, statusDoneStyle.Render(title)) {
+	if strings.Contains(line, rowfmt.StatusDoneStyle.Render(title)) {
 		t.Fatalf("row line = %q, title still rendered in statusDoneStyle instead of ui.StyleDim", line)
 	}
 }

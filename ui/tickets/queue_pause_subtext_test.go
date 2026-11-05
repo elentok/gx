@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -81,11 +82,11 @@ func TestQueueModel_PausedTicketWithChildren_ReasonRendersDirectlyUnderItself(t 
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
-	entries := m.rows.queueTree.Entries()
-	var parent tree.Entry[queueNode]
+	entries := m.rows.Tree.Entries()
+	var parent tree.Entry[queue.Node]
 	parentIdx := -1
 	for i, e := range entries {
-		if e.Value.kind == nodeQueueTicket && e.Value.ticket.ticket.Identifier == "01" {
+		if e.Value.Kind == queue.NodeTicket && e.Value.Ticket.Ticket.Identifier == "01" {
 			parent, parentIdx = e, i
 			break
 		}
@@ -99,7 +100,7 @@ func TestQueueModel_PausedTicketWithChildren_ReasonRendersDirectlyUnderItself(t 
 	if !parent.HasChildren || !parent.Expanded {
 		t.Fatalf("expected ticket 01 to still report hasChildren+expanded, got %+v", parent)
 	}
-	if parentIdx+1 >= len(entries) || entries[parentIdx+1].Value.ticket.ticket.Identifier != "02" {
+	if parentIdx+1 >= len(entries) || entries[parentIdx+1].Value.Ticket.Ticket.Identifier != "02" {
 		t.Fatalf("expected ticket 02 to immediately follow ticket 01's entry, got %+v", entries)
 	}
 }

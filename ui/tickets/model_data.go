@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"slices"
-	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -128,7 +127,7 @@ type epicTicketTree struct {
 // equally for m.archivedEpics — indices in that slice mean nothing against
 // m.epics.
 func (m Model) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
-	sorted := sortedTicketIndexes(epic)
+	sorted := rowfmt.SortedTicketIndexes(epic)
 
 	visible := make(map[int]bool, len(sorted))
 	for _, idx := range sorted {
@@ -484,25 +483,4 @@ func deriveCollapsedSidebar(explicit map[string]bool, epics []tickets.Epic, arch
 		effective[id] = false
 	}
 	return effective
-}
-
-// sortedTicketIndexes orders epic.Tickets' indexes in plan order — ticket
-// number ascending, so the list reads as the epic's intended order of
-// execution and a ticket (done or otherwise) never jumps out of its place
-// once it finishes. Lettered siblings sharing a Number (e.g. 04,
-// 04a, 04b) tie-break on DisplayNumber, so the original sorts before its
-// replacements in filename order.
-func sortedTicketIndexes(epic tickets.Epic) []int {
-	indexes := make([]int, len(epic.Tickets))
-	for i := range indexes {
-		indexes[i] = i
-	}
-	sort.SliceStable(indexes, func(i, j int) bool {
-		a, b := epic.Tickets[indexes[i]], epic.Tickets[indexes[j]]
-		if a.Number != b.Number {
-			return a.Number < b.Number
-		}
-		return a.DisplayNumber() < b.DisplayNumber()
-	})
-	return indexes
 }

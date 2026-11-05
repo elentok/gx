@@ -50,7 +50,7 @@ func (m QueueModel) yankQueueTicketSummary() tea.Cmd {
 	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	return m.editor.Yank(formatTicketSummary(r.epic.Name, r.ticket), "ticket")
+	return m.editor.Yank(formatTicketSummary(r.Epic.Name, r.Ticket), "ticket")
 }
 
 // yankQueueTicketFilePath is the Queue tab's counterpart to
@@ -60,5 +60,5 @@ func (m QueueModel) yankQueueTicketFilePath() tea.Cmd {
 	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	return m.editor.Yank(r.ticket.FilePath(), "file path")
+	return m.editor.Yank(r.Ticket.FilePath(), "file path")
 }

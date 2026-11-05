@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -25,8 +26,8 @@ func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueM
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
-	m.rows.epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
-	m.rows.checked = map[string]bool{"gx:alpha/01": true}
+	m.rows.Epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
+	m.rows.Checked = map[string]bool{"gx:alpha/01": true}
 	m.clampSelected()
 	return m
 }
@@ -38,8 +39,8 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("the tab must not run a reconnect loop of its own")
 	}
-	if len(m.rows.epics) != 0 {
-		t.Fatalf("rows not cleared: %+v", m.rows.epics)
+	if len(m.rows.Epics) != 0 {
+		t.Fatalf("rows not cleared: %+v", m.rows.Epics)
 	}
 	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "server not running — s to start") || strings.Contains(view, "First") {
@@ -69,8 +70,8 @@ func TestQueueServerDown_StateDeliveredDownShowsOnceUp(t *testing.T) {
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/09"}})
 	next, _ := m.WithServerState(&st, tabapi.ServerLinkDown)
 	m = next.(QueueModel)
-	if len(m.rows.epics) != 0 {
-		t.Fatalf("rows shown while down: %+v", m.rows.epics)
+	if len(m.rows.Epics) != 0 {
+		t.Fatalf("rows shown while down: %+v", m.rows.Epics)
 	}
 
 	next, _ = m.WithServerState(&st, tabapi.ServerLinkUp)
@@ -116,14 +117,14 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}}, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}})
 
-	if want := map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}; !reflect.DeepEqual(m.rows.checked, want) {
-		t.Errorf("checked = %v, want the server queue %v", m.rows.checked, want)
+	if want := map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}; !reflect.DeepEqual(m.rows.Checked, want) {
+		t.Errorf("checked = %v, want the server queue %v", m.rows.Checked, want)
 	}
-	if m.rows.checkOrder["gx:alpha/02"] >= m.rows.checkOrder["gx:alpha/01"] {
-		t.Errorf("checkOrder = %v, want the server's order (02 before 01)", m.rows.checkOrder)
+	if m.rows.CheckOrder["gx:alpha/02"] >= m.rows.CheckOrder["gx:alpha/01"] {
+		t.Errorf("checkOrder = %v, want the server's order (02 before 01)", m.rows.CheckOrder)
 	}
-	if len(m.rows.epics) != 1 || m.rows.epics[0].Name != "gx:alpha" || len(m.rows.epics[0].Tickets) != 2 {
-		t.Errorf("epics = %+v, want gx:alpha with both server tickets", m.rows.epics)
+	if len(m.rows.Epics) != 1 || m.rows.Epics[0].Name != "gx:alpha" || len(m.rows.Epics[0].Tickets) != 2 {
+		t.Errorf("epics = %+v, want gx:alpha with both server tickets", m.rows.Epics)
 	}
 }
 
@@ -148,12 +149,12 @@ func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
 		}
 	}
 
-	m.rows.projectFilter = nextProject(m.rows.epics, "")
+	m.rows.ProjectFilter = queue.NextProject(m.rows.Epics, "")
 	view = ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "01 Second") || strings.Contains(view, "01 First") {
-		t.Errorf("filter %q should show only blog:\n%s", m.rows.projectFilter, view)
+		t.Errorf("filter %q should show only blog:\n%s", m.rows.ProjectFilter, view)
 	}
-	if got := nextProject(m.rows.epics, "gx"); got != "" {
+	if got := queue.NextProject(m.rows.Epics, "gx"); got != "" {
 		t.Errorf("after the last project the filter should return to all, got %q", got)
 	}
 }
@@ -172,8 +173,8 @@ func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	m = next.(QueueModel)
 
-	entry := m.rows.queueTree.Entries()[m.rows.queueTree.SelectedIndex()].Value
-	if entry.kind != nodeEpicName || entry.epic.Path != "gx:beta" {
+	entry := m.rows.Tree.Entries()[m.rows.Tree.SelectedIndex()].Value
+	if entry.Kind != queue.NodeEpicName || entry.Epic.Path != "gx:beta" {
 		t.Fatalf("selected = %+v, want the gx:beta header", entry)
 	}
 }
