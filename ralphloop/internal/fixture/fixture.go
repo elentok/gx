@@ -24,27 +24,15 @@ var homeDir string
 // Tests that use SetHomeEnv are not parallel, so no parallel test sees it.
 func HomeDir() string { return homeDir }
 
-// SetHomeEnv points $HOME at dir for the rest of the test, restored on
-// cleanup via a manual os.Setenv/os.Unsetenv pair rather than t.Setenv, which
-// panics once a test has called t.Parallel(). Production code in this
-// package that still reads $HOME from the process env sees dir, so
-// this remains a process-wide mutation — a test using it must stay
-// non-parallel with any other test that also touches $HOME.
+// SetHomeEnv points $HOME at dir for the rest of the test. Production code in
+// this package that still reads $HOME from the process env sees dir, so this
+// is a process-wide mutation; t.Setenv panics in a parallel test, which keeps
+// every user of it non-parallel.
 func SetHomeEnv(t *testing.T, dir string) {
 	t.Helper()
 	homeDir = dir
 	t.Cleanup(func() { homeDir = "" })
-	prev, had := os.LookupEnv("HOME")
-	if err := os.Setenv("HOME", dir); err != nil {
-		t.Fatalf("Setenv HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if had {
-			os.Setenv("HOME", prev)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	})
+	t.Setenv("HOME", dir)
 }
 
 // TicketPath is the path of ticket file in epicName's issues dir under scratchDir.
