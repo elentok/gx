@@ -86,10 +86,10 @@ export function MoreActionsMenu({
           minW={sheetMode ? "64" : "280px"}
           {...(sheetMode && { ...sheetPanel, pb: "6" })}
         >
-          {sheetMode && <GrabHandle my="2" />}
+          {sheetMode && <GrabHandle my="2" mx="auto" />}
           {sections.map((section, i) => (
             <Fragment key={i}>
-              {i > 0 && <Box role="separator" h="1px" bg="border" my="1" />}
+              {i > 0 && <Box role="separator" h="1px" bg="border" mx="1" my="1.5" />}
               {"content" in section && section.content}
               {Array.isArray(section) && section.map((it) => (
                 <Menu.Item

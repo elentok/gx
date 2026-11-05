@@ -128,7 +128,7 @@ function LiveSessionRows({
 }) {
   return (
     <>
-      <Text px="3" pt="2" mt="1" borderTopWidth="1px" borderColor="border" fontSize="xs" letterSpacing="wider" textTransform="uppercase" color="text.muted">
+      <Text px="3" pt="2" pb="0.5" fontFamily="mono" fontSize="11px" letterSpacing="0.07em" textTransform="uppercase" color="text.muted">
         Live sessions · {live.length}
       </Text>
       {live.map((s) => (
@@ -294,14 +294,14 @@ export function DesignActionsMenu({
 /** The menu's key-value rows for what the header leaves out; a row with no key is a note. */
 function AgentBlock({ rows }: { rows: string[][] }) {
   return (
-    <Box px="3" py="2">
-      <Text fontSize="xs" letterSpacing="wider" textTransform="uppercase" color="text.muted">
+    <Box>
+      <Text fontFamily="mono" fontSize="11px" letterSpacing="0.07em" textTransform="uppercase" color="text.muted" px="3" pt="2" pb="0.5">
         Agent
       </Text>
       {rows.map(([key, value]) => (
-        <Box key={key + value} display="flex" justifyContent="space-between" gap="4" fontSize="sm" color="text.dim">
+        <Box key={key + value} display="flex" justifyContent="space-between" gap="3" px="3" py="5px" fontSize="13.5px" color="text.dim">
           {key && <span>{key}</span>}
-          <Text as="b" fontWeight="600" color="text">
+          <Text as="b" fontFamily="mono" fontSize="13px" fontWeight="500" color="text">
             {value}
           </Text>
         </Box>
