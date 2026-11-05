@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"errors"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -25,10 +26,10 @@ func menuHasStartSession(m Model) bool {
 
 func selectTicketByAddress(t *testing.T, m *Model, address string) {
 	t.Helper()
-	for i, e := range m.sidebar.tree.Entries() {
+	for i, e := range m.sidebar.Tree.Entries() {
 		r := e.Value
-		if r.kind == nodeTicket && !r.archived && m.sidebar.epics[r.epicIdx].Tickets[r.ticketIdx].Path == address {
-			m.sidebar.tree.SetSelectedIndex(i)
+		if r.Kind == sidebar.NodeTicket && !r.Archived && m.sidebar.Epics[r.EpicIdx].Tickets[r.TicketIdx].Path == address {
+			m.sidebar.Tree.SetSelectedIndex(i)
 			return
 		}
 	}
@@ -44,8 +45,8 @@ func startSessionModel(t *testing.T) Model {
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	setCollapsedSection(&m, sectionOpenMaps, false)
-	setCollapsedSection(&m, sectionOpen, false)
+	setCollapsedSection(&m, sidebar.SectionOpenMaps, false)
+	setCollapsedSection(&m, sidebar.SectionOpen, false)
 	return m
 }
 
@@ -79,7 +80,7 @@ func TestStartSession_CompletedMapEpicSuggestsStartAndMerge(t *testing.T) {
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	setCollapsedSection(&m, sectionCompleteMaps, false)
+	setCollapsedSection(&m, sidebar.SectionCompleteMaps, false)
 	selectEpicRow(t, &m, "gx:done-map")
 	var suggested []string
 	for _, it := range openEpicMenuOn(t, m, "gx:done-map").menus.Menu.Items() {

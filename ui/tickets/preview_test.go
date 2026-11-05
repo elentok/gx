@@ -218,7 +218,7 @@ func TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
 	// Empty sections are hidden, so the last row is the last ticket.
-	if r, ok := m.sidebar.selectedRow(); !ok || r.isEpic() || m.sidebar.epicAt(r).Tickets[r.ticketIdx].Number != 3 {
+	if r, ok := m.sidebar.SelectedRow(); !ok || r.IsEpic() || m.sidebar.EpicAt(r).Tickets[r.TicketIdx].Number != 3 {
 		t.Fatalf("expected 'G' to select the last ticket row, got %+v (ok=%v)", r, ok)
 	}
 
@@ -228,7 +228,7 @@ func TestModel_GAndGGJumpSidebarSelectionToLastAndFirstRow(t *testing.T) {
 	m = updated.(Model)
 	// The first row is now the "Open epics" section header itself
 	// (cursor-reachable, per 03a) — selectedRow reports ok=false there.
-	if _, ok := m.sidebar.selectedRow(); ok {
+	if _, ok := m.sidebar.SelectedRow(); ok {
 		t.Fatalf("expected 'gg' to select the first row (section header, ok=false)")
 	}
 }

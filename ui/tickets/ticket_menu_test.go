@@ -193,8 +193,8 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var calls []string
 			m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{Calls: &calls}, false)
-			r, _ := m.sidebar.selectedRow()
-			m.sidebar.epics[r.epicIdx].Tickets[r.ticketIdx].Mutes = muted
+			r, _ := m.sidebar.SelectedRow()
+			m.sidebar.Epics[r.EpicIdx].Tickets[r.TicketIdx].Mutes = muted
 			cut(&m)
 
 			m, ready := requestTicketMenu(t, m)

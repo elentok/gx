@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowactions"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
@@ -41,7 +42,7 @@ type Model struct {
 
 	loaded bool
 	// sidebar owns the epic rows and the sidebar tree's state (sidebar.go).
-	sidebar sidebar
+	sidebar sidebar.Model
 	search  search.Model
 
 	// preview backs the preview panel's own focus/scroll/search state
@@ -81,14 +82,14 @@ type Model struct {
 // modal alongside the tab's own bindings, mirroring ui/prs's NewModelWithScope.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
 	km := newTicketsManager()
-	sb := newSidebar(tabapi.ScratchDir(settings.TicketStore, worktreeRoot))
+	sb := sidebar.New(tabapi.ScratchDir(settings.TicketStore, worktreeRoot))
 	return Model{
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		editor:       rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
 		keys:         km,
 		sidebar:      sb,
-		help:         help.NewModel(help.BuildSections(km, *sb.tree.Keys(), extraKeys), settings.About),
+		help:         help.NewModel(help.BuildSections(km, *sb.Tree.Keys(), extraKeys), settings.About),
 		search:       search.NewModel(),
 		preview:      preview.NewPane(),
 		confirm:      confirm.New(),
@@ -161,7 +162,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
-		m.sidebar.tree.SetVisibleHeight(m.sidebarViewportHeight())
+		m.sidebar.Tree.SetVisibleHeight(m.sidebarViewportHeight())
 		return m, nil
 
 	case epicsLoadedMsg:
@@ -171,15 +172,15 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		firstLoad := !m.loaded
 		m.loaded = true
-		m.sidebar.epics = msg.epics
-		m.sidebar.archivedEpicCount = msg.archivedEpicCount
-		m.sidebar.archivedLazy.SetCount(msg.archivedEpicCount)
+		m.sidebar.Epics = msg.epics
+		m.sidebar.ArchivedEpicCount = msg.archivedEpicCount
+		m.sidebar.ArchivedLazy.SetCount(msg.archivedEpicCount)
 		if m.search.HasQuery() {
 			m.recomputeSearchMatches()
 		}
 		m.clampSelected()
 		if firstLoad {
-			m.sidebar.selectFirstEpic()
+			m.sidebar.SelectFirstEpic()
 		}
 		if msg.err != nil {
 			return m, notify.Error("load .scratch/: " + msg.err.Error())
@@ -187,8 +188,8 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tree.LazyResultMsg[tickets.Epic]:
-		if m.sidebar.archivedLazy.Deliver(msg) {
-			m.sidebar.archivedEpics = m.sidebar.archivedLazy.Rows()
+		if m.sidebar.ArchivedLazy.Deliver(msg) {
+			m.sidebar.ArchivedEpics = m.sidebar.ArchivedLazy.Rows()
 			m.clampSelected()
 		}
 		return m, nil
@@ -262,7 +263,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouseWheel(msg)
 
 	case tea.MouseMotionMsg:
-		m.sidebar.tree.SetHoveredIndex(m.hoverTarget(msg))
+		m.sidebar.Tree.SetHoveredIndex(m.hoverTarget(msg))
 		return m, nil
 
 	case rowactions.StatusChangedMsg:
@@ -273,13 +274,13 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // clampSelected rebuilds the sidebar's entries (see sidebar.clampSelected).
 func (m *Model) clampSelected() {
-	m.sidebar.clampSelected(sidebarEnvFor(*m))
+	m.sidebar.ClampSelected(sidebarEnvFor(*m))
 }
 
 // afterSidebarToggle runs the sidebar's post-toggle bookkeeping, then re-runs
 // the search so its matches follow the new collapse state.
 func (m *Model) afterSidebarToggle(toggledID string, cmd tea.Cmd) tea.Cmd {
-	cmd = m.sidebar.afterToggle(sidebarEnvFor(*m), toggledID, cmd)
+	cmd = m.sidebar.AfterToggle(sidebarEnvFor(*m), toggledID, cmd)
 	if m.search.HasQuery() {
 		m.recomputeSearchMatches()
 	}
@@ -325,14 +326,14 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	}
 	bodyLine := mouse.Y - 1
 	if mouse.Button == tea.MouseRight {
-		if !m.sidebar.selectRowAt(bodyLine) {
+		if !m.sidebar.SelectRowAt(bodyLine) {
 			return m, nil
 		}
 		m.preview.Focus = preview.FocusSidebar
 		return m.handleSuggestedActionsKey()
 	}
 	m.preview.Focus = preview.FocusSidebar
-	if id, toggled := m.sidebar.clickAt(mouse.X, bodyLine, m.icons()); toggled {
+	if id, toggled := m.sidebar.ClickAt(mouse.X, bodyLine, m.icons()); toggled {
 		return m, m.afterSidebarToggle(id, nil)
 	}
 	return m, nil
@@ -351,7 +352,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if idx == 0 {
-		m.sidebar.scrollWheel(msg)
+		m.sidebar.ScrollWheel(msg)
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -417,7 +418,7 @@ func (m Model) normalView() string {
 	sidebarH, previewH := m.splitHeight(h)
 
 	sidebarViewportH := m.sidebarViewportHeight()
-	sidebarView := renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebar.body(sidebarEnvFor(m), sidebarViewportH, sidebarW-2), m.preview.Focus == preview.FocusSidebar, true)
+	sidebarView := renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebar.Body(sidebarEnvFor(m), sidebarViewportH, sidebarW-2), m.preview.Focus == preview.FocusSidebar, true)
 	previewView := renderPanel(previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, false)
 
 	return m.preview.JoinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)

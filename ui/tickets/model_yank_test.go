@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/rowactions"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
 // stubClipboard swaps rowactions.ClipboardWrite for the test's duration, so
@@ -25,9 +26,9 @@ func stubClipboard(t *testing.T) *string {
 
 func selectEpicRow(t *testing.T, m *Model, name string) {
 	t.Helper()
-	for i, e := range m.sidebar.tree.Entries() {
-		if e.Value.kind == nodeEpic && !e.Value.archived && m.sidebar.epics[e.Value.epicIdx].Name == name {
-			m.sidebar.tree.SetSelectedIndex(i)
+	for i, e := range m.sidebar.Tree.Entries() {
+		if e.Value.Kind == sidebar.NodeEpic && !e.Value.Archived && m.sidebar.Epics[e.Value.EpicIdx].Name == name {
+			m.sidebar.Tree.SetSelectedIndex(i)
 			return
 		}
 	}

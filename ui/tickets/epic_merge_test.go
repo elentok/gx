@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
 // openEpicMenuOn selects the epic row name and presses "m".
@@ -34,7 +35,7 @@ func TestEpicMerge_TicketsTabMergesCompleteUnmergedEpicByAddress(t *testing.T) {
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	setCollapsedSection(&m, sectionComplete, false)
+	setCollapsedSection(&m, sidebar.SectionComplete, false)
 
 	open := openEpicMenuOn(t, m, "gx:beta")
 	if _, cmd := chooseTicketMenuItem(t, open, "Merge"); cmd != nil {
@@ -63,10 +64,10 @@ func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithMergeDim(t *testing.T)
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	if got := epicSection(m.sidebar.epics[0]); got != sectionMerged {
+	if got := sidebar.EpicSection(m.sidebar.Epics[0]); got != sidebar.SectionMerged {
 		t.Fatalf("section = %v, want sectionMerged", got)
 	}
-	setCollapsedSection(&m, sectionMerged, false)
+	setCollapsedSection(&m, sidebar.SectionMerged, false)
 
 	m = openEpicMenuOn(t, m, "gx:alpha")
 	if !menuHasReason(m, "already merged") {

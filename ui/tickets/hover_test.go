@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"fmt"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 	"image/color"
 	"strings"
 	"testing"
@@ -34,19 +35,19 @@ func ticketsHoverFixture(t *testing.T) hoverFixture {
 	m = updated.(Model)
 	px, py, pw, ph := m.previewRect()
 	other := -1
-	for i, e := range m.sidebar.tree.Entries() {
-		if _, ok := rowFromEntry(e); ok && i != m.sidebar.tree.SelectedIndex() {
+	for i, e := range m.sidebar.Tree.Entries() {
+		if _, ok := sidebar.RowFromEntry(e); ok && i != m.sidebar.Tree.SelectedIndex() {
 			other = i
 		}
 	}
 	return hoverFixture{
 		model:    m,
-		selected: m.sidebar.tree.SelectedIndex(),
+		selected: m.sidebar.Tree.SelectedIndex(),
 		other:    other,
 		outside:  ui.Rect{X: px, Y: py, W: pw, H: ph},
 		rowY:     func(entry int) int { return entry + 1 },
 		state: func(tm tea.Model) (int, int, bool) {
-			tree := tm.(Model).sidebar.tree
+			tree := tm.(Model).sidebar.Tree
 			hovered, ok := tree.HoveredIndex()
 			return tree.SelectedIndex(), hovered, ok
 		},

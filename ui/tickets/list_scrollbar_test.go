@@ -54,16 +54,16 @@ func TestModel_MouseWheelScrollsSidebarWithoutMovingSelection(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
 	m = updated.(Model)
 
-	before := m.sidebar.tree.ScrollOffset()
-	selected := m.sidebar.tree.SelectedIndex()
+	before := m.sidebar.Tree.ScrollOffset()
+	selected := m.sidebar.Tree.SelectedIndex()
 	updated, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
-	if m.sidebar.tree.ScrollOffset() <= before {
-		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.sidebar.tree.ScrollOffset())
+	if m.sidebar.Tree.ScrollOffset() <= before {
+		t.Fatalf("expected mouse wheel down to increase scroll offset from %d, got %d", before, m.sidebar.Tree.ScrollOffset())
 	}
-	if m.sidebar.tree.SelectedIndex() != selected {
-		t.Fatalf("expected mouse wheel to leave selection at %d, got %d", selected, m.sidebar.tree.SelectedIndex())
+	if m.sidebar.Tree.SelectedIndex() != selected {
+		t.Fatalf("expected mouse wheel to leave selection at %d, got %d", selected, m.sidebar.Tree.SelectedIndex())
 	}
 }
 
@@ -83,27 +83,27 @@ func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
 
 	// Entry 0 is the "Open epics" section header; initial selection lands on
 	// the epic below it.
-	if m.sidebar.tree.SelectedIndex() != 1 {
-		t.Fatalf("expected initial selection at 1, got %d", m.sidebar.tree.SelectedIndex())
+	if m.sidebar.Tree.SelectedIndex() != 1 {
+		t.Fatalf("expected initial selection at 1, got %d", m.sidebar.Tree.SelectedIndex())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if want := 1 + list.DefaultScroll; m.sidebar.tree.SelectedIndex() != want {
-		t.Fatalf("expected ctrl+d to move selection by %d, got %d", list.DefaultScroll, m.sidebar.tree.SelectedIndex())
+	if want := 1 + list.DefaultScroll; m.sidebar.Tree.SelectedIndex() != want {
+		t.Fatalf("expected ctrl+d to move selection by %d, got %d", list.DefaultScroll, m.sidebar.Tree.SelectedIndex())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.sidebar.tree.SelectedIndex() != 1 {
-		t.Fatalf("expected ctrl+u to move selection back to 1, got %d", m.sidebar.tree.SelectedIndex())
+	if m.sidebar.Tree.SelectedIndex() != 1 {
+		t.Fatalf("expected ctrl+u to move selection back to 1, got %d", m.sidebar.Tree.SelectedIndex())
 	}
 
 	// Clamps at the top: ctrl+u past the start stops at entry 0, the section
 	// header (itself cursor-reachable).
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.sidebar.tree.SelectedIndex() != 0 {
-		t.Fatalf("expected ctrl+u to clamp at 0, got %d", m.sidebar.tree.SelectedIndex())
+	if m.sidebar.Tree.SelectedIndex() != 0 {
+		t.Fatalf("expected ctrl+u to clamp at 0, got %d", m.sidebar.Tree.SelectedIndex())
 	}
 }

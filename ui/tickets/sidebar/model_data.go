@@ -1,4 +1,4 @@
-package tickets
+package sidebar
 
 import (
 	"slices"
@@ -16,62 +16,62 @@ import (
 // whose containing ancestor was filtered out by hideDone).
 const noParentTicket = -1
 
-// sidebarNodeKind distinguishes the three row kinds the sidebar tree can
+// NodeKind distinguishes the three row kinds the sidebar tree can
 // hold: a section header ("Open epics", "Merged epics", …), an epic, or a
 // ticket. tree.Model[T] itself has no notion of a heterogeneous node — this
 // sum type plus idFn/childrenFn is what makes one tree.Model[sidebarNode]
 // stand in for what used to be two hand-flattened levels (epics, then each
 // epic's own tickets).
-type sidebarNodeKind int
+type NodeKind int
 
 const (
-	nodeSection sidebarNodeKind = iota
-	nodeEpic
-	nodeTicket
-	nodeLoading   // "loading…" placeholder, child of the Archived section while its lazy load is in flight
-	nodeLoadError // inline error placeholder, child of the Archived section after a failed lazy load
+	NodeSection NodeKind = iota
+	NodeEpic
+	NodeTicket
+	NodeLoading   // "loading…" placeholder, child of the Archived section while its lazy load is in flight
+	NodeLoadError // inline error placeholder, child of the Archived section after a failed lazy load
 )
 
-// sidebarSection is which section-header root a sidebarNode belongs under.
+// Section is which section-header root a sidebarNode belongs under.
 // Declaration order is the sidebar's render order.
-type sidebarSection int
+type Section int
 
 const (
-	sectionOpen sidebarSection = iota
-	sectionMapsInProgress
-	sectionOpenMaps
-	sectionComplete
-	sectionMerged
-	sectionCompleteMaps
-	sectionArchived
-	sectionCount
+	SectionOpen Section = iota
+	SectionMapsInProgress
+	SectionOpenMaps
+	SectionComplete
+	SectionMerged
+	SectionCompleteMaps
+	SectionArchived
+	SectionCount
 )
 
-// sectionCollapsedByDefault marks the sections holding finished work: they
+// SectionCollapsedByDefault marks the sections holding finished work: they
 // start collapsed so what still needs merging stays on screen.
-var sectionCollapsedByDefault = map[sidebarSection]bool{
-	sectionComplete:     true,
-	sectionMerged:       true,
-	sectionCompleteMaps: true,
-	sectionArchived:     true,
+var SectionCollapsedByDefault = map[Section]bool{
+	SectionComplete:     true,
+	SectionMerged:       true,
+	SectionCompleteMaps: true,
+	SectionArchived:     true,
 }
 
-// epicSection classifies an active (non-archived) epic. A zero-ticket epic is
+// EpicSection classifies an active (non-archived) epic. A zero-ticket epic is
 // never AllDone, so it stays open.
-func epicSection(epic tickets.Epic) sidebarSection {
+func EpicSection(epic tickets.Epic) Section {
 	switch {
 	case epic.IsMap && epic.AllDone():
-		return sectionCompleteMaps
+		return SectionCompleteMaps
 	case epic.IsMap && hasDoneTicket(epic):
-		return sectionMapsInProgress
+		return SectionMapsInProgress
 	case epic.IsMap:
-		return sectionOpenMaps
+		return SectionOpenMaps
 	case !epic.AllDone():
-		return sectionOpen
+		return SectionOpen
 	case !epic.MergedAt.IsZero():
-		return sectionMerged
+		return SectionMerged
 	default:
-		return sectionComplete
+		return SectionComplete
 	}
 }
 
@@ -83,28 +83,28 @@ func hasDoneTicket(epic tickets.Epic) bool {
 	})
 }
 
-// groupEpicIndexesBySection buckets m.epics' indexes by epicSection,
+// groupEpicIndexesBySection buckets m.epics' indexes by EpicSection,
 // preserving input order within each section.
-func groupEpicIndexesBySection(epics []tickets.Epic) map[sidebarSection][]int {
-	groups := make(map[sidebarSection][]int, sectionCount)
+func groupEpicIndexesBySection(epics []tickets.Epic) map[Section][]int {
+	groups := make(map[Section][]int, SectionCount)
 	for i, epic := range epics {
-		s := epicSection(epic)
+		s := EpicSection(epic)
 		groups[s] = append(groups[s], i)
 	}
 	return groups
 }
 
-// sidebarNode is ui/tree.Model[sidebarNode]'s value type. ticketIdx is -1 for
+// Node is ui/tree.Model[Node]'s value type. ticketIdx is -1 for
 // nodeSection/nodeEpic. archived marks a node sourced from m.archivedEpics
 // rather than m.epics — always false until ticket 04's Archived section
 // starts populating entries from it; carried through to row (rowFromEntry)
 // so epicAt(row) knows which slice to resolve against.
-type sidebarNode struct {
-	kind      sidebarNodeKind
-	section   sidebarSection
-	epicIdx   int
-	ticketIdx int
-	archived  bool
+type Node struct {
+	Kind      NodeKind
+	Section   Section
+	EpicIdx   int
+	TicketIdx int
+	Archived  bool
 }
 
 // epicTicketTree is one epic's ticketRows-equivalent shape: which tickets are
@@ -124,12 +124,12 @@ type epicTicketTree struct {
 // Epic value directly (rather than an index into s.epics) so it works
 // equally for s.archivedEpics — indices in that slice mean nothing against
 // s.epics.
-func (s sidebar) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
+func (s Model) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
 	sorted := rowfmt.SortedTicketIndexes(epic)
 
 	visible := make(map[int]bool, len(sorted))
 	for _, idx := range sorted {
-		if s.hideDone && rowfmt.TicketStatus(epic, epic.Tickets[idx]).Terminal() {
+		if s.HideDone && rowfmt.TicketStatus(epic, epic.Tickets[idx]).Terminal() {
 			continue
 		}
 		visible[idx] = true
@@ -158,22 +158,22 @@ func (s sidebar) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
 	return epicTicketTree{roots: roots, childrenOf: childrenOf}
 }
 
-// buildSidebarEntries flattens m.epics into the sidebar's full tree.Entry
-// list: one nodeSection root per non-empty section (per epicSection), each
+// BuildSidebarEntries flattens m.epics into the sidebar's full tree.Entry
+// list: one nodeSection root per non-empty section (per EpicSection), each
 // epic's root tickets beneath its nodeEpic entry, and each ticket's nested
 // children (epicTicketTree.childrenOf) beneath its nodeTicket entry. Called
 // on every epicsLoadedMsg/hideDone toggle/collapse mutation via
 // clampSelected.
-func (s sidebar) buildSidebarEntries(env sidebarEnv) []tree.Entry[sidebarNode] {
-	groups := groupEpicIndexesBySection(s.epics)
+func (s Model) BuildSidebarEntries(env Env) []tree.Entry[Node] {
+	groups := groupEpicIndexesBySection(s.Epics)
 
-	epicTreesOpen := make(map[int]epicTicketTree, len(s.epics))
-	epicTreesArchived := make(map[int]epicTicketTree, len(s.archivedEpics))
+	epicTreesOpen := make(map[int]epicTicketTree, len(s.Epics))
+	epicTreesArchived := make(map[int]epicTicketTree, len(s.ArchivedEpics))
 	epicTree := func(archived bool, epicIdx int) epicTicketTree {
 		cache := epicTreesOpen
-		epics := s.epics
+		epics := s.Epics
 		if archived {
-			cache, epics = epicTreesArchived, s.archivedEpics
+			cache, epics = epicTreesArchived, s.ArchivedEpics
 		}
 		t, ok := cache[epicIdx]
 		if !ok {
@@ -183,61 +183,61 @@ func (s sidebar) buildSidebarEntries(env sidebarEnv) []tree.Entry[sidebarNode] {
 		return t
 	}
 
-	var roots []sidebarNode
-	for section := range sectionCount {
-		if len(groups[section]) == 0 && (section != sectionArchived || s.archivedEpicCount == 0) {
+	var roots []Node
+	for section := range SectionCount {
+		if len(groups[section]) == 0 && (section != SectionArchived || s.ArchivedEpicCount == 0) {
 			continue
 		}
-		roots = append(roots, sidebarNode{kind: nodeSection, section: section, ticketIdx: -1})
+		roots = append(roots, Node{Kind: NodeSection, Section: section, TicketIdx: -1})
 	}
 
-	idFn := func(n sidebarNode) string {
-		switch n.kind {
-		case nodeSection:
-			return sidebarSectionID(n.section)
-		case nodeLoading:
-			return sidebarSectionID(n.section) + ":loading"
-		case nodeLoadError:
-			return sidebarSectionID(n.section) + ":error"
-		case nodeEpic:
-			return s.epicAt(row{epicIdx: n.epicIdx, archived: n.archived}).Path
+	idFn := func(n Node) string {
+		switch n.Kind {
+		case NodeSection:
+			return SectionID(n.Section)
+		case NodeLoading:
+			return SectionID(n.Section) + ":loading"
+		case NodeLoadError:
+			return SectionID(n.Section) + ":error"
+		case NodeEpic:
+			return s.EpicAt(Row{EpicIdx: n.EpicIdx, Archived: n.Archived}).Path
 		default:
-			return s.epicAt(row{epicIdx: n.epicIdx, archived: n.archived}).Tickets[n.ticketIdx].Path
+			return s.EpicAt(Row{EpicIdx: n.EpicIdx, Archived: n.Archived}).Tickets[n.TicketIdx].Path
 		}
 	}
 
-	childrenFn := func(n sidebarNode) []sidebarNode {
-		switch n.kind {
-		case nodeSection:
-			if n.section == sectionArchived {
+	childrenFn := func(n Node) []Node {
+		switch n.Kind {
+		case NodeSection:
+			if n.Section == SectionArchived {
 				return s.archivedSectionChildren()
 			}
-			order := groups[n.section]
-			children := make([]sidebarNode, len(order))
+			order := groups[n.Section]
+			children := make([]Node, len(order))
 			for i, epicIdx := range order {
-				children[i] = sidebarNode{kind: nodeEpic, epicIdx: epicIdx, ticketIdx: -1}
+				children[i] = Node{Kind: NodeEpic, EpicIdx: epicIdx, TicketIdx: -1}
 			}
 			return children
-		case nodeLoading, nodeLoadError:
+		case NodeLoading, NodeLoadError:
 			return nil
-		case nodeEpic:
-			roots := epicTree(n.archived, n.epicIdx).roots
-			children := make([]sidebarNode, len(roots))
+		case NodeEpic:
+			roots := epicTree(n.Archived, n.EpicIdx).roots
+			children := make([]Node, len(roots))
 			for i, idx := range roots {
-				children[i] = sidebarNode{kind: nodeTicket, epicIdx: n.epicIdx, ticketIdx: idx, archived: n.archived}
+				children[i] = Node{Kind: NodeTicket, EpicIdx: n.EpicIdx, TicketIdx: idx, Archived: n.Archived}
 			}
 			return children
 		default:
-			kids := epicTree(n.archived, n.epicIdx).childrenOf[n.ticketIdx]
-			children := make([]sidebarNode, len(kids))
+			kids := epicTree(n.Archived, n.EpicIdx).childrenOf[n.TicketIdx]
+			children := make([]Node, len(kids))
 			for i, idx := range kids {
-				children[i] = sidebarNode{kind: nodeTicket, epicIdx: n.epicIdx, ticketIdx: idx, archived: n.archived}
+				children[i] = Node{Kind: NodeTicket, EpicIdx: n.EpicIdx, TicketIdx: idx, Archived: n.Archived}
 			}
 			return children
 		}
 	}
 
-	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, s.tree.CollapsedIDs())
+	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, s.Tree.CollapsedIDs())
 	for i := range entries {
 		if line, ok := s.pendingSubtext(env, entries[i]); ok {
 			entries[i].Body = []string{line}
@@ -248,92 +248,92 @@ func (s sidebar) buildSidebarEntries(env sidebarEnv) []tree.Entry[sidebarNode] {
 
 // pendingSubtext is a queued ticket row's explain verdict, indented under the
 // row's title. ok is false for any entry that isn't a queued ticket.
-func (s sidebar) pendingSubtext(env sidebarEnv, entry tree.Entry[sidebarNode]) (string, bool) {
-	if entry.Value.kind != nodeTicket {
+func (s Model) pendingSubtext(env Env, entry tree.Entry[Node]) (string, bool) {
+	if entry.Value.Kind != NodeTicket {
 		return "", false
 	}
-	r, _ := rowFromEntry(entry)
-	epic := s.epicAt(r)
-	t := epic.Tickets[r.ticketIdx]
-	text, ok := env.pendingText(t.Path)
+	r, _ := RowFromEntry(entry)
+	epic := s.EpicAt(r)
+	t := epic.Tickets[r.TicketIdx]
+	text, ok := env.PendingText(t.Path)
 	if !ok {
 		return "", false
 	}
-	icon, _ := rowfmt.StatusIconAndStyle(env.icons, rowfmt.TicketStatus(epic, t))
-	width := rowfmt.TriangleColumnWidth(env.icons) + 1 + lipgloss.Width(icon) + 1
-	return strings.Repeat(" ", width) + rowfmt.BlockedBySuffixStyle.Render(rowfmt.Ellipsize(text, rowfmt.PauseReasonMaxRunes, env.icons.Ellipsis)), true
+	icon, _ := rowfmt.StatusIconAndStyle(env.Icons, rowfmt.TicketStatus(epic, t))
+	width := rowfmt.TriangleColumnWidth(env.Icons) + 1 + lipgloss.Width(icon) + 1
+	return strings.Repeat(" ", width) + rowfmt.BlockedBySuffixStyle.Render(rowfmt.Ellipsize(text, rowfmt.PauseReasonMaxRunes, env.Icons.Ellipsis)), true
 }
 
 // archivedSectionChildren computes the Archived section header's synthetic
 // children: a loading/error placeholder or the real archived-epic rows
 // depending on s.archivedLazy's current state. The section itself is hidden
 // while the up-front count is zero.
-func (s sidebar) archivedSectionChildren() []sidebarNode {
-	switch s.archivedLazy.State() {
+func (s Model) archivedSectionChildren() []Node {
+	switch s.ArchivedLazy.State() {
 	case tree.LazyLoaded:
-		children := make([]sidebarNode, len(s.archivedEpics))
-		for i := range s.archivedEpics {
-			children[i] = sidebarNode{kind: nodeEpic, epicIdx: i, ticketIdx: -1, archived: true}
+		children := make([]Node, len(s.ArchivedEpics))
+		for i := range s.ArchivedEpics {
+			children[i] = Node{Kind: NodeEpic, EpicIdx: i, TicketIdx: -1, Archived: true}
 		}
 		return children
 	case tree.LazyFailed:
-		return []sidebarNode{{kind: nodeLoadError, section: sectionArchived, ticketIdx: -1}}
+		return []Node{{Kind: NodeLoadError, Section: SectionArchived, TicketIdx: -1}}
 	default:
-		return []sidebarNode{{kind: nodeLoading, section: sectionArchived, ticketIdx: -1}}
+		return []Node{{Kind: NodeLoading, Section: SectionArchived, TicketIdx: -1}}
 	}
 }
 
-// row is the shim view.go's render functions and model_preview_focus.go's
+// Row is the shim view.go's render functions and model_preview_focus.go's
 // selectedRow() consumers read, adapted from a tree.Entry[sidebarNode] by
 // rowFromEntry. depth/hasChildren/expanded mirror ui/tree's Entry (ticket 02)
-// for a ticket row nested under another ticket via Parent/Children (ticket
+// for a ticket Row nested under another ticket via Parent/Children (ticket
 // 03): depth 0 is a ticket directly under the epic (rowFromEntry subtracts
 // the section+epic ancestor levels from the entry's own Depth), and
-// hasChildren/expanded drive the row's own fold glyph.
-type row struct {
-	epicIdx     int
-	ticketIdx   int // -1 for an epic row
-	depth       int
-	hasChildren bool
-	expanded    bool
-	// archived mirrors sidebarNode.archived — which of m.epics/m.archivedEpics
+// hasChildren/expanded drive the Row's own fold glyph.
+type Row struct {
+	EpicIdx     int
+	TicketIdx   int // -1 for an epic row
+	Depth       int
+	HasChildren bool
+	Expanded    bool
+	// Archived mirrors sidebarNode.Archived — which of m.epics/m.archivedEpics
 	// epicIdx indexes into. Read via epicAt(row) rather than directly.
-	archived bool
+	Archived bool
 }
 
-func (r row) isEpic() bool { return r.ticketIdx < 0 }
+func (r Row) IsEpic() bool { return r.TicketIdx < 0 }
 
-// rowFromEntry adapts one sidebar tree.Entry into row's flat shape. A
+// RowFromEntry adapts one sidebar tree.Entry into row's flat shape. A
 // nodeSection entry has no row representation — a section header is
 // cursor-reachable but isn't an epic or ticket, so there's nothing to check
 // or preview — so it reports ok = false.
-func rowFromEntry(e tree.Entry[sidebarNode]) (row, bool) {
-	switch e.Value.kind {
-	case nodeEpic:
-		return row{epicIdx: e.Value.epicIdx, ticketIdx: -1, archived: e.Value.archived}, true
-	case nodeTicket:
-		return row{
-			epicIdx:     e.Value.epicIdx,
-			ticketIdx:   e.Value.ticketIdx,
-			depth:       e.Depth - 2, // section, epic ancestors
-			hasChildren: e.HasChildren,
-			expanded:    e.Expanded,
-			archived:    e.Value.archived,
+func RowFromEntry(e tree.Entry[Node]) (Row, bool) {
+	switch e.Value.Kind {
+	case NodeEpic:
+		return Row{EpicIdx: e.Value.EpicIdx, TicketIdx: -1, Archived: e.Value.Archived}, true
+	case NodeTicket:
+		return Row{
+			EpicIdx:     e.Value.EpicIdx,
+			TicketIdx:   e.Value.TicketIdx,
+			Depth:       e.Depth - 2, // section, epic ancestors
+			HasChildren: e.HasChildren,
+			Expanded:    e.Expanded,
+			Archived:    e.Value.Archived,
 		}, true
 	default:
-		return row{}, false
+		return Row{}, false
 	}
 }
 
-// epicAt resolves r's epic against s.epics or s.archivedEpics depending on
+// EpicAt resolves r's epic against s.epics or s.archivedEpics depending on
 // which one r.archived says it was sourced from — the single accessor every
 // row-carrying call site uses instead of indexing s.epics directly, so a
 // row sourced from the (ticket 04) Archived section resolves correctly too.
-func (s sidebar) epicAt(r row) tickets.Epic {
-	if r.archived {
-		return s.archivedEpics[r.epicIdx]
+func (s Model) EpicAt(r Row) tickets.Epic {
+	if r.Archived {
+		return s.ArchivedEpics[r.EpicIdx]
 	}
-	return s.epics[r.epicIdx]
+	return s.Epics[r.EpicIdx]
 }
 
 // nearestVisibleAncestor walks idx's Parent chain (ticket 03's schema field)
@@ -360,25 +360,25 @@ func nearestVisibleAncestor(epic tickets.Epic, idx int, visible map[int]bool, by
 	return noParentTicket
 }
 
-func (s sidebar) isCollapsed(epic tickets.Epic) bool {
-	return s.tree.CollapsedIDs()[epic.Path]
+func (s Model) IsCollapsed(epic tickets.Epic) bool {
+	return s.Tree.CollapsedIDs()[epic.Path]
 }
 
-// sidebarSectionID is the tree.Entry ID for a section's nodeSection root row
+// SectionID is the tree.Entry ID for a section's nodeSection root row
 // — the single source of truth idFn and epicCollapseDefaults both share.
-func sidebarSectionID(section sidebarSection) string {
+func SectionID(section Section) string {
 	switch section {
-	case sectionOpen:
+	case SectionOpen:
 		return "section:open"
-	case sectionMapsInProgress:
+	case SectionMapsInProgress:
 		return "section:maps-in-progress"
-	case sectionOpenMaps:
+	case SectionOpenMaps:
 		return "section:open-maps"
-	case sectionComplete:
+	case SectionComplete:
 		return "section:complete"
-	case sectionMerged:
+	case SectionMerged:
 		return "section:merged"
-	case sectionCompleteMaps:
+	case SectionCompleteMaps:
 		return "section:complete-maps"
 	default:
 		return "section:archived"
@@ -386,14 +386,14 @@ func sidebarSectionID(section sidebarSection) string {
 }
 
 // epicCollapseDefaults is the sidebar's declared-default collapse policy: the
-// sectionCollapsedByDefault sections start collapsed, and every epic's own
+// SectionCollapsedByDefault sections start collapsed, and every epic's own
 // row starts collapsed too, open or closed — so the sidebar first shows one
 // row per epic instead of every ticket. Declared fresh from epics every call
 // — never mutated or persisted.
 func epicCollapseDefaults(epics []tickets.Epic, archivedEpics []tickets.Epic) map[string]bool {
 	defaults := map[string]bool{}
-	for s := range sectionCollapsedByDefault {
-		defaults[sidebarSectionID(s)] = true
+	for s := range SectionCollapsedByDefault {
+		defaults[SectionID(s)] = true
 	}
 	for _, epic := range epics {
 		defaults[epic.Path] = true
@@ -433,12 +433,12 @@ func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
 		if ticketMatched {
 			overrides[epic.Path] = false
 		}
-		overrides[sidebarSectionID(epicSection(epic))] = false
+		overrides[SectionID(EpicSection(epic))] = false
 	}
 	return overrides
 }
 
-// deriveCollapsedSidebar computes the sidebar's effective/derived collapse
+// DeriveCollapsed computes the sidebar's effective/derived collapse
 // map fresh every call, from three layers: explicit (the user's own
 // recorded expand/collapse/toggle choices — the only durable map, owned by
 // Model.explicitCollapsed, never written to by this function or its
@@ -452,7 +452,7 @@ func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
 // sidebarTree.SetCollapsedIDs — it must never be read back into explicit,
 // or a default/override would calcify into a permanent choice the way the
 // old read-back-and-write-back defaultCollapsedSidebar did.
-func deriveCollapsedSidebar(explicit map[string]bool, epics []tickets.Epic, archivedEpics []tickets.Epic, query string) map[string]bool {
+func DeriveCollapsed(explicit map[string]bool, epics []tickets.Epic, archivedEpics []tickets.Epic, query string) map[string]bool {
 	effective := tree.ApplyDefaults(explicit, epicCollapseDefaults(epics, archivedEpics))
 	for id := range searchExpandOverrides(epics, query) {
 		if _, ok := explicit[id]; ok {

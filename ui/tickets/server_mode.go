@@ -87,7 +87,7 @@ func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea
 	}
 	m = m.applyServerRows()
 	if firstLoad {
-		m.sidebar.selectFirstEpic()
+		m.sidebar.SelectFirstEpic()
 	}
 	return m, nil
 }
@@ -131,7 +131,7 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 }
 
 func (m Model) applyServerRows() Model {
-	m.sidebar.epics = tabapi.EpicsFromViewModel(m.vm, m.scope)
+	m.sidebar.Epics = tabapi.EpicsFromViewModel(m.vm, m.scope)
 	m.clampSelected()
 	return m
 }

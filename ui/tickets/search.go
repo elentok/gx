@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
 // ticketRef identifies a ticket by its epic and position within that epic's
@@ -31,18 +32,18 @@ func (m *Model) recomputeSearchMatches() {
 		// per-row lookup (view.go's dim/highlight): its HasQuery() gates
 		// SearchMatch, so the query has to land there too, not just on the
 		// matches — SetPassiveResults sets both in one call.
-		m.sidebar.tree.Search().SetPassiveResults("", nil)
+		m.sidebar.Tree.Search().SetPassiveResults("", nil)
 		// Re-derive collapse state now (rather than waiting for the next
 		// unrelated rebuild) so ending a search drops its transient
 		// auto-expand override immediately, per ticket 02.
-		m.sidebar.rebuild(sidebarEnvFor(*m))
+		m.sidebar.Rebuild(sidebarEnvFor(*m))
 		return
 	}
 
 	// An epic row is keyed as ticketRef{epicIdx, -1}, matching its
 	// sidebarNode's ticketIdx.
 	wanted := map[ticketRef]bool{}
-	for epicIdx, epic := range m.sidebar.epics {
+	for epicIdx, epic := range m.sidebar.Epics {
 		if rowfmt.EpicMatchesQuery(epic, q) {
 			wanted[ticketRef{epicIdx: epicIdx, ticketIdx: -1}] = true
 		}
@@ -55,8 +56,8 @@ func (m *Model) recomputeSearchMatches() {
 
 	if len(wanted) == 0 {
 		m.search.SetMatches(nil)
-		m.sidebar.tree.Search().SetPassiveResults("", nil)
-		m.sidebar.rebuild(sidebarEnvFor(*m))
+		m.sidebar.Tree.Search().SetPassiveResults("", nil)
+		m.sidebar.Rebuild(sidebarEnvFor(*m))
 		return
 	}
 
@@ -64,21 +65,21 @@ func (m *Model) recomputeSearchMatches() {
 	// auto-expand this loop used to write directly into the tree's collapsed
 	// map — but transiently, off m.search.Query() (already set by the
 	// caller), never touching explicitCollapsed.
-	m.sidebar.rebuild(sidebarEnvFor(*m))
+	m.sidebar.Rebuild(sidebarEnvFor(*m))
 
 	matches := make([]search.Match, 0, len(wanted))
-	for i, e := range m.sidebar.tree.Entries() {
+	for i, e := range m.sidebar.Tree.Entries() {
 		// Archived nodes index m.archivedEpics, not m.epics, so their
 		// epicIdx would collide with an unrelated wanted ref.
-		if (e.Value.kind != nodeTicket && e.Value.kind != nodeEpic) || e.Value.archived {
+		if (e.Value.Kind != sidebar.NodeTicket && e.Value.Kind != sidebar.NodeEpic) || e.Value.Archived {
 			continue
 		}
-		if wanted[ticketRef{epicIdx: e.Value.epicIdx, ticketIdx: e.Value.ticketIdx}] {
+		if wanted[ticketRef{epicIdx: e.Value.EpicIdx, ticketIdx: e.Value.TicketIdx}] {
 			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
 	m.search.SetMatches(matches)
-	m.sidebar.tree.Search().SetPassiveResults(q, matches)
+	m.sidebar.Tree.Search().SetPassiveResults(q, matches)
 }
 
 // jumpToCurrentMatch moves the selection to the search cursor's current
@@ -89,8 +90,8 @@ func (m *Model) jumpToCurrentMatch() {
 	if !ok {
 		return
 	}
-	entries := m.sidebar.tree.Entries()
+	entries := m.sidebar.Tree.Entries()
 	if match.DataIndex >= 0 && match.DataIndex < len(entries) {
-		m.sidebar.tree.SetSelectedIndex(match.DataIndex)
+		m.sidebar.Tree.SetSelectedIndex(match.DataIndex)
 	}
 }

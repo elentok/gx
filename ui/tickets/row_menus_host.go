@@ -31,22 +31,22 @@ func (t modelMenuTab) EditFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmd
 
 func (t modelMenuTab) Selection() rowactions.Selection {
 	m := t.m
-	r, ok := m.sidebar.selectedRow()
+	r, ok := m.sidebar.SelectedRow()
 	if !ok {
 		return rowactions.Selection{}
 	}
-	epic := m.sidebar.epicAt(r)
-	if r.isEpic() {
+	epic := m.sidebar.EpicAt(r)
+	if r.IsEpic() {
 		return rowactions.Selection{
-			OK: true, IsEpic: true, Epic: epic, Archived: r.archived,
+			OK: true, IsEpic: true, Epic: epic, Archived: r.Archived,
 			Session:   rowactions.EpicSession(m.vm.Sessions, epic.Path),
 			Queueable: rowactions.EpicQueueable(epic, m.vm.Queue),
 			Actions:   rowactions.EpicSummaryActions(m.vm.Epics, epic.Name),
 		}
 	}
-	ticket := epic.Tickets[r.ticketIdx]
+	ticket := epic.Tickets[r.TicketIdx]
 	return rowactions.Selection{
-		OK: true, Epic: epic, Ticket: ticket, Archived: r.archived,
+		OK: true, Epic: epic, Ticket: ticket, Archived: r.Archived,
 		Session:    rowactions.TicketSession(m.vm.Sessions, epic.Path, ticket),
 		QueueAgent: rowactions.QueueAgentOf(m.vm.Sessions, ticket.Path),
 	}
@@ -83,7 +83,7 @@ func (m Model) selectedTicketPath() string {
 // menuAnchor is the selected sidebar row on screen, under the panel's
 // header line, for the Context menu to open next to.
 func (m Model) menuAnchor() contextmenu.Anchor {
-	line, h, ok := m.sidebar.tree.SelectedBodyLine()
+	line, h, ok := m.sidebar.Tree.SelectedBodyLine()
 	if !ok {
 		return contextmenu.Anchor{}
 	}

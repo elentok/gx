@@ -18,27 +18,27 @@ func (m Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	if !ok {
 		return notify.Warning(warning)
 	}
-	r, _ := m.sidebar.selectedRow()
-	return m.editor.Edit(target, splitType, r.archived)
+	r, _ := m.sidebar.SelectedRow()
+	return m.editor.Edit(target, splitType, r.Archived)
 }
 
 // selectedEditTarget resolves the file path to edit for the current
 // selection. A ticket row always has one; an epic row only has one when it
 // has a ticket.md. On failure it also returns a warning message describing why.
 func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
-	r, ok := m.sidebar.selectedRow()
+	r, ok := m.sidebar.SelectedRow()
 	if !ok {
 		return "", false, "nothing selected"
 	}
-	epic := m.sidebar.epicAt(r)
-	if r.isEpic() {
+	epic := m.sidebar.EpicAt(r)
+	if r.IsEpic() {
 		path, ok := preview.EpicTicketMDPath(epic)
 		if !ok {
 			return "", false, "epic has no ticket.md to edit"
 		}
 		return path, true, ""
 	}
-	return epic.Tickets[r.ticketIdx].FilePath(), true, ""
+	return epic.Tickets[r.TicketIdx].FilePath(), true, ""
 }
 
 func (m Model) handleEditFileFinished(msg rowactions.EditFileFinishedMsg) (Model, tea.Cmd) {

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -33,11 +34,11 @@ func TestModel_ArchivedSectionShowsCountWithoutLoading(t *testing.T) {
 	if !strings.Contains(m.View().Content, "Archived epics (1)") {
 		t.Fatalf("expected archived section header with count, got:\n%s", m.View().Content)
 	}
-	if m.sidebar.archivedLazy.State() != tree.LazyIdle {
-		t.Fatalf("archivedLazy.State() = %v, want LazyIdle before expand", m.sidebar.archivedLazy.State())
+	if m.sidebar.ArchivedLazy.State() != tree.LazyIdle {
+		t.Fatalf("archivedLazy.State() = %v, want LazyIdle before expand", m.sidebar.ArchivedLazy.State())
 	}
-	if len(m.sidebar.archivedEpics) != 0 {
-		t.Fatalf("expected archivedEpics unpopulated before expand, got %v", m.sidebar.archivedEpics)
+	if len(m.sidebar.ArchivedEpics) != 0 {
+		t.Fatalf("expected archivedEpics unpopulated before expand, got %v", m.sidebar.ArchivedEpics)
 	}
 }
 
@@ -56,23 +57,23 @@ func TestModel_ExpandArchivedSectionLoadsAndPopulatesCollapsedByDefault(t *testi
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.Tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
 	if cmd == nil {
 		t.Fatal("expected expand of the Archived section to return a load command")
 	}
-	if m.sidebar.archivedLazy.State() != tree.LazyLoading {
-		t.Fatalf("archivedLazy.State() = %v, want LazyLoading immediately after expand", m.sidebar.archivedLazy.State())
+	if m.sidebar.ArchivedLazy.State() != tree.LazyLoading {
+		t.Fatalf("archivedLazy.State() = %v, want LazyLoading immediately after expand", m.sidebar.ArchivedLazy.State())
 	}
 
 	m = deliverCmd(t, m, cmd)
 
-	if m.sidebar.archivedLazy.State() != tree.LazyLoaded {
-		t.Fatalf("archivedLazy.State() = %v, want LazyLoaded", m.sidebar.archivedLazy.State())
+	if m.sidebar.ArchivedLazy.State() != tree.LazyLoaded {
+		t.Fatalf("archivedLazy.State() = %v, want LazyLoaded", m.sidebar.ArchivedLazy.State())
 	}
-	if len(m.sidebar.archivedEpics) != 1 || m.sidebar.archivedEpics[0].Name != "old-epic" {
-		t.Fatalf("archivedEpics = %+v, want one epic named old-epic", m.sidebar.archivedEpics)
+	if len(m.sidebar.ArchivedEpics) != 1 || m.sidebar.ArchivedEpics[0].Name != "old-epic" {
+		t.Fatalf("archivedEpics = %+v, want one epic named old-epic", m.sidebar.ArchivedEpics)
 	}
 	if !strings.Contains(m.View().Content, "old-epic") {
 		t.Fatalf("expected archived epic row in view, got:\n%s", m.View().Content)
@@ -103,34 +104,34 @@ func TestModel_FailedArchivedLoadRendersInlineErrorAndStaysExpandedThenRetries(t
 
 	testutil.EnsureEpicTicketMD(t, filepath.Join(root, ".scratch", "my-epic"))
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m.sidebar.archivedEpicCount = 1 // bypass the count-0 short-circuit; CountArchivedEpics itself tolerates the file fine
+	m.sidebar.ArchivedEpicCount = 1 // bypass the count-0 short-circuit; CountArchivedEpics itself tolerates the file fine
 	m = deliverLoad(t, m)
-	m.sidebar.archivedEpicCount = 1
+	m.sidebar.ArchivedEpicCount = 1
 	m.clampSelected() // rebuild so the now non-empty Archived section shows
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.Tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
 	m = deliverCmd(t, m, cmd)
 
-	if m.sidebar.archivedLazy.State() != tree.LazyFailed {
-		t.Fatalf("archivedLazy.State() = %v, want LazyFailed", m.sidebar.archivedLazy.State())
+	if m.sidebar.ArchivedLazy.State() != tree.LazyFailed {
+		t.Fatalf("archivedLazy.State() = %v, want LazyFailed", m.sidebar.ArchivedLazy.State())
 	}
-	body := strings.Join(m.sidebar.body(sidebarEnvFor(m), 20, 80), "\n")
+	body := strings.Join(m.sidebar.Body(sidebarEnvFor(m), 20, 80), "\n")
 	if !strings.Contains(body, "failed to load") {
 		t.Fatalf("expected inline error text, got:\n%s", body)
 	}
-	if m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionArchived)] {
+	if m.sidebar.Tree.CollapsedIDs()[sidebar.SectionID(sidebar.SectionArchived)] {
 		t.Fatal("expected Archived section to stay expanded after a failed load")
 	}
 
 	// Retry: collapse then re-expand.
-	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.Tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"}) // collapse
 	m = updated.(Model)
-	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.Tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"}) // re-expand
 	m = updated.(Model)
 	if cmd == nil {
@@ -153,12 +154,12 @@ func TestModel_ArchivedCountChangeInvalidatesLazyCacheOnNextExpand(t *testing.T)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.Tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
 	m = deliverCmd(t, m, cmd)
-	if m.sidebar.archivedLazy.State() != tree.LazyLoaded {
-		t.Fatalf("archivedLazy.State() = %v, want LazyLoaded before the count change", m.sidebar.archivedLazy.State())
+	if m.sidebar.ArchivedLazy.State() != tree.LazyLoaded {
+		t.Fatalf("archivedLazy.State() = %v, want LazyLoaded before the count change", m.sidebar.ArchivedLazy.State())
 	}
 
 	tickettest.WriteArchivedTicket(t, root, "another-old-epic", "01-ticket.md", "Status: done\n\nBody.\n")
@@ -166,17 +167,17 @@ func TestModel_ArchivedCountChangeInvalidatesLazyCacheOnNextExpand(t *testing.T)
 	m = updated.(Model)
 	m = deliverCmd(t, m, cmd)
 
-	if m.sidebar.archivedEpicCount != 2 {
-		t.Fatalf("archivedEpicCount after refresh = %d, want 2", m.sidebar.archivedEpicCount)
+	if m.sidebar.ArchivedEpicCount != 2 {
+		t.Fatalf("archivedEpicCount after refresh = %d, want 2", m.sidebar.ArchivedEpicCount)
 	}
-	if m.sidebar.archivedLazy.State() != tree.LazyIdle {
-		t.Fatalf("archivedLazy.State() = %v, want LazyIdle after a count change invalidates the cache", m.sidebar.archivedLazy.State())
+	if m.sidebar.ArchivedLazy.State() != tree.LazyIdle {
+		t.Fatalf("archivedLazy.State() = %v, want LazyIdle after a count change invalidates the cache", m.sidebar.ArchivedLazy.State())
 	}
 
-	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.Tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"}) // collapse
 	m = updated.(Model)
-	m.sidebar.tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
+	m.sidebar.Tree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"}) // re-expand
 	m = updated.(Model)
 	if cmd == nil {

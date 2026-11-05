@@ -135,7 +135,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.handleServerFinishAndPauseKey()
 		case bindingTicketsToggleHideDone:
 			// Hiding done tickets can shrink the tree out from under the cursor.
-			m.sidebar.hideDone = !m.sidebar.hideDone
+			m.sidebar.HideDone = !m.sidebar.HideDone
 			if m.search.HasQuery() {
 				m.recomputeSearchMatches()
 			}
@@ -144,11 +144,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.toggleProjectScope()
 		case bindingTicketsTogglePreview:
 			m.preview.Toggle()
-			m.sidebar.tree.SetVisibleHeight(m.sidebarViewportHeight())
+			m.sidebar.Tree.SetVisibleHeight(m.sidebarViewportHeight())
 		case bindingTicketsSelectFirst:
-			m.sidebar.selectFirstRow()
+			m.sidebar.SelectFirstRow()
 		case bindingTicketsSelectLast:
-			m.sidebar.selectLastRow()
+			m.sidebar.SelectLastRow()
 		case bindingTicketsPreviewBottom:
 			m.preview.VP.GotoBottom()
 		case bindingTicketsSuggestedActions:
@@ -178,17 +178,17 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	selectedID := ""
-	if entries := m.sidebar.tree.Entries(); len(entries) > 0 {
-		if idx := m.sidebar.tree.SelectedIndex(); idx >= 0 && idx < len(entries) {
+	if entries := m.sidebar.Tree.Entries(); len(entries) > 0 {
+		if idx := m.sidebar.Tree.SelectedIndex(); idx >= 0 && idx < len(entries) {
 			selectedID = entries[idx].ID
 		}
 	}
-	next, cmd, result := m.sidebar.tree.Update(msg)
+	next, cmd, result := m.sidebar.Tree.Update(msg)
 	if result.ExpandNoop {
 		m.preview.FocusPreviewPane()
 		return m, cmd
 	}
-	m.sidebar.tree = next
+	m.sidebar.Tree = next
 	if result.RebuildRequested {
 		cmd = m.afterSidebarToggle(selectedID, cmd)
 	}
@@ -208,8 +208,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // write to or navigate away from them. blocked reports whether the caller
 // should stop and return cmd unchanged instead of running its handler.
 func (m Model) archivedReadOnlyGuard() (cmd tea.Cmd, blocked bool) {
-	r, ok := m.sidebar.selectedRow()
-	if !ok || !r.archived {
+	r, ok := m.sidebar.SelectedRow()
+	if !ok || !r.Archived {
 		return nil, false
 	}
 	return notify.Info("read-only: this ticket is archived"), true

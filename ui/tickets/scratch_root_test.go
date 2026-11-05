@@ -57,8 +57,8 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 		if got := m.scratchDir(); got != wantScratchRoot {
 			t.Errorf("Model.scratchDir() from %q = %q, want %q", wt, got, wantScratchRoot)
 		}
-		if len(m.sidebar.epics) != 1 {
-			t.Fatalf("Model from %q: expected 1 epic loaded from shared .scratch, got %d", wt, len(m.sidebar.epics))
+		if len(m.sidebar.Epics) != 1 {
+			t.Fatalf("Model from %q: expected 1 epic loaded from shared .scratch, got %d", wt, len(m.sidebar.Epics))
 		}
 	}
 }

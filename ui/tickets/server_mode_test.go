@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/rowactions"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -71,8 +72,8 @@ func TestServerMode_SnapshotRendersReducedRows(t *testing.T) {
 		{Address: "gx:alpha/02", Title: "Fork", Status: "open", Parent: "gx:alpha/01"},
 	}}
 	m := withState(newServerModel(t), snap)
-	if len(m.sidebar.epics) != 1 || len(m.sidebar.epics[0].Tickets) != 2 {
-		t.Fatalf("epics = %+v", m.sidebar.epics)
+	if len(m.sidebar.Epics) != 1 || len(m.sidebar.Epics[0].Tickets) != 2 {
+		t.Fatalf("epics = %+v", m.sidebar.Epics)
 	}
 }
 
@@ -102,11 +103,11 @@ var scopeSnap = wire.Snapshot{Seq: 4, Tickets: []wire.TicketInfo{
 
 func TestServerMode_ScopesToCwdProjectAndToggles(t *testing.T) {
 	m := withState(newServerModel(t).WithCwdProject("gx"), scopeSnap)
-	if len(m.sidebar.epics) != 1 || m.sidebar.epics[0].Name != "gx:alpha" {
-		t.Fatalf("scoped epics = %+v", m.sidebar.epics)
+	if len(m.sidebar.Epics) != 1 || m.sidebar.Epics[0].Name != "gx:alpha" {
+		t.Fatalf("scoped epics = %+v", m.sidebar.Epics)
 	}
 	next, _ := m.toggleProjectScope()
-	if got := len(next.(Model).sidebar.epics); got != 2 {
+	if got := len(next.(Model).sidebar.Epics); got != 2 {
 		t.Fatalf("all-projects epics = %d, want 2", got)
 	}
 }
@@ -116,7 +117,7 @@ func TestServerMode_ScopeToggleSurvivesDeliveredState(t *testing.T) {
 	next, _ := m.toggleProjectScope()
 
 	m = withState(next.(Model), scopeSnap)
-	if got := len(m.sidebar.epics); got != 2 {
+	if got := len(m.sidebar.Epics); got != 2 {
 		t.Fatalf("epics after delivery = %d, want 2 (still all projects)", got)
 	}
 }
@@ -124,8 +125,8 @@ func TestServerMode_ScopeToggleSurvivesDeliveredState(t *testing.T) {
 // The first-load hint comes from the app shell, so the tab stays quiet.
 func TestServerMode_OutsideProjectShowsAllWithoutToasting(t *testing.T) {
 	m := withState(newServerModel(t).WithCwdProject(""), scopeSnap)
-	if len(m.sidebar.epics) != 2 {
-		t.Fatalf("epics = %d, want all", len(m.sidebar.epics))
+	if len(m.sidebar.Epics) != 2 {
+		t.Fatalf("epics = %d, want all", len(m.sidebar.Epics))
 	}
 	_, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if got := toastsOf(cmd); len(got) != 0 {
@@ -138,8 +139,8 @@ func TestServerMode_StaleStateIsIgnoredWhileOnFallback(t *testing.T) {
 	st := applySnapshot(viewmodel.State{}, scopeSnap)
 	next, _ := m.WithServerState(&st, tabapi.ServerLinkDown)
 	m = next.(Model)
-	if m.loaded || len(m.sidebar.epics) != 0 {
-		t.Fatalf("fallback tab took the shell's stale state: loaded=%v epics=%d", m.loaded, len(m.sidebar.epics))
+	if m.loaded || len(m.sidebar.Epics) != 0 {
+		t.Fatalf("fallback tab took the shell's stale state: loaded=%v epics=%d", m.loaded, len(m.sidebar.Epics))
 	}
 }
 
@@ -170,8 +171,8 @@ func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 	m = withState(m, snap)
 
 	var body []string
-	for _, e := range m.sidebar.buildSidebarEntries(sidebarEnvFor(m)) {
-		if e.Value.kind == nodeTicket {
+	for _, e := range m.sidebar.BuildSidebarEntries(sidebarEnvFor(m)) {
+		if e.Value.Kind == sidebar.NodeTicket {
 			body = e.Body
 		}
 	}
@@ -194,8 +195,8 @@ func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing
 	m = withState(m, snap)
 
 	var bodies [][]string
-	for _, e := range m.sidebar.buildSidebarEntries(sidebarEnvFor(m)) {
-		if e.Value.kind == nodeTicket {
+	for _, e := range m.sidebar.BuildSidebarEntries(sidebarEnvFor(m)) {
+		if e.Value.Kind == sidebar.NodeTicket {
 			bodies = append(bodies, e.Body)
 		}
 	}

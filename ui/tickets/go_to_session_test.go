@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -26,7 +27,7 @@ func goToSessionModel(t *testing.T, ticketStatus string, sessions ...wire.Sessio
 		},
 		Sessions: sessions,
 	})
-	setCollapsedSection(&m, sectionOpenMaps, false)
+	setCollapsedSection(&m, sidebar.SectionOpenMaps, false)
 	return m
 }
 
@@ -95,7 +96,7 @@ func TestGoToSession_NotOfferedOnNonMapTicket(t *testing.T) {
 		Tickets:  []wire.TicketInfo{{Address: "gx:plain/01", Title: "One", Status: "claimed"}},
 		Sessions: []wire.SessionInfo{{ID: "s1", Ticket: "gx:plain/01"}},
 	})
-	setCollapsedSection(&m, sectionOpenMaps, false)
+	setCollapsedSection(&m, sidebar.SectionOpenMaps, false)
 	labels := ticketMenuLabels(t, m, "gx:plain/01")
 	if slices.Contains(labels, rowactions.GoToSessionLabel) {
 		t.Errorf("labels = %v, want no %q on a non-map ticket", labels, rowactions.GoToSessionLabel)

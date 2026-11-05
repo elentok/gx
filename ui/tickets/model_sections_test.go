@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
 func TestNewModel_RendersEmptyStateWithNoScratchDir(t *testing.T) {
@@ -109,9 +110,9 @@ func TestModel_ArchivedEpicCountSuppressesEmptyState(t *testing.T) {
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
-	m.sidebar.archivedEpicCount = 1
+	m.sidebar.ArchivedEpicCount = 1
 
-	body := strings.Join(m.sidebar.body(sidebarEnvFor(m), 20, 80), "\n")
+	body := strings.Join(m.sidebar.Body(sidebarEnvFor(m), 20, 80), "\n")
 	if strings.Contains(body, "no .scratch/ directory found") {
 		t.Fatalf("expected archivedEpicCount>0 to suppress empty state, got:\n%s", body)
 	}
@@ -133,8 +134,8 @@ func TestModel_CmdLoad_CarriesArchivedEpicCountAndRefreshesIt(t *testing.T) {
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
-	if m.sidebar.archivedEpicCount != 1 {
-		t.Fatalf("archivedEpicCount after initial load = %d, want 1", m.sidebar.archivedEpicCount)
+	if m.sidebar.ArchivedEpicCount != 1 {
+		t.Fatalf("archivedEpicCount after initial load = %d, want 1", m.sidebar.ArchivedEpicCount)
 	}
 
 	secondArchiveDir := filepath.Join(root, ".scratch", ".archive", "another-old-epic")
@@ -146,8 +147,8 @@ func TestModel_CmdLoad_CarriesArchivedEpicCountAndRefreshesIt(t *testing.T) {
 	m = updated.(Model)
 	m = deliverCmd(t, m, cmd)
 
-	if m.sidebar.archivedEpicCount != 2 {
-		t.Fatalf("archivedEpicCount after refresh = %d, want 2", m.sidebar.archivedEpicCount)
+	if m.sidebar.ArchivedEpicCount != 2 {
+		t.Fatalf("archivedEpicCount after refresh = %d, want 2", m.sidebar.ArchivedEpicCount)
 	}
 }
 
@@ -282,7 +283,7 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 
 	// Manually collapse open-epic, which deliverLoad expanded.
 	setCollapsedEpic(&m, indexOfEpic(t, m, "open-epic"), true)
-	if !m.sidebar.isCollapsed(findEpic(t, m, "open-epic")) {
+	if !m.sidebar.IsCollapsed(findEpic(t, m, "open-epic")) {
 		t.Fatalf("expected open-epic collapsed after manual toggle")
 	}
 
@@ -295,12 +296,12 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 	updated, _ = m.Update(msg)
 	m = updated.(Model)
 
-	if !m.sidebar.isCollapsed(findEpic(t, m, "open-epic")) {
+	if !m.sidebar.IsCollapsed(findEpic(t, m, "open-epic")) {
 		t.Fatalf("expected manually-collapsed open-epic to stay collapsed after epicsLoadedMsg")
 	}
 	// A newly-closed epic now gets its own collapsed default (ticket 02),
 	// on top of the Closed section itself also starting collapsed.
-	if !m.sidebar.isCollapsed(findEpic(t, m, "new-done-epic")) {
+	if !m.sidebar.IsCollapsed(findEpic(t, m, "new-done-epic")) {
 		t.Fatalf("expected new fully-done epic to default to collapsed")
 	}
 	// ...and its ticket is hidden either way, because the Closed section
@@ -325,12 +326,12 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	if !m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	if !m.sidebar.Tree.CollapsedIDs()[sidebar.SectionID(sidebar.SectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed")
 	}
 
-	setCollapsedSection(&m, sectionComplete, false)
-	if m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+	setCollapsedSection(&m, sidebar.SectionComplete, false)
+	if m.sidebar.Tree.CollapsedIDs()[sidebar.SectionID(sidebar.SectionComplete)] {
 		t.Fatalf("expected Closed section expanded after manual toggle")
 	}
 	// done-epic itself still defaults to collapsed once the section is
@@ -343,7 +344,7 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 		updated, _ = m.Update(msg)
 		m = updated.(Model)
 
-		if m.sidebar.tree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
+		if m.sidebar.Tree.CollapsedIDs()[sidebar.SectionID(sidebar.SectionComplete)] {
 			t.Fatalf("refresh %d: expected Closed section to stay expanded, got collapsed", i+1)
 		}
 		if !strings.Contains(m.View().Content, "Only ticket") {
@@ -388,12 +389,12 @@ func TestNewModel_GroupsEpicsIntoSectionsInOrder(t *testing.T) {
 
 	// The complete sections start collapsed; each expands and collapses again.
 	for _, c := range []struct {
-		section sidebarSection
+		section sidebar.Section
 		epic    string
 	}{
-		{sectionComplete, "complete-epic"},
-		{sectionMerged, "merged-epic"},
-		{sectionCompleteMaps, "complete-map"},
+		{sidebar.SectionComplete, "complete-epic"},
+		{sidebar.SectionMerged, "merged-epic"},
+		{sidebar.SectionCompleteMaps, "complete-map"},
 	} {
 		if strings.Contains(content, c.epic) {
 			t.Fatalf("expected %s hidden under its collapsed section, got:\n%s", c.epic, content)
@@ -445,7 +446,7 @@ func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	setCollapsedSection(&m, sectionComplete, false)
+	setCollapsedSection(&m, sidebar.SectionComplete, false)
 
 	rawContent := m.View().Content
 	content := ansi.Strip(rawContent)
@@ -544,15 +545,15 @@ func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 	// done-epic starts collapsed by default: expand it and confirm it's
 	// still dimmed (dimming tracks AllDone(), not the collapse toggle).
 	setCollapsedEpic(&m, indexOfEpic(t, m, "done-epic"), false)
-	if !strings.Contains(m.sidebar.renderEpicRow(sidebarEnvFor(m), doneEpic), dimPrefix) {
-		t.Fatalf("expected done-epic to stay dimmed after manual expand, got: %q", m.sidebar.renderEpicRow(sidebarEnvFor(m), doneEpic))
+	if !strings.Contains(m.sidebar.RenderEpicRow(sidebarEnvFor(m), doneEpic), dimPrefix) {
+		t.Fatalf("expected done-epic to stay dimmed after manual expand, got: %q", m.sidebar.RenderEpicRow(sidebarEnvFor(m), doneEpic))
 	}
 
 	// open-epic starts expanded: collapse it and confirm it does NOT
 	// become dimmed just because it's collapsed.
 	setCollapsedEpic(&m, indexOfEpic(t, m, "open-epic"), true)
-	if strings.Contains(m.sidebar.renderEpicRow(sidebarEnvFor(m), openEpic), dimPrefix) {
-		t.Fatalf("expected open-epic to stay undimmed after manual collapse, got: %q", m.sidebar.renderEpicRow(sidebarEnvFor(m), openEpic))
+	if strings.Contains(m.sidebar.RenderEpicRow(sidebarEnvFor(m), openEpic), dimPrefix) {
+		t.Fatalf("expected open-epic to stay undimmed after manual collapse, got: %q", m.sidebar.RenderEpicRow(sidebarEnvFor(m), openEpic))
 	}
 }
 

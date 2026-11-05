@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
 func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
@@ -75,7 +76,7 @@ func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
 	// The Closed section starts collapsed by default; expand it (and the
 	// epic itself, which has no default of its own) so its ticket row would
 	// normally be visible.
-	setCollapsedSection(&m, sectionComplete, false)
+	setCollapsedSection(&m, sidebar.SectionComplete, false)
 	setCollapsedEpic(&m, indexOfEpic(t, m, "done-epic"), false)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
@@ -84,7 +85,7 @@ func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
 	m = updated.(Model)
 
 	rows := visibleRows(m)
-	if len(rows) != 1 || !rows[0].isEpic() {
+	if len(rows) != 1 || !rows[0].IsEpic() {
 		t.Fatalf("expected only the epic row visible for a fully-done epic under 'tc', got %+v", rows)
 	}
 	if !strings.Contains(m.View().Content, "done-epic") {
@@ -116,14 +117,14 @@ func TestModel_UnrelatedTAndCSequencesUnaffectedByHideDoneChord(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected 'et' to still launch the edit-tab command")
 	}
-	if m.sidebar.hideDone {
+	if m.sidebar.HideDone {
 		t.Fatalf("expected 'et' to leave hideDone untouched")
 	}
 
 	// A bare "c" (no preceding "t") must not toggle hideDone either.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(Model)
-	if m.sidebar.hideDone {
+	if m.sidebar.HideDone {
 		t.Fatalf("expected a bare 'c' to leave hideDone untouched")
 	}
 }

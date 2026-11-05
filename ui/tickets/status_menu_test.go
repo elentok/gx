@@ -4,19 +4,20 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
 // selectTicketRow moves the sidebar selection onto the first visible ticket
 // row.
 func selectTicketRow(t *testing.T, m Model) Model {
 	t.Helper()
-	for i, e := range m.sidebar.tree.Entries() {
-		if e.Value.kind == nodeTicket {
-			m.sidebar.tree.SetSelectedIndex(i)
+	for i, e := range m.sidebar.Tree.Entries() {
+		if e.Value.Kind == sidebar.NodeTicket {
+			m.sidebar.Tree.SetSelectedIndex(i)
 			break
 		}
 	}
-	if r, ok := m.sidebar.selectedRow(); !ok || r.isEpic() {
+	if r, ok := m.sidebar.SelectedRow(); !ok || r.IsEpic() {
 		t.Fatalf("expected selection on a ticket row, got row=%+v ok=%v", r, ok)
 	}
 	return m
