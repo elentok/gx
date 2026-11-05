@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/tickets"
@@ -86,7 +87,7 @@ func runStatus(dirs config.Dirs, target string) error {
 		return fmt.Errorf("gx status must be run from a regular repo or linked worktree")
 	}
 
-	root, err := git.WorktreeRoot(cwd)
+	root, err := stage.WorktreeRoot(cwd)
 	if err != nil {
 		return err
 	}
@@ -129,7 +130,7 @@ func runLog(dirs config.Dirs, opts LogOptions) error {
 		return fmt.Errorf("gx log must be run from a regular repo or linked worktree")
 	}
 
-	root, err := git.WorktreeRoot(cwd)
+	root, err := stage.WorktreeRoot(cwd)
 	if err != nil {
 		return err
 	}
@@ -165,7 +166,7 @@ func runShow(dirs config.Dirs, ref string) error {
 		return fmt.Errorf("gx show must be run from a regular repo or linked worktree")
 	}
 
-	root, err := git.WorktreeRoot(cwd)
+	root, err := stage.WorktreeRoot(cwd)
 	if err != nil {
 		return err
 	}
@@ -201,7 +202,7 @@ func runStash(dirs config.Dirs) error {
 		return fmt.Errorf("gx stash must be run from a regular repo or linked worktree")
 	}
 
-	root, err := git.WorktreeRoot(cwd)
+	root, err := stage.WorktreeRoot(cwd)
 	if err != nil {
 		return err
 	}
@@ -237,7 +238,7 @@ func runPRs(dirs config.Dirs, allRepos bool) error {
 		return fmt.Errorf("gx prs must be run from a regular repo or linked worktree")
 	}
 
-	root, err := git.WorktreeRoot(cwd)
+	root, err := stage.WorktreeRoot(cwd)
 	if err != nil {
 		return err
 	}
@@ -303,7 +304,7 @@ func tabTarget(cwd string, tab nav.TabID) (*git.Repo, string, error) {
 		return repo, repo.Root, nil
 	}
 
-	root, err := git.WorktreeRoot(cwd)
+	root, err := stage.WorktreeRoot(cwd)
 	if err != nil {
 		return nil, "", err
 	}

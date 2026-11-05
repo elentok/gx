@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tree"
 )
 
 func TestBuildStatusEntries_CollapsibleDirectory(t *testing.T) {
-	files := []git.StageFileStatus{
+	files := []stage.StageFileStatus{
 		{Path: "dir/a.txt", IndexStatus: '?', WorktreeCode: '?'},
 		{Path: "dir/b.txt", IndexStatus: '?', WorktreeCode: '?'},
 		{Path: "root.txt", IndexStatus: ' ', WorktreeCode: 'M'},
@@ -38,7 +38,7 @@ func TestBuildStatusEntries_CollapsibleDirectory(t *testing.T) {
 }
 
 func TestBuildStatusEntries_CompressesSingleChildDirectoryChains(t *testing.T) {
-	files := []git.StageFileStatus{
+	files := []stage.StageFileStatus{
 		{Path: "keyboards/iris/keymaps/myfile.c", IndexStatus: ' ', WorktreeCode: 'M'},
 	}
 
@@ -78,9 +78,9 @@ func TestBuildStatusEntries_CompressesSingleChildDirectoryChains(t *testing.T) {
 }
 
 func TestVisibleStatusLines_UsesStatusSpecificLabelAndMeta(t *testing.T) {
-	m := Model{settings: ui.Settings{}, focus: focusFiletree, fileTreeModel: tree.NewModel[git.StageFileStatus]()}
-	file := git.StageFileStatus{Path: "new.go", RenameFrom: "old.go", IndexStatus: 'R', WorktreeCode: ' '}
-	m.fileTreeModel.SetEntries([]tree.Entry[git.StageFileStatus]{
+	m := Model{settings: ui.Settings{}, focus: focusFiletree, fileTreeModel: tree.NewModel[stage.StageFileStatus]()}
+	file := stage.StageFileStatus{Path: "new.go", RenameFrom: "old.go", IndexStatus: 'R', WorktreeCode: ' '}
+	m.fileTreeModel.SetEntries([]tree.Entry[stage.StageFileStatus]{
 		{DisplayName: "new.go", Value: file},
 	})
 

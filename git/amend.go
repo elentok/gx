@@ -6,21 +6,6 @@ import (
 	"strings"
 )
 
-// StagedFiles returns the paths of files with staged index changes.
-func StagedFiles(root string) ([]string, error) {
-	files, err := ListStageFiles(root)
-	if err != nil {
-		return nil, err
-	}
-	var staged []string
-	for _, f := range files {
-		if f.HasStagedChanges() {
-			staged = append(staged, f.Path)
-		}
-	}
-	return staged, nil
-}
-
 // IsCommitPushed reports whether hash appears in any remote tracking branch.
 func IsCommitPushed(root, hash string) (bool, error) {
 	out, _, err := run.Exec(root, []string{"branch", "-r", "--contains", hash})

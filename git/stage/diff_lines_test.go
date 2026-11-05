@@ -1,4 +1,4 @@
-package git_test
+package stage_test
 
 import (
 	"strings"

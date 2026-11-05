@@ -3,7 +3,7 @@ package status
 import (
 	"testing"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 	notifypkg "github.com/elentok/gx/ui/notify"
 
@@ -161,7 +161,7 @@ func TestStashStaged_OpensStagedModalWhenStagedChangesExist(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "staged.txt", "staged\n")
-	if err := git.StagePath(repo, "staged.txt"); err != nil {
+	if err := stage.StagePath(repo, "staged.txt"); err != nil {
 		t.Fatalf("stage staged.txt: %v", err)
 	}
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -159,7 +159,7 @@ func TestStagedOnly_StashesOnlyStagedLeavesUnstaged(t *testing.T) {
 	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "staged.txt", "staged\n")
-	if err := git.StagePath(repo, "staged.txt"); err != nil {
+	if err := stage.StagePath(repo, "staged.txt"); err != nil {
 		t.Fatalf("stage staged.txt: %v", err)
 	}
 	testutil.WriteFile(t, repo, "unstaged.txt", "unstaged\n")
@@ -185,7 +185,7 @@ func TestStagedOnly_StashesOnlyStagedLeavesUnstaged(t *testing.T) {
 	}
 
 	// unstaged.txt must still be present (untracked, not stashed)
-	files, err := git.ListStageFiles(repo)
+	files, err := stage.ListStageFiles(repo)
 	if err != nil {
 		t.Fatalf("ListStageFiles: %v", err)
 	}

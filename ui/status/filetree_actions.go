@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
@@ -72,19 +73,19 @@ func (m Model) confirmAccept() (Model, tea.Cmd) {
 		return m, actionPollCmd()
 	case confirmDiscardStatus:
 		if m.confirmDiscardUntracked {
-			if err := git.DiscardUntrackedPath(m.worktreeRoot, m.confirmPaths[0]); err != nil {
+			if err := stage.DiscardUntrackedPath(m.worktreeRoot, m.confirmPaths[0]); err != nil {
 				m.showGitError(err)
 				return m, nil
 			}
 		} else {
-			if err := git.RestorePaths(m.worktreeRoot, m.confirmPaths); err != nil {
+			if err := stage.RestorePaths(m.worktreeRoot, m.confirmPaths); err != nil {
 				m.showGitError(err)
 				return m, nil
 			}
 		}
 		if len(m.confirmDeletePaths) > 0 {
 			for _, path := range m.confirmDeletePaths {
-				if err := git.DiscardUntrackedPath(m.worktreeRoot, path); err != nil {
+				if err := stage.DiscardUntrackedPath(m.worktreeRoot, path); err != nil {
 					m.showGitError(err)
 					return m, nil
 				}
@@ -100,7 +101,7 @@ func (m Model) confirmAccept() (Model, tea.Cmd) {
 		}
 		return m, tea.Batch(notify.Success("discarded "+displayPath), m.reload(preservePath))
 	case confirmDiscardUnstaged:
-		if err := git.ApplyPatchToWorktree(m.worktreeRoot, m.confirmPatch, true, m.confirmPatchUnidiffZero); err != nil {
+		if err := stage.ApplyPatchToWorktree(m.worktreeRoot, m.confirmPatch, true, m.confirmPatchUnidiffZero); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}

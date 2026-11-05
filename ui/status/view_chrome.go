@@ -3,7 +3,7 @@ package status
 import (
 	"image/color"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/status/diffarea"
@@ -104,7 +104,7 @@ func statusEntryMeta(entry statusEntry, useNerdFontIcons bool, icons filetreePan
 	return entry.File.XY()
 }
 
-func statusFileIcon(file git.StageFileStatus, isSymlink bool, icons filetreePaneIcons) string {
+func statusFileIcon(file stage.StageFileStatus, isSymlink bool, icons filetreePaneIcons) string {
 	if isDeletedFileStatus(file) {
 		return icons.fileDeleted
 	}
@@ -120,7 +120,7 @@ func statusFileIcon(file git.StageFileStatus, isSymlink bool, icons filetreePane
 	return icons.fileModified
 }
 
-func isDeletedFileStatus(file git.StageFileStatus) bool {
+func isDeletedFileStatus(file stage.StageFileStatus) bool {
 	return file.IndexStatus == 'D' || file.WorktreeCode == 'D'
 }
 

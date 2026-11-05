@@ -5,6 +5,8 @@ import (
 	"math"
 
 	"github.com/elentok/gx/git"
+
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
@@ -63,7 +65,7 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 			statusEntries: []statusEntry{{
 				Kind:        statusEntryFile,
 				DisplayName: "renamed.go",
-				File: git.StageFileStatus{
+				File: stage.StageFileStatus{
 					Path:         "new/renamed.go",
 					RenameFrom:   "old/name.go",
 					IndexStatus:  'R',
@@ -72,10 +74,10 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 				HasStaged: true,
 			}},
 		},
-		fileTreeModel: tree.NewModel[git.StageFileStatus](),
+		fileTreeModel: tree.NewModel[stage.StageFileStatus](),
 	}
-	m.fileTreeModel.SetEntries([]tree.Entry[git.StageFileStatus]{
-		{DisplayName: "renamed.go", Value: git.StageFileStatus{Path: "new/renamed.go", RenameFrom: "old/name.go", IndexStatus: 'R', WorktreeCode: ' '}},
+	m.fileTreeModel.SetEntries([]tree.Entry[stage.StageFileStatus]{
+		{DisplayName: "renamed.go", Value: stage.StageFileStatus{Path: "new/renamed.go", RenameFrom: "old/name.go", IndexStatus: 'R', WorktreeCode: ' '}},
 	})
 
 	filetreeW, diffW := m.splitWidth()
@@ -767,7 +769,7 @@ func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
 		t.Fatalf("expected unified view to keep changed content visible, got:\n%s", view)
 	}
 
-	stagedBefore, err := git.DiffPath(repo, "clean.txt", true, 1)
+	stagedBefore, err := stage.DiffPath(repo, "clean.txt", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff before apply: %v", err)
 	}
@@ -780,7 +782,7 @@ func TestUnifiedDiffViewHidesVisibleChangeMarkers(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	stagedAfter, err := git.DiffPath(repo, "clean.txt", true, 1)
+	stagedAfter, err := stage.DiffPath(repo, "clean.txt", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff after apply: %v", err)
 	}
@@ -918,7 +920,7 @@ func TestSideBySideModeAllowsHunkStaging(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
-	staged, err := git.DiffPath(repo, "b.txt", true, 1)
+	staged, err := stage.DiffPath(repo, "b.txt", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
@@ -947,7 +949,7 @@ func TestSideBySideModeAllowsLineModeToggle(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
-	staged, err := git.DiffPath(repo, "c.txt", true, 1)
+	staged, err := stage.DiffPath(repo, "c.txt", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
@@ -976,7 +978,7 @@ func TestSideBySideModeAllowsVisualLineRangeStaging(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	staged, err := git.DiffPath(repo, "v.txt", true, 1)
+	staged, err := stage.DiffPath(repo, "v.txt", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
@@ -1079,7 +1081,7 @@ func TestSpaceStagesSingleLineInLineMode(t *testing.T) {
 
 	m.applySelection()
 
-	staged, err := git.DiffPath(repo, "line.txt", true, 1)
+	staged, err := stage.DiffPath(repo, "line.txt", true, 1)
 	if err != nil {
 		t.Fatalf("DiffPath cached: %v", err)
 	}
@@ -1100,7 +1102,7 @@ func TestFiletreeSpaceTogglesWholeFile(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	staged, err := git.DiffPath(repo, "README.md", true, 1)
+	staged, err := stage.DiffPath(repo, "README.md", true, 1)
 	if err != nil {
 		t.Fatalf("DiffPath cached: %v", err)
 	}
@@ -1111,7 +1113,7 @@ func TestFiletreeSpaceTogglesWholeFile(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	staged, err = git.DiffPath(repo, "README.md", true, 1)
+	staged, err = stage.DiffPath(repo, "README.md", true, 1)
 	if err != nil {
 		t.Fatalf("DiffPath cached after unstage: %v", err)
 	}
@@ -1215,7 +1217,7 @@ func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
 
-	unstaged, err := git.DiffPath(repo, "line.txt", false, 1)
+	unstaged, err := stage.DiffPath(repo, "line.txt", false, 1)
 	if err != nil {
 		t.Fatalf("DiffPath unstaged: %v", err)
 	}
@@ -1244,7 +1246,7 @@ func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
 	if m.confirmOpen {
 		t.Fatalf("did not expect discard confirm in staged diff; d should unstage")
 	}
-	unstaged, err := git.DiffPath(repo, "line.txt", false, 1)
+	unstaged, err := stage.DiffPath(repo, "line.txt", false, 1)
 	if err != nil {
 		t.Fatalf("DiffPath unstaged: %v", err)
 	}
@@ -1757,7 +1759,7 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 
 func TestStatusFileIconDeletedAndFallback(t *testing.T) {
 	t.Parallel()
-	deleted := git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'}
+	deleted := stage.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'}
 
 	nerd := filetreePaneIconsFor(true)
 	if got := statusFileIcon(deleted, false, nerd); got != "" {
@@ -1774,7 +1776,7 @@ func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
 	t.Parallel()
 	entry := statusEntry{
 		Kind: statusEntryFile,
-		File: git.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'},
+		File: stage.StageFileStatus{Path: "gone.txt", WorktreeCode: 'D'},
 	}
 	if got := statusEntryColor(entry); got != "#a6adc8" {
 		t.Fatalf("expected dim deleted color, got %q", got)
@@ -1783,7 +1785,7 @@ func TestStatusEntryColorDeletedFileIsDim(t *testing.T) {
 
 func TestStatusFileIconRenamedAndFallback(t *testing.T) {
 	t.Parallel()
-	renamed := git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'}
+	renamed := stage.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'}
 
 	nerd := filetreePaneIconsFor(true)
 	if got := statusFileIcon(renamed, false, nerd); got != "󰁔" {
@@ -1800,7 +1802,7 @@ func TestStatusEntryColorRenamedFileIsBlue(t *testing.T) {
 	t.Parallel()
 	entry := statusEntry{
 		Kind: statusEntryFile,
-		File: git.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'},
+		File: stage.StageFileStatus{Path: "new.txt", RenameFrom: "old.txt", IndexStatus: 'R'},
 	}
 	if got := statusEntryColor(entry); got != "#89b4fa" {
 		t.Fatalf("expected renamed color, got %q", got)
@@ -2685,13 +2687,13 @@ func TestStatusFileIcon(t *testing.T) {
 	t.Parallel()
 	icons := filetreePaneIconsFor(true)
 
-	if got := statusFileIcon(git.StageFileStatus{IndexStatus: '?', WorktreeCode: '?'}, false, icons); got != "" {
+	if got := statusFileIcon(stage.StageFileStatus{IndexStatus: '?', WorktreeCode: '?'}, false, icons); got != "" {
 		t.Fatalf("untracked icon = %q, want new file icon", got)
 	}
-	if got := statusFileIcon(git.StageFileStatus{IndexStatus: 'A', WorktreeCode: ' '}, false, icons); got != "" {
+	if got := statusFileIcon(stage.StageFileStatus{IndexStatus: 'A', WorktreeCode: ' '}, false, icons); got != "" {
 		t.Fatalf("added icon = %q, want new file icon", got)
 	}
-	if got := statusFileIcon(git.StageFileStatus{IndexStatus: ' ', WorktreeCode: 'M'}, false, icons); got != "" {
+	if got := statusFileIcon(stage.StageFileStatus{IndexStatus: ' ', WorktreeCode: 'M'}, false, icons); got != "" {
 		t.Fatalf("modified icon = %q, want modified file icon", got)
 	}
 }
@@ -2701,7 +2703,7 @@ func TestStatusFileIconSymlink(t *testing.T) {
 	nerd := filetreePaneIconsFor(true)
 	plain := filetreePaneIconsFor(false)
 
-	modified := git.StageFileStatus{Path: "link", IndexStatus: ' ', WorktreeCode: 'M'}
+	modified := stage.StageFileStatus{Path: "link", IndexStatus: ' ', WorktreeCode: 'M'}
 	if got := statusFileIcon(modified, true, nerd); got != "󰌷" {
 		t.Fatalf("symlink nerd icon = %q, want symlink icon", got)
 	}
@@ -2710,7 +2712,7 @@ func TestStatusFileIconSymlink(t *testing.T) {
 	}
 
 	// Deleted symlink keeps the delete icon (deletion takes precedence).
-	deleted := git.StageFileStatus{Path: "link", IndexStatus: 'D'}
+	deleted := stage.StageFileStatus{Path: "link", IndexStatus: 'D'}
 	if got := statusFileIcon(deleted, true, nerd); got == "󰌷" {
 		t.Fatalf("deleted symlink should show delete icon, not symlink icon")
 	}
@@ -2747,11 +2749,11 @@ func TestLineModeCanUnstageSingleModifiedLine(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	staged, err := git.DiffPath(repo, "README.md", true, 1)
+	staged, err := stage.DiffPath(repo, "README.md", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
-	unstaged, err := git.DiffPath(repo, "README.md", false, 1)
+	unstaged, err := stage.DiffPath(repo, "README.md", false, 1)
 	if err != nil {
 		t.Fatalf("unstaged diff: %v", err)
 	}
@@ -2778,7 +2780,7 @@ func TestLineModeStagesSingleLineInUntrackedFile(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	staged, err := git.DiffPath(repo, "new.txt", true, 1)
+	staged, err := stage.DiffPath(repo, "new.txt", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
@@ -2824,7 +2826,7 @@ func TestLineModeUnstageOneOfAdjacentDeletedLinesDoesNotDuplicate(t *testing.T) 
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updatedModel.(Model)
 
-	staged, err := git.DiffPath(repo, "f.go", true, 1)
+	staged, err := stage.DiffPath(repo, "f.go", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
@@ -2889,7 +2891,7 @@ func TestLineModeUnstageBraceFromFirstHunkBlock(t *testing.T) {
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updatedModel.(Model)
 
-	staged, err := git.DiffPath(repo, "stage.go", true, 1)
+	staged, err := stage.DiffPath(repo, "stage.go", true, 1)
 	if err != nil {
 		t.Fatalf("staged diff: %v", err)
 	}
@@ -2920,7 +2922,7 @@ func TestVisualModeStagesLineRange(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	staged, err := git.DiffPath(repo, "range.txt", true, 1)
+	staged, err := stage.DiffPath(repo, "range.txt", true, 1)
 	if err != nil {
 		t.Fatalf("DiffPath cached: %v", err)
 	}
@@ -3043,11 +3045,11 @@ func TestVisualModeUnstagesLineRange(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
 	m = updated.(Model)
 
-	staged, err := git.DiffPath(repo, "range.txt", true, 1)
+	staged, err := stage.DiffPath(repo, "range.txt", true, 1)
 	if err != nil {
 		t.Fatalf("DiffPath(staged): %v", err)
 	}
-	unstaged, err := git.DiffPath(repo, "range.txt", false, 1)
+	unstaged, err := stage.DiffPath(repo, "range.txt", false, 1)
 	if err != nil {
 		t.Fatalf("DiffPath(unstaged): %v", err)
 	}

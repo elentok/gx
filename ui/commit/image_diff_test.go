@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/imagediff"
@@ -84,7 +84,7 @@ func newCommitImageDiffModel(t *testing.T, repo string, capability kittygraphics
 			return spies.capability
 		},
 	)
-	m.fetchImageDiffBlobs = func(ref string, file git.CommitFile) (oldBytes, newBytes []byte, oldOK, newOK bool) {
+	m.fetchImageDiffBlobs = func(ref string, file stage.CommitFile) (oldBytes, newBytes []byte, oldOK, newOK bool) {
 		spies.fetchCalls++
 		return spies.old, spies.new, len(spies.old) > 0, len(spies.new) > 0
 	}

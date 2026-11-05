@@ -75,8 +75,8 @@ func TestStashPush_StagedOnlyLeavesUnstaged(t *testing.T) {
 	// staged.txt is staged; unstaged.txt is left in the working tree.
 	writeFile(t, dir, "staged.txt", "staged change")
 	writeFile(t, dir, "unstaged.txt", "unstaged change")
-	if err := StagePath(dir, "staged.txt"); err != nil {
-		t.Fatalf("StagePath: %v", err)
+	if stdout, stderr, err := run.Exec(dir, []string{"add", "staged.txt"}); err != nil {
+		t.Fatalf("git add: %v\n%s", err, run.JoinOutput(stdout, stderr))
 	}
 
 	out, err := StashPush(dir, "staged-stash", true)
@@ -85,7 +85,7 @@ func TestStashPush_StagedOnlyLeavesUnstaged(t *testing.T) {
 	}
 
 	files := listFiles(t, dir)
-	if len(files) != 1 || files[0].Path != "unstaged.txt" {
+	if len(files) != 1 || files[0] != "unstaged.txt" {
 		t.Fatalf("expected only unstaged.txt to remain, got %v", files)
 	}
 	if list := stashList(t, dir); !strings.Contains(list, "staged-stash") {
@@ -97,8 +97,8 @@ func TestStashPush_StagedOnlyWithoutName(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 	writeFile(t, dir, "staged.txt", "staged change")
-	if err := StagePath(dir, "staged.txt"); err != nil {
-		t.Fatalf("StagePath: %v", err)
+	if stdout, stderr, err := run.Exec(dir, []string{"add", "staged.txt"}); err != nil {
+		t.Fatalf("git add: %v\n%s", err, run.JoinOutput(stdout, stderr))
 	}
 
 	out, err := StashPush(dir, "", true)
@@ -117,11 +117,18 @@ func writeFile(t *testing.T, dir, name, content string) {
 	}
 }
 
-func listFiles(t *testing.T, dir string) []StageFileStatus {
+// listFiles returns the paths git status reports as changed.
+func listFiles(t *testing.T, dir string) []string {
 	t.Helper()
-	files, err := ListStageFiles(dir)
+	stdout, stderr, err := run.Exec(dir, []string{"status", "--porcelain", "--untracked-files=all"})
 	if err != nil {
-		t.Fatalf("ListStageFiles: %v", err)
+		t.Fatalf("status: %v\n%s", err, run.JoinOutput(stdout, stderr))
+	}
+	var files []string
+	for _, line := range strings.Split(stdout, "\n") {
+		if len(line) > 3 {
+			files = append(files, line[3:])
+		}
 	}
 	return files
 }

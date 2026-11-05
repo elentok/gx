@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/imagediff"
@@ -62,7 +62,7 @@ func newImageDiffTestModel(t *testing.T, repo string, settings ui.Settings, capa
 			return spies.capability
 		},
 	)
-	m.fetchImageDiffBlobs = func(file git.StageFileStatus, cached bool) (oldBytes, newBytes []byte, oldOK, newOK bool) {
+	m.fetchImageDiffBlobs = func(file stage.StageFileStatus, cached bool) (oldBytes, newBytes []byte, oldOK, newOK bool) {
 		spies.fetchCalls++
 		return spies.old, spies.new, len(spies.old) > 0, len(spies.new) > 0
 	}

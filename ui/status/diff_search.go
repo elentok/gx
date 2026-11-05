@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -68,7 +68,7 @@ func (m *Model) syncSearchToInactivePane() {
 	inactive.Search().DismissAndKeepResults()
 }
 
-func (m Model) filetreeEntrySearchText(entry tree.Entry[git.StageFileStatus]) string {
+func (m Model) filetreeEntrySearchText(entry tree.Entry[stage.StageFileStatus]) string {
 	name := entry.DisplayName
 	if !entry.HasChildren && entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
 		name = entry.Value.RenameFrom + " -> " + entry.ID

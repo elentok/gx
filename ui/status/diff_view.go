@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
@@ -162,7 +162,7 @@ func (m Model) diffSectionPaneTitle(title string, section diffarea.Section, expa
 	return title + ": " + m.diffDisplayedPath(file.stageFile)
 }
 
-func (m Model) diffDisplayedPath(file git.StageFileStatus) string {
+func (m Model) diffDisplayedPath(file stage.StageFileStatus) string {
 	if file.IsRenamed() && file.RenameFrom != "" {
 		return file.RenameFrom + " -> " + file.Path
 	}
@@ -207,7 +207,7 @@ func (m Model) binarySummaryLine() string {
 	if !ok {
 		return "binary file"
 	}
-	prevSize, newSize, prevOK, newOK := git.BinaryFileSizes(m.worktreeRoot, file.stageFile)
+	prevSize, newSize, prevOK, newOK := stage.BinaryFileSizes(m.worktreeRoot, file.stageFile)
 	if !prevOK && !newOK {
 		return "binary file"
 	}

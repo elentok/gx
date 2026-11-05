@@ -1,7 +1,7 @@
 package status
 
 import (
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -18,7 +18,7 @@ type statusEntry struct {
 	ParentPath       string
 	Depth            int
 	DisplayName      string
-	File             git.StageFileStatus
+	File             stage.StageFileStatus
 	HasStaged        bool
 	HasUnstaged      bool
 	HasOnlyUntracked bool
@@ -32,13 +32,13 @@ type aggregateStatus struct {
 	onlyUntracked bool
 }
 
-func buildStatusEntries(files []git.StageFileStatus, collapsed map[string]bool) []statusEntry {
+func buildStatusEntries(files []stage.StageFileStatus, collapsed map[string]bool) []statusEntry {
 	entries, _ := buildStatusEntriesAndRows(files, collapsed)
 	return entries
 }
 
-func buildStatusEntriesAndRows(files []git.StageFileStatus, collapsed map[string]bool) ([]statusEntry, []tree.Entry[git.StageFileStatus]) {
-	entries := tree.BuildEntriesFromPaths(files, func(file git.StageFileStatus) string {
+func buildStatusEntriesAndRows(files []stage.StageFileStatus, collapsed map[string]bool) ([]statusEntry, []tree.Entry[stage.StageFileStatus]) {
+	entries := tree.BuildEntriesFromPaths(files, func(file stage.StageFileStatus) string {
 		return file.Path
 	}, collapsed)
 	out := make([]statusEntry, 0, len(entries))
@@ -48,7 +48,7 @@ func buildStatusEntriesAndRows(files []git.StageFileStatus, collapsed map[string
 	return out, entries
 }
 
-func aggregateStatusFiles(files []git.StageFileStatus) aggregateStatus {
+func aggregateStatusFiles(files []stage.StageFileStatus) aggregateStatus {
 	agg := aggregateStatus{}
 	for _, file := range files {
 		childAgg := aggregateStatus{
@@ -68,7 +68,7 @@ func aggregateStatusFiles(files []git.StageFileStatus) aggregateStatus {
 	return agg
 }
 
-func statusEntryFromRow(row tree.Entry[git.StageFileStatus]) statusEntry {
+func statusEntryFromRow(row tree.Entry[stage.StageFileStatus]) statusEntry {
 	entry := statusEntry{
 		Path:        row.ID,
 		ParentPath:  row.ParentID,

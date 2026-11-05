@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui/keys"
@@ -143,11 +143,11 @@ func setupRemoteAndClone(t *testing.T, initialBranch string) (remoteBare, cloneD
 
 func stagedAndUnstagedDiff(t *testing.T, repoDir, path string) (string, string) {
 	t.Helper()
-	staged, err := git.DiffPath(repoDir, path, true, 1)
+	staged, err := stage.DiffPath(repoDir, path, true, 1)
 	if err != nil {
 		t.Fatalf("DiffPath(cached,%s): %v", path, err)
 	}
-	unstaged, err := git.DiffPath(repoDir, path, false, 1)
+	unstaged, err := stage.DiffPath(repoDir, path, false, 1)
 	if err != nil {
 		t.Fatalf("DiffPath(unstaged,%s): %v", path, err)
 	}

@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 )
@@ -60,7 +61,7 @@ func New() Model {
 
 // Open fetches staged files, checks push status, computes the step list, and opens the modal.
 func (m *Model) Open(root, hash, subject string) error {
-	staged, err := git.StagedFiles(root)
+	staged, err := stage.StagedFiles(root)
 	if err != nil {
 		return err
 	}

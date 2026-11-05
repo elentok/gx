@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/help"
@@ -36,7 +38,7 @@ type Model struct {
 	diffarea         diffarea.Model
 	diffContextLines int
 	statusData       statusData
-	fileTreeModel    tree.Model[git.StageFileStatus]
+	fileTreeModel    tree.Model[stage.StageFileStatus]
 
 	err            error
 	errorOpen      bool
@@ -78,16 +80,16 @@ type Model struct {
 	keys                    keys.Manager
 
 	overlay             imagediff.Overlay
-	fetchImageDiffBlobs func(file git.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool)
+	fetchImageDiffBlobs func(file stage.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool)
 }
 
 type statusData struct {
-	files         []git.StageFileStatus
+	files         []stage.StageFileStatus
 	branchName    string
 	branchBaseRef string
 	branchSync    git.SyncStatus
 	statusEntries []statusEntry
-	statusRows    []tree.Entry[git.StageFileStatus]
+	statusRows    []tree.Entry[stage.StageFileStatus]
 	listState     list.Model
 }
 
@@ -137,7 +139,7 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 	}
 	statusKeys := newStatusManager()
 	diffarreaModel := diffarea.NewModel(settings.UseNerdFontIcons)
-	fileTreeModel := tree.NewModel[git.StageFileStatus](toggleStageBinding, discardBinding)
+	fileTreeModel := tree.NewModel[stage.StageFileStatus](toggleStageBinding, discardBinding)
 	m := Model{
 		worktreeRoot:     worktreeRoot,
 		isBareRepo:       isBareRepo,
@@ -157,8 +159,8 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 		stash:            stash.New(),
 
 		overlay: imagediff.NewOverlay(imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
-		fetchImageDiffBlobs: func(file git.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool) {
-			return git.ImageDiffBlobs(worktreeRoot, file, cached)
+		fetchImageDiffBlobs: func(file stage.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool) {
+			return stage.ImageDiffBlobs(worktreeRoot, file, cached)
 		},
 	}
 

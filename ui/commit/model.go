@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
@@ -60,7 +62,7 @@ type Model struct {
 	screenCol           int
 	screenRow           int
 	screenVisible       bool
-	fetchImageDiffBlobs func(ref string, file git.CommitFile) (old, newBytes []byte, oldOK, newOK bool)
+	fetchImageDiffBlobs func(ref string, file stage.CommitFile) (old, newBytes []byte, oldOK, newOK bool)
 }
 
 type editCommentFinishedMsg struct {
@@ -74,8 +76,8 @@ type commitDiffArea struct {
 }
 
 type commitSidebarState struct {
-	files         []git.CommitFile
-	fileTreeModel tree.Model[git.CommitFile]
+	files         []stage.CommitFile
+	fileTreeModel tree.Model[stage.CommitFile]
 }
 
 func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraKeys keys.Manager) Model {
@@ -92,13 +94,13 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 			diffContextLines: settings.DiffContextLines,
 		},
 		commitSidebarState: commitSidebarState{
-			fileTreeModel: tree.NewModel[git.CommitFile](),
+			fileTreeModel: tree.NewModel[stage.CommitFile](),
 		},
 		keys: newCommitManager(),
 		overlay: imagediff.NewOverlay(
 			imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
-		fetchImageDiffBlobs: func(ref string, file git.CommitFile) (old, newBytes []byte, oldOK, newOK bool) {
-			return git.CommitImageDiffBlobs(worktreeRoot, ref, file)
+		fetchImageDiffBlobs: func(ref string, file stage.CommitFile) (old, newBytes []byte, oldOK, newOK bool) {
+			return stage.CommitImageDiffBlobs(worktreeRoot, ref, file)
 		},
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, extraKeys), settings.About)
@@ -188,7 +190,7 @@ func (m *Model) reload() {
 		m.headerOffset = 0
 		return
 	}
-	m.files, m.err = git.CommitFilesForRef(m.worktreeRoot, m.ref)
+	m.files, m.err = stage.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.diffModel.SetData(diffview.NewDiffData())
 		m.headerOffset = 0
@@ -196,7 +198,7 @@ func (m *Model) reload() {
 	}
 	entries := tree.BuildEntriesFromPaths(
 		m.files,
-		func(file git.CommitFile) string { return file.Path },
+		func(file stage.CommitFile) string { return file.Path },
 		m.fileTreeModel.CollapsedIDs(),
 	)
 	m.fileTreeModel.SetEntries(entries)
@@ -214,14 +216,14 @@ func (m *Model) refreshDiff() {
 		m.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
-	rawDiff, err := git.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffContextLines())
+	rawDiff, err := stage.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffContextLines())
 	if err != nil {
 		m.err = err
 		m.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
 	sideBySide := m.diffModel.RenderMode() == diffview.RenderModeSideBySide
-	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.settings.Home(), m.ref, file.Path, m.currentDiffContextLines(), m.currentDiffRenderWidth(), sideBySide)
+	colorDiff, err := stage.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.settings.Home(), m.ref, file.Path, m.currentDiffContextLines(), m.currentDiffRenderWidth(), sideBySide)
 	if err != nil {
 		colorDiff = rawDiff
 	}

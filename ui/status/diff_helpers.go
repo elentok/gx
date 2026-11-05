@@ -1,7 +1,7 @@
 package status
 
 import (
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/status/diffarea"
 )
 
@@ -9,7 +9,7 @@ type statusDiffFileSelection struct {
 	Path       string
 	RenameFrom string
 	Untracked  bool
-	stageFile  git.StageFileStatus
+	stageFile  stage.StageFileStatus
 }
 
 type statusDiffSelection struct {

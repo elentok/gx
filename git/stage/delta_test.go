@@ -1,4 +1,4 @@
-package git
+package stage
 
 import (
 	"os"

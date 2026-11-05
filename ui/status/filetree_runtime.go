@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -16,17 +17,17 @@ func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
 	return m.statusData.statusEntries[m.statusData.listState.Selected()], true
 }
 
-func (m Model) selectedFiletreeRow() (tree.Entry[git.StageFileStatus], bool) {
+func (m Model) selectedFiletreeRow() (tree.Entry[stage.StageFileStatus], bool) {
 	if m.statusData.listState.Selected() < 0 || m.statusData.listState.Selected() >= len(m.statusData.statusRows) {
-		return tree.Entry[git.StageFileStatus]{}, false
+		return tree.Entry[stage.StageFileStatus]{}, false
 	}
 	return m.statusData.statusRows[m.statusData.listState.Selected()], true
 }
 
-func (m Model) selectedFile() (git.StageFileStatus, bool) {
+func (m Model) selectedFile() (stage.StageFileStatus, bool) {
 	entry, ok := m.selectedFiletreeEntry()
 	if !ok || entry.Kind != statusEntryFile {
-		return git.StageFileStatus{}, false
+		return stage.StageFileStatus{}, false
 	}
 	return entry.File, true
 }
@@ -38,7 +39,7 @@ func (m *Model) reload(preservePath string) tea.Cmd {
 }
 
 func (m *Model) reloadFileList(preservePath string) {
-	files, err := git.ListStageFiles(m.worktreeRoot)
+	files, err := stage.ListStageFiles(m.worktreeRoot)
 	if err != nil {
 		m.err = err
 		m.statusData.files = nil
@@ -134,9 +135,9 @@ func (m *Model) toggleStageStatusEntry() tea.Cmd {
 	stageAll := entry.HasUnstaged
 	var err error
 	if stageAll {
-		err = git.StagePath(m.worktreeRoot, path)
+		err = stage.StagePath(m.worktreeRoot, path)
 	} else if entry.HasStaged {
-		err = git.UnstagePath(m.worktreeRoot, path)
+		err = stage.UnstagePath(m.worktreeRoot, path)
 	} else {
 		return nil
 	}
@@ -206,7 +207,7 @@ func (m *Model) openDiscardStatusConfirm() {
 	m.confirmPreservePath = entry.Path
 }
 
-func statusDiscardPathsForLeaves(files []git.StageFileStatus) (restorePaths, deletePaths []string) {
+func statusDiscardPathsForLeaves(files []stage.StageFileStatus) (restorePaths, deletePaths []string) {
 	for _, file := range files {
 		switch {
 		case file.IsUntracked():

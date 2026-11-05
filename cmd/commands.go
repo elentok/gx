@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/nav"
 
 	"github.com/spf13/cobra"
@@ -148,7 +148,7 @@ func resolveLogFile(d deps, file string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	root, err := git.WorktreeRoot(cwd)
+	root, err := stage.WorktreeRoot(cwd)
 	if err != nil {
 		return "", err
 	}
@@ -157,7 +157,7 @@ func resolveLogFile(d deps, file string) (string, error) {
 	if canon, e := filepath.EvalSymlinks(cwd); e == nil {
 		cwd = canon
 	}
-	return git.RepoRelativePath(cwd, file, root)
+	return stage.RepoRelativePath(cwd, file, root)
 }
 
 func newShowCmd(d deps) *cobra.Command {

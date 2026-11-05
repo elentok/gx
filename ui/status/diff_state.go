@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/notify"
@@ -13,14 +13,14 @@ import (
 
 func (m *Model) colorizeDiffsSync(filePath, unstagedRaw, stagedRaw string, sideBySide bool, renderWidth int) (unstagedColor, stagedColor string) {
 	contextLines := m.currentDiffContextLines()
-	unstagedColor, _ = git.ColorizeDiff(m.worktreeRoot, m.settings.Home(), filePath, unstagedRaw, false, sideBySide, renderWidth, contextLines)
-	stagedColor, _ = git.ColorizeDiff(m.worktreeRoot, m.settings.Home(), filePath, stagedRaw, true, sideBySide, renderWidth, contextLines)
+	unstagedColor, _ = stage.ColorizeDiff(m.worktreeRoot, m.settings.Home(), filePath, unstagedRaw, false, sideBySide, renderWidth, contextLines)
+	stagedColor, _ = stage.ColorizeDiff(m.worktreeRoot, m.settings.Home(), filePath, stagedRaw, true, sideBySide, renderWidth, contextLines)
 	return unstagedColor, stagedColor
 }
 
 func (m *Model) colorizeUntrackedSync(filePath, rawDiff string, sideBySide bool, renderWidth int) string {
 	contextLines := m.currentDiffContextLines()
-	color, _ := git.ColorizeUntrackedDiff(m.worktreeRoot, m.settings.Home(), filePath, rawDiff, sideBySide, renderWidth, contextLines)
+	color, _ := stage.ColorizeUntrackedDiff(m.worktreeRoot, m.settings.Home(), filePath, rawDiff, sideBySide, renderWidth, contextLines)
 	return color
 }
 
@@ -40,7 +40,7 @@ func (m *Model) applySelection() tea.Cmd {
 	diffviewModel := m.diffarea.ActiveSectionModel()
 	sig := movedTarget{fromSection: m.diffarea.ActiveSection, navMode: m.diffarea.NavMode()}
 	if file.Untracked && m.diffarea.ActiveSection == diffarea.SectionUnstaged {
-		if err := git.StageIntentPath(m.worktreeRoot, file.Path); err != nil {
+		if err := stage.StageIntentPath(m.worktreeRoot, file.Path); err != nil {
 			m.showGitError(err)
 			return nil
 		}
@@ -56,7 +56,7 @@ func (m *Model) applySelection() tea.Cmd {
 			return notify.Error(err.Error())
 		}
 		reverse := m.diffarea.ActiveSection == diffarea.SectionStaged
-		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
+		if err := stage.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, false); err != nil {
 			if !isCorruptPatchErr(err) {
 				m.showGitError(err)
 				return nil
@@ -73,7 +73,7 @@ func (m *Model) applySelection() tea.Cmd {
 				m.showGitError(err)
 				return nil
 			}
-			if fallbackApplyErr := git.ApplyPatchToIndex(m.worktreeRoot, fallbackPatch, reverse, true); fallbackApplyErr != nil {
+			if fallbackApplyErr := stage.ApplyPatchToIndex(m.worktreeRoot, fallbackPatch, reverse, true); fallbackApplyErr != nil {
 				m.showGitError(err)
 				return nil
 			}
@@ -101,7 +101,7 @@ func (m *Model) applySelection() tea.Cmd {
 			return notify.Error(err.Error())
 		}
 		reverse := m.diffarea.ActiveSection == diffarea.SectionStaged
-		if err := git.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, true); err != nil {
+		if err := stage.ApplyPatchToIndex(m.worktreeRoot, patch, reverse, true); err != nil {
 			m.showGitError(err)
 			return nil
 		}
@@ -147,7 +147,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.activeFilePath = file.Path
 	}
 	if file.Untracked {
-		raw, err := git.DiffUntrackedPath(m.worktreeRoot, m.settings.Home(), file.Path, false, false, 0, m.currentDiffContextLines())
+		raw, err := stage.DiffUntrackedPath(m.worktreeRoot, m.settings.Home(), file.Path, false, false, 0, m.currentDiffContextLines())
 		if err != nil {
 			m.showGitError(err)
 			raw = ""
@@ -162,12 +162,12 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		return nil
 	}
 
-	unstagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, false, m.currentDiffContextLines())
+	unstagedRaw, err := stage.DiffPath(m.worktreeRoot, file.Path, false, m.currentDiffContextLines())
 	if err != nil {
 		m.showGitError(err)
 		unstagedRaw = ""
 	}
-	stagedRaw, err := git.DiffPath(m.worktreeRoot, file.Path, true, m.currentDiffContextLines())
+	stagedRaw, err := stage.DiffPath(m.worktreeRoot, file.Path, true, m.currentDiffContextLines())
 	if err != nil {
 		m.showGitError(err)
 		stagedRaw = ""

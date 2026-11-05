@@ -3,7 +3,7 @@ package commit
 import (
 	"strings"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/imagediff"
 
@@ -51,7 +51,7 @@ func (m Model) overlaySignature() overlaySignature {
 // rendering in the commit detail panel: extension allowlisted, config enabled,
 // and the host terminal supports kitty graphics. Otherwise behavior is the plain
 // "binary file" summary line.
-func (m *Model) isImageDiffEligible(file git.CommitFile) bool {
+func (m *Model) isImageDiffEligible(file stage.CommitFile) bool {
 	if !m.settings.ImageDiffs {
 		return false
 	}

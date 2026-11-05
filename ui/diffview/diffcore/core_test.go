@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/diffview/diffrender"
@@ -165,7 +165,7 @@ func TestBuildHunkPatch_ApplyToIndex_WithIndentedGoLines(t *testing.T) {
 	}, "\n") + "\n"
 	testutil.WriteFile(t, repo, "a.go", updated)
 
-	raw, err := git.DiffPath(repo, "a.go", false, 1)
+	raw, err := stage.DiffPath(repo, "a.go", false, 1)
 	if err != nil {
 		t.Fatalf("DiffPath: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestBuildHunkPatch_ApplyToIndex_WithIndentedGoLines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildHunkPatch: %v", err)
 	}
-	if err := git.ApplyPatchToIndex(repo, patch, false, false); err != nil {
+	if err := stage.ApplyPatchToIndex(repo, patch, false, false); err != nil {
 		t.Fatalf("ApplyPatchToIndex failed: %v\npatch:\n%s", err, patch)
 	}
 }

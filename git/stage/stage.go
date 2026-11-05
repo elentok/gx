@@ -1,8 +1,9 @@
-package git
+package stage
 
 import (
 	"bytes"
 	"fmt"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"path/filepath"
@@ -235,7 +236,7 @@ func ApplyPatchToIndex(worktreeRoot, patch string, reverse bool, unidiffZero boo
 	if err == nil {
 		return nil
 	}
-	if runErr, ok := err.(*RunError); ok {
+	if runErr, ok := err.(*git.RunError); ok {
 		if strings.TrimSpace(runErr.Stdout) == "" && strings.TrimSpace(runErr.Stderr) == "" {
 			return fmt.Errorf("%w\npatch:\n%s", err, patch)
 		}
@@ -256,7 +257,7 @@ func ApplyPatchToWorktree(worktreeRoot, patch string, reverse bool, unidiffZero 
 	if err == nil {
 		return nil
 	}
-	if runErr, ok := err.(*RunError); ok {
+	if runErr, ok := err.(*git.RunError); ok {
 		if strings.TrimSpace(runErr.Stdout) == "" && strings.TrimSpace(runErr.Stderr) == "" {
 			return fmt.Errorf("%w\npatch:\n%s", err, patch)
 		}
@@ -289,6 +290,21 @@ func DiscardUntrackedPath(worktreeRoot, relPath string) error {
 	return os.RemoveAll(target)
 }
 
+// StagedFiles returns the paths of files with staged index changes.
+func StagedFiles(root string) ([]string, error) {
+	files, err := ListStageFiles(root)
+	if err != nil {
+		return nil, err
+	}
+	var staged []string
+	for _, f := range files {
+		if f.HasStagedChanges() {
+			staged = append(staged, f.Path)
+		}
+	}
+	return staged, nil
+}
+
 // StagePath stages a full path (used for untracked files).
 func StagePath(worktreeRoot, path string) error {
 	_, _, err := run.Exec(worktreeRoot, []string{"add", "--", path})
@@ -302,12 +318,12 @@ func StageIntentPath(worktreeRoot, path string) error {
 }
 
 func runGitAllowExitCodes(dir string, stdin []byte, allowed map[int]bool, args ...string) (string, error) {
-	o := RunOptions{AllowExit: allowed}
+	o := git.RunOptions{AllowExit: allowed}
 	if stdin != nil {
 		o.Stdin = bytes.NewReader(stdin)
 	}
-	out, _, err := RunWith(dir, NonInteractiveEnv(), o, args...)
-	if runErr, ok := err.(*RunError); ok && runErr.Stderr == "" {
+	out, _, err := git.RunWith(dir, git.NonInteractiveEnv(), o, args...)
+	if runErr, ok := err.(*git.RunError); ok && runErr.Stderr == "" {
 		runErr.Stderr = runErr.Stdout
 	}
 	return out, err

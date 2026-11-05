@@ -3,7 +3,7 @@ package status
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/diffview"
 )
 
@@ -26,7 +26,7 @@ func (m Model) deltaRenderWidth() int {
 
 func (m *Model) toggleRenderMode() tea.Cmd {
 	if m.diffarea.RenderMode() == diffview.RenderModeUnified {
-		if !git.DeltaAvailable() {
+		if !stage.DeltaAvailable() {
 			return nil
 		}
 		m.diffarea.SetRenderMode(diffview.RenderModeSideBySide)

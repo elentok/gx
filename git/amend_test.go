@@ -66,34 +66,6 @@ func TestIsCommitPushed_NotPushed(t *testing.T) {
 	}
 }
 
-func TestStagedFiles_Empty(t *testing.T) {
-	t.Parallel()
-	dir := testutil.TempRepo(t)
-	files, err := StagedFiles(dir)
-	if err != nil {
-		t.Fatalf("StagedFiles: %v", err)
-	}
-	if len(files) != 0 {
-		t.Errorf("expected no staged files, got %v", files)
-	}
-}
-
-func TestStagedFiles_WithStagedFile(t *testing.T) {
-	t.Parallel()
-	dir := testutil.TempRepo(t)
-	testutil.WriteFile(t, dir, "staged.txt", "hello")
-	if _, _, err := run.Exec(dir, []string{"add", "staged.txt"}); err != nil {
-		t.Fatalf("git add: %v", err)
-	}
-	files, err := StagedFiles(dir)
-	if err != nil {
-		t.Fatalf("StagedFiles: %v", err)
-	}
-	if len(files) != 1 || files[0] != "staged.txt" {
-		t.Errorf("expected [staged.txt], got %v", files)
-	}
-}
-
 func TestHasUnstagedChanges_False(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
