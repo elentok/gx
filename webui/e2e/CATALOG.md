@@ -23,7 +23,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (115). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (121). Before you add a flow, add a step to a flow on the same scenario
 (see `skills/gx-playwright-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -147,6 +147,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **`agents-session.e2e.ts`:** **75. Read a session**; **103. Rate-limit hold**; **104. Usage gate and override.**
 - **`agents-composer.e2e.ts`:** **76. Send and draft (and Promote to Design)**; **78. Send refused**; **91. Removed session draft**; **93. Shared draft.**
   - **76.** Scenario: `agents-promote`. After the send steps: on a Claude and a Codex session with one message, type a draft and click Promote to Design. Pass: the fake agent receives `/gx-promote-to-design` (Codex: `$gx-promote-to-design`), the draft stays, no dialog opens. The button's disabled states and its absence on Design and Queue agents are in `AgentsPage.promote.test.tsx`.
+- **`composer-images.e2e.ts`:** **182. Paste images** (`agents`, 1280 px: one PNG, then three images in one paste; thumbnails in order, "4 of 10 images"); **183. Drop images** (two files dropped on the composer); **184. Add image button** (390 px: Add shows before any image, a multi-file pick adds thumbnails, a busy session still takes images); **184. Add image button, design composer** (`design`: the picked thumbnails show on the Agents page of the same session); **187. Remove image** (the thumbnail leaves and the file leaves `<DataDir>/sessions/<id>/images`); **188. Image limits** (11 picked, ten show, "Max 10 images").
 - **`agents-keys.e2e.ts`:** **156. Key bar and Type field in the screen view**; **156. Type refuses !x**; **156. Error-blocked session, Type and Enter get out**; **160. Phone, key input and Blocked notices.**
 - **`agents-commands.e2e.ts`:** **149. Command list freshness and failure, refresh**; **152. Phone, command menu.**
 - **`agents-commands-send.e2e.ts`:** **153. Send a command, typed once or nudged, and /clear**; **154. Commands in a design session** (two flows: `/clear` and `/compact` with keys, Type and Close dialog; Continue with the countdown off).

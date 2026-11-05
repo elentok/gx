@@ -12,7 +12,10 @@ import (
 // Lower it whenever flows are removed (docs/plans/slim-e2e-suite.md aims for
 // about 100). Raise it only with a reason in the commit, after trying vitest or
 // a Go test (skills/gx-playwright-e2es, "Write an e2e only when...").
-const maxFlows = 115
+// Composer image flows (+6): paste, drop and the file picker need real browser
+// clipboard/drag events and a server round trip to the session's image dir,
+// which jsdom tests cannot see.
+const maxFlows = 121
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

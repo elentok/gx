@@ -108,6 +108,8 @@ export interface Fixture {
   writeStoreFile(path: string, content: string): Promise<void>;
   /** Reads a file under the fixture's ticket store. */
   readStoreFile(path: string): Promise<string>;
+  /** The uploaded image files in `<DataDir>/sessions/<id>/images`, without the sent markers. */
+  sessionImages(id: string): Promise<string[]>;
   /** Merges `patch` into the top-level keys of `project`'s `project.json`. */
   patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
@@ -286,6 +288,10 @@ async function startFixture(
       await writeFile(file, content);
     },
     readStoreFile: (path) => readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", path), "utf8"),
+    async sessionImages(id) {
+      const names = await readdir(join(env.XDG_DATA_HOME!, "gx", "sessions", id, "images")).catch(() => [] as string[]);
+      return names.filter((n) => !n.startsWith("."));
+    },
     async patchProjectConfig(project, patch) {
       const path = join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json");
       const next = { ...JSON.parse(await readFile(path, "utf8")), ...patch };
