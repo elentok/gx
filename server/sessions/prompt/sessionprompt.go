@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
 
@@ -52,6 +53,17 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if req.Continue && !meta.Design {
 		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
+	if req.Promote {
+		if req.Continue {
+			return sessions.Refusal(wire.ReasonSessionBadRequest, "continue and promote cannot be combined"), nil
+		}
+		// A Queue agent never gets here: SessionDir refuses its id as unknown.
+		if meta.Design {
+			return sessions.Refusal(wire.ReasonSessionNotPlain, fmt.Sprintf("session %s is a design session, not a plain one", req.ID)), nil
+		}
+		// The server builds the command, so the prefix rule stays closed to the page.
+		req.Text = harness.SkillCommand(meta.Harness, "gx-promote-to-design", "")
+	}
 	if !p.settings.Load().HasChatReader(meta.Harness) {
 		return sessions.Refusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
@@ -79,6 +91,9 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	ev := runlog.Event{
 		Time: time.Now(), Type: string(events.SessionPrompted),
 		Session: req.ID, Source: source, Action: "text", Bytes: len(text),
+	}
+	if req.Promote {
+		ev.Action = "promote"
 	}
 	if req.Continue {
 		// The server builds the slash commands, so the prefix rule stays closed

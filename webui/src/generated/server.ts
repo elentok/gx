@@ -1761,10 +1761,11 @@ export const ReasonSessionNoResume = "no-resume";
 export const ReasonSessionNotDesign = "not-design-session";
 export const ReasonSessionNameTaken = "name-taken";
 export const ReasonSessionQueue = "queue-session";
+export const ReasonSessionNotPlain = "not-plain-session";
 /**
  * Refusal reasons of the interactive-session writes.
  */
-export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue;
+export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue | typeof ReasonSessionNotPlain;
 export const SessionStarting = "starting";
 export const SessionWorking = "working";
 export const SessionIdle = "idle";
@@ -1976,6 +1977,11 @@ export interface SessionPromptRequest {
    * Continue replaces Text: the server types /clear and /gx-design <epic>.
    */
   continue?: boolean;
+  /**
+   * Promote replaces Text with the gx-promote-to-design skill command. It is
+   * for a plain session only, and excludes Continue.
+   */
+  promote?: boolean;
 }
 /**
  * SessionRoundOption is one choice of an options card.

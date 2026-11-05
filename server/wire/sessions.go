@@ -23,6 +23,7 @@ const (
 	ReasonSessionNotDesign      = "not-design-session"
 	ReasonSessionNameTaken      = "name-taken"
 	ReasonSessionQueue          = "queue-session"
+	ReasonSessionNotPlain       = "not-plain-session"
 )
 
 // Session states, as SessionStatus.State.
@@ -207,6 +208,9 @@ type SessionPromptRequest struct {
 	LastMessage string `json:"last_message,omitempty"`
 	// Continue replaces Text: the server types /clear and /gx-design <epic>.
 	Continue bool `json:"continue,omitempty"`
+	// Promote replaces Text with the gx-promote-to-design skill command. It is
+	// for a plain session only, and excludes Continue.
+	Promote bool `json:"promote,omitempty"`
 }
 
 // SessionRoundOption is one choice of an options card.
