@@ -39,7 +39,7 @@ func (s *Server) startAfterMigrations(ctx context.Context) bool {
 	// The first scan comes first: it fills the index the steps below read, and
 	// it also raises the parent defects.
 	s.startupStep("first-rescan", s.idx.Rescan)
-	s.startupStep("recover-merges", s.merger.recoverMerges)
+	s.startupStep("recover-merges", s.merger.RecoverMerges)
 	// Running agents stay invisible to a restart, only a little later.
 	s.startupStep("reclaim-runs", s.reclaimRuns)
 	s.logFlushingRunners()

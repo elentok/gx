@@ -435,7 +435,7 @@ func TestCompleteRootIfDone_ResolvedCrossEpicBlockersCompleteTheEpic(t *testing.
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
 
-	s.merger.completeRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
+	s.merger.CompleteRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
 	s.chat.Close()
 	got := wait(1)
 	if len(got) != 1 || !strings.Contains(got[0], "epic complete") || !strings.Contains(got[0], "2 done · 2 total") {
@@ -462,7 +462,7 @@ func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testin
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/99")
 
-	s.merger.completeRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
+	s.merger.CompleteRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
 	s.chat.Close()
 	if got := wait(-1); len(got) != 0 {
 		t.Fatalf("sends = %v, want none", got)

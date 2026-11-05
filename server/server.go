@@ -330,7 +330,6 @@ func New(cfg Config) (*Server, error) {
 
 		focus: sessions.NewFocusReports(),
 	}
-	s.rec = newReconciler(s)
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
@@ -369,9 +368,11 @@ func New(cfg Config) (*Server, error) {
 	s.writer = newTicketWriter(s)
 	s.recovery = newRecovery(s)
 	// Built once the fields they copy are set; they and rec reach each other through s.
+	s.rec = newReconciler(s)
 	s.landing = newLanding(s)
 	s.merger = newMerger(s)
 	s.landing.merger = s.merger
+	s.rec.merger = s.merger
 	s.settings.Init(settings.Options{
 		ConfigPath: cfg.ConfigPath,
 		Startup: settings.Startup{
@@ -435,6 +436,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.sessions = newManager(s)
+	s.rec.sessions = s.sessions
 	s.resumer = newResumer(s)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished
@@ -444,8 +446,8 @@ func New(cfg Config) (*Server, error) {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
 	}
 	// The rescan steps run in this order after every store scan.
-	s.idx.OnRescan(s.rec.scanParentDefects)
-	s.idx.OnRescan(s.rec.scanLateFinishes)
+	s.idx.OnRescan(s.rec.ScanParentDefects)
+	s.idx.OnRescan(s.rec.ScanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.scanDesignCleanups)
 	s.idx.SetReady(s.migrationsEnded)
@@ -494,8 +496,8 @@ var routeTable = []struct {
 	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAnswer)(w, r) }},
 	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
-	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.merger.epicMerge)(w, r) }},
-	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.landing.epicStashMerge)(w, r) }},
+	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.merger.EpicMerge)(w, r) }},
+	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.landing.EpicStashMerge)(w, r) }},
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},
 	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},
@@ -565,7 +567,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 			snap.Tickets[i].Recovery = ticketwrite.RecoveryState(s.pauseHold.State(t.Address), t.Address, snap.Tickets)
 		}
 	}
-	s.merger.fillEpicMergeTargets(snap.Tickets)
+	s.merger.FillEpicMergeTargets(snap.Tickets)
 	snap.Build = s.cfg.Build
 	snap.Instance = s.instanceID
 	snap.MigrationFailures = s.MigrationFailures()

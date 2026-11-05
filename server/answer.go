@@ -103,7 +103,7 @@ func validateAnswer(q tickets.Question, req wire.QueueRequest) (answer, note str
 // agent.
 func (s *Server) ticketAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 	return s.writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
-		if s.rec.adoptFirst(ref.ProjectDir, ref.Addr, ref.Ticket.Path) {
+		if s.rec.AdoptFirst(ref.ProjectDir, ref.Addr, ref.Ticket.Path) {
 			return wire.QueueResult{Outcome: wire.OutcomeAdopted}, nil
 		}
 		address := ref.Addr.String()

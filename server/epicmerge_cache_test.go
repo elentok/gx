@@ -31,20 +31,20 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 	t.Cleanup(func() { gitIsAncestor = orig })
 
 	key := tickets.Address{Project: "proj", Epic: "b"}
-	if got := s.merger.epicMergeTarget(key); got != "a" {
+	if got := s.merger.EpicMergeTarget(key); got != "a" {
 		t.Fatalf("target = %q, want a", got)
 	}
 	first := calls
 	if first == 0 {
 		t.Fatal("first resolve made no ancestry call; the fixture doesn't exercise git")
 	}
-	if got := s.merger.epicMergeTarget(key); got != "a" || calls != first {
+	if got := s.merger.EpicMergeTarget(key); got != "a" || calls != first {
 		t.Errorf("repeat: target %q, %d new git calls, want a and none", got, calls-first)
 	}
 
 	// A trunk move merges the blocker, so the target is fresh trunk again.
 	runGit(t, repo, "branch", "-f", "develop", "a")
-	if got := s.merger.epicMergeTarget(key); got != "develop" {
+	if got := s.merger.EpicMergeTarget(key); got != "develop" {
 		t.Errorf("after trunk move: target %q, want develop", got)
 	}
 
@@ -53,8 +53,8 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 	origRead := readProjectFile
 	readProjectFile = func(dir string) (config.ProjectFile, error) { reads++; return origRead(dir) }
 	t.Cleanup(func() { readProjectFile = origRead })
-	s.merger.epicMergeTarget(key)
-	s.merger.epicMergeTarget(key)
+	s.merger.EpicMergeTarget(key)
+	s.merger.EpicMergeTarget(key)
 	if reads > 1 {
 		t.Errorf("project.json read %d times over two snapshots, want at most 1", reads)
 	}
@@ -62,7 +62,7 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 	// A rescan (new epic slice) re-resolves.
 	before := calls
 	load(done("a"), done("b", "a/01"))
-	s.merger.epicMergeTarget(key)
+	s.merger.EpicMergeTarget(key)
 	if calls == before {
 		t.Error("a ticket change didn't re-resolve")
 	}

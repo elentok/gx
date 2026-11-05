@@ -18,16 +18,16 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// epicMerge is the manual merge trigger for an epic address: it merges the
+// EpicMerge is the manual merge trigger for an epic address: it merges the
 // epic's branch when it already fast-forwards, and forks a manual merge ticket
 // otherwise. A manual ticket resets the merge-ticket cap and merges the epic
 // whatever auto-ff-merge says.
-func (s *Merger) epicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
+func (s *Merger) EpicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 	m, err := s.loadMergeEpic(req)
 	if err != nil {
 		return mergeVerbError(err)
 	}
-	first, _, target, err := s.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
+	first, _, target, err := s.EpicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
 		return wire.QueueResult{}, err
 	}
@@ -72,8 +72,8 @@ func mergeVerbError(err error) (wire.QueueResult, error) {
 // shownEpicState is the state a merge request's token names, in the Epic
 // page's vocabulary. An Epics card shows the list state, which calls a
 // merge-blocked epic "merge-blocked" where the Epic page says paused.
-func shownEpicState(shown wire.EpicState, e tickets.Epic) wire.EpicState {
-	if shown == wire.EpicState(wire.EpicListMergeBlocked) && epicMergeBlocked(e) {
+func (s *Merger) shownEpicState(shown wire.EpicState, e tickets.Epic) wire.EpicState {
+	if shown == wire.EpicState(wire.EpicListMergeBlocked) && s.host.EpicMergeBlocked(e) {
 		return wire.EpicStatePaused
 	}
 	return shown
@@ -104,13 +104,13 @@ func (s *Merger) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 	if e.IsMap {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand")
 	}
-	if !isMergeableEpic(root) {
+	if !root.Mergeable() {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
 	}
 	// The web page sends the state it shows; the socket route sends none.
 	if shown := wire.EpicState(req.State); shown != "" {
-		now := epicStateFor(root, e, s.registry.StartedAtOf)
-		if shown = shownEpicState(shown, e); shown != now {
+		now := s.host.EpicState(root, e)
+		if shown = s.shownEpicState(shown, e); shown != now {
 			return mergeEpicRef{}, refuseMerge(wire.ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
 		}
 	}
@@ -156,9 +156,9 @@ func lowestTicket(e tickets.Epic) tickets.Ticket {
 	})
 }
 
-// fillEpicMergeTargets sets each ticket's EpicMergeTarget to the branch
+// FillEpicMergeTargets sets each ticket's EpicMergeTarget to the branch
 // epicMerge would merge its epic on. rootRefs runs git, so once per epic.
-func (s *Merger) fillEpicMergeTargets(list []wire.TicketInfo) {
+func (s *Merger) FillEpicMergeTargets(list []wire.TicketInfo) {
 	targets := map[tickets.Address]string{}
 	for i, info := range list {
 		a, err := tickets.ParseAddress(info.Address, tickets.AddressContext{})
@@ -168,18 +168,18 @@ func (s *Merger) fillEpicMergeTargets(list []wire.TicketInfo) {
 		key := tickets.Address{Project: a.Project, Epic: a.Epic}
 		target, ok := targets[key]
 		if !ok {
-			target = s.epicMergeTarget(key)
+			target = s.EpicMergeTarget(key)
 			targets[key] = target
 		}
 		list[i].EpicMergeTarget = target
 	}
 }
 
-// epicMergeTarget is "" when the target can't be worked out: the menu then
+// EpicMergeTarget is "" when the target can't be worked out: the menu then
 // just says "Merge". It is also "" for an epic whose Merge is dimmed (tickets
 // not done, already merged): every snapshot runs this per epic, and only a
 // mergeable epic is worth its git calls.
-func (s *Merger) epicMergeTarget(a tickets.Address) string {
+func (s *Merger) EpicMergeTarget(a tickets.Address) string {
 	// The cheap epic checks come from the index and run before projectOf, which
 	// reads project.json: most epics are not mergeable.
 	dir, epics, ok := s.idx.ProjectEpics(a.Project)
@@ -204,7 +204,7 @@ func (s *Merger) epicMergeTarget(a tickets.Address) string {
 			return target
 		}
 	}
-	_, _, target, err := s.epicRefs(a.Project, epics, a.Epic, repo)
+	_, _, target, err := s.EpicRefs(a.Project, epics, a.Epic, repo)
 	if err != nil {
 		return ""
 	}

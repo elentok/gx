@@ -12,10 +12,10 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// recoverMerges runs before anything is scheduled. A merge lock whose owner is
+// RecoverMerges runs before anything is scheduled. A merge lock whose owner is
 // dead and that has no conflict marker means a merge was in flight when a
 // process died: clear the lock, then let verify say whether the ticket merged.
-func (s *Merger) recoverMerges() {
+func (s *Merger) RecoverMerges() {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		s.log.Warn("recover merges", "err", err)

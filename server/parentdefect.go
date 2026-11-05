@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// scanParentDefects starts recovery for each lettered ticket whose parent its
+// ScanParentDefects starts recovery for each lettered ticket whose parent its
 // ID does not allow. It runs on every rescan, so a ticket whose run log already
 // holds the defect is skipped: a remedy that fixed it leaves nothing to find,
 // and one refused or stopped by a guard rail must not be raised again. Done
@@ -19,7 +19,7 @@ import (
 // old epic's backlog would otherwise flood recovery on the first scan. Drafts
 // are skipped as unfinished. Nothing is raised while R14 is off: a raised
 // defect is never raised again, and unmatched it would only fork investigations.
-func (s *Reconciler) scanParentDefects() {
+func (s *Reconciler) ScanParentDefects() {
 	if !s.settings.Load().Recovery.EntryEnabled("R14") {
 		return
 	}
@@ -64,5 +64,5 @@ func (s *Reconciler) raiseParentDefect(projectDir, epic, id, want string) {
 		return
 	}
 	addr := tickets.Address{Project: tickets.ProjectName(projectDir), Epic: epic, ID: id}
-	s.recovery.RecoverAsync(recovery.Failure{Address: addr.String(), Type: events.TicketGraphDefect, Kind: events.ParentDefect, Reason: want, Parent: want})
+	s.host.RecoverAsync(recovery.Failure{Address: addr.String(), Type: events.TicketGraphDefect, Kind: events.ParentDefect, Reason: want, Parent: want})
 }

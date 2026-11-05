@@ -15,12 +15,12 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// epicStashMerge is the "Stash, merge and restore" verb for an epic paused
+// EpicStashMerge is the "Stash, merge and restore" verb for an epic paused
 // dirty-trunk: it backs up the clashing uncommitted files, fast-forwards the
 // target and puts the files back with conflict markers, committing nothing. A
 // trunk-conflict ticket carries the resolution; until it is done the epic is
 // not merged.
-func (s *Landing) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error) {
+func (s *Landing) EpicStashMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 	m, err := s.merger.loadMergeEpic(req)
 	if err != nil {
 		return mergeVerbError(err)
@@ -28,7 +28,7 @@ func (s *Landing) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error
 	if m.epic.MergeBlockKind != string(events.DirtyTrunk) {
 		return queue.Refusal(wire.ReasonNotDirtyTrunk, m.root.String()+" is not paused on a dirty trunk"), nil
 	}
-	first, _, target, err := s.merger.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
+	first, _, target, err := s.merger.EpicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
 		return wire.QueueResult{}, err
 	}

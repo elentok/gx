@@ -110,7 +110,7 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (t
 	if sum.State == wire.EpicStatePaused {
 		sum.Reason, sum.More = pausedEpicReason(e)
 		switch {
-		case isMergeableEpic(root) && epicMergeBlocked(e):
+		case root.Mergeable() && epicMergeBlocked(e):
 			sum.Reason, sum.Detail = wire.EpicReasonMergeBlocked, e.MergeBlockReason
 			sum.MergeBlocked, sum.MergeBlockKind = true, e.MergeBlockKind
 			sum.Actions = mergeBlockActions(e.MergeBlockKind)
@@ -127,11 +127,6 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (t
 // showsActive reports whether an epic in state lists its claimed tickets.
 func showsActive(state wire.EpicState) bool {
 	return state == wire.EpicStateRunning || state == wire.EpicStateMerging
-}
-
-// isMergeableEpic reports whether root can ever merge; the one-offs inbox never does.
-func isMergeableEpic(root queue.RootRef) bool {
-	return root.Epic != queue.OneOffsEpic
 }
 
 // pausedEpicReason is the reason of the first paused ticket in e's ticket
@@ -181,7 +176,7 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 func epicStateFor(root queue.RootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) wire.EpicState {
 	switch epicStateOf(e) {
 	case epicDone:
-		if !isMergeableEpic(root) {
+		if !root.Mergeable() {
 			return wire.EpicStateWaiting
 		}
 		if e.MergedAt.IsZero() {
@@ -192,7 +187,7 @@ func epicStateFor(root queue.RootRef, e tickets.Epic, claimedAt func(string) (ti
 		}
 		return wire.EpicStateFinished
 	case epicRunnable:
-		if isMergeableEpic(root) && onlyMergeTicketsRemain(e) {
+		if root.Mergeable() && onlyMergeTicketsRemain(e) {
 			return wire.EpicStateMerging
 		}
 		for _, t := range e.Tickets {

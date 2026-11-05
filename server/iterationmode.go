@@ -13,15 +13,15 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// iterationMode is where a ticket runs and how its iteration ends: on the epic's
+// IterationMode is where a ticket runs and how its iteration ends: on the epic's
 // feature branch, commitless (a prompt ticket, or anything in the scratch
 // project, which has no VCS), or in the feature worktree itself (a merge
 // ticket). Decided once per ticket, so launch, finish and resume cannot disagree.
-type iterationMode struct {
+type IterationMode struct {
 	commitless bool
-	// feature runs in the epic's feature worktree with no iteration branch, and
+	// Feature runs in the epic's Feature worktree with no iteration branch, and
 	// ends like a commitless ticket on a kept directory: only the agent stops.
-	feature bool
+	Feature bool
 	// target is where a feature-mode epic merges, resolved at finish so the check
 	// sees the trunk current then.
 	target func() (string, error)
@@ -42,14 +42,14 @@ type iterationMode struct {
 	ref string
 }
 
-func (s *Landing) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
+func (s *Landing) IterationModeFor(addr tickets.Address, t tickets.Ticket) IterationMode {
 	typ := schema.TicketType(t.Type)
 	if typ == schema.TypeMerge {
-		return iterationMode{feature: true, target: func() (string, error) { return s.host.mergeTarget(addr) }}
+		return IterationMode{Feature: true, target: func() (string, error) { return s.host.mergeTarget(addr) }}
 	}
 	if typ == schema.TypeTrunkConflict {
 		dir, err := s.targetCheckout(addr)
-		m := iterationMode{commitless: true, scratchDir: dir, err: err, afterDone: func() { s.dropTrunkConflictBackup(addr) }}
+		m := IterationMode{commitless: true, scratchDir: dir, err: err, afterDone: func() { s.dropTrunkConflictBackup(addr) }}
 		// An epic with no recorded files still gets the scan.
 		var files []string
 		if e, ok := s.writer.FreshEpic(addr.Project, addr.Epic); ok {
@@ -60,7 +60,7 @@ func (s *Landing) iterationModeFor(addr tickets.Address, t tickets.Ticket) itera
 		}
 		return m
 	}
-	m := iterationMode{commitless: addr.Project == projects.ScratchProject || addr.Epic == queue.OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
+	m := IterationMode{commitless: addr.Project == projects.ScratchProject || addr.Epic == queue.OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
 	if m.commitless && (addr.Project == projects.ScratchProject || s.projectHasNoVCS(addr.Project)) {
 		m.scratchDir = projects.ScratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}
@@ -112,11 +112,11 @@ func (s *Landing) projectHasNoVCS(project string) bool {
 	return pf.VCS != nil && *pf.VCS == config.VCSNone
 }
 
-func (m iterationMode) prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
+func (m IterationMode) prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
 	switch {
 	case m.err != nil:
 		return ralphloop.IterationWorktree{}, m.err
-	case m.feature:
+	case m.Feature:
 		return ralphloop.PrepareFeature(d, o)
 	case m.commitless:
 		return ralphloop.PrepareCommitless(d, o, m.scratchDir, m.ref)
@@ -124,16 +124,16 @@ func (m iterationMode) prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralp
 	return ralphloop.PrepareIteration(d, o)
 }
 
-func (m iterationMode) discard(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree) error {
-	if m.commitless || m.feature {
+func (m IterationMode) discard(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree) error {
+	if m.commitless || m.Feature {
 		return ralphloop.DiscardCommitless(d, o, w)
 	}
 	return ralphloop.DiscardIteration(d, o, w)
 }
 
-func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, error) {
+func (m IterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, error) {
 	switch {
-	case m.feature:
+	case m.Feature:
 		target, err := m.target()
 		if err != nil {
 			return ralphloop.FinishOutcome{}, fmt.Errorf("resolving merge target: %w", err)
@@ -174,11 +174,11 @@ func pauseOnMarkers(o ralphloop.OneIteration, dir string, files []string) (out r
 }
 
 // resume rebuilds the worktree; base is the persisted base of a feature-branch run.
-func (m iterationMode) resume(d ralphloop.Deps, o ralphloop.OneIteration, base string) (ralphloop.IterationWorktree, error) {
+func (m IterationMode) resume(d ralphloop.Deps, o ralphloop.OneIteration, base string) (ralphloop.IterationWorktree, error) {
 	switch {
 	case m.err != nil:
 		return ralphloop.IterationWorktree{}, m.err
-	case m.feature:
+	case m.Feature:
 		return ralphloop.ResumeFeature(d, o)
 	case m.commitless:
 		return ralphloop.ResumeCommitless(d, o, m.scratchDir)

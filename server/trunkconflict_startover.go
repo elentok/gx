@@ -13,39 +13,40 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// startOverTrunkConflict is Start over for a trunk-conflict ticket. There is no
+// StartOverTrunkConflict is Start over for a trunk-conflict ticket. There is no
 // branch to reset: the backed-up files go back into the target's checkout, the
 // ticket is done and the backup ref goes, so the epic can land. Any clash the
-// restore leaves is the person's to fix by hand.
-func (s *Landing) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, addr tickets.Address, t tickets.Ticket) (wire.RepairResult, error) {
+// restore leaves is the person's to fix by hand. A refusal comes back as a
+// *repair.RefusalError.
+func (s *Landing) StartOverTrunkConflict(req wire.RepairRequest, origin string, addr tickets.Address, t tickets.Ticket) (repair.StartOverResult, error) {
 	if strings.TrimSpace(req.Reason) == "" {
-		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "--reason is required"}), nil
+		return repair.StartOverResult{}, &repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "--reason is required"}
 	}
 	if st := schema.Status(t.Status); st != schema.StatusClaimed && st != schema.StatusPaused {
-		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %v; start-over accepts only claimed or paused", addr.ID, st)}), nil
+		return repair.StartOverResult{}, &repair.RefusalError{Reason: repair.ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %v; start-over accepts only claimed or paused", addr.ID, st)}
 	}
 	e, ok := s.writer.FreshEpic(addr.Project, addr.Epic)
 	if !ok || e.TrunkConflictBackup == "" {
-		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonStatusRefused, Message: "no trunk-conflict backup is recorded for " + addr.Epic}), nil
+		return repair.StartOverResult{}, &repair.RefusalError{Reason: repair.ReasonStatusRefused, Message: "no trunk-conflict backup is recorded for " + addr.Epic}
 	}
 	dir, err := s.targetCheckout(addr)
 	if err != nil {
-		return wire.RepairResult{}, err
+		return repair.StartOverResult{}, err
 	}
 	// Restored before anything is closed: a failure leaves the ticket as it was.
 	if err := git.RestoreFromTree(dir, e.TrunkConflictBackup, e.TrunkConflictFiles); err != nil {
-		return wire.RepairResult{}, fmt.Errorf("restoring %s from %s: %w", listFiles(e.TrunkConflictFiles), e.TrunkConflictBackup, err)
+		return repair.StartOverResult{}, fmt.Errorf("restoring %s from %s: %w", listFiles(e.TrunkConflictFiles), e.TrunkConflictBackup, err)
 	}
-	if err := tickets.EndOpenRound(t.Path, rc.origin, tickets.HowStartOver, "start-over"); err != nil {
-		return wire.RepairResult{}, err
+	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowStartOver, "start-over"); err != nil {
+		return repair.StartOverResult{}, err
 	}
 	if err := ralphloop.MarkDone(t.Path); err != nil {
-		return wire.RepairResult{}, fmt.Errorf("marking trunk-conflict ticket %s done: %w", addr.ID, err)
+		return repair.StartOverResult{}, fmt.Errorf("marking trunk-conflict ticket %s done: %w", addr.ID, err)
 	}
 	s.dropTrunkConflictBackup(addr)
 	if _, fresh, ok := s.host.FreshTicket(addr); ok && s.guards.Merges.Begin() {
 		defer s.guards.Merges.End()
-		s.merger.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: fresh})
+		s.merger.CompleteRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: fresh})
 	}
-	return repairOK(repair.StartOverResult{Ticket: addr.ID, Status: string(schema.StatusDone)})
+	return repair.StartOverResult{Ticket: addr.ID, Status: string(schema.StatusDone)}, nil
 }

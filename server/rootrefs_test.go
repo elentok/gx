@@ -129,7 +129,7 @@ func TestEpicRefs_EveryCallerUsesTheLowestTicket(t *testing.T) {
 	epics := rootLowestEpics()
 	finished, claimed := epics[1].Tickets[0], epics[1].Tickets[2]
 
-	root, base, target, err := s.merger.epicRefs("proj", epics, "b", repo)
+	root, base, target, err := s.merger.EpicRefs("proj", epics, "b", repo)
 	if err != nil || root.Identifier != "01" || base != "a" || target != "a" {
 		t.Fatalf("epicRefs = (%s, %q, %q, %v), want (01, a, a)", root.Identifier, base, target, err)
 	}
@@ -139,7 +139,7 @@ func TestEpicRefs_EveryCallerUsesTheLowestTicket(t *testing.T) {
 	}
 	// b holds only a's work: landed on the root's target a, not on trunk.
 	runGit(t, repo, "branch", "b", "a")
-	if !s.merger.nothingToMerge("proj", epics, ralphloop.OneIteration{Epic: "b", Ticket: finished}, repo) {
+	if !s.merger.NothingToMerge("proj", epics, ralphloop.OneIteration{Epic: "b", Ticket: finished}, repo) {
 		t.Errorf("nothingToMerge = false, want b already on its target a")
 	}
 }

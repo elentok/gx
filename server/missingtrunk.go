@@ -58,18 +58,18 @@ func (m *missingTrunks) keepOnly(projects map[string]bool) {
 	}
 }
 
-func (m *missingTrunks) get(project string) (string, bool) {
+func (m *missingTrunks) Get(project string) (string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	r, ok := m.reason[project]
 	return r, ok
 }
 
-// checkTrunks resolves trunk for every project with a queued root, on every
+// CheckTrunks resolves trunk for every project with a queued root, on every
 // pass, so claimRoot can refuse a Missing trunk project before it derives any
 // base. A project with nothing queued leaves the state silently: a re-queue
 // after a fix must not announce a stale "trunk found".
-func (s *Reconciler) checkTrunks() {
+func (s *Reconciler) CheckTrunks() {
 	seen := map[string]bool{}
 	defer s.trunkMissing.keepOnly(seen)
 	for _, item := range s.queue.List() {
@@ -103,10 +103,10 @@ func (s *Reconciler) enterTrunkMissing(project, reason string) {
 		Detail: reason + "; its tickets will not be claimed until it is fixed"})
 }
 
-// migrationBlock reports a project's saved migration failure: its tickets are
+// MigrationBlock reports a project's saved migration failure: its tickets are
 // not claimed while the record stands. The record is read on every call so a
 // clear by the CLI or a Fix agent ends the block with no restart.
-func (s *Reconciler) migrationBlock(project string) (string, bool) {
+func (s *Reconciler) MigrationBlock(project string) (string, bool) {
 	failed, err := migratefail.Read(s.cfg.StateDir, []string{project})
 	if err != nil || len(failed) == 0 {
 		return "", false

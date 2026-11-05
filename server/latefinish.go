@@ -69,10 +69,10 @@ func (f *inFlight) running(key string) <-chan struct{} {
 	return f.m[key]
 }
 
-// adoptFirst is resume's and relaunch's late-finish check: it adopts a match
+// AdoptFirst is resume's and relaunch's late-finish check: it adopts a match
 // itself, or waits out the adoption a rescan already started, and reports
 // whether the ticket ended adopted.
-func (s *Reconciler) adoptFirst(dir string, addr tickets.Address, path string) bool {
+func (s *Reconciler) AdoptFirst(dir string, addr tickets.Address, path string) bool {
 	lf, ok := lateFinishOf(dir, addr, path)
 	if !ok {
 		return false
@@ -89,9 +89,9 @@ func (s *Reconciler) adoptFirst(dir string, addr tickets.Address, path string) b
 	return err == nil && t.Status == schema.StatusDone
 }
 
-// scanLateFinishes adopts every late finish in the store. It is a finish, not
+// ScanLateFinishes adopts every late finish in the store. It is a finish, not
 // a recovery remedy (ADR 0038), so no settings gate holds it.
-func (s *Reconciler) scanLateFinishes() {
+func (s *Reconciler) ScanLateFinishes() {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return
@@ -161,18 +161,18 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		return false
 	}
 	base, _ := git.MergeBase(worktree, branch, addr.Epic)
-	one, wt, mode, err := s.resolveRun(runs.TrackedRun{Run: run, Repo: repo, Base: base, TicketPath: lf.path})
+	one, wt, mode, err := s.host.resolveRun(runs.TrackedRun{Run: run, Repo: repo, Base: base, TicketPath: lf.path})
 	if err != nil {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
 		return false
 	}
 	// Only a merge ticket runs in the feature worktree, and only it pauses merge-unreported.
-	if mode.feature != (lf.pause.Kind == string(events.MergeUnreported)) {
+	if mode.Feature != (lf.pause.Kind == string(events.MergeUnreported)) {
 		return false
 	}
 	deps := s.projects.DepsWith(runner)
 	ahead := 0
-	if !mode.commitless && !mode.feature {
+	if !mode.commitless && !mode.Feature {
 		if ahead, err = deps.CommitsAhead(wt.Path, wt.Base(), wt.Branch); err != nil || (ahead == 0 && !lf.commitless) {
 			return false
 		}
@@ -190,7 +190,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		return false
 	}
 	// A failing check here would re-pause iteration-error, which is never adopted.
-	if mode.feature {
+	if mode.Feature {
 		target, err := mode.target()
 		if err != nil {
 			s.log.Warn("late finish: merge target", "ticket", addr, "err", err)
@@ -234,13 +234,13 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		return false
 	}
 	sha, outcome := "", "closed commitless"
-	if mode.feature {
+	if mode.Feature {
 		outcome = "closed merge"
 	} else if ahead > 0 {
 		sha = ralphloop.LatestMergedSHA(lf.dir, addr.Epic, addr.ID)
 		outcome = "merged " + sha
 	}
-	s.logEvent(addr, ralphloop.Event{
+	s.host.logEvent(addr, ralphloop.Event{
 		Type: string(events.LateFinishAdopted), SHA: sha,
 		Reason: fmt.Sprintf("paused %s, finished %s; %s",
 			lf.pause.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),
@@ -250,7 +250,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 	s.cancelUnstartedInvestigations(lf.dir, addr)
 	unlock()
 	// The adopted ticket may be the epic's last; settleRun would have completed it.
-	s.merger.completeRootIfDone(queue.RootOf(addr), one)
+	s.merger.CompleteRootIfDone(queue.RootOf(addr), one)
 	s.guards.Kick()
 	return true
 }

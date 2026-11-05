@@ -78,13 +78,13 @@ func (s *Landing) backupSnapshot(repoRoot, epic, snapshot string) (ref string, n
 	if err := git.UpdateRef(repoRoot, ref, snapshot); err != nil {
 		return "", now, err
 	}
-	s.pruneBackups(repoRoot, now)
+	s.PruneBackups(repoRoot, now)
 	return ref, now, nil
 }
 
-// pruneBackups drops the gx backup refs older than backupMaxAge. A failure is
+// PruneBackups drops the gx backup refs older than backupMaxAge. A failure is
 // logged, never fatal: it must not stop a land.
-func (s *Landing) pruneBackups(repoRoot string, now time.Time) {
+func (s *Landing) PruneBackups(repoRoot string, now time.Time) {
 	refs, err := git.ListBackupRefs(repoRoot)
 	if err != nil {
 		s.log.Warn("list backup refs", "err", err)

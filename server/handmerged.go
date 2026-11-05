@@ -7,12 +7,12 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// stampHandMerged notices epics merged outside the server (gx merge or a plain
+// StampHandMerged notices epics merged outside the server (gx merge or a plain
 // git merge). Only a complete, unmerged epic with a queued root or a
 // non-terminal ticket waiting on it is checked: the scope keeps idle cost flat
 // as unmerged epics pile up under auto-ff-merge off. It reads the index, not
 // the disk, so an out-of-scope epic costs no I/O at all.
-func (s *Reconciler) stampHandMerged() {
+func (s *Reconciler) StampHandMerged() {
 	queued := map[queue.RootRef]bool{}
 	for _, item := range s.queue.List() {
 		if addr, err := tickets.ParseQueuedAddress(item.Address); err == nil {
@@ -58,7 +58,7 @@ func (s *Reconciler) stampIfMerged(root queue.RootRef, epics []tickets.Epic, e t
 	if err != nil {
 		return
 	}
-	t, _, target, err := s.merger.epicRefs(root.Project, epics, e.Name, repo)
+	t, _, target, err := s.merger.EpicRefs(root.Project, epics, e.Name, repo)
 	if err != nil {
 		return
 	}

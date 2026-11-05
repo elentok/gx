@@ -15,6 +15,11 @@ type RootRef struct {
 	Epic    string
 }
 
+// Mergeable reports whether the root can ever merge; the one-offs inbox never does.
+func (r RootRef) Mergeable() bool {
+	return r.Epic != OneOffsEpic
+}
+
 // ParseRootRef reads the "project:epic" form of a RootRef.
 func ParseRootRef(s string) (RootRef, error) {
 	project, epic, ok := strings.Cut(s, ":")

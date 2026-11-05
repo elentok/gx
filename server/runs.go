@@ -239,7 +239,7 @@ func (s *Server) stopLaunching(t runs.TrackedRun, runner agentrunner.Runner, ses
 
 // resume rebuilds the iteration a persisted handle stands for, whose worktree
 // must still exist.
-func (s *Server) resume(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
+func (s *Server) resume(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, IterationMode, error) {
 	one, wt, mode, err := s.resolveRun(t)
 	if err != nil {
 		return one, wt, mode, err
@@ -290,8 +290,8 @@ func (s *Server) reopenEmptyClaim(t runs.TrackedRun) (bool, error) {
 // iterationEmpty reports whether an iteration provably holds no work. A
 // directory the ticket doesn't own, or a detached worktree's commits, can't be
 // measured, so those count as holding work unless the worktree is gone.
-func iterationEmpty(mode iterationMode, wt ralphloop.IterationWorktree, repo, base string) (bool, error) {
-	if mode.feature || mode.scratchDir != "" {
+func iterationEmpty(mode IterationMode, wt ralphloop.IterationWorktree, repo, base string) (bool, error) {
+	if mode.Feature || mode.scratchDir != "" {
 		return false, nil
 	}
 	_, statErr := os.Stat(wt.Path)
@@ -318,18 +318,18 @@ func iterationEmpty(mode iterationMode, wt ralphloop.IterationWorktree, repo, ba
 
 // resolveRun rebuilds the iteration a persisted handle stands for, whether or
 // not its worktree is still on disk.
-func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
+func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, IterationMode, error) {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
-		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
+		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, IterationMode{}, err
 	}
 	dir, _, err := s.projects.Of(addr.Project)
 	if err != nil {
-		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
+		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, IterationMode{}, err
 	}
 	epics, err := tickets.LoadResolved(addr.Project, dir)
 	if err != nil {
-		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
+		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, IterationMode{}, err
 	}
 	one := ralphloop.OneIteration{
 		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: ralphloop.AgentKind(t.Agent),
@@ -343,10 +343,10 @@ func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloo
 		}
 	}
 	if one.Ticket.Path == "" {
-		return one, ralphloop.IterationWorktree{}, iterationMode{}, errors.New("ticket gone")
+		return one, ralphloop.IterationWorktree{}, IterationMode{}, errors.New("ticket gone")
 	}
 	one.Sink = s.writer.FinishSink(addr, one.Ticket.Path)
-	mode := s.landing.iterationModeFor(addr, one.Ticket)
+	mode := s.landing.IterationModeFor(addr, one.Ticket)
 	wt, err := mode.resume(s.projects.DefaultDeps(), one, t.Base)
 	return one, wt, mode, err
 }

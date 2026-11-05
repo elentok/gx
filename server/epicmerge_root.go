@@ -21,7 +21,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// completeRootIfDone merges the root's feature branch once every ticket in its
+// CompleteRootIfDone merges the root's feature branch once every ticket in its
 // epic is done, then dequeues it. A branch that needs a rebase gets a merge
 // ticket instead, or pauses the root at the cap. With the project's auto-ff-merge off,
 // and no manual merge ticket in the epic, the
@@ -29,7 +29,7 @@ import (
 // completed_at marks the epic's final outcome: with auto-ff-merge on that is
 // the merge or the pause, not all-done. An epic with nothing to merge is merged
 // as it stands, whatever auto-ff-merge says.
-func (s *Merger) completeRootIfDone(root queue.RootRef, one ralphloop.OneIteration) {
+func (s *Merger) CompleteRootIfDone(root queue.RootRef, one ralphloop.OneIteration) {
 	// The one-offs epic is a standing inbox: it never merges, merges or retros.
 	if root.Epic == queue.OneOffsEpic {
 		return
@@ -60,7 +60,7 @@ func (s *Merger) completeRootIfDone(root queue.RootRef, one ralphloop.OneIterati
 // Without refs there is no target, so the merge locks the epic itself: mergeEpic
 // pauses it the way mergeRoot does, and two finishes still can't both stamp.
 func (s *Merger) completeEpic(root queue.RootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
-	_, _, target, err := s.epicRefs(root.Project, epics, one.Epic, repo)
+	_, _, target, err := s.EpicRefs(root.Project, epics, one.Epic, repo)
 	lockKey := mergeLockKey(root, target, err)
 	if err == nil {
 		if holder := s.trunkConflictHolder(root.Project, epics, repo, target, one.Epic); holder != "" {
@@ -95,26 +95,26 @@ func (s *Merger) trunkConflictHolder(project string, epics []tickets.Epic, repo,
 		}) {
 			continue
 		}
-		if _, _, held, err := s.epicRefs(project, epics, e.Name, repo); err == nil && held == target {
+		if _, _, held, err := s.EpicRefs(project, epics, e.Name, repo); err == nil && held == target {
 			return e.Name
 		}
 	}
 	return ""
 }
 
-// retryHeldMerge merges root again once the trunk-conflict ticket that held its
+// RetryHeldMerge merges root again once the trunk-conflict ticket that held its
 // merge is gone. The hold lives in memory only: a server restart forgets it.
-func (s *Merger) retryHeldMerge(root queue.RootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
+func (s *Merger) RetryHeldMerge(root queue.RootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
 	if !s.guards.HeldMerges.Has(root.String()) {
 		return
 	}
-	_, _, target, err := s.epicRefs(root.Project, epics, root.Epic, repo)
+	_, _, target, err := s.EpicRefs(root.Project, epics, root.Epic, repo)
 	if err == nil && s.trunkConflictHolder(root.Project, epics, repo, target, root.Epic) != "" {
 		return
 	}
 	s.guards.HeldMerges.Set(root.String(), false)
 	one := ralphloop.OneIteration{Epic: root.Epic, Ticket: lowestTicket(e)}
-	s.guards.GoSettle(func() { s.completeRootIfDone(root, one) })
+	s.guards.GoSettle(func() { s.CompleteRootIfDone(root, one) })
 }
 
 // mergeOutcome is how a merge ended; the zero value is a refusal with nothing
@@ -198,11 +198,11 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 		if first {
 			s.StampEpic(root, e.Path, "completed_at")
 		}
-	case s.nothingToMerge(project, epics, one, repo):
+	case s.NothingToMerge(project, epics, one, repo):
 		s.stampMergedEpic(root, e, 0, 0, nil)
 		s.StampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
-	case force || s.autoFFMerge(project) || hasManualMergeTicket(e):
+	case force || s.AutoFFMerge(project) || hasManualMergeTicket(e):
 		trunkBefore, revErr := git.RevParse(repo, "refs/heads/"+target)
 		pause := s.mergeRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
@@ -364,7 +364,7 @@ func (s *Merger) StampEpic(root queue.RootRef, epicPath string, keys ...string) 
 		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
 		}
-		s.guards.GoSettle(func() { s.rec.removeMergedWorktree(root) })
+		s.guards.GoSettle(func() { s.rec.RemoveMergedWorktree(root) })
 	}
 }
 
@@ -428,15 +428,15 @@ func (s *Merger) storeMergeBlock(root queue.RootRef, epicPath string, p mergePau
 	}
 }
 
-// nothingToMerge reports whether the root's feature branch is missing or has no
+// NothingToMerge reports whether the root's feature branch is missing or has no
 // commits ahead of its target. An error reading either means there may be
 // something to merge: never call an epic merged on a guess.
-func (s *Merger) nothingToMerge(project string, epics []tickets.Epic, one ralphloop.OneIteration, repo string) bool {
+func (s *Merger) NothingToMerge(project string, epics []tickets.Epic, one ralphloop.OneIteration, repo string) bool {
 	branch := "refs/heads/" + one.Epic
 	if _, err := git.RevParse(repo, branch); err != nil {
 		return errors.Is(err, git.ErrRefNotFound)
 	}
-	_, _, target, err := s.epicRefs(project, epics, one.Epic, repo)
+	_, _, target, err := s.EpicRefs(project, epics, one.Epic, repo)
 	if err != nil {
 		return false
 	}
@@ -449,7 +449,7 @@ func (s *Merger) nothingToMerge(project string, epics []tickets.Epic, one ralphl
 // names the pause's cause. Every error pauses the
 // root: one left all-done in the queue looks stuck.
 func (s *Merger) mergeRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) mergePause {
-	_, _, target, err := s.epicRefs(project, epics, one.Epic, repoDir)
+	_, _, target, err := s.EpicRefs(project, epics, one.Epic, repoDir)
 	if err != nil {
 		return s.refsFailed(project, one.Epic, err)
 	}

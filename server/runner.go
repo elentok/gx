@@ -46,8 +46,8 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	defer ticker.Stop()
 	for {
 		s.projects.Check()
-		s.rec.checkTrunks()
-		s.rec.stampHandMerged()
+		s.rec.CheckTrunks()
+		s.rec.StampHandMerged()
 		s.releaseWaitingSlots(time.Now())
 		s.claimNext()
 		s.publishVerdictChanges()
@@ -177,10 +177,10 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 	if _, held := s.disks.FreshHeldDisk(addr.Project); held {
 		return false, nil
 	}
-	if _, missing := s.rec.trunkMissing.get(addr.Project); missing {
+	if _, missing := s.rec.trunkMissing.Get(addr.Project); missing {
 		return false, nil
 	}
-	if _, blocked := s.rec.migrationBlock(addr.Project); blocked {
+	if _, blocked := s.rec.MigrationBlock(addr.Project); blocked {
 		return false, nil
 	}
 	projectDir, repo, err := s.projects.Of(addr.Project)
@@ -200,7 +200,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 		s.checkDeadlock(root, projectDir, e)
 		t, ok := s.nextUntracked(addr.Project, e)
 		if !ok {
-			s.merger.retryHeldMerge(root, e, loaded, repo)
+			s.merger.RetryHeldMerge(root, e, loaded, repo)
 			return false, nil
 		}
 		if s.parentAwaitsAdoption(projectDir, addr, e, t) {
@@ -312,13 +312,13 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 	if (agent == ralphloop.AgentClaude || agent == ralphloop.AgentCodex) && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
 		one.ResumeSessionID = answered
 	}
-	mode := s.landing.iterationModeFor(ticket, t)
+	mode := s.landing.IterationModeFor(ticket, t)
 	if mode.commitless && mode.scratchDir == "" {
 		if mode.ref, err = s.commitlessRef(ticket, t, repo, epics); err != nil {
 			return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 		}
 	}
-	if mode.feature {
+	if mode.Feature {
 		if one.TargetTip, err = s.mergeTargetTip(ticket, repo); err != nil {
 			return false, fmt.Errorf("merge target for %s: %w", ticketAddr, err)
 		}
@@ -370,7 +370,7 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
 		return "", "", "", err
 	}
-	_, ref, _, err = s.merger.epicRefs(addr.Project, epics, addr.Epic, repo)
+	_, ref, _, err = s.merger.EpicRefs(addr.Project, epics, addr.Epic, repo)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -444,7 +444,7 @@ func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, _, target, err := s.merger.epicRefs(addr.Project, epics, addr.Epic, repo)
+	_, _, target, err := s.merger.EpicRefs(addr.Project, epics, addr.Epic, repo)
 	return target, err
 }
 
@@ -495,7 +495,7 @@ func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo stri
 // in it. A launch that fails takes that back out so a retry starts clean.
 // prepared sees the worktree before the agent starts.
 func (s *Server) prepareAndLaunch(
-	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode iterationMode,
+	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode IterationMode,
 	prepared func(ralphloop.IterationWorktree),
 ) (runs.Run, ralphloop.IterationWorktree, error) {
 	wt, err := mode.prepare(deps, *one)
@@ -568,7 +568,7 @@ func (s *Server) watchBlocked(r agentrunner.Runner, sess agentrunner.Session, ad
 type runContext struct {
 	deps       ralphloop.Deps
 	root       queue.RootRef
-	mode       iterationMode
+	mode       IterationMode
 	one        ralphloop.OneIteration
 	wt         ralphloop.IterationWorktree
 	run        runs.Run
@@ -669,7 +669,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	if mode.afterDone != nil {
 		mode.afterDone()
 	}
-	s.merger.completeRootIfDone(root, one)
+	s.merger.CompleteRootIfDone(root, one)
 }
 
 // keepsAskedAgent reports whether run's agent stays alive after it asks: a

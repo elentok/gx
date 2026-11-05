@@ -17,13 +17,13 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// removeMergedWorktree removes a merged epic's feature worktree, never its
+// RemoveMergedWorktree removes a merged epic's feature worktree, never its
 // branch. It runs on the settle group, started by stampEpic while the stamping
 // path still holds its trunk lock, so it first waits that lock out: the queued
 // check then sees the queue after the dequeue. The first failed check keeps the
 // worktree and logs why; nothing here pauses the epic or fails the merge.
-func (s *Reconciler) removeMergedWorktree(root queue.RootRef) {
-	if !isMergeableEpic(root) {
+func (s *Reconciler) RemoveMergedWorktree(root queue.RootRef) {
+	if !root.Mergeable() {
 		return
 	}
 	project := root.Project
@@ -53,7 +53,7 @@ func (s *Reconciler) removeMergedWorktree(root queue.RootRef) {
 // waitOutStamping blocks until the stamping path releases the epic's trunk lock.
 func (s *Reconciler) waitOutStamping(root queue.RootRef, project, dir, repoDir string) {
 	if epics, err := tickets.LoadResolved(project, dir); err == nil {
-		_, _, target, refsErr := s.merger.epicRefs(project, epics, root.Epic, repoDir)
+		_, _, target, refsErr := s.merger.EpicRefs(project, epics, root.Epic, repoDir)
 		s.guards.Trunks.Lock(repoDir, mergeLockKey(root, target, refsErr))()
 	}
 }

@@ -169,7 +169,7 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	}
 	if _, t, ok := s.FreshTicket(addr); ok && s.guards.Merges.Begin() {
 		defer s.guards.Merges.End()
-		s.merger.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
+		s.merger.CompleteRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	}
 	return res, nil
 }
@@ -219,7 +219,15 @@ func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Rep
 	}
 	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
 		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
-		return s.landing.startOverTrunkConflict(req, rc, addr, t)
+		res, err := s.landing.StartOverTrunkConflict(req, rc.origin, addr, t)
+		var refusal *repair.RefusalError
+		if errors.As(err, &refusal) {
+			return repairRefusal(refusal), nil
+		}
+		if err != nil {
+			return wire.RepairResult{}, err
+		}
+		return repairOK(res)
 	}
 	// The web never deletes the branch, whatever the body says.
 	deleteBranch := req.DeleteBranch && !rc.RequireState
@@ -289,7 +297,7 @@ func (s *Server) repairResume(req wire.RepairRequest, rc repairCtx) (wire.Repair
 			return repairRefusal(&repair.RefusalError{Reason: wire.ReasonBadBase, Message: msg}), nil
 		}
 	}
-	if s.rec.adoptFirst(dir, addr, t.Path) {
+	if s.rec.AdoptFirst(dir, addr, t.Path) {
 		res := repair.ResumeResult{Ticket: id, Status: repair.ResumeAdopted}
 		if zeroCommit {
 			res.Message = repair.MessageAdopted
