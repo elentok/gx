@@ -37,7 +37,7 @@ func (h ticketWriteHost) WriteFollowUp(from tickets.Address, f ticketwrite.Follo
 	return h.s.recovery.WriteFollowUp(from, f)
 }
 
-func (h ticketWriteHost) HerdrUnavailable() bool { return h.s.herdr.isUnavailable() }
+func (h ticketWriteHost) HerdrUnavailable() bool { return h.s.herdr.IsUnavailable() }
 
 func (h ticketWriteHost) StopRun(run runs.Run) error {
 	r, err := h.s.harness.RunnerOf(run)
@@ -51,7 +51,7 @@ func (h ticketWriteHost) TakeTierOverride(ticketPath string) ralphloop.Tier {
 	return ticketops.TakeTierOverride(ticketPath)
 }
 
-func (h ticketWriteHost) HerdrHolds(r agentrunner.Runner) (string, bool) { return h.s.herdrHolds(r) }
+func (h ticketWriteHost) HerdrHolds(r agentrunner.Runner) (string, bool) { return h.s.herdr.Holds(r) }
 
 func (h ticketWriteHost) UsageGate(agent ralphloop.AgentKind, now time.Time) (string, bool) {
 	return h.s.limits.UsageGate(agent, now)

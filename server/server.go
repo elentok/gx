@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/sched"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/brief"
@@ -129,7 +130,7 @@ type Server struct {
 	limits    *limits.Limits
 	stats     *stats.Stats
 	events    *broker.Broker
-	herdr     herdrWatch
+	herdr     *sched.HerdrWatch
 	writer    *ticketwrite.Writer
 	ops       *ticketops.Ops
 	pauseHold ticketwrite.RecoveryHold
@@ -458,7 +459,8 @@ func New(cfg Config) (*Server, error) {
 	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
 	s.bindWeb()
 	// A down herdr never stops the server; it is reported and retried.
-	s.checkHerdr()
+	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
+	s.herdr.Check()
 	return s, nil
 }
 
@@ -523,7 +525,7 @@ func (s *Server) TCPAddr() string {
 func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	snap, agents := s.idx.SnapshotAgents()
-	snap.HerdrText, snap.HerdrUnavailable = s.herdrBanner()
+	snap.HerdrText, snap.HerdrUnavailable = s.herdr.Banner()
 	for i, t := range snap.Tickets {
 		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
 			snap.Tickets[i].HarnessLabel = s.harness.LabelFor(addr, agents[i], cmp.Or(t.RenderedStatus, t.Status))
@@ -639,7 +641,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr}
-	h.HerdrText, h.HerdrUnavailable = s.herdrBanner()
+	h.HerdrText, h.HerdrUnavailable = s.herdr.Banner()
 	h.Migrating = s.migrator.Migrating()
 	if s.web != nil {
 		var err error
@@ -701,7 +703,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		})
 	}()
 	herdrDone := make(chan struct{})
-	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
+	go func() { defer close(herdrDone); s.herdr.KeepChecked(freshCtx) }()
 	// A claim must not see a low disk before the watcher has recorded its projects.
 	s.disks.Check()
 	claimDone := make(chan struct{})

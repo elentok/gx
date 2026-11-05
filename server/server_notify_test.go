@@ -292,7 +292,7 @@ func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
-	s.herdr.unavailable = true
+	s.herdr.SetUnavailable(true)
 	pause := func(project, id string, kind events.Kind) {
 		s.writer.NotifyPause(tickets.Address{Project: project, Epic: "epic", ID: id}, "", kind, "why-"+project)
 	}
@@ -301,7 +301,7 @@ func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 	pause("p2", "02", events.HandleMismatch)
 	pause("p3", "03", events.AgentPaneBusy)
 	pause("p4", "04", events.ZeroCommit) // not herdr-caused: at once
-	s.herdr.unavailable = false
+	s.herdr.SetUnavailable(false)
 	s.writer.FlushPauseFold()
 
 	s.chat.Close()

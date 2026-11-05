@@ -2,11 +2,9 @@ package server
 
 import (
 	harnesschoice "github.com/elentok/gx/server/harness"
-	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -26,7 +24,7 @@ func (s *Server) claimHold(project string, t tickets.Ticket, rh harnesschoice.Re
 	if reason := s.harness.QueueMissingReason(project, rh); reason != "" {
 		return claimHold{Verdict: wire.VerdictHarnessMissing, Reason: reason}, true
 	}
-	if reason, held := s.herdrHolds(s.harness.LaunchRunner(project, agent)); held {
+	if reason, held := s.herdr.Holds(s.harness.LaunchRunner(project, agent)); held {
 		return claimHold{Verdict: wire.VerdictHerdrDown, Reason: reason}, true
 	}
 	if limited, held := s.registry.RateLimitHeld(string(agent)); held {
@@ -38,13 +36,4 @@ func (s *Server) claimHold(project string, t tickets.Ticket, rh harnesschoice.Re
 		}
 	}
 	return claimHold{}, false
-}
-
-// herdrHolds reports why r cannot take work now: r is herdr and herdr is down
-// or not installed. Any other runner is never held by herdr.
-func (s *Server) herdrHolds(r agentrunner.Runner) (string, bool) {
-	if r == nil || r.Name() != runs.RunnerHerdr {
-		return "", false
-	}
-	return s.herdr.holdReason()
 }
