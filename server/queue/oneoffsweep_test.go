@@ -110,7 +110,7 @@ func TestSweep_DependentOfAnArchivedOneOffIsUnblockedLikeAnyTerminalBlocker(t *t
 	// "blocked" is the scheduler's word for a ticket with an unresolved blocker;
 	// an unblocked one falls through to the queue verdicts.
 	for id, want := range map[string]string{"01": "not queued", "02": "not queued", "03": "blocked"} {
-		ex, err := h.Client.Explain(context.Background(), "proj:feature/"+id)
+		ex, err := h.Client.Reads.Explain(context.Background(), "proj:feature/"+id)
 		if err != nil {
 			t.Fatalf("%s: %v", id, err)
 		}
@@ -122,7 +122,7 @@ func TestSweep_DependentOfAnArchivedOneOffIsUnblockedLikeAnyTerminalBlocker(t *t
 
 func oneOffsQueued(t *testing.T, h *servertest.Harness) bool {
 	t.Helper()
-	q, err := h.Client.QueueItems(context.Background())
+	q, err := h.Client.Queue.Items(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,11 +145,11 @@ func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
 	h := startSweep(t, store)
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "first", Project: "proj"})
+	res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "first", Project: "proj"})
 	if err != nil || res.Refused {
 		t.Fatalf("submit: %+v, %v", res, err)
 	}
@@ -159,7 +159,7 @@ func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
 	}
 	waitOneOffsQueued(t, h, false)
 
-	res, err = h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "second", Project: "proj"})
+	res, err = h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "second", Project: "proj"})
 	if err != nil || res.Refused {
 		t.Fatalf("second submit: %+v, %v", res, err)
 	}
@@ -176,7 +176,7 @@ func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
 			servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: status})
 			h := startSweep(t, store)
 			ctx := context.Background()
-			if _, err := h.Client.QueuePause(ctx); err != nil {
+			if _, err := h.Client.Queue.Pause(ctx); err != nil {
 				t.Fatal(err)
 			}
 			var res wire.QueueResult
@@ -201,11 +201,11 @@ func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
 	h := startSweep(t, store)
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for i := range 10 {
-		res, err := h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "p" + string(rune('a'+i)), Project: "proj"})
+		res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "p" + string(rune('a'+i)), Project: "proj"})
 		if err != nil || res.Refused {
 			t.Fatalf("submit %d: %+v, %v", i, res, err)
 		}
@@ -213,7 +213,7 @@ func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
 			t.Fatalf("cancel %d: %+v, %v", i, cres, err)
 		}
 	}
-	last, err := h.Client.OneOff(ctx, wire.OneOffRequest{Prompt: "last", Project: "proj"})
+	last, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "last", Project: "proj"})
 	if err != nil || last.Refused {
 		t.Fatalf("last submit: %+v, %v", last, err)
 	}

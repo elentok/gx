@@ -93,7 +93,7 @@ func (f *schedFixture) mergeTicketFiles(t *testing.T) []string {
 
 func (f *schedFixture) rootQueued(t *testing.T) bool {
 	t.Helper()
-	q, err := f.H.Client.QueueItems(context.Background())
+	q, err := f.H.Client.Queue.Items(context.Background())
 	if err != nil {
 		t.Error(err)
 		return false
@@ -107,7 +107,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 		if !f.rootQueued(t) {
 			t.Error("root dequeued while its merge ticket runs")
 		}
-		q, err := f.H.Client.QueueItems(context.Background())
+		q, err := f.H.Client.Queue.Items(context.Background())
 		if err != nil {
 			t.Error(err)
 		}

@@ -121,7 +121,7 @@ func TestOneOffLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
 				default:
 				}
 			})
-			res, err := h.Client.OneOff(context.Background(), wire.OneOffRequest{Prompt: "look around", Project: "proj", Type: typ})
+			res, err := h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{Prompt: "look around", Project: "proj", Type: typ})
 			if err != nil || res.Refused {
 				t.Fatalf("one-off: %+v, %v", res, err)
 			}

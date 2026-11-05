@@ -149,7 +149,7 @@ func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
 
 func lateFinishReason(t *testing.T, f *schedFixture) (string, bool) {
 	t.Helper()
-	hist, err := f.H.Client.History(context.Background(), "proj:"+schedEpic+"/01")
+	hist, err := f.H.Client.Reads.History(context.Background(), "proj:"+schedEpic+"/01")
 	if err != nil {
 		t.Fatal(err)
 	}

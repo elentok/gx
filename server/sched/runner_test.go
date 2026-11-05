@@ -67,7 +67,7 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	servertest.WaitFor(t, 30*time.Second, "the claim-reread-mismatch verdict", func() bool {
 		ctx, cancel := call()
 		defer cancel()
-		ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+		ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -320,7 +320,7 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 		if ev.Type != wire.EventExplainVerdictChange || ev.Address != "proj:epic-b/01" {
 			continue
 		}
-		ex, err := h.Client.Explain(ctx, ev.Address)
+		ex, err := h.Client.Reads.Explain(ctx, ev.Address)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -353,7 +353,7 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	ex, err := h.Client.Explain(ctx, "proj:epic-b/01")
+	ex, err := h.Client.Reads.Explain(ctx, "proj:epic-b/01")
 	if err != nil {
 		t.Fatal(err)
 	}

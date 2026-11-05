@@ -26,7 +26,7 @@ func TestBlockedPause_AgentErrorPausesWithItsTextAndOffersRetry(t *testing.T) {
 			turn.SetErrored("epic-a-iter-01", "model gone")
 			servertest.WaitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 
-			d, err := h.Client.Detail(context.Background(), "proj:epic-a/01")
+			d, err := h.Client.Reads.Detail(context.Background(), "proj:epic-a/01")
 			if err != nil || !slices.Contains(d.Actions, wire.ActionRetry) {
 				t.Errorf("actions = %v, %v; want Retry offered", d.Actions, err)
 			}
@@ -100,7 +100,7 @@ func TestBlockedPause_UsageLimitErrorHoldsInsteadOfPausing(t *testing.T) {
 	turn.SetRateLimit("epic-a-iter-01", time.Now().Add(time.Hour))
 	turn.SetErrored("epic-a-iter-01", "You've hit your usage limit.")
 	servertest.Await(t, func() bool {
-		ex, err := h.Client.Explain(context.Background(), "proj:epic-a/01")
+		ex, err := h.Client.Reads.Explain(context.Background(), "proj:epic-a/01")
 		return err == nil && strings.HasPrefix(ex.Verdict, "rate-limited: resets")
 	})
 	time.Sleep(200 * time.Millisecond) // negative wait: a pause would show within a few ticks

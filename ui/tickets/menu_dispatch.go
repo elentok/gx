@@ -13,7 +13,7 @@ const serverNotRunning = "server not running"
 // dispatchMenuAction runs an accepted "m" menu action for either tab, keyed by
 // the row's address (result.Path). Orchestration writes go only through the
 // server.
-func dispatchMenuAction(api ServerAPI, sessions SessionsAPI, tix TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
+func dispatchMenuAction(api ServerAPI, reads ReadsAPI, sessions SessionsAPI, tix TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
 	if word, ok := recoveryWord(result.Action); ok {
 		return cmdServerWrite(api, tix, word, result.Path)
 	}
@@ -38,9 +38,9 @@ func dispatchMenuAction(api ServerAPI, sessions SessionsAPI, tix TicketsAPI, wor
 		file, address := resolveTicketPath(settings.TicketStore, result.Path)
 		return cmdTranscript(settings.Dirs, file, address, width)
 	case actionWatch:
-		return cmdWatchAgent(api, settings.Dirs, agentAddress(result.Path, result.TicketID))
+		return cmdWatchAgent(reads, settings.Dirs, agentAddress(result.Path, result.TicketID))
 	case actionGoToPane:
-		return cmdServerFocusPane(api, result.Path)
+		return cmdServerFocusPane(reads, result.Path)
 	}
 	return nil
 }

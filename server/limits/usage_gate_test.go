@@ -64,7 +64,7 @@ func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 				return
 			}
 			servertest.WaitFor(t, 10*time.Second, "the claude ticket explains the gate", func() bool {
-				ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+				ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
 				return err == nil && strings.Contains(ex.Verdict, c.want)
 			})
 			if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {

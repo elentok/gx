@@ -14,7 +14,7 @@ import (
 
 func epicRows(t *testing.T, h *servertest.Harness, f designsFixture) map[string]wire.EpicListRow {
 	t.Helper()
-	list, err := h.Client.Epics(f.Ctx)
+	list, err := h.Client.Reads.Epics(f.Ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestEpicList_DesignCountdownCarriesItsDeadline(t *testing.T) {
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-	list, err := f.H.Client.Epics(f.Ctx)
+	list, err := f.H.Client.Reads.Epics(f.Ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

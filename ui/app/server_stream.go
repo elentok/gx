@@ -188,9 +188,9 @@ func cmdStreamNext(events <-chan wire.Event) tea.Cmd {
 }
 
 func (m Model) cmdStreamQueue() tea.Cmd {
-	client := m.settings.Server.Client
+	queue := m.settings.Server.Queue
 	return func() tea.Msg {
-		items, err := client.QueueItems(context.Background())
+		items, err := queue.Items(context.Background())
 		return streamQueueMsg{items: items, err: err}
 	}
 }

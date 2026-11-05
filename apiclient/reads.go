@@ -8,102 +8,108 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
+// Reads is the sub-client for project, budget, history, epic and stats reads
+// (and the project writes). It shares Client's transport.
+type Reads struct {
+	t *transport
+}
+
 // Projects returns every project in the server's ticket store with its state.
-func (c *Client) Projects(ctx context.Context) ([]wire.ProjectInfo, error) {
+func (r *Reads) Projects(ctx context.Context) ([]wire.ProjectInfo, error) {
 	var p []wire.ProjectInfo
-	err := c.get(ctx, "/v1/projects", &p)
+	err := r.t.get(ctx, "/v1/projects", &p)
 	return p, err
 }
 
 // ProjectWorktrees returns each project's repo root and other worktree dirs.
-func (c *Client) ProjectWorktrees(ctx context.Context) ([]wire.ProjectWorktrees, error) {
+func (r *Reads) ProjectWorktrees(ctx context.Context) ([]wire.ProjectWorktrees, error) {
 	var p []wire.ProjectWorktrees
-	err := c.get(ctx, "/v1/projects/worktrees", &p)
+	err := r.t.get(ctx, "/v1/projects/worktrees", &p)
 	return p, err
 }
 
 // AddProject registers a project. A refusal is a result (Refused set), not an
 // error.
-func (c *Client) AddProject(ctx context.Context, req wire.AddProjectRequest) (wire.AddProjectResult, error) {
+func (r *Reads) AddProject(ctx context.Context, req wire.AddProjectRequest) (wire.AddProjectResult, error) {
 	var res wire.AddProjectResult
-	err := c.post(ctx, "/v1/projects/add", req, &res)
+	err := r.t.post(ctx, "/v1/projects/add", req, &res)
 	return res, err
 }
 
 // RemoveProject unregisters a project, keeping its tickets. A refusal is a
 // result (Refused set), not an error.
-func (c *Client) RemoveProject(ctx context.Context, req wire.ProjectRequest) (wire.ProjectResult, error) {
+func (r *Reads) RemoveProject(ctx context.Context, req wire.ProjectRequest) (wire.ProjectResult, error) {
 	var res wire.ProjectResult
-	err := c.post(ctx, "/v1/projects/remove", req, &res)
+	err := r.t.post(ctx, "/v1/projects/remove", req, &res)
 	return res, err
 }
 
 // SetProjectPath points a project at another repo. A refusal is a result.
-func (c *Client) SetProjectPath(ctx context.Context, req wire.ProjectRequest) (wire.ProjectResult, error) {
+func (r *Reads) SetProjectPath(ctx context.Context, req wire.ProjectRequest) (wire.ProjectResult, error) {
 	var res wire.ProjectResult
-	err := c.post(ctx, "/v1/projects/set-path", req, &res)
+	err := r.t.post(ctx, "/v1/projects/set-path", req, &res)
 	return res, err
 }
 
 // Locks returns every held lock with its owner.
-func (c *Client) Locks(ctx context.Context) ([]wire.LockInfo, error) {
+func (r *Reads) Locks(ctx context.Context) ([]wire.LockInfo, error) {
 	var l []wire.LockInfo
-	err := c.get(ctx, "/v1/locks", &l)
+	err := r.t.get(ctx, "/v1/locks", &l)
 	return l, err
 }
 
 // Budget returns today's spend and the configured limits.
-func (c *Client) Budget(ctx context.Context) (wire.BudgetStatus, error) {
+func (r *Reads) Budget(ctx context.Context) (wire.BudgetStatus, error) {
 	var b wire.BudgetStatus
-	err := c.get(ctx, "/v1/budget", &b)
+	err := r.t.get(ctx, "/v1/budget", &b)
 	return b, err
 }
 
 // UsageSummary returns the usage mode, the stored limit windows and the spend totals.
-func (c *Client) UsageSummary(ctx context.Context) (wire.UsageSummary, error) {
+func (r *Reads) UsageSummary(ctx context.Context) (wire.UsageSummary, error) {
 	var u wire.UsageSummary
-	err := c.get(ctx, "/v1/usage/summary", &u)
+	err := r.t.get(ctx, "/v1/usage/summary", &u)
 	return u, err
 }
 
 // History returns the events logged for one ticket, by its full address.
-func (c *Client) History(ctx context.Context, address string) (wire.History, error) {
+func (r *Reads) History(ctx context.Context, address string) (wire.History, error) {
 	var h wire.History
-	err := c.get(ctx, "/v1/tickets/history?address="+url.QueryEscape(address), &h)
+	err := r.t.get(ctx, "/v1/tickets/history?address="+url.QueryEscape(address), &h)
 	return h, err
 }
 
 // Explain returns the scheduler's verdict on one ticket, by its full address.
-func (c *Client) Explain(ctx context.Context, address string) (wire.Explanation, error) {
+func (r *Reads) Explain(ctx context.Context, address string) (wire.Explanation, error) {
 	var e wire.Explanation
-	err := c.get(ctx, "/v1/tickets/explain?address="+url.QueryEscape(address), &e)
+	err := r.t.get(ctx, "/v1/tickets/explain?address="+url.QueryEscape(address), &e)
 	return e, err
 }
 
 // Detail returns one ticket's pause detail, by its full address.
-func (c *Client) Detail(ctx context.Context, address string) (wire.TicketDetail, error) {
+func (r *Reads) Detail(ctx context.Context, address string) (wire.TicketDetail, error) {
 	var d wire.TicketDetail
-	err := c.get(ctx, "/v1/tickets/detail?address="+url.QueryEscape(address), &d)
+	err := r.t.get(ctx, "/v1/tickets/detail?address="+url.QueryEscape(address), &d)
 	return d, err
 }
 
 // Epics returns every epic the Epics page lists.
-func (c *Client) Epics(ctx context.Context) (wire.EpicList, error) {
+func (r *Reads) Epics(ctx context.Context) (wire.EpicList, error) {
 	var l wire.EpicList
-	err := c.get(ctx, "/v1/epics", &l)
+	err := r.t.get(ctx, "/v1/epics", &l)
 	return l, err
 }
 
 // EpicDetail returns an epic's state, progress and ticket rows.
-func (c *Client) EpicDetail(ctx context.Context, address string) (wire.EpicDetail, error) {
+func (r *Reads) EpicDetail(ctx context.Context, address string) (wire.EpicDetail, error) {
 	var d wire.EpicDetail
-	err := c.get(ctx, "/v1/epics/detail?address="+url.QueryEscape(address), &d)
+	err := r.t.get(ctx, "/v1/epics/detail?address="+url.QueryEscape(address), &d)
 	return d, err
 }
 
 // Stats returns the per-day stats for one range in days (0 is the server's
 // default) and one project (empty means all).
-func (c *Client) Stats(ctx context.Context, days int, project string) (wire.Stats, error) {
+func (r *Reads) Stats(ctx context.Context, days int, project string) (wire.Stats, error) {
 	q := url.Values{}
 	if days > 0 {
 		q.Set("range", strconv.Itoa(days))
@@ -112,27 +118,13 @@ func (c *Client) Stats(ctx context.Context, days int, project string) (wire.Stat
 		q.Set("project", project)
 	}
 	var s wire.Stats
-	err := c.get(ctx, "/v1/stats?"+q.Encode(), &s)
+	err := r.t.get(ctx, "/v1/stats?"+q.Encode(), &s)
 	return s, err
 }
 
 // Iterations returns the live iterations.
-func (c *Client) Iterations(ctx context.Context) ([]wire.IterationInfo, error) {
+func (r *Reads) Iterations(ctx context.Context) ([]wire.IterationInfo, error) {
 	var l []wire.IterationInfo
-	err := c.get(ctx, "/v1/iterations", &l)
-	return l, err
-}
-
-// Queue returns every ticket with the scheduler's verdict on it.
-func (c *Client) Queue(ctx context.Context) ([]wire.QueueEntry, error) {
-	var l []wire.QueueEntry
-	err := c.get(ctx, "/v1/queue", &l)
-	return l, err
-}
-
-// QueueItems returns the server-wide queue in order.
-func (c *Client) QueueItems(ctx context.Context) ([]wire.QueueItem, error) {
-	var l []wire.QueueItem
-	err := c.get(ctx, "/v1/queue/items", &l)
+	err := r.t.get(ctx, "/v1/iterations", &l)
 	return l, err
 }

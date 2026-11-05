@@ -143,7 +143,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 func TestLimitBurnFixture_StatsShape(t *testing.T) {
 	r := startWith(t, "limit-burn", nil, "--shape", "stats")
 	defer r.stop(t)
-	st, err := apiclient.New(r.Socket).Stats(context.Background(), 30, "")
+	st, err := apiclient.New(r.Socket).Reads.Stats(context.Background(), 30, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func appendUsage(t *testing.T, path string, tokens int) {
 // todaysTokens is each cost group's tokens for today in /v1/stats.
 func todaysTokens(t *testing.T, socket string) map[string]float64 {
 	t.Helper()
-	st, err := apiclient.New(socket).Stats(context.Background(), 7, "")
+	st, err := apiclient.New(socket).Reads.Stats(context.Background(), 7, "")
 	if err != nil {
 		t.Fatal(err)
 	}

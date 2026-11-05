@@ -174,7 +174,7 @@ func queueWithTurn(t *testing.T, h *Harness, hook func(*Turn)) {
 
 func liveIterations(t *testing.T, h *Harness) int {
 	t.Helper()
-	its, err := h.Client.Iterations(context.Background())
+	its, err := h.Client.Reads.Iterations(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestPty_TurnBlockShowsAPendingPermissionWithTheReason(t *testing.T) {
 
 	var card *wire.PermissionCard
 	WaitFor(t, 30*time.Second, "a pending permission", func() bool {
-		d, err := h.Client.Detail(context.Background(), "proj:epic-a/01")
+		d, err := h.Client.Reads.Detail(context.Background(), "proj:epic-a/01")
 		card = d.Permission
 		return err == nil && card != nil
 	})

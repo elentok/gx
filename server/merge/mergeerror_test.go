@@ -43,7 +43,7 @@ func (f *schedFixture) pauseRoot(t *testing.T) wire.Event {
 // assertRootQueued checks the paused root was not dequeued.
 func (f *schedFixture) assertRootQueued(t *testing.T) {
 	t.Helper()
-	q, err := f.H.Client.QueueItems(context.Background())
+	q, err := f.H.Client.Queue.Items(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if _, err := f.H.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil {
+	if _, err := f.H.Client.Queue.Remove(ctx, "proj:"+schedEpic+"/01"); err != nil {
 		t.Fatal(err)
 	}
 	// Reopen the ticket, so its second finish runs the merge step again.

@@ -184,7 +184,7 @@ func herdrIteration(dial func() (*apiclient.Client, error)) func(ctx context.Con
 		if err != nil {
 			return agentlog.HerdrIteration{}, false, err
 		}
-		its, err := cl.Iterations(ctx)
+		its, err := cl.Reads.Iterations(ctx)
 		if err != nil {
 			return agentlog.HerdrIteration{}, false, err
 		}

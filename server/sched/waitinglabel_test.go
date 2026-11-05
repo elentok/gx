@@ -37,7 +37,7 @@ func waitingLabels(t *testing.T, h *servertest.Harness) (queue, detail string) {
 	if len(rows) != 1 {
 		t.Fatalf("queue rows = %+v, want one", rows)
 	}
-	d, err := h.Client.Detail(context.Background(), servertest.QueueRowTicket)
+	d, err := h.Client.Reads.Detail(context.Background(), servertest.QueueRowTicket)
 	if err != nil {
 		t.Fatal(err)
 	}

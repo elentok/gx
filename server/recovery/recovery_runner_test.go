@@ -41,7 +41,7 @@ func startOnRunner(t *testing.T, name string, opts ...func(*server.Config)) (*se
 func TestRecoveryRunner_HeadlessRunListsWithoutPaneOrTab(t *testing.T) {
 	t.Parallel()
 	h, _, sess := startOnRunner(t, "headless")
-	its, err := h.Client.Iterations(context.Background())
+	its, err := h.Client.Reads.Iterations(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestRecoveryRunner_LiveCheckAgreesAcrossShapes(t *testing.T) {
 				})
 			}
 			fake.SetState(iterLabel, c.state, "")
-			its, err := h.Client.Iterations(context.Background())
+			its, err := h.Client.Reads.Iterations(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}

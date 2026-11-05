@@ -71,29 +71,35 @@ func (f fakeServerAPI) verb(v string) {
 	}
 }
 
-func (f fakeServerAPI) QueueRemove(_ context.Context, a string) (wire.QueueResult, error) {
+// fakeQueue and fakeReads are the Queue and Reads sub-clients over the same
+// fakeServerAPI state; Pause differs from the Tickets one, so they can't share a type.
+type fakeQueue struct{ fakeServerAPI }
+
+type fakeReads struct{ fakeServerAPI }
+
+func (f fakeQueue) Remove(_ context.Context, a string) (wire.QueueResult, error) {
 	f.verb("remove " + a)
 	return f.removeRes, nil
 }
 
-func (f fakeServerAPI) QueuePause(context.Context) (wire.QueueResult, error) {
+func (f fakeQueue) Pause(context.Context) (wire.QueueResult, error) {
 	f.verb("pause")
 	return wire.QueueResult{Mode: "paused"}, nil
 }
 
-func (f fakeServerAPI) QueueResume(context.Context) (wire.QueueResult, error) {
+func (f fakeQueue) Resume(context.Context) (wire.QueueResult, error) {
 	f.verb("resume")
 	return wire.QueueResult{Mode: "running"}, nil
 }
 
-func (f fakeServerAPI) Budget(context.Context) (wire.BudgetStatus, error) { return f.budget, nil }
+func (f fakeReads) Budget(context.Context) (wire.BudgetStatus, error) { return f.budget, nil }
 
 func (f fakeServerAPI) BudgetOverride(context.Context) (wire.BudgetResult, error) {
 	f.verb("override")
 	return wire.BudgetResult{}, nil
 }
 
-func (f fakeServerAPI) QueueReplace(_ context.Context, _ string, items []wire.QueueItem) (wire.QueueResult, error) {
+func (f fakeQueue) Replace(_ context.Context, _ string, items []wire.QueueItem) (wire.QueueResult, error) {
 	if f.replaced != nil {
 		*f.replaced = append(*f.replaced, items...)
 	}
@@ -142,7 +148,7 @@ func (f fakeServerAPI) EpicStashMerge(_ context.Context, address string) (wire.Q
 	return wire.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) Detail(context.Context, string) (wire.TicketDetail, error) {
+func (f fakeReads) Detail(context.Context, string) (wire.TicketDetail, error) {
 	return f.detail, f.detailErr
 }
 
@@ -171,7 +177,7 @@ func (f fakeServerAPI) Snapshot(context.Context) (wire.Snapshot, error) {
 	return f.snap, nil
 }
 func (fakeServerAPI) Events(context.Context, uint64) (<-chan wire.Event, error) { return nil, nil }
-func (f fakeServerAPI) QueueItems(context.Context) ([]wire.QueueItem, error)    { return f.queue, nil }
+func (f fakeQueue) Items(context.Context) ([]wire.QueueItem, error)             { return f.queue, nil }
 
 // withRenderedStatus makes snap look like one from a current server, which
 // always sends rendered_status: a ticket without one gets its raw status word.
@@ -205,7 +211,7 @@ func pausedRepairInfo(address, title string) wire.TicketInfo {
 
 func newServerModel(t *testing.T) Model {
 	t.Helper()
-	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{})
+	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 }
 
 // withState hands the tab the state the app shell would deliver for snap,
@@ -360,7 +366,7 @@ func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing
 // Seam D: "enter" on a paused row issues the detail's first verb (resume here).
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		// The wire carries no pause reason, so only the retired repair status
 		// tells the client this pause is a repair.
@@ -392,7 +398,7 @@ func serverModelWithStoreTicket(t *testing.T, api fakeServerAPI, isMap bool) (Mo
 	t.Helper()
 	store := t.TempDir()
 	file := writeStoreTicket(t, store, "20-a.md", "---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n")
-	m := newServerModel(t).WithServer(api).WithTickets(api)
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
 	m.settings.TicketStore = store
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file, EpicIsMap: isMap},
@@ -410,23 +416,23 @@ func TestServerMode_EditTargetIsTheTicketFile(t *testing.T) {
 	}
 }
 
-func (f fakeServerAPI) Iterations(context.Context) ([]wire.IterationInfo, error) {
+func (f fakeReads) Iterations(context.Context) ([]wire.IterationInfo, error) {
 	return f.iterations, nil
 }
 
 type countingIterationsAPI struct {
-	fakeServerAPI
+	fakeReads
 	calls *int
 }
 
 func (c countingIterationsAPI) Iterations(ctx context.Context) ([]wire.IterationInfo, error) {
 	*c.calls++
-	return c.fakeServerAPI.Iterations(ctx)
+	return c.fakeReads.Iterations(ctx)
 }
 
 func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
 	calls := 0
-	api := countingIterationsAPI{fakeServerAPI: fakeServerAPI{}, calls: &calls}
+	api := countingIterationsAPI{fakeReads: fakeReads{}, calls: &calls}
 	in := newTicketMenuInput(gxtickets.Epic{}, gxtickets.Ticket{Path: "gx:alpha/01", Title: "First"}, false, "")
 
 	cmdTicketMenu(api, config.Dirs{}, in)()
@@ -446,7 +452,7 @@ func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 	if len(api.detail.Actions) == 0 {
 		api.detail = detailWith(wire.ActionAnswer, wire.ActionResume)
 	}
-	m := newServerModel(t).WithServer(api).WithTickets(api)
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
@@ -467,7 +473,7 @@ func pressMenuKey(t *testing.T, m Model) Model {
 
 func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "paused"} {
-		m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{})
+		m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 		m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: status},
 			// Keeps the epic open: a fully done epic starts collapsed.

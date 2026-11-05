@@ -22,7 +22,7 @@ func newServerStatsCmd(d deps) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.Stats, error) {
-					return cl.Stats(ctx, days, project)
+					return cl.Reads.Stats(ctx, days, project)
 				},
 				printStats)
 		},

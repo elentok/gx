@@ -79,7 +79,7 @@ func newServerOneOffCmd(d deps) *cobra.Command {
 // runServerOneOff never starts the server: a dead socket is a refusal with a
 // `gx server start` hint, exit code 8, and nothing spooled.
 func runServerOneOff(ctx context.Context, dirs config.Dirs, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, timeout time.Duration, req wire.OneOffRequest) error {
-	res, err := cl.OneOff(ctx, req)
+	res, err := cl.Queue.OneOff(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.OneOffResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}

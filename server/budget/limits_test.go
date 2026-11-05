@@ -140,7 +140,7 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	status, err := h.Client.Budget(ctx)
+	status, err := h.Client.Reads.Budget(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +490,7 @@ func TestBudget_CodexRunIsNotMeteredOrKilled(t *testing.T) {
 
 	claudeCost.Store(2)
 	h.Server.Budget().PollBudget()
-	status, err := h.Client.Budget(ctx)
+	status, err := h.Client.Reads.Budget(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

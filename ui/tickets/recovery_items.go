@@ -41,7 +41,7 @@ func recoveryActions(d *wire.TicketDetail) []recoveryAction {
 // ticketDetail reads address's detail. With no server it returns nil and no
 // error; a failed read returns the error, and the menu opens without recovery
 // items.
-func ticketDetail(api ServerAPI, address string) (*wire.TicketDetail, error) {
+func ticketDetail(api ReadsAPI, address string) (*wire.TicketDetail, error) {
 	if api == nil {
 		return nil, nil
 	}

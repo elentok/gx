@@ -22,7 +22,7 @@ func StartOneOffHarness(t *testing.T, opts ...func(*server.Config)) (*Harness, s
 	h := StartWithStore(t, store, append(opts, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 	})...)
-	if _, err := h.Client.QueuePause(context.Background()); err != nil {
+	if _, err := h.Client.Queue.Pause(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	return h, repo

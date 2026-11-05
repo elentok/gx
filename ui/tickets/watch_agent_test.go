@@ -240,14 +240,14 @@ func failOnNativeLog(t *testing.T) (undo func()) {
 func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	undo := failOnNativeLog(t)
-	cmd := cmdWatchAgent(fakeServerAPI{}, config.Dirs{}, "gx:epic/01")
+	cmd := cmdWatchAgent(fakeReads{}, config.Dirs{}, "gx:epic/01")
 	undo()
 	cmd()
 }
 
 func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
-	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{})
+	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "claimed"}}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
@@ -272,7 +272,7 @@ func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
 func requestMenu(t *testing.T) (Model, tea.Msg) {
 	t.Helper()
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
-	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{})
+	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "claimed"},
@@ -467,7 +467,7 @@ func TestWatchReason_NativeLog(t *testing.T) {
 	}
 	for _, c := range cases {
 		fakeNativeLog(t, c.log, c.err)
-		if got := watchReason(fakeServerAPI{}, config.Dirs{}, "gx:epic/01"); got != c.want {
+		if got := watchReason(fakeReads{}, config.Dirs{}, "gx:epic/01"); got != c.want {
 			t.Errorf("%s: watchReason = %q, want %q", c.name, got, c.want)
 		}
 	}
@@ -496,7 +496,7 @@ func herdrAPI(agent, transcript string) fakeServerAPI {
 
 func TestWatch_HerdrClaudeOpensLiveModal(t *testing.T) {
 	fakeHerdrOnlyLog(t)
-	m := watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", watchLogFile(t)))
+	m := watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", watchLogFile(t))).WithReads(fakeReads{herdrAPI("claude", watchLogFile(t))})
 	m = openWatchFromMenu(t, m)
 	if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· live") || !strings.Contains(view, "hello from the agent") {
 		t.Errorf("Watch on a herdr claude agent did not open live:\n%s", view)
@@ -506,7 +506,7 @@ func TestWatch_HerdrClaudeOpensLiveModal(t *testing.T) {
 func TestWatch_HerdrDimReasons(t *testing.T) {
 	t.Run("codex", func(t *testing.T) {
 		fakeHerdrOnlyLog(t)
-		m := watchTicketTab(t, "claimed").WithServer(herdrAPI("codex", ""))
+		m := watchTicketTab(t, "claimed").WithServer(herdrAPI("codex", "")).WithReads(fakeReads{herdrAPI("codex", "")})
 		_, ready := requestTicketMenu(t, m)
 		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != notForCodex {
 			t.Errorf("Watch disabled = %q, want %q", got, notForCodex)
@@ -542,7 +542,7 @@ func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
 		if hasItem(ready.items, "Go to pane") {
 			t.Error("Go to pane shown for a ticket with no herdr agent")
 		}
-		m, ready := requestTicketMenu(t, watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", "")))
+		m, ready := requestTicketMenu(t, watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", "")).WithReads(fakeReads{herdrAPI("claude", "")}))
 		updated, _ := m.Update(ready)
 		_, cmd := chooseTicketMenuItem(t, updated.(Model), "Go to pane")
 		if cmd == nil {
@@ -560,7 +560,7 @@ func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
 		if _, ready := requestQueueMenu(t, m); hasItem(ready.items, "Go to pane") {
 			t.Error("Go to pane shown for a ticket with no herdr agent")
 		}
-		m.serverAPI = herdrAPI("codex", "")
+		m.serverAPI, m.reads = herdrAPI("codex", ""), fakeReads{herdrAPI("codex", "")}
 		_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Go to pane")
 		if cmd == nil {
 			t.Fatal("Go to pane returned no Cmd")

@@ -182,7 +182,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	}
 
 	// The dependent epic still waits for the merge.
-	list, err := f.H.Client.Epics(context.Background())
+	list, err := f.H.Client.Reads.Epics(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

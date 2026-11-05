@@ -132,14 +132,14 @@ func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
 	if !isRepairPause(ticket) {
 		return nil, false
 	}
-	return cmdRunFirstAction(m.serverAPI, m.tickets, ticket.Path), true
+	return cmdRunFirstAction(m.serverAPI, m.reads, m.tickets, ticket.Path), true
 }
 
 // cmdRunFirstAction reads the ticket's detail and runs its first action; with
 // none it does nothing.
-func cmdRunFirstAction(api ServerAPI, tix TicketsAPI, address string) tea.Cmd {
+func cmdRunFirstAction(api ServerAPI, reads ReadsAPI, tix TicketsAPI, address string) tea.Cmd {
 	return func() tea.Msg {
-		d, err := api.Detail(context.Background(), address)
+		d, err := reads.Detail(context.Background(), address)
 		if err != nil {
 			return notify.Error("detail: " + err.Error())()
 		}

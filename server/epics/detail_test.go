@@ -16,7 +16,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	if err := fake.Stop(sess); err != nil {
 		t.Fatal(err)
 	}
-	d, err = h.Client.Detail(context.Background(), answerAddr)
+	d, err = h.Client.Reads.Detail(context.Background(), answerAddr)
 	if want := []string{wire.ActionAnswer, wire.ActionResume}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("gone agent actions = %v, %v; want %v", d.Actions, err, want)
 	}
@@ -57,7 +57,7 @@ func TestDetail_ZeroCommitOffersRetryOnly(t *testing.T) {
 	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "no commits"}); err != nil {
 		t.Fatal(err)
 	}
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if want := []string{wire.ActionRetry}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("actions = %v, %v; want %v", d.Actions, err, want)
 	}
@@ -90,7 +90,7 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		d, err := h.Client.Detail(context.Background(), answerAddr)
+		d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 		if err != nil || !slices.Equal(d.Actions, c.want) {
 			t.Errorf("%s: actions = %v, %v; want %v", c.reason, d.Actions, err, c.want)
 		}
@@ -122,7 +122,7 @@ func TestDetail_FinishedCommitlessOffersMergeOnly(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		d, err := h.Client.Detail(context.Background(), answerAddr)
+		d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 		if err != nil || !slices.Equal(d.Actions, c.want) {
 			t.Errorf("%s: actions = %v, %v; want %v", c.name, d.Actions, err, c.want)
 		}
@@ -140,7 +140,7 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusOpen }); err != nil {
 		t.Fatal(err)
 	}
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil || !d.Answered || len(d.Actions) != 0 {
 		t.Fatalf("answered = %+v, %v", d, err)
 	}
@@ -159,7 +159,7 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseClosed, Question: q.Seq, Reason: "resumed"}); err != nil {
 		t.Fatal(err)
 	}
-	d, err = h.Client.Detail(context.Background(), answerAddr)
+	d, err = h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil || len(d.Rounds) != 1 || d.Rounds[0].Outcome != wire.RoundAnswered || d.Rounds[0].Options != nil {
 		t.Fatalf("earlier rounds = %+v, %v", d.Rounds, err)
 	}
@@ -176,7 +176,7 @@ func TestDetail_StuckHasNoAnswerAction(t *testing.T) {
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusLegacyRepair }); err != nil {
 		t.Fatal(err)
 	}
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil || slices.Contains(d.Actions, wire.ActionAnswer) {
 		t.Errorf("stuck actions = %v, %v", d.Actions, err)
 	}
@@ -187,7 +187,7 @@ func TestDetail_BadBlockReadsAsText(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, "type: nonsense\n")
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil || d.Latest == nil || d.Latest.Kind != ticketlog.QuestionText || len(d.Latest.Options) != 0 {
 		t.Errorf("latest = %+v, %v; want a text question", d.Latest, err)
 	}
@@ -196,7 +196,7 @@ func TestDetail_BadBlockReadsAsText(t *testing.T) {
 func TestDetail_UnknownAddressIs404(t *testing.T) {
 	t.Parallel()
 	h, _, _ := startWaitingRestartFake(t, 0)
-	if _, err := h.Client.Detail(context.Background(), "proj:epic-a/99"); err == nil {
+	if _, err := h.Client.Reads.Detail(context.Background(), "proj:epic-a/99"); err == nil {
 		t.Error("unknown ticket returned no error")
 	}
 }

@@ -80,7 +80,7 @@ func (f *streamFake) EventsAs(ctx context.Context, since uint64, client string) 
 	return s.ch, nil
 }
 
-func (f *streamFake) QueueItems(context.Context) ([]wire.QueueItem, error) {
+func (f *streamFake) Items(context.Context) ([]wire.QueueItem, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.queueGets++

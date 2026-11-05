@@ -98,7 +98,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 	if got := f.Git(t, "rev-parse", "main"); got != main {
 		t.Errorf("main moved to %s", got)
 	}
-	q, err := f.H.Client.QueueItems(context.Background())
+	q, err := f.H.Client.Queue.Items(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

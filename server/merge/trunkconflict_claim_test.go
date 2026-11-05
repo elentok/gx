@@ -85,7 +85,7 @@ func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *test
 	if otherMerged() {
 		t.Fatal("other landed while the trunk-conflict ticket was open")
 	}
-	q, err := f.H.Client.Queue(ctx)
+	q, err := f.H.Client.Queue.List(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

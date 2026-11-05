@@ -100,14 +100,14 @@ func TestQueue_MoveAndRemoveAcceptAnEpicAddress(t *testing.T) {
 		}
 	}
 
-	if res, err := h.Client.QueueMove(t.Context(), "proj:epic-b", 1); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Move(t.Context(), "proj:epic-b", 1); err != nil || res.Refused {
 		t.Fatalf("move = %+v, %v; want accepted", res, err)
 	}
 	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-b", "proj:epic-a"}) {
 		t.Errorf("queue after move = %v", got)
 	}
 
-	if res, err := h.Client.QueueRemove(t.Context(), "proj:epic-b"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Remove(t.Context(), "proj:epic-b"); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v; want accepted", res, err)
 	}
 	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {

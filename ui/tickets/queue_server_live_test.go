@@ -27,7 +27,7 @@ func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
 // from snap and the queue order, as WithServerState does on every delivery.
 func deliverQueue(t *testing.T, snap wire.Snapshot, queue []wire.QueueItem) (QueueModel, tea.Cmd) {
 	t.Helper()
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(fakeServerAPI{}, nil).WithTickets(fakeServerAPI{})
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(fakeServerAPI{}, nil).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return deliverQueueTo(next.(QueueModel), snap, queue)
 }
@@ -299,7 +299,7 @@ func TestQueueServerMode_ReloadAsksShellForSnapshot(t *testing.T) {
 }
 
 func TestQueueServerMode_InitDoesNotFetch(t *testing.T) {
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(fakeServerAPI{}, nil).WithTickets(fakeServerAPI{})
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(fakeServerAPI{}, nil).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 
 	if cmd := m.Init(); cmd != nil {
 		t.Errorf("Init returned a command in server mode")

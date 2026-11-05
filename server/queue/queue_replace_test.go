@@ -42,7 +42,7 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"proj:epic-a/01", "other:epic-b/01", "proj:epic-a/02"} {
@@ -51,7 +51,7 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 		}
 	}
 
-	res, err := h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{{Address: "proj:epic-a/02", Agent: "codex"}})
+	res, err := h.Client.Queue.Replace(ctx, "proj", []wire.QueueItem{{Address: "proj:epic-a/02", Agent: "codex"}})
 	if err != nil || res.Refused {
 		t.Fatalf("replace: %+v, %v", res, err)
 	}
@@ -60,12 +60,12 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 		t.Fatalf("queue = %+v, want other kept and proj swapped", res.Queue)
 	}
 
-	res, err = h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{{Address: "proj:epic-a/01"}})
+	res, err = h.Client.Queue.Replace(ctx, "proj", []wire.QueueItem{{Address: "proj:epic-a/01"}})
 	if err != nil || res.Refused || res.Queue[len(res.Queue)-1].Agent != "" {
 		t.Fatalf("replace with no agent = %+v, %v; want an empty agent", res, err)
 	}
 
-	res, err = h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{{Address: "other:epic-b/01"}})
+	res, err = h.Client.Queue.Replace(ctx, "proj", []wire.QueueItem{{Address: "other:epic-b/01"}})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonInvalidAddress {
 		t.Fatalf("replace with a foreign ticket = %+v, %v", res, err)
 	}
@@ -75,7 +75,7 @@ func TestQueueRemove_CascadesToDescendants(t *testing.T) {
 	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"proj:epic-a/01", "other:epic-b/01", "proj:epic-a/02"} {
@@ -83,7 +83,7 @@ func TestQueueRemove_CascadesToDescendants(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", a, res, err)
 		}
 	}
-	res, err := h.Client.QueueRemove(ctx, "proj:epic-a/01")
+	res, err := h.Client.Queue.Remove(ctx, "proj:epic-a/01")
 	if err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
@@ -101,11 +101,11 @@ func TestQueue_ReplaceAndRemoveRefuseWhileAnIterationIsLive(t *testing.T) {
 	}
 	expectRun(t, h)
 
-	res, err := h.Client.QueueRemove(ctx, "proj:epic-a/01")
+	res, err := h.Client.Queue.Remove(ctx, "proj:epic-a/01")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
-	res, err = h.Client.QueueReplace(ctx, "proj", nil)
+	res, err = h.Client.Queue.Replace(ctx, "proj", nil)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonTicketLive {
 		t.Fatalf("replace = %+v, %v", res, err)
 	}
@@ -116,7 +116,7 @@ func TestQueue_ReplaceAndRemoveRefuseWhileAnIterationIsLive(t *testing.T) {
 
 func mustItems(t *testing.T, h *servertest.Harness) []wire.QueueItem {
 	t.Helper()
-	items, err := h.Client.QueueItems(context.Background())
+	items, err := h.Client.Queue.Items(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

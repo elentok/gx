@@ -27,6 +27,11 @@ import (
 // embedded (nil) API are not reached by these tests' messages.
 type fakeServerClient struct {
 	ticketsui.ServerAPI
+	// QueueAPI and ReadsAPI stand in for the Queue and Reads sub-clients:
+	// newServerShellOn hands the same fake to ServerDeps, and a fake that
+	// needs one overrides the method (streamFake: Items, Budget).
+	ticketsui.QueueAPI
+	ticketsui.ReadsAPI
 	agentsui.SessionClient
 	down     bool
 	readOnly bool
@@ -82,10 +87,12 @@ func newServerShellOn(t *testing.T, client ServerClient, tab nav.TabID) Model {
 	if err != nil {
 		t.Fatal(err)
 	}
+	queue, _ := client.(ticketsui.QueueAPI)
+	reads, _ := client.(ticketsui.ReadsAPI)
 	m := New(*repo, Settings{
 		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
-		Server:             &ServerDeps{Client: client, Sessions: fakeSessions{}, Build: "test"},
+		Server:             &ServerDeps{Client: client, Sessions: fakeSessions{}, Queue: queue, Reads: reads, Build: "test"},
 		Settings: ui.Settings{
 			TicketStore: t.TempDir(),
 			Dirs:        config.DirsFrom([]string{"HOME=" + t.TempDir()}),

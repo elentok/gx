@@ -12,14 +12,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// OneOff creates a top-level ticket from a prompt and queues it. A refusal is a
-// result (Refused set), not an error.
-func (c *Client) OneOff(ctx context.Context, req wire.OneOffRequest) (wire.OneOffResult, error) {
-	var res wire.OneOffResult
-	err := c.post(ctx, "/v1/oneoff", req, &res)
-	return res, err
-}
-
 // CPUSpike reports a TUI's CPU spike; the server decides whether to file a ticket.
 func (c *Client) CPUSpike(ctx context.Context, spike cpuwatch.Spike) (wire.CPUSpikeResult, error) {
 	var res wire.CPUSpikeResult

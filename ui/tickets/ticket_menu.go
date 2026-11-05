@@ -273,7 +273,7 @@ func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool
 
 // cmdTicketMenu resolves liveness in a Cmd (it shells out to ps), so the menu
 // opens once the result comes back.
-func cmdTicketMenu(api ServerAPI, dirs config.Dirs, in ticketMenuInput) tea.Cmd {
+func cmdTicketMenu(api ReadsAPI, dirs config.Dirs, in ticketMenuInput) tea.Cmd {
 	address := in.ticket.Path
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.
@@ -326,7 +326,7 @@ func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived
 	in.session = ticketSession(m.vm.Sessions, epic.Path, ticket)
 	in.queueAgent = queueAgentOf(m.vm.Sessions, ticket.Path)
 	m.ticketMenuPending = ticket.Path
-	return m, cmdTicketMenu(m.serverAPI, m.settings.Dirs, in)
+	return m, cmdTicketMenu(m.reads, m.settings.Dirs, in)
 }
 
 // menuAnchor is the selected sidebar row on screen, under the panel's
@@ -371,5 +371,5 @@ func (m Model) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.Cmd) 
 	if cmd, ok := ticketMenuEditCopy(msg.action, m.yankTicketSummary, m.yankTicketFilePath, m.cmdEditSelectedFile); ok {
 		return m, cmd
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.sessions, m.tickets, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.reads, m.sessions, m.tickets, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }

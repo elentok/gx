@@ -167,7 +167,7 @@ func TestDefaultHarness_NoticeCounts(t *testing.T) {
 	servertest.WriteConfig(t, path, store, nil)
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for _, addr := range []string{"inherit:epic/01", "override:epic/01"} {

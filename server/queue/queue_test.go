@@ -35,10 +35,10 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", w.addr, res, err)
 		}
 	}
-	if res, err := h.Client.QueueMove(ctx, "proj:epic-a/03", 1); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Move(ctx, "proj:epic-a/03", 1); err != nil || res.Refused {
 		t.Fatalf("move: %+v, %v", res, err)
 	}
-	if res, err := h.Client.QueueRemove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Remove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
 
@@ -46,7 +46,7 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 	if got := servertest.QueueAddresses(t, h); !reflect.DeepEqual(got, want) {
 		t.Errorf("queue = %v, want %v", got, want)
 	}
-	items, _ := h.Client.QueueItems(ctx)
+	items, _ := h.Client.Queue.Items(ctx)
 	if items[0].Agent != "" || items[1].Agent != "codex" {
 		t.Errorf("agents = %+v, want empty (follows the default) then codex", items)
 	}
@@ -95,7 +95,7 @@ func TestQueue_StoredAgentSurvivesDefaultSwitch(t *testing.T) {
 	if got := h.Server.Harness().DefaultHarness("proj"); got != "codex" {
 		t.Errorf("default after reload = %q, want codex", got)
 	}
-	items, _ := h.Client.QueueItems(ctx)
+	items, _ := h.Client.Queue.Items(ctx)
 	if len(items) != 2 || items[0].Agent != "claude" || items[1].Agent != "" {
 		t.Errorf("items = %+v, want claude kept and the empty one still empty", items)
 	}
@@ -125,10 +125,10 @@ func TestQueue_Refusals(t *testing.T) {
 		{"unknown ticket", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/99", "") }, wire.ReasonUnknownTicket},
 		{"bad address", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "nonsense", "") }, wire.ReasonInvalidAddress},
 		{"bad agent", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/02", "gpt") }, wire.ReasonInvalidAgent},
-		{"remove unqueued", func() (wire.QueueResult, error) { return h.Client.QueueRemove(ctx, "proj:epic-a/02") }, wire.ReasonNotQueued},
-		{"move unqueued", func() (wire.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/02", 1) }, wire.ReasonNotQueued},
+		{"remove unqueued", func() (wire.QueueResult, error) { return h.Client.Queue.Remove(ctx, "proj:epic-a/02") }, wire.ReasonNotQueued},
+		{"move unqueued", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/02", 1) }, wire.ReasonNotQueued},
 		{"map epic", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:map-epic/01", "") }, wire.ReasonMapEpic},
-		{"move out of range", func() (wire.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/01", 2) }, wire.ReasonBadPosition},
+		{"move out of range", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/01", 2) }, wire.ReasonBadPosition},
 	}
 	for _, c := range cases {
 		res, err := c.do()

@@ -8,7 +8,7 @@ import (
 // QueueAddresses returns the addresses of the queue's items, in order.
 func QueueAddresses(t *testing.T, h *Harness) []string {
 	t.Helper()
-	items, err := h.Client.QueueItems(context.Background())
+	items, err := h.Client.Queue.Items(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

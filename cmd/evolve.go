@@ -383,7 +383,7 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 		if err != nil {
 			return wire.OneOffResult{}, err
 		}
-		return cl.OneOff(ctx, req)
+		return cl.Queue.OneOff(ctx, req)
 	}
 	return env, nil
 }

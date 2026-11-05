@@ -25,7 +25,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"proj:epic-a/01", "other:epic-b/01", "proj:epic-a/02"} {
@@ -33,7 +33,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", a, res, err)
 		}
 	}
-	items, err := h.Client.QueueItems(ctx)
+	items, err := h.Client.Queue.Items(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 	}
 	first := enqueuedAt(t, items, "proj:epic-a/01")
 
-	res, err := h.Client.QueueMove(ctx, "proj:epic-a/01", 3)
+	res, err := h.Client.Queue.Move(ctx, "proj:epic-a/01", 3)
 	if err != nil || res.Refused {
 		t.Fatalf("move: %+v, %v", res, err)
 	}
@@ -54,7 +54,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 
 	// A client-sent time is ignored; a kept address keeps its server time.
 	sent := time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
-	res, err = h.Client.QueueReplace(ctx, "proj", []wire.QueueItem{
+	res, err = h.Client.Queue.Replace(ctx, "proj", []wire.QueueItem{
 		{Address: "proj:epic-a/01", EnqueuedAt: sent},
 		{Address: "proj:epic-a/02", EnqueuedAt: sent},
 	})
@@ -68,7 +68,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 		t.Fatalf("replace took the client time for a new address: %v", got)
 	}
 
-	if res, err := h.Client.QueueRemove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Remove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
 	res, err = h.Client.QueueAdd(ctx, "proj:epic-a/01", "")
@@ -88,7 +88,7 @@ func TestQueue_OldStateFileLoadsWithZeroTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.Restart(t)
-	items, err := h.Client.QueueItems(context.Background())
+	items, err := h.Client.Queue.Items(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

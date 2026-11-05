@@ -131,7 +131,7 @@ func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	counts := map[string]int{}
 	countUntil(ctx, t, evs, counts, wire.EventTrunkMissing)
-	if res, err := f.H.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
+	if res, err := f.H.Client.Queue.Remove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
 	time.Sleep(300 * time.Millisecond) // many polls pass with nothing queued

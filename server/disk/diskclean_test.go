@@ -466,7 +466,7 @@ func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
 	r.queue(t, "proj:epic-a/01")
 	r.waitClean(t, 2)
 	servertest.Await(t, func() bool { return r.countBodies("low disk space") == 2 })
-	ex, err := r.h.Client.Explain(context.Background(), "proj:epic-a/01")
+	ex, err := r.h.Client.Reads.Explain(context.Background(), "proj:epic-a/01")
 	if err != nil || ex.Verdict != wire.VerdictDiskLow {
 		t.Errorf("explain = %+v, %v, want %q", ex, err, wire.VerdictDiskLow)
 	}

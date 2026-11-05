@@ -53,7 +53,7 @@ func TestQueueAdd_StampsQueuedAtOnceAndKeepsIt(t *testing.T) {
 	if first == "" {
 		t.Fatal("first enqueue did not stamp queued_at")
 	}
-	if res, err := h.Client.QueueRemove(t.Context(), "proj:e"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Remove(t.Context(), "proj:e"); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(t.Context(), "proj:e", ""); err != nil || res.Refused {

@@ -248,7 +248,7 @@ func TestDetail_AmbiguousBaseListsTheCompetingBlockers(t *testing.T) {
 	if _, err := h.Server.Scheduler().ClaimTicket("proj:epic-a/03", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	d, err := h.Client.Detail(context.Background(), "proj:epic-a/03")
+	d, err := h.Client.Reads.Detail(context.Background(), "proj:epic-a/03")
 	if err != nil || len(d.Bases) != 2 || !slices.Contains(d.Bases, "01") || !slices.Contains(d.Bases, "02") {
 		t.Errorf("bases = %v, %v; want 01 and 02", d.Bases, err)
 	}

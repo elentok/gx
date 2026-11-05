@@ -80,7 +80,7 @@ func (r *holdRig) queue(t *testing.T, addr string) {
 
 func (r *holdRig) explain(t *testing.T, addr string) wire.Explanation {
 	t.Helper()
-	ex, err := r.h.Client.Explain(context.Background(), addr)
+	ex, err := r.h.Client.Reads.Explain(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestDiskHold_OneOffOnHeldDiskWaits(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, gb)
-	res, err := r.h.Client.OneOff(context.Background(), wire.OneOffRequest{Prompt: "do it", Project: "proj"})
+	res, err := r.h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{Prompt: "do it", Project: "proj"})
 	if err != nil || res.Refused {
 		t.Fatalf("one-off = %+v, %v", res, err)
 	}

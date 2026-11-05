@@ -55,7 +55,7 @@ var errServerDown = errors.New(serverNotRunning)
 // serverHerdrLookup looks an address up in the server's iterations read. Nil
 // without a server: only the server knows herdr iterations, so herdr isn't in
 // play and an agentless ticket reads as having no agent log.
-func serverHerdrLookup(api ServerAPI) herdrLookup {
+func serverHerdrLookup(api ReadsAPI) herdrLookup {
 	if api == nil {
 		return nil
 	}
@@ -86,7 +86,7 @@ const notForCodex = "not supported for codex"
 
 // watchReason is why Watch can't open address's agent log, empty when it
 // can, whether the agent still runs or has ended.
-func watchReason(api ServerAPI, dirs config.Dirs, address string) string {
+func watchReason(api ReadsAPI, dirs config.Dirs, address string) string {
 	log, err := agentLog(context.Background(), dirs, address, serverHerdrLookup(api))
 	switch {
 	case err == nil && !log.Pruned:
@@ -281,7 +281,7 @@ func (w watchModal) View() string {
 // renderer and tail stepper as `gx server agents watch`. A pty or herdr
 // agent's log is its conversation transcript, not its terminal screen. The
 // tail stays on this run's log, so a later resumed run is not followed.
-func cmdWatchAgent(api ServerAPI, dirs config.Dirs, address string) tea.Cmd {
+func cmdWatchAgent(api ReadsAPI, dirs config.Dirs, address string) tea.Cmd {
 	return func() tea.Msg {
 		log, err := agentLog(context.Background(), dirs, address, serverHerdrLookup(api))
 		if err != nil {

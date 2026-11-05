@@ -56,7 +56,7 @@ func TestTicketScreen_PtyAgentReturnsItsSavedScreen(t *testing.T) {
 	if got := strings.Join(res.Rows, "|"); got != "saved one|saved two" {
 		t.Errorf("rows = %q, want the saved screen", got)
 	}
-	d, err := h.Client.Detail(ctx, "proj:epic-a/01")
+	d, err := h.Client.Reads.Detail(ctx, "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestTicketScreen_AgentWithoutPtyHasNoScreen(t *testing.T) {
 	if _, err := h.Client.Tickets.Screen(ctx, "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("headless agent err = %v, want a 404", err)
 	}
-	d, err := h.Client.Detail(ctx, "proj:epic-a/01")
+	d, err := h.Client.Reads.Detail(ctx, "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}

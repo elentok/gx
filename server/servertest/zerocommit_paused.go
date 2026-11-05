@@ -118,7 +118,7 @@ func (p ZeroCommitPaused) Adopted(t *testing.T) string {
 	WaitStatus(t, p.TicketPath, schema.StatusDone)
 	var reason string
 	Await(t, func() bool {
-		hist, err := p.H.Client.History(context.Background(), "proj:epic-a/01")
+		hist, err := p.H.Client.Reads.History(context.Background(), "proj:epic-a/01")
 		if err != nil {
 			return false
 		}
@@ -144,7 +144,7 @@ func (p ZeroCommitPaused) StaysPaused(t *testing.T) {
 	if tk.Status == schema.StatusDone {
 		t.Errorf("status = done, want left alone")
 	}
-	hist, err := p.H.Client.History(context.Background(), "proj:epic-a/01")
+	hist, err := p.H.Client.Reads.History(context.Background(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -391,7 +391,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 				}
 			}
 		}
-		if b, berr := c.Budget(ctx); berr == nil {
+		if b, berr := c.Reads.Budget(ctx); berr == nil {
 			info.Budget = &b
 		}
 		if st, serr := c.ConfigStatus(ctx); serr == nil && !st.Empty() {

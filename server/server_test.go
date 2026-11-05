@@ -502,7 +502,7 @@ func TestHerdr_BannerClearsWhenTheNeedGoesAway(t *testing.T) {
 		snap, err := h.Client.Snapshot(ctx)
 		return err == nil && snap.HerdrUnavailable
 	})
-	if res, err := h.Client.QueueRemove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Remove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("queue remove: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 5*time.Second, "banner off", func() bool {

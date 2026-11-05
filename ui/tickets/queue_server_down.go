@@ -34,6 +34,18 @@ func (m QueueModel) WithSessions(s SessionsAPI) QueueModel {
 	return m
 }
 
+// WithQueue gives the tab the queue sub-client; see Model.WithQueue.
+func (m QueueModel) WithQueue(q QueueAPI) QueueModel {
+	m.queue = q
+	return m
+}
+
+// WithReads gives the tab the reads sub-client; see Model.WithReads.
+func (m QueueModel) WithReads(r ReadsAPI) QueueModel {
+	m.reads = r
+	return m
+}
+
 // WithTickets gives the tab the tickets sub-client; see Model.WithTickets.
 func (m QueueModel) WithTickets(t TicketsAPI) QueueModel {
 	m.tickets = t

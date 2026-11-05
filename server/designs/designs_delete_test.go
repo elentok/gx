@@ -116,7 +116,7 @@ func TestDesignsDelete_EpicDetailDeletableMatchesTheRule(t *testing.T) {
 	f := startDeletable(t)
 	f.open(t, "proj:live", false)
 	for epic, want := range map[string]bool{"proj:bare": true, "proj:charted": false, "proj:ticketed": false, "proj:live": false} {
-		d, err := f.h.Client.EpicDetail(f.ctx, epic)
+		d, err := f.h.Client.Reads.EpicDetail(f.ctx, epic)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -136,7 +136,7 @@ func TestDesignsDelete_EpicDetailLogsADeletableCheckError(t *testing.T) {
 	if err := os.WriteFile(f.h.SessionsDir, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	d, err := f.h.Client.EpicDetail(f.ctx, "proj:bare")
+	d, err := f.h.Client.Reads.EpicDetail(f.ctx, "proj:bare")
 	if err != nil {
 		t.Fatal(err)
 	}

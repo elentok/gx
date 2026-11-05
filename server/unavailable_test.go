@@ -62,7 +62,7 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 	var ex wire.Explanation
 	servertest.Poll(10*time.Second, func() bool {
 		var err error
-		if ex, err = h.Client.Explain(ctx, "proj:epic-a/01"); err != nil {
+		if ex, err = h.Client.Reads.Explain(ctx, "proj:epic-a/01"); err != nil {
 			t.Fatal(err)
 		}
 		return ex.Verdict == wire.VerdictProjectUnavailable
@@ -77,10 +77,10 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 	}
 
 	fresh := testutil.TempRepo(t)
-	if res, err := h.Client.SetProjectPath(ctx, wire.ProjectRequest{Name: "proj", Path: fresh}); err != nil || res.Refused {
+	if res, err := h.Client.Reads.SetProjectPath(ctx, wire.ProjectRequest{Name: "proj", Path: fresh}); err != nil || res.Refused {
 		t.Fatalf("set-path: %+v, %v", res, err)
 	}
-	ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+	ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -127,6 +127,8 @@ type QueueModel struct {
 	serverAPI   ServerAPI
 	sessions    SessionsAPI
 	tickets     TicketsAPI
+	queue       QueueAPI
+	reads       ReadsAPI
 	serverStart func(context.Context) error
 	link        ServerLink
 	// olderServer: see Model.olderServer.

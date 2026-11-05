@@ -52,7 +52,7 @@ func TestExplain_WaitingRunVerdicts(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			waitFor(t, func() bool {
-				ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+				ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
 				return err == nil && ex.Verdict == tc.want
 			})
 		})

@@ -38,10 +38,10 @@ func TestQueueAgentRows_IterationsNameTheRunnerAndTheRow(t *testing.T) {
 	fake.SetState(servertest.ResumeLabel, agentrunner.StateWorking, "")
 
 	servertest.WaitFor(t, 10*time.Second, "a live iteration", func() bool {
-		its, err := h.Client.Iterations(context.Background())
+		its, err := h.Client.Reads.Iterations(context.Background())
 		return err == nil && len(its) == 1
 	})
-	its, _ := h.Client.Iterations(context.Background())
+	its, _ := h.Client.Reads.Iterations(context.Background())
 	rows := servertest.QueueRows(t, h)
 	if its[0].Runner != "pty" || len(rows) != 1 || its[0].QueueAgent != rows[0].ID {
 		t.Errorf("iteration = %+v, Queue rows = %+v; want runner pty and the row's id", its[0], rows)

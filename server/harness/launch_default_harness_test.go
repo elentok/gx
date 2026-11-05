@@ -68,7 +68,7 @@ func TestProjectWorktrees_TiersFollowProjectDefaultHarness(t *testing.T) {
 		c.AgentsClaude = config.DefaultAgentsConfig().Claude
 		c.AgentsCodex = config.DefaultAgentsConfig().Codex
 	})
-	list, err := h.Client.ProjectWorktrees(context.Background())
+	list, err := h.Client.Reads.ProjectWorktrees(context.Background())
 	if err != nil || len(list) != 2 {
 		t.Fatalf("worktrees = %+v, %v", list, err)
 	}

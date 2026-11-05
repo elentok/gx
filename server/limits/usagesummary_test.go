@@ -14,7 +14,7 @@ import (
 
 func usageSummary(t *testing.T, h *servertest.Harness) wire.UsageSummary {
 	t.Helper()
-	u, err := h.Client.UsageSummary(context.Background())
+	u, err := h.Client.Reads.UsageSummary(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -46,7 +46,7 @@ func TestPause_WritesStatusSectionAndOneEvent(t *testing.T) {
 			t.Errorf("ticket lacks %q:\n%s", want, data)
 		}
 	}
-	hist, err := h.Client.History(ctx, "proj:epic-a/01")
+	hist, err := h.Client.Reads.History(ctx, "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}

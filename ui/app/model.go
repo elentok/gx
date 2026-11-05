@@ -111,7 +111,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
 	tm := ticketsui.NewModel(root, s, keys.New(Bindings()))
 	if m.settings.Server != nil {
-		tm = tm.WithServer(m.settings.Server.Client).WithSessions(m.settings.Server.Sessions).WithTickets(m.settings.Server.Tickets).WithCwdProject(cwdProjectName(s.TicketStore, root))
+		tm = tm.WithServer(m.settings.Server.Client).WithSessions(m.settings.Server.Sessions).WithTickets(m.settings.Server.Tickets).WithQueue(m.settings.Server.Queue).WithReads(m.settings.Server.Reads).WithCwdProject(cwdProjectName(s.TicketStore, root))
 	}
 	return tm
 }
@@ -129,7 +129,7 @@ func cwdProjectName(store, root string) string {
 func (m Model) newQueueModel(root string, s ui.Settings, focusEpic string) ticketsui.QueueModel {
 	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings())).WithFocusEpic(focusEpic)
 	if m.settings.Server != nil {
-		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start).WithSessions(m.settings.Server.Sessions).WithTickets(m.settings.Server.Tickets)
+		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start).WithSessions(m.settings.Server.Sessions).WithTickets(m.settings.Server.Tickets).WithQueue(m.settings.Server.Queue).WithReads(m.settings.Server.Reads)
 	}
 	return qm
 }

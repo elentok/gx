@@ -44,7 +44,7 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
-	if res, err := h.Client.QueuePause(ctx); err != nil || res.Refused || res.Mode != wire.QueueModePaused {
+	if res, err := h.Client.Queue.Pause(ctx); err != nil || res.Refused || res.Mode != wire.QueueModePaused {
 		t.Fatalf("pause: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -56,7 +56,7 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	servertest.RegisterTurn(h)
 	expectNoRun(t, h)
 
-	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused || res.Mode != wire.QueueModeRunning {
+	if res, err := h.Client.Queue.Resume(ctx); err != nil || res.Refused || res.Mode != wire.QueueModeRunning {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
 	expectRun(t, h)
@@ -67,7 +67,7 @@ func TestFlush_IsFinishAndPause(t *testing.T) {
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
-	if res, err := h.Client.QueuePause(ctx); err != nil || res.Refused || res.Mode != wire.QueueModePaused {
+	if res, err := h.Client.Queue.Pause(ctx); err != nil || res.Refused || res.Mode != wire.QueueModePaused {
 		t.Fatalf("flush: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -79,7 +79,7 @@ func TestFlush_IsFinishAndPause(t *testing.T) {
 	servertest.RegisterTurn(h)
 	expectNoRun(t, h)
 
-	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Resume(ctx); err != nil || res.Refused {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
 	expectRun(t, h)
@@ -95,9 +95,9 @@ func TestSnapshot_ReportsQueueMode(t *testing.T) {
 		want wire.QueueMode
 	}{
 		{"initial", nil, wire.QueueModeRunning},
-		{"pause", h.Client.QueuePause, wire.QueueModePaused},
-		{"resume", h.Client.QueueResume, wire.QueueModeRunning},
-		{"pause again", h.Client.QueuePause, wire.QueueModePaused},
+		{"pause", h.Client.Queue.Pause, wire.QueueModePaused},
+		{"resume", h.Client.Queue.Resume, wire.QueueModeRunning},
+		{"pause again", h.Client.Queue.Pause, wire.QueueModePaused},
 	}
 	for _, st := range steps {
 		if st.do != nil {

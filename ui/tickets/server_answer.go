@@ -19,11 +19,11 @@ var focusIterationTab = func(tabID string) error {
 	return err
 }
 
-// iterationsSnapshot is a ServerAPI whose Iterations read is answered from one
+// iterationsSnapshot is a ReadsAPI whose Iterations read is answered from one
 // earlier fetch, so a caller that looks up several things in a row hits the
 // server once.
 type iterationsSnapshot struct {
-	ServerAPI
+	ReadsAPI
 	list []wire.IterationInfo
 	err  error
 }
@@ -33,16 +33,16 @@ func (s iterationsSnapshot) Iterations(context.Context) ([]wire.IterationInfo, e
 }
 
 // snapshotIterations fetches api's iterations once. Nil stays nil: no server.
-func snapshotIterations(api ServerAPI) ServerAPI {
+func snapshotIterations(api ReadsAPI) ReadsAPI {
 	if api == nil {
 		return nil
 	}
 	list, err := api.Iterations(context.Background())
-	return iterationsSnapshot{ServerAPI: api, list: list, err: err}
+	return iterationsSnapshot{ReadsAPI: api, list: list, err: err}
 }
 
 // serverIteration is address's live iteration from the server's iterations read.
-func serverIteration(api ServerAPI, address string) (wire.IterationInfo, bool) {
+func serverIteration(api ReadsAPI, address string) (wire.IterationInfo, bool) {
 	if api == nil {
 		return wire.IterationInfo{}, false
 	}
@@ -82,7 +82,7 @@ func resolveTicketPath(store, path string) (file, address string) {
 
 // cmdServerFocusPane focuses the herdr tab the iterations read names for
 // address.
-func cmdServerFocusPane(api ServerAPI, address string) tea.Cmd {
+func cmdServerFocusPane(api ReadsAPI, address string) tea.Cmd {
 	return func() tea.Msg {
 		it, live := serverIteration(api, address)
 		if !live || it.Tab == "" {

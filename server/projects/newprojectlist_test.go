@@ -31,7 +31,7 @@ func appliedLines(t *testing.T, projectDir string) (lines []string, ok bool) {
 func TestProjectAdd_NewProjectGetsTheFullAppliedList(t *testing.T) {
 	t.Parallel()
 	h := servertest.Start(t)
-	res, err := h.Client.AddProject(context.Background(), wire.AddProjectRequest{Path: t.TempDir(), Name: "fresh", VCS: config.VCSNone})
+	res, err := h.Client.Reads.AddProject(context.Background(), wire.AddProjectRequest{Path: t.TempDir(), Name: "fresh", VCS: config.VCSNone})
 	if err != nil || res.Refused {
 		t.Fatalf("add = %+v, %v", res, err)
 	}

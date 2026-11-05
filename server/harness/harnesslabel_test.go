@@ -53,7 +53,7 @@ func TestHarnessLabel_WaitingNotes(t *testing.T) {
 	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "04", "sess-4", true)
 	servertest.SeedEarlierClaudeRun(t, h, h.TicketStore, "proj", "work", "05", "sess-5", false)
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:work/02", ""); err != nil || res.Refused {
@@ -84,7 +84,7 @@ func TestHarnessLabel_QueueItemAgentPins(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	if _, err := h.Client.QueuePause(ctx); err != nil {
+	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:work/01", "codex"); err != nil || res.Refused {

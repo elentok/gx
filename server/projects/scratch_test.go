@@ -18,7 +18,7 @@ func TestScratchProject_AutoCreatedAndUnremovable(t *testing.T) {
 	h := servertest.Start(t)
 	ctx := context.Background()
 
-	list, err := h.Client.Projects(ctx)
+	list, err := h.Client.Reads.Projects(ctx)
 	if err != nil || len(list) != 1 || list[0].Name != projects.ScratchProject || list[0].VCS != config.VCSNone {
 		t.Fatalf("projects = %+v, %v; want just scratch with vcs none", list, err)
 	}
@@ -34,11 +34,11 @@ func TestScratchProject_AutoCreatedAndUnremovable(t *testing.T) {
 		t.Errorf("workspace not created: %v", err)
 	}
 
-	res, err := h.Client.RemoveProject(ctx, wire.ProjectRequest{Name: projects.ScratchProject})
+	res, err := h.Client.Reads.RemoveProject(ctx, wire.ProjectRequest{Name: projects.ScratchProject})
 	if err == nil && !res.Refused {
 		t.Fatalf("remove scratch = %+v, want refusal", res)
 	}
-	if list, _ := h.Client.Projects(ctx); len(list) != 1 {
+	if list, _ := h.Client.Reads.Projects(ctx); len(list) != 1 {
 		t.Errorf("scratch gone after refused remove: %+v", list)
 	}
 }

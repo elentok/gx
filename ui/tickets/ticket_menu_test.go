@@ -87,7 +87,7 @@ func withMutes(info wire.TicketInfo, mutes []schema.MuteRecord) wire.TicketInfo 
 
 func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
@@ -121,7 +121,7 @@ func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 
 func TestTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls}).WithTickets(fakeServerAPI{calls: &calls})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls}).WithTickets(fakeServerAPI{calls: &calls}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls}}).WithReads(fakeReads{fakeServerAPI{calls: &calls}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted),
 	}})
@@ -147,7 +147,7 @@ func TestTicketMenu_ServerTicketMutesDecideUnmute(t *testing.T) {
 		"unmuted": {nil, notMuted},
 	} {
 		t.Run(name, func(t *testing.T) {
-			m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{})
+			m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 			m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 				withMutes(pausedRepairInfo("gx:alpha/01", "First"), tt.mutes),
 			}})
@@ -463,7 +463,7 @@ func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
 func TestCmdTicketMenu_PTYIterationOffersTheAgentRow(t *testing.T) {
 	api := fakeServerAPI{iterations: []wire.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
 	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01"}, true, "")
-	msg := cmdTicketMenu(api, config.Dirs{}, in)().(ticketMenuReadyMsg)
+	msg := cmdTicketMenu(fakeReads{api}, config.Dirs{}, in)().(ticketMenuReadyMsg)
 	item := itemByLabel(t, msg.items, "Go to pane")
 	if item.Disabled != "" {
 		t.Fatalf("Go to pane dimmed %q with a live PTY holder and herdr down", item.Disabled)

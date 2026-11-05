@@ -18,7 +18,7 @@ func TestProjectWorktrees_PrintsRootAndWorktree(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
 
-	list, err := h.Client.ProjectWorktrees(context.Background())
+	list, err := h.Client.Reads.ProjectWorktrees(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

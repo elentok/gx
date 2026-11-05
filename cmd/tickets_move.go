@@ -96,8 +96,8 @@ func activeAddresses(dirs config.Dirs, dial func() (*apiclient.Client, error)) (
 	if cl, err := dial(); err == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 		defer cancel()
-		items, qerr := cl.QueueItems(ctx)
-		its, ierr := cl.Iterations(ctx)
+		items, qerr := cl.Queue.Items(ctx)
+		its, ierr := cl.Reads.Iterations(ctx)
 		if qerr == nil && ierr == nil {
 			var out []string
 			for _, i := range items {

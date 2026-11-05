@@ -20,19 +20,27 @@ import (
 type ServerAPI interface {
 	Snapshot(ctx context.Context) (wire.Snapshot, error)
 	Events(ctx context.Context, since uint64) (<-chan wire.Event, error)
-	QueueItems(ctx context.Context) ([]wire.QueueItem, error)
 	QueueAdd(ctx context.Context, address, agent string) (wire.QueueResult, error)
-	QueueReplace(ctx context.Context, project string, items []wire.QueueItem) (wire.QueueResult, error)
-	QueueRemove(ctx context.Context, address string) (wire.QueueResult, error)
-	QueuePause(ctx context.Context) (wire.QueueResult, error)
-	QueueResume(ctx context.Context) (wire.QueueResult, error)
-	Budget(ctx context.Context) (wire.BudgetStatus, error)
 	BudgetOverride(ctx context.Context) (wire.BudgetResult, error)
-	Detail(ctx context.Context, address string) (wire.TicketDetail, error)
 	Repair(ctx context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error)
-	Iterations(ctx context.Context) ([]wire.IterationInfo, error)
 	DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error)
 	SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error)
+}
+
+// QueueAPI is the slice of *apiclient.Queue the tickets and queue tabs use.
+type QueueAPI interface {
+	Items(ctx context.Context) ([]wire.QueueItem, error)
+	Replace(ctx context.Context, project string, items []wire.QueueItem) (wire.QueueResult, error)
+	Remove(ctx context.Context, address string) (wire.QueueResult, error)
+	Pause(ctx context.Context) (wire.QueueResult, error)
+	Resume(ctx context.Context) (wire.QueueResult, error)
+}
+
+// ReadsAPI is the slice of *apiclient.Reads the tickets and queue tabs use.
+type ReadsAPI interface {
+	Budget(ctx context.Context) (wire.BudgetStatus, error)
+	Detail(ctx context.Context, address string) (wire.TicketDetail, error)
+	Iterations(ctx context.Context) ([]wire.IterationInfo, error)
 }
 
 // TicketsAPI is the slice of *apiclient.Tickets the tickets and queue tabs use:
@@ -87,6 +95,18 @@ func (m Model) WithSessions(s SessionsAPI) Model {
 // orchestration writes answering "server not running".
 func (m Model) WithTickets(t TicketsAPI) Model {
 	m.tickets = t
+	return m
+}
+
+// WithQueue gives the tab the queue sub-client.
+func (m Model) WithQueue(q QueueAPI) Model {
+	m.queue = q
+	return m
+}
+
+// WithReads gives the tab the reads sub-client.
+func (m Model) WithReads(r ReadsAPI) Model {
+	m.reads = r
 	return m
 }
 

@@ -30,7 +30,7 @@ func TestRecommend_StoredRecommendationShowsInDetail(t *testing.T) {
 	if res := recommendAs(t, h, investigateAddr, "proj:epic-a/01", wire.ActionRetry); res.Refused {
 		t.Fatalf("recommend refused: %+v", res)
 	}
-	d, err := h.Client.Detail(t.Context(), "proj:epic-a/01")
+	d, err := h.Client.Reads.Detail(t.Context(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestRecommend_VerbOutsideActionsIsRefused(t *testing.T) {
 	if res := recommendAs(t, h, investigateAddr, "proj:epic-a/01", wire.ActionApprove); !res.Refused || res.Reason != wire.ReasonVerbNotOffered {
 		t.Errorf("recommend = %+v, want %s refusal", res, wire.ReasonVerbNotOffered)
 	}
-	d, err := h.Client.Detail(t.Context(), "proj:epic-a/01")
+	d, err := h.Client.Reads.Detail(t.Context(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestRecommend_NewPauseRoundClearsIt(t *testing.T) {
 	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "again"); err != nil {
 		t.Fatal(err)
 	}
-	d, err := h.Client.Detail(t.Context(), "proj:epic-a/01")
+	d, err := h.Client.Reads.Detail(t.Context(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestRecommend_DeadlockInvestigationWritesNone(t *testing.T) {
 	if res := recommendAs(t, h, "proj:epic-a/03", "proj:epic-a/01", wire.ActionRetry); !res.Refused || res.Reason != wire.ReasonInvestigateStop {
 		t.Errorf("recommend = %+v, want %s refusal", res, wire.ReasonInvestigateStop)
 	}
-	d, err := h.Client.Detail(t.Context(), "proj:epic-a/01")
+	d, err := h.Client.Reads.Detail(t.Context(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,7 +23,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), listJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.EpicList, error) {
-					return cl.Epics(ctx)
+					return cl.Reads.Epics(ctx)
 				},
 				func(w io.Writer, l wire.EpicList) error { return printEpicList(w, l, allFinished) })
 		},
@@ -71,7 +71,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.EpicDetail, error) {
-					return cl.EpicDetail(ctx, args[0])
+					return cl.Reads.EpicDetail(ctx, args[0])
 				},
 				printEpicDetail)
 		},

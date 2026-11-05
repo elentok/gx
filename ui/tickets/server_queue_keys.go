@@ -56,11 +56,11 @@ func serverPauseActionFor(b wire.BudgetStatus, paused bool) serverPauseAction {
 }
 
 func (m QueueModel) cmdServerRemove(addrs []string) tea.Cmd {
-	api := m.serverAPI
+	api := m.queue
 	return func() tea.Msg {
 		out := serverRemovedMsg{}
 		for _, addr := range addrs {
-			res, err := api.QueueRemove(context.Background(), addr)
+			res, err := api.Remove(context.Background(), addr)
 			switch {
 			case err != nil:
 				out.problem = addr + ": " + err.Error()
@@ -132,7 +132,7 @@ func (m QueueModel) handleServerApproveKey() (tea.Model, tea.Cmd) {
 // handleServerPauseKey is "p" in server mode: read the budget, then offer the
 // matching action.
 func (m QueueModel) handleServerPauseKey() (tea.Model, tea.Cmd) {
-	api := m.serverAPI
+	api := m.reads
 	return m, func() tea.Msg {
 		b, err := api.Budget(context.Background())
 		return serverPauseStateMsg{budget: b, err: err}
@@ -140,7 +140,7 @@ func (m QueueModel) handleServerPauseKey() (tea.Model, tea.Cmd) {
 }
 
 func (m QueueModel) openServerPauseConfirm(b wire.BudgetStatus) QueueModel {
-	api := m.serverAPI
+	api, queue := m.serverAPI, m.queue
 	var prompt string
 	var accept tea.Cmd
 	switch serverPauseActionFor(b, m.paused) {
@@ -158,10 +158,10 @@ func (m QueueModel) openServerPauseConfirm(b wire.BudgetStatus) QueueModel {
 		}
 	case serverActionResume:
 		prompt = "Resume the queue?"
-		accept = cmdServerQueueMode("queue resumed", api.QueueResume)
+		accept = cmdServerQueueMode("queue resumed", queue.Resume)
 	default:
 		prompt = finishAndPausePrompt
-		accept = cmdServerQueueMode("queue paused", api.QueuePause)
+		accept = cmdServerQueueMode("queue paused", queue.Pause)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: accept})
 	return m
@@ -211,10 +211,9 @@ func (m QueueModel) updateServerKeys(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 // handleServerFinishAndPauseKey is "D" in server mode, an alias of Finish and pause kept
 // for one release: stop the server handing out new work; running tickets finish.
 func (m Model) handleServerFinishAndPauseKey() (tea.Model, tea.Cmd) {
-	api := m.serverAPI
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:    finishAndPausePrompt,
-		AcceptCmd: cmdServerQueueMode("queue paused", api.QueuePause),
+		AcceptCmd: cmdServerQueueMode("queue paused", m.queue.Pause),
 	})
 	return m, nil
 }

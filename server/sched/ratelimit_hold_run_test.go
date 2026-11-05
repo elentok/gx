@@ -49,7 +49,7 @@ func TestRateLimitHold_RunKeepsSlotAndExplainsTheHold(t *testing.T) {
 			pty.SetState("epic-a-iter-01", agentrunner.StateDone, "")
 
 			servertest.WaitFor(t, 10*time.Second, "explain shows the hold", func() bool {
-				ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+				ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
 				return err == nil && ex.Verdict == tc.want && ex.Reason == ""
 			})
 			snap, err := h.Client.Snapshot(ctx)

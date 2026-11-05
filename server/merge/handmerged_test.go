@@ -69,7 +69,7 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 	f.Git(t, "merge", "-q", "--ff-only", schedEpic)
 
 	waitUntil(t, "the root to leave the queue", func() bool {
-		q, err := f.H.Client.QueueItems(context.Background())
+		q, err := f.H.Client.Queue.Items(context.Background())
 		return err == nil && !slices.ContainsFunc(q, func(e wire.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
 	})
 	f.assertStamps(t, true)

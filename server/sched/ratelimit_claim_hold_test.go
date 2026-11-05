@@ -38,7 +38,7 @@ func TestRateLimitHold_StopsNewClaimsOfThatHarnessOnly(t *testing.T) {
 	pty.SetLimitedUnknownReset("epic-a-iter-01")
 	pty.SetState("epic-a-iter-01", agentrunner.StateDone, "")
 	servertest.WaitFor(t, 10*time.Second, "the hold shows", func() bool {
-		ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+		ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
 		return err == nil && ex.Verdict == wire.VerdictRateLimited
 	})
 
@@ -50,7 +50,7 @@ func TestRateLimitHold_StopsNewClaimsOfThatHarnessOnly(t *testing.T) {
 	}
 	servertest.WaitFor(t, 10*time.Second, "the codex ticket claims", func() bool { return len(pty.Prompts("epic-c-iter-01")) > 0 })
 	servertest.WaitFor(t, 10*time.Second, "the claude ticket explains the hold", func() bool {
-		ex, err := h.Client.Explain(ctx, "proj:epic-b/01")
+		ex, err := h.Client.Reads.Explain(ctx, "proj:epic-b/01")
 		return err == nil && ex.Verdict == wire.VerdictRateLimited
 	})
 	if n := len(pty.Prompts("epic-b-iter-01")); n != 0 {
@@ -92,25 +92,25 @@ func TestRateLimitHold_RestartHoldsBeforeTheFirstClaim(t *testing.T) {
 	defer cancel()
 	// Queued while paused, so the ticket waits across the restart and is
 	// claimable the moment the queue resumes on the new server.
-	if res, err := h.Client.QueuePause(ctx); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Pause(ctx); err != nil || res.Refused {
 		t.Fatalf("pause: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add second: %+v, %v", res, err)
 	}
 	h.Restart(t)
-	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Resume(ctx); err != nil || res.Refused {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "explain shows the hold", func() bool {
-		ex, err := h.Client.Explain(ctx, "proj:epic-b/01")
+		ex, err := h.Client.Reads.Explain(ctx, "proj:epic-b/01")
 		return err == nil && ex.Verdict == wire.VerdictRateLimited
 	})
 	time.Sleep(200 * time.Millisecond) // negative wait: a claim would show within a few ticks
 	if n := len(fake.Prompts("epic-b-iter-01")); n != 0 {
 		t.Errorf("second ticket got %d prompts during the hold", n)
 	}
-	if ex, err := h.Client.Explain(ctx, "proj:epic-a/01"); err != nil || ex.Verdict != wire.VerdictRateLimited {
+	if ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01"); err != nil || ex.Verdict != wire.VerdictRateLimited {
 		t.Errorf("held run explain = %+v, %v; want the hold", ex, err)
 	}
 }

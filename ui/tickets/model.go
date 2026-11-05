@@ -109,6 +109,8 @@ type Model struct {
 	serverAPI ServerAPI
 	sessions  SessionsAPI
 	tickets   TicketsAPI
+	queue     QueueAPI
+	reads     ReadsAPI
 	// link is the link half of the last WithServerState delivery; nothing else
 	// writes it (server_link.go).
 	link ServerLink

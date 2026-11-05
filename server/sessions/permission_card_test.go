@@ -43,7 +43,7 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 	})
 	ctx := context.Background()
 
-	d, err := h.Client.Detail(ctx, answerAddr)
+	d, err := h.Client.Reads.Detail(ctx, answerAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 	if res, err := h.Client.Tickets.AgentAnswer(ctx, answerAddr, "allow", ""); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
 	}
-	d, err = h.Client.Detail(ctx, answerAddr)
+	d, err = h.Client.Reads.Detail(ctx, answerAddr)
 	if err != nil || d.Permission != nil || slices.Contains(d.Actions, wire.ActionApprove) {
 		t.Errorf("after answer: permission %+v, actions %v, err %v", d.Permission, d.Actions, err)
 	}
@@ -88,7 +88,7 @@ func TestPermissionCard_StaysOnABlockedPanePause(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestPermissionCard_BlockAndClearPublishTicketChanged(t *testing.T) {
 func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 	t.Parallel()
 	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{ID: "req-2", Tool: "ExitPlanMode", NotApprovable: true})
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
 	var d wire.TicketDetail
 	waitFor(t, func() bool {
 		var err error
-		if d, err = h.Client.Detail(context.Background(), answerAddr); err != nil {
+		if d, err = h.Client.Reads.Detail(context.Background(), answerAddr); err != nil {
 			t.Fatal(err)
 		}
 		return d.Permission != nil
@@ -180,7 +180,7 @@ func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
 func TestPermissionCard_NoCardWhenNotBlocked(t *testing.T) {
 	t.Parallel()
 	h, _ := startBlockedClaimed(t, false, nil)
-	d, err := h.Client.Detail(context.Background(), answerAddr)
+	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil || d.Permission != nil {
 		t.Errorf("permission = %+v, err %v; want none", d.Permission, err)
 	}
@@ -244,7 +244,7 @@ func TestPermissionCard_CodexHookRequestAllowAndDeny(t *testing.T) {
 				ID: "codex-req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"rg foo"}`), Description: "rg foo",
 			})
 			ctx := context.Background()
-			d, err := h.Client.Detail(ctx, answerAddr)
+			d, err := h.Client.Reads.Detail(ctx, answerAddr)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -42,7 +42,7 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 		t.Fatalf("project.json = %+v, %v", pf, err)
 	}
 
-	list, err := h.Client.Projects(ctx)
+	list, err := h.Client.Reads.Projects(ctx)
 	if err != nil || len(list) != 2 || !slices.ContainsFunc(list, func(p wire.ProjectInfo) bool { return p.Name == name }) {
 		t.Fatalf("list = %+v, %v", list, err)
 	}

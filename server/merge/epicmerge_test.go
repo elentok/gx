@@ -78,7 +78,7 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 		}
 	}
 
-	if q, err := f.H.Client.QueueItems(context.Background()); err != nil || len(q) != 0 {
+	if q, err := f.H.Client.Queue.Items(context.Background()); err != nil || len(q) != 0 {
 		t.Errorf("queue = %+v, %v, want empty", q, err)
 	}
 	after := ticketFiles(t, f.Store)
@@ -372,7 +372,7 @@ func TestEpicMerge_RequeuedRootHasNoAgent(t *testing.T) {
 	if _, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil {
 		t.Fatal(err)
 	}
-	q, err := f.H.Client.QueueItems(ctx)
+	q, err := f.H.Client.Queue.Items(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

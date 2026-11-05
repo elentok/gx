@@ -17,7 +17,7 @@ import (
 
 func (r *running) epicRow(t *testing.T, epic, ticket string) wire.EpicDetailRow {
 	t.Helper()
-	d, err := apiclient.New(r.Socket).EpicDetail(context.Background(), "demo:"+epic)
+	d, err := apiclient.New(r.Socket).Reads.EpicDetail(context.Background(), "demo:"+epic)
 	if err != nil {
 		t.Fatal(err)
 	}

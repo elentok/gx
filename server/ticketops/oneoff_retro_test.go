@@ -22,7 +22,7 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 	at := time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC)
 	req := ticketwrite.RetroSubmit("proj", "epic-a", at)
 
-	first, err := h.Client.OneOff(ctx, req)
+	first, err := h.Client.Queue.OneOff(ctx, req)
 	if err != nil || first.Refused {
 		t.Fatalf("retro: %+v, %v", first, err)
 	}
@@ -44,7 +44,7 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 	}
 
 	again := ticketwrite.RetroSubmit("proj", "epic-a", at.Add(time.Hour))
-	res, err := h.Client.OneOff(ctx, again)
+	res, err := h.Client.Queue.OneOff(ctx, again)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonDuplicateLive || res.Address != first.Address {
 		t.Errorf("second retro: %+v, %v; want duplicate-live naming %s", res, err, first.Address)
 	}
@@ -65,7 +65,7 @@ func TestRunner_UnpinnedOneOffAndRetroClaimOnTheDefaultHarness(t *testing.T) {
 		fake := runnerfake.NewRunner()
 		h := servertest.StartOneOffsHarness(t, store, servertest.WithRunner(fake), func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		res, err := h.Client.OneOff(ctx, req)
+		res, err := h.Client.Queue.OneOff(ctx, req)
 		if err != nil || res.Refused {
 			t.Fatalf("%s: %+v, %v", name, res, err)
 		}

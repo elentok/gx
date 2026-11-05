@@ -26,7 +26,7 @@ func (f designsFixture) webCreate(t *testing.T, body string) (int, wire.SessionR
 
 func (f designsFixture) projectRoot(t *testing.T) string {
 	t.Helper()
-	list, err := f.h.Client.ProjectWorktrees(f.ctx)
+	list, err := f.h.Client.Reads.ProjectWorktrees(f.ctx)
 	if err != nil || len(list) != 1 {
 		t.Fatalf("worktrees = %+v, %v", list, err)
 	}
@@ -99,7 +99,7 @@ func TestWebSessionCreate_NewWorktreeRunsTheSessionThere(t *testing.T) {
 	if filepath.Base(res.Session.Dir) != "fresh" || sameDir(t, res.Session.Dir, f.projectRoot(t)) || res.Session.Name != "fresh" {
 		t.Errorf("session = %+v, want a worktree dir named fresh", res.Session)
 	}
-	list, err := f.h.Client.ProjectWorktrees(f.ctx)
+	list, err := f.h.Client.Reads.ProjectWorktrees(f.ctx)
 	if err != nil || len(list) != 1 || !strings.Contains(strings.Join(list[0].Worktrees, "\n"), "fresh") {
 		t.Errorf("worktrees = %+v, %v; want fresh listed", list, err)
 	}

@@ -38,18 +38,18 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 
-	hist, err := h.Client.History(ctx, "proj:epic-a/01")
+	hist, err := h.Client.Reads.History(ctx, "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(hist.Events) != 2 || hist.Events[0].Address != "proj:epic-a/01" {
 		t.Errorf("history = %+v", hist)
 	}
-	if _, err := h.Client.History(ctx, "nope:epic-a/01"); err == nil {
+	if _, err := h.Client.Reads.History(ctx, "nope:epic-a/01"); err == nil {
 		t.Error("history of an unknown project should fail")
 	}
 
-	locks, err := h.Client.Locks(ctx)
+	locks, err := h.Client.Reads.Locks(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 		t.Errorf("locks = %+v", locks)
 	}
 
-	projects, err := h.Client.Projects(ctx)
+	projects, err := h.Client.Reads.Projects(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestReads_ProjectWorktrees(t *testing.T) {
 		c.AgentsClaude.Strongest.Model = "fable"
 	})
 
-	list, err := h.Client.ProjectWorktrees(context.Background())
+	list, err := h.Client.Reads.ProjectWorktrees(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 		"05": {"stalled", tickets.StatusPausedAnswer.Word()},
 	}
 	for id, w := range want {
-		ex, err := h.Client.Explain(context.Background(), "proj:epic-a/"+id)
+		ex, err := h.Client.Reads.Explain(context.Background(), "proj:epic-a/"+id)
 		if err != nil {
 			t.Fatalf("%s: %v", id, err)
 		}
@@ -137,7 +137,7 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 			t.Error("error verdict should carry its reason")
 		}
 	}
-	if _, err := h.Client.Explain(context.Background(), "proj:epic-a/77"); err == nil {
+	if _, err := h.Client.Reads.Explain(context.Background(), "proj:epic-a/77"); err == nil {
 		t.Error("explain of an unknown ticket should fail")
 	}
 }
@@ -154,7 +154,7 @@ func TestExplain_ForkChildNamesItsUndoneParent(t *testing.T) {
 	}
 	h := servertest.StartWithStore(t, store)
 
-	ex, err := h.Client.Explain(context.Background(), "proj:epic-a/02a")
+	ex, err := h.Client.Reads.Explain(context.Background(), "proj:epic-a/02a")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestReads_IterationsAndQueue(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	its, err := h.Client.Iterations(ctx)
+	its, err := h.Client.Reads.Iterations(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestReads_IterationsAndQueue(t *testing.T) {
 		t.Errorf("iterations = %+v", its)
 	}
 
-	q, err := h.Client.Queue(ctx)
+	q, err := h.Client.Queue.List(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

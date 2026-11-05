@@ -113,7 +113,7 @@ func TestServerMode_EnterSkipsWebOnlyActions(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
-			m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)})
+			m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}})
 			m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 				{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 			}})
@@ -144,7 +144,7 @@ func TestRecoveryItems_NoDetailOffersNone(t *testing.T) {
 func TestCmdTicketMenu_ReportsAFailedDetailRead(t *testing.T) {
 	api := fakeServerAPI{detailErr: errors.New("boom")}
 	ticket := tickets.Ticket{Path: "gx:alpha/02", Status: string(schema.StatusPaused), PauseReason: schema.PauseIterationError}
-	msg, ok := cmdTicketMenu(api, config.Dirs{}, ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})().(ticketMenuReadyMsg)
+	msg, ok := cmdTicketMenu(fakeReads{api}, config.Dirs{}, ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})().(ticketMenuReadyMsg)
 	if !ok {
 		t.Fatal("no ticketMenuReadyMsg")
 	}
@@ -190,7 +190,7 @@ func TestRecoveryItems_MarkTheRecommendedVerb(t *testing.T) {
 func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionRetry, wire.ActionStartOver)}
-	m := newServerModel(t).WithServer(api).WithTickets(api)
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})
@@ -209,7 +209,7 @@ func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 
 func TestServerMode_EnterWithNoActionsDoesNothing(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith()}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith()})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith()}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith()}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith()}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith()}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})

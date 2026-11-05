@@ -57,7 +57,7 @@ func TestUsageGate_CodexSampleHoldsCodexClaimsOnlyAndItsOverrideLiftsThem(t *tes
 	}
 	servertest.WaitFor(t, 10*time.Second, "the claude ticket claims", func() bool { return len(pty.Prompts("epic-b-iter-01")) > 0 })
 	servertest.WaitFor(t, 10*time.Second, "the codex ticket explains the gate", func() bool {
-		ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+		ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
 		return err == nil && strings.Contains(ex.Verdict, "Codex usage: 98% of the weekly limit, resets "+resets.UTC().Format(time.RFC3339))
 	})
 	if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {
