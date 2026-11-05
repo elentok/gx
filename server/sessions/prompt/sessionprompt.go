@@ -50,13 +50,13 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if res.Refused || err != nil {
 		return res, err
 	}
+	if req.Continue && req.Promote {
+		return sessions.Refusal(wire.ReasonSessionBadRequest, "continue and promote cannot be combined"), nil
+	}
 	if req.Continue && !meta.Design {
 		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if req.Promote {
-		if req.Continue {
-			return sessions.Refusal(wire.ReasonSessionBadRequest, "continue and promote cannot be combined"), nil
-		}
 		// A Queue agent never gets here: SessionDir refuses its id as unknown.
 		if meta.Design {
 			return sessions.Refusal(wire.ReasonSessionNotPlain, fmt.Sprintf("session %s is a design session, not a plain one", req.ID)), nil

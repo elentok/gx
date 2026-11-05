@@ -91,6 +91,10 @@ func TestSessionPrompt_PromoteRefusals(t *testing.T) {
 		"continue and promote": {func() wire.SessionResult {
 			return promptAs(t, f, wire.SessionPromptRequest{ID: f.id, Promote: true, Continue: true})
 		}, wire.ReasonSessionBadRequest},
+		"continue and promote on a plain session": {func() wire.SessionResult {
+			id, _ := plainSession(t, f)
+			return promptAs(t, f, wire.SessionPromptRequest{ID: id, Promote: true, Continue: true})
+		}, wire.ReasonSessionBadRequest},
 	} {
 		if got := tc.client(); !got.Refused || got.Reason != tc.reason {
 			t.Errorf("%s = %+v, want %s", name, got, tc.reason)
