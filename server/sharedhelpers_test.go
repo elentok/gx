@@ -121,6 +121,7 @@ var (
 	gateDwell              = servertest.GateDwell
 	startWithLeftover      = servertest.StartWithLeftover
 	endedRounds            = servertest.EndedRounds
+	writeMuted             = servertest.WriteMuted
 	runLog                 = servertest.RunLog
 	ofType                 = servertest.OfType
 	startDeadlock          = servertest.StartDeadlock

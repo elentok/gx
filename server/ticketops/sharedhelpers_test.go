@@ -20,7 +20,13 @@ type (
 	answerEnv    = servertest.AnswerEnv
 )
 
+var epicA01 = servertest.EpicA01
+
 var (
+	startTicketWrites       = servertest.StartTicketWrites
+	endedRounds             = servertest.EndedRounds
+	keepWorktree            = servertest.KeepWorktree
+	writeMuted              = servertest.WriteMuted
 	assertPaused            = servertest.AssertPaused
 	commitAgentWork         = servertest.CommitAgentWork
 	newTurnRunner           = servertest.NewTurnRunner

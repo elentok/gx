@@ -3,13 +3,13 @@ package ticketops_test
 import (
 	"io"
 	"log/slog"
+	"net/http"
 	"sync"
 	"testing"
 
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
-	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/settings"
@@ -22,10 +22,9 @@ import (
 // launchFake is a ticketops.Launch that records what the operations ask of the
 // run loop and answers the budget check as told.
 type launchFake struct {
-	mu        sync.Mutex
-	budget    *wire.QueueResult
-	cancelled []string
-	settled   []string
+	mu      sync.Mutex
+	budget  *wire.QueueResult
+	settled []string
 }
 
 func (l *launchFake) BudgetRefusal() (wire.QueueResult, bool) {
@@ -35,12 +34,9 @@ func (l *launchFake) BudgetRefusal() (wire.QueueResult, bool) {
 	return *l.budget, true
 }
 
-func (l *launchFake) CancelInvestigateChild(ref queue.TicketRef, _ string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.cancelled = append(l.cancelled, ref.Addr.String())
-	return nil
-}
+func (l *launchFake) PromptsOnRetry(string) bool { return false }
+
+func (l *launchFake) RepairResume(bool) http.HandlerFunc { return nil }
 
 func (l *launchFake) ResettleWaiting(t runs.TrackedRun) error {
 	l.mu.Lock()
@@ -50,7 +46,7 @@ func (l *launchFake) ResettleWaiting(t runs.TrackedRun) error {
 }
 
 // An answer to a ticket whose run is not tracked is queued: the ticket opens
-// again, the child investigation is withdrawn and nothing is settled, even
+// again and nothing is settled, even
 // with the budget spent.
 func TestAnswer_QueuedPathUsesTheLaunchFake(t *testing.T) {
 	t.Parallel()
@@ -87,7 +83,7 @@ func TestAnswer_QueuedPathUsesTheLaunchFake(t *testing.T) {
 	if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusOpen {
 		t.Errorf("ticket = %+v, %v; want open", tk, err)
 	}
-	if len(launch.cancelled) != 1 || len(launch.settled) != 0 {
-		t.Errorf("cancelled = %v, settled = %v; want one cancel and no settle", launch.cancelled, launch.settled)
+	if len(launch.settled) != 0 {
+		t.Errorf("settled = %v; want no settle", launch.settled)
 	}
 }

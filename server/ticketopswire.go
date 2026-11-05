@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketops"
@@ -10,8 +12,8 @@ import (
 // newTicketOps needs s.writer, harness, registry, idx, events, epics and rec set.
 func newTicketOps(s *Server) *ticketops.Ops {
 	return ticketops.New(ticketops.Deps{
-		Writer: s.writer, Harness: s.harness, Registry: s.registry, Index: s.idx,
-		Events: s.events, Epics: s.epics, Rec: s.rec, Launch: ticketOpsLaunch{s},
+		Log: s.log, Writer: s.writer, Harness: s.harness, Registry: s.registry, Index: s.idx,
+		Events: s.events, Epics: s.epics, Projects: s.projects, Rec: s.rec, Launch: ticketOpsLaunch{s},
 	})
 }
 
@@ -20,8 +22,10 @@ type ticketOpsLaunch struct{ s *Server }
 
 func (l ticketOpsLaunch) BudgetRefusal() (wire.QueueResult, bool) { return l.s.budgetRefusal() }
 
-func (l ticketOpsLaunch) CancelInvestigateChild(ref queue.TicketRef, source string) error {
-	return l.s.cancelInvestigateChild(ref, source)
+func (l ticketOpsLaunch) PromptsOnRetry(address string) bool { return l.s.promptsOnRetry(address) }
+
+func (l ticketOpsLaunch) RepairResume(web bool) http.HandlerFunc {
+	return repairWriteAs(web, l.s.repairResume)
 }
 
 func (l ticketOpsLaunch) ResettleWaiting(t runs.TrackedRun) error { return l.s.resettleWaiting(t) }

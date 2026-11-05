@@ -488,9 +488,6 @@ var routeTable = []struct {
 	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/verify", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairVerify)(w, r) }},
-	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketUnmute)(w, r) }},
-	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketCancel)(w, r) }},
-	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

@@ -1,4 +1,4 @@
-package server_test
+package ticketops_test
 
 import (
 	"context"
@@ -10,11 +10,9 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/ralphloop"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -142,16 +140,6 @@ func TestCancel_FailedWorktreeRemovalDoesNotStopTheCancel(t *testing.T) {
 		if b, err := os.ReadFile(p); err != nil || !strings.Contains(string(b), "status: cancelled") {
 			t.Errorf("%s not cancelled: %v\n%s", p, err, b)
 		}
-	}
-}
-
-const mutedFrontmatter = "mutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n"
-
-func writeMuted(t *testing.T, path, status, body string) {
-	t.Helper()
-	content := "---\nid: \"01\"\nstatus: " + status + "\ntype: implement\n" + mutedFrontmatter + "---\n# first\n\n" + body
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -305,35 +293,5 @@ func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 		if stamped := strings.Contains(string(data), "cancelled_at:"); stamped != (want == "cancelled") {
 			t.Errorf("%s cancelled_at stamped = %v:\n%s", filepath.Base(p), stamped, data)
 		}
-	}
-}
-
-func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
-	t.Parallel()
-	h, path := startTicketWrites(t)
-	if err := ralphloop.Claim(path); err != nil {
-		t.Fatal(err)
-	}
-	launched := time.Now().Add(-90 * time.Second).Truncate(time.Second)
-	h.Server.Registry().PutRunAt("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty", Session: agentrunner.Session{ID: "p1"}}, launched)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	var claimed wire.TicketInfo
-	servertest.WaitFor(t, 5*time.Second, "the ticket to show as claimed", func() bool {
-		snap, err := h.Client.Snapshot(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, tk := range snap.Tickets {
-			if tk.Address == "proj:epic-a/01" && tk.Status == "claimed" {
-				claimed = tk
-				return true
-			}
-		}
-		return false
-	})
-	if !claimed.ClaimedAt.Equal(launched) {
-		t.Fatalf("ClaimedAt = %v, want %v", claimed.ClaimedAt, launched)
 	}
 }

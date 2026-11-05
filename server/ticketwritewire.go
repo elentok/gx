@@ -63,7 +63,7 @@ func (h ticketWriteHost) FreshHeldDisk(project string) (wire.DiskStatus, bool) {
 func (h ticketWriteHost) BudgetRefusal() (wire.QueueResult, bool) { return h.s.budgetRefusal() }
 
 func (h ticketWriteHost) SettleLive(addrs []tickets.Address, stop bool, reason string, blocks func(agentrunner.Runner, agentrunner.Session) bool) (wire.QueueResult, bool, error) {
-	return h.s.settleLive(addrs, stop, reason, blocks)
+	return h.s.ops.SettleLive(addrs, stop, reason, blocks)
 }
 
 func (h ticketWriteHost) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (bool, error) {
@@ -71,7 +71,7 @@ func (h ticketWriteHost) ClaimAndLaunch(root queue.RootRef, queued tickets.Addre
 }
 
 func (h ticketWriteHost) CancelInvestigateChild(ref queue.TicketRef, source string) error {
-	return h.s.cancelInvestigateChild(ref, source)
+	return h.s.ops.CancelInvestigateChild(ref, source)
 }
 
 func (h ticketWriteHost) AdoptFirst(dir string, addr tickets.Address, path string) bool {

@@ -157,7 +157,7 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("answer %s: %w", ref.Addr, err)
 		}
-		if err := o.d.Launch.CancelInvestigateChild(ref, req.Source); err != nil {
+		if err := o.CancelInvestigateChild(ref, req.Source); err != nil {
 			return wire.QueueResult{}, err
 		}
 		if queued {

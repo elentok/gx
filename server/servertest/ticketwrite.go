@@ -160,3 +160,14 @@ func OfType(logged []ralphloop.Event, typ events.Type) []ralphloop.Event {
 	}
 	return out
 }
+
+const mutedFrontmatter = "mutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n"
+
+// WriteMuted rewrites the ticket at path as proj:epic-a/01 carrying a mute.
+func WriteMuted(t *testing.T, path, status, body string) {
+	t.Helper()
+	content := "---\nid: \"01\"\nstatus: " + status + "\ntype: implement\n" + mutedFrontmatter + "---\n# first\n\n" + body
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

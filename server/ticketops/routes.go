@@ -20,6 +20,13 @@ func Routes(get func() *Ops) []wire.Route {
 			WebHandler: func(rw http.ResponseWriter, r *http.Request) { queue.HandlerWeb(get().Answer)(rw, r) },
 		},
 		{Pattern: "POST /v1/tickets/ask", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().Ask)(rw, r) }},
+		{Pattern: "POST /v1/tickets/unmute", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().Unmute)(rw, r) }},
+		{Pattern: "POST /v1/tickets/cancel", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().Cancel)(rw, r) }},
+		{
+			Pattern: "POST /v1/tickets/retry", Web: wire.WebWrite,
+			Handler:    func(rw http.ResponseWriter, r *http.Request) { get().Retry(false)(rw, r) },
+			WebHandler: func(rw http.ResponseWriter, r *http.Request) { get().Retry(true)(rw, r) },
+		},
 		{Pattern: "POST /v1/agents/prompt", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().AgentPrompt)(rw, r) }},
 		{Pattern: "POST /v1/agents/interrupt", Handler: func(rw http.ResponseWriter, r *http.Request) { queue.Handler(get().AgentInterrupt)(rw, r) }},
 		{

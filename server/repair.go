@@ -200,7 +200,7 @@ func (s *Server) cancelInvestigateUnlessSelf(req wire.RepairRequest, rc repairCt
 	if rc.investigator != "" {
 		return nil
 	}
-	return s.cancelInvestigateOf(req.Address, rc.origin)
+	return s.ops.CancelInvestigateOf(req.Address, rc.origin)
 }
 
 func (s *Server) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.RepairResult, error) {
