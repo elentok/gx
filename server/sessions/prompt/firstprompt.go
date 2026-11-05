@@ -256,7 +256,7 @@ var errSessionBlocked = errors.New("session is blocked")
 // session is still Starting, so only Blocked refuses. A step that fails after
 // typing (blocked, ended) is only logged: the prompt was delivered.
 func (f *firstPrompt) deliverSlash(prompt string) error {
-	run, closeRun, err := f.p.OpenActionRun(f.dir, RunOpts{OnTyped: f.markTyped, Cancel: f.cancel})
+	run, closeRun, err := f.p.openActionRun(f.dir, RunOpts{OnTyped: f.markTyped, Cancel: f.cancel})
 	if err != nil {
 		return err
 	}
@@ -281,7 +281,7 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 // proveDelivered checks that a claude session's slash prompt reached its
 // transcript, resending while it did not. Other harnesses write no such
 // transcript, so they keep the unchecked send.
-func (f *firstPrompt) proveDelivered(run ActionRun, prompt string) error {
+func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	meta, err := sessions.ReadMeta(f.dir)
 	if err != nil || (meta.Harness != "" && meta.Harness != string(harness.Claude)) {
 		return nil

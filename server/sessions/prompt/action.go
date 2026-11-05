@@ -104,7 +104,7 @@ var errNotIdle = errors.New("session is not idle")
 // runAction sends the prompts and returns the index of the step it stopped
 // at, with the error it stopped on.
 func (p *Prompt) runAction(dir string, action []string) (int, error) {
-	run, closeRun, err := p.OpenActionRun(dir, RunOpts{})
+	run, closeRun, err := p.openActionRun(dir, RunOpts{})
 	if err != nil {
 		return 0, err
 	}
@@ -123,9 +123,9 @@ func (p *Prompt) runAction(dir string, action []string) (int, error) {
 	return len(action), nil
 }
 
-// OpenActionRun dials the session's holder and starts following its watch;
+// openActionRun dials the session's holder and starts following its watch;
 // the returned func ends the watch.
-func (p *Prompt) OpenActionRun(dir string, opts RunOpts) (ActionRun, func(), error) {
+func (p *Prompt) openActionRun(dir string, opts RunOpts) (*actionRun, func(), error) {
 	c, err := nativerunner.DialHolder(dir)
 	if err != nil {
 		return nil, nil, err

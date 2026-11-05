@@ -65,7 +65,7 @@ func isSingleSendCommand(text string) bool {
 // start no turn, so a nudge would run them twice. A swallowed Enter leaves the
 // text in the input box.
 func (p *Prompt) typeCommandOnce(dir, text string) error {
-	run, closeRun, err := p.OpenActionRun(dir, RunOpts{})
+	run, closeRun, err := p.openActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (p *Prompt) typeCommandOnce(dir, text string) error {
 }
 
 func (p *Prompt) nudgePrompt(dir, text string) error {
-	run, closeRun, err := p.OpenActionRun(dir, RunOpts{})
+	run, closeRun, err := p.openActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (p *Prompt) nudgePrompt(dir, text string) error {
 // starts, and a person's own input stops the nudges.
 type runPrompter struct {
 	holderPrompter
-	run ActionRun
+	run *actionRun
 }
 
 func (p *runPrompter) WaitStart(timeout time.Duration) (bool, error) {

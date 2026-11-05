@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions"
@@ -66,31 +65,6 @@ type Config struct {
 type RunOpts struct {
 	OnTyped func()
 	Cancel  <-chan struct{}
-}
-
-// ActionRun follows one session's status on its own watch while prompts are
-// typed into it.
-type ActionRun interface {
-	// CatchUp applies the statuses already sent.
-	CatchUp() error
-	// Step types one prompt and waits for it to end.
-	Step(i int, prompt string) error
-	// TypeStep types one prompt and presses its Enter, without waiting.
-	TypeStep(i int, prompt string) error
-	// State is the session state the run last saw.
-	State() string
-	// Holder is the session's holder client.
-	Holder() *nativerunner.HolderClient
-	// PersonTyped reports whether a person's own input reached the session;
-	// ClearPersonTyped forgets input from before gx typed.
-	PersonTyped() bool
-	ClearPersonTyped()
-	// NextStatus blocks for the next event of a step.
-	NextStatus(timer <-chan time.Time) (expired bool, signal string, err error)
-	// TurnRunning reports whether a turn is running.
-	TurnRunning() bool
-	// Promptable reports whether the session waits for the person.
-	Promptable() bool
 }
 
 // BadRounds files the badly formed grilling rounds a Design session's last
