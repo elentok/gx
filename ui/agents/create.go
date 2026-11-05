@@ -29,7 +29,7 @@ func (m Model) openCreate() (Model, tea.Cmd) {
 // OpenCreateForm opens the create form pre-filled with p; without a client
 // there is no server to create on.
 func (m Model) OpenCreateForm(p create.Prefill) (Model, tea.Cmd) {
-	if m.client == nil {
+	if m.actions.client == nil {
 		return m, nil
 	}
 	m.create = create.New(m.settings.Home(), p)
@@ -41,7 +41,7 @@ func (m Model) jumpCtx() jump.Ctx {
 }
 
 func (m Model) createCtx() create.Ctx {
-	return create.Ctx{Height: m.height, MainWidth: m.mainWidth(), Sessions: m.sessionAPI}
+	return create.Ctx{Height: m.height, MainWidth: m.mainWidth(), Sessions: m.actions.sessionAPI}
 }
 
 // selectPending refreshes, first selecting and focusing the just-created

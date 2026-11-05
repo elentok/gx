@@ -68,14 +68,14 @@ func TestActions_StopAsksAndSendsOnlyOnYes(t *testing.T) {
 		t.Run(tc.answer, func(t *testing.T) {
 			f := &fakeSessionClient{}
 			m, _ := act(t, actionModel(t, f, "live"), letter("x"))
-			if !m.confirm.IsOpen || !m.InputFocused() || !strings.Contains(plainView(m), "Stop session live?") {
+			if !m.actions.confirm.IsOpen || !m.InputFocused() || !strings.Contains(plainView(m), "Stop session live?") {
 				t.Fatalf("x did not ask:\n%s", plainView(m))
 			}
 			if got := calls(f); len(got) != 0 {
 				t.Fatalf("calls before the answer = %v", got)
 			}
 			m, _ = act(t, m, letter(tc.answer))
-			if m.confirm.IsOpen {
+			if m.actions.confirm.IsOpen {
 				t.Fatal("the confirm stayed open")
 			}
 			if got := calls(f); !slices.Equal(got, tc.want) {
@@ -88,7 +88,7 @@ func TestActions_StopAsksAndSendsOnlyOnYes(t *testing.T) {
 func TestActions_LeaderXStops(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, cmd := leaderThen(t, actionModel(t, f, "live"), letter("x"))
-	if cmd != nil || !m.confirm.IsOpen {
+	if cmd != nil || !m.actions.confirm.IsOpen {
 		t.Fatal("leader x did not ask")
 	}
 	act(t, m, letter("y"))
@@ -100,7 +100,7 @@ func TestActions_LeaderXStops(t *testing.T) {
 func TestActions_RemoveExitedAsksAndSends(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, _ := act(t, actionModel(t, f, "done"), letter("d"))
-	if !m.confirm.IsOpen || !strings.Contains(plainView(m), "Remove session done?") {
+	if !m.actions.confirm.IsOpen || !strings.Contains(plainView(m), "Remove session done?") {
 		t.Fatalf("X did not ask:\n%s", plainView(m))
 	}
 	act(t, m, letter("y"))
@@ -112,7 +112,7 @@ func TestActions_RemoveExitedAsksAndSends(t *testing.T) {
 func TestActions_RemoveLiveShowsTheRefusal(t *testing.T) {
 	f := &fakeSessionClient{result: wire.SessionResult{Refused: true, Message: "session live is live"}}
 	m, note := act(t, actionModel(t, f, "live"), letter("d"))
-	if m.confirm.IsOpen {
+	if m.actions.confirm.IsOpen {
 		t.Fatal("X on a live session asked")
 	}
 	if note != "session live is live" {
@@ -193,10 +193,10 @@ func TestActions_RunActionAsksFirstListingEveryStep(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := &fakeSessionClient{}
 			m := press(t, withAction(actionModel(t, f, "live"), "live", "/clear", "go on"))
-			if !m.confirm.IsOpen {
+			if !m.actions.confirm.IsOpen {
 				t.Fatal("run action did not ask")
 			}
-			view := m.confirm.View(80)
+			view := m.actions.confirm.View(80)
 			for _, step := range []string{"/clear", "go on"} {
 				if !strings.Contains(view, step) {
 					t.Fatalf("confirm lacks %q:\n%s", step, view)
@@ -222,7 +222,7 @@ func TestActions_RunActionEscSendsNothing(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, _ := act(t, withAction(actionModel(t, f, "live"), "live", "go on"), letter("a"))
 	m, _ = act(t, m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if m.confirm.IsOpen {
+	if m.actions.confirm.IsOpen {
 		t.Fatal("esc left the confirm open")
 	}
 	if got := calls(f); len(got) != 0 {
@@ -236,7 +236,7 @@ func TestActions_QueueActionListsTheQueue(t *testing.T) {
 		s.Actionable = wire.SessionActionable{Reason: "done", Kind: wire.SessionActionableQueue, Target: "gx:epic-impl"}
 	})
 	m, _ = act(t, m, letter("a"))
-	if view := m.confirm.View(80); !strings.Contains(view, "Queue `gx:epic-impl`") {
+	if view := m.actions.confirm.View(80); !strings.Contains(view, "Queue `gx:epic-impl`") {
 		t.Fatalf("confirm lacks the queue:\n%s", view)
 	}
 }
@@ -324,12 +324,12 @@ func TestActions_RunActionWithoutAnActionSaysSo(t *testing.T) {
 // menuRow is the plain text of the open menu's row for label.
 func menuRow(t *testing.T, m Model, label string) string {
 	t.Helper()
-	for line := range strings.SplitSeq(ansi.Strip(m.menu.View()), "\n") {
+	for line := range strings.SplitSeq(ansi.Strip(m.actions.menu.View()), "\n") {
 		if strings.Contains(line, " "+label+" ") {
 			return line
 		}
 	}
-	t.Fatalf("no %q row in the menu:\n%s", label, ansi.Strip(m.menu.View()))
+	t.Fatalf("no %q row in the menu:\n%s", label, ansi.Strip(m.actions.menu.View()))
 	return ""
 }
 
@@ -352,15 +352,15 @@ func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, _ := act(t, tc.prep(actionModel(t, &fakeSessionClient{}, tc.id)), letter("m"))
-			if !m.menu.IsOpen || !m.InputFocused() {
+			if !m.actions.menu.IsOpen || !m.InputFocused() {
 				t.Fatal("m did not open the menu")
 			}
 			for label, hint := range tc.want {
-				i := slices.IndexFunc(m.menu.Items(), func(it contextmenu.Item[wire.SessionInfo]) bool { return it.Label == label })
+				i := slices.IndexFunc(m.actions.menu.Items(), func(it contextmenu.Item[wire.SessionInfo]) bool { return it.Label == label })
 				if i < 0 {
 					t.Fatalf("no %q item", label)
 				}
-				if why := m.menu.Items()[i].Disabled; why != "" {
+				if why := m.actions.menu.Items()[i].Disabled; why != "" {
 					if why != hint {
 						t.Errorf("%s dim for %q, want %q", label, why, hint)
 					}
@@ -370,7 +370,7 @@ func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 					t.Errorf("%s row = %q, want it to end in %q", label, row, hint)
 				}
 			}
-			if strings.Contains(m.menu.View(), "Watch") {
+			if strings.Contains(m.actions.menu.View(), "Watch") {
 				t.Error("the session menu has a Watch item")
 			}
 		})
@@ -381,7 +381,7 @@ func TestActions_MenuDimItemMakesNoCall(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, _ := act(t, actionModel(t, f, "live"), letter("m"))
 	m, _ = pick(t, m, "restore")
-	if !m.menu.IsOpen || len(calls(f)) != 0 {
+	if !m.actions.menu.IsOpen || len(calls(f)) != 0 {
 		t.Fatalf("Enter on a dim Resume closed the menu or called; calls = %v", calls(f))
 	}
 }
@@ -402,11 +402,11 @@ func TestActions_MenuItemsMakeTheirSessionCalls(t *testing.T) {
 			f := &fakeSessionClient{}
 			m, _ := act(t, tc.prep(actionModel(t, f, tc.id)), letter("m"))
 			m, _ = pick(t, m, tc.filter)
-			if m.menu.IsOpen {
+			if m.actions.menu.IsOpen {
 				t.Fatal("the menu stayed open")
 			}
 			if tc.want == "" {
-				if !m.confirm.IsOpen {
+				if !m.actions.confirm.IsOpen {
 					t.Fatal("Remove of an exited session did not ask")
 				}
 				return
@@ -431,7 +431,7 @@ func TestActions_MenuMarkReadSendsMarkRead(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, _ := act(t, withUnread(actionModel(t, f, "live"), "live"), letter("m"))
 	m, _ = pick(t, m, "mark")
-	if m.menu.IsOpen {
+	if m.actions.menu.IsOpen {
 		t.Fatal("the menu stayed open")
 	}
 	if got := calls(f); !slices.Equal(got, []string{"mark-read live"}) {
@@ -443,7 +443,7 @@ func TestActions_MenuStopAsks(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, _ := act(t, actionModel(t, f, "live"), letter("m"))
 	m, _ = pick(t, m, "stop")
-	if !m.confirm.IsOpen || len(calls(f)) != 0 {
+	if !m.actions.confirm.IsOpen || len(calls(f)) != 0 {
 		t.Fatalf("Stop from the menu did not ask; calls = %v", calls(f))
 	}
 	act(t, m, letter("y"))

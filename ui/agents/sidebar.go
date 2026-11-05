@@ -130,9 +130,9 @@ func (sb sidebar) visibleRows(in sidebarInput) []sidebarRow {
 // menu is on top, it takes the click.
 func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
-	if m.menu.IsOpen && !m.confirm.IsOpen && !m.help.IsOpen {
+	if m.actions.menu.IsOpen && !m.actions.confirm.IsOpen && !m.help.IsOpen {
 		var cmd tea.Cmd
-		m.menu, cmd = m.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
+		m.actions.menu, cmd = m.actions.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 		return m, cmd
 	}
 	if m.copy != nil || m.ModalOpen() || m.leaderPending {
@@ -145,7 +145,17 @@ func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if mouse.Button == tea.MouseRight {
-		return m.rightClick(mouse)
+		i, ok := m.sidebar.sessionAt(m.sidebarInput(), mouse.X, mouse.Y)
+		if !ok {
+			return m, nil
+		}
+		m.cursor = i
+		next, cmd := m.refresh()
+		m = next.(Model)
+		m.terminalFocused = false
+		s, ok := m.selected()
+		m.actions.openMenu(s, ok)
+		return m, cmd
 	}
 	if mouse.Button != tea.MouseLeft {
 		return m, nil
@@ -160,19 +170,6 @@ func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	}
 	m.terminalFocused = false
 	return m.selectAndFocus(i)
-}
-
-func (m Model) rightClick(mouse tea.Mouse) (tea.Model, tea.Cmd) {
-	i, ok := m.sidebar.sessionAt(m.sidebarInput(), mouse.X, mouse.Y)
-	if !ok {
-		return m, nil
-	}
-	m.cursor = i
-	next, cmd := m.refresh()
-	m = next.(Model)
-	m.terminalFocused = false
-	next, menuCmd := m.openMenu()
-	return next, tea.Batch(cmd, menuCmd)
 }
 
 // sessionAt is the session on the sidebar row under (x, y); false off

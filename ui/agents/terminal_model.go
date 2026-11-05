@@ -13,7 +13,7 @@ import (
 
 // attachTarget is the session the panel shows live, or "" for none.
 func (m Model) attachTarget() string {
-	if m.client == nil || m.link == tabapi.ServerLinkDown || !m.loaded || m.term.SessionsDir == "" || m.cursor >= len(m.sessions) {
+	if m.actions.client == nil || m.link == tabapi.ServerLinkDown || !m.loaded || m.term.SessionsDir == "" || m.cursor >= len(m.sessions) {
 		return ""
 	}
 	if s := m.sessions[m.cursor]; s.Status.State != wire.SessionExited {

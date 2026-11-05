@@ -54,7 +54,7 @@ func (m Model) WithLastViewedFile(path string) Model {
 func (m Model) open() Model {
 	i := slices.IndexFunc(m.sessions, func(s wire.SessionInfo) bool { return s.ID == m.lastViewed })
 	if i < 0 {
-		i = m.attentionFrom(0)
+		i = attentionFrom(m.sessions, 0)
 	}
 	if i < 0 {
 		return m
@@ -66,7 +66,7 @@ func (m Model) open() Model {
 
 func (m Model) focusReport() wire.FocusReport {
 	r := wire.FocusReport{Client: FocusClient, Focused: m.focused, TermProgram: m.termProgram}
-	if m.lines() == nil {
+	if emptyLines(m) == nil {
 		r.Session = m.selectedID()
 	}
 	return r

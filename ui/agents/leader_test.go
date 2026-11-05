@@ -314,8 +314,8 @@ func TestModalOpen_EachPopup(t *testing.T) {
 	for name, open := range map[string]func(*Model){
 		"jump":    func(m *Model) { m.jump = &jump.Popup{} },
 		"create":  func(m *Model) { m.create = &create.Form{} },
-		"confirm": func(m *Model) { m.confirm.IsOpen = true },
-		"menu":    func(m *Model) { m.menu.IsOpen = true },
+		"confirm": func(m *Model) { m.actions.confirm.IsOpen = true },
+		"menu":    func(m *Model) { m.actions.menu.IsOpen = true },
 		"help":    func(m *Model) { m.help.IsOpen = true },
 	} {
 		t.Run(name, func(t *testing.T) {

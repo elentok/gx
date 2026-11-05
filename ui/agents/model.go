@@ -21,8 +21,6 @@ import (
 	"github.com/elentok/gx/ui/agents/jump"
 	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/clip"
-	"github.com/elentok/gx/ui/confirm"
-	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -49,12 +47,7 @@ type pageActivatedMsg struct{}
 
 // Model is the Agents tab: the server's interactive sessions.
 type Model struct {
-	// client is nil when no server client could be built.
-	client SessionClient
-	// sessionAPI is nil exactly when client is.
-	sessionAPI Sessions
-	// queue is nil exactly when client is.
-	queue    Queue
+	actions  sessionActions
 	settings ui.Settings
 	link     tabapi.ServerLink
 	loaded   bool
@@ -85,10 +78,6 @@ type Model struct {
 	// pendingSelect is a just-created or banner-clicked session to select and
 	// focus once a snapshot lists it.
 	pendingSelect string
-	// confirm asks y/n before a Stop or Remove.
-	confirm confirm.Model
-	// menu is the `m` menu of the selected session's actions.
-	menu          contextmenu.Menu[wire.SessionInfo]
 	help          help.Model
 	width, height int
 	// term renders the terminal panel (see termView).
@@ -115,7 +104,7 @@ type Model struct {
 func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebar: sidebar{memo: &ui.Memo{}}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]create.Project, error) { return create.ListProjects(settings.TicketStore) },
+	m := Model{actions: sessionActions{client: client, sessionAPI: sessions}, settings: settings, spinner: sp, sidebar: sidebar{memo: &ui.Memo{}}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]create.Project, error) { return create.ListProjects(settings.TicketStore) },
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{sessions: sessions}
@@ -130,7 +119,7 @@ func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Mod
 
 // WithQueue gives the tab the queue sub-client.
 func (m Model) WithQueue(q Queue) Model {
-	m.queue = q
+	m.actions.queue = q
 	return m
 }
 
@@ -158,7 +147,7 @@ func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea
 // after the leader, in the jump popup, create form, confirm or menu and while
 // typing a help filter, and in copy mode.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.sidebar.togglePending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.sidebar.togglePending || m.copy != nil || m.jump != nil || m.create != nil || m.actions.confirm.IsOpen || m.actions.menu.IsOpen || m.help.InputFocused()
 }
 
 // TerminalFocused tells the shell ctrl+o is the page's: the agent's in the
@@ -170,7 +159,7 @@ func (m Model) TerminalFocused() bool {
 
 // ModalOpen is true while the jump, create, confirm, menu or help popup is open.
 func (m Model) ModalOpen() bool {
-	return m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.IsOpen
+	return m.jump != nil || m.create != nil || m.actions.confirm.IsOpen || m.actions.menu.IsOpen || m.help.IsOpen
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -227,7 +216,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case afkMsg:
-		return m.updateAFK(msg)
+		var cmd tea.Cmd
+		m.afk, cmd = updateAFK(msg, m.afk)
+		return m, cmd
 	case terminal.AttachedMsg:
 		return m, m.attach.UpdateAttached(msg)
 	case terminal.AttachRetryMsg:
@@ -264,13 +255,27 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pendingSelect = res.CreatedID
 		return m.selectPending()
 	case sessionActionMsg:
-		return m.updateSessionAction(msg)
+		res := updateSessionAction(msg, m.sessions)
+		if res.Resumed == nil {
+			return m, res.Cmd
+		}
+		m.sessions = slices.Clone(m.sessions)
+		m.sessions[res.Index] = *res.Resumed
+		return m.selectAndFocus(res.Index)
 	case queueActionMsg:
-		return m.updateQueueAction(msg)
+		return m, queueActionResult(msg)
 	case sessionMenuPickMsg:
-		return m.updateMenuPick(msg)
+		if msg.id != m.selectedID() {
+			return m, nil
+		}
+		s, ok := m.selected()
+		cmd := m.actions.pick(msg.key, s, ok, m.attach)
+		return m, cmd
 	case unlockMsg:
-		return m.updateUnlock(msg)
+		if msg.a == m.attach && !msg.a.Closed {
+			msg.a.ReadOnly = false
+		}
+		return m, nil
 	case pageActivatedMsg:
 		// The spinner's tick chain died while the tab was hidden. Focus
 		// reports reach only the page on screen, and switching tabs takes
@@ -335,22 +340,20 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keyToggleSidebar):
 		m.hideSidebar = !m.hideSidebar
 	case key.Matches(msg, keyAttention):
-		m.cursor = m.nextNeedingAttention()
+		m.cursor = nextNeedingAttention(m.sessions, m.cursor)
 	case key.Matches(msg, keyJump):
 		m.jump = &jump.Popup{}
 		return m.startSpinner()
 	case key.Matches(msg, keyCreate):
 		return m.openCreate()
-	case key.Matches(msg, keyStop):
-		return m.stopSelected()
-	case key.Matches(msg, keyRemove):
-		return m.removeSelected()
-	case key.Matches(msg, keyResume):
-		return m.resumeSelected()
-	case key.Matches(msg, keyRunAction):
-		return m.runActionSelected()
+	case key.Matches(msg, keyStop, keyRemove, keyResume, keyRunAction):
+		s, ok := m.selected()
+		cmd := m.actions.pick(msg.String(), s, ok, m.attach)
+		return m, cmd
 	case key.Matches(msg, keyMenu):
-		return m.openMenu()
+		s, ok := m.selected()
+		m.actions.openMenu(s, ok)
+		return m, nil
 	case key.Matches(msg, keyHelp):
 		return m.openHelp(), nil
 	default:
@@ -415,7 +418,7 @@ func (m Model) workingVisible() bool {
 }
 
 func (m Model) sidebarShown() bool {
-	return !m.hideSidebar && m.loaded && m.client != nil && m.link != tabapi.ServerLinkDown
+	return !m.hideSidebar && m.loaded && m.actions.client != nil && m.link != tabapi.ServerLinkDown
 }
 
 // followSelection is the cursor into next that keeps the session selected in
@@ -474,7 +477,7 @@ func (m Model) termView() terminal.View {
 }
 
 func (m Model) render() string {
-	lines := m.lines()
+	lines := emptyLines(m)
 	if m.width <= 0 || m.height <= 0 {
 		return strings.Join(lines, "\n")
 	}
@@ -493,14 +496,14 @@ func (m Model) render() string {
 	if m.create != nil {
 		out = ui.OverlayCenter(out, m.create.View(m.width, m.height, m.sessions), m.width, m.height)
 	}
-	if m.menu.IsOpen {
-		out = m.menu.Overlay(out, m.menuAnchor(), m.width, m.height)
+	if m.actions.menu.IsOpen {
+		out = m.actions.menu.Overlay(out, m.menuAnchor(), m.width, m.height)
 	}
-	if m.confirm.IsOpen {
-		out = ui.OverlayCenter(out, m.confirm.View(m.width), m.width, m.height)
+	if m.actions.confirm.IsOpen {
+		out = ui.OverlayCenter(out, m.actions.confirm.View(m.width), m.width, m.height)
 	}
 	if m.leaderPending {
-		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.leaderKeys()[0], m.leaderBindings()), m.width, m.height)
+		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(leaderKeys(m.settings)[0], leaderBindingsFor(m.settings)), m.width, m.height)
 	}
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
@@ -532,9 +535,10 @@ func (m Model) renderMain(width int, lines []string) string {
 	return m.term.MainMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
 }
 
-func (m Model) lines() []string {
+// emptyLines is what the panel says instead of a session; nil when one shows.
+func emptyLines(m Model) []string {
 	switch {
-	case m.client == nil || m.link == tabapi.ServerLinkDown:
+	case m.actions.client == nil || m.link == tabapi.ServerLinkDown:
 		return []string{ui.StyleMuted.Render("no server running — agent sessions need the gx server")}
 	case !m.loaded:
 		return []string{ui.StyleMuted.Render("loading…")}

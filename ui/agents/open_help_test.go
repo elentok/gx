@@ -23,7 +23,7 @@ func TestOpenHelp_TerminalFocusedOpensHelpAndSendsNothing(t *testing.T) {
 
 func TestOpenHelp_IgnoredWhileModalOrCopyModeOpen(t *testing.T) {
 	m, _ := focusedTerminal(t)
-	m.menu.IsOpen = true
+	m.actions.menu.IsOpen = true
 	if update1(t, m, nav.OpenHelp()()).help.IsOpen {
 		t.Fatal("OpenHelp opened help over the menu")
 	}

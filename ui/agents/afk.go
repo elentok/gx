@@ -14,11 +14,11 @@ type afkMsg struct {
 	err    error
 }
 
-func (m Model) toggleAFKCmd() tea.Cmd {
-	if m.client == nil {
+func (a sessionActions) toggleAFK() tea.Cmd {
+	if a.client == nil {
 		return nil
 	}
-	sessions := m.sessionAPI
+	sessions := a.sessionAPI
 	return func() tea.Msg {
 		res, err := sessions.SetAFK(context.Background(), nil)
 		return afkMsg{result: res, err: err}
@@ -26,15 +26,14 @@ func (m Model) toggleAFKCmd() tea.Cmd {
 }
 
 // updateAFK shows the new mode at once, ahead of the snapshot that follows.
-func (m Model) updateAFK(msg afkMsg) (tea.Model, tea.Cmd) {
+func updateAFK(msg afkMsg, afk bool) (bool, tea.Cmd) {
 	switch {
 	case msg.err != nil:
-		return m, notify.Error("AFK failed: " + msg.err.Error())
+		return afk, notify.Error("AFK failed: " + msg.err.Error())
 	case msg.result.Refused:
-		return m, notify.Error("AFK refused: " + msg.result.Reason)
+		return afk, notify.Error("AFK refused: " + msg.result.Reason)
 	}
-	m.afk = msg.result.AFK
-	return m, nil
+	return msg.result.AFK, nil
 }
 
 // WithFocusSession selects and focuses session id once a snapshot lists it.

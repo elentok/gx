@@ -203,16 +203,16 @@ func TestSidebar_RightClickSelectsAndOpensTheMenu(t *testing.T) {
 	if got := m.selectedID(); got != "s4" {
 		t.Fatalf("selected %s, want s4", got)
 	}
-	if !m.menu.IsOpen || m.terminalFocused {
-		t.Fatalf("menu open %v, focused %v; want the menu over the sidebar", m.menu.IsOpen, m.terminalFocused)
+	if !m.actions.menu.IsOpen || m.terminalFocused {
+		t.Fatalf("menu open %v, focused %v; want the menu over the sidebar", m.actions.menu.IsOpen, m.terminalFocused)
 	}
 }
 
 func TestSidebar_RightClickOffASessionRowOpensNoMenu(t *testing.T) {
 	m := sidebarModel(t, false, fixtureSessions(), 70, 14)
 	for _, c := range []tea.MouseClickMsg{rightClick(5, 0), rightClick(5, 1), rightClick(40, 4)} {
-		if got := update1(t, m, c); got.menu.IsOpen || got.selectedID() != "s1" || got.terminalFocused {
-			t.Fatalf("%+v: menu open %v, selected %s, focused %v", c, got.menu.IsOpen, got.selectedID(), got.terminalFocused)
+		if got := update1(t, m, c); got.actions.menu.IsOpen || got.selectedID() != "s1" || got.terminalFocused {
+			t.Fatalf("%+v: menu open %v, selected %s, focused %v", c, got.actions.menu.IsOpen, got.selectedID(), got.terminalFocused)
 		}
 	}
 }

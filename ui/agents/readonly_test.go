@@ -115,13 +115,13 @@ func TestReadOnly_UnlockConfirmNamesTheKindAndDefaultsToCancel(t *testing.T) {
 		t.Run(tc.want, func(t *testing.T) {
 			m, fa := readOnlyTerminal(t, tc.info)
 			m, _ = leaderThen(t, m, letter("i"))
-			if !m.confirm.IsOpen || !strings.Contains(plainView(m), tc.want) {
+			if !m.actions.confirm.IsOpen || !strings.Contains(plainView(m), tc.want) {
 				t.Fatalf("unlock did not ask %q:\n%s", tc.want, plainView(m))
 			}
 			// Enter takes the default, which is Cancel.
 			m = update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 			m = update1(t, m, letter("x"))
-			if m.confirm.IsOpen || len(fa.keys) != 0 {
+			if m.actions.confirm.IsOpen || len(fa.keys) != 0 {
 				t.Fatalf("Enter on the dialog unlocked: keys %v", fa.keys)
 			}
 		})
@@ -168,7 +168,7 @@ func TestReadOnly_QueueAgentHidesStopRemoveAndRestore(t *testing.T) {
 		t.Error("the Queue agent menu has no Unlock input")
 	}
 	m, _ = leaderThen(t, m, letter("x"))
-	if m.confirm.IsOpen {
+	if m.actions.confirm.IsOpen {
 		t.Fatal("leader x opened a Stop confirm on a Queue agent")
 	}
 }

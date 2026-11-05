@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/agents/agentstyle"
 	"github.com/elentok/gx/ui/agents/jump"
 	"github.com/elentok/gx/ui/help"
@@ -64,27 +65,27 @@ var sidebarBindings = []keys.Binding{
 	{Seq: []string{"?"}, Title: "help"},
 }
 
-func (m Model) leaderKeys() []string {
-	if len(m.settings.Agents.LeaderKey) == 0 {
+func leaderKeys(s ui.Settings) []string {
+	if len(s.Agents.LeaderKey) == 0 {
 		return []string{config.DefaultLeaderKey}
 	}
-	return m.settings.Agents.LeaderKey
+	return s.Agents.LeaderKey
 }
 
-func (m Model) focusSidebarKeys() []string {
-	if len(m.settings.Agents.FocusSidebarKey) == 0 {
+func focusSidebarKeys(s ui.Settings) []string {
+	if len(s.Agents.FocusSidebarKey) == 0 {
 		return []string{config.DefaultFocusSidebarKey}
 	}
-	return m.settings.Agents.FocusSidebarKey
+	return s.Agents.FocusSidebarKey
 }
 
-// leaderBindings is leaderBindings with the focus-sidebar key named on the
+// leaderBindingsFor is leaderBindings with the focus-sidebar key named on the
 // switch-focus row, its one-key alternative.
-func (m Model) leaderBindings() []keys.Binding {
+func leaderBindingsFor(s ui.Settings) []keys.Binding {
 	bs := slices.Clone(leaderBindings)
 	for i, b := range bs {
 		if b.Keys() == "tab" {
-			bs[i].Title += " (" + m.focusSidebarKeys()[0] + " to sidebar)"
+			bs[i].Title += " (" + focusSidebarKeys(s)[0] + " to sidebar)"
 		}
 	}
 	return bs
@@ -93,7 +94,7 @@ func (m Model) leaderBindings() []keys.Binding {
 // updateKey matches the leader before anything else, in either focus, so the
 // leader never reaches the session on its own.
 func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	isLeader := slices.Contains(m.leaderKeys(), msg.String())
+	isLeader := slices.Contains(leaderKeys(m.settings), msg.String())
 	switch {
 	case m.help.IsOpen:
 		var cmd tea.Cmd
@@ -110,16 +111,18 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.create, cmd, _ = m.create.Update(msg, m.createCtx())
 		return m, cmd
-	case m.confirm.IsOpen:
-		return m.updateConfirmKey(msg)
-	case m.menu.IsOpen:
-		return m.updateMenuKey(msg)
+	case m.actions.confirm.IsOpen:
+		cmd := m.actions.updateConfirmKey(msg)
+		return m, cmd
+	case m.actions.menu.IsOpen:
+		cmd := m.actions.updateMenuKey(msg)
+		return m, cmd
 	case m.copy != nil:
 		// Copy mode takes every key, the leader too, so `g g` stays its own.
 		return m.updateCopyKey(msg)
 	case m.leaderPending:
 		m.leaderPending = false
-		if isLeader || slices.Contains(m.focusSidebarKeys(), msg.String()) {
+		if isLeader || slices.Contains(focusSidebarKeys(m.settings), msg.String()) {
 			m.attach.SendKey(msg)
 			return m, nil
 		}
@@ -127,12 +130,12 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case isLeader:
 		m.leaderPending = true
 		return m, nil
-	case m.terminalFocused && slices.Contains(m.focusSidebarKeys(), msg.String()):
+	case m.terminalFocused && slices.Contains(focusSidebarKeys(m.settings), msg.String()):
 		m.terminalFocused, m.hideSidebar = false, false
 		return m, nil
 	case m.terminalFocused:
 		if a := m.attach; a.Live() && a.ReadOnly {
-			return m, notify.Info("read-only: " + m.leaderKeys()[0] + " then i to unlock")
+			return m, notify.Info("read-only: " + leaderKeys(m.settings)[0] + " then i to unlock")
 		}
 		m.attach.SendKey(msg)
 		return m, nil
@@ -145,9 +148,9 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) openHelp() Model {
 	m.help = help.NewModel([]help.KeySection{
 		help.NewKeySection("Terminal", keys.Binding{
-			Seq: m.focusSidebarKeys()[:1], Display: strings.Join(m.focusSidebarKeys(), "/"), Title: "focus sidebar",
+			Seq: focusSidebarKeys(m.settings)[:1], Display: strings.Join(focusSidebarKeys(m.settings), "/"), Title: "focus sidebar",
 		}),
-		help.NewKeySection("Leader ("+m.leaderKeys()[0]+" then)", m.leaderBindings()...),
+		help.NewKeySection("Leader ("+leaderKeys(m.settings)[0]+" then)", leaderBindingsFor(m.settings)...),
 		help.NewKeySection("Sidebar", sidebarBindings...),
 	}, m.settings.About)
 	m.help.Open(m.width, m.height)
@@ -163,16 +166,14 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m.startSpinner()
 	case "c":
 		return m.openCreate()
-	case "x":
-		return m.stopSelected()
-	case "d":
-		return m.removeSelected()
-	case "r":
-		return m.resumeSelected()
-	case "i":
-		return m.unlockSelected()
-	case "a":
-		return m.runActionSelected()
+	case "x", "d", "r", "i", "a":
+		pick := k
+		if k == "i" {
+			pick = "unlock"
+		}
+		s, ok := m.selected()
+		cmd := m.actions.pick(pick, s, ok, m.attach)
+		return m, cmd
 	case "[":
 		return m.enterCopyMode()
 	case "n":
@@ -180,11 +181,11 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	case "p":
 		m.cursor = m.sidebar.stepCursor(m.sidebarInput(), -1)
 	case "u":
-		m.cursor = m.nextNeedingAttention()
+		m.cursor = nextNeedingAttention(m.sessions, m.cursor)
 	case "b":
 		m.hideSidebar = !m.hideSidebar
 	case "z":
-		return m, m.toggleAFKCmd()
+		return m, m.actions.toggleAFK()
 	case "tab":
 		m = m.toggleFocus()
 		return m, nil
@@ -217,23 +218,23 @@ func (m Model) toggleFocus() Model {
 
 // nextNeedingAttention is the next session after the cursor needing
 // attention; the cursor when there is none.
-func (m Model) nextNeedingAttention() int {
-	if i := m.attentionFrom(m.cursor + 1); i >= 0 {
+func nextNeedingAttention(sessions []wire.SessionInfo, cursor int) int {
+	if i := attentionFrom(sessions, cursor+1); i >= 0 {
 		return i
 	}
-	return m.cursor
+	return cursor
 }
 
 // attentionFrom is the first session from start, wrapping, that is
 // Actionable, or failing that Unread; -1 when there is none.
-func (m Model) attentionFrom(start int) int {
+func attentionFrom(sessions []wire.SessionInfo, start int) int {
 	for _, needs := range []func(wire.SessionInfo) bool{
 		agentstyle.IsActionable,
 		func(s wire.SessionInfo) bool { return s.Unread.Unread },
 	} {
-		for step := range len(m.sessions) {
-			i := (start + step) % len(m.sessions)
-			if needs(m.sessions[i]) {
+		for step := range len(sessions) {
+			i := (start + step) % len(sessions)
+			if needs(sessions[i]) {
 				return i
 			}
 		}
