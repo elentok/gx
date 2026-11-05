@@ -52,13 +52,13 @@ So a sweep over the two stuck tickets costs 20.0s, as the log shows. I did not t
 
 ### 4. The numbers fit
 
-Claim to `deps-installed` for the 307 launches since 2026-11-04 17:00 (claim from the ticket's `claimed_at`, which keeps only the last claim, so I kept tickets with one `deps-installed` and one `iteration-started` event; script output in the scratchpad):
+Claim to `deps-installed` for the 307 launches since 2026-11-04 17:00 (claim from the ticket's `claimed_at`, which keeps only the last claim, so I kept tickets with one `deps-installed` and one `iteration-started` event):
 
-- 5s buckets with the most launches: 25-30s (45), 40-45s (51), 60-65s (42), 80-85s (40), 100-105s (29), 120-125s (12). Steps of 20s, as the sweep length predicts. The minimum is 25s, which is one 20s sweep plus the claim's other steps.
+- Launches per 5s bucket (bucket start): 25s (34), 40s (39), 60s (23), 80s (26), 100s (21), 120s (11), with few in between. Steps of 20s, as the sweep length predicts. Nothing is faster than 25s. A few negative or huge values come from `claimed_at` being overwritten by a later re-claim and are not counted as evidence.
 - The median is 65s for `split-server-pkg-impl` and the worst values are 150 to 570s (those may include a re-claim).
 - `webui-paste-image-impl/01`: claimed `21:44:44.628Z` (23:44:44 local, `issues/01-*.md`), worktree dir 23:47:13, `deps-installed` 23:47:14.05 (run log). That is 148.8s, about 7 sweeps.
 
-The switch is sharp. All 18 launches of `split-server-pkg-impl` between 12:00 and 16:04 on 2026-11-04 took 1.5 to 3.1s. The next launch, ticket `33a` at 17:59:59, took 39.3s. The lock file was made at 16:39 and no launch ran between. After 17:00 the hourly median stays between 40s and 110s.
+The switch is sharp. The 32 launches of `split-server-pkg-impl` between 12:00 and 16:04 on 2026-11-04 had hourly medians of 1.6 to 2.8s. The next launch, ticket `33a` at 17:59:59, took 39.3s. The lock file was made at 16:39 and no launch ran between. After 17:00 the hourly median stays between 40s and 110s.
 
 ### 5. Why "only some epics"
 
