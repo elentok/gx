@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -162,7 +163,7 @@ func TestRecoveryState_FromInvestigations(t *testing.T) {
 		"open beats paused": {"", []wire.TicketInfo{inv("needs-answer"), inv("claimed")}, wire.RecoveryPending},
 		"hold wins":         {wire.RecoveryEscalated, []wire.TicketInfo{inv("claimed")}, wire.RecoveryEscalated},
 	} {
-		if got := server.RecoveryState(tc.held, "p:e/01", tc.all); got != tc.want {
+		if got := ticketwrite.RecoveryState(tc.held, "p:e/01", tc.all); got != tc.want {
 			t.Errorf("%s: state = %q; want %q", name, got, tc.want)
 		}
 	}

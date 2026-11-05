@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -28,23 +28,6 @@ func (s *Server) stampFriction(addr tickets.Address, ticketPath string) {
 	}
 }
 
-// retroKeyPrefix is how RetroSubmit's dedupe key names the epic a retro covers.
-const retroKeyPrefix = "evolve:"
-
-// RetroSubmit is the one-off a retro of epic runs as: a commitless evolve ticket
-// in the epic's own project. The dedupe key refuses a second live retro of the
-// same epic; the timestamped name keeps a --force re-run from hitting a taken one.
-func RetroSubmit(project, epic string, now time.Time) wire.OneOffRequest {
-	return wire.OneOffRequest{
-		Prompt:  "Retro of epic " + project + ":" + epic,
-		Project: project,
-		Name:    "evolve-" + epic + "-" + now.Format("20060102-1504"),
-		Type:    string(schema.TypeEvolve),
-		Unique:  retroKeyPrefix + project + "/" + epic,
-		Notify:  true,
-	}
-}
-
 // stampRetro records on the retro'd epic what became of its evolve one-off: the
 // server stamps, never the skill. A done retro (zero findings included) sets
 // evolve_ticket, overwriting a --force re-run's predecessor; a cancelled one
@@ -55,7 +38,7 @@ func (s *Server) stampRetro(addr tickets.Address, ticketPath string, cancelled b
 	if err != nil || tk.Type != schema.TypeEvolve {
 		return
 	}
-	target, ok := strings.CutPrefix(tk.Unique, retroKeyPrefix)
+	target, ok := strings.CutPrefix(tk.Unique, ticketwrite.RetroKeyPrefix)
 	if !ok {
 		return
 	}

@@ -154,6 +154,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   banner, watches, state) and the `Resumer` (resume, restore, handoff, link, step, fix agent), with
   `Routes()`. It imports `chat` (never the reverse); the root implements its `Host`, `Prompter`
   and back-call interfaces and calls `Watches.Close()` at the `session-watches-close` shutdown step;
+  `server/ticketwrite/` holds single-ticket writes (so far the leaf types: `RecoveryHold` and
+  `RecoveryState`, `PauseFold`, `NudgeLimiter`, `PauseChatDetail`, `RetroSubmit`; the `Server`
+  methods follow in later tickets);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -84,7 +84,7 @@ func TestEvolveRun_SubmitsOnceWithDedupeKey(t *testing.T) {
 	if len(f.sent) != 1 {
 		t.Fatalf("submits = %d, want 1", len(f.sent))
 	}
-	want := server.RetroSubmit("proj", "epic", f.env.now())
+	want := ticketwrite.RetroSubmit("proj", "epic", f.env.now())
 	if !reflect.DeepEqual(f.sent[0], want) {
 		t.Errorf("request = %+v, want %+v", f.sent[0], want)
 	}

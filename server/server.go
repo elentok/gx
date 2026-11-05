@@ -42,6 +42,7 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/stats"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
@@ -145,8 +146,8 @@ type Server struct {
 	stats        *stats.Stats
 	events       *broker.Broker
 	herdr        herdrWatch
-	pauseFold    pauseFold
-	pauseHold    recoveryHold
+	pauseFold    ticketwrite.PauseFold
+	pauseHold    ticketwrite.RecoveryHold
 	defectScan   sync.Mutex
 	lateFinishes inFlight
 	designSteps  sync.Map // map address -> design step at the last rescan
@@ -162,7 +163,7 @@ type Server struct {
 	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
 	mergedProbe  func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts     verdictLog
-	nudges       nudgeLimiter
+	nudges       ticketwrite.NudgeLimiter
 	trunkMissing missingTrunks
 	// sessions creates, stops and watches the sessions; resumer brings them back.
 	sessions    *sessions.Manager
@@ -371,7 +372,7 @@ func New(cfg Config) (*Server, error) {
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
-	s.pauseFold.onCap = s.flushPauseFold
+	s.pauseFold.OnCap = s.flushPauseFold
 	s.settings.Init(settings.Options{
 		ConfigPath: cfg.ConfigPath,
 		Startup: settings.Startup{
@@ -568,7 +569,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 		case string(schema.StatusClaimed):
 			snap.Tickets[i].ClaimedAt, _ = s.registry.StartedAtOf(t.Address)
 		case string(schema.StatusPaused), string(schema.StatusLegacyAnswer), string(schema.StatusLegacyRepair):
-			snap.Tickets[i].Recovery = recoveryState(s.pauseHold.state(t.Address), t.Address, snap.Tickets)
+			snap.Tickets[i].Recovery = ticketwrite.RecoveryState(s.pauseHold.State(t.Address), t.Address, snap.Tickets)
 		}
 	}
 	s.fillEpicMergeTargets(snap.Tickets)

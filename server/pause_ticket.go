@@ -2,8 +2,8 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 
@@ -76,21 +76,7 @@ func (s *Server) notifyPause(addr tickets.Address, ticketPath string, kind event
 // sendPause sends the one chat message for a pause.
 func (s *Server) sendPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
 	status := ralphloop.PauseStatus(kind)
-	s.chat.Pause(addr.Project, s.projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, pauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
-}
-
-// pauseChatDetail is the chat line for a pause. A self-reported pause shows the
-// agent's own question summary, which says more than the generic reason. It
-// falls back to the generic line when the ticket has no open question.
-func pauseChatDetail(ticketPath string, kind events.Kind, reason string) string {
-	if kind == events.SelfReported && ticketPath != "" {
-		if evs, err := tickets.ReadLog(ticketPath); err == nil {
-			if q := tickets.OpenQuestion(evs); q != nil && q.Summary != "" {
-				return q.Summary
-			}
-		}
-	}
-	return fmt.Sprintf("%s: %s", kind, reason)
+	s.chat.Pause(addr.Project, s.projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, ticketwrite.PauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
 }
 
 // finishSink carries the finish path's chat-worthy events the outcome cannot

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -15,7 +16,7 @@ import (
 func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 	out := []wire.EpicSummary{}
 	seen := map[queue.RootRef]bool{}
-	recoveryOf := func(addr string) string { return recoveryState(s.pauseHold.state(addr), addr, all) }
+	recoveryOf := func(addr string) string { return ticketwrite.RecoveryState(s.pauseHold.State(addr), addr, all) }
 	for _, item := range s.queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil {

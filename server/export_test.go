@@ -19,7 +19,6 @@ import (
 )
 
 var (
-	RecoveryState = recoveryState
 	GuardRailStop = guardRailStop
 )
 

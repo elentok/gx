@@ -12,9 +12,9 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets"
@@ -152,7 +152,7 @@ func evolveTicketNote(env evolveEnv, t evolveTarget) string {
 
 // submitRetro is the submit step `run` and `all` share.
 func submitRetro(ctx context.Context, env evolveEnv, w, errW io.Writer, project, epic string) error {
-	res, err := env.submit(ctx, server.RetroSubmit(project, epic, env.now()))
+	res, err := env.submit(ctx, ticketwrite.RetroSubmit(project, epic, env.now()))
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.OneOffResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -337,7 +338,7 @@ func (s *Server) submitRetro(root queue.RootRef, projectDir string, e tickets.Ep
 			return
 		}
 	}
-	res, err := s.oneOffs.Submit(RetroSubmit(root.Project, filepath.Base(e.Path), time.Now()))
+	res, err := s.oneOffs.Submit(ticketwrite.RetroSubmit(root.Project, filepath.Base(e.Path), time.Now()))
 	switch {
 	case err != nil:
 		s.log.Warn("retro hook: submit", "root", root, "err", err)

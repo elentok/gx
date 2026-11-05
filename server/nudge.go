@@ -4,50 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/ticketwrite"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/wire"
 )
-
-const (
-	nudgeLimit  = 3
-	nudgeWindow = time.Minute
-)
-
-// nudgeLimiter allows nudgeLimit nudges per iteration in any nudgeWindow, so a
-// looping caller cannot bury a pane in text. The zero value is ready to use.
-type nudgeLimiter struct {
-	mu   sync.Mutex
-	sent map[string][]time.Time
-}
-
-// allow records a nudge for address and reports whether it is within the limit.
-func (l *nudgeLimiter) allow(address string, now time.Time) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.sent == nil {
-		l.sent = map[string][]time.Time{}
-	}
-	recent := l.sent[address][:0]
-	for _, t := range l.sent[address] {
-		if now.Sub(t) < nudgeWindow {
-			recent = append(recent, t)
-		}
-	}
-	if len(recent) >= nudgeLimit {
-		l.sent[address] = recent
-		return false
-	}
-	l.sent[address] = append(recent, now)
-	return true
-}
 
 // ticketNudge types req.Text into the live pane of a ticket's iteration. It is
 // the only way to nudge a pane: every nudge is rate-limited, written to the
@@ -72,8 +39,8 @@ func (s *Server) ticketNudge(req wire.QueueRequest) (wire.QueueResult, error) {
 			return queue.Refusal(wire.ReasonIterationNotLive, "no live iteration for "+address), nil
 		}
 		now := time.Now()
-		if !s.nudges.allow(address, now) {
-			return queue.Refusal(wire.ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", nudgeLimit, address, nudgeWindow)), nil
+		if !s.nudges.Allow(address, now) {
+			return queue.Refusal(wire.ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", ticketwrite.NudgeLimit, address, ticketwrite.NudgeWindow)), nil
 		}
 		if err := it.runner.Prompt(it.session, text); err != nil {
 			if errors.Is(err, agentrunner.ErrNotReady) {

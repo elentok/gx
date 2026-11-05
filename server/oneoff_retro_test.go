@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -19,7 +20,7 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 	h, _ := servertest.StartOneOffHarness(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC)
-	req := server.RetroSubmit("proj", "epic-a", at)
+	req := ticketwrite.RetroSubmit("proj", "epic-a", at)
 
 	first, err := h.Client.OneOff(ctx, req)
 	if err != nil || first.Refused {
@@ -42,7 +43,7 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 		t.Errorf("retro ticket pins an agent:\n%s", raw)
 	}
 
-	again := server.RetroSubmit("proj", "epic-a", at.Add(time.Hour))
+	again := ticketwrite.RetroSubmit("proj", "epic-a", at.Add(time.Hour))
 	res, err := h.Client.OneOff(ctx, again)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonDuplicateLive || res.Address != first.Address {
 		t.Errorf("second retro: %+v, %v; want duplicate-live naming %s", res, err, first.Address)
@@ -53,7 +54,7 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 // codex both claim on codex.
 func TestRunner_UnpinnedOneOffAndRetroClaimOnTheDefaultHarness(t *testing.T) {
 	t.Parallel()
-	retro := server.RetroSubmit("proj", "epic-a", time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC))
+	retro := ticketwrite.RetroSubmit("proj", "epic-a", time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC))
 	for name, req := range map[string]wire.OneOffRequest{
 		"plain": {Prompt: "plain job", Name: "plain-job", Project: "proj"},
 		"retro": retro,

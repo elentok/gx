@@ -183,7 +183,7 @@ func (s *Server) runRule(plan recoveryPlan, f recovery.Failure) {
 	switch {
 	case outcome != "ok":
 		s.escalate(plan, f, entry.ID, outcome)
-	case !s.pauseHold.take(f.Address):
+	case !s.pauseHold.Take(f.Address):
 	case s.stillPaused(f.Address):
 		// R5 and R7 end ok once their nudge is typed, which resumes nothing.
 		s.escalate(plan, f, entry.ID+" left it paused", "")
@@ -200,8 +200,8 @@ func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome
 	ref := plan.ref
 	s.recordRecovery(ref, events.RecoveryEscalated, f, reason, outcome)
 	if f.Type == events.Paused {
-		s.pauseHold.take(f.Address)
-		s.pauseHold.escalate(f.Address)
+		s.pauseHold.Take(f.Address)
+		s.pauseHold.Escalate(f.Address)
 		// A --wait on the ticket reads the hold, so it must hear the escalation.
 		s.events.Publish(wire.EventTicketChanged, f.Address)
 	}
@@ -224,23 +224,23 @@ func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome
 // reports false when nothing is held: the caller then notifies at once.
 func (s *Server) holdPauseForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool {
 	f := recovery.Failure{Address: addr.String(), Type: events.Paused, Kind: kind, Reason: reason}
-	s.pauseHold.forget(f.Address)
+	s.pauseHold.Forget(f.Address)
 	plan, ok := s.planRecovery(f)
 	if !ok {
 		return false
 	}
 	if !plan.holdsPause() {
-		s.pauseHold.start(f.Address)
+		s.pauseHold.Start(f.Address)
 		s.guards.GoSettle(func() {
 			s.recoverFrom(plan, f)
-			// An opened investigation keeps it pending from here: see recoveryState.
-			if s.pauseHold.started(f.Address) {
+			// An opened investigation keeps it pending from here: see ticketwrite.RecoveryState.
+			if s.pauseHold.Started(f.Address) {
 				s.events.Publish(wire.EventTicketChanged, f.Address)
 			}
 		})
 		return false
 	}
-	s.pauseHold.hold(f.Address, s.settings.Load().RecoverySettings.NotifyHold, func() {
+	s.pauseHold.Hold(f.Address, s.settings.Load().RecoverySettings.NotifyHold, func() {
 		s.events.Publish(wire.EventTicketChanged, f.Address)
 		s.notifyPause(addr, ticketPath, kind, reason)
 	})
