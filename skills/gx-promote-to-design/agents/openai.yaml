@@ -1,0 +1,5 @@
+interface:
+  display_name: "Promote to Design"
+  short_description: "Turn this chat's topic into a new Design"
+policy:
+  allow_implicit_invocation: false
