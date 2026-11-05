@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server"
@@ -47,7 +48,7 @@ func heldServer(t *testing.T) (h *servertest.Harness, release func()) {
 
 // Seam: `gx server status` says migrating while a migration is held, and not after.
 func TestServerStatus_SaysMigratingWhileAMigrationIsHeld(t *testing.T) {
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	h, release := heldServer(t)
 	ctx := context.Background()
 

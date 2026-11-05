@@ -117,7 +117,7 @@ var allowed = map[string]allowance{
 	"tickets/loader_test.go":                                 allow("loads legacy statuses, park_kind and headings", "land", "needsanswer", "needsrepair"),
 	"tickets/log_test.go":                                    allow("reads legacy park.* log events and writes under a legacy needs-answer ticket", "park", "needsanswer"),
 	"migrations/steps.go":                                    allow("comment names the legacy Needs Answer heading the question step reads", "needsanswer"),
-	"cmd/server_restart_test.go":                             allow("legacy needs-answer ticket the migration must rewrite", "needsanswer"),
+	"cmd/serverctl/server_restart_test.go":                   allow("legacy needs-answer ticket the migration must rewrite", "needsanswer"),
 	"testutil/gxfixture/scenarios.go":                        allow("fixture writes a pause status of the old shape for the migration scenario", "needsanswer"),
 	"webui/e2e/migration.e2e.ts":                             allow("writes a broken-shape needs-answer ticket the migration must handle", "needsanswer"),
 	"tickets/schema/parse_test.go":                           allow("reads the legacy iteration_status needs-answer", "needsanswer"),

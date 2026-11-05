@@ -8,35 +8,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migratefail"
 )
 
-// writeStoreProject makes <store>/<name> a project holding one epic with the
-// given tickets.
-func writeStoreProject(t *testing.T, store, name string, files map[string]string) string {
+// testEnv is a cmdbase.Env on a fresh temp HOME with discarded output.
+func testEnv(t *testing.T) cmdbase.Env {
 	t.Helper()
-	dir := filepath.Join(store, name)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte("{}"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	cmdtest.WriteMigrateFixtureEpic(t, dir, "epic", files)
-	return dir
+	return cmdbase.Env{Env: cmdtest.TempEnv(t), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}}
 }
+
+func testDeps(t *testing.T) Deps { return Deps{Env: testEnv(t)} }
 
 const legacyStatusTicket = "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\nBody.\n"
 
 func TestServerRestart_MigrateFlagIsUnknown(t *testing.T) {
 	t.Parallel()
-	root := newRootCmd(deps{env: tempEnv(t)})
-	root.SetOut(&bytes.Buffer{})
-	root.SetErr(&bytes.Buffer{})
-	root.SetArgs([]string{"server", "restart", "--migrate"})
-	err := root.Execute()
+	err := cmdtest.Run(t, testEnv(t), []string{"server", "restart", "--migrate"}, New(testDeps(t)))
 	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
 		t.Fatalf("err = %v, want unknown flag", err)
 	}
@@ -44,12 +34,10 @@ func TestServerRestart_MigrateFlagIsUnknown(t *testing.T) {
 
 func TestServerRestart_HelpHasNoMigrate(t *testing.T) {
 	t.Parallel()
-	root := newRootCmd(deps{env: tempEnv(t)})
 	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetErr(&out)
-	root.SetArgs([]string{"server", "restart", "--help"})
-	if err := root.Execute(); err != nil {
+	env := testEnv(t)
+	env.Stdout, env.Stderr = &out, &out
+	if err := cmdtest.Run(t, env, []string{"server", "restart", "--help"}, New(Deps{Env: env})); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out.String(), "--migrate") {
@@ -59,8 +47,7 @@ func TestServerRestart_HelpHasNoMigrate(t *testing.T) {
 
 func TestServerRestart_ContinueFlagIsAcceptedAndHidden(t *testing.T) {
 	t.Parallel()
-	root := newRootCmd(deps{env: tempEnv(t)})
-	c, _, err := root.Find([]string{"server", "restart"})
+	c, _, err := New(testDeps(t)).Find([]string{"restart"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +59,7 @@ func TestServerRestart_ContinueFlagIsAcceptedAndHidden(t *testing.T) {
 
 func TestOpenRestartLog_AppendsToRestartLogInStateDir(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	stateDir, err := dirs.StateDir()
 	if err != nil {
 		t.Fatal(err)

@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -20,7 +22,7 @@ import (
 )
 
 func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
@@ -40,8 +42,8 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	}
 
 	out.Reset()
-	d := deps{stdout: &out, stderr: &bytes.Buffer{}, env: cmdtest.EnvFor(t), serverClient: func() (*apiclient.Client, error) { return h.Client, nil }}
-	if err := execute([]string{"server", "config-status", "--json"}, d); err != nil {
+	env := cmdbase.Env{Stdout: &out, Stderr: &bytes.Buffer{}, Env: cmdtest.EnvFor(t), NewClient: func() (*apiclient.Client, error) { return h.Client, nil }}
+	if err := cmdtest.Run(t, env, []string{"server", "config-status", "--json"}, New(Deps{Env: env}, serverapi.Commands(serverapi.Deps{Env: env})...)); err != nil {
 		t.Fatal(err)
 	}
 	var st wire.ConfigStatus
@@ -76,8 +78,8 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 }
 
 func TestServerStatus_BrokenConfigStillReportsTheError(t *testing.T) {
-	env := tempEnv(t)
-	home := envValue(env, "HOME")
+	env := cmdtest.TempEnv(t)
+	home := cmdtest.EnvValue(env, "HOME")
 	if err := os.MkdirAll(filepath.Join(home, ".config", "gx"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +98,7 @@ func TestServerStatus_BrokenConfigStillReportsTheError(t *testing.T) {
 }
 
 func TestServerStatus_PrintsFingerprintAndAWarningPerLeftOutHost(t *testing.T) {
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {
@@ -125,7 +127,7 @@ func TestServerStatus_PrintsFingerprintAndAWarningPerLeftOutHost(t *testing.T) {
 }
 
 func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing.T) {
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(context.Background())
 	if err != nil {
@@ -162,7 +164,7 @@ func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing
 }
 
 func TestServerStatus_NoSetupCodeAfterSetup(t *testing.T) {
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	cmdtest.FinishWebSetup(t, h)
 
@@ -185,7 +187,7 @@ func TestServerStatus_NeverPrintsATOTPSecret(t *testing.T) {
 	check := func(stage string) {
 		for _, jsonOut := range []bool{false, true} {
 			var out bytes.Buffer
-			if err := runServerStatusWith(context.Background(), config.DirsFrom(tempEnv(t)), h.Client, jsonOut, &out); err != nil {
+			if err := runServerStatusWith(context.Background(), config.DirsFrom(cmdtest.TempEnv(t)), h.Client, jsonOut, &out); err != nil {
 				t.Fatalf("%s: %v", stage, err)
 			}
 			if secretLeak.MatchString(out.String()) {
@@ -200,8 +202,8 @@ func TestServerStatus_NeverPrintsATOTPSecret(t *testing.T) {
 
 func TestServerStatus_NotRunningFromATempEnv(t *testing.T) {
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: tempEnv(t)}
-	if err := execute([]string{"server", "status"}, d); err != nil {
+	env := cmdbase.Env{Stdout: &stdout, Stderr: &bytes.Buffer{}, Env: cmdtest.TempEnv(t)}
+	if err := cmdtest.Run(t, env, []string{"server", "status"}, New(Deps{Env: env})); err != nil {
 		t.Fatalf("server status: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "not running") {
@@ -210,8 +212,7 @@ func TestServerStatus_NotRunningFromATempEnv(t *testing.T) {
 }
 
 func TestWebToken_CommandIsGone(t *testing.T) {
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, env: tempEnv(t)}
-	err := execute([]string{"server", "web-token"}, d)
+	err := cmdtest.Run(t, testEnv(t), []string{"server", "web-token"}, New(testDeps(t)))
 	if err == nil || !strings.Contains(err.Error(), "unknown command") {
 		t.Errorf("err = %v, want unknown command", err)
 	}

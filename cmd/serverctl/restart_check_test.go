@@ -42,9 +42,9 @@ func runRestartCheckJSON(t *testing.T, dirs config.Dirs) restartCheck {
 
 func TestRestartCheck_ValidConfigReportsVersionConfigAndProjects(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	store := t.TempDir()
-	writeStoreProject(t, store, "alpha", map[string]string{"01-a.md": legacyStatusTicket})
+	cmdtest.WriteStoreProject(t, store, "alpha", map[string]string{"01-a.md": legacyStatusTicket})
 	writeRestartCheckConfig(t, dirs, `{"ticket-store": {"path": "`+store+`"}}`)
 
 	got := runRestartCheckJSON(t, dirs)
@@ -65,9 +65,9 @@ func TestRestartCheck_ValidConfigReportsVersionConfigAndProjects(t *testing.T) {
 
 func TestRestartCheck_NamesProjectByProjectJSON(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	store := t.TempDir()
-	dir := writeStoreProject(t, store, "alpha-dir", map[string]string{"01-a.md": legacyStatusTicket})
+	dir := cmdtest.WriteStoreProject(t, store, "alpha-dir", map[string]string{"01-a.md": legacyStatusTicket})
 	if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte(`{"name":"pretty"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestRestartCheck_NamesProjectByProjectJSON(t *testing.T) {
 
 func TestRestartCheck_BrokenConfigReportsStartupErrorText(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	writeRestartCheckConfig(t, dirs, `{not json`)
 	_, wantErr := dirs.Load()
 	if wantErr == nil {
@@ -103,13 +103,13 @@ func TestRestartCheck_BrokenConfigReportsStartupErrorText(t *testing.T) {
 
 func TestRestartCheck_DryRunsOnlyThePendingSteps(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	store := t.TempDir()
-	full := writeStoreProject(t, store, "full", map[string]string{"01-a.md": legacyStatusTicket})
+	full := cmdtest.WriteStoreProject(t, store, "full", map[string]string{"01-a.md": legacyStatusTicket})
 	if err := migrations.WriteFullApplied(full); err != nil {
 		t.Fatal(err)
 	}
-	writeStoreProject(t, store, "nolist", map[string]string{"01-a.md": legacyStatusTicket})
+	cmdtest.WriteStoreProject(t, store, "nolist", map[string]string{"01-a.md": legacyStatusTicket})
 	writeRestartCheckConfig(t, dirs, `{"ticket-store": {"path": "`+store+`"}}`)
 	before := cmdtest.SnapshotTree(t, full)
 
@@ -130,9 +130,9 @@ func TestRestartCheck_DryRunsOnlyThePendingSteps(t *testing.T) {
 
 func TestRestartCheck_FailingMigrationShowsAsFailedAndWritesNothing(t *testing.T) {
 	t.Parallel()
-	dirs := config.DirsFrom(tempEnv(t))
+	dirs := config.DirsFrom(cmdtest.TempEnv(t))
 	store := t.TempDir()
-	dir := writeStoreProject(t, store, "broken", map[string]string{
+	dir := cmdtest.WriteStoreProject(t, store, "broken", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
