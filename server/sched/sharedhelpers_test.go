@@ -45,7 +45,12 @@ var (
 	stampRun                = servertest.StampRun
 	startWaitingRestartFake = servertest.StartWaitingRestartFake
 	waitFor                 = servertest.Await
+	liveUnder               = servertest.LiveUnder
+	liveUnderOther          = servertest.LiveUnderOther
+	pauseWithQuestion       = servertest.PauseWithQuestion
 )
+
+const optionsBlock = servertest.OptionsBlock
 
 // leaveIterationWith is leaveIteration with work as what the agent did in its worktree.
 func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo, runner string, work func(wtPath string)) (string, string) {

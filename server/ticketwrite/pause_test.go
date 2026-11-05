@@ -79,7 +79,7 @@ func TestPause_AmbiguousBaseLogsGxQuestion(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
 	servertest.RegisterTurn(h)
-	if _, err := h.Server.ClaimTicket("proj:epic-a/03", "claude"); err != nil {
+	if _, err := h.Server.Scheduler().ClaimTicket("proj:epic-a/03", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	assertGxQuestion(t, filepath.Join(store, "proj", "epic-a", "issues", "03-third.md"), events.AmbiguousBase,

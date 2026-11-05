@@ -20,7 +20,7 @@ func newRecovery(s *Server) *srvrecovery.Recovery {
 type recoveryHost struct{ s *Server }
 
 func (h recoveryHost) LiveIteration(address string) (ticketwrite.LiveIter, bool) {
-	return liveIteration(h.s, address)
+	return h.s.scheduler.LiveIteration(address)
 }
 
 // EnsureDraftEpic is queue.Host's.

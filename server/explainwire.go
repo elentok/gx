@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/elentok/gx/server/explain"
+	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
 )
@@ -18,14 +19,25 @@ func writeJSON(w http.ResponseWriter, v any) {
 // type so these methods stay off Server's explain surface.
 type explainHost struct{ s *Server }
 
-func (h explainHost) PerRootLimit(root queue.RootRef) int { return h.s.perRootLimit(root) }
+func (h explainHost) PerRootLimit(root queue.RootRef) int { return h.s.scheduler.PerRootLimit(root) }
 func (h explainHost) ProjectAtCap(project string) (int, int, bool) {
-	return h.s.projectAtCap(project)
+	return h.s.scheduler.ProjectAtCap(project)
 }
-func (h explainHost) ConcurrencyLimit() int { return h.s.concurrencyLimit() }
+func (h explainHost) ConcurrencyLimit() int { return h.s.scheduler.ConcurrencyLimit() }
 func (h explainHost) NextUntracked(project string, e tickets.Epic) (tickets.Ticket, bool) {
-	return h.s.nextUntracked(project, e)
+	return h.s.scheduler.NextUntracked(project, e)
 }
+
+// claimExplainer is sched.ClaimExplainer: sched cannot import explain, which
+// imports it.
+type claimExplainer struct{ x *explain.Explainer }
+
+func (c claimExplainer) ClaimHeld(project string, t tickets.Ticket, rh harnesschoice.ResolvedHarness) bool {
+	_, held := c.x.ClaimHold(project, t, rh)
+	return held
+}
+
+func (c claimExplainer) PublishChanges() { c.x.PublishChanges() }
 
 func newExplainer(s *Server) *explain.Explainer {
 	return explain.New(explain.Deps{

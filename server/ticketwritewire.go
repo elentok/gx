@@ -89,7 +89,7 @@ func (h ticketWriteHost) AppendRecoveryApplied(ref queue.TicketRef, f recovery.F
 }
 
 func (h ticketWriteHost) LiveIteration(address string) (ticketwrite.LiveIter, bool) {
-	return liveIteration(h.s, address)
+	return h.s.scheduler.LiveIteration(address)
 }
 
 func (h ticketWriteHost) ResettleWaiting(t runs.TrackedRun) error { return resettleWaiting(h.s, t) }

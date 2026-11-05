@@ -455,16 +455,21 @@ func New(cfg Config) (*Server, error) {
 	// A down herdr never stops the server; it is reported and retried.
 	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
 	s.explain = newExplainer(s)
+	// The scheduler and the launcher call each other, so the launcher is set after both exist.
+	s.scheduler = sched.NewScheduler(sched.SchedulerDeps{
+		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
+		Index: s.idx, Writer: s.writer, Settings: &s.settings, Migrator: s.migrator, Queue: s.queue,
+		Budget: s.budget, Disks: s.disks, Rec: s.rec, Merger: s.merger, Guards: s.guards,
+		Harness: s.harness, Herdr: s.herdr, Explain: claimExplainer{s.explain},
+		Env: s.cfg.Env, PollInterval: s.cfg.PollInterval, TicketStore: s.cfg.TicketStore,
+	})
 	s.launcher = sched.NewLauncher(sched.LauncherDeps{
-		Log: s.log, Host: launchHost{s}, Projects: s.projects, Recovery: s.recovery, Sessions: s.sessions,
+		Log: s.log, Host: s.scheduler, Projects: s.projects, Recovery: s.recovery, Sessions: s.sessions,
 		Settings: &s.settings, Registry: s.registry, Guards: s.guards, Events: s.events, Index: s.idx,
 		Budget: s.budget, Writer: s.writer, Harness: s.harness, Landing: s.landing, Merger: s.merger,
 		OneOffs: s.oneOffs, Chat: s.chat, DropAskedAgent: s.cfg.DropAskedAgent,
 	})
-	s.scheduler = sched.NewScheduler(sched.SchedulerDeps{
-		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
-		Index: s.idx, Writer: s.writer, TicketStore: s.cfg.TicketStore,
-	})
+	s.scheduler.Launcher = s.launcher
 	s.reclaimer = sched.NewReclaimer(s.log, reclaimHost{s}, s.registry, savedRuns)
 	s.herdr.Check()
 	return s, nil
@@ -489,8 +494,6 @@ var routeTable = []struct {
 	{"GET /v1/restart/check", restartCheckRoute},
 	{"POST /v1/restart", restartWriteRoute},
 	{"GET /v1/tickets/explain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.explain.Handle(w, r) }},
-	{"GET /v1/iterations", iterations},
-	{"GET /v1/queue", queueView},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.
@@ -713,7 +716,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	// A claim must not see a low disk before the watcher has recorded its projects.
 	s.disks.Check()
 	claimDone := make(chan struct{})
-	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
+	go func() { defer close(claimDone); s.scheduler.KeepClaiming(freshCtx) }()
 	pruneDone := make(chan struct{})
 	go func() { defer close(pruneDone); s.sessions.Logs.KeepPruned(freshCtx) }()
 	budgetDone := make(chan struct{})

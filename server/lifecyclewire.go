@@ -19,10 +19,6 @@ func LockHeldBy(stateDir string) (int, bool) { return lifecycle.LockHeldBy(state
 // migrations have ended: a rescan reads nothing until then.
 func (s *Server) Rescan() { s.startup.Rescan() }
 
-// ClaimNext runs one claim pass now. It is exported only so tests outside the
-// package can force a pass.
-func (s *Server) ClaimNext() { s.claimNext() }
-
 // newRestarter builds the restart routes' state from the server's Config.
 func (s *Server) newRestarter() *lifecycle.Restarter {
 	return lifecycle.NewRestarter(lifecycle.RestartConfig{

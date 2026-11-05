@@ -27,10 +27,10 @@ func TestDeadlock_AllPausedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 3 {
-		h.Server.ClaimNext()
+		h.Server.Scheduler().ClaimNext()
 	}
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
-	h.Server.ClaimNext()
+	h.Server.Scheduler().ClaimNext()
 	got := runLogOf(t, h, events.Deadlocked)
 	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
 		t.Errorf("deadlocked events = %+v, want one all-paused", got)
@@ -49,7 +49,7 @@ func TestDeadlock_ErrorTicketPausesTheEpic(t *testing.T) {
 	if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/02", ""); err != nil {
 		t.Fatal(err)
 	}
-	h.Server.ClaimNext()
+	h.Server.Scheduler().ClaimNext()
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
 	got := runLogOf(t, h, events.Deadlocked)
 	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
@@ -96,7 +96,7 @@ func TestDeadlock_BlockedOrWaitingNextToPausedIsAllPaused(t *testing.T) {
 					break
 				}
 			}
-			h.Server.ClaimNext()
+			h.Server.Scheduler().ClaimNext()
 			waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
 			got := runLogOf(t, h, events.Deadlocked)
 			if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
@@ -130,7 +130,7 @@ func TestDeadlock_AnswerOnlyPausesLogWaitingForAnswer(t *testing.T) {
 			if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil {
 				t.Fatal(err)
 			}
-			h.Server.ClaimNext()
+			h.Server.Scheduler().ClaimNext()
 			waitFor(t, func() bool {
 				return len(runLogOf(t, h, events.WaitingForAnswer))+len(runLogOf(t, h, events.Deadlocked)) > 0
 			})
@@ -157,7 +157,7 @@ func TestDeadlock_MapEpicIsNeverDeadlocked(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 	_, _ = h.Client.QueueAdd(context.Background(), "proj:epic-a/02", "")
 	for range 3 {
-		h.Server.ClaimNext()
+		h.Server.Scheduler().ClaimNext()
 	}
 	time.Sleep(200 * time.Millisecond) // negative wait: a deadlock event would show by now
 	if got := runLogOf(t, h, events.Deadlocked); len(got) != 0 {
@@ -174,7 +174,7 @@ func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store)
 	_, _ = h.Client.QueueAdd(context.Background(), "proj:epic-a/02", "")
-	h.Server.ClaimNext()
+	h.Server.Scheduler().ClaimNext()
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
 	got := runLogOf(t, h, events.Deadlocked)
 	want := "proj:epic-a/02 waits on proj:epic-a/01"

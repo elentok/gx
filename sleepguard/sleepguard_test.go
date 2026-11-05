@@ -101,7 +101,7 @@ var allowed = map[string]int{
 	"server/recovery/recovery_notify_test.go":              4,
 	"server/recovery/recovery_investigate_test.go":         1,
 	"server/recovery/recovery_gates_test.go":               6,
-	"server/runner_test.go":                                1,
+	"server/sched/runner_test.go":                          1,
 	"server/server_notify_test.go":                         1,
 	"server/server_test.go":                                1,
 	"server/sessions/retry_prompt_test.go":                 1, // negative wait: no second interrupt or prompt follows the retry

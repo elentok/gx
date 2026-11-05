@@ -1,4 +1,4 @@
-package server
+package sched
 
 import (
 	"errors"
@@ -13,6 +13,8 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/merge"
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
@@ -20,7 +22,7 @@ import (
 
 // rootRefsFixture is a repo with trunk develop and branches a (a stacked
 // blocker's feature branch) and release-1.2, under an on-done project.
-func rootRefsFixture(t *testing.T) (*Server, string) {
+func rootRefsFixture(t *testing.T) (*Scheduler, string) {
 	t.Helper()
 	repo := testutil.TempRepo(t)
 	for _, b := range []string{"develop", "a", "release-1.2"} {
@@ -37,9 +39,31 @@ func rootRefsFixture(t *testing.T) (*Server, string) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := withProjects(&Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))})
-	s.rec, s.landing, s.merger = merge.New(s.mergeDeps())
+	s := &Scheduler{SchedulerDeps: SchedulerDeps{Log: slog.New(slog.NewTextHandler(io.Discard, nil)), TicketStore: store}}
+	s.Projects = projects.NewRegistry(func() projects.Env { return projects.Env{TicketStore: store} }, s.Log, nil, &settings.Holder{}, nil, nil)
+	buildMerger(s)
 	return s, repo
+}
+
+// mergeHost is the merge.Host the Merger asks for the base rules; it leaves
+// the methods these tests never reach unset.
+type mergeHost struct {
+	merge.Host
+	s *Scheduler
+}
+
+func (h mergeHost) RootRefs(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, string, error) {
+	return h.s.RootRefs(project, epics, epic, t, repo)
+}
+
+func (h mergeHost) MergeTarget(addr tickets.Address) (string, error) { return h.s.MergeTarget(addr) }
+
+// buildMerger gives s a Merger that asks s for its refs. It copies s.Index.
+func buildMerger(s *Scheduler) {
+	s.Rec, _, s.Merger = merge.New(merge.Deps{
+		Host: mergeHost{s: s}, Log: s.Log, Dirs: merge.Dirs{TicketStore: s.TicketStore},
+		Idx: s.Index, Projects: s.Projects, Settings: &settings.Holder{},
+	})
 }
 
 func runGit(t *testing.T, dir string, args ...string) {
@@ -131,17 +155,17 @@ func TestEpicRefs_EveryCallerUsesTheLowestTicket(t *testing.T) {
 	epics := rootLowestEpics()
 	finished, claimed := epics[1].Tickets[0], epics[1].Tickets[2]
 
-	root, base, target, err := s.merger.EpicRefs("proj", epics, "b", repo)
+	root, base, target, err := s.Merger.EpicRefs("proj", epics, "b", repo)
 	if err != nil || root.Identifier != "01" || base != "a" || target != "a" {
 		t.Fatalf("epicRefs = (%s, %q, %q, %v), want (01, a, a)", root.Identifier, base, target, err)
 	}
-	ref, stamp, _, err := s.resolveBase(tickets.Address{Project: "proj", Epic: "b", ID: "02"}, claimed, repo, epics)
+	ref, stamp, _, err := s.ResolveBase(tickets.Address{Project: "proj", Epic: "b", ID: "02"}, claimed, repo, epics)
 	if want := "a@" + revParse(t, repo, "a"); err != nil || ref != "a" || stamp != want {
-		t.Errorf("resolveBase = (%q, %q, %v), want (a, %s)", ref, stamp, err, want)
+		t.Errorf("ResolveBase =(%q, %q, %v), want (a, %s)", ref, stamp, err, want)
 	}
 	// b holds only a's work: landed on the root's target a, not on trunk.
 	runGit(t, repo, "branch", "b", "a")
-	if !s.merger.NothingToMerge("proj", epics, ralphloop.OneIteration{Epic: "b", Ticket: finished}, repo) {
+	if !s.Merger.NothingToMerge("proj", epics, ralphloop.OneIteration{Epic: "b", Ticket: finished}, repo) {
 		t.Errorf("nothingToMerge = false, want b already on its target a")
 	}
 }
@@ -151,7 +175,7 @@ func TestResolveBase_ExistingFeatureBranchKeepsItsBase(t *testing.T) {
 	s, repo := rootRefsFixture(t)
 	runGit(t, repo, "branch", "b", "main")
 	epics := rootLowestEpics()
-	_, stamp, _, err := s.resolveBase(tickets.Address{Project: "proj", Epic: "b", ID: "02"}, epics[1].Tickets[2], repo, epics)
+	_, stamp, _, err := s.ResolveBase(tickets.Address{Project: "proj", Epic: "b", ID: "02"}, epics[1].Tickets[2], repo, epics)
 	if want := "a@" + revParse(t, repo, "main"); err != nil || stamp != want {
 		t.Errorf("stamp = %q, %v, want %s", stamp, err, want)
 	}

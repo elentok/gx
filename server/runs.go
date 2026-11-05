@@ -41,7 +41,7 @@ func (h reclaimHost) Pause(dir string, addr tickets.Address, ticketPath string, 
 	return h.s.writer.Pause(dir, addr, ticketPath, kind, reason, run)
 }
 
-func (h reclaimHost) StalledNudgeDelay() time.Duration { return h.s.stalledNudgeDelay() }
+func (h reclaimHost) StalledNudgeDelay() time.Duration { return h.s.scheduler.StalledNudgeDelay() }
 
 func (h reclaimHost) FinishSink(addr tickets.Address, ticketPath string) ralphloop.EventSink {
 	return h.s.writer.FinishSink(addr, ticketPath)

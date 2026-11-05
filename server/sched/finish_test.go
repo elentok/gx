@@ -265,7 +265,7 @@ func TestRunner_AmbiguousBasePausesWithoutLaunching(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 	servertest.RegisterTurn(h)
 
-	launched, err := h.Server.ClaimTicket("proj:epic-a/03", "claude")
+	launched, err := h.Server.Scheduler().ClaimTicket("proj:epic-a/03", "claude")
 	if err != nil {
 		t.Fatal(err)
 	}

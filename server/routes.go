@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
+	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/sessions/fixagent"
@@ -59,6 +60,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		designs.Routes(func() *designs.Designs { return s.designs }),
 		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
+		sched.Routes(func() *sched.Scheduler { return s.scheduler }),
 	)
 }
 
