@@ -225,6 +225,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/lifecycle/` holds the server's start, stop and restart plumbing: the state-dir lock, the
   log file, the start-up steps, the restart check and the config-reload apply order (the root
   implements `StartupHost` and `ReloadHost`);
+  `server/sessions/banners/` holds the session banner, failure banner, AFK, draft and link tests
+  (test-only package: it has no non-test code);
   `server/sessions/convrecord/` holds a session's conversation record: its token and cost totals
   and Grilling round counts;
   `server/sessions/fixagent/` holds the `/gx-investigate` fix agent for a paused ticket or a failed
