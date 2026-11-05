@@ -17,6 +17,7 @@ const (
 	investigateAddr      = servertest.InvestigateAddr
 	answerAddr           = servertest.AnswerAddr
 	optionsBlock         = servertest.OptionsBlock
+	answerLabel          = servertest.AnswerLabel
 )
 
 type (
@@ -26,6 +27,7 @@ type (
 	herdrNamed   = servertest.HerdrNamed
 	codexNamed   = servertest.CodexNamed
 	ptyNamed     = servertest.PtyNamed
+	answerEnv    = servertest.AnswerEnv
 )
 
 var epicA01 = servertest.EpicA01
@@ -121,4 +123,15 @@ var (
 	endedRounds            = servertest.EndedRounds
 	runLog                 = servertest.RunLog
 	ofType                 = servertest.OfType
+	startDeadlock          = servertest.StartDeadlock
+	runLogOf               = servertest.RunLogOf
+	startAnswerEnv         = servertest.StartAnswerEnv
+	pauseEnvZeroCommit     = servertest.PauseEnvZeroCommit
+	answerEvents           = servertest.AnswerEvents
+	stateOf                = servertest.StateOf
+	mustFind               = servertest.MustFind
+	registerLiveAgent      = servertest.RegisterLiveAgent
+	restartUnder           = servertest.RestartUnder
+	liveUnder              = servertest.LiveUnder
+	liveUnderOther         = servertest.LiveUnderOther
 )

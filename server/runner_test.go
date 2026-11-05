@@ -22,7 +22,6 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -672,18 +671,6 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo, runner string, work func(wtPath string)) (string, string) {
 	t.Helper()
 	return h.LeaveHerdrRun(t, store, repo, epicA01, runner, work)
-}
-
-func registerLiveAgent(h *servertest.Harness) {
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": 1}}
-	for _, verb := range []string{"get", "wait"} {
-		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-			return idle, herdrfake.Identities{}, nil
-		})
-	}
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
 }
 
 func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {

@@ -3,7 +3,6 @@ package server_test
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -17,7 +16,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/sessionlookup"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -29,49 +27,6 @@ type findErrFake struct {
 
 func (r findErrFake) Find(string) (agentrunner.Session, bool, error) {
 	return agentrunner.Session{}, false, r.err
-}
-
-// restartUnder leaves an iteration whose handle names savedRunner ("" keeps
-// the herdr handle), then restarts a server configured with configured, whose
-// RunnerFor builds only the runners in others. It returns the ticket path.
-func restartUnder(t *testing.T, savedRunner string, configured agentrunner.Runner, others map[string]agentrunner.Runner, opts ...func(*server.Config)) (*servertest.Harness, string) {
-	t.Helper()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {
-		if name == configured.Name() {
-			return configured
-		}
-		return others[name]
-	})}, opts...)...)
-	if h.Herdr != nil {
-		registerLiveAgent(h)
-	}
-	h.DropAgentsAtCleanup(configured)
-	for _, r := range others {
-		h.DropAgentsAtCleanup(r)
-	}
-	_, ticketPath := leaveIteration(t, h, store, repo, "herdr")
-	if savedRunner != "" {
-		asHeadlessRun(t, h)
-		setSavedRunner(t, h, savedRunner)
-	}
-	h.Restart(t)
-	return h, ticketPath
-}
-
-func setSavedRunner(t *testing.T, h *servertest.Harness, name string) {
-	t.Helper()
-	path := filepath.Join(h.StateDir, "runs.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data = []byte(strings.Replace(string(data), `"runner":"fake"`, `"runner":"`+name+`"`, 1))
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
 }
 
 var waitStatus = servertest.WaitStatus

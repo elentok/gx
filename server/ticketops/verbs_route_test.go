@@ -1,15 +1,12 @@
-package server_test
+package ticketops_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/runs"
 	"os"
 	"slices"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -17,32 +14,6 @@ import (
 )
 
 const routedLabel = "epic-a-iter-01"
-
-// liveUnderOther restarts a server configured with runner "b" over a live,
-// working run that runner "a" started. It returns the harness, a's fake and
-// the ticket path.
-func liveUnderOther(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, renamedFake, string) {
-	t.Helper()
-	return liveUnder(t, newRenamedFake("a", nativerunner.VerdictLive), opts...)
-}
-
-// liveUnder is liveUnderOther with the run's runner given as own.
-func liveUnder(t *testing.T, own renamedFake, opts ...func(*server.Config)) (*servertest.Harness, renamedFake, string) {
-	t.Helper()
-	own.IDs = func(string) (string, string) { return "p1", "sess" }
-	own.PromptState = agentrunner.StateWorking
-	if _, err := own.Start(agentrunner.StartOptions{Label: routedLabel, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
-		t.Fatal(err)
-	}
-	own.SetState(routedLabel, agentrunner.StateWorking, "")
-	h, ticketPath := restartUnder(t, own.Name(), newRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.Name(): own}, opts...)
-	if !servertest.Poll(10*time.Second, func() bool {
-		return slices.ContainsFunc(h.Server.Runs(), func(r runs.Run) bool { return r.Runner == own.Name() })
-	}) {
-		t.Fatalf("run not reclaimed under %s: %+v", own.Name(), h.Server.Runs())
-	}
-	return h, own, ticketPath
-}
 
 func TestAgentVerbs_ReachARunOnAnotherRunner(t *testing.T) {
 	t.Parallel()

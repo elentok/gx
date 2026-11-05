@@ -1,0 +1,41 @@
+package servertest
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
+)
+
+// StartDeadlock starts a server over epic-a with ticket 02 blocked by 01.
+func StartDeadlock(t *testing.T, cat recovery.Catalog) *Harness {
+	t.Helper()
+	store := t.TempDir()
+	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
+	SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	return StartWithStore(t, store, func(c *server.Config) {
+		c.Recovery = cat
+	})
+}
+
+// RunLogOf is the run log's epic-level events of typ. The claim loop may
+// launch and pause 01 meanwhile; its own events are not the epic's.
+func RunLogOf(t *testing.T, h *Harness, typ events.Type) []ralphloop.Event {
+	t.Helper()
+	log, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []ralphloop.Event
+	for _, ev := range log {
+		if events.Type(ev.Type) == typ && ev.Ticket == "" {
+			got = append(got, ev)
+		}
+	}
+	return got
+}

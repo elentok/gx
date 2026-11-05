@@ -9,41 +9,11 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
-
-func startDeadlock(t *testing.T, cat recovery.Catalog) *servertest.Harness {
-	t.Helper()
-	store := t.TempDir()
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
-	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	return servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Recovery = cat
-	})
-}
-
-// runLogOf is the run log's epic-level events of typ. The claim loop may
-// launch and pause 01 meanwhile; its own events are not the epic's.
-func runLogOf(t *testing.T, h *servertest.Harness, typ events.Type) []ralphloop.Event {
-	t.Helper()
-	log, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got []ralphloop.Event
-	for _, ev := range log {
-		if events.Type(ev.Type) == typ && ev.Ticket == "" {
-			got = append(got, ev)
-		}
-	}
-	return got
-}
 
 // An epic whose only unblocked ticket is paused logs deadlocked once, however
 // many claim passes see it.
