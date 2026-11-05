@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/check"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/term"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -269,7 +270,7 @@ Run without a command to open the status UI.`,
 		newStashifyCmd(d),
 		newRunCmd(d),
 		newAgentHolderCmd(),
-		newTermCmd(d),
+		term.New(term.Deps{Env: d.base(), GOOS: d.goos}),
 		brief.New(brief.Deps{Env: d.base(), CacheGate: brief.DefaultDeps().CacheGate}),
 		check.New(check.Deps{Env: d.base()}),
 		newDoctorCmd(d),

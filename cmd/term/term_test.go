@@ -1,12 +1,15 @@
-package cmd
+package term
 
 import (
 	"bytes"
 	"errors"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/terminalrun"
 )
@@ -85,22 +88,29 @@ func withSeams(t *testing.T) (*capturedLaunch, *capturedExec) {
 	return &l, &e
 }
 
-// envFunc builds a getenv from a map for terminal detection.
-func envFunc(m map[string]string) func(string) string {
-	return func(k string) string { return m[k] }
+// termDeps builds Deps with the given process environment (for terminal
+// detection) and stderr, running in /wd.
+func termDeps(env map[string]string, stderr io.Writer) Deps {
+	return Deps{Env: cmdbase.Env{
+		Stdout: bytes.NewBuffer(nil),
+		Stderr: stderr,
+		Getwd:  func() (string, error) { return "/wd", nil },
+		Getenv: func(k string) string { return env[k] },
+	}}
+}
+
+// run executes `gx term` with args under d.
+func run(t *testing.T, d Deps, args ...string) error {
+	t.Helper()
+	return cmdtest.Run(t, d.Env, append([]string{"term"}, args...), New(d))
 }
 
 func TestRunTerm_SplitWrapsExplicitCommand(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"TMUX": "/tmp/tmux-1,1,0"}),
-	}
+	d := termDeps(map[string]string{"TMUX": "/tmp/tmux-1,1,0"}, bytes.NewBuffer(nil))
 
-	err := execute([]string{"term", "--below", "nvim", "-u", "NONE", "file"}, d)
+	err := run(t, d, "--below", "nvim", "-u", "NONE", "file")
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -129,14 +139,9 @@ func TestRunTerm_SplitWrapsExplicitCommand(t *testing.T) {
 func TestRunTerm_NoCommandLaunchesShellBare(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"TMUX": "x", "SHELL": "/usr/bin/fish"}),
-	}
+	d := termDeps(map[string]string{"TMUX": "x", "SHELL": "/usr/bin/fish"}, bytes.NewBuffer(nil))
 
-	if err := execute([]string{"term", "--right"}, d); err != nil {
+	if err := run(t, d, "--right"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if !l.called {
@@ -160,13 +165,8 @@ func TestRunTerm_NoCommandLaunchesShellBare(t *testing.T) {
 func TestRunTerm_ShellFallsBackToSh(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"TMUX": "x"}),
-	}
-	if err := execute([]string{"term"}, d); err != nil {
+	d := termDeps(map[string]string{"TMUX": "x"}, bytes.NewBuffer(nil))
+	if err := run(t, d); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if l.program != "/bin/sh" {
@@ -177,13 +177,9 @@ func TestRunTerm_ShellFallsBackToSh(t *testing.T) {
 func TestRunTerm_CwdOverride(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/from/getwd", nil },
-		getenv: envFunc(map[string]string{"TMUX": "x"}),
-	}
-	if err := execute([]string{"term", "--cwd", "/explicit/dir", "lazygit"}, d); err != nil {
+	d := termDeps(map[string]string{"TMUX": "x"}, bytes.NewBuffer(nil))
+	d.Getwd = func() (string, error) { return "/from/getwd", nil }
+	if err := run(t, d, "--cwd", "/explicit/dir", "lazygit"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if l.cwd != "/explicit/dir" {
@@ -194,13 +190,9 @@ func TestRunTerm_CwdOverride(t *testing.T) {
 func TestRunTerm_CwdDefaultsToGetwd(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/from/getwd", nil },
-		getenv: envFunc(map[string]string{"TMUX": "x"}),
-	}
-	if err := execute([]string{"term", "lazygit"}, d); err != nil {
+	d := termDeps(map[string]string{"TMUX": "x"}, bytes.NewBuffer(nil))
+	d.Getwd = func() (string, error) { return "/from/getwd", nil }
+	if err := run(t, d, "lazygit"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if l.cwd != "/from/getwd" {
@@ -211,14 +203,9 @@ func TestRunTerm_CwdDefaultsToGetwd(t *testing.T) {
 func TestRunTerm_HereRunsInPlace(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/wd", nil },
-		// Even inside tmux, --here forces in-place.
-		getenv: envFunc(map[string]string{"TMUX": "x"}),
-	}
-	if err := execute([]string{"term", "--here", "ls", "-la"}, d); err != nil {
+	// Even inside tmux, --here forces in-place.
+	d := termDeps(map[string]string{"TMUX": "x"}, bytes.NewBuffer(nil))
+	if err := run(t, d, "--here", "ls", "-la"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if l.called {
@@ -240,13 +227,8 @@ func TestRunTerm_PlainTerminalFallsBackInPlaceSilently(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
 	var stderr bytes.Buffer
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: &stderr,
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{}), // plain terminal
-	}
-	if err := execute([]string{"term", "--below", "lazygit"}, d); err != nil {
+	d := termDeps(map[string]string{}, &stderr) // plain terminal
+	if err := run(t, d, "--below", "lazygit"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if l.called {
@@ -264,13 +246,8 @@ func TestRunTerm_KittyWithoutRemotePrintsHint(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, e := withSeams(t)
 	var stderr bytes.Buffer
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: &stderr,
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"KITTY_WINDOW_ID": "1"}), // kitty, no remote
-	}
-	if err := execute([]string{"term", "--right", "lazygit"}, d); err != nil {
+	d := termDeps(map[string]string{"KITTY_WINDOW_ID": "1"}, &stderr) // kitty, no remote
+	if err := run(t, d, "--right", "lazygit"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if l.called {
@@ -287,14 +264,9 @@ func TestRunTerm_KittyWithoutRemotePrintsHint(t *testing.T) {
 func TestRunTerm_GoosReachesDetection(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"TERM_PROGRAM": "ghostty"}),
-		goos:   "darwin",
-	}
-	if err := execute([]string{"term", "--right", "lazygit"}, d); err != nil {
+	d := termDeps(map[string]string{"TERM_PROGRAM": "ghostty"}, bytes.NewBuffer(nil))
+	d.GOOS = "darwin"
+	if err := run(t, d, "--right", "lazygit"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if !l.called || l.terminal != ui.TerminalGhostty {
@@ -305,13 +277,8 @@ func TestRunTerm_GoosReachesDetection(t *testing.T) {
 func TestRunTerm_KittyRemoteUsesSplit(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"KITTY_LISTEN_ON": "unix:/tmp/k"}),
-	}
-	if err := execute([]string{"term", "--tab", "lazygit"}, d); err != nil {
+	d := termDeps(map[string]string{"KITTY_LISTEN_ON": "unix:/tmp/k"}, bytes.NewBuffer(nil))
+	if err := run(t, d, "--tab", "lazygit"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if !l.called {
@@ -325,14 +292,9 @@ func TestRunTerm_KittyRemoteUsesSplit(t *testing.T) {
 func TestRunTerm_DashTerminator(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"TMUX": "x"}),
-	}
+	d := termDeps(map[string]string{"TMUX": "x"}, bytes.NewBuffer(nil))
 	// `--` lets a program name starting with `-` (or flag-like args) pass through.
-	if err := execute([]string{"term", "--below", "--", "myprog", "--right"}, d); err != nil {
+	if err := run(t, d, "--below", "--", "myprog", "--right"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	wantArgs := []string{"run", "myprog", "--right"}
@@ -343,25 +305,17 @@ func TestRunTerm_DashTerminator(t *testing.T) {
 
 func TestRunTerm_ConflictingDirectionsError(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getenv: envFunc(map[string]string{"TMUX": "x"}),
-	}
-	err := execute([]string{"term", "--right", "--tab", "lazygit"}, d)
+	d := termDeps(map[string]string{"TMUX": "x"}, bytes.NewBuffer(nil))
+	err := run(t, d, "--right", "--tab", "lazygit")
 	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
 		t.Fatalf("expected mutually-exclusive error, got: %v", err)
 	}
 }
 
-func ghosttyDeps(stderr *bytes.Buffer) deps {
-	return deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: stderr,
-		getwd:  func() (string, error) { return "/wd", nil },
-		getenv: envFunc(map[string]string{"TERM_PROGRAM": "ghostty"}),
-		goos:   "darwin",
-	}
+func ghosttyDeps(stderr *bytes.Buffer) Deps {
+	d := termDeps(map[string]string{"TERM_PROGRAM": "ghostty"}, stderr)
+	d.GOOS = "darwin"
+	return d
 }
 
 func TestRunTerm_GhosttyFallbackErrorRunsInPlace(t *testing.T) {
@@ -372,7 +326,7 @@ func TestRunTerm_GhosttyFallbackErrorRunsInPlace(t *testing.T) {
 	}
 	var stderr bytes.Buffer
 
-	if err := execute([]string{"term", "--right", "ls"}, ghosttyDeps(&stderr)); err != nil {
+	if err := run(t, ghosttyDeps(&stderr), "--right", "ls"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if !e.called || e.program != "ls" {
@@ -392,7 +346,7 @@ func TestRunTerm_GhosttyPlainErrorDoesNotExecReplace(t *testing.T) {
 	}
 	var stderr bytes.Buffer
 
-	err := execute([]string{"term", "--tab", "ls"}, ghosttyDeps(&stderr))
+	err := run(t, ghosttyDeps(&stderr), "--tab", "ls")
 	if err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("err = %v, want boom", err)
 	}
@@ -409,7 +363,7 @@ func TestRunTerm_GhosttySuccessNeitherHintNorExec(t *testing.T) {
 	l, e := withSeams(t)
 	var stderr bytes.Buffer
 
-	if err := execute([]string{"term", "--below"}, ghosttyDeps(&stderr)); err != nil {
+	if err := run(t, ghosttyDeps(&stderr), "--below"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if !l.called || l.terminal != ui.TerminalGhostty {
@@ -422,7 +376,7 @@ func TestRunTerm_GhosttySuccessNeitherHintNorExec(t *testing.T) {
 
 func TestTermHelpNamesAllBackends(t *testing.T) {
 	t.Parallel()
-	c := newTermCmd(deps{})
+	c := New(Deps{})
 	for _, s := range []string{c.Short, c.Long} {
 		for _, b := range []string{"tmux", "kitty", "herdr", "ghostty"} {
 			if !strings.Contains(strings.ToLower(s), b) {

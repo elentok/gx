@@ -1,4 +1,6 @@
-package cmd
+// Package term is `gx term`: launch a command into a terminal split, tab, or
+// in place.
+package term
 
 import (
 	"errors"
@@ -8,11 +10,19 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/terminalrun"
 
 	"github.com/spf13/cobra"
 )
+
+// Deps is the runtime context of `gx term`.
+type Deps struct {
+	cmdbase.Env
+	// GOOS feeds terminal detection (Ghostty is macOS-only).
+	GOOS string
+}
 
 // termFlags holds the parsed `gx term` direction/cwd flags. The four direction
 // flags are mutually exclusive; resolveSplitType enforces that.
@@ -45,7 +55,8 @@ var (
 	}
 )
 
-func newTermCmd(d deps) *cobra.Command {
+// New builds the `gx term` command.
+func New(d Deps) *cobra.Command {
 	var f termFlags
 	cmd := &cobra.Command{
 		Use:   "term [command...]",
@@ -100,7 +111,7 @@ func resolveSplitType(f termFlags) (terminalrun.SplitType, error) {
 	return st, nil
 }
 
-func runTerm(args []string, f termFlags, d deps) error {
+func runTerm(args []string, f termFlags, d Deps) error {
 	splitType, err := resolveSplitType(f)
 	if err != nil {
 		return err
@@ -108,7 +119,7 @@ func runTerm(args []string, f termFlags, d deps) error {
 
 	cwd := f.cwd
 	if cwd == "" {
-		cwd, err = d.getwd()
+		cwd, err = d.Getwd()
 		if err != nil {
 			return err
 		}
@@ -119,7 +130,7 @@ func runTerm(args []string, f termFlags, d deps) error {
 	// An explicit command is wrapped so a failure keeps the pane open.
 	program, pargs, isShell := resolveProgram(args, d)
 
-	terminal := ui.DetectTerminalFor(d.getenv, d.goos)
+	terminal := ui.DetectTerminalFor(d.Getenv, d.GOOS)
 
 	if splitType != terminalrun.InPlace && terminal.CanSplit() {
 		launchProg, launchArgs := program, pargs
@@ -133,7 +144,7 @@ func runTerm(args []string, f termFlags, d deps) error {
 		_, err := launchInSplit(cwd, terminal, splitType, launchProg, launchArgs, opts...)
 		var fb *terminalrun.FallbackError
 		if errors.As(err, &fb) {
-			fmt.Fprintf(d.stderr, "gx: %s — running in place.\n", fb.Hint)
+			fmt.Fprintf(d.Stderr, "gx: %s — running in place.\n", fb.Hint)
 			return execReplace(program, pargs, cwd)
 		}
 		return err
@@ -143,16 +154,16 @@ func runTerm(args []string, f termFlags, d deps) error {
 	// can't split). On kitty without remote control we can detect the missed
 	// opportunity, so point the user at the fix before handing over the process.
 	if splitType != terminalrun.InPlace && terminal == ui.TerminalKitty {
-		fmt.Fprintln(d.stderr, "gx: kitty remote control is off — running in place. Enable it with `allow_remote_control yes` and `listen_on` in kitty.conf to use splits.")
+		fmt.Fprintln(d.Stderr, "gx: kitty remote control is off — running in place. Enable it with `allow_remote_control yes` and `listen_on` in kitty.conf to use splits.")
 	}
 	return execReplace(program, pargs, cwd)
 }
 
 // resolveProgram picks the program/args to launch: the explicit command if
 // given, otherwise $SHELL (falling back to /bin/sh) marked as a shell launch.
-func resolveProgram(args []string, d deps) (program string, pargs []string, isShell bool) {
+func resolveProgram(args []string, d Deps) (program string, pargs []string, isShell bool) {
 	if len(args) == 0 {
-		shell := strings.TrimSpace(d.getenv("SHELL"))
+		shell := strings.TrimSpace(d.Getenv("SHELL"))
 		if shell == "" {
 			shell = "/bin/sh"
 		}
