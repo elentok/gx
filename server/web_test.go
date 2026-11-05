@@ -35,24 +35,7 @@ func webHostPort(rawURL string) string {
 	return u.Host
 }
 
-// webSend sends an authenticated request with the given headers and an empty JSON body.
-func webSend(t *testing.T, h *servertest.Harness, method, url string, headers map[string]string) int {
-	t.Helper()
-	req, err := http.NewRequest(method, url, strings.NewReader("{}"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.AddCookie(servertest.Login(t, h.StateDir, servertest.WebBase(url)))
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := servertest.WebClient().Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	return resp.StatusCode
-}
+var webSend = servertest.WebSend
 
 func TestWeb_WriteRequestOriginAndJSONCheck(t *testing.T) {
 	t.Parallel()

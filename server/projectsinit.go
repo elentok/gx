@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 )
@@ -19,8 +20,8 @@ func (s *Server) projectsEnvOf() projects.Env {
 // initProjects builds the projects Registry, Migrator and Checks from the
 // Server's own fields. Tests that build a bare Server call it too.
 func (s *Server) initProjects() {
-	s.projects = projects.NewRegistry(s.projectsEnvOf, s.log, s.idx, &s.settings, s.chat, s)
-	s.migrator = projects.NewMigrator(s.projectsEnvOf, s.log, s)
+	s.projects = projects.NewRegistry(s.projectsEnvOf, s.log, s.idx, &s.settings, s.chat, projectsBack{s})
+	s.migrator = projects.NewMigrator(s.projectsEnvOf, s.log, projectsBack{s})
 	s.checks = projects.NewChecks(s.projectsEnvOf, s.projects, s.guards)
 }
 
@@ -30,8 +31,18 @@ func withProjects(s *Server) *Server {
 	return s
 }
 
+// projectsBack is projects.RegistryBack and projects.MigratorBack.
+type projectsBack struct{ s *Server }
+
+// SessionFinished reports whether a finished session was a ticket agent that
+// reported iteration_status finished.
+func (b projectsBack) SessionFinished(sess agentrunner.Session) bool {
+	return b.s.sessions.SessionFinished(sess)
+}
+
 // BusyAddresses implements projects.RegistryBack.
-func (s *Server) BusyAddresses() []string {
+func (b projectsBack) BusyAddresses() []string {
+	s := b.s
 	var out []string
 	for _, it := range s.queue.List() {
 		out = append(out, it.Address)
@@ -43,7 +54,8 @@ func (s *Server) BusyAddresses() []string {
 }
 
 // FailuresChanged implements projects.MigratorBack.
-func (s *Server) FailuresChanged() {
+func (b projectsBack) FailuresChanged() {
+	s := b.s
 	s.events.Publish(wire.EventMigrationFailuresChanged, "")
 	s.guards.Kick() // a clear ends a Migration block: claim now, not at the next tick
 }

@@ -1,4 +1,4 @@
-package server_test
+package ticketops_test
 
 import (
 	"context"
@@ -18,6 +18,8 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
+
+type schedFixture struct{ *servertest.SchedFixture }
 
 // completeEpic runs the fixture's epic to completion and returns the retro
 // one-off epics the hook submitted in the project by then.
@@ -121,7 +123,7 @@ func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 
 func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *servertest.SchedFixture, p *servertest.Turn, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}
@@ -156,7 +158,7 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 // A merge error pauses the root, and that pause is the epic's final outcome.
 func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *servertest.SchedFixture, p *servertest.Turn, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}

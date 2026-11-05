@@ -17,13 +17,13 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func (s *Server) iterations(w http.ResponseWriter, _ *http.Request) {
+func iterations(s *Server, w http.ResponseWriter, _ *http.Request) {
 	list := []wire.IterationInfo{}
 	for _, t := range s.idx.Snapshot().Tickets {
 		if t.Status != "claimed" {
 			continue
 		}
-		if it, ok := s.liveIteration(t.Address); ok {
+		if it, ok := liveIteration(s, t.Address); ok {
 			list = append(list, it.Info)
 		}
 	}
@@ -34,7 +34,7 @@ func (s *Server) iterations(w http.ResponseWriter, _ *http.Request) {
 // liveIteration resolves a claimed ticket's iteration through the run's
 // runner. It is live when that runner finds the label and the session has not
 // exited; blocked is live.
-func (s *Server) liveIteration(address string) (ticketwrite.LiveIter, bool) {
+func liveIteration(s *Server, address string) (ticketwrite.LiveIter, bool) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return ticketwrite.LiveIter{}, false
@@ -79,7 +79,7 @@ func (s *Server) liveIteration(address string) (ticketwrite.LiveIter, bool) {
 	return ticketwrite.LiveIter{Info: it, Runner: runner, Session: sess}, true
 }
 
-func (s *Server) queueView(w http.ResponseWriter, _ *http.Request) {
+func queueView(s *Server, w http.ResponseWriter, _ *http.Request) {
 	list := []wire.QueueEntry{}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {

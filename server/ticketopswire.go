@@ -56,13 +56,13 @@ func (l ticketOpsLaunch) CompleteMergedRoot(addr tickets.Address) {
 // ticketOpsLaunch is ticketops.Launch.
 type ticketOpsLaunch struct{ s *Server }
 
-func (l ticketOpsLaunch) BudgetRefusal() (wire.QueueResult, bool) { return l.s.budgetRefusal() }
+func (l ticketOpsLaunch) BudgetRefusal() (wire.QueueResult, bool) { return budgetRefusal(l.s) }
 
-func (l ticketOpsLaunch) ResettleWaiting(t runs.TrackedRun) error { return l.s.resettleWaiting(t) }
+func (l ticketOpsLaunch) ResettleWaiting(t runs.TrackedRun) error { return resettleWaiting(l.s, t) }
 
 // resettleWaiting ends a run's wait for an answer and settles it as a normal
 // run: the run context is rebuilt from the registry entry, as a restart does.
-func (s *Server) resettleWaiting(t runs.TrackedRun) error {
+func resettleWaiting(s *Server, t runs.TrackedRun) error {
 	runner, err := s.harness.RunnerOf(t.Run)
 	if err != nil {
 		return err

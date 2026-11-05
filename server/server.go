@@ -483,8 +483,8 @@ var routeTable = []struct {
 	{"GET /v1/restart/check", restartCheckRoute},
 	{"POST /v1/restart", restartWriteRoute},
 	{"GET /v1/tickets/explain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.explain.Handle(w, r) }},
-	{"GET /v1/iterations", (*Server).iterations},
-	{"GET /v1/queue", (*Server).queueView},
+	{"GET /v1/iterations", iterations},
+	{"GET /v1/queue", queueView},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

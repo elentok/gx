@@ -48,4 +48,9 @@ var (
 	pausedIteration         = servertest.PausedIteration
 	stateOf                 = servertest.StateOf
 	pauseEnvZeroCommit      = servertest.PauseEnvZeroCommit
+	newSchedFixture         = servertest.NewSchedFixture
+	commitWork              = servertest.CommitWork
+	atMergeCap              = servertest.AtMergeCap
 )
+
+const schedEpic = servertest.SchedEpic

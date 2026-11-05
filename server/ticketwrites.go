@@ -9,7 +9,7 @@ import (
 
 // budgetRefusal refuses new agent work past the daily soft limit; ok is
 // false when there is nothing to refuse.
-func (s *Server) budgetRefusal() (wire.QueueResult, bool) {
+func budgetRefusal(s *Server) (wire.QueueResult, bool) {
 	if !s.budget.SoftReached(time.Now()) {
 		return wire.QueueResult{}, false
 	}

@@ -71,6 +71,26 @@ func Login(t *testing.T, stateDir, base string) *http.Cookie {
 	return entry.cookie
 }
 
+// WebSend sends an authenticated request with the given headers and an empty
+// JSON body, and returns the status code.
+func WebSend(t *testing.T, h *Harness, method, url string, headers map[string]string) int {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(Login(t, h.StateDir, WebBase(url)))
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := WebClient().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
 // SignIn sets the account up through the real routes and returns the cookie and
 // the TOTP secret. now is the clock the server runs on.
 func SignIn(t *testing.T, h *Harness, base string, now func() time.Time) (*http.Cookie, string) {

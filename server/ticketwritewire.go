@@ -62,7 +62,7 @@ func (h ticketWriteHost) FreshHeldDisk(project string) (wire.DiskStatus, bool) {
 	return h.s.disks.FreshHeldDisk(project)
 }
 
-func (h ticketWriteHost) BudgetRefusal() (wire.QueueResult, bool) { return h.s.budgetRefusal() }
+func (h ticketWriteHost) BudgetRefusal() (wire.QueueResult, bool) { return budgetRefusal(h.s) }
 
 func (h ticketWriteHost) SettleLive(addrs []tickets.Address, stop bool, reason string, blocks func(agentrunner.Runner, agentrunner.Session) bool) (wire.QueueResult, bool, error) {
 	return h.s.ops.SettleLive(addrs, stop, reason, blocks)
@@ -89,7 +89,7 @@ func (h ticketWriteHost) AppendRecoveryApplied(ref queue.TicketRef, f recovery.F
 }
 
 func (h ticketWriteHost) LiveIteration(address string) (ticketwrite.LiveIter, bool) {
-	return h.s.liveIteration(address)
+	return liveIteration(h.s, address)
 }
 
-func (h ticketWriteHost) ResettleWaiting(t runs.TrackedRun) error { return h.s.resettleWaiting(t) }
+func (h ticketWriteHost) ResettleWaiting(t runs.TrackedRun) error { return resettleWaiting(h.s, t) }
