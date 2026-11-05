@@ -49,7 +49,7 @@ func sidebarModel(t *testing.T, nerd bool, sessions []wire.SessionInfo, width, h
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd, Dirs: dirs})
 	// Start on the first session in the sidebar, past the opening focus.
 	m.opened = true
-	m.showQueue, m.showDesign = true, true
+	m.sidebar.showQueue, m.sidebar.showDesign = true, true
 	m = withState(t, m, &viewmodel.State{Sessions: sessions}, tabapi.ServerLinkUp)
 	return update1(t, m, tea.WindowSizeMsg{Width: width, Height: height})
 }

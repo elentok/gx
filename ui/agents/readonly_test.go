@@ -25,7 +25,7 @@ func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) 
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.term.SessionsDir = "/sessions"
 	m.dial = h.dial
-	m.showQueue, m.showDesign = true, true
+	m.sidebar.showQueue, m.sidebar.showDesign = true, true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
 	info.ID, info.Name, info.Project, info.Status = "a", "alpha", "gx", idleStatus
 	st := &viewmodel.State{Sessions: []wire.SessionInfo{info, {ID: "b", Name: "beta", Project: "gx", Status: idleStatus}}}
@@ -57,8 +57,8 @@ func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 	next, cmd := m.WithServerState(st, tabapi.ServerLinkUp)
 	m = next.(Model)
 	m, _ = dialed(t, m, cmd)
-	if m.showQueue || m.selectedID() != "q2" {
-		t.Fatalf("showQueue=%v selected=%q, want the hidden group's q2 selected", m.showQueue, m.selectedID())
+	if m.sidebar.showQueue || m.selectedID() != "q2" {
+		t.Fatalf("showQueue=%v selected=%q, want the hidden group's q2 selected", m.sidebar.showQueue, m.selectedID())
 	}
 	if a := m.attach; a == nil || a.ID != "q2" || !a.ReadOnly {
 		t.Fatalf("attach = %+v, want q2 read-only", a)

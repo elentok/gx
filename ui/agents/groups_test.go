@@ -33,7 +33,7 @@ func groupsModel(t *testing.T, dirs config.Dirs) Model {
 
 func sidebarText(m Model) string {
 	var out []string
-	for _, r := range m.sidebarRows(sidebarWidth - 2) {
+	for _, r := range m.sidebar.sidebarRows(m.sidebarInput(), sidebarWidth-2) {
 		out = append(out, r.text)
 	}
 	return strings.Join(out, "\n")
@@ -75,12 +75,12 @@ func TestGroups_TogglesShowAndHide(t *testing.T) {
 func TestGroups_StateSurvivesANewModel(t *testing.T) {
 	dirs := config.DirsFrom([]string{"HOME=" + t.TempDir()})
 	m := press(t, press(t, groupsModel(t, dirs), "t"), "d")
-	if !m.showDesign {
+	if !m.sidebar.showDesign {
 		t.Fatal("t d did not show Design agents")
 	}
 	again := groupsModel(t, dirs)
-	if again.showQueue || !again.showDesign {
-		t.Fatalf("new model: showQueue=%v showDesign=%v, want false true", again.showQueue, again.showDesign)
+	if again.sidebar.showQueue || !again.sidebar.showDesign {
+		t.Fatalf("new model: showQueue=%v showDesign=%v, want false true", again.sidebar.showQueue, again.sidebar.showDesign)
 	}
 }
 

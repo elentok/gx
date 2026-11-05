@@ -61,8 +61,8 @@ func liveCount(sessions []wire.SessionInfo) int {
 	return n
 }
 
-func (m Model) sidebarRows(innerW int) []sidebarRow {
-	icons := ui.Icons(m.settings.UseNerdFontIcons)
+func (sb sidebar) sidebarRows(in sidebarInput, innerW int) []sidebarRow {
+	icons := ui.Icons(in.nerdFont)
 	var rows []sidebarRow
 	header := func(text string) {
 		if len(rows) > 0 {
@@ -72,8 +72,8 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 	}
 	// prev is the last session listed, to know when a header starts.
 	var prev *wire.SessionInfo
-	for i, s := range m.sessions {
-		if !m.onSidebar(i) {
+	for i, s := range in.sessions {
+		if !sb.onSidebar(in, i) {
 			continue
 		}
 		switch g := groupOf(s); {
@@ -86,15 +86,15 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 		case g == groupRegular && s.Project != prev.Project:
 			header(s.Project)
 		}
-		prev = &m.sessions[i]
-		row := agentstyle.Fit(" "+agentstyle.StatusIcon(s, icons, m.spinner.View())+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + agentstyle.Marks(s, icons)
-		if i == m.cursor {
+		prev = &in.sessions[i]
+		row := agentstyle.Fit(" "+agentstyle.StatusIcon(s, icons, in.spinner)+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + agentstyle.Marks(s, icons)
+		if i == in.cursor {
 			row = ui.RenderRowHighlight(row)
 		}
 		rows = append(rows, sidebarRow{text: row, session: i})
 	}
 	for _, g := range []agentGroup{groupQueue, groupDesign} {
-		if n := m.hiddenCount(g); n > 0 {
+		if n := sb.hiddenCount(in, g); n > 0 {
 			if len(rows) > 0 {
 				rows = append(rows, sidebarRow{session: -1})
 			}
@@ -106,15 +106,15 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 
 // visibleRows is the window of rows the sidebar body shows, scrolled just
 // enough to keep the cursor on screen.
-func (m Model) visibleRows() []sidebarRow {
-	rows := m.sidebarRows(sidebarWidth - 2)
-	bodyH := m.height - 1
-	if m.height <= 0 || len(rows) <= bodyH {
+func (sb sidebar) visibleRows(in sidebarInput) []sidebarRow {
+	rows := sb.sidebarRows(in, sidebarWidth-2)
+	bodyH := in.height - 1
+	if in.height <= 0 || len(rows) <= bodyH {
 		return rows
 	}
 	cursorRow := 0
 	for i, r := range rows {
-		if r.session == m.cursor {
+		if r.session == in.cursor {
 			cursorRow = i
 		}
 	}
@@ -154,7 +154,7 @@ func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		m.focusTerminal()
 		return m, nil
 	}
-	i, ok := m.sidebarSessionAt(mouse.X, mouse.Y)
+	i, ok := m.sidebar.sessionAt(m.sidebarInput(), mouse.X, mouse.Y)
 	if !ok {
 		return m, nil
 	}
@@ -163,7 +163,7 @@ func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) rightClick(mouse tea.Mouse) (tea.Model, tea.Cmd) {
-	i, ok := m.sidebarSessionAt(mouse.X, mouse.Y)
+	i, ok := m.sidebar.sessionAt(m.sidebarInput(), mouse.X, mouse.Y)
 	if !ok {
 		return m, nil
 	}
@@ -175,39 +175,39 @@ func (m Model) rightClick(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	return next, tea.Batch(cmd, menuCmd)
 }
 
-// sidebarSessionAt is the session on the sidebar row under (x, y); false off
+// sessionAt is the session on the sidebar row under (x, y); false off
 // the sidebar and on project headers and gaps.
-func (m Model) sidebarSessionAt(x, y int) (int, bool) {
-	if !m.sidebarOnScreen() || x < 0 || x >= sidebarWidth {
+func (sb sidebar) sessionAt(in sidebarInput, x, y int) (int, bool) {
+	if !in.onScreen || x < 0 || x >= sidebarWidth {
 		return 0, false
 	}
 	// Row 0 is the panel's header.
-	rows := m.visibleRows()
+	rows := sb.visibleRows(in)
 	if i := y - 1; i >= 0 && i < len(rows) && rows[i].session >= 0 {
 		return rows[i].session, true
 	}
 	return 0, false
 }
 
-func (m Model) renderSidebar() string {
-	visible := m.visibleRows()
-	hovered, hovering := m.hoveredSession()
+func (sb sidebar) render(in sidebarInput) string {
+	visible := sb.visibleRows(in)
+	hovered, hovering := sb.hoveredSession(in)
 	lines := make([]string, len(visible))
 	for i, r := range visible {
 		lines[i] = r.text
-		if hovering && r.session == hovered && hovered != m.cursor {
+		if hovering && r.session == hovered && hovered != in.cursor {
 			lines[i] = ui.RenderRowHover(r.text)
 		}
 	}
-	active := !m.terminalFocused
+	active := !in.terminalFocused
 	titleColor, headerBg := headerColors(active)
 	title := ui.RenderRowWithBackground(lipgloss.NewStyle().Foreground(titleColor).Bold(active).Render("Agents"), headerBg)
-	live := strconv.Itoa(liveCount(m.sessions)) + " live"
-	if m.afk {
+	live := strconv.Itoa(liveCount(in.sessions)) + " live"
+	if in.afk {
 		live = "AFK · " + live
 	}
-	opts := ui.PanelOptionsFor(sidebarWidth, m.height, title, live, lines, active, titleColor, titleColor, true)
-	return m.sidebarMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
+	opts := ui.PanelOptionsFor(sidebarWidth, in.height, title, live, lines, active, titleColor, titleColor, true)
+	return sb.memo.Get(opts, func() string { return ui.RenderPanel(opts) })
 }
 
 // headerColors are the title colour and header fill of a focused or

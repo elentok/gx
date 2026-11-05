@@ -64,9 +64,10 @@ type Model struct {
 	afk         bool
 	hideSidebar bool
 	spinner     spinner.Model
-	// sidebarMemo and joinMemo let a frame that changes nothing visible skip
-	// the render and its width measuring.
-	sidebarMemo, joinMemo *ui.Memo
+	// joinMemo lets a frame that changes nothing visible skip the render and
+	// its width measuring.
+	joinMemo *ui.Memo
+	sidebar  sidebar
 	// ticking: a spinner tick chain is in flight, so another must not start.
 	ticking bool
 	// terminalFocused: the embedded terminal takes every key, so the shell
@@ -103,27 +104,18 @@ type Model struct {
 	opened bool
 	// lastViewed is the session viewed last by an earlier TUI.
 	lastViewed string
-	// showQueue and showDesign: the Queue and Design groups are listed, not
-	// folded into a count; remembered in groupsPath.
-	showQueue, showDesign bool
-	groupsPath            string
-	// togglePending: `t` was pressed and the next key picks the group.
-	togglePending bool
 	// focused: the TUI's terminal has focus.
 	focused     bool
 	termProgram string
 	// reporter is nil without a client.
 	reporter *focusReporter
-	// hoverAt is the last mouse position; its zero value is on the panel
-	// header, so no row is hovered.
-	hoverAt tea.Mouse
 }
 
 // NewModel builds the tab; a nil client means there is no server to reach.
 func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]create.Project, error) { return create.ListProjects(settings.TicketStore) },
+	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebar: sidebar{memo: &ui.Memo{}}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]create.Project, error) { return create.ListProjects(settings.TicketStore) },
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{sessions: sessions}
@@ -131,8 +123,8 @@ func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Mod
 	if data, err := settings.Dirs.DataDir(); err == nil {
 		m.term.SessionsDir = filepath.Join(data, "sessions")
 	}
-	m.groupsPath = groupsFile(settings.Dirs)
-	m.showQueue, m.showDesign = loadGroups(m.groupsPath)
+	m.sidebar.groupsPath = groupsFile(settings.Dirs)
+	m.sidebar.showQueue, m.sidebar.showDesign = loadGroups(m.sidebar.groupsPath)
 	return m
 }
 
@@ -166,7 +158,7 @@ func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea
 // after the leader, in the jump popup, create form, confirm or menu and while
 // typing a help filter, and in copy mode.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.togglePending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.sidebar.togglePending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.InputFocused()
 }
 
 // TerminalFocused tells the shell ctrl+o is the page's: the agent's in the
@@ -200,7 +192,7 @@ func (m Model) Init() tea.Cmd { return nil }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
 	nm := next.(Model)
-	nm.refreshHover()
+	nm.sidebar.refreshHover(nm.ModalOpen())
 	nm.reportFocus()
 	if nm.terminalFocused {
 		nm.attach.SyncSize(nm.termView().ScreenSize())
@@ -316,7 +308,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.attach.ForwardMove(msg.Mouse(), screen.MouseRelease, m.termView().ClampedCell)
 		return m, nil
 	case tea.MouseMotionMsg:
-		m.hoverAt = msg.Mouse()
+		m.sidebar.hoverAt = msg.Mouse()
 		m.attach.ForwardMove(msg.Mouse(), screen.MouseDrag, m.termView().ClampedCell)
 		return m, nil
 	}
@@ -324,21 +316,22 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if m.togglePending {
-		m.togglePending = false
-		return m.toggleGroup(msg.String()).refresh()
+	if m.sidebar.togglePending {
+		m.sidebar.togglePending = false
+		m.sidebar = m.sidebar.toggleGroup(msg.String())
+		return m.refresh()
 	}
 	switch {
 	case key.Matches(msg, keyFocusTerminal):
 		m.focusTerminal()
 		return m, nil
 	case msg.String() == "t":
-		m.togglePending = true
+		m.sidebar.togglePending = true
 		return m, nil
 	case key.Matches(msg, keyDown):
-		m.cursor = m.stepCursor(1)
+		m.cursor = m.sidebar.stepCursor(m.sidebarInput(), 1)
 	case key.Matches(msg, keyUp):
-		m.cursor = m.stepCursor(-1)
+		m.cursor = m.sidebar.stepCursor(m.sidebarInput(), -1)
 	case key.Matches(msg, keyToggleSidebar):
 		m.hideSidebar = !m.hideSidebar
 	case key.Matches(msg, keyAttention):
@@ -407,7 +400,7 @@ func (m Model) workingVisible() bool {
 		shown = m.jump.Shown(m.jumpCtx())
 	}
 	if m.sidebarShown() {
-		for _, r := range m.visibleRows() {
+		for _, r := range m.sidebar.visibleRows(m.sidebarInput()) {
 			if r.session >= 0 {
 				shown = append(shown, r.session)
 			}
@@ -487,7 +480,7 @@ func (m Model) render() string {
 	}
 	var out string
 	if m.sidebarOnScreen() {
-		sidebar, main := m.renderSidebar(), m.renderMain(m.mainWidth(), lines)
+		sidebar, main := m.sidebar.render(m.sidebarInput()), m.renderMain(m.mainWidth(), lines)
 		out = m.joinMemo.Get([3]any{sidebar, main, m.height}, func() string {
 			return lipgloss.JoinHorizontal(lipgloss.Top, sidebar, ui.RenderSeamColumn(m.height, ui.SeamColor), main)
 		})

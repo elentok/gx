@@ -61,41 +61,41 @@ func loadGroups(path string) (queue, design bool) {
 	return queue, design
 }
 
-func (m Model) saveGroups() {
-	if m.groupsPath == "" {
+func (s sidebar) saveGroups() {
+	if s.groupsPath == "" {
 		return
 	}
 	var out string
-	if m.showQueue {
+	if s.showQueue {
 		out += "queue\n"
 	}
-	if m.showDesign {
+	if s.showDesign {
 		out += "design\n"
 	}
-	_ = os.MkdirAll(filepath.Dir(m.groupsPath), 0o755)
-	_ = os.WriteFile(m.groupsPath, []byte(out), 0o644)
+	_ = os.MkdirAll(filepath.Dir(s.groupsPath), 0o755)
+	_ = os.WriteFile(s.groupsPath, []byte(out), 0o644)
 }
 
-func (m Model) groupShown(g agentGroup) bool {
+func (s sidebar) groupShown(g agentGroup) bool {
 	switch g {
 	case groupQueue:
-		return m.showQueue
+		return s.showQueue
 	case groupDesign:
-		return m.showDesign
+		return s.showDesign
 	}
 	return true
 }
 
 // onSidebar: the session's group is shown, or it is the selected one, which
 // stays on screen so an agent opened on purpose never vanishes.
-func (m Model) onSidebar(i int) bool {
-	return i == m.cursor || m.groupShown(groupOf(m.sessions[i]))
+func (s sidebar) onSidebar(in sidebarInput, i int) bool {
+	return i == in.cursor || s.groupShown(groupOf(in.sessions[i]))
 }
 
-func (m Model) hiddenCount(g agentGroup) int {
+func (s sidebar) hiddenCount(in sidebarInput, g agentGroup) int {
 	n := 0
-	for i, s := range m.sessions {
-		if groupOf(s) == g && !m.onSidebar(i) {
+	for i, sess := range in.sessions {
+		if groupOf(sess) == g && !s.onSidebar(in, i) {
 			n++
 		}
 	}
@@ -104,13 +104,13 @@ func (m Model) hiddenCount(g agentGroup) int {
 
 // stepCursor moves the cursor one session in dir (+1 or -1) over those on the
 // sidebar.
-func (m Model) stepCursor(dir int) int {
-	for i := m.cursor + dir; i >= 0 && i < len(m.sessions); i += dir {
-		if m.onSidebar(i) {
+func (s sidebar) stepCursor(in sidebarInput, dir int) int {
+	for i := in.cursor + dir; i >= 0 && i < len(in.sessions); i += dir {
+		if s.onSidebar(in, i) {
 			return i
 		}
 	}
-	return m.cursor
+	return in.cursor
 }
 
 // hiddenRow is the dim row standing in for a hidden group.
@@ -123,15 +123,15 @@ func hiddenRow(g agentGroup, n int) sidebarRow {
 }
 
 // toggleGroup runs the second key of the `t` chord; other keys drop it.
-func (m Model) toggleGroup(k string) Model {
+func (s sidebar) toggleGroup(k string) sidebar {
 	switch k {
 	case "q":
-		m.showQueue = !m.showQueue
+		s.showQueue = !s.showQueue
 	case "d":
-		m.showDesign = !m.showDesign
+		s.showDesign = !s.showDesign
 	default:
-		return m
+		return s
 	}
-	m.saveGroups()
-	return m
+	s.saveGroups()
+	return s
 }

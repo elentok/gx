@@ -260,7 +260,7 @@ func (m Model) menuAnchor() contextmenu.Anchor {
 	if !m.sidebarOnScreen() {
 		return contextmenu.Anchor{}
 	}
-	for i, r := range m.visibleRows() {
+	for i, r := range m.sidebar.visibleRows(m.sidebarInput()) {
 		if r.session == m.cursor {
 			return contextmenu.Anchor{X: 1, Y: 1 + i, H: 1}
 		}

@@ -65,7 +65,7 @@ func TestHover_ClearsWhenLeavingTheList(t *testing.T) {
 		"chrome":         {5, -1},
 	} {
 		m := update1(t, hoverModel(t), tea.MouseMotionMsg{X: pos[0], Y: pos[1]})
-		if _, ok := m.hoveredSession(); ok {
+		if _, ok := m.sidebar.hoveredSession(m.sidebarInput()); ok {
 			t.Fatalf("%s: hover kept after leaving the list", name)
 		}
 		if got := hoverLines(m); len(got) != 0 {
@@ -76,7 +76,7 @@ func TestHover_ClearsWhenLeavingTheList(t *testing.T) {
 
 func TestHover_ClearsWhenModalOpens(t *testing.T) {
 	m := update1(t, hoverModel(t), nav.OpenHelp()())
-	if _, ok := m.hoveredSession(); ok {
+	if _, ok := m.sidebar.hoveredSession(m.sidebarInput()); ok {
 		t.Fatal("hover kept after a modal opened")
 	}
 	if m.HoverChanges(tea.MouseMotionMsg{X: 5, Y: otherRowY}) {
@@ -87,7 +87,7 @@ func TestHover_ClearsWhenModalOpens(t *testing.T) {
 	if m.ModalOpen() {
 		t.Fatal("help still open after esc")
 	}
-	if _, ok := m.hoveredSession(); ok {
+	if _, ok := m.sidebar.hoveredSession(m.sidebarInput()); ok {
 		t.Fatal("hover came back when the modal closed, before the mouse moved")
 	}
 }
@@ -103,7 +103,7 @@ func TestHover_OnlyARowChangeReRenders(t *testing.T) {
 	if !m.HoverChanges(tea.MouseMotionMsg{X: 5, Y: selectedRowY}) {
 		t.Fatal("motion onto another row would not re-render")
 	}
-	if got, ok := m.hoveredSession(); !ok || m.sessions[got].ID != "s4" {
+	if got, ok := m.sidebar.hoveredSession(m.sidebarInput()); !ok || m.sessions[got].ID != "s4" {
 		t.Fatal("HoverChanges moved the model's own hover")
 	}
 }

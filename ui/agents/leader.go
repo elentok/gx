@@ -176,9 +176,9 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	case "[":
 		return m.enterCopyMode()
 	case "n":
-		m.cursor = m.stepCursor(1)
+		m.cursor = m.sidebar.stepCursor(m.sidebarInput(), 1)
 	case "p":
-		m.cursor = m.stepCursor(-1)
+		m.cursor = m.sidebar.stepCursor(m.sidebarInput(), -1)
 	case "u":
 		m.cursor = m.nextNeedingAttention()
 	case "b":
