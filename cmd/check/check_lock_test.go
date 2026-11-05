@@ -47,6 +47,15 @@ func TestCheck_FullTestRunWaitsForTheLock(t *testing.T) {
 		out, code := runCheckCmd(t, repo, "--full", "--kind", "test")
 		done <- result{out, code}
 	}()
+	// The hold is timed from when the waiter registers: under load the command
+	// starts late, and a timer from the goroutine launch would undercount the wait.
+	deadline := time.Now().Add(10 * time.Second)
+	for len(check.ReadWaiting(stateDir)) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("full test run never registered as waiting")
+		}
+		<-time.After(10 * time.Millisecond)
+	}
 	select {
 	case <-done:
 		t.Fatal("full test run did not wait")
