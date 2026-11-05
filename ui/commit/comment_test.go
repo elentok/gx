@@ -29,7 +29,7 @@ func TestCommentLocationAndBodyWithValidDiffSelection(t *testing.T) {
 	data.Parsed.Changed = []diffcore.ChangedLine{{NewLine: 1, Prefix: '-', Text: "old-1"}}
 	data.RawLines = []string{"-old-1"}
 
-	cl := m.commentLocationAndBody()
+	cl := m.diffActions.commentLocationAndBody(m.diffActionCtx())
 
 	if !cl.ok {
 		t.Fatalf("expected ok=true from valid diff selection, errMsg=%q", cl.errMsg)
@@ -47,7 +47,7 @@ func TestCommentLocationAndBodyFallsBackToRawLines(t *testing.T) {
 	data.ActiveHunk = -1
 	data.ActiveLine = -1
 
-	cl := m.commentLocationAndBody()
+	cl := m.diffActions.commentLocationAndBody(m.diffActionCtx())
 
 	if !cl.ok {
 		t.Fatalf("expected ok=true when raw lines are available, errMsg=%q", cl.errMsg)
@@ -64,7 +64,7 @@ func TestCommentLocationAndBodyReturnsErrMsgWhenDiffModelEmpty(t *testing.T) {
 	// Replace diffModel with a fully empty one (no raw lines, no hunks).
 	m.diff.diffModel = diffview.NewModel(false)
 
-	cl := m.commentLocationAndBody()
+	cl := m.diffActions.commentLocationAndBody(m.diffActionCtx())
 
 	// Both RawLines and hunk selection are empty, so should fail.
 	if cl.ok {
@@ -80,10 +80,9 @@ func TestHandleEditCommentFinishedWithError(t *testing.T) {
 	m := newTestModel(repo, "HEAD")
 	m.ready = true
 
-	updatedModel, cmd := m.handleEditCommentFinished(editCommentFinishedMsg{
+	cmd := m.diffActions.handleEditCommentFinished(editCommentFinishedMsg{
 		err: errors.New("editor failed"),
-	})
-	_ = updatedModel
+	}, m.reload)
 
 	if cmd == nil {
 		t.Fatal("expected error notify cmd from failed comment edit")
@@ -95,10 +94,9 @@ func TestHandleEditCommentFinishedWithSplitApp(t *testing.T) {
 	m := newTestModel(repo, "HEAD")
 	m.ready = true
 
-	updatedModel, cmd := m.handleEditCommentFinished(editCommentFinishedMsg{
+	cmd := m.diffActions.handleEditCommentFinished(editCommentFinishedMsg{
 		splitApp: "kitty",
-	})
-	_ = updatedModel
+	}, m.reload)
 
 	if cmd == nil {
 		t.Fatal("expected notify cmd when splitApp is set")
@@ -113,8 +111,7 @@ func TestHandleEditCommentFinishedSuccess(t *testing.T) {
 	m := newTestModel(repo, "HEAD")
 	m.ready = true
 
-	updatedModel, cmd := m.handleEditCommentFinished(editCommentFinishedMsg{})
-	_ = updatedModel
+	cmd := m.diffActions.handleEditCommentFinished(editCommentFinishedMsg{}, m.reload)
 
 	// Success is silent: the editor takeover and reload are their own feedback,
 	// so no toast is emitted (only the split-app and error paths notify).

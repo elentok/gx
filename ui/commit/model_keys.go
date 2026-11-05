@@ -244,13 +244,13 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		if m.focusHeader {
 			return m, commitops.YankBody(m.header.commitMessageBody(m.headerInput()))
 		}
-		return m, m.yankContentOnly()
+		return m, m.diffActions.yankContentOnly(m.diffActionCtx())
 	case bindingYankLoc:
-		return m, m.yankLocationOnly()
+		return m, m.diffActions.yankLocationOnly(m.diffActionCtx())
 	case bindingYankAll:
-		return m, m.yankAllContext()
+		return m, m.diffActions.yankAllContext(m.diffActionCtx())
 	case bindingYankFile:
-		return m, m.yankFilename()
+		return m, m.diffActions.yankFilename(m.diffActionCtx())
 	case bindingYankHash:
 		return m, commitops.YankHash(m.details.FullHash)
 	case bindingYankSubject:
@@ -261,7 +261,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		if !m.focusDiff {
 			return m, nil
 		}
-		return m, m.cmdCreateCommentFromDiff()
+		return m, m.diffActions.cmdCreateCommentFromDiff(m.diffActionCtx())
 	case bindingAmend:
 		if err := m.commitOps.OpenAmend(m.worktreeRoot, m.details.FullHash, m.details.Subject); err != nil {
 			return m, notify.Error(err.Error())
@@ -274,13 +274,13 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingFilterLog:
 		return m, nav.Open(m.filterLogViewState())
 	case bindingEditInPlace:
-		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.InPlace)
 	case bindingEditHSplit:
-		return m, m.cmdEditSelectedFile(terminalrun.HSplit)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.HSplit)
 	case bindingEditVSplit:
-		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.VSplit)
 	case bindingEditTab:
-		return m, m.cmdEditSelectedFile(terminalrun.Tab)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.Tab)
 	case bindingContextDec:
 		return m, m.adjustDiffContextLines(-1)
 	case bindingContextInc:

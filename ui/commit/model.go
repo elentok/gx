@@ -40,8 +40,9 @@ type Model struct {
 
 	header headerPane
 
-	diff    diffPane
-	sidebar filesPane
+	diff        diffPane
+	sidebar     filesPane
+	diffActions diffActions
 
 	help help.Model
 	keys keys.Manager

@@ -1,6 +1,9 @@
 package commit
 
-import tea "charm.land/bubbletea/v2"
+import (
+	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui"
+)
 
 func (m *Model) diffPaneSize() (int, int) {
 	_, contentH := m.layoutHeights()
@@ -53,6 +56,16 @@ func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
 	return nil
 }
 
-func (m Model) editorLineForCurrentSelection() int {
-	return m.diff.editorLineForCurrentSelection(m.focusDiff)
+func (m *Model) diffActionCtx() diffActionCtx {
+	file, ok := m.sidebar.selectedCommitFile()
+	return diffActionCtx{
+		worktreeRoot: m.worktreeRoot,
+		home:         m.settings.Home(),
+		terminal:     m.settings.Terminal,
+		commentTerm:  ui.DetectTerminal(),
+		focusDiff:    m.focusDiff,
+		filePath:     file.Path,
+		hasFile:      ok,
+		diff:         &m.diff,
+	}
 }

@@ -64,9 +64,11 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	case editFileFinishedMsg:
-		return m.handleEditFileFinished(msg)
+		cmd := m.diffActions.handleEditFileFinished(msg, m.reload)
+		return m, cmd
 	case editCommentFinishedMsg:
-		return m.handleEditCommentFinished(msg)
+		cmd := m.diffActions.handleEditCommentFinished(msg, m.reload)
+		return m, cmd
 	case reword.EditorFinishedMsg:
 		return m.handleCommitOpsUpdate(msg)
 	}

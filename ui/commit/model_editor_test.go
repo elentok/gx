@@ -138,7 +138,7 @@ func TestEditorLineForCurrentSelectionInDiffModeCommit(t *testing.T) {
 		}
 	}
 
-	line := m.editorLineForCurrentSelection()
+	line := m.diff.editorLineForCurrentSelection(m.focusDiff)
 	if line != 2 {
 		t.Fatalf("editorLineForCurrentSelection()=%d, want 2", line)
 	}
@@ -155,7 +155,7 @@ func TestEditorLineForCurrentSelectionInSidebarFocus(t *testing.T) {
 	m := newTestModel(repo, "HEAD")
 	m.focusDiff = false
 
-	line := m.editorLineForCurrentSelection()
+	line := m.diff.editorLineForCurrentSelection(m.focusDiff)
 	if line != 0 {
 		t.Fatalf("editorLineForCurrentSelection() in sidebar focus = %d, want 0", line)
 	}
