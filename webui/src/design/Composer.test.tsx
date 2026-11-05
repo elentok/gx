@@ -1092,3 +1092,70 @@ test("Cmd+Enter still sends with the menu open", async () => {
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   spy.mockRestore();
 });
+
+const uploads = vi.hoisted(() => ({ upload: vi.fn() }));
+vi.mock("./sessionImages", () => ({
+  uploadSessionImage: uploads.upload,
+  deleteSessionImage: vi.fn(async () => ({})),
+  sessionImageUrl: (_s: string, id: string) => `/img/${id}`,
+}));
+
+const pngFile = () =>
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", { type: "image/png" });
+
+// A draft that already holds ready images, as another tab or an earlier visit leaves it.
+const draftImages = (...ids: string[]) =>
+  localStorage.setItem("gx.draft.images.s-a", JSON.stringify(ids.map((id) => ({ key: `k-${id}`, id }))));
+
+test("images: a ready image turns Continue into Send and the post carries the ids", async () => {
+  draftImages("i1", "i2");
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ next: runEnd }), steps: stepsAt("spec") });
+  const send = (await screen.findByRole("button", { name: "Send" })) as HTMLButtonElement;
+  expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
+  expect(send.disabled).toBe(false);
+  fireEvent.click(send);
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0]).toMatchObject({ text: "", images: ["i1", "i2"] });
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Remove image" })).toBeNull());
+});
+
+test("images: the note opens from the draft on load and the key sends images alone", async () => {
+  draftImages("i1");
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  cmdEnter(await screen.findByLabelText("Message"));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].images).toEqual(["i1"]);
+});
+
+test("images: Send answers carries the ready images", async () => {
+  draftImages("i1");
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: round() }) });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
+  fireEvent.click(s.getByRole("button", { name: "Nope" }));
+  fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), { target: { value: "x" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].images).toEqual(["i1"]);
+});
+
+test("images: a failed upload keeps Send off", async () => {
+  uploads.upload.mockRejectedValueOnce(new Error("Upload failed"));
+  render({});
+  fireEvent.change(await openNote(), { target: { value: "hi" } });
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
+  await screen.findByText("Upload failed, tap to retry");
+  expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("images: busy keeps Add working and the note disabled, and Interrupt shows", async () => {
+  draftImages("i1");
+  render({ state: "working" });
+  await screen.findByRole("button", { name: "Interrupt" });
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect((screen.getByRole("button", { name: "Add image" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(((await screen.findByLabelText("Message")) as HTMLTextAreaElement).disabled).toBe(true);
+});

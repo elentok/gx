@@ -19,7 +19,9 @@ import {
   type SetAutoAdvance,
 } from "./open";
 import { codexSkillHint } from "./chat";
+import { ComposerImages } from "./ComposerImages";
 import { InterruptPopover } from "./InterruptPopover";
+import { useComposerImages } from "./useComposerImages";
 import { NoteBox } from "./NoteBox";
 import type { PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
@@ -76,10 +78,17 @@ export function Composer({
   const interruptRef = useRef<HTMLButtonElement>(null);
   const [text, setText] = useComposerDraft(session.id);
   // Shared text is never hidden behind a closed Note: it opens on load and on every change (another tab).
-  const [open, setOpen] = useState(text !== "");
+  const images = useComposerImages(session.id);
+  const hasImages = images.images.length > 0;
+  const shared = text !== "" || hasImages;
+  const [open, setOpen] = useState(shared);
   useEffect(() => {
-    if (text !== "") setOpen(true);
-  }, [text]);
+    if (shared) setOpen(true);
+  }, [shared]);
+  // A ready image makes the turn sendable without text; an uploading or failed one holds Send off.
+  const hasContent = text.trim() !== "" || images.readyIds.length > 0;
+  const imagesBlock = images.uploading > 0 || images.failed > 0;
+  const withImages = () => (images.readyIds.length > 0 ? { images: images.readyIds } : {});
   const { send, write, enabled, pending } = usePromptSend({
     session,
     lastMessage,
@@ -100,8 +109,9 @@ export function Composer({
   const inRound = round.length > 0;
   const sendRound = () => {
     setGapsOpen(false);
-    return send({ text: roundPrompt(round, answers, text) }, () => {
+    return send({ text: roundPrompt(round, answers, text), ...withImages() }, () => {
       setText("");
+      images.clear();
       onRoundSent?.();
     });
   };
@@ -109,17 +119,22 @@ export function Composer({
   // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
   const onSendRound = () => {
     if (gapsOpen) setGapsOpen(false);
+    else if (imagesBlock) return;
     else if (unanswered.length > 0) setGapsOpen(true);
     else sendRound();
   };
 
-  const sendText = () => send({ text }, () => setText(""));
+  const sendText = () =>
+    send({ text, ...withImages() }, () => {
+      setText("");
+      images.clear();
+    });
   // Cmd/Ctrl+Enter runs the main button only when that is Send or Send answers; a phone has no key send.
   const onSubmit = wide
     ? () => {
         if (!enabled) return;
         if (inRound) onSendRound();
-        else if (text.trim() !== "") sendText();
+        else if (hasContent && !imagesBlock) sendText();
       }
     : undefined;
 
@@ -145,7 +160,7 @@ export function Composer({
         onClose={() => setInterruptOpen(false)}
       />
     </>
-  ) : canContinue && !inRound && text.trim() === "" ? (
+  ) : canContinue && !inRound && !hasContent ? (
     <Button
       aria-label={nextTitle ? `Continue ${nextTitle}` : "Continue"}
       disabled={!enabled}
@@ -156,7 +171,7 @@ export function Composer({
     </Button>
   ) : inRound ? (
     <>
-      <Button ref={sendRef} disabled={!enabled} onClick={onSendRound}>
+      <Button ref={sendRef} disabled={!enabled || imagesBlock} onClick={onSendRound}>
         {pending && <Spinner size="sm" />}
         Send answers
       </Button>
@@ -164,7 +179,7 @@ export function Composer({
         open={gapsOpen && unanswered.length > 0}
         unanswered={unanswered}
         total={round.length}
-        sendDisabled={!enabled}
+        sendDisabled={!enabled || imagesBlock}
         anchorRef={sendRef}
         onSendAnyway={sendRound}
         onAnswer={(c) =>
@@ -174,7 +189,7 @@ export function Composer({
       />
     </>
   ) : (
-    <Button disabled={!enabled || text.trim() === ""} onClick={sendText}>
+    <Button disabled={!enabled || !hasContent || imagesBlock} onClick={sendText}>
       {pending && <Spinner size="sm" />}
       Send
     </Button>
@@ -204,6 +219,28 @@ export function Composer({
       role="form"
       aria-label="Composer"
     >
+      <ComposerImages
+        state={images}
+        send={
+          <>
+            {autoAdvanceBar}
+            {canContinue && !working && (
+              <Text as="span" fontSize="xs" color="text.dim" truncate minW="0">
+                {nextTitle}
+              </Text>
+            )}
+            <Button
+              emphasis="secondary"
+              aria-label="Note"
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
+            >
+              ✎{wide && " Note"}
+            </Button>
+            {mainButton}
+          </>
+        }
+      >
       {open && (
         <NoteBox
           name="the composer"
@@ -223,25 +260,7 @@ export function Composer({
           {codexSkillHint(session.harness, text)}
         </Text>
       )}
-      {/* One line: the Auto menu on the left, the main action on the right. */}
-      <Box display="flex" gap="2" alignItems="center">
-        {autoAdvanceBar}
-        <Box flex="1" />
-        {canContinue && !working && (
-          <Text as="span" fontSize="xs" color="text.dim" truncate minW="0">
-            {nextTitle}
-          </Text>
-        )}
-        <Button
-          emphasis="secondary"
-          aria-label="Note"
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
-        >
-          ✎{wide && " Note"}
-        </Button>
-        {mainButton}
-      </Box>
+      </ComposerImages>
     </Box>
   );
 }
