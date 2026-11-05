@@ -67,7 +67,7 @@ var allowed = map[site]entry{
 	{"testutil/agentfake/editormode.go", ruleEnvRead}:     {2, reasonChild},
 	{"testutil/agentfake/editormode.go", ruleHomeDir}:     {2, reasonChild},
 	{"testutil/agentfake/design.go", ruleHomeDir}:         {1, reasonChild},
-	{"testutil/agentfake/tui.go", ruleHomeDir}:            {1, reasonChild},
+	{"testutil/agentfake/tui_options.go", ruleHomeDir}:    {1, reasonChild},
 	{"testutil/agentfake/worker.go", ruleChildEnv}:        {1, reasonChild},
 	{"testutil/gxfixture/build.go", ruleChildEnv}:         {1, reasonStartup},
 	{"testutil/gxfixture/serve.go", ruleChildEnv}:         {1, reasonStartup},
