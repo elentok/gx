@@ -15,6 +15,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 			"3 times", "git merge-base", "flake", "pre-existing failure", "branch fault",
 			"30 changed lines or fewer in at most 2 files", "](gx-follow-up/SKILL.md)", "--check-failures",
 		}},
+		{"flake tickets", "gx-flake-tickets.md", []string{"`uptime`", "shared state", "`-run '^TestX$' -count=20`"}},
+		{"flake tickets in follow-up", "gx-follow-up/SKILL.md", []string{"](../gx-flake-tickets.md)"}},
+		{"flake tickets in to-tickets", "gx-to-tickets/SKILL.md", []string{"](../gx-flake-tickets.md)"}},
 		{"implement", "gx-implement/SKILL.md", []string{
 			"](../gx-failing-tests.md)", "-count=20", "`gx check`",
 		}},

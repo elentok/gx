@@ -487,6 +487,9 @@ part has no `## Mock check`.)
 
 </ticket-template>
 
+**Flake and timeout tickets** follow [gx-flake-tickets](../gx-flake-tickets.md): the acceptance
+criterion names one exact `-run '^TestX$'` and one `-count`.
+
 **Mock check rules** (for the `## Mock check` section above). Name the gxfixture scenario for every
 mock state in `## Mock check`. If no scenario exists for a state, add an implement ticket that
 creates it, and make it block every ticket that checks that state.

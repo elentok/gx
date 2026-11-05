@@ -181,6 +181,7 @@ skills/
   gx.md                — this file
   gx-local-tracker.md  — the shared local ticket tracker contract
   gx-failing-tests.md  — the shared rule for sorting a failing test
+  gx-flake-tickets.md  — the shared rule for writing flake and timeout tickets
   gx-to-tickets/
     SKILL.md
   gx-tdd/

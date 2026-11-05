@@ -78,6 +78,8 @@ for that test name first. Judge each hit yourself, by title and `## Problem`: th
   `--category bug|idea`.
 - **Sections**: fill Source, Problem, Evidence, Suggested fix and (only when there are any) Open
   questions from the conversation or the caller's input. No preview.
+- **A flake, hang or timeout** → also follow [gx-flake-tickets](../gx-flake-tickets.md) for the
+  Evidence and the Suggested fix.
 - **Several problems** → one follow-up each, each through step 2. A caller's group of findings that
   name the same fix counts as one problem.
 - File each with `gx tickets follow-up add <project>:follow-ups --body -`. Write the body to a
