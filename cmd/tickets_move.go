@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
@@ -126,14 +127,14 @@ func printMove(w io.Writer, p ticketmove.MovePlan, jsonOut bool, mode string) er
 		if warnings == nil {
 			warnings = []string{}
 		}
-		return writeStamped(w, struct {
+		return cmdbase.WriteStamped(w, struct {
 			From      string   `json:"from"`
 			To        string   `json:"to"`
 			Path      string   `json:"path"`
 			Rewritten []string `json:"rewritten"`
 			Warnings  []string `json:"warnings"`
 			DryRun    bool     `json:"dry_run,omitempty"`
-		}{p.From.String(), p.To.String(), p.NewPath, rewritten, warnings, mode == "dry-run"}, viaDirect, callerActor(os.Getwd))
+		}{p.From.String(), p.To.String(), p.NewPath, rewritten, warnings, mode == "dry-run"}, cmdbase.ViaDirect, cmdbase.CallerActor(os.Getwd))
 	}
 	if mode != "dry-run" {
 		if _, err := fmt.Fprintln(w, p.To.String()); err != nil {

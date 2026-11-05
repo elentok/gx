@@ -15,6 +15,7 @@ import (
 	"rsc.io/qr"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -52,7 +53,7 @@ func runWebCall[T Refusable[T]](ctx context.Context, call func(context.Context) 
 		return fmt.Errorf("%s: %w", failure, err)
 	}
 	if jsonOut {
-		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
 			return err
 		}
 	}
@@ -173,7 +174,7 @@ func newServerWebResetCmd(d deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if !yes {
-				if !isTerminal(d) {
+				if !cmdbase.IsTerminal(d.stdinIsTerminal) {
 					return errors.New("refusing to reset the web account without a terminal to confirm on; pass --yes")
 				}
 				fmt.Fprint(d.stdout, "Clear the web password, authenticator and every web login? [y/N] ")
@@ -306,7 +307,7 @@ func readNewPassword(d deps, fromStdin bool) (string, error) {
 		return strings.TrimRight(line, "\r\n"), nil
 	}
 	f, ok := d.stdin.(*os.File)
-	if !isTerminal(d) || !ok {
+	if !cmdbase.IsTerminal(d.stdinIsTerminal) || !ok {
 		return "", errors.New("no terminal to ask on; pass --password-stdin")
 	}
 	ask := func(prompt string) (string, error) {

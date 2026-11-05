@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
@@ -35,7 +36,7 @@ func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, 
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		stamped, err := stampProvenance(res, viaServer, callerActor(os.Getwd))
+		stamped, err := cmdbase.StampProvenance(res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 		if err != nil {
 			return err
 		}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
@@ -358,19 +359,6 @@ func resolveAddTarget(d deps, arg, parentFlag string) (epicPath, parent string, 
 	return filepath.Dir(filepath.Dir(t.Path)), t.Identifier, nil
 }
 
-// readBodyArg returns arg, or all of stdin when arg is "-".
-func readBodyArg(d deps, arg string) (string, error) {
-	if arg != "-" {
-		return arg, nil
-	}
-	in := d.stdin
-	if in == nil {
-		in = os.Stdin
-	}
-	b, err := io.ReadAll(in)
-	return string(b), err
-}
-
 // printTicketRef prints the ticket at path by address, or as {address, path}
 // JSON.
 func printTicketRef(path string, jsonOut bool, w io.Writer) error {
@@ -379,8 +367,8 @@ func printTicketRef(path string, jsonOut bool, w io.Writer) error {
 		_, err := fmt.Fprintln(w, label)
 		return err
 	}
-	return writeStamped(w, struct {
+	return cmdbase.WriteStamped(w, struct {
 		Address string `json:"address"`
 		Path    string `json:"path"`
-	}{label, path}, viaDirect, callerActor(os.Getwd))
+	}{label, path}, cmdbase.ViaDirect, cmdbase.CallerActor(os.Getwd))
 }

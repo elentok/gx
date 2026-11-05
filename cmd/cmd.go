@@ -9,13 +9,13 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/logger"
-	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
@@ -32,6 +32,9 @@ type LogOptions struct {
 	Ref  string
 	File string
 }
+
+// ExitError is the one alias root keeps, so main.go needs no import of cmdbase.
+type ExitError = cmdbase.ExitError
 
 type deps struct {
 	stdin  io.Reader
@@ -85,16 +88,19 @@ type deps struct {
 	writeFile func(path string, data []byte, perm os.FileMode) error
 }
 
+// base builds the shared runtime context from the deps' nine common members.
+func (d deps) base() cmdbase.Env {
+	return cmdbase.Env{
+		Stdin: d.stdin, Stdout: d.stdout, Stderr: d.stderr, Getwd: d.getwd,
+		Env: d.env, Getenv: d.getenv, LoadConfig: d.loadConfig, NewClient: d.serverClient,
+	}
+}
+
 // dirs resolves the config, data and state directories from the deps env.
-func (d deps) dirs() config.Dirs { return config.DirsFrom(d.env) }
+func (d deps) dirs() config.Dirs { return d.base().Dirs() }
 
 // dial returns the injected server client factory, or the real one.
-func (d deps) dial() func() (*apiclient.Client, error) {
-	if d.serverClient != nil {
-		return d.serverClient
-	}
-	return func() (*apiclient.Client, error) { return serverClient(d.dirs()) }
-}
+func (d deps) dial() func() (*apiclient.Client, error) { return d.base().Dial() }
 
 func defaultDeps() deps {
 	env := os.Environ()
@@ -181,19 +187,10 @@ func defaultSkillsStatusPath(dirs config.Dirs) (string, error) {
 	return skills.StatusPath(stateDir), nil
 }
 
-// registerMigrationWaitNotice prints a stderr line when a command waits on a
-// project migration. Stderr, because agents parse stdout. The server logs
-// instead, so runServer unregisters it.
-func registerMigrationWaitNotice(w io.Writer) (restore func()) {
-	return projectlock.SetWaitHook(func(project string) {
-		fmt.Fprintf(w, "waiting for the migration of %s\n", project)
-	})
-}
-
 // Execute runs gx with the provided arguments.
 func Execute(args []string) error {
 	config.WarnOnMigrateFailure(os.Stderr)
-	defer registerMigrationWaitNotice(os.Stderr)()
+	defer cmdbase.RegisterMigrationWaitNotice(os.Stderr)()
 	d := defaultDeps()
 	if dir, err := d.dirs().StateDir(); err == nil {
 		logger.SetDir(dir)

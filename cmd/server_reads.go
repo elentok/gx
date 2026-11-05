@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
@@ -18,30 +17,11 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
-
-// serverRead fetches one read payload from the server and prints it: as
-// indented JSON, or through text when jsonOut is false.
-func serverRead[T any](dial func() (*apiclient.Client, error), ctx context.Context, jsonOut bool, w io.Writer, fetch func(context.Context, *apiclient.Client) (T, error), text func(io.Writer, T) error) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	c, err := dial()
-	if err != nil {
-		return err
-	}
-	v, err := fetch(ctx, c)
-	if err != nil {
-		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
-	}
-	if jsonOut {
-		return encodeProvenance(w, v, viaServer, callerActor(os.Getwd))
-	}
-	return text(w, v)
-}
 
 func newProjectCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "project", Short: "ticket-store projects", Args: cobra.NoArgs}
@@ -51,7 +31,7 @@ func newProjectCmd(d deps) *cobra.Command {
 		Short: "list projects with their ticket counts by status (asks the server)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]wire.ProjectInfo, error) {
 					return cl.Reads.Projects(ctx)
 				},
@@ -67,7 +47,7 @@ func newProjectCmd(d deps) *cobra.Command {
 		Short: "list each project's repo root and worktrees (asks the server)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), worktreesJSON, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), worktreesJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]wire.ProjectWorktrees, error) {
 					return cl.Reads.ProjectWorktrees(ctx)
 				},
@@ -164,7 +144,7 @@ func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string,
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -201,7 +181,7 @@ func runProjectAdd(ctx context.Context, cl *apiclient.Client, d deps, w io.Write
 				out.ChecksMissing, out.OnboardCommand = missingKinds(*pc), onboardCommand(res.Name)
 			}
 		}
-		return encodeProvenance(w, out, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, out, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -225,7 +205,7 @@ func newBudgetCmd(d deps) *cobra.Command {
 		Short: "show today's total spend and the budget limits (asks the server)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.BudgetStatus, error) {
 					return cl.Reads.Budget(ctx)
 				},
@@ -275,7 +255,7 @@ func newUsageCmd(d deps) *cobra.Command {
 		Short: "show the usage mode, the Claude limit windows and the spend totals (asks the server)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), summaryJSON, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), summaryJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.UsageSummary, error) {
 					return cl.Reads.UsageSummary(ctx)
 				},
@@ -338,7 +318,7 @@ func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, 
 	}
 	w := c.OutOrStdout()
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -376,7 +356,7 @@ func newBudgetIncreaseCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-// runBudgetOverride mirrors runServerQueueWrite.
+// runBudgetOverride mirrors cmdbase.RunServerQueueWrite.
 func runBudgetOverride(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool) error {
 	return runBudgetWrite(dial, c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.BudgetResult, error) {
 		return cl.Admin.BudgetOverride(ctx)
@@ -403,7 +383,7 @@ func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, js
 	}
 	w := c.OutOrStdout()
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -471,7 +451,7 @@ func newServerLocksCmd(d deps) *cobra.Command {
 		Short: "list held locks with their owners",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]wire.LockInfo, error) { return cl.Reads.Locks(ctx) },
 				printLocks)
 		},
@@ -487,7 +467,7 @@ func newServerIterationsCmd(d deps) *cobra.Command {
 		Short: "list live iterations with pane, worktree, branch, base and transcript path",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]wire.IterationInfo, error) {
 					return cl.Reads.Iterations(ctx)
 				},
@@ -506,7 +486,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Short: "list every ticket with the scheduler's verdict on it",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]wire.QueueEntry, error) { return cl.Queue.List(ctx) },
 				printQueue)
 		},
@@ -519,7 +499,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Short: "list the queued tickets in order",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]wire.QueueItem, error) { return cl.Queue.Items(ctx) },
 				printQueueItems)
 		},
@@ -533,7 +513,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Short: "append a ticket, or a whole epic, to the server-wide queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Queue.Add(ctx, args[0], agent)
 			})
 		},
@@ -544,7 +524,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Short: "remove a ticket from the server-wide queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Queue.Remove(ctx, args[0])
 			})
 		},
@@ -559,7 +539,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 			for _, a := range args[1:] {
 				items = append(items, wire.QueueItem{Address: a, Agent: replaceAgent})
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Queue.Replace(ctx, args[0], items)
 			})
 		},
@@ -574,7 +554,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("position %q is not a number", args[1])
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Queue.Move(ctx, args[0], pos)
 			})
 		},
@@ -585,7 +565,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 			Short: short,
 			Args:  cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {
-				return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+				return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 					return do(cl.Queue, ctx)
 				})
 			},
@@ -600,61 +580,6 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		cmd.AddCommand(c)
 	}
 	return cmd
-}
-
-// serverQueueWrite runs one queue write. With --json the result or refusal is
-// the output; otherwise a refusal is an error.
-func serverQueueWrite(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool, do func(context.Context, *apiclient.Client) (wire.QueueResult, error)) error {
-	ctx := c.Context()
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	cl, err := dial()
-	if err != nil {
-		return err
-	}
-	return runServerQueueWrite(ctx, cl, c.OutOrStdout(), jsonOut, do)
-}
-
-// runServerQueueWrite never starts the server: a dead socket is a refusal
-// with a `gx server start` hint.
-func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, do func(context.Context, *apiclient.Client) (wire.QueueResult, error)) error {
-	res, err := do(ctx, cl)
-	switch {
-	case apiclient.IsNotRunning(err):
-		res = wire.QueueResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
-	case err != nil:
-		return fmt.Errorf("server write failed: %w", err)
-	}
-	if jsonOut {
-		stamped, err := stampProvenance(res, viaServer, callerActor(os.Getwd))
-		if err != nil {
-			return err
-		}
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(stamped)
-	}
-	if res.Refused {
-		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
-	}
-	if res.Paused {
-		return fmt.Errorf("paused (%s): %s", res.PauseKind, res.Message)
-	}
-	if res.Merged {
-		_, err := fmt.Fprintln(w, "merged")
-		return err
-	}
-	if res.MergeTicket != "" {
-		_, err := fmt.Fprintln(w, res.MergeTicket)
-		return err
-	}
-	for i, it := range res.Queue {
-		if _, err := fmt.Fprintf(w, "%d\t%s\t%s\n", i+1, it.Address, it.Agent); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func printIterations(w io.Writer, its []wire.IterationInfo) error {
@@ -693,7 +618,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "print a ticket's events from its epic's run log",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.History, error) {
 					return cl.Reads.History(ctx, args[0])
 				},
@@ -709,7 +634,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "explain why the scheduler would or wouldn't pick a ticket",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(d.dial(), c.Context(), explainJSON, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), explainJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.Explanation, error) {
 					return cl.Reads.Explain(ctx, args[0])
 				},
@@ -725,7 +650,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "show a ticket's pause rounds, state token and applicable actions",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.TicketDetail, error) {
 					return cl.Reads.Detail(ctx, args[0])
 				},
@@ -753,7 +678,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 				return fmt.Errorf("server ping failed: %w", err)
 			}
 			if changedJSON {
-				return writeStamped(c.OutOrStdout(), wire.ChangedRequest{Address: args[0]}, viaServer, callerActor(os.Getwd))
+				return cmdbase.WriteStamped(c.OutOrStdout(), wire.ChangedRequest{Address: args[0]}, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 			}
 			return nil
 		},
@@ -770,7 +695,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 			Args:   cobra.ExactArgs(1),
 			Hidden: name == "park",
 			RunE: func(c *cobra.Command, args []string) error {
-				return serverQueueWrite(d.dial(), c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+				return cmdbase.ServerQueueWrite(d.dial(), c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 					return cl.Tickets.Pause(ctx, args[0], pauseReason)
 				})
 			},
@@ -786,7 +711,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "clear a ticket's mutes and reopen it if it was paused by a fault",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Unmute(ctx, args[0])
 			})
 		},
@@ -800,7 +725,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "cancel a ticket and its non-terminal descendants",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Cancel(ctx, args[0], cancelStop)
 			})
 		},
@@ -815,7 +740,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "run a ticket's latest recovery proposal",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Approve(ctx, args[0])
 			})
 		},
@@ -832,7 +757,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 			Args:   cobra.ExactArgs(1),
 			Hidden: name == "relaunch",
 			RunE: func(c *cobra.Command, args []string) error {
-				return serverQueueWrite(d.dial(), c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+				return cmdbase.ServerQueueWrite(d.dial(), c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 					return cl.Tickets.Retry(ctx, args[0], retryStop)
 				})
 			},
@@ -848,7 +773,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 		Short: "type text into the live pane of a ticket's iteration",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Nudge(ctx, args[0], args[1])
 			})
 		},
@@ -871,7 +796,7 @@ func newServerTicketsCmd(d deps) *cobra.Command {
 				}
 				diagnosis = string(b)
 			}
-			return serverQueueWrite(d.dial(), c, recJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, recJSON, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Recommend(ctx, args[0], recVerb, diagnosis)
 			})
 		},

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -303,7 +304,7 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 	}
 	// The JSON is a machine contract, so the reminder stays out of it.
 	if asJSON {
-		return writeJSON(w, table)
+		return cmdbase.WriteJSON(w, table)
 	}
 	if err := printInputsTable(w, table); err != nil {
 		return err

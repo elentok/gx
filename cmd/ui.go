@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/git"
@@ -318,7 +319,7 @@ func tabTarget(cwd string, tab nav.TabID) (*git.Repo, string, error) {
 // serverDeps carries the API client and the "start the server" action the TUI
 // offers when it is down.
 func serverDeps(dirs config.Dirs) *app.ServerDeps {
-	c, err := serverClient(dirs)
+	c, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return nil
 	}

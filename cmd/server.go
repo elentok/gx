@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -316,14 +317,6 @@ func runServer(ctx context.Context, d deps) error {
 	return srv.Serve(ctx)
 }
 
-func serverClient(dirs config.Dirs) (*apiclient.Client, error) {
-	stateDir, err := dirs.StateDir()
-	if err != nil {
-		return nil, err
-	}
-	return apiclient.New(server.SocketPath(stateDir)), nil
-}
-
 // StatusInfo is the `gx server status --json` payload.
 type StatusInfo struct {
 	Running bool   `json:"running"`
@@ -355,7 +348,7 @@ func runServerStatus(ctx context.Context, dirs config.Dirs, jsonOut bool, w io.W
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c, err := serverClient(dirs)
+	c, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return err
 	}
@@ -409,11 +402,11 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		}
 	}
 	if jsonOut {
-		via := viaDirect
+		via := cmdbase.ViaDirect
 		if info.Running {
-			via = viaServer
+			via = cmdbase.ViaServer
 		}
-		return encodeProvenance(w, info, via, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, info, via, cmdbase.CallerActor(os.Getwd))
 	}
 	if info.ConfigError != "" {
 		if _, err = fmt.Fprintln(w, "config error: "+info.ConfigError); err != nil {
@@ -603,7 +596,7 @@ func runServerStartCmd(ctx context.Context, d deps, w io.Writer) error {
 		return err
 	}
 	refreshSkills(d, w)
-	c, err := serverClient(dirs)
+	c, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return err
 	}
@@ -673,7 +666,7 @@ func runServerStop(ctx context.Context, dirs config.Dirs, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	c, err := serverClient(dirs)
+	c, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return err
 	}
@@ -741,7 +734,7 @@ func runServerSnapshot(ctx context.Context, dirs config.Dirs, jsonOut bool, w io
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c, err := serverClient(dirs)
+	c, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return err
 	}
@@ -750,7 +743,7 @@ func runServerSnapshot(ctx context.Context, dirs config.Dirs, jsonOut bool, w io
 		return fmt.Errorf("server not reachable (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, snap, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, snap, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if _, err := fmt.Fprintf(w, "seq: %d\n", snap.Seq); err != nil {
 		return err

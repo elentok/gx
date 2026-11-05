@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +34,7 @@ func newServerCPUSpikeCmd(d deps) *cobra.Command {
 				return fmt.Errorf("server write failed: %w", err)
 			}
 			if jsonOut {
-				return encodeProvenance(c.OutOrStdout(), res, viaServer, callerActor(os.Getwd))
+				return cmdbase.EncodeProvenance(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 			}
 			if res.Address != "" {
 				_, err = fmt.Fprintf(c.OutOrStdout(), "filed %s\n", res.Address)

@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/codexsetup"
 	"github.com/elentok/gx/sessionlookup"
 )
@@ -26,7 +27,7 @@ git cherry-pick). Shows the changes first and asks before writing.`,
 			return codexsetup.Run(codexsetup.Options{
 				CodexHome:   codexHome,
 				Yes:         yes,
-				Interactive: isTerminal(d),
+				Interactive: cmdbase.IsTerminal(d.stdinIsTerminal),
 				In:          d.stdin,
 				Out:         d.stdout,
 			})

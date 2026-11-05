@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -48,7 +49,7 @@ func runServerChecksSave(ctx context.Context, cl *apiclient.Client, w io.Writer,
 		return fmt.Errorf("server save failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	switch {
 	case res.Refused:
@@ -93,7 +94,7 @@ func runServerChecks(ctx context.Context, cl *apiclient.Client, w io.Writer, pro
 		return fmt.Errorf("server read failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, st, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, st, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	for _, p := range st.Projects {
 		state := "configured"

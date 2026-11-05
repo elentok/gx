@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -68,7 +69,7 @@ func TestServerRepairJSON_ReportsServerVia(t *testing.T) {
 func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out bytes.Buffer
-	err := runServerQueueWrite(context.Background(), cl, &out, true,
+	err := cmdbase.RunServerQueueWrite(context.Background(), cl, &out, true,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.Queue.Add(ctx, "p:e/01", "")
 		})
@@ -78,30 +79,5 @@ func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
 	got := decodeJSON(t, out.Bytes())
 	if got["via"] != "server" || got["actor"] == nil {
 		t.Errorf("via/actor = %v/%v; want server/<actor>", got["via"], got["actor"])
-	}
-}
-
-// Read results that are JSON objects carry via/actor like writes do; a JSON
-// array keeps its shape, since stamping it would mean wrapping it.
-func TestEncodeProvenance_StampsObjectsLeavesArrays(t *testing.T) {
-	t.Parallel()
-	var obj bytes.Buffer
-	if err := encodeProvenance(&obj, wire.Explanation{}, viaServer, actorHuman); err != nil {
-		t.Fatal(err)
-	}
-	if got := decodeJSON(t, obj.Bytes()); got["via"] != "server" || got["actor"] != "human" {
-		t.Errorf("object via/actor = %v/%v; want server/human", got["via"], got["actor"])
-	}
-
-	var arr bytes.Buffer
-	if err := encodeProvenance(&arr, []wire.LockInfo{{}}, viaServer, actorHuman); err != nil {
-		t.Fatal(err)
-	}
-	var list []map[string]any
-	if err := json.Unmarshal(arr.Bytes(), &list); err != nil || len(list) != 1 {
-		t.Fatalf("array output %q: %v", arr.Bytes(), err)
-	}
-	if _, stamped := list[0]["via"]; stamped {
-		t.Errorf("array element stamped: %v", list[0])
 	}
 }

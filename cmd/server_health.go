@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/wire"
 )
@@ -42,7 +43,7 @@ func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		return fmt.Errorf("server read failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, rep, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, rep, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	lines := []string{
 		"host " + rep.Host,

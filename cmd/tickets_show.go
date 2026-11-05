@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
@@ -182,10 +183,10 @@ func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer)
 		blocked = []string{}
 	}
 	if jsonOut {
-		return encodeProvenance(w, ticketShowJSON{
+		return cmdbase.EncodeProvenance(w, ticketShowJSON{
 			Address: a.String(), Title: t.Title, Type: t.Type, Status: t.Status,
 			Parent: t.Parent, BlockedBy: blocked, Path: t.Path, Body: t.Body,
-		}, viaDirect, callerActor(os.Getwd))
+		}, cmdbase.ViaDirect, cmdbase.CallerActor(os.Getwd))
 	}
 	fmt.Fprintf(w, "%s  %s\n", a, t.Title)
 	fmt.Fprintf(w, "status: %s\ntype: %s\n", t.Status, t.Type)

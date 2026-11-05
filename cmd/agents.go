@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 
@@ -325,7 +326,7 @@ func printSessionResult(w io.Writer, jsonOut bool, res wire.SessionResult, err e
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		stamped, err := stampProvenance(res, viaServer, callerActor(os.Getwd))
+		stamped, err := cmdbase.StampProvenance(res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 		if err != nil {
 			return err
 		}
@@ -381,7 +382,7 @@ func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, chat, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, chat, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	for _, m := range chat.Messages {
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", m.Role, m.Kind, m.Text); err != nil {
@@ -418,7 +419,7 @@ func runAgentsSessionScreen(ctx context.Context, cl *apiclient.Client, w io.Writ
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, screen, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, screen, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	for _, row := range screen.Rows {
 		if _, err := fmt.Fprintln(w, row); err != nil {
@@ -455,7 +456,7 @@ func runAgentsList(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, list, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, list, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	for _, s := range list {
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", s.ID, s.Status.State, s.Project, s.Name, s.Dir); err != nil {

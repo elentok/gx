@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/elentok/gx/cmd/cmdbase"
 )
 
 func newAgentsPermissionCmd(d deps) *cobra.Command {
@@ -23,7 +25,7 @@ func newAgentsPermissionCmd(d deps) *cobra.Command {
 				return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 			}
 			if jsonOut {
-				return encodeProvenance(c.OutOrStdout(), res, viaServer, callerActor(os.Getwd))
+				return cmdbase.EncodeProvenance(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 			}
 			_, err = fmt.Fprintf(c.OutOrStdout(), "%s\t%s\n%s\n", res.Kind, res.RequestID, res.Text)
 			return err

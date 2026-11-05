@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/ticketops"
@@ -104,11 +105,11 @@ func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		via := viaServer
+		via := cmdbase.ViaServer
 		if res.Via == wire.ViaDirect {
 			via = wire.ViaDirect
 		}
-		stamped, err := stampProvenance(res, via, actorRecovery)
+		stamped, err := cmdbase.StampProvenance(res, via, cmdbase.ActorRecovery)
 		if err != nil {
 			return err
 		}

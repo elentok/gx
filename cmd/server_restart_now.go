@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -48,7 +49,7 @@ func runServerRestartNow(ctx context.Context, cl *apiclient.Client, w io.Writer,
 		return fmt.Errorf("server restart failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

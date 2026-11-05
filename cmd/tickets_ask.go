@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -19,11 +20,11 @@ func newTicketsAskCmd(d deps) *cobra.Command {
 		Short: "record a question on a ticket and pause it as asking",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			text, err := readBodyArg(d, body)
+			text, err := cmdbase.ReadBodyArg(d.stdin, body)
 			if err != nil {
 				return err
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Ask(ctx, args[0], text)
 			})
 		},

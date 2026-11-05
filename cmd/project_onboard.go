@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
@@ -60,14 +61,12 @@ func onboardChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Write
 	if err != nil || pc == nil {
 		return false, err
 	}
-	if !isTerminal(d) {
+	if !cmdbase.IsTerminal(d.stdinIsTerminal) {
 		fmt.Fprintf(w, "checks not configured: %s\nrun `%s` to set them up\n", strings.Join(missingKinds(*pc), ", "), onboardCommand(project))
 		return true, nil
 	}
 	return true, askChecks(ctx, cl, d, w, project, *pc)
 }
-
-func isTerminal(d deps) bool { return d.stdinIsTerminal != nil && d.stdinIsTerminal() }
 
 func onboardCommand(project string) string { return "gx project onboard " + project }
 

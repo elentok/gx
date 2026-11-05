@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/wire"
 )
@@ -78,7 +79,7 @@ func runDiskClean(ctx context.Context, cl *apiclient.Client, w io.Writer, disk s
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+		if err := cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
 			return err
 		}
 	} else if !res.Refused {
@@ -110,7 +111,7 @@ func runDiskStatus(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 		return fmt.Errorf("server read failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, rep, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, rep, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	now := time.Now()
 	lines := []string{fmt.Sprintf("warn below %s, clean below %s", rep.WarnBelow, rep.CleanBelow)}

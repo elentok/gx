@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +42,7 @@ func runConfigStatus(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		return fmt.Errorf("server read failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, st, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, st, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if st.Empty() {
 		_, err = fmt.Fprintln(w, "no reload since startup")

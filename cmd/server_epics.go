@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"io"
 
@@ -21,7 +22,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 		Short: "list every epic the Epics page shows, or act on a whole epic through the gx server",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(d.dial(), c.Context(), listJSON, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), listJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.EpicList, error) {
 					return cl.Reads.Epics(ctx)
 				},
@@ -39,7 +40,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.EpicMerge(ctx, args[0])
 			})
 		},
@@ -55,7 +56,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.EpicStashMerge(ctx, args[0])
 			})
 		},
@@ -69,7 +70,7 @@ func newServerEpicsCmd(d deps) *cobra.Command {
 		Short: "show an epic's state, progress and ticket rows",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.EpicDetail, error) {
 					return cl.Reads.EpicDetail(ctx, args[0])
 				},

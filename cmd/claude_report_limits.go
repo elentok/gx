@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -79,7 +80,7 @@ func runReportLimits(dial func() (*apiclient.Client, error), c *cobra.Command, p
 	}
 	w := c.OutOrStdout()
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

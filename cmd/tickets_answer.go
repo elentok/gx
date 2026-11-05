@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -24,13 +25,13 @@ func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			req.Address, req.Source = args[0], "cli"
 			if body != "" {
-				text, err := readBodyArg(d, body)
+				text, err := cmdbase.ReadBodyArg(d.stdin, body)
 				if err != nil {
 					return err
 				}
 				req.Text = text
 			}
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				res, err := cl.Tickets.Answer(ctx, req)
 				if err == nil && res.Refused && res.Reason == wire.ReasonStale && !jsonOut {
 					res.Message = staleMessage(res)

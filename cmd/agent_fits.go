@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/wire"
 
@@ -83,7 +84,7 @@ func readServerHarness(dirs config.Dirs, sessionID string) (string, error) {
 }
 
 func findServerSession(dirs config.Dirs, sessionID string) (wire.SessionInfo, error) {
-	cl, err := serverClient(dirs)
+	cl, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return wire.SessionInfo{}, err
 	}

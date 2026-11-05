@@ -5,6 +5,7 @@ import (
 	"io"
 	"sort"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketspec"
@@ -85,7 +86,7 @@ func runTicketsCalibration(cfgDirs config.Dirs, cwd, arg string, asJSON bool, w 
 
 func writeCalibration(w io.Writer, c Calibration, asJSON bool) error {
 	if asJSON {
-		return writeJSON(w, c)
+		return cmdbase.WriteJSON(w, c)
 	}
 	if c.Count == 0 {
 		_, err := fmt.Fprintf(w, "no finished tickets, use %.2f\n", defaultCalibrationRatio)

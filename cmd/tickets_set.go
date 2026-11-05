@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/repair"
@@ -274,11 +275,11 @@ func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 	printNotices(c.ErrOrStderr(), notices)
 
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
-		return writeStamped(w, struct {
+		return cmdbase.WriteStamped(w, struct {
 			Address string   `json:"address"`
 			Path    string   `json:"path"`
 			Updated []string `json:"updated"`
-		}{ticketLabel(path), path, changed}, viaDirect, callerActor(getwd))
+		}{ticketLabel(path), path, changed}, cmdbase.ViaDirect, cmdbase.CallerActor(getwd))
 	}
 	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
 	return nil
@@ -499,11 +500,11 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 
 	pingLabels(dial, ticketLabel(path))
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
-		return writeStamped(w, struct {
+		return cmdbase.WriteStamped(w, struct {
 			Address string   `json:"address"`
 			Path    string   `json:"path"`
 			Updated []string `json:"updated"`
-		}{ticketLabel(path), path, changed}, viaDirect, callerActor(getwd))
+		}{ticketLabel(path), path, changed}, cmdbase.ViaDirect, cmdbase.CallerActor(getwd))
 	}
 	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
 	return nil

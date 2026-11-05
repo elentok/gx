@@ -18,6 +18,7 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
 )
@@ -168,7 +169,7 @@ func agentsWriteCmd(d deps, use, short string, args cobra.PositionalArgs, do fun
 		Short: short,
 		Args:  args,
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return do(ctx, cl, args)
 			})
 		},

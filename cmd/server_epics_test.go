@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
@@ -143,7 +144,7 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 	}
 	for name, tc := range cases {
 		var out bytes.Buffer
-		err := runServerQueueWrite(context.Background(), nil, &out, false,
+		err := cmdbase.RunServerQueueWrite(context.Background(), nil, &out, false,
 			func(context.Context, *apiclient.Client) (wire.QueueResult, error) { return tc.res, nil })
 		if tc.errPart == "" && (err != nil || out.String() != tc.out) {
 			t.Errorf("%s: out = %q, err = %v; want %q", name, out.String(), err, tc.out)
@@ -156,7 +157,7 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 
 func TestServerEpicsMerge_RefusesWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
-	err := runServerQueueWrite(context.Background(), cl, &bytes.Buffer{}, false,
+	err := cmdbase.RunServerQueueWrite(context.Background(), cl, &bytes.Buffer{}, false,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.Tickets.EpicMerge(ctx, "proj:epic")
 		})

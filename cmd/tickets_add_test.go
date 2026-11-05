@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/testutil"
@@ -29,7 +30,7 @@ func TestRunTicketsAdd_WaitsForProjectMigrationAndSaysSo(t *testing.T) {
 	}
 	defer projectlock.SetWaitHookDelayForTest(50 * time.Millisecond)()
 	var notice syncBuffer
-	defer registerMigrationWaitNotice(&notice)()
+	defer cmdbase.RegisterMigrationWaitNotice(&notice)()
 
 	unlock, err := projectlock.Exclusive(project)
 	if err != nil {

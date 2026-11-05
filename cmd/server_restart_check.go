@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +31,7 @@ func newServerRestartCheckCmd(d deps) *cobra.Command {
 				return fmt.Errorf("server read failed: %w", err)
 			}
 			if jsonOut {
-				return encodeProvenance(c.OutOrStdout(), rep, viaServer, callerActor(os.Getwd))
+				return cmdbase.EncodeProvenance(c.OutOrStdout(), rep, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 			}
 			return writeRestartCheck(c.OutOrStdout(), rep)
 		},

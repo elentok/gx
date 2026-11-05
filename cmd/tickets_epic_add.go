@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
@@ -74,7 +75,7 @@ func newTicketsEpicCmd(d deps) *cobra.Command {
 				return err
 			}
 			if body != "" {
-				if body, err = readBodyArg(d, body); err != nil {
+				if body, err = cmdbase.ReadBodyArg(d.stdin, body); err != nil {
 					return err
 				}
 			}

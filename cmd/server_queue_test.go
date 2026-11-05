@@ -12,13 +12,14 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
 func TestServerQueueAdd_RefusesWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out bytes.Buffer
-	err := runServerQueueWrite(context.Background(), cl, &out, false,
+	err := cmdbase.RunServerQueueWrite(context.Background(), cl, &out, false,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.Queue.Add(ctx, "proj:epic/01", "")
 		})

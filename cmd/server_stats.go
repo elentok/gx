@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
@@ -20,7 +21,7 @@ func newServerStatsCmd(d deps) *cobra.Command {
 		Short: "show per-day throughput, cost and friction stats through the gx server",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
+			return cmdbase.ServerRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (wire.Stats, error) {
 					return cl.Reads.Stats(ctx, days, project)
 				},

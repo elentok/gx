@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/nav"
 
@@ -361,7 +362,7 @@ second run changes nothing.`,
 				}
 				return runTicketsAdd(d, epicPath, parent, addSlug, out)
 			}
-			body, err := readBodyArg(d, addBody)
+			body, err := cmdbase.ReadBodyArg(d.stdin, addBody)
 			if err != nil {
 				return err
 			}
@@ -397,7 +398,7 @@ second run changes nothing.`,
 			if err != nil {
 				return err
 			}
-			body, err := readBodyArg(d, followUpBody)
+			body, err := cmdbase.ReadBodyArg(d.stdin, followUpBody)
 			if err != nil {
 				return err
 			}
@@ -453,7 +454,7 @@ second run changes nothing.`,
 			}
 			content := ""
 			if !sectionClear {
-				if content, err = readBodyArg(d, args[2]); err != nil {
+				if content, err = cmdbase.ReadBodyArg(d.stdin, args[2]); err != nil {
 					return err
 				}
 			}

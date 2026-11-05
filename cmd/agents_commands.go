@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 )
 
 func newAgentsCommandsCmd(d deps) *cobra.Command {
@@ -49,7 +50,7 @@ func runAgentsCommands(ctx context.Context, cl *apiclient.Client, w io.Writer, j
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		return cmdbase.EncodeProvenance(w, res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 	}
 	for _, e := range res.Entries {
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.Name, e.ArgHint, e.Source, e.Description); err != nil {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -30,7 +31,7 @@ func TestServerStats_JSONHoldsLimitBurnSeries(t *testing.T) {
 		},
 	}}
 	var buf bytes.Buffer
-	if err := encodeProvenance(&buf, s, viaServer, callerActor(func() (string, error) { return "", nil })); err != nil {
+	if err := cmdbase.EncodeProvenance(&buf, s, cmdbase.ViaServer, cmdbase.CallerActor(func() (string, error) { return "", nil })); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`"limit_burn"`, `"claude_weekly"`, `"codex_5h"`, `"reset_day"`, `"forecast"`} {
@@ -46,7 +47,7 @@ func TestServerStats_JSONHoldsGrillingSeries(t *testing.T) {
 		Questions: []wire.StatsAmount{{NoData: true}},
 	}}
 	var buf bytes.Buffer
-	if err := encodeProvenance(&buf, s, viaServer, callerActor(func() (string, error) { return "", nil })); err != nil {
+	if err := cmdbase.EncodeProvenance(&buf, s, cmdbase.ViaServer, cmdbase.CallerActor(func() (string, error) { return "", nil })); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`"grilling"`, `"words"`, `"questions"`} {
