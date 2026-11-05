@@ -47,7 +47,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 		s.rec.StampHandMerged()
 		s.releaseWaitingSlots(time.Now())
 		s.claimNext()
-		s.publishVerdictChanges()
+		s.explain.PublishChanges()
 		s.herdr.SyncBanner()
 		select {
 		case <-ctx.Done():
@@ -216,7 +216,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 		}
 		s.guards.Refused.Set(ticketAddr, false)
 		resolved := s.harness.ResolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t)
-		if _, held := s.claimHold(addr.Project, t, resolved.ResolvedHarness); held {
+		if _, held := s.explain.ClaimHold(addr.Project, t, resolved.ResolvedHarness); held {
 			return false, nil
 		}
 		return s.launcher.ClaimAndLaunch(root, addr, t, repo, resolved.Harness, loaded)

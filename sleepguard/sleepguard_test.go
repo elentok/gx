@@ -74,7 +74,7 @@ var allowed = map[string]int{
 	"ralphloop/telegram_transport_test.go":                 7, // same rename as slack_transport_test.go
 	"server/budget/grace_test.go":                          5,
 	"server/budget/limits_test.go":                         2,
-	"server/claimhold_test.go":                             1, // negative wait: a herdr event would show within a few retries
+	"server/explain/claimhold_test.go":                     1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":                     2,
 	"server/lifecycle/configreload_test.go":                2,
 	"server/deadlock_test.go":                              2,
@@ -96,7 +96,7 @@ var allowed = map[string]int{
 	"server/queue/oneoffsweep_test.go":                     2,
 	"server/queue/pause_test.go":                           1,
 	"server/sched/reclaim_waiting_test.go":                 1,
-	"server/ratelimit_claim_hold_test.go":                  1, // negative wait: a claim would show within a few ticks
+	"server/explain/ratelimit_claim_hold_test.go":          1, // negative wait: a claim would show within a few ticks
 	"server/sched/ratelimit_hold_run_test.go":              1, // negative wait: a launch would show within a few ticks
 	"server/recovery/recovery_notify_test.go":              4,
 	"server/recovery/recovery_investigate_test.go":         1,

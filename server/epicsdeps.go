@@ -24,7 +24,7 @@ func (s *Server) epicsDeps() epics.Deps {
 		Sessions: s.sessions,
 
 		AutoFFMerge:       func(project string) bool { return s.merger.AutoFFMerge(project) },
-		CheckWaitingLabel: s.CheckWaitingLabel,
+		CheckWaitingLabel: func(address string) string { return s.explain.CheckWaitingLabel(address) },
 		AgentGone:         func(address string) (bool, error) { return s.ops.AgentGone(address) },
 		AmbiguousBlockers: func(addr tickets.Address) []string { return s.ops.AmbiguousBlockers(addr) },
 		DesignUncharted:   s.designs.Uncharted,

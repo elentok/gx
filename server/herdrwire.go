@@ -40,7 +40,7 @@ func (h herdrHost) Waiting() []string {
 			continue
 		}
 		seen[queue.RootOf(addr).String()] = true
-		t, ok := s.nextQueuedTicket(addr, s.projects.Epics)
+		t, ok := s.explain.NextQueuedTicket(addr, s.projects.Epics)
 		if !ok {
 			continue
 		}

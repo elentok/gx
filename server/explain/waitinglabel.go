@@ -1,4 +1,4 @@
-package server
+package explain
 
 import (
 	"github.com/elentok/gx/check"
@@ -14,13 +14,13 @@ import (
 // the two meet on that path. check.ReadWaiting drops a waiter whose process is
 // gone, so a killed waiter never leaves a label, and a run with no tracked
 // ticket matches nothing.
-func (s *Server) CheckWaitingLabel(address string) string {
-	t, ok := s.registry.Tracked(address)
+func (x *Explainer) CheckWaitingLabel(address string) string {
+	t, ok := x.Registry.Tracked(address)
 	if !ok || t.Cwd == "" {
 		return ""
 	}
 	cwd := projects.CanonicalDir(t.Cwd)
-	for _, w := range check.ReadWaiting(s.cfg.StateDir) {
+	for _, w := range check.ReadWaiting(x.StateDir) {
 		if w.Root == "" || projects.CanonicalDir(w.Root) != cwd {
 			continue
 		}

@@ -36,6 +36,7 @@ import (
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
+	"github.com/elentok/gx/server/explain"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
@@ -139,7 +140,7 @@ type Server struct {
 	reclaimer *sched.Reclaimer
 	launcher  *sched.Launcher
 	guards    *runs.Guards
-	verdicts  verdictLog
+	explain   *explain.Explainer
 	// sessions creates, stops and watches the sessions; resumer brings them back.
 	sessions *sessions.Manager
 	resumer  *sessions.Resumer
@@ -451,6 +452,7 @@ func New(cfg Config) (*Server, error) {
 	s.web.Bind()
 	// A down herdr never stops the server; it is reported and retried.
 	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
+	s.explain = newExplainer(s)
 	s.launcher = sched.NewLauncher(sched.LauncherDeps{
 		Log: s.log, Host: launchHost{s}, Projects: s.projects, Recovery: s.recovery, Sessions: s.sessions,
 		Settings: &s.settings, Registry: s.registry, Guards: s.guards, Events: s.events, Index: s.idx,
@@ -480,7 +482,7 @@ var routeTable = []struct {
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/restart/check", restartCheckRoute},
 	{"POST /v1/restart", restartWriteRoute},
-	{"GET /v1/tickets/explain", (*Server).explain},
+	{"GET /v1/tickets/explain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.explain.Handle(w, r) }},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"GET /v1/queue", (*Server).queueView},
 }
@@ -544,7 +546,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.ExtraUsage = s.budget.ExtraUsageOn()
 	snap.Disks = s.disks.Listed()
 	snap.Health = s.health.Current()
-	snap.Pending = s.pendingRows()
+	snap.Pending = s.explain.Pending()
 	snap.Epics = s.epics.EpicSummaries(snap.Tickets)
 	snap.RecentlyFinished = epics.RecentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
 	snap.Mode = s.queue.Mode()
