@@ -144,15 +144,15 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingCancel:
 		return m, nil
 	case bindingViewOutput:
-		if m.output.HasContent() {
-			m.output.Open(m.width, m.height)
+		if m.git.HasOutput() {
+			m.git.OpenOutput(m.width, m.height)
 		}
 		return m, nil
 	case bindingPull:
-		cmd := m.pull.Open(m.worktreeRoot)
+		cmd := m.git.OpenPull(m.worktreeRoot)
 		return m, cmd
 	case bindingPush:
-		if err := m.push.Open(m.worktreeRoot); err != nil {
+		if err := m.git.OpenPush(m.worktreeRoot); err != nil {
 			return m, notify.Error(err.Error())
 		}
 		return m, nil
@@ -162,7 +162,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case bindingBump:
-		if err := m.bump.Open(m.worktreeRoot); err != nil {
+		if err := m.git.OpenBump(m.worktreeRoot); err != nil {
 			return m, notify.Error(err.Error())
 		}
 		return m, nil

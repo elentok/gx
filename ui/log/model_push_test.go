@@ -5,7 +5,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/ui/push"
 )
 
 const testPRURL = "https://github.com/owner/repo/pull/new/feature"
@@ -15,10 +14,9 @@ const testPRURL = "https://github.com/owner/repo/pull/new/feature"
 func TestHandlePushUpdateForwardsCmdOnDone(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo, "", settings)
-	m.push = push.New()
-	m.push.OpenAtPRPrompt(testPRURL)
+	m.git.OpenPRPrompt(testPRURL)
 
-	_, cmd := m.handlePushUpdate(tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd := m.handleGitopsUpdate(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd when push completes with PR URL")
 	}

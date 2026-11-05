@@ -9,13 +9,10 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/amend"
-	"github.com/elentok/gx/ui/bump"
 	"github.com/elentok/gx/ui/commit"
+	"github.com/elentok/gx/ui/gitops"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/output"
-	"github.com/elentok/gx/ui/pull"
-	"github.com/elentok/gx/ui/push"
 	"github.com/elentok/gx/ui/reword"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/splitview"
@@ -70,10 +67,7 @@ type Model struct {
 	trunkProblem   string // last trunk resolver error shown as a warning
 
 	amendConfirm amend.Model
-	bump         bump.Model
-	push         push.Model
-	pull         pull.Model
-	output       output.Model
+	git          gitops.Model
 
 	reword reword.Model
 
@@ -117,10 +111,7 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys(), extraKeys), settings.About)
 	m.amendConfirm = amend.New()
-	m.bump = bump.New()
-	m.push = push.New()
-	m.pull = pull.New()
-	m.output = output.New()
+	m.git = gitops.New()
 	m.reword = reword.New()
 	m.listPanel = newListPanel()
 	m.commitDetail = commit.NewModel(worktreeRoot, "HEAD", "", settings, keys.Manager{})
@@ -160,12 +151,12 @@ func (m Model) WithPendingFocus(subject string) Model {
 }
 
 func (m Model) InputFocused() bool {
-	return m.search.Mode() == search.SearchModeInput || m.bump.InputFocused() || m.push.InputFocused() || m.pull.InputFocused() || m.help.InputFocused()
+	return m.search.Mode() == search.SearchModeInput || m.git.InputFocused() || m.help.InputFocused()
 }
 
 func (m Model) ModalOpen() bool {
-	return m.amendConfirm.IsOpen || m.bump.IsOpen || m.push.IsOpen || m.pull.IsOpen ||
-		m.reword.IsOpen || m.output.IsOpen || m.commitInfoOpen
+	return m.amendConfirm.IsOpen || m.git.IsOpen() ||
+		m.reword.IsOpen || m.commitInfoOpen
 }
 
 func normalizedRef(ref string) string {

@@ -66,17 +66,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)
 	}
-	// Delegate all messages to bump.Model while it's open.
-	if m.bump.IsOpen {
-		return m.handleBumpUpdate(msg)
-	}
-	// Delegate all messages to push.Model while it's open.
-	if m.push.IsOpen {
-		return m.handlePushUpdate(msg)
-	}
-	// Delegate all messages to pull.Model while it's open.
-	if m.pull.IsOpen {
-		return m.handlePullUpdate(msg)
+	// Delegate all messages to the bump/push/pull modal while one is open.
+	if m.git.ActionOpen() {
+		return m.handleGitopsUpdate(msg)
 	}
 	// Delegate all messages to reword.Model while it's running.
 	if m.reword.IsOpen {
@@ -91,9 +83,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	}
 
 	// Delegate output modal keys.
-	if m.output.IsOpen {
-		next, childCmd := m.output.Update(msg)
-		m.output = next
+	if m.git.OutputOpen() {
+		next, childCmd, _ := m.git.Update(msg)
+		m.git = next
 		return m, childCmd
 	}
 

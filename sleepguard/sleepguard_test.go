@@ -63,7 +63,6 @@ var allowed = map[string]int{
 	"nativerunner/holder/holderwatch_test.go":              1,
 	"nativerunner/shorttempdir_test.go":                    1, // poll loop with a deadline
 	"nativerunner/pty_pending_test.go":                     1,
-	"nativerunner/shorttempdir_test.go":                    1,
 	"nativerunner/pty_ratelimit_test.go":                   1, // negative wait: another API error never marks the session limited
 	"nativerunner/pty_test.go":                             1,
 	"ralphloop/chat_eventsink_test.go":                     4,
