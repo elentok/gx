@@ -1,6 +1,6 @@
 package status
 
-import "github.com/elentok/gx/ui/diffview"
+import tea "charm.land/bubbletea/v2"
 
 func (m *Model) switchDiffSection() {
 	m.diffarea.ToggleSection()
@@ -8,28 +8,43 @@ func (m *Model) switchDiffSection() {
 	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 }
 
-func (m Model) editorLineForCurrentSelection() int {
-	if m.focus != focusDiff {
-		return 0
+func (m *Model) focusDiffPane() { m.focus = focusDiff }
+
+func (m *Model) diffLoadEnv() diffLoadEnv {
+	file, ok := m.selectedStatusFile()
+	return diffLoadEnv{
+		host:         m,
+		diffarea:     &m.diffarea,
+		worktreeRoot: m.worktreeRoot,
+		home:         m.settings.Home(),
+		file:         file,
+		hasFile:      ok,
+		contextLines: m.currentDiffContextLines(),
+		renderWidth:  m.deltaRenderWidth(),
 	}
-	diffviewModel := m.diffarea.ActiveSectionModel()
-	diff := diffviewModel.DataRef()
-	if m.diffarea.NavMode() == diffview.NavModeLine {
-		if diff.ActiveLine < 0 || diff.ActiveLine >= len(diff.Parsed.Changed) {
-			return 0
-		}
-		cl := diff.Parsed.Changed[diff.ActiveLine]
-		if cl.NewLine > 0 {
-			return cl.NewLine
-		}
-		return cl.OldLine
+}
+
+func (m *Model) diffActionCtx() diffActionCtx {
+	file, ok := m.selectedStatusFile()
+	return diffActionCtx{
+		worktreeRoot: m.worktreeRoot,
+		home:         m.settings.Home(),
+		terminal:     m.settings.Terminal,
+		focus:        m.focus,
+		file:         file,
+		hasFile:      ok,
+		diffarea:     &m.diffarea,
 	}
-	if diff.ActiveHunk < 0 || diff.ActiveHunk >= len(diff.Parsed.Hunks) {
-		return 0
-	}
-	h := diff.Parsed.Hunks[diff.ActiveHunk]
-	if h.NewStart > 0 {
-		return h.NewStart
-	}
-	return h.OldStart
+}
+
+func (m *Model) reloadDiffsForSelection() tea.Cmd {
+	return m.diffLoader.reloadDiffsForSelection(m.diffLoadEnv())
+}
+
+func (m *Model) applySelection() tea.Cmd {
+	return m.diffLoader.applySelection(m.diffLoadEnv())
+}
+
+func (m *Model) enterDiffFromStatus(resetSection bool) tea.Cmd {
+	return m.diffLoader.enterDiffFromStatus(m.diffLoadEnv(), resetSection)
 }

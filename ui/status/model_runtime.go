@@ -1,17 +1,13 @@
 package status
 
 import (
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/comments"
 	"github.com/elentok/gx/ui/nav"
-	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
@@ -38,46 +34,6 @@ func cmdLazygitLog(worktreeRoot string) tea.Cmd {
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return lazygitLogFinishedMsg{err: err}
 	})
-}
-
-func (m *Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
-	file, ok := m.filetree.selectedFile()
-	if !ok {
-		return notify.Warning("no file selected")
-	}
-	editor := strings.TrimSpace(os.Getenv("EDITOR"))
-	if editor == "" {
-		return notify.Warning("$EDITOR is not set")
-	}
-	parts := strings.Fields(editor)
-	if len(parts) == 0 {
-		return notify.Warning("$EDITOR is empty")
-	}
-	target := filepath.Join(m.worktreeRoot, file.Path)
-	line := m.editorLineForCurrentSelection()
-	args := ui.EditorLaunchArgs(parts[0], parts[1:], target, line)
-	cmd := terminalrun.CommandWithSplit(m.worktreeRoot, m.settings.Terminal, splitType, parts[0], args, func(err error, splitApp string) tea.Msg {
-		return editFileFinishedMsg{err: err, splitApp: splitApp}
-	})
-	return cmd
-}
-
-func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
-	file, ok := m.selectedStatusFile()
-	if !ok {
-		return notify.Warning("no file context for comment")
-	}
-	loc, body, errMsg, ok := m.commentLocationAndBody()
-	if !ok {
-		return notify.Warning(errMsg)
-	}
-	cmd, msg := comments.CmdOpenEditor(m.settings.Home(), file.Path, loc, body, m.worktreeRoot, m.settings.Terminal, func(err error, splitApp string) tea.Msg {
-		return editCommentFinishedMsg{err: err, splitApp: splitApp}
-	})
-	if cmd == nil {
-		return notify.Warning(msg)
-	}
-	return cmd
 }
 
 type autoReloadMsg struct{}

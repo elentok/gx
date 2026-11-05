@@ -405,7 +405,7 @@ func TestEditorLineForCurrentSelectionInDiffMode(t *testing.T) {
 		}
 	}
 
-	line := m.editorLineForCurrentSelection()
+	line := m.diffActions.editorLineForCurrentSelection(m.diffActionCtx())
 	if line != 2 {
 		t.Fatalf("editorLineForCurrentSelection()=%d, want 2", line)
 	}

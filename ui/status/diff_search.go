@@ -47,7 +47,7 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 		if match.DataIndex >= 0 && match.DataIndex < len(m.filetree.model.Entries()) {
 			m.filetree.setSelection(match.DataIndex)
 			m.onFiletreeSelectionChanged()
-			return m, m.scheduleDiffReload()
+			return m, m.diffLoader.scheduleDiffReload()
 		}
 	}
 	return m, nil

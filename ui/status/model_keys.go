@@ -117,13 +117,13 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 	case bindingGotoBottom:
 		m.jumpToBottom()
 		if m.focus == focusFiletree {
-			return m, m.scheduleDiffReload()
+			return m, m.diffLoader.scheduleDiffReload()
 		}
 		return m, nil
 	case bindingGotoTop:
 		m.jumpToTop()
 		if m.focus == focusFiletree {
-			return m, m.scheduleDiffReload()
+			return m, m.diffLoader.scheduleDiffReload()
 		}
 		return m, nil
 	case bindingViewOutput:
@@ -138,15 +138,15 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		if m.focus != focusDiff {
 			return m, nil
 		}
-		return m, m.cmdCreateCommentFromDiff()
+		return m, m.diffActions.cmdCreateCommentFromDiff(m.diffActionCtx())
 	case bindingYankContent:
-		return m, m.yankContentOnly()
+		return m, m.diffActions.yankContentOnly(m.diffActionCtx())
 	case bindingYankLocation:
-		return m, m.yankLocationOnly()
+		return m, m.diffActions.yankLocationOnly(m.diffActionCtx())
 	case bindingYankAll:
-		return m, m.yankAllContext()
+		return m, m.diffActions.yankAllContext(m.diffActionCtx())
 	case bindingYankFilename:
-		return m, m.yankFilename()
+		return m, m.diffActions.yankFilename(m.diffActionCtx())
 	case bindingCancelChord:
 		return m, nil
 	case bindingToggleSection:
@@ -201,13 +201,13 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		m.keys.Reset()
 		return m, m.git.OpenStash(m.worktreeRoot, true)
 	case bindingEditInPlace:
-		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.InPlace)
 	case bindingEditHSplit:
-		return m, m.cmdEditSelectedFile(terminalrun.HSplit)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.HSplit)
 	case bindingEditVSplit:
-		return m, m.cmdEditSelectedFile(terminalrun.VSplit)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.VSplit)
 	case bindingEditTab:
-		return m, m.cmdEditSelectedFile(terminalrun.Tab)
+		return m, m.diffActions.cmdEditSelectedFile(m.diffActionCtx(), terminalrun.Tab)
 	case bindingFilterLog:
 		if !m.settings.EnableNavigation {
 			return m, nil

@@ -31,10 +31,11 @@ type Model struct {
 	diffContextLines int
 	filetree         filetreePane
 
-	err            error
-	help           help.Model
-	activeFilePath string
-	diffReloadSeq  int
+	err  error
+	help help.Model
+
+	diffLoader  diffLoader
+	diffActions diffActions
 
 	git gitops.Model
 

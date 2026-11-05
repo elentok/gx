@@ -107,9 +107,11 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case lazygitLogFinishedMsg:
 		return m.handleLazygitLogFinished(msg)
 	case editFileFinishedMsg:
-		return m.handleEditFileFinished(msg)
+		cmd := m.diffActions.handleEditFileFinished(msg, m.refresh)
+		return m, cmd
 	case editCommentFinishedMsg:
-		return m.handleEditCommentFinished(msg)
+		cmd := m.diffActions.handleEditCommentFinished(msg, m.refresh)
+		return m, cmd
 	case search.JumpToMatchMsg:
 		return m.handleJumpToMatch(msg)
 	case search.SearchQueryUpdatedMsg:
@@ -170,7 +172,7 @@ func (m Model) handleActionPoll() (Model, tea.Cmd) {
 }
 
 func (m Model) handleDiffReload(msg diffReloadMsg) (Model, tea.Cmd) {
-	if msg.seq == m.diffReloadSeq && m.focus == focusFiletree {
+	if m.diffLoader.isCurrentReload(msg.seq) && m.focus == focusFiletree {
 		return m, m.reloadDiffsForSelection()
 	}
 	return m, nil
@@ -310,26 +312,6 @@ func (m Model) handleCommitFinished(msg commitFinishedMsg) (Model, tea.Cmd) {
 func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m, notify.Error("lazygit log failed: " + msg.err.Error())
-	}
-	return m, m.refresh()
-}
-
-func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (Model, tea.Cmd) {
-	if msg.err != nil {
-		return m, notify.Error("edit failed: " + msg.err.Error())
-	}
-	if msg.splitApp != "" {
-		return m, notify.Info("opened " + msg.splitApp + " split: editor")
-	}
-	return m, m.refresh()
-}
-
-func (m Model) handleEditCommentFinished(msg editCommentFinishedMsg) (Model, tea.Cmd) {
-	if msg.err != nil {
-		return m, notify.Error("comment edit failed: " + msg.err.Error())
-	}
-	if msg.splitApp != "" {
-		return m, notify.Info("opened " + msg.splitApp + " split: comment editor")
 	}
 	return m, m.refresh()
 }

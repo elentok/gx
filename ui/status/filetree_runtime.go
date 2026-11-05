@@ -31,7 +31,7 @@ func (m *Model) reloadFileList(preservePath string) {
 
 	if len(m.filetree.data.statusEntries) == 0 {
 		m.filetree.setSelection(0)
-		m.activeFilePath = ""
+		m.diffLoader.activeFilePath = ""
 		m.diffarea.ResetSections()
 		m.focus = focusFiletree
 		return

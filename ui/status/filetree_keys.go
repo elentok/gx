@@ -39,7 +39,7 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case result.PageMoved:
-		return m, m.scheduleDiffReload()
+		return m, m.diffLoader.scheduleDiffReload()
 	case result.ToggleStage:
 		return m, m.toggleStageStatusEntry()
 	case result.Discard:
@@ -62,17 +62,17 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if childCmd != nil {
 		if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
 			if selectionChanged {
-				return handledModel, tea.Batch(actionCmd, handledCmd, m.scheduleDiffReload())
+				return handledModel, tea.Batch(actionCmd, handledCmd, m.diffLoader.scheduleDiffReload())
 			}
 			return handledModel, tea.Batch(actionCmd, handledCmd)
 		}
 		if selectionChanged {
-			return m, tea.Batch(actionCmd, msgCmd(childCmd()), m.scheduleDiffReload())
+			return m, tea.Batch(actionCmd, msgCmd(childCmd()), m.diffLoader.scheduleDiffReload())
 		}
 		return m, tea.Batch(actionCmd, msgCmd(childCmd()))
 	}
 	if selectionChanged {
-		return m, tea.Batch(actionCmd, m.scheduleDiffReload())
+		return m, tea.Batch(actionCmd, m.diffLoader.scheduleDiffReload())
 	}
 	return m, actionCmd
 }

@@ -337,8 +337,8 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 	if m.focus != focusFiletree {
 		t.Fatalf("focus = %v, want %v", m.focus, focusFiletree)
 	}
-	if m.activeFilePath != "dir/b.txt" {
-		t.Fatalf("activeFilePath = %q, want %q", m.activeFilePath, "dir/b.txt")
+	if m.diffLoader.activeFilePath != "dir/b.txt" {
+		t.Fatalf("activeFilePath = %q, want %q", m.diffLoader.activeFilePath, "dir/b.txt")
 	}
 }
 
@@ -471,19 +471,19 @@ func TestFiletreeSelectionDebouncesDiffReload(t *testing.T) {
 	m.ready = true
 	m.focus = focusFiletree
 
-	before := m.activeFilePath
+	before := m.diffLoader.activeFilePath
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	if cmd == nil {
 		t.Fatalf("expected j in filetree to schedule debounced reload")
 	}
-	if m.activeFilePath != before {
+	if m.diffLoader.activeFilePath != before {
 		t.Fatalf("expected active file to remain unchanged before debounce fires")
 	}
 
-	updated, _ = m.Update(diffReloadMsg{seq: m.diffReloadSeq})
+	updated, _ = m.Update(diffReloadMsg{seq: m.diffLoader.reloadSeq})
 	m = updated.(Model)
-	if m.activeFilePath == before {
+	if m.diffLoader.activeFilePath == before {
 		t.Fatalf("expected active file to update after debounce message")
 	}
 }
@@ -494,8 +494,8 @@ func TestNavigationStartupDefersInitialDiffLoad(t *testing.T) {
 	testutil.WriteFile(t, repo, "dirty.txt", "dirty\n")
 
 	m := newTestModel(repo, ui.Settings{EnableNavigation: true}, "")
-	if m.activeFilePath != "" {
-		t.Fatalf("expected initial navigation startup to skip diff load, got %q", m.activeFilePath)
+	if m.diffLoader.activeFilePath != "" {
+		t.Fatalf("expected initial navigation startup to skip diff load, got %q", m.diffLoader.activeFilePath)
 	}
 	if len(m.diffarea.Unstaged.DataRef().Parsed.Hunks) != 0 {
 		t.Fatalf("expected no diff hunks before startup load, got %d", len(m.diffarea.Unstaged.DataRef().Parsed.Hunks))
@@ -503,8 +503,8 @@ func TestNavigationStartupDefersInitialDiffLoad(t *testing.T) {
 
 	updated, _ := m.Update(statusStartupLoadMsg{})
 	m = updated.(Model)
-	if m.activeFilePath != "dirty.txt" {
-		t.Fatalf("expected startup load to select dirty diff, got %q", m.activeFilePath)
+	if m.diffLoader.activeFilePath != "dirty.txt" {
+		t.Fatalf("expected startup load to select dirty diff, got %q", m.diffLoader.activeFilePath)
 	}
 	if len(m.diffarea.Unstaged.DataRef().Parsed.Hunks) == 0 {
 		t.Fatalf("expected diff hunks after startup load")
