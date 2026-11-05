@@ -7,6 +7,8 @@ import "github.com/elentok/gx/server/servertest"
 const (
 	holderLabel       = servertest.HolderLabel
 	testFlushInterval = servertest.FlushInterval
+	answerAddr        = servertest.AnswerAddr
+	optionsBlock      = servertest.OptionsBlock
 )
 
 type renamedFake = servertest.RenamedFake
@@ -21,4 +23,8 @@ var (
 	startInvestigateEnv = servertest.StartInvestigateEnv
 	gitIn               = servertest.GitIn
 	epicTickets         = servertest.EpicTickets
+
+	pausedIteration         = servertest.PausedIteration
+	startWaitingRestartFake = servertest.StartWaitingRestartFake
+	pauseWithQuestion       = servertest.PauseWithQuestion
 )

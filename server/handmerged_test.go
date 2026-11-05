@@ -37,12 +37,6 @@ func commitOnBranch(t *testing.T, repo, branch string) {
 	runGitIn(t, repo, "checkout", "-q", "main")
 }
 
-func runGitIn(t *testing.T, repo string, args ...string) {
-	t.Helper()
-	f := servertest.SchedFixture{Repo: repo}
-	f.Git(t, args...)
-}
-
 func waitUntil(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	servertest.WaitFor(t, 10*time.Second, what, cond)

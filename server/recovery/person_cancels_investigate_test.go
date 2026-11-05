@@ -1,13 +1,11 @@
-package server_test
+package recovery_test
 
 import (
 	"context"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -74,18 +72,6 @@ func TestInvestigateVerb_StartOverLeavesItsOwnTicket(t *testing.T) {
 		t.Fatalf("start-over = %+v, %v; want started over", res, err)
 	}
 	wantChildStatus(t, child, schema.StatusOpen)
-}
-
-func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
-	t.Parallel()
-	h, _ := pausedIteration(t, string(events.ZeroCommit), true)
-	res, err := h.Server.StartOverAsWeb(wire.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
-	if err != nil || !res.Refused || res.Reason != repair.ReasonReasonRequired {
-		t.Fatalf("start-over = %+v, %v; want %s refusal", res, err, repair.ReasonReasonRequired)
-	}
-	if strings.Contains(res.Message, "--reason") {
-		t.Errorf("message = %q, must not mention a CLI flag", res.Message)
-	}
 }
 
 func TestPersonVerb_RefusedMergeLeavesTheInvestigateChild(t *testing.T) {

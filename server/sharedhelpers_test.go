@@ -15,6 +15,8 @@ const (
 	repairToken          = servertest.RepairToken
 	holderLabel          = servertest.HolderLabel
 	investigateAddr      = servertest.InvestigateAddr
+	answerAddr           = servertest.AnswerAddr
+	optionsBlock         = servertest.OptionsBlock
 )
 
 type (
@@ -24,6 +26,20 @@ type (
 	herdrNamed   = servertest.HerdrNamed
 	codexNamed   = servertest.CodexNamed
 	ptyNamed     = servertest.PtyNamed
+)
+
+var epicA01 = servertest.EpicA01
+
+var (
+	pausedIteration         = servertest.PausedIteration
+	leaveIteration          = servertest.LeaveIteration
+	asHeadlessRun           = servertest.AsHeadlessRun
+	stampRun                = servertest.StampRun
+	runGitIn                = servertest.RunGitIn
+	startWaitingRestartFake = servertest.StartWaitingRestartFake
+	markWaiting             = servertest.MarkWaiting
+	pauseWithQuestion       = servertest.PauseWithQuestion
+	answerToken             = servertest.AnswerToken
 )
 
 var (

@@ -12,32 +12,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-const answerAddr = "proj:epic-a/01"
-
-// pauseWithQuestion turns the waiting run's ticket into a self-reported pause
-// with one open question, and returns the state token a client would hold.
-func pauseWithQuestion(t *testing.T, ticketPath, block string) string {
-	t.Helper()
-	err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
-		tk.Status = schema.StatusLegacyAnswer
-		tk.PauseKind = schema.PauseKindSelfReported
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ev, err := tickets.AppendLog(ticketPath, tickets.LogEvent{
-		Type: tickets.EventPauseQuestion, By: "agent", Summary: "which?", Handoff: "h", Block: block,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return answerToken(ev.Seq, schema.PauseClassAnswer)
-}
-
-func answerToken(seq int, class schema.PauseClass) string {
-	return strings.Join([]string{string(rune('0' + seq)), string(class)}, ":")
-}
-
 func answerCount(t *testing.T, ticketPath string) int {
 	t.Helper()
 	evs, err := tickets.ReadLog(ticketPath)
@@ -52,8 +26,6 @@ func answerCount(t *testing.T, ticketPath string) int {
 	}
 	return n
 }
-
-const optionsBlock = "type: options\noptions:\n  - {id: a, label: A}\n  - {id: b, label: B}\n"
 
 func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	t.Parallel()

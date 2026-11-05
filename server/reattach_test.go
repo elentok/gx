@@ -1,14 +1,12 @@
 package server_test
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
@@ -17,41 +15,6 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// asHeadlessRun rewrites the staged handle as a headless run on the fake runner.
-func asHeadlessRun(t *testing.T, h *servertest.Harness) {
-	t.Helper()
-	stampRun(t, h, "fake", agentrunner.Session{Label: "epic-a-iter-01", ID: "p1"})
-}
-
-// stampRun rewrites the staged handle's runner and session.
-func stampRun(t *testing.T, h *servertest.Harness, runner string, session agentrunner.Session) {
-	t.Helper()
-	if runner == "" {
-		t.Fatal("stampRun needs a runner")
-	}
-	path := filepath.Join(h.StateDir, "runs.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var runs []map[string]any
-	if err := json.Unmarshal(data, &runs); err != nil {
-		t.Fatal(err)
-	}
-	runs[0]["runner"] = runner
-	runs[0]["session"] = session
-	if _, ok := runs[0]["agent"]; !ok {
-		runs[0]["agent"] = "claude" // a real launch always records it
-	}
-	delete(runs[0], "pane")
-	if data, err = json.Marshal(runs); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention time.Duration) (*headlessFake, string) {
 	t.Helper()

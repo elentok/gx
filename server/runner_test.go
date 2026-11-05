@@ -668,25 +668,11 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	}
 }
 
-// leaveIteration stages what a server that died mid-iteration leaves behind: a
-// claimed ticket, its worktree with the agent's commit, and the persisted
-// handle. It returns the worktree path and the ticket file.
-func leaveIteration(t *testing.T, h *servertest.Harness, store, repo, runner string) (string, string) {
-	t.Helper()
-	return leaveIterationWith(t, h, store, repo, runner, func(wtPath string) {
-		testutil.WriteFile(t, wtPath, "agent.txt", "work")
-		testutil.CommitAll(t, wtPath, "agent work")
-	})
-}
-
 // leaveIterationWith is leaveIteration with work as what the agent did in its worktree.
 func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo, runner string, work func(wtPath string)) (string, string) {
 	t.Helper()
 	return h.LeaveHerdrRun(t, store, repo, epicA01, runner, work)
 }
-
-// epicA01 is the ticket WriteTicket(t, store, "proj", "epic-a", "01", ...) makes.
-var epicA01 = servertest.Target{Project: "proj", Epic: "epic-a", Ticket: "01"}
 
 func registerLiveAgent(h *servertest.Harness) {
 	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": 1}}

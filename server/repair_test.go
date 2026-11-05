@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +15,18 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
+	t.Parallel()
+	h, _ := pausedIteration(t, string(events.ZeroCommit), true)
+	res, err := h.Server.StartOverAsWeb(wire.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
+	if err != nil || !res.Refused || res.Reason != repair.ReasonReasonRequired {
+		t.Fatalf("start-over = %+v, %v; want %s refusal", res, err, repair.ReasonReasonRequired)
+	}
+	if strings.Contains(res.Message, "--reason") {
+		t.Errorf("message = %q, must not mention a CLI flag", res.Message)
+	}
+}
 
 func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
 	t.Parallel()
@@ -143,24 +154,6 @@ func TestRepair_ResumeAndUnparkRefusalsNameStatusAndVerb(t *testing.T) {
 			}
 		}
 	}
-}
-
-// pausedIteration leaves ticket 01 paused as kind with an iteration branch,
-// committed to when commit is set, and returns the ticket's path.
-func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harness, string) {
-	t.Helper()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
-	wt, ticketPath := leaveIteration(t, h, store, repo, "herdr")
-	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
-	if !commit {
-		runGitIn(t, wt, "reset", "-q", "--hard", "HEAD~1")
-	}
-	pause := "status: paused\npause_reason: " + kind
-	testutil.WriteFile(t, filepath.Dir(ticketPath), filepath.Base(ticketPath), strings.Replace(servertest.ReadFile(t, ticketPath), "status: claimed", pause, 1))
-	return h, ticketPath
 }
 
 func TestRepair_StartOverIgnoresAnOpenInvestigateChild(t *testing.T) {
