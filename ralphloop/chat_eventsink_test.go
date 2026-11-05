@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
@@ -316,7 +317,7 @@ func TestChatEventSink_Pause_ProducesExactlyOneChatMessage(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 message for the pause", got)
 	}
-	want := slackStyle.ticketNeedsHumanText("04", "epic", ticketops.PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt", EpicCounts{}).String()
+	want := slackStyle.ticketNeedsHumanText("04", "epic", ticketops.PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt", schedule.EpicCounts{}).String()
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -493,7 +494,7 @@ func TestChatEventSink_MultipleDistinctEvents_FlushSendsOneSeparatorJoinedMessag
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message", got)
 	}
-	want := slackStyle.epicStartedText("epic", EpicCounts{}).String() + "\n\n---\n\n" + slackStyle.epicCompleteText("epic", EpicCounts{}, 1, 10, 0).String()
+	want := slackStyle.epicStartedText("epic", schedule.EpicCounts{}).String() + "\n\n---\n\n" + slackStyle.epicCompleteText("epic", schedule.EpicCounts{}, 1, 10, 0).String()
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}
@@ -515,7 +516,7 @@ func TestChatEventSink_IdenticalMessages_FlushCollapsesToSingleLineWithCount(t *
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 batched message", got)
 	}
-	want := fmt.Sprintf("%s ×3", slackStyle.epicStartedText("epic", EpicCounts{}).String())
+	want := fmt.Sprintf("%s ×3", slackStyle.epicStartedText("epic", schedule.EpicCounts{}).String())
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}

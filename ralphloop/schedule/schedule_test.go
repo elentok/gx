@@ -1,4 +1,4 @@
-package ralphloop
+package schedule
 
 import (
 	"os"

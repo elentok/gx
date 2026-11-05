@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
@@ -81,19 +81,19 @@ func (w *Writer) sendPause(addr tickets.Address, ticketPath string, kind events.
 // FinishSink carries the finish path's chat-worthy events the outcome cannot
 // show: a merge conflict's resolution starting, and its child pausing.
 func (w *Writer) FinishSink(addr tickets.Address, ticketPath string) runlog.EventSink {
-	return w.d.Chat.FinishSink(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() ralphloop.EpicCounts {
+	return w.d.Chat.FinishSink(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() schedule.EpicCounts {
 		return w.epicCounts(addr.Project, addr.Epic)
 	})
 }
 
 // epicCounts tallies the epic from disk, fresh: a pause has just rewritten a
 // ticket, so the scanned view may not have it yet. Zero when the epic cannot be read.
-func (w *Writer) epicCounts(project, epic string) ralphloop.EpicCounts {
+func (w *Writer) epicCounts(project, epic string) schedule.EpicCounts {
 	e, ok := w.FreshEpic(project, epic)
 	if !ok {
-		return ralphloop.EpicCounts{}
+		return schedule.EpicCounts{}
 	}
-	return ralphloop.CountsOf(e)
+	return schedule.CountsOf(e)
 }
 
 // FreshEpic loads one epic straight from its project's directory.

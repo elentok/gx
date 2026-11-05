@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -15,7 +16,7 @@ import (
 // adversarial input a live Telegram sendMessage call would reject if any
 // call site forgot to escape it: a punctuation-heavy title (parens, a
 // hyphen, a period, a literal asterisk), a fractional cost, and an
-// EpicCounts with more than pausedIdentifierCap PausedIdentifiers (the "+N
+// schedule.EpicCounts with more than pausedIdentifierCap PausedIdentifiers (the "+N
 // more" overflow case — see TestMarkdownV2Validity_OverflowPausedIdentifiers
 // for a dedicated tripwire). Each case is checked against
 // isValidTelegramMarkdownV2's own independently-written special-character
@@ -28,7 +29,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 	const adversarialTicket = "04"
 	const fractionalCost = 12.345
 
-	overflowCounts := EpicCounts{
+	overflowCounts := schedule.EpicCounts{
 		Done:              2,
 		PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"},
 		Total:             10,
@@ -71,7 +72,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 func TestMarkdownV2Validity_OverflowPausedIdentifiers(t *testing.T) {
 	t.Parallel()
 
-	counts := EpicCounts{
+	counts := schedule.EpicCounts{
 		Done:              2,
 		PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06", "07"},
 		Total:             10,

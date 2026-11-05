@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -290,7 +291,7 @@ func epicMergeRefusal(root queue.RootRef, e tickets.Epic, repo string) *wire.Que
 		r = queue.Refusal(wire.ReasonAlreadyMerged, root.String()+" is already merged")
 	case slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return pendingMerge(e, t) }):
 		r = queue.Refusal(wire.ReasonMergePending, root.String()+" already has a merge ticket pending")
-	case !ralphloop.AllDone(e):
+	case !schedule.AllDone(e):
 		r = queue.Refusal(wire.ReasonNotComplete, root.String()+" has tickets that are not done")
 	// A commitless epic never makes a branch: mergeEpic stamps it merged.
 	case !allCommitless(e) && !git.RefExists(repo, "refs/heads/"+root.Epic):

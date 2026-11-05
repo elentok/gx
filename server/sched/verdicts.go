@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
@@ -27,7 +27,7 @@ func (x *Explainer) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Add
 	if v, ok := x.waitingVerdict(addr); ok {
 		return wire.Explanation{Address: addr.String(), Verdict: v}
 	}
-	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, claimed, false)
+	d := schedule.TicketVerdict(e, schedule.WholeEpicScope(), t, claimed, false)
 	switch d.Decision {
 	case runlog.DecisionStalled:
 		return wire.Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // asking, stuck or draft
@@ -135,7 +135,7 @@ func (x *Explainer) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr ticke
 
 // frontierIndex is t's place among the epic's claimable tickets, or -1.
 func frontierIndex(e tickets.Epic, t tickets.Ticket) int {
-	for i, f := range ralphloop.Frontier(e) {
+	for i, f := range schedule.Frontier(e) {
 		if f.Identifier == t.Identifier {
 			return i
 		}

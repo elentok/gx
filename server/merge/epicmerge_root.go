@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
@@ -49,7 +50,7 @@ func (s *Merger) CompleteRootIfDone(root queue.RootRef, one ralphloop.OneIterati
 		return
 	}
 	for _, e := range epics {
-		if filepath.Base(e.Path) == one.Epic && ralphloop.AllDone(e) {
+		if filepath.Base(e.Path) == one.Epic && schedule.AllDone(e) {
 			s.completeEpic(root, one, dir, repo, epics, e)
 		}
 	}
@@ -293,7 +294,7 @@ func (s *Merger) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir s
 		return
 	}
 	if s.chat.Enabled() {
-		s.chat.Pause(project, s.projects.ChatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), events.Kind(kind), reason, ralphloop.CountsOf(e))
+		s.chat.Pause(project, s.projects.ChatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), events.Kind(kind), reason, schedule.CountsOf(e))
 	}
 	// Only a needs-rebase pause is the epic's outcome; any other pause waits on
 	// a person's fix and then merges.
@@ -308,8 +309,8 @@ func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 	if !s.chat.Enabled() || queue.IsOneOffEpic(e) {
 		return
 	}
-	elapsed, cost := ralphloop.EpicTotals(e)
-	counts := ralphloop.CountsOf(e)
+	elapsed, cost := schedule.EpicTotals(e)
+	counts := schedule.CountsOf(e)
 	counts.Recovered = srvrecovery.RecoveredCount(dir, one.Epic)
 	s.chat.EpicComplete(project, s.projects.ChatOverride(project), one.Epic, counts, elapsed, cost, merged)
 }

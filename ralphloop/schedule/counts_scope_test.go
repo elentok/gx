@@ -1,4 +1,4 @@
-package ralphloop
+package schedule
 
 import "github.com/elentok/gx/tickets"
 import "github.com/elentok/gx/tickets/schema"
@@ -23,7 +23,7 @@ func TestRunScope_Counts_BucketsEveryStatus(t *testing.T) {
 		{Number: 8, Identifier: "08", Status: "open", Parent: strPtr("07")},
 	}}
 
-	scope := RunScope{wholeEpic: true}
+	scope := WholeEpicScope()
 	counts := scope.Counts(epic)
 
 	if counts.Done != 1 {

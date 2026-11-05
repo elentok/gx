@@ -1,4 +1,4 @@
-package ralphloop
+package schedule
 
 import (
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -9,7 +9,7 @@ import (
 // scheduler's own verdict (TicketVerdict), whole-epic scope, a ticket already
 // claimed reported as "claimed".
 func EpicQueue(epic tickets.Epic) []runlog.ScanDecision {
-	scope := RunScope{wholeEpic: true}
+	scope := WholeEpicScope()
 	frontier := scope.Frontier(epic)
 	inFrontier := make(map[string]bool, len(frontier))
 	for _, t := range frontier {

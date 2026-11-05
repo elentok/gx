@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
@@ -142,7 +142,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				// suggest that epic alone is over budget.
 				return m.epicStatusRow(entry.Value.epic, m.queueLabelWidth())
 			case nodeEpicError:
-				if stuck, ok := entry.Value.err.(*ralphloop.StuckPlanError); ok {
+				if stuck, ok := entry.Value.err.(*schedule.StuckPlanError); ok {
 					return "    " + metricsLineStyle.Render(
 						"no unblocked tickets left: "+strings.Join(stuck.BlockedIDs(), ", ")+
 							" still waiting on a dependency cycle or a blocker outside the selection",

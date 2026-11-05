@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -133,7 +134,7 @@ func TestTelegramStyleIterationResumedText_LabelInDetailNotIdentity(t *testing.T
 
 func TestTelegramStyleTicketNeedsHumanText_DistinctFromIterationPausedText(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", ticketops.PauseStatus("zero-commit"), "zero-commit", "No commits merged; marked paused.", EpicCounts{Done: 3, Total: 5}).String()
+	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", ticketops.PauseStatus("zero-commit"), "zero-commit", "No commits merged; marked paused.", schedule.EpicCounts{Done: 3, Total: 5}).String()
 	want := "\U0001f198 *needs answer*\n\nNo commits merged; marked paused\\.\n3 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/04"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -145,7 +146,7 @@ func TestTelegramStyleTicketNeedsHumanText_DistinctFromIterationPausedText(t *te
 
 func TestTelegramStyleTicketNeedsHumanText_RepairUsesDifferentLabel(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", ticketops.PauseStatus("spinning"), "blocked-pane", "Codex is waiting for operator intervention", EpicCounts{Done: 3, Total: 5}).String()
+	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", ticketops.PauseStatus("spinning"), "blocked-pane", "Codex is waiting for operator intervention", schedule.EpicCounts{Done: 3, Total: 5}).String()
 	want := "\U0001f6d1 *needs repair*\n\nCodex is waiting for operator intervention\n3 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/04"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -154,7 +155,7 @@ func TestTelegramStyleTicketNeedsHumanText_RepairUsesDifferentLabel(t *testing.T
 
 func TestSlackStyleTicketNeedsHumanText_NoEscaping(t *testing.T) {
 	t.Parallel()
-	got := slackStyle.ticketNeedsHumanText("04", "ui-tree-migration", ticketops.PauseStatus("zero-commit"), "zero-commit", "No commits merged; marked paused.", EpicCounts{Done: 3, Total: 5}).String()
+	got := slackStyle.ticketNeedsHumanText("04", "ui-tree-migration", ticketops.PauseStatus("zero-commit"), "zero-commit", "No commits merged; marked paused.", schedule.EpicCounts{Done: 3, Total: 5}).String()
 	want := "\U0001f198 *needs answer*\n\nNo commits merged; marked paused.\n3 done · 5 total\n[gx] ui-tree-migration/04"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -163,7 +164,7 @@ func TestSlackStyleTicketNeedsHumanText_NoEscaping(t *testing.T) {
 
 func TestTelegramStyleEpicStartedText(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.epicStartedText("ui-tree-migration", EpicCounts{Done: 2, Total: 5}).String()
+	got := telegramStyle.epicStartedText("ui-tree-migration", schedule.EpicCounts{Done: 2, Total: 5}).String()
 	want := "\U0001f680 *epic started*\n\n2 done · 5 total\n\\[gx\\] ui\\-tree\\-migration"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -181,7 +182,7 @@ func TestTelegramStyleEpicPausedText(t *testing.T) {
 
 func TestTelegramStyleEpicCompleteText(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.epicCompleteText("ui-tree-migration", EpicCounts{Done: 8, Total: 10}, 5, 492, 12.5).String()
+	got := telegramStyle.epicCompleteText("ui-tree-migration", schedule.EpicCounts{Done: 8, Total: 10}, 5, 492, 12.5).String()
 	want := "\U0001f389 *epic complete*\n\n8 done · 10 total\n5 ticket\\(s\\) merged in 8m12s · $12\\.50\n\\[gx\\] ui\\-tree\\-migration"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -190,7 +191,7 @@ func TestTelegramStyleEpicCompleteText(t *testing.T) {
 
 func TestTelegramStyle_OverflowPausedIdentifiersEscapesPlus(t *testing.T) {
 	t.Parallel()
-	counts := EpicCounts{Done: 2, PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"}, Total: 8}
+	counts := schedule.EpicCounts{Done: 2, PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"}, Total: 8}
 	const countsLine = "2 done · 6 paused: 01, 02, 03, 04, 05, \\+1 more · 8 total"
 
 	t.Run("epicStartedText", func(t *testing.T) {
@@ -231,10 +232,10 @@ func TestTelegramStyle_OverflowPausedIdentifiersEscapesPlus(t *testing.T) {
 }
 
 func TestEpicCompleteText_CountsRecoveredPausesOnlyWhenThereAre(t *testing.T) {
-	if got := slackStyle.epicCompleteText("e", EpicCounts{}, 1, 10, 0).String(); strings.Contains(got, "recovered") {
+	if got := slackStyle.epicCompleteText("e", schedule.EpicCounts{}, 1, 10, 0).String(); strings.Contains(got, "recovered") {
 		t.Errorf("no recoveries but text says so: %s", got)
 	}
-	if got := slackStyle.epicCompleteText("e", EpicCounts{Recovered: 2}, 1, 10, 0).String(); !strings.Contains(got, "2 recovered automatically") {
+	if got := slackStyle.epicCompleteText("e", schedule.EpicCounts{Recovered: 2}, 1, 10, 0).String(); !strings.Contains(got, "2 recovered automatically") {
 		t.Errorf("text lacks the recovered count: %s", got)
 	}
 }

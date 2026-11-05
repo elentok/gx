@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -106,7 +106,7 @@ func (s *Scheduler) queueView(w http.ResponseWriter, _ *http.Request) {
 		}
 		for _, e := range epics {
 			epicName := filepath.Base(e.Path)
-			for _, d := range ralphloop.EpicQueue(e) {
+			for _, d := range schedule.EpicQueue(e) {
 				list = append(list, wire.QueueEntry{
 					Address:  project + ":" + epicName + "/" + d.Ticket,
 					Decision: string(d.Decision), Reason: d.Reason,

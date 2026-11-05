@@ -63,7 +63,7 @@ func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
 
 // TestQueueModelOrdersRowsByDependencyNotTicketNumber covers ticket 11: the
 // Queue tab's row order must reflect actual execution order (blockers before
-// dependents via ralphloop.PlanWaves), not plain ticket-number order — even
+// dependents via schedule.PlanWaves), not plain ticket-number order — even
 // when the blocker has a higher ticket number than its dependent.
 func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 	t.Parallel()
@@ -468,7 +468,7 @@ func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *test
 
 	// Only the dependent ticket is checked — its blocker never got selected,
 	// and it isn't done, so ralph-loop's own scheduler would never claim it
-	// either (ralphloop.RunScope.Frontier resolves blockers epic-wide).
+	// either (schedule.RunScope.Frontier resolves blockers epic-wide).
 	checked := map[string]bool{
 		ticketPath(root, "alpha", "02-dependent.md"): true,
 	}

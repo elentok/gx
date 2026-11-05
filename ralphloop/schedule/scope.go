@@ -1,4 +1,4 @@
-package ralphloop
+package schedule
 
 import (
 	"fmt"
@@ -137,7 +137,7 @@ func findTicketByID(epic tickets.Epic, id string) (tickets.Ticket, bool) {
 // not trip the requested-count sanity check.
 func (s RunScope) AllDone(epic tickets.Epic) bool {
 	if s.wholeEpic {
-		return allDone(epic)
+		return AllDone(epic)
 	}
 
 	foundRequested := 0

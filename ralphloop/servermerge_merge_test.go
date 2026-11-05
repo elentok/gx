@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -73,7 +74,7 @@ func TestMergeBuilt_FinishSinkSendsConflictStartAndChildPauseOnly(t *testing.T) 
 	d.CherryPickInProgress = func(string) (bool, error) { return picked, nil }
 	srv, reqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
-	p.Sink = c.FinishSink("alpha", nil, "epic", ticketPath, "01", func() EpicCounts { return EpicCounts{Total: 2} })
+	p.Sink = c.FinishSink("alpha", nil, "epic", ticketPath, "01", func() schedule.EpicCounts { return schedule.EpicCounts{Total: 2} })
 
 	if err := mergeBuilt(d, p, built); err != nil {
 		t.Fatalf("mergeBuilt() error = %v", err)

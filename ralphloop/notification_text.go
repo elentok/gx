@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -79,7 +80,7 @@ func (s mrkdwnStyle) identityLine(epicName, ticketIdentifier string) string {
 //
 //	{counts line}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicStartedText(epicName string, counts EpicCounts) chatmarkup.Text {
+func (s mrkdwnStyle) epicStartedText(epicName string, counts schedule.EpicCounts) chatmarkup.Text {
 	return s.chatStyle.Message("\U0001f680", "epic started", RenderCountsLine(counts), "", s.identityLine(epicName, ""))
 }
 
@@ -126,12 +127,12 @@ func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier stri
 //	[gx] {epic}/{ticket}
 //
 // The counts line here carries only done/in-progress/total (see
-// EpicCounts.PausedIdentifiers, Blocked, Ready, which IterationStats never
+// schedule.EpicCounts.PausedIdentifiers, Blocked, Ready, which IterationStats never
 // populates): a ticket-merged message reports what this merging changed,
 // not the epic's full paused/blocked/ready breakdown, which belongs to the
 // epic-level messages alone (see epicStartedText/epicCompleteText).
 func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) chatmarkup.Text {
-	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
+	line := RenderCountsLine(schedule.EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
 	counts := fmt.Sprintf(
 		"%s · %s · %s · %s",
 		formatDuration(stats.ElapsedSeconds), formatTokens(stats.PeakContextTokens), tickets.FormatCost(stats.Cost), line,
@@ -155,7 +156,7 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 //	{reason}
 //	{counts line}
 //	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status string, kind events.Kind, reason string, counts EpicCounts) chatmarkup.Text {
+func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status string, kind events.Kind, reason string, counts schedule.EpicCounts) chatmarkup.Text {
 	emoji, headline := "\U0001f198", "needs answer"
 	if (schema.Ticket{Status: schema.Status(status)}).PausedClass() != schema.PauseClassAnswer {
 		emoji, headline = "\U0001f6d1", "needs repair"
@@ -200,12 +201,12 @@ func (s mrkdwnStyle) epicPausedText(epicName string, stalled []string) chatmarku
 //	{counts line}
 //	{completed} ticket(s) merged in {elapsed} · {totalCost}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
+func (s mrkdwnStyle) epicCompleteText(epicName string, counts schedule.EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
 	return s.epicOutcomeText("\U0001f389", "epic complete", epicName, counts, completed, elapsedSeconds, totalCost)
 }
 
 // epicOutcomeText is the epic-level summary under glyph and title.
-func (s mrkdwnStyle) epicOutcomeText(glyph, title, epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
+func (s mrkdwnStyle) epicOutcomeText(glyph, title, epicName string, counts schedule.EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
 	detail := fmt.Sprintf("%d ticket(s) merged in %s · %s", completed, formatDuration(elapsedSeconds), tickets.FormatCost(totalCost))
 	if counts.Recovered > 0 {
 		detail += fmt.Sprintf(" · %d recovered automatically", counts.Recovered)
@@ -224,7 +225,7 @@ func (s mrkdwnStyle) epicOutcomeText(glyph, title, epicName string, counts EpicC
 //	{counts line}
 //	{err}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicFailedText(epicName string, counts EpicCounts, errMsg string) chatmarkup.Text {
+func (s mrkdwnStyle) epicFailedText(epicName string, counts schedule.EpicCounts, errMsg string) chatmarkup.Text {
 	return s.chatStyle.Message("\U0001f525", "epic failed", RenderCountsLine(counts), errMsg, s.identityLine(epicName, ""))
 }
 

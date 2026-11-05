@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 )
 
 // newTelegramEventSink wires a chatEventSink to a Telegram transport the way
@@ -103,7 +104,7 @@ func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	if reqs[0].ParseMode != "MarkdownV2" {
 		t.Errorf("parse_mode = %q, want %q", reqs[0].ParseMode, "MarkdownV2")
 	}
-	want := telegramStyle.epicCompleteText("epic", EpicCounts{}, 5, 300, 0).String()
+	want := telegramStyle.epicCompleteText("epic", schedule.EpicCounts{}, 5, 300, 0).String()
 	if reqs[0].Text != want {
 		t.Errorf("text = %q, want %q", reqs[0].Text, want)
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 )
 
 func TestServerChat_PausesGoToTheirOwnDestinationAndSharedTargetsShareABatch(t *testing.T) {
@@ -16,9 +17,9 @@ func TestServerChat_PausesGoToTheirOwnDestinationAndSharedTargetsShareABatch(t *
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 
 	own := &ServerChatConfig{SlackWebhookURL: other.URL}
-	c.Pause("alpha", nil, "e", "/t/1.md", "01", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", EpicCounts{})
-	c.Pause("beta", own, "e", "/t/2.md", "02", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", EpicCounts{})
-	c.Pause("gamma", own, "e", "/t/3.md", "03", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", EpicCounts{})
+	c.Pause("alpha", nil, "e", "/t/1.md", "01", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", schedule.EpicCounts{})
+	c.Pause("beta", own, "e", "/t/2.md", "02", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", schedule.EpicCounts{})
+	c.Pause("gamma", own, "e", "/t/3.md", "03", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", schedule.EpicCounts{})
 	c.Close()
 
 	g := globalReqs()
@@ -35,9 +36,9 @@ func TestServerChat_MultiProjectBatchGroupsUnderOneHeaderPerProject(t *testing.T
 	srv, reqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 
-	c.Pause("alpha", nil, "e", "/t/1.md", "A1", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", EpicCounts{})
-	c.Pause("beta", nil, "e", "/t/2.md", "B1", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", EpicCounts{})
-	c.Pause("alpha", nil, "e", "/t/3.md", "A2", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", EpicCounts{})
+	c.Pause("alpha", nil, "e", "/t/1.md", "A1", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", schedule.EpicCounts{})
+	c.Pause("beta", nil, "e", "/t/2.md", "B1", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", schedule.EpicCounts{})
+	c.Pause("alpha", nil, "e", "/t/3.md", "A2", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", schedule.EpicCounts{})
 	c.Close()
 
 	got := reqs()
@@ -62,7 +63,7 @@ func TestServerChat_OverrideReplacesGlobalWithoutMerging(t *testing.T) {
 
 	// An override naming no destination mutes the project; it must not fall
 	// back to the global webhook.
-	c.Pause("quiet", &ServerChatConfig{}, "e", "/t/1.md", "01", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", EpicCounts{})
+	c.Pause("quiet", &ServerChatConfig{}, "e", "/t/1.md", "01", ticketops.PauseStatus("zero-commit"), "zero-commit", "r", schedule.EpicCounts{})
 	c.Close()
 
 	if got := globalReqs(); len(got) != 0 {
@@ -73,7 +74,7 @@ func TestServerChat_OverrideReplacesGlobalWithoutMerging(t *testing.T) {
 func TestServerChat_PauseShowsTheEpicCounts(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
-	c.Pause("alpha", nil, "e", "/t/1.md", "01", ticketops.PauseStatus("zero-commit"), "", "needs rebase", EpicCounts{Done: 5, Total: 7})
+	c.Pause("alpha", nil, "e", "/t/1.md", "01", ticketops.PauseStatus("zero-commit"), "", "needs rebase", schedule.EpicCounts{Done: 5, Total: 7})
 	c.Close()
 
 	g := globalReqs()
@@ -85,7 +86,7 @@ func TestServerChat_PauseShowsTheEpicCounts(t *testing.T) {
 func TestServerChat_EpicCompleteNamesTheProjectAndTheTotals(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
-	c.EpicComplete("alpha", nil, "e", EpicCounts{Done: 7, Total: 7}, 3600, 12.5, true)
+	c.EpicComplete("alpha", nil, "e", schedule.EpicCounts{Done: 7, Total: 7}, 3600, 12.5, true)
 	c.Close()
 
 	g := globalReqs()
@@ -97,7 +98,7 @@ func TestServerChat_EpicCompleteNamesTheProjectAndTheTotals(t *testing.T) {
 func TestServerChat_EpicCompleteNotMergedSaysSo(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
-	c.EpicComplete("alpha", nil, "e", EpicCounts{Done: 7, Total: 7}, 3600, 12.5, false)
+	c.EpicComplete("alpha", nil, "e", schedule.EpicCounts{Done: 7, Total: 7}, 3600, 12.5, false)
 	c.Close()
 
 	g := globalReqs()

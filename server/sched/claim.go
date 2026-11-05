@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
@@ -257,7 +257,7 @@ func (s *Scheduler) parentAwaitsAdoption(dir string, addr tickets.Address, e tic
 // ticket a claim of e's root starts next, and the one its pending row names.
 // The last scan can still list a ticket whose launch already began.
 func (s *Scheduler) NextUntracked(project string, e tickets.Epic) (tickets.Ticket, bool) {
-	for _, t := range ralphloop.Frontier(e) {
+	for _, t := range schedule.Frontier(e) {
 		addr := tickets.Address{Project: project, Epic: filepath.Base(e.Path), ID: t.Identifier}
 		if !s.Registry.Has(addr.String()) {
 			return t, true

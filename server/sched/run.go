@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/merge"
@@ -334,6 +335,6 @@ func (l *Launcher) NotifyDone(addr tickets.Address, ticketPath string) {
 		return
 	}
 	if e, t, ok := l.Writer.FreshTicket(addr); ok && !queue.IsOneOffEpic(e) {
-		l.Chat.TicketDone(addr.Project, l.Projects.ChatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
+		l.Chat.TicketDone(addr.Project, l.Projects.ChatOverride(addr.Project), addr.Epic, t, schedule.CountsOf(e))
 	}
 }

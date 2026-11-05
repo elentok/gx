@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -161,7 +162,7 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerC
 // Pause notifies that a person must look at a ticket the server could not merge.
 // Every message starts with the project name: one server notifies for many.
 // override is the project's own notification block, nil to use the global one.
-func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, ticketPath, identifier, status string, kind events.Kind, reason string, counts EpicCounts) {
+func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, ticketPath, identifier, status string, kind events.Kind, reason string, counts schedule.EpicCounts) {
 	if c == nil {
 		return
 	}
@@ -175,7 +176,7 @@ func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, tic
 // one ticket. It forwards only what the server cannot see from the outcome: a
 // conflict resolution starting, and the resolution child pausing. The ticket's
 // own pause is dropped, since the server notifies it from the outcome.
-func (c *ServerChat) FinishSink(project string, override *ServerChatConfig, epic, ticketPath, ticketID string, counts func() EpicCounts) runlog.EventSink {
+func (c *ServerChat) FinishSink(project string, override *ServerChatConfig, epic, ticketPath, ticketID string, counts func() schedule.EpicCounts) runlog.EventSink {
 	return finishSink{c: c, project: project, override: override, epic: epic, ticketPath: ticketPath, ticketID: ticketID, counts: counts}
 }
 
@@ -185,7 +186,7 @@ type finishSink struct {
 	project                    string
 	override                   *ServerChatConfig
 	epic, ticketPath, ticketID string
-	counts                     func() EpicCounts
+	counts                     func() schedule.EpicCounts
 }
 
 func (f finishSink) ConflictResolutionStarted(identifier string) {
@@ -231,7 +232,7 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 // EpicComplete tells the project's destinations that every ticket of epic
 // merged: "epic merged" when its branch went onto its target, "epic complete
 // (not merged)" otherwise, so chat never claims a merge that did not happen.
-func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts EpicCounts, elapsedSeconds int, totalCost float64, merged bool) {
+func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts schedule.EpicCounts, elapsedSeconds int, totalCost float64, merged bool) {
 	if c == nil {
 		return
 	}
@@ -247,7 +248,7 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 
 // TicketDone tells the project's destinations that a ticket merged, with the
 // metrics the merge wrote onto it and the epic's counts after it.
-func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic string, t tickets.Ticket, counts EpicCounts) {
+func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic string, t tickets.Ticket, counts schedule.EpicCounts) {
 	if c == nil {
 		return
 	}

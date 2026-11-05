@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -383,7 +383,7 @@ func epicRowOrder(epic tickets.Epic, waves [][]tickets.Ticket, candidates map[st
 }
 
 // epicWaves resolves candidates (the checked-ticket paths within epic) into a
-// ralphloop.RunScope and hands off to ralphloop.PlanWaves, the same planner
+// schedule.RunScope and hands off to schedule.PlanWaves, the same planner
 // Run uses to claim tickets — see buildQueueEntries.
 func epicWaves(epic tickets.Epic, candidates map[string]bool, maxParallel int) ([][]tickets.Ticket, error) {
 	var ids []string
@@ -396,9 +396,9 @@ func epicWaves(epic tickets.Epic, candidates map[string]bool, maxParallel int) (
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	scope, err := ralphloop.ResolveRunScope(epic, ids)
+	scope, err := schedule.ResolveRunScope(epic, ids)
 	if err != nil {
 		return nil, err
 	}
-	return ralphloop.PlanWaves(epic, scope, maxParallel)
+	return schedule.PlanWaves(epic, scope, maxParallel)
 }
