@@ -15,7 +15,7 @@ import (
 func TestConfigStatus_FreshServerIsEmpty(t *testing.T) {
 	t.Parallel()
 	h := servertest.Start(t)
-	st, err := h.Client.ConfigStatus(context.Background())
+	st, err := h.Client.Admin.ConfigStatus(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestConfigStatus_KeepsLastReloadAndPendingKeysUntilRestart(t *testing.T) {
 	servertest.WriteConfig(t, path, store, map[string]any{"server": map[string]any{"tcp-listen": true}})
 	before := time.Now()
 	reload(t, h)
-	st, err := h.Client.ConfigStatus(ctx)
+	st, err := h.Client.Admin.ConfigStatus(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestConfigStatus_KeepsLastReloadAndPendingKeysUntilRestart(t *testing.T) {
 
 	servertest.WriteConfig(t, path, store, nil)
 	reload(t, h)
-	st, err = h.Client.ConfigStatus(ctx)
+	st, err = h.Client.Admin.ConfigStatus(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

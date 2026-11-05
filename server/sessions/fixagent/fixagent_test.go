@@ -101,7 +101,7 @@ func TestFixAgent_SurvivesResumingTheTicket(t *testing.T) {
 	if res := f.fix(t, "proj:loop/03"); res.Refused {
 		t.Fatalf("fix = %+v", res)
 	}
-	res, err := f.h.Client.Repair(f.ctx, "resume", wire.RepairRequest{Address: "proj:loop/03"})
+	res, err := f.h.Client.Admin.Repair(f.ctx, "resume", wire.RepairRequest{Address: "proj:loop/03"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -40,7 +40,7 @@ func reportLimits(ctx context.Context, dial func() (*apiclient.Client, error), p
 	if err != nil {
 		return res, false, err
 	}
-	res, err = cl.ReportLimits(ctx, report)
+	res, err = cl.Admin.ReportLimits(ctx, report)
 	switch {
 	case apiclient.IsNotRunning(err):
 		return wire.LimitsReportResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, true, nil

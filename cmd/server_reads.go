@@ -329,7 +329,7 @@ func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, 
 	if err != nil {
 		return err
 	}
-	res, err := cl.UsageOverride(ctx, harness)
+	res, err := cl.Admin.UsageOverride(ctx, harness)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.UsageOverrideResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
@@ -366,7 +366,7 @@ func newBudgetIncreaseCmd(d deps) *cobra.Command {
 				return fmt.Errorf("pass --soft or --hard")
 			}
 			return runBudgetWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.BudgetResult, error) {
-				return cl.BudgetIncrease(ctx, req)
+				return cl.Admin.BudgetIncrease(ctx, req)
 			})
 		},
 	}
@@ -379,7 +379,7 @@ func newBudgetIncreaseCmd(d deps) *cobra.Command {
 // runBudgetOverride mirrors runServerQueueWrite.
 func runBudgetOverride(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool) error {
 	return runBudgetWrite(dial, c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.BudgetResult, error) {
-		return cl.BudgetOverride(ctx)
+		return cl.Admin.BudgetOverride(ctx)
 	})
 }
 

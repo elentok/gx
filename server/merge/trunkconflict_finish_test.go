@@ -83,7 +83,7 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 		t.Fatalf("same.txt = %q, want conflict markers", got)
 	}
 
-	res, err := f.H.Client.Repair(ctx, "start-over", wire.RepairRequest{Address: "proj:" + schedEpic + "/02", Reason: "give up"})
+	res, err := f.H.Client.Admin.Repair(ctx, "start-over", wire.RepairRequest{Address: "proj:" + schedEpic + "/02", Reason: "give up"})
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v", res, err)
 	}

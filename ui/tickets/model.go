@@ -107,6 +107,7 @@ type Model struct {
 	// serverAPI feeds vm (server_mode.go); nil keeps the tab reading the
 	// store for good.
 	serverAPI ServerAPI
+	admin     AdminAPI
 	sessions  SessionsAPI
 	tickets   TicketsAPI
 	queue     QueueAPI

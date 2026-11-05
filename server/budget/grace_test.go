@@ -111,7 +111,7 @@ func TestHardLimitGrace_ConfigStatusShowsCountdown(t *testing.T) {
 	t.Parallel()
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
-	st, err := f.h.Client.ConfigStatus(f.ctx)
+	st, err := f.h.Client.Admin.ConfigStatus(f.ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestHardLimitGrace_BudgetIncreaseCancels(t *testing.T) {
 	f.expectHeld(t)
 
 	hard := 30.0
-	if res, err := f.h.Client.BudgetIncrease(f.ctx, wire.BudgetIncreaseRequest{Hard: &hard}); err != nil || res.Refused {
+	if res, err := f.h.Client.Admin.BudgetIncrease(f.ctx, wire.BudgetIncreaseRequest{Hard: &hard}); err != nil || res.Refused {
 		t.Fatalf("increase = %+v, %v", res, err)
 	}
 	f.expectCancelled(t)
@@ -247,7 +247,7 @@ func TestHardLimitGrace_OverrideCancels(t *testing.T) {
 	stopAt := f.h.Server.Settings().HardStopAt()
 	f.expectHeld(t)
 
-	if res, err := f.h.Client.BudgetOverride(f.ctx); err != nil || res.Refused {
+	if res, err := f.h.Client.Admin.BudgetOverride(f.ctx); err != nil || res.Refused {
 		t.Fatalf("override = %+v, %v", res, err)
 	}
 	f.expectCancelled(t)

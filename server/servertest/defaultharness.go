@@ -13,7 +13,7 @@ import (
 // SetHarness sets the default harness through the client.
 func SetHarness(t *testing.T, h *Harness, req wire.SetDefaultHarnessRequest) wire.SetDefaultHarnessResult {
 	t.Helper()
-	res, err := h.Client.SetDefaultHarness(context.Background(), req)
+	res, err := h.Client.Admin.SetDefaultHarness(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func SetHarness(t *testing.T, h *Harness, req wire.SetDefaultHarnessRequest) wir
 func SwitchDefaultHarness(t *testing.T, h *Harness, path, store, harness string) {
 	t.Helper()
 	WriteConfig(t, path, store, map[string]any{"agents": map[string]any{"default-harness": harness}})
-	if res, err := h.Client.ReloadConfig(context.Background()); err != nil || res.Refused {
+	if res, err := h.Client.Admin.ReloadConfig(context.Background()); err != nil || res.Refused {
 		t.Fatalf("reload: %+v, %v", res, err)
 	}
 }

@@ -126,7 +126,7 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 				servertest.WriteTicketWith(t, p.Store, "proj", "epic-a", "03", "running", servertest.TicketOpts{Type: "investigate", Parent: "01", Status: "claimed"})
 				ctx := context.Background()
 				if verb == "resume" {
-					res, err := p.H.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:epic-a/01"})
+					res, err := p.H.Client.Admin.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:epic-a/01"})
 					if err != nil || res.Refused || !strings.Contains(string(res.Data), `"adopted"`) {
 						t.Fatalf("resume = %+v (data %s), %v; want adopted", res, res.Data, err)
 					}

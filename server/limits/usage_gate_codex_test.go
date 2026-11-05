@@ -22,7 +22,7 @@ func TestUsageOverride_NoHarnessLiftsTheDefaultHarness(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithDefaultHarness("codex"), withCodexUsageSample(t, rec))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if res, err := h.Client.UsageOverride(ctx, ""); err != nil || res.Refused {
+	if res, err := h.Client.Admin.UsageOverride(ctx, ""); err != nil || res.Refused {
 		t.Fatalf("override with the default harness codex = %+v, %v; want it lifted", res, err)
 	}
 }
@@ -64,13 +64,13 @@ func TestUsageGate_CodexSampleHoldsCodexClaimsOnlyAndItsOverrideLiftsThem(t *tes
 		t.Fatalf("codex ticket got %d prompts while gated", n)
 	}
 
-	if res, err := h.Client.UsageOverride(ctx, "claude"); err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
+	if res, err := h.Client.Admin.UsageOverride(ctx, "claude"); err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
 		t.Errorf("claude override = %+v, %v; want refused %s", res, err, wire.ReasonNotGated)
 	}
-	if res, err := h.Client.UsageOverride(ctx, "no-such"); err == nil {
+	if res, err := h.Client.Admin.UsageOverride(ctx, "no-such"); err == nil {
 		t.Errorf("unknown harness override = %+v, want an error", res)
 	}
-	if res, err := h.Client.UsageOverride(ctx, "codex"); err != nil || res.Refused {
+	if res, err := h.Client.Admin.UsageOverride(ctx, "codex"); err != nil || res.Refused {
 		t.Fatalf("codex override = %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the codex claim lands after its override", func() bool { return len(pty.Prompts("epic-a-iter-01")) > 0 })

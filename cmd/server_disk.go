@@ -63,14 +63,14 @@ func newServerDiskCmd(d deps) *cobra.Command {
 // both return an error, so the command exits non-zero.
 func runDiskClean(ctx context.Context, cl *apiclient.Client, w io.Writer, disk string, jsonOut bool) error {
 	id := disk
-	if rep, err := cl.DiskStatus(ctx); err == nil {
+	if rep, err := cl.Admin.DiskStatus(ctx); err == nil {
 		for _, d := range rep.Disks {
 			if d.Name == disk {
 				id = d.ID
 			}
 		}
 	}
-	res, err := cl.CleanDisk(ctx, id)
+	res, err := cl.Admin.CleanDisk(ctx, id)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.CleanNowResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
@@ -105,7 +105,7 @@ func runDiskClean(ctx context.Context, cl *apiclient.Client, w io.Writer, disk s
 }
 
 func runDiskStatus(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	rep, err := cl.DiskStatus(ctx)
+	rep, err := cl.Admin.DiskStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}

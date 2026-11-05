@@ -73,7 +73,7 @@ func onboardCommand(project string) string { return "gx project onboard " + proj
 
 // missingChecks returns the project's check state, or nil when it has config.
 func missingChecks(ctx context.Context, cl *apiclient.Client, project string) (*wire.ProjectChecks, error) {
-	st, err := cl.ChecksStatus(ctx, project)
+	st, err := cl.Admin.ChecksStatus(ctx, project)
 	if err != nil {
 		return nil, fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
@@ -130,7 +130,7 @@ func askChecks(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, p
 			target = wire.SaveTargetRepo
 		}
 	}
-	res, err := cl.SaveChecks(ctx, wire.SaveChecksRequest{Project: project, Target: target, Checks: proposal})
+	res, err := cl.Admin.SaveChecks(ctx, wire.SaveChecksRequest{Project: project, Target: target, Checks: proposal})
 	if err != nil {
 		return fmt.Errorf("server write failed: %w", err)
 	}

@@ -97,12 +97,12 @@ func TestUsageGate_OverrideLetsAClaudeTicketClaim(t *testing.T) {
 	if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {
 		t.Fatalf("claimed %d prompts while gated", n)
 	}
-	res, err := h.Client.UsageOverride(ctx, "")
+	res, err := h.Client.Admin.UsageOverride(ctx, "")
 	if err != nil || res.Refused {
 		t.Fatalf("override: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the claim lands after the override", func() bool { return len(pty.Prompts("epic-a-iter-01")) > 0 })
-	res, err = h.Client.UsageOverride(ctx, "")
+	res, err = h.Client.Admin.UsageOverride(ctx, "")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonNotGated {
 		t.Errorf("second override = %+v, %v; want refused %s", res, err, wire.ReasonNotGated)
 	}

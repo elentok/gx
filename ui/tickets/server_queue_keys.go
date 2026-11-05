@@ -140,14 +140,14 @@ func (m QueueModel) handleServerPauseKey() (tea.Model, tea.Cmd) {
 }
 
 func (m QueueModel) openServerPauseConfirm(b wire.BudgetStatus) QueueModel {
-	api, queue := m.serverAPI, m.queue
+	admin, queue := m.admin, m.queue
 	var prompt string
 	var accept tea.Cmd
 	switch serverPauseActionFor(b, m.paused) {
 	case serverActionOverride:
 		prompt = fmt.Sprintf("Budget limit reached ($%.2f spent). Override and resume?", b.Total)
 		accept = func() tea.Msg {
-			res, err := api.BudgetOverride(context.Background())
+			res, err := admin.BudgetOverride(context.Background())
 			switch {
 			case err != nil:
 				return serverDoneMsg{problem: err.Error()}

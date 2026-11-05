@@ -15,7 +15,7 @@ const cleanDisk = "d1"
 
 func (r *cleanRig) cleanNow(t *testing.T) wire.CleanNowResult {
 	t.Helper()
-	res, err := r.h.Client.CleanDisk(context.Background(), cleanDisk)
+	res, err := r.h.Client.Admin.CleanDisk(context.Background(), cleanDisk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func (r *cleanRig) cleanNow(t *testing.T) wire.CleanNowResult {
 func (r *cleanRig) cleanNowAsync() <-chan wire.CleanNowResult {
 	done := make(chan wire.CleanNowResult, 1)
 	go func() {
-		res, _ := r.h.Client.CleanDisk(context.Background(), cleanDisk)
+		res, _ := r.h.Client.Admin.CleanDisk(context.Background(), cleanDisk)
 		done <- res
 	}()
 	return done
@@ -36,7 +36,7 @@ func (r *cleanRig) cleanNowAsync() <-chan wire.CleanNowResult {
 func (r *cleanRig) known(t *testing.T) {
 	t.Helper()
 	servertest.Await(t, func() bool {
-		rep, err := r.h.Client.DiskStatus(context.Background())
+		rep, err := r.h.Client.Admin.DiskStatus(context.Background())
 		if err != nil {
 			return false
 		}
@@ -174,7 +174,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 	t.Run("unknown disk", func(t *testing.T) {
 		t.Parallel()
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
-		res, err := r.h.Client.CleanDisk(context.Background(), "nope")
+		res, err := r.h.Client.Admin.CleanDisk(context.Background(), "nope")
 		if err != nil || !res.Refused || res.Reason != wire.ReasonUnknownDisk {
 			t.Errorf("result = %+v, %v", res, err)
 		}

@@ -16,7 +16,7 @@ func limitsHarness(t *testing.T) *servertest.Harness {
 
 func sendLimits(t *testing.T, h *servertest.Harness, r wire.LimitsReport) wire.LimitsReportResult {
 	t.Helper()
-	res, err := h.Client.ReportLimits(context.Background(), r)
+	res, err := h.Client.Admin.ReportLimits(context.Background(), r)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -43,7 +43,7 @@ func newServerChecksSaveCmd(d deps) *cobra.Command {
 }
 
 func runServerChecksSave(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.SaveChecksRequest, jsonOut bool) error {
-	res, err := cl.SaveChecks(ctx, req)
+	res, err := cl.Admin.SaveChecks(ctx, req)
 	if err != nil {
 		return fmt.Errorf("server save failed: %w", err)
 	}
@@ -88,7 +88,7 @@ func newServerChecksCmd(d deps) *cobra.Command {
 }
 
 func runServerChecks(ctx context.Context, cl *apiclient.Client, w io.Writer, project string, jsonOut bool) error {
-	st, err := cl.ChecksStatus(ctx, project)
+	st, err := cl.Admin.ChecksStatus(ctx, project)
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}

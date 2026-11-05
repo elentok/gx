@@ -27,7 +27,7 @@ func TestDiskHealth_StateAgreesWithTheDiskStatusFlags(t *testing.T) {
 
 	r.Disks.SetFree(repo, 15*gb)
 	r.DiskMeterWhen(t, "high at level 4", diskIs(wire.HealthStateHigh, 4))
-	rep, err := r.H.Client.DiskStatus(context.Background())
+	rep, err := r.H.Client.Admin.DiskStatus(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestDiskHealth_StateAgreesWithTheDiskStatusFlags(t *testing.T) {
 
 	r.Disks.SetFree(repo, 5*gb)
 	r.DiskMeterWhen(t, "critical at level 4", diskIs(wire.HealthStateCritical, 4))
-	rep, err = r.H.Client.DiskStatus(context.Background())
+	rep, err = r.H.Client.Admin.DiskStatus(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestDiskStatus_ListsTotalBytes(t *testing.T) {
 	r := servertest.StartDiskRig(t, map[string]string{"proj": repo}, 20*gb)
 	r.Disks.PutSized(repo, "d1", "/vol1", 30*gb, 100*gb)
 	r.DiskMeterWhen(t, "a disk", diskIs(wire.HealthStateNormal, 3))
-	rep, err := r.H.Client.DiskStatus(context.Background())
+	rep, err := r.H.Client.Admin.DiskStatus(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

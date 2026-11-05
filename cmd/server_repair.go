@@ -91,7 +91,7 @@ func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.Repair(ctx, verb, req)
+	res, err := cl.Admin.Repair(ctx, verb, req)
 	switch {
 	case apiclient.IsNotRunning(err):
 		if res, err = direct(verb, req); err != nil {

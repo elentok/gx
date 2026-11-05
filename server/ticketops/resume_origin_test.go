@@ -37,7 +37,7 @@ func TestResume_ZeroCommitPromptedLiveAgentKeepsTheRoundOpen(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
-	res, err := e.H.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
+	res, err := e.H.Client.Admin.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
 	if err != nil {
 		t.Fatal(err)
 	}

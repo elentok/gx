@@ -323,7 +323,7 @@ func serverDeps(dirs config.Dirs) *app.ServerDeps {
 		return nil
 	}
 	tui := c.AsTUI()
-	return &app.ServerDeps{Client: tui, Sessions: tui.Sessions, Tickets: tui.Tickets, Queue: tui.Queue, Reads: tui.Reads, Build: getVersion(), Start: serverStarter(dirs, c)}
+	return &app.ServerDeps{Client: tui, Sessions: tui.Sessions, Admin: tui.Admin, Tickets: tui.Tickets, Queue: tui.Queue, Reads: tui.Reads, Build: getVersion(), Start: serverStarter(dirs, c)}
 }
 
 // herdrUnavailable reports herdr missing from PATH or not answering. It is
@@ -393,7 +393,7 @@ func runApp(dirs config.Dirs, m tea.Model, cfg config.Config) error {
 				cl := apiclient.New(server.SocketPath(stateDir))
 				reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 				defer cancel()
-				_, _ = cl.CPUSpike(reqCtx, spike)
+				_, _ = cl.Admin.CPUSpike(reqCtx, spike)
 			},
 		}
 		go w.Run(ctx)

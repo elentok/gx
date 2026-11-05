@@ -36,14 +36,14 @@ func newServerRestartNowCmd(d deps) *cobra.Command {
 }
 
 func runServerRestartNow(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	rep, err := cl.RestartCheck(ctx)
+	rep, err := cl.Admin.RestartCheck(ctx)
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}
 	if rep.Status != wire.RestartCheckOK {
 		return fmt.Errorf("restart check failed (%s): %s", rep.Status, rep.Error)
 	}
-	res, err := cl.Restart(ctx, restartRequestFor(rep))
+	res, err := cl.Admin.Restart(ctx, restartRequestFor(rep))
 	if err != nil {
 		return fmt.Errorf("server restart failed: %w", err)
 	}

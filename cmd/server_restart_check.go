@@ -25,7 +25,7 @@ func newServerRestartCheckCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			rep, err := cl.RestartCheck(ctx)
+			rep, err := cl.Admin.RestartCheck(ctx)
 			if err != nil {
 				return fmt.Errorf("server read failed: %w", err)
 			}

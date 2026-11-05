@@ -39,13 +39,13 @@ func TestRepairMerge_LiveAgentOnPTYRefusesUnlessIgnored(t *testing.T) {
 	f, ctx := liveAgentFixture(t)
 	req := wire.RepairRequest{Address: "proj:" + servertest.SchedEpic + "/01"}
 
-	res, err := f.H.Client.Repair(ctx, "merge", req)
+	res, err := f.H.Client.Admin.Repair(ctx, "merge", req)
 	if err != nil || !res.Refused || res.Reason != repair.ReasonLiveAgentOnTab {
 		t.Fatalf("merge = %+v, %v; want %s refusal", res, err, repair.ReasonLiveAgentOnTab)
 	}
 
 	req.IgnoreLiveTab = true
-	res, err = f.H.Client.Repair(ctx, "merge", req)
+	res, err = f.H.Client.Admin.Repair(ctx, "merge", req)
 	if err != nil || res.Reason == repair.ReasonLiveAgentOnTab {
 		t.Errorf("merge --ignore-live-tab = %+v, %v; want the live-agent guard skipped", res, err)
 	}
@@ -55,7 +55,7 @@ func TestRepairVerify_ReportsAPTYLeftoverSession(t *testing.T) {
 	t.Parallel()
 	f, ctx := liveAgentFixture(t)
 
-	res, err := f.H.Client.Repair(ctx, "verify", wire.RepairRequest{Address: "proj:" + servertest.SchedEpic + "/01"})
+	res, err := f.H.Client.Admin.Repair(ctx, "verify", wire.RepairRequest{Address: "proj:" + servertest.SchedEpic + "/01"})
 	if err != nil || res.Refused {
 		t.Fatalf("verify = %+v, %v", res, err)
 	}

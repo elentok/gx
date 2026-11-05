@@ -60,7 +60,7 @@ func TestConfigReload_KeepsIncreaseOnUneditedField(t *testing.T) {
 	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 5, 20)
 	soft := 10.0
-	if res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft}); err != nil || res.Refused {
+	if res, err := h.Client.Admin.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft}); err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
 

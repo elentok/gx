@@ -49,7 +49,7 @@ func (w *totpWeb) setTOTP(t *testing.T, on bool) {
 func (w *totpWeb) reloadTOTP(t *testing.T, on bool) {
 	t.Helper()
 	w.setTOTP(t, on)
-	res, err := w.h.Client.ReloadConfig(context.Background())
+	res, err := w.h.Client.Admin.ReloadConfig(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

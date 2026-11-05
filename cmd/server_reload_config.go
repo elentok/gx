@@ -35,7 +35,7 @@ func newServerReloadConfigCmd(d deps) *cobra.Command {
 }
 
 func runReloadConfig(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	res, err := cl.ReloadConfig(ctx)
+	res, err := cl.Admin.ReloadConfig(ctx)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = wire.ReloadResult{Refused: true, Reason: wire.ReasonServerNotRunning, Message: "server not running; start it with `gx server start`"}

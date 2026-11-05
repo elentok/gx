@@ -89,7 +89,7 @@ func TestServerHealth_AgentRowShowsAddressAndBusiestProcess(t *testing.T) {
 func waitHealthKnown(t *testing.T, h *servertest.Harness) {
 	t.Helper()
 	known := testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
-		rep, err := h.Client.Health(context.Background())
+		rep, err := h.Client.Admin.Health(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

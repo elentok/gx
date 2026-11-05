@@ -134,7 +134,7 @@ func GitOut(t *testing.T, dir string, args ...string) string {
 // Reload reloads the server's config and returns the result.
 func Reload(t *testing.T, h *Harness) wire.ReloadResult {
 	t.Helper()
-	res, err := h.Client.ReloadConfig(context.Background())
+	res, err := h.Client.Admin.ReloadConfig(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -138,7 +138,7 @@ func TestDiskWatch_ReloadAppliesAtNextReading(t *testing.T) {
 	r.DisksWhen(t, "no disks under 20G", noDisks)
 
 	servertest.WriteConfig(t, cfgPath, r.Store, map[string]any{"disk-space": map[string]any{"warn-below": "50G", "clean-below": "10G"}})
-	if res, err := r.H.Client.ReloadConfig(context.Background()); err != nil || res.Refused {
+	if res, err := r.H.Client.Admin.ReloadConfig(context.Background()); err != nil || res.Refused {
 		t.Fatalf("reload: %+v, %v", res, err)
 	}
 	r.DisksWhen(t, "warned under 50G", oneDisk)

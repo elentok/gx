@@ -33,12 +33,12 @@ type defaultHarnessWroteMsg struct {
 }
 
 func (m QueueModel) handleDefaultHarnessKey() (tea.Model, tea.Cmd) {
-	if m.serverAPI == nil || m.serverDown() {
+	if m.serverAPI == nil || m.admin == nil || m.serverDown() {
 		return m, notify.Warning(serverNotRunning)
 	}
-	api := m.serverAPI
+	admin := m.admin
 	return m, func() tea.Msg {
-		st, err := api.DefaultHarness(context.Background())
+		st, err := admin.DefaultHarness(context.Background())
 		return defaultHarnessReadMsg{status: st, err: err}
 	}
 }
@@ -92,9 +92,9 @@ func (m QueueModel) updateHarnessPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.
 	if m.harnessPicker.project != "" {
 		req = wire.SetDefaultHarnessRequest{Scope: "project", Project: m.harnessPicker.project, Harness: item.Value}
 	}
-	api := m.serverAPI
+	admin := m.admin
 	return m, func() tea.Msg {
-		res, err := api.SetDefaultHarness(context.Background(), req)
+		res, err := admin.SetDefaultHarness(context.Background(), req)
 		return defaultHarnessWroteMsg{res: res, err: err}
 	}
 }

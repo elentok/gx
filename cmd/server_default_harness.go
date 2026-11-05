@@ -33,7 +33,7 @@ func newServerDefaultHarnessCmd(d deps) *cobra.Command {
 }
 
 func runServerDefaultHarness(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	st, err := cl.DefaultHarness(ctx)
+	st, err := cl.Admin.DefaultHarness(ctx)
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}
@@ -80,7 +80,7 @@ func newServerDefaultHarnessSetCmd(d deps) *cobra.Command {
 }
 
 func runServerDefaultHarnessSet(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.SetDefaultHarnessRequest, jsonOut bool) error {
-	res, err := cl.SetDefaultHarness(ctx, req)
+	res, err := cl.Admin.SetDefaultHarness(ctx, req)
 	if err != nil {
 		return fmt.Errorf("server write failed: %w", err)
 	}

@@ -28,7 +28,7 @@ func newServerCPUSpikeCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			res, err := cl.CPUSpike(ctx, spike)
+			res, err := cl.Admin.CPUSpike(ctx, spike)
 			if err != nil {
 				return fmt.Errorf("server write failed: %w", err)
 			}

@@ -89,7 +89,7 @@ func TestQueue_StoredAgentSurvivesDefaultSwitch(t *testing.T) {
 	}
 
 	servertest.WriteConfig(t, path, store, map[string]any{"agents": map[string]any{"default-harness": "codex"}})
-	if res, err := h.Client.ReloadConfig(ctx); err != nil || res.Refused {
+	if res, err := h.Client.Admin.ReloadConfig(ctx); err != nil || res.Refused {
 		t.Fatalf("reload: %+v, %v", res, err)
 	}
 	if got := h.Server.Harness().DefaultHarness("proj"); got != "codex" {

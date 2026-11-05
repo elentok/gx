@@ -119,7 +119,7 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 	f.assertFeatureKept(t, "pause")
 
 	// The server holds the paused PTY run, so the resume goes through it.
-	if res, err := f.H.Client.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:" + schedEpic + "/01"}); err != nil || res.Refused {
+	if res, err := f.H.Client.Admin.Repair(ctx, "resume", wire.RepairRequest{Address: "proj:" + schedEpic + "/01"}); err != nil || res.Refused {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")

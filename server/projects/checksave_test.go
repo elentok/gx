@@ -37,7 +37,7 @@ func TestSaveChecks_RepoMakesOneCommitOfTheFileAlone(t *testing.T) {
 		t.Fatal("fixture should start missing")
 	}
 
-	res := saveChecks(t, h.Client, "repo", `{"test": {"full": "make test"}}`)
+	res := saveChecks(t, h.Client.Admin, "repo", `{"test": {"full": "make test"}}`)
 	if res.Refused || res.Commit == "" || res.Trunk == "" {
 		t.Fatalf("result = %+v", res)
 	}
@@ -66,7 +66,7 @@ func TestSaveChecks_WritesConfigAsSent(t *testing.T) {
 	t.Parallel()
 	for _, cfg := range []string{`{}`, `{"test":false}`, `{"test":{"full":"make test"}}`} {
 		h, repo := checksFixture(t, "")
-		if res := saveChecks(t, h.Client, "repo", cfg); res.Refused {
+		if res := saveChecks(t, h.Client.Admin, "repo", cfg); res.Refused {
 			t.Fatalf("%s: %+v", cfg, res)
 		}
 		data, err := os.ReadFile(filepath.Join(repo, check.RepoConfigPath))
@@ -92,7 +92,7 @@ func TestSaveChecks_WritesConfigAsSent(t *testing.T) {
 func TestSaveChecks_ProjectJSONKeepsOtherKeys(t *testing.T) {
 	t.Parallel()
 	h, repo := checksFixture(t, `,"trunk":"main"`)
-	res := saveChecks(t, h.Client, "project.json", `{"lint":false}`)
+	res := saveChecks(t, h.Client.Admin, "project.json", `{"lint":false}`)
 	if res.Refused || res.Path != filepath.Join(h.TicketStore, "demo", "project.json") {
 		t.Fatalf("result = %+v", res)
 	}
@@ -117,11 +117,11 @@ func TestSaveChecks_ProjectJSONKeepsOtherKeys(t *testing.T) {
 func TestSaveChecks_VCSNoneOnlyProjectJSON(t *testing.T) {
 	t.Parallel()
 	h, _ := checksFixture(t, `,"vcs":"none"`)
-	res := saveChecks(t, h.Client, "repo", `{}`)
+	res := saveChecks(t, h.Client.Admin, "repo", `{}`)
 	if !res.Refused || res.Reason != wire.ReasonVCSNone || res.Message == "" {
 		t.Errorf("repo result = %+v", res)
 	}
-	if res := saveChecks(t, h.Client, "project.json", `{}`); res.Refused {
+	if res := saveChecks(t, h.Client.Admin, "project.json", `{}`); res.Refused {
 		t.Errorf("project.json result = %+v", res)
 	}
 }
@@ -132,7 +132,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 		h, repo := checksFixture(t, "")
 		writeNested(t, repo, check.RepoConfigPath, `{"lint":false}`)
 		before := gitIn(t, repo, "rev-parse", "HEAD")
-		res := saveChecks(t, h.Client, "repo", `{"test":false}`)
+		res := saveChecks(t, h.Client.Admin, "repo", `{"test":false}`)
 		if !res.Refused || res.Reason != wire.ReasonDirtyChecks || res.Message == "" {
 			t.Fatalf("result = %+v", res)
 		}
@@ -148,7 +148,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 		trunk := gitIn(t, repo, "rev-parse", "--abbrev-ref", "HEAD")
 		gitIn(t, repo, "checkout", "-q", "-b", "side")
 		before := gitIn(t, repo, "rev-parse", trunk)
-		res := saveChecks(t, h.Client, "repo", `{}`)
+		res := saveChecks(t, h.Client.Admin, "repo", `{}`)
 		if !res.Refused || res.Reason != wire.ReasonWrongBranch {
 			t.Fatalf("result = %+v", res)
 		}
@@ -166,7 +166,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 			t.Fatal(err)
 		}
 		before := gitIn(t, repo, "rev-parse", "HEAD")
-		res := saveChecks(t, h.Client, "repo", `{}`)
+		res := saveChecks(t, h.Client.Admin, "repo", `{}`)
 		if !res.Refused || res.Reason != wire.ReasonCommitFailed {
 			t.Fatalf("result = %+v", res)
 		}
@@ -183,7 +183,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 	t.Run("no trunk checkout", func(t *testing.T) {
 		h, repo := checksFixture(t, "")
 		gitIn(t, repo, "checkout", "-q", "--detach")
-		res := saveChecks(t, h.Client, "repo", `{}`)
+		res := saveChecks(t, h.Client.Admin, "repo", `{}`)
 		if !res.Refused || res.Message == "" {
 			t.Fatalf("result = %+v", res)
 		}
@@ -195,7 +195,7 @@ func TestSaveChecks_InvalidConfigIsRefused(t *testing.T) {
 	h, repo := checksFixture(t, "")
 	before := gitIn(t, repo, "rev-parse", "HEAD")
 	for _, target := range []string{"repo", "project.json"} {
-		res := saveChecks(t, h.Client, target, `{"deploy":"x"}`)
+		res := saveChecks(t, h.Client.Admin, target, `{"deploy":"x"}`)
 		if !res.Refused || res.Reason != wire.ReasonInvalidChecks || !strings.Contains(res.Message, "deploy") {
 			t.Errorf("%s: result = %+v", target, res)
 		}

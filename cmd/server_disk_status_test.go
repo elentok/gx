@@ -55,7 +55,7 @@ func startDiskStatusServer(t *testing.T, ds config.DiskSpaceConfig) *servertest.
 	var rep wire.DiskReport
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		var err error
-		if rep, err = h.Client.DiskStatus(context.Background()); err != nil {
+		if rep, err = h.Client.Admin.DiskStatus(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		if diskByID(rep.Disks, "d-low") != nil && diskByID(rep.Disks, "d-ok") != nil {

@@ -112,7 +112,7 @@ func (r *DiskRig) WaitNotices(t *testing.T, n int) {
 func (r *DiskRig) WaitReading(t *testing.T, id string, free uint64) {
 	t.Helper()
 	WaitFor(t, 10*time.Second, fmt.Sprintf("a reading of %s at %d bytes", id, free), func() bool {
-		rep, err := r.H.Client.DiskStatus(context.Background())
+		rep, err := r.H.Client.Admin.DiskStatus(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

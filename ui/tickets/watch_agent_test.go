@@ -247,7 +247,7 @@ func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 
 func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
-	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
+	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithAdmin(fakeAdmin{fakeServerAPI{}}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "claimed"}}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
@@ -272,7 +272,7 @@ func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
 func requestMenu(t *testing.T) (Model, tea.Msg) {
 	t.Helper()
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
-	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
+	m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithAdmin(fakeAdmin{fakeServerAPI{}}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "claimed"},

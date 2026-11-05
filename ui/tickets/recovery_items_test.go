@@ -82,7 +82,7 @@ func TestServerWrite_WebOnlyVerbsNeverResume(t *testing.T) {
 	for _, verb := range []string{wire.ActionAnswer, wire.ActionChooseBase, wire.ActionReopenAndRetry, "no-such-verb"} {
 		t.Run(verb, func(t *testing.T) {
 			var calls []string
-			cmd := cmdServerWrite(fakeServerAPI{calls: &calls}, fakeServerAPI{calls: &calls}, verb, "gx:alpha/02")
+			cmd := cmdServerWrite(fakeAdmin{fakeServerAPI{calls: &calls}}, fakeServerAPI{calls: &calls}, verb, "gx:alpha/02")
 			if cmd == nil {
 				t.Fatal("no toast for a web-only verb")
 			}
@@ -96,7 +96,7 @@ func TestServerWrite_WebOnlyVerbsNeverResume(t *testing.T) {
 
 func TestServerWrite_ResumeStillResumes(t *testing.T) {
 	var calls []string
-	cmdServerWrite(fakeServerAPI{calls: &calls}, fakeServerAPI{calls: &calls}, wire.ActionResume, "gx:alpha/02")()
+	cmdServerWrite(fakeAdmin{fakeServerAPI{calls: &calls}}, fakeServerAPI{calls: &calls}, wire.ActionResume, "gx:alpha/02")()
 	if want := []string{"resume gx:alpha/02"}; !slices.Equal(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
 	}
@@ -113,7 +113,7 @@ func TestServerMode_EnterSkipsWebOnlyActions(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
-			m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}})
+			m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}})
 			m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 				{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 			}})
@@ -190,7 +190,7 @@ func TestRecoveryItems_MarkTheRecommendedVerb(t *testing.T) {
 func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionRetry, wire.ActionStartOver)}
-	m := newServerModel(t).WithServer(api).WithTickets(api).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})
@@ -209,7 +209,7 @@ func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 
 func TestServerMode_EnterWithNoActionsDoesNothing(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith()}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith()}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith()}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith()}})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith()}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith()}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls, detail: detailWith()}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith()}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith()}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})

@@ -262,7 +262,7 @@ func TestResume_CLIWithoutATokenStillWorks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := e.H.Client.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
+	res, err := e.H.Client.Admin.Repair(context.Background(), "resume", wire.RepairRequest{Address: answerAddr})
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v; want reopened", res, err)
 	}

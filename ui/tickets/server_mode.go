@@ -16,10 +16,16 @@ import (
 	"github.com/elentok/gx/viewmodel"
 )
 
-// ServerAPI is the slice of apiclient.Client the tab uses in server mode.
+// ServerAPI is the slice of apiclient.Client the tab uses in server mode: the
+// snapshot and event stream. A nil ServerAPI means the tab reads the store.
 type ServerAPI interface {
 	Snapshot(ctx context.Context) (wire.Snapshot, error)
 	Events(ctx context.Context, since uint64) (<-chan wire.Event, error)
+}
+
+// AdminAPI is the slice of *apiclient.Admin the tickets and queue tabs use:
+// the budget override, the repair verbs and the Default harness.
+type AdminAPI interface {
 	BudgetOverride(ctx context.Context) (wire.BudgetResult, error)
 	Repair(ctx context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error)
 	DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error)
@@ -88,6 +94,13 @@ func (m Model) WithServer(api ServerAPI) Model {
 // and "investigate" unavailable.
 func (m Model) WithSessions(s SessionsAPI) Model {
 	m.sessions = s
+	return m
+}
+
+// WithAdmin gives the tab the admin sub-client; nil leaves the repair verbs
+// answering "server not running".
+func (m Model) WithAdmin(a AdminAPI) Model {
+	m.admin = a
 	return m
 }
 

@@ -18,7 +18,7 @@ import (
 func newMaintenanceQueue(t *testing.T, api fakeServerAPI) QueueModel {
 	t.Helper()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).
-		WithServerLink(api, nil).WithTickets(api).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
+		WithServerLink(api, nil).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
@@ -152,7 +152,7 @@ func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
 
 func TestServerMode_FinishAndPauseKeyIsFinishAndPause(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls}).WithTickets(fakeServerAPI{calls: &calls}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls}}).WithReads(fakeReads{fakeServerAPI{calls: &calls}})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls}).WithTickets(fakeServerAPI{calls: &calls}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls}}).WithReads(fakeReads{fakeServerAPI{calls: &calls}})
 	next, _ := m.handleServerFinishAndPauseKey()
 	m = next.(Model)
 	if !m.confirm.IsOpen {

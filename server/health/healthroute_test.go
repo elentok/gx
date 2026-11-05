@@ -52,7 +52,7 @@ func healthRouteWhen(t *testing.T, h *servertest.Harness, what string, pred func
 	var last wire.HealthReport
 	ok := testutil.Poll(10*time.Second, 5*time.Millisecond, func() bool {
 		var err error
-		if last, err = h.Client.Health(context.Background()); err != nil {
+		if last, err = h.Client.Admin.Health(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		return pred(last)

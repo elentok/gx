@@ -46,6 +46,12 @@ func (m QueueModel) WithReads(r ReadsAPI) QueueModel {
 	return m
 }
 
+// WithAdmin gives the tab the admin sub-client; see Model.WithAdmin.
+func (m QueueModel) WithAdmin(a AdminAPI) QueueModel {
+	m.admin = a
+	return m
+}
+
 // WithTickets gives the tab the tickets sub-client; see Model.WithTickets.
 func (m QueueModel) WithTickets(t TicketsAPI) QueueModel {
 	m.tickets = t

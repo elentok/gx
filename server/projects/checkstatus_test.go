@@ -39,7 +39,7 @@ func writeNested(t *testing.T, repo, name, content string) {
 
 func demoChecks(t *testing.T, h *servertest.Harness) wire.ProjectChecks {
 	t.Helper()
-	st, err := h.Client.ChecksStatus(context.Background(), "demo")
+	st, err := h.Client.Admin.ChecksStatus(context.Background(), "demo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestChecksStatus_MissingState(t *testing.T) {
 	})
 	t.Run("scratch is never missing", func(t *testing.T) {
 		h := servertest.StartWithStore(t, t.TempDir())
-		st, err := h.Client.ChecksStatus(context.Background(), projects.ScratchProject)
+		st, err := h.Client.Admin.ChecksStatus(context.Background(), projects.ScratchProject)
 		if err != nil || len(st.Projects) != 1 || st.Projects[0].Missing {
 			t.Errorf("scratch = %+v, %v", st, err)
 		}
@@ -183,7 +183,7 @@ func TestChecksStatus_VCSNoneSavesOnlyToProjectJSON(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.TicketStore, "notes", "project.json"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	st, err := h.Client.ChecksStatus(context.Background(), "notes")
+	st, err := h.Client.Admin.ChecksStatus(context.Background(), "notes")
 	if err != nil || len(st.Projects) != 1 {
 		t.Fatalf("status = %+v, %v", st, err)
 	}
@@ -195,7 +195,7 @@ func TestChecksStatus_VCSNoneSavesOnlyToProjectJSON(t *testing.T) {
 func TestChecksStatus_NoProjectListsEveryProject(t *testing.T) {
 	t.Parallel()
 	h, _ := checksFixture(t, "")
-	st, err := h.Client.ChecksStatus(context.Background(), "")
+	st, err := h.Client.Admin.ChecksStatus(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
 	}

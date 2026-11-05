@@ -36,7 +36,7 @@ func newServerConfigStatusCmd(d deps) *cobra.Command {
 }
 
 func runConfigStatus(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	st, err := cl.ConfigStatus(ctx)
+	st, err := cl.Admin.ConfigStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}

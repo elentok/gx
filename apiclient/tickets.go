@@ -8,16 +8,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/server/wire"
 )
-
-// CPUSpike reports a TUI's CPU spike; the server decides whether to file a ticket.
-func (c *Client) CPUSpike(ctx context.Context, spike cpuwatch.Spike) (wire.CPUSpikeResult, error) {
-	var res wire.CPUSpikeResult
-	err := c.post(ctx, "/v1/cpu-spike", spike, &res)
-	return res, err
-}
 
 // Tickets is the sub-client for ticket, epic and live-agent writes. It shares
 // Client's transport.

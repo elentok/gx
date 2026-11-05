@@ -44,7 +44,7 @@ func TestCPUSpike_MaintainerFilesOneTicketThenCoolsDown(t *testing.T) {
 	t.Parallel()
 	h, store := cpuSpikeServer(t, servertest.WithEvolve(config.EvolveMaintainer))
 	ctx := context.Background()
-	res, err := h.Client.CPUSpike(ctx, testSpike)
+	res, err := h.Client.Admin.CPUSpike(ctx, testSpike)
 	if err != nil || res.Address == "" {
 		t.Fatalf("CPUSpike = %+v, %v; want a filed ticket", res, err)
 	}
@@ -62,7 +62,7 @@ func TestCPUSpike_MaintainerFilesOneTicketThenCoolsDown(t *testing.T) {
 		t.Errorf("diagnose ticket pins an agent:\n%s", body)
 	}
 
-	again, err := h.Client.CPUSpike(ctx, testSpike)
+	again, err := h.Client.Admin.CPUSpike(ctx, testSpike)
 	if err != nil || again.Address != "" || !strings.Contains(again.Message, "cooling down") {
 		t.Fatalf("second CPUSpike = %+v, %v; want a cooldown refusal", again, err)
 	}
@@ -73,7 +73,7 @@ func TestCPUSpike_OnlyLoggedOutsideMaintainerMode(t *testing.T) {
 	for _, mode := range []string{config.EvolveOff, config.EvolveContributor} {
 		t.Run(mode, func(t *testing.T) {
 			h, store := cpuSpikeServer(t, servertest.WithEvolve(mode))
-			res, err := h.Client.CPUSpike(context.Background(), testSpike)
+			res, err := h.Client.Admin.CPUSpike(context.Background(), testSpike)
 			if err != nil || res.Address != "" || res.Message == "" {
 				t.Fatalf("CPUSpike = %+v, %v; want no ticket and a reason", res, err)
 			}
@@ -87,7 +87,7 @@ func TestCPUSpike_OnlyLoggedOutsideMaintainerMode(t *testing.T) {
 func TestCPUSpike_OffFilesNothing(t *testing.T) {
 	t.Parallel()
 	h, _ := cpuSpikeServer(t, servertest.WithEvolve(config.EvolveMaintainer), func(c *server.Config) { c.CPUWatchdog.Enabled = false })
-	res, err := h.Client.CPUSpike(context.Background(), testSpike)
+	res, err := h.Client.Admin.CPUSpike(context.Background(), testSpike)
 	if err != nil || res.Address != "" || !strings.Contains(res.Message, "off") {
 		t.Fatalf("CPUSpike = %+v, %v; want it refused as off", res, err)
 	}

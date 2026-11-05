@@ -26,7 +26,7 @@ func epicMenuModel(t *testing.T, api fakeServerAPI) (Model, string) {
 	if err := os.WriteFile(epicMD, []byte("---\nstatus: draft\n---\n\n# alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := newServerModel(t).WithServer(api).WithTickets(api).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
 	m.settings.TicketStore = store
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "A", Status: "done"},
@@ -81,7 +81,7 @@ func TestEpicMenu_MergeLabelNamesTheBranch(t *testing.T) {
 }
 
 func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
-	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}).WithTickets(fakeServerAPI{calls: &[]string{}}).WithQueue(fakeQueue{fakeServerAPI{calls: &[]string{}}}).WithReads(fakeReads{fakeServerAPI{calls: &[]string{}}}), wire.Snapshot{Tickets: []wire.TicketInfo{
+	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}).WithTickets(fakeServerAPI{calls: &[]string{}}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &[]string{}}}).WithQueue(fakeQueue{fakeServerAPI{calls: &[]string{}}}).WithReads(fakeReads{fakeServerAPI{calls: &[]string{}}}), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "A", Status: "open", EpicStatus: "draft", EpicMergeTarget: "main"},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -107,7 +107,7 @@ func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 		{Address: "gx:alpha/06", Title: "Queued", Status: "open"},
 		{Address: "gx:alpha/07", Title: "Blocked", Status: "open", BlockedBy: []string{"gx:alpha/02"}},
 	}})
-	next, _ := newServerModel(t).WithServer(api).WithTickets(api).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithServerState(&st, ServerLinkUp)
+	next, _ := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithServerState(&st, ServerLinkUp)
 	m := next.(Model)
 	expandOpenEpics(&m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

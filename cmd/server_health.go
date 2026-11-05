@@ -37,7 +37,7 @@ func newServerHealthCmd(d deps) *cobra.Command {
 }
 
 func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	rep, err := cl.HealthWait(ctx)
+	rep, err := cl.Admin.HealthWait(ctx)
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}

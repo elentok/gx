@@ -29,7 +29,7 @@ func TestBudgetLatch_SurvivesRestartAndOverrideLiftsIt(t *testing.T) {
 		t.Fatal("latch lost across restart")
 	}
 	ctx := context.Background()
-	res, err := h.Client.BudgetOverride(ctx)
+	res, err := h.Client.Admin.BudgetOverride(ctx)
 	if err != nil || res.Refused {
 		t.Fatalf("override: %+v, %v", res, err)
 	}
@@ -67,7 +67,7 @@ func TestBudgetLatch_ResetsAtMidnight(t *testing.T) {
 func TestBudgetOverride_RefusesWhenNothingLatched(t *testing.T) {
 	t.Parallel()
 	h := startLatchServer(t)
-	res, err := h.Client.BudgetOverride(context.Background())
+	res, err := h.Client.Admin.BudgetOverride(context.Background())
 	if err != nil || !res.Refused || res.Reason != wire.ReasonNothingLatched {
 		t.Fatalf("override = %+v, %v; want nothing-latched refusal", res, err)
 	}
@@ -81,7 +81,7 @@ func TestBudgetLatch_IsIndependentOfUserPause(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.Server.Budget().RecordSpend("spent", 6)
-	if res, err := h.Client.BudgetOverride(ctx); err != nil || res.Refused {
+	if res, err := h.Client.Admin.BudgetOverride(ctx); err != nil || res.Refused {
 		t.Fatalf("override: %+v, %v", res, err)
 	}
 	// With the latch cleared, the mode reads the user's pause.
@@ -97,7 +97,7 @@ func TestBudgetStatus_ReportsOverridePoint(t *testing.T) {
 	if got := h.Server.Budget().Status(time.Now()).Override; got != 0 {
 		t.Fatalf("override = %v before any override, want 0", got)
 	}
-	res, err := h.Client.BudgetOverride(context.Background())
+	res, err := h.Client.Admin.BudgetOverride(context.Background())
 	if err != nil || res.Refused {
 		t.Fatalf("override: %+v, %v", res, err)
 	}
@@ -114,7 +114,7 @@ func TestBudgetIncrease_LiftsLatchWithoutMovingOverride(t *testing.T) {
 		t.Fatal("not latched")
 	}
 	soft := 10.0
-	res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
+	res, err := h.Client.Admin.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
 	if err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
@@ -133,7 +133,7 @@ func TestBudgetIncrease_KeepsLatchWhenStillReached(t *testing.T) {
 	h := startLatchServer(t)
 	h.Server.Budget().RecordSpend("spent", 9)
 	soft := 8.0
-	res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
+	res, err := h.Client.Admin.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
 	if err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
@@ -149,7 +149,7 @@ func TestBudgetIncrease_SoftPastHardRaisesHard(t *testing.T) {
 		c.BudgetPollInterval = time.Hour
 	})
 	soft := 9.0
-	res, err := h.Client.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
+	res, err := h.Client.Admin.BudgetIncrease(context.Background(), wire.BudgetIncreaseRequest{Soft: &soft})
 	if err != nil || res.Refused {
 		t.Fatalf("increase: %+v, %v", res, err)
 	}
@@ -168,7 +168,7 @@ func TestBudgetIncrease_RefusesLowerOrOffLimit(t *testing.T) {
 		"off hard":   {Hard: &some},
 		"empty":      {},
 	} {
-		res, err := h.Client.BudgetIncrease(ctx, req)
+		res, err := h.Client.Admin.BudgetIncrease(ctx, req)
 		if err != nil || !res.Refused || res.Reason != wire.ReasonNotAnIncrease {
 			t.Errorf("%s: %+v, %v; want not-an-increase refusal", name, res, err)
 		}

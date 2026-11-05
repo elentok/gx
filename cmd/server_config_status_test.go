@@ -33,7 +33,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	}
 
 	servertest.WriteConfig(t, path, store, map[string]any{"server": map[string]any{"tcp-listen": true}})
-	if _, err := h.Client.ReloadConfig(ctx); err != nil {
+	if _, err := h.Client.Admin.ReloadConfig(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +103,7 @@ func TestServerStatus_PrintsFingerprintAndAWarningPerLeftOutHost(t *testing.T) {
 	servertest.WriteConfig(t, path, store, map[string]any{
 		"server": map[string]any{"web": map[string]any{"allowed-hosts": []string{"a.example.org", "outside.example.net"}}},
 	})
-	if res, err := h.Client.ReloadConfig(context.Background()); err != nil || res.Refused {
+	if res, err := h.Client.Admin.ReloadConfig(context.Background()); err != nil || res.Refused {
 		t.Fatalf("reload: %+v, %v", res, err)
 	}
 	var out bytes.Buffer

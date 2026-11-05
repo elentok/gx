@@ -37,9 +37,9 @@ func proc(pid int, comm string, ticks uint64, mem uint64) syshealth.Process {
 
 func health(t *testing.T, h *servertest.Harness, wait bool) wire.HealthReport {
 	t.Helper()
-	get := h.Client.Health
+	get := h.Client.Admin.Health
 	if wait {
-		get = h.Client.HealthWait
+		get = h.Client.Admin.HealthWait
 	}
 	rep, err := get(context.Background())
 	if err != nil {
@@ -259,7 +259,7 @@ func TestHealthProcs_WaitStopsWithTheRequestContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	if _, err := h.Client.HealthWait(ctx); err == nil {
+	if _, err := h.Client.Admin.HealthWait(ctx); err == nil {
 		t.Fatal("wait call succeeded, want the context error")
 	}
 	if time.Since(start) > 2*time.Second {

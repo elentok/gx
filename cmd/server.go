@@ -394,7 +394,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		if b, berr := c.Reads.Budget(ctx); berr == nil {
 			info.Budget = &b
 		}
-		if st, serr := c.ConfigStatus(ctx); serr == nil && !st.Empty() {
+		if st, serr := c.Admin.ConfigStatus(ctx); serr == nil && !st.Empty() {
 			info.Config = &st
 		}
 	}

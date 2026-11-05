@@ -33,7 +33,7 @@ func TestServerChecks_JSONMatchesTheRoute(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	ctx := context.Background()
 
-	want, err := h.Client.ChecksStatus(ctx, "")
+	want, err := h.Client.Admin.ChecksStatus(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}

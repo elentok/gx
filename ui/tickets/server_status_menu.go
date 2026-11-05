@@ -62,8 +62,8 @@ type serverWriteMsg struct {
 
 // cmdServerWrite issues verb for address through the server. With no server
 // it writes nothing: orchestration writes have no file fallback.
-func cmdServerWrite(api ServerAPI, tix TicketsAPI, verb, address string) tea.Cmd {
-	if api == nil || tix == nil {
+func cmdServerWrite(admin AdminAPI, tix TicketsAPI, verb, address string) tea.Cmd {
+	if admin == nil || tix == nil {
 		return notify.Warning(serverNotRunning)
 	}
 	if isWebOnlyVerb(verb) {
@@ -77,7 +77,7 @@ func cmdServerWrite(api ServerAPI, tix TicketsAPI, verb, address string) tea.Cmd
 		)
 		repair := func(repairVerb string, req wire.RepairRequest) {
 			var rr wire.RepairResult
-			rr, err = api.Repair(ctx, repairVerb, req)
+			rr, err = admin.Repair(ctx, repairVerb, req)
 			res = wire.QueueResult{Refused: rr.Refused, Message: rr.Message}
 		}
 		switch verb {
@@ -132,12 +132,12 @@ func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
 	if !isRepairPause(ticket) {
 		return nil, false
 	}
-	return cmdRunFirstAction(m.serverAPI, m.reads, m.tickets, ticket.Path), true
+	return cmdRunFirstAction(m.admin, m.reads, m.tickets, ticket.Path), true
 }
 
 // cmdRunFirstAction reads the ticket's detail and runs its first action; with
 // none it does nothing.
-func cmdRunFirstAction(api ServerAPI, reads ReadsAPI, tix TicketsAPI, address string) tea.Cmd {
+func cmdRunFirstAction(admin AdminAPI, reads ReadsAPI, tix TicketsAPI, address string) tea.Cmd {
 	return func() tea.Msg {
 		d, err := reads.Detail(context.Background(), address)
 		if err != nil {
@@ -147,6 +147,6 @@ func cmdRunFirstAction(api ServerAPI, reads ReadsAPI, tix TicketsAPI, address st
 		if i < 0 {
 			return nil
 		}
-		return cmdServerWrite(api, tix, d.Actions[i], address)()
+		return cmdServerWrite(admin, tix, d.Actions[i], address)()
 	}
 }

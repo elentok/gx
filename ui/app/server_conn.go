@@ -43,6 +43,7 @@ type ServerSessions interface {
 type ServerDeps struct {
 	Client   ServerClient
 	Sessions ServerSessions
+	Admin    ticketsui.AdminAPI
 	Tickets  ticketsui.TicketsAPI
 	Queue    ticketsui.QueueAPI
 	Reads    ticketsui.ReadsAPI

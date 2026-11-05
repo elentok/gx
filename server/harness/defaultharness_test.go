@@ -59,7 +59,7 @@ func TestDefaultHarness_GlobalWriteKeepsKeysAndSymlink(t *testing.T) {
 	if claude := got["agents"].(map[string]any)["claude"]; claude == nil {
 		t.Errorf("sibling agents key lost: %v", got)
 	}
-	st, err := h.Client.DefaultHarness(context.Background())
+	st, err := h.Client.Admin.DefaultHarness(context.Background())
 	if err != nil || st.Default != "codex" {
 		t.Errorf("status after reload = %+v, %v", st, err)
 	}
@@ -103,7 +103,7 @@ func TestDefaultHarness_ProjectWriteAndRemoveOverride(t *testing.T) {
 	if agentsKey(got) != "codex" || got["vcs"] != "git" || got["checks"] == nil || len(got["agents"].(map[string]any)) != 1 {
 		t.Errorf("project.json = %v", got)
 	}
-	st, _ := h.Client.DefaultHarness(context.Background())
+	st, _ := h.Client.Admin.DefaultHarness(context.Background())
 	if !slices.Contains(st.Projects, wire.ProjectDefaultHarness{Project: "proj", Harness: "codex"}) {
 		t.Errorf("status = %+v", st)
 	}

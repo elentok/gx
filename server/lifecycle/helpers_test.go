@@ -39,7 +39,7 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 // reload asks the running server to reload its config and returns the result.
 func reload(t *testing.T, h *servertest.Harness) wire.ReloadResult {
 	t.Helper()
-	res, err := h.Client.ReloadConfig(context.Background())
+	res, err := h.Client.Admin.ReloadConfig(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

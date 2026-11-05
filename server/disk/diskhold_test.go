@@ -188,7 +188,7 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 	}
 	disks.SetFree(repo, gb)
 	servertest.WaitFor(t, 10*time.Second, "the disk held", func() bool {
-		rep, err := h.Client.DiskStatus(context.Background())
+		rep, err := h.Client.Admin.DiskStatus(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

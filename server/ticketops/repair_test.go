@@ -35,7 +35,7 @@ func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Admin.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -52,7 +52,7 @@ func TestRepair_MergeStampsTheFrictionSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Admin.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -81,7 +81,7 @@ func TestRepair_MergeClosesAFinishedCommitlessTicketAsDone(t *testing.T) {
 	}
 	merge := func() wire.RepairResult {
 		t.Helper()
-		res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+		res, err := h.Client.Admin.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,7 +130,7 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 		{"unknown project", "start-over", wire.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, wire.ReasonUnknownTicket},
 	}
 	for _, c := range cases {
-		res, err := h.Client.Repair(ctx, c.verb, c.req)
+		res, err := h.Client.Admin.Repair(ctx, c.verb, c.req)
 		if err != nil || !res.Refused || res.Reason != c.reason {
 			t.Errorf("%s: %+v, %v; want refusal %s", c.name, res, err, c.reason)
 		}
@@ -148,7 +148,7 @@ func TestRepair_ResumeAndUnparkRefusalsNameStatusAndVerb(t *testing.T) {
 			{"14", "ticket 14 is paused (repair: iteration-error); use retry"},
 			{"15", "ticket 15 is open, not asking"},
 		} {
-			res, err := h.Client.Repair(context.Background(), verb, wire.RepairRequest{Address: "proj:epic-a/" + c.id})
+			res, err := h.Client.Admin.Repair(context.Background(), verb, wire.RepairRequest{Address: "proj:epic-a/" + c.id})
 			if err != nil || !res.Refused || res.Message != c.want {
 				t.Errorf("%s %s: %+v, %v; want refusal %q", verb, c.id, res, err, c.want)
 			}
@@ -162,7 +162,7 @@ func TestRepair_StartOverIgnoresAnOpenInvestigateChild(t *testing.T) {
 	epicIssues := filepath.Dir(ticketPath)
 	testutil.WriteFile(t, epicIssues, "01a-investigate.md", "---\nid: \"01a\"\nparent: \"01\"\nstatus: open\ntype: investigate\n---\n\n# 01a\n")
 
-	res, err := h.Client.Repair(context.Background(), "start-over", wire.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	res, err := h.Client.Admin.Repair(context.Background(), "start-over", wire.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v; want started over", res, err)
 	}
@@ -173,7 +173,7 @@ func TestRepair_MergeAcceptsAZeroCommitPauseWithCommits(t *testing.T) {
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 
 	// A caller outside the repo still merges: the repo comes from the project.
-	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Admin.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -196,7 +196,7 @@ func TestRepair_MergeRefusesOtherPauses(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			h, _ := pausedIteration(t, c.kind, c.commit)
-			res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01"})
+			res, err := h.Client.Admin.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01"})
 			if err != nil || !res.Refused || res.Reason != c.reason {
 				t.Errorf("merge = %+v, %v; want refusal %s", res, err, c.reason)
 			}
@@ -214,7 +214,7 @@ func TestRepair_MergeWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01"})
+	res, err := h.Client.Admin.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonWrongRepo {
 		t.Errorf("merge = %+v, %v; want %s", res, err, repair.ReasonWrongRepo)
 	}
@@ -226,7 +226,7 @@ func TestRepair_RalphLoopGuardIsServerSide(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Branch: "ralph-loop/other"})
+	res, err := h.Client.Admin.Repair(context.Background(), "merge", wire.RepairRequest{Address: "proj:epic-a/01", Branch: "ralph-loop/other"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonRalphLoopCwd {
 		t.Errorf("merge = %+v, %v; want %s", res, err, repair.ReasonRalphLoopCwd)
 	}
