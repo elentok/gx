@@ -143,7 +143,7 @@ func (p *Prompt) sendAutoAdvance(id string) {
 	if res.Refused || err != nil || !meta.CanAutoAdvance() {
 		return
 	}
-	if res, err := p.host.SendAction(wire.SessionRequest{ID: id}, true); err != nil || res.Refused {
+	if res, err := p.SendSessionAction(wire.SessionRequest{ID: id}, true); err != nil || res.Refused {
 		p.log.Info("auto-advance not sent", "session", id, "err", err, "reason", res.Reason)
 	}
 }

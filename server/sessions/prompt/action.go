@@ -1,4 +1,4 @@
-package server
+package prompt
 
 import (
 	"cmp"
@@ -8,27 +8,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/server/sessions"
-	sessprompt "github.com/elentok/gx/server/sessions/prompt"
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/wire"
 )
 
-// runSessionAction clears an Idle session's Actionable and sends its Action
+// RunSessionAction clears an Idle session's Actionable and sends its Action
 // in the background, so the run outlives the client that asked for it.
-func (s *Server) runSessionAction(req wire.SessionRequest) (wire.SessionResult, error) {
-	return s.sendSessionAction(req, false)
+func (p *Prompt) RunSessionAction(req wire.SessionRequest) (wire.SessionResult, error) {
+	return p.SendSessionAction(req, false)
 }
 
-// sendSessionAction is runSessionAction; auto marks a send the server made
+// SendSessionAction is RunSessionAction; auto marks a send the server made
 // itself, which the runaway guard counts. Any other send is the person's input
 // and resets that count.
-func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
-	s.sessions.Watches.MetaMu.Lock()
-	defer s.sessions.Watches.MetaMu.Unlock()
-	dir, meta, res, err := s.sessions.SessionDir(req.ID)
+func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
+	p.sessions.Watches.MetaMu.Lock()
+	defer p.sessions.Watches.MetaMu.Unlock()
+	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -39,21 +37,21 @@ func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 	if len(action) == 0 {
 		return sessions.Refusal(wire.ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
 	}
-	if res, refused := s.resumer.HandoffRefusal(meta, action); refused {
+	if res, refused := p.resumer.HandoffRefusal(meta, action); refused {
 		return res, nil
 	}
 	meta.Actionable = wire.SessionActionable{}
 	if auto {
 		meta.AutoSends++
 	} else {
-		s.prompt.CancelAutoAdvance(req.ID, "Auto-advance stopped: you ran the action")
+		p.CancelAutoAdvance(req.ID, "Auto-advance stopped: you ran the action")
 		meta.AutoSends = 0
 	}
 	if err := sessions.WriteMeta(dir, meta); err != nil {
 		return wire.SessionResult{}, err
 	}
-	s.events.Publish(wire.EventSessionChanged, req.ID)
-	s.resumer.StartContinue(dir, meta, "Action", action)
+	p.events.Publish(wire.EventSessionChanged, req.ID)
+	p.resumer.StartContinue(dir, meta, "Action", action)
 	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
 }
@@ -61,7 +59,7 @@ func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 // actionRun follows the session's status on its own watch, not the saved
 // meta, which can still lag behind the Idle a step just saw.
 type actionRun struct {
-	s      *Server
+	p      *Prompt
 	dir    string
 	holder *nativerunner.HolderClient
 	msgs   <-chan nativerunner.WatchMessage
@@ -77,70 +75,57 @@ type actionRun struct {
 	convChanged bool
 	// personTyped is set once a person's own key or paste reaches the session.
 	personTyped bool
-	actionRunOpts
+	RunOpts
 }
 
-// actionRunOpts hooks a run into a person's own input. onTyped runs once a
-// step's prompt is typed. cancel, when closed, ends a step's wait without
-// another Enter: the first prompt sets both so a person's own input stops it.
-type actionRunOpts struct {
-	onTyped func()
-	cancel  <-chan struct{}
-}
-
-// sendAction sends each prompt once the one before it has finished its turn;
+// SendAction sends each prompt once the one before it has finished its turn;
 // a step that finds the session not Idle, or whose prompt never starts,
 // drops the rest. A step that fails raises a gx Actionable named after label
 // with the prompts it did not send, so the failure shows instead of only
 // reaching the log.
-func (s *Server) sendAction(dir, label string, action []string) {
-	i, err := s.runAction(dir, action)
+func (p *Prompt) SendAction(dir, label string, action []string) {
+	i, err := p.runAction(dir, action)
 	switch {
 	case err == nil:
-	case errors.Is(err, sessprompt.ErrDraft):
-		s.log.Info("draft would not clear", "session", filepath.Base(dir), "unsent", len(action)-i)
-		s.raiseGxActionable(dir, sessprompt.DraftReason, action[i:])
-	case errors.Is(err, errServerStopping), errors.Is(err, errWentBlocked), errors.Is(err, errNotIdle):
+	case errors.Is(err, ErrDraft):
+		p.log.Info("draft would not clear", "session", filepath.Base(dir), "unsent", len(action)-i)
+		p.RaiseGxActionable(dir, DraftReason, action[i:])
+	case errors.Is(err, ErrServerStopping), errors.Is(err, ErrWentBlocked), errors.Is(err, errNotIdle):
 		// Shutdown is not a failure, and Blocked or a busy session already shows.
-		s.log.Info(strings.ToLower(label)+" stopped", "session", filepath.Base(dir), "err", err)
+		p.log.Info(strings.ToLower(label)+" stopped", "session", filepath.Base(dir), "err", err)
 	default:
-		s.log.Warn(strings.ToLower(label)+" failed", "session", filepath.Base(dir), "err", err)
-		s.raiseGxActionable(dir, fmt.Sprintf("%s failed: %v", label, err), action[i:])
+		p.log.Warn(strings.ToLower(label)+" failed", "session", filepath.Base(dir), "err", err)
+		p.RaiseGxActionable(dir, fmt.Sprintf("%s failed: %v", label, err), action[i:])
 	}
 }
 
-// Errors that end an Action without raising an Actionable.
-var (
-	errServerStopping = sessprompt.ErrServerStopping
-	errWentBlocked    = sessprompt.ErrWentBlocked
-	errNotIdle        = errors.New("session is not idle")
-)
+var errNotIdle = errors.New("session is not idle")
 
 // runAction sends the prompts and returns the index of the step it stopped
 // at, with the error it stopped on.
-func (s *Server) runAction(dir string, action []string) (int, error) {
-	run, closeRun, err := s.openActionRun(dir, actionRunOpts{})
+func (p *Prompt) runAction(dir string, action []string) (int, error) {
+	run, closeRun, err := p.OpenActionRun(dir, RunOpts{})
 	if err != nil {
 		return 0, err
 	}
 	defer closeRun()
 	for i, prompt := range action {
-		if err := run.catchUp(); err != nil {
+		if err := run.CatchUp(); err != nil {
 			return i, err
 		}
-		if !run.promptable() {
-			return i, fmt.Errorf("step %d: %w (%s)", i, errNotIdle, run.state)
+		if !run.Promptable() {
+			return i, fmt.Errorf("step %d: %w (%s)", i, errNotIdle, run.State())
 		}
-		if err := run.step(i, prompt); err != nil {
+		if err := run.Step(i, prompt); err != nil {
 			return i, err
 		}
 	}
 	return len(action), nil
 }
 
-// openActionRun dials the session's holder and starts following its watch;
+// OpenActionRun dials the session's holder and starts following its watch;
 // the returned func ends the watch.
-func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func(), error) {
+func (p *Prompt) OpenActionRun(dir string, opts RunOpts) (ActionRun, func(), error) {
 	c, err := nativerunner.DialHolder(dir)
 	if err != nil {
 		return nil, nil, err
@@ -166,10 +151,10 @@ func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func
 		}
 	}()
 	run := &actionRun{
-		actionRunOpts: opts,
-		s:             s, dir: dir, holder: c, msgs: msgs, state: wire.SessionIdle,
-		started: cmp.Or(s.cfg.ActionStepStartTimeout, DefaultActionStepStartTimeout),
-		settle:  cmp.Or(s.cfg.ActionSlashSettle, DefaultActionSlashSettle),
+		RunOpts: opts,
+		p:       p, dir: dir, holder: c, msgs: msgs, state: wire.SessionIdle,
+		started: cmp.Or(p.cfg.ActionStepStartTimeout, DefaultActionStepStartTimeout),
+		settle:  cmp.Or(p.cfg.ActionSlashSettle, DefaultActionSlashSettle),
 	}
 	return run, func() {
 		close(done)
@@ -177,59 +162,48 @@ func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func
 	}, nil
 }
 
-// runAdapter is the prompt package's view of an actionRun. 58d moves
-// actionRun into that package, which ends the adapter.
-type runAdapter struct{ r *actionRun }
+func (r *actionRun) State() string                      { return r.state }
+func (r *actionRun) Holder() *nativerunner.HolderClient { return r.holder }
+func (r *actionRun) PersonTyped() bool                  { return r.personTyped }
+func (r *actionRun) ClearPersonTyped()                  { r.personTyped = false }
 
-func (a runAdapter) CatchUp() error                      { return a.r.catchUp() }
-func (a runAdapter) Step(i int, prompt string) error     { return a.r.step(i, prompt) }
-func (a runAdapter) TypeStep(i int, prompt string) error { return a.r.typeStep(i, prompt) }
-func (a runAdapter) State() string                       { return a.r.state }
-func (a runAdapter) Holder() *nativerunner.HolderClient  { return a.r.holder }
-func (a runAdapter) PersonTyped() bool                   { return a.r.personTyped }
-func (a runAdapter) ClearPersonTyped()                   { a.r.personTyped = false }
-func (a runAdapter) TurnRunning() bool                   { return a.r.turnRunning() }
-func (a runAdapter) NextStatus(timer <-chan time.Time) (bool, string, error) {
-	return a.r.nextStatus(timer)
-}
-
-// typeStep types one prompt and presses its Enter, without waiting.
-func (r *actionRun) typeStep(i int, prompt string) error {
-	if !r.s.projects.Typing().ReadyToType(r.s.projects.TypingIO(r.dir, r.holder, "action-step")) {
+// TypeStep types one prompt and presses its Enter, without waiting.
+func (r *actionRun) TypeStep(i int, prompt string) error {
+	if !r.p.projects.Typing().ReadyToType(r.p.projects.TypingIO(r.dir, r.holder, "action-step")) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
-	if err := r.s.prompt.ClearDraft(r.dir, r.holder); err != nil {
+	if err := r.p.ClearDraft(r.dir, r.holder); err != nil {
 		return err
 	}
 	r.convChanged = false
-	before, _ := sessprompt.InputState(r.holder)
-	r.s.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", sessprompt.PromptHead(prompt), "input_before", before)
+	before, _ := InputState(r.holder)
+	r.p.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", PromptHead(prompt), "input_before", before)
 	if err := sessions.TypeSessionPrompt(r.dir, prompt); err != nil {
 		return err
 	}
-	if r.onTyped != nil {
-		r.onTyped()
+	if r.OnTyped != nil {
+		r.OnTyped()
 	}
-	r.s.log.Info("action step typed", "session", filepath.Base(r.dir), "step", i)
+	r.p.log.Info("action step typed", "session", filepath.Base(r.dir), "step", i)
 	return nil
 }
 
-// step types one prompt and waits for it to end.
-func (r *actionRun) step(i int, prompt string) error {
+// Step types one prompt and waits for it to end.
+func (r *actionRun) Step(i int, prompt string) error {
 	begin := time.Now()
-	if err := r.typeStep(i, prompt); err != nil {
+	if err := r.TypeStep(i, prompt); err != nil {
 		return err
 	}
 	signal, err := r.waitForStep(strings.HasPrefix(prompt, "/"))
-	r.s.log.Info("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
+	r.p.log.Info("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
 	if err != nil {
 		return fmt.Errorf("step %d: %w", i, err)
 	}
 	return nil
 }
 
-// catchUp applies the statuses already sent.
-func (r *actionRun) catchUp() error {
+// CatchUp applies the statuses already sent.
+func (r *actionRun) CatchUp() error {
 	for {
 		select {
 		case msg, ok := <-r.msgs:
@@ -259,15 +233,15 @@ func (r *actionRun) waitForStep(slash bool) (string, error) {
 	return r.waitForTurn()
 }
 
-// nextStatus blocks for the next event of a step. It reports expired when the
+// NextStatus blocks for the next event of a step. It reports expired when the
 // timer fires. Otherwise a non-empty signal or an error means the step is over,
 // and neither means a status was applied to r.state. Blocked stops the rest
 // rather than wait on a person who may never come.
-func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal string, err error) {
+func (r *actionRun) NextStatus(timer <-chan time.Time) (expired bool, signal string, err error) {
 	select {
-	case <-r.s.sessions.Watches.Stop:
-		return false, "", errServerStopping
-	case <-r.cancel:
+	case <-r.p.sessions.Watches.Stop:
+		return false, "", ErrServerStopping
+	case <-r.Cancel:
 		return false, signalPersonInput, nil
 	case <-timer:
 		return true, "", nil
@@ -276,7 +250,7 @@ func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal str
 			return false, "", err
 		}
 		if r.state == wire.SessionBlocked {
-			return false, "", errWentBlocked
+			return false, "", ErrWentBlocked
 		}
 		return false, "", nil
 	}
@@ -291,7 +265,7 @@ func (r *actionRun) waitForTurn() (string, error) {
 	timer := time.After(r.started)
 	working := false
 	for {
-		expired, signal, err := r.nextStatus(timer)
+		expired, signal, err := r.NextStatus(timer)
 		if signal != "" || err != nil {
 			return signal, err
 		}
@@ -299,9 +273,9 @@ func (r *actionRun) waitForTurn() (string, error) {
 		case expired && !working:
 			return signalStartTimeout, errors.New("prompt never went working")
 		case expired:
-		case r.turnRunning():
+		case r.TurnRunning():
 			working = true
-		case r.promptable() && working:
+		case r.Promptable() && working:
 			return signalTurn, nil
 		}
 	}
@@ -315,37 +289,37 @@ func (r *actionRun) waitForSlash() (string, error) {
 	timer := time.After(r.settle)
 	working := false
 	for {
-		expired, signal, err := r.nextStatus(timer)
+		expired, signal, err := r.NextStatus(timer)
 		if signal != "" || err != nil {
 			return signal, err
 		}
 		switch {
-		case expired && (working || !r.promptable()):
+		case expired && (working || !r.Promptable()):
 		case expired:
-			pressed, err := r.s.prompt.PressEnterIfStillTyped(r.dir, r.holder)
+			pressed, err := r.p.PressEnterIfStillTyped(r.dir, r.holder)
 			if pressed {
-				r.s.log.Debug("action step settle enter", "session", filepath.Base(r.dir))
+				r.p.log.Debug("action step settle enter", "session", filepath.Base(r.dir))
 			}
 			return signalSettle, err
-		case r.turnRunning():
+		case r.TurnRunning():
 			working = true
-		case r.promptable() && working:
+		case r.Promptable() && working:
 			return signalTurn, nil
-		case r.promptable() && r.convChanged:
+		case r.Promptable() && r.convChanged:
 			return signalNewConv, nil
 		}
 	}
 }
 
-// promptable reports whether the session waits for the person, as
+// Promptable reports whether the session waits for the person, as
 // SessionStatus.Promptable does.
-func (r *actionRun) promptable() bool {
+func (r *actionRun) Promptable() bool {
 	return wire.SessionStatus{State: r.state, Background: r.background}.Promptable()
 }
 
-// turnRunning reports whether a turn is running: Working, but not a finished
+// TurnRunning reports whether a turn is running: Working, but not a finished
 // turn that only left a background task.
-func (r *actionRun) turnRunning() bool {
+func (r *actionRun) TurnRunning() bool {
 	return r.state == wire.SessionWorking && !r.background
 }
 
@@ -359,7 +333,7 @@ func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {
 	if msg.Type == nativerunner.StreamStatus {
 		st := sessions.SessionStatusOf(msg.Status)
 		r.state, r.background = st.State, st.Background
-		log := r.s.log.With("session", filepath.Base(r.dir))
+		log := r.p.log.With("session", filepath.Base(r.dir))
 		if id := msg.ConversationID; id != "" && id != r.convID {
 			// The first id seen is the baseline, not a change.
 			if r.convID != "" {

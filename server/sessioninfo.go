@@ -29,7 +29,7 @@ func (c chatSource) CheckProjectDir(project, dir string) (*wire.SessionResult, e
 	return c.s.sessions.CheckProjectDir(project, dir)
 }
 
-func (c chatSource) DesignFinal(ticket string) bool { return c.s.designFinal(ticket) }
+func (c chatSource) DesignFinal(ticket string) bool { return c.s.prompt.DesignFinal(ticket) }
 func (c chatSource) NoteFailure(id string)          { c.s.noteFailure(id) }
 func (c chatSource) Stopped() <-chan struct{}       { return c.s.sessions.Watches.Stop }
 func (c chatSource) CodexHome() (string, error)     { return c.s.projects.CodexHome() }

@@ -73,19 +73,6 @@ func SocketPath(stateDir string) string { return filepath.Join(stateDir, socketF
 // It is an alias so the many readers and hand-built test values keep the name.
 type Settings = settings.Settings
 
-// Defaults for the session-prompting timings in Config. A zero Config field
-// means the default; PromptGrace defaults to claudeui.DefaultNudgeCaps.
-const (
-	// DefaultActionStepStartTimeout is how long an Action step waits for its
-	// prompt to go Working before the rest of the Action is dropped.
-	DefaultActionStepStartTimeout = 10 * time.Second
-
-	// DefaultActionSlashSettle is how long a slash step stays Idle after
-	// typing before it counts as done: claude runs some commands locally and
-	// never goes Working.
-	DefaultActionSlashSettle = time.Second
-)
-
 // DefaultTCPAddr is where the opt-in TCP listener binds.
 const DefaultTCPAddr = "127.0.0.1:7421"
 
@@ -437,9 +424,10 @@ func New(cfg Config) (*Server, error) {
 			AutoAdvanceDelay: cfg.AutoAdvanceDelay, TurnSettleTimeout: cfg.TurnSettleTimeout,
 			TicketStore: cfg.TicketStore, FirstPromptStartTimeout: cfg.FirstPromptStartTimeout,
 			PromptGrace: cfg.PromptGrace, LaunchProofCaps: cfg.LaunchProofCaps,
+			ActionStepStartTimeout: cfg.ActionStepStartTimeout, ActionSlashSettle: cfg.ActionSlashSettle,
 		},
 		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
-		Projects: s.projects, Host: promptHost{s},
+		Projects: s.projects, BadRounds: s.recovery,
 	})
 	s.sessions = newManager(s)
 	s.designs.GiveSessions(s.sessions)
@@ -506,11 +494,6 @@ var routeTable = []struct {
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},
 	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},
-	// Interactive sessions; /v1/agents/* is the loop agents'.
-	{"POST /v1/sessions/actionable", (*Server).sessionActionableWrite},
-	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessions.SessionWrite(s.runSessionAction)(w, r)
-	}},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

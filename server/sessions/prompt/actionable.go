@@ -1,45 +1,43 @@
-package server
+package prompt
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/elentok/gx/server/queue"
 	"net/http"
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/server/sessions"
-	"github.com/elentok/gx/server/sessions/chat"
-	sessprompt "github.com/elentok/gx/server/sessions/prompt"
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/transcript"
 )
 
-func (s *Server) sessionActionableWrite(w http.ResponseWriter, r *http.Request) {
+func (p *Prompt) actionableWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.MarkActionableRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	res, err := s.markSessionActionable(req)
+	res, err := p.markSessionActionable(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // markSessionActionable saves an agent-raised Actionable, replacing any
 // earlier one.
-func (s *Server) markSessionActionable(req wire.MarkActionableRequest) (wire.SessionResult, error) {
+func (p *Prompt) markSessionActionable(req wire.MarkActionableRequest) (wire.SessionResult, error) {
 	if req.Reason == "" {
 		return sessions.Refusal(wire.ReasonSessionBadRequest, "an actionable needs a reason"), nil
 	}
-	dir, meta, res, err := s.sessions.SessionDir(req.ID)
+	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
@@ -47,14 +45,14 @@ func (s *Server) markSessionActionable(req wire.MarkActionableRequest) (wire.Ses
 		return sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
 	var info wire.SessionInfo
-	if err := s.sessions.UpdateSessionMeta(dir, req.ID, func(m *sessions.Meta) bool {
+	if err := p.sessions.UpdateSessionMeta(dir, req.ID, func(m *sessions.Meta) bool {
 		m.Actionable = wire.SessionActionable{Reason: req.Reason, Action: req.Action}
 		info = m.Info()
 		return true
 	}); err != nil {
 		return wire.SessionResult{}, err
 	}
-	s.triggerBanner(req.ID, sound.Attention, req.Reason)
+	p.sessions.TriggerBanner(req.ID, sound.Attention, req.Reason)
 	return wire.SessionResult{Session: &info}, nil
 }
 
@@ -69,14 +67,14 @@ func designActionable(text, ticket, agent string, final bool) (wire.SessionActio
 	return chat.RunEndNext(text, ticket, agent, final)
 }
 
-// designFinal reports whether the map behind a design ticket is at Branch or
+// DesignFinal reports whether the map behind a design ticket is at Branch or
 // Done, where no step follows. A map that cannot be read is not final.
-func (s *Server) designFinal(ticket string) bool {
+func (p *Prompt) DesignFinal(ticket string) bool {
 	addr := queue.EpicAddress(ticket)
 	project, name, _ := strings.Cut(addr, ":")
-	epics, err := s.projects.Epics(project)
+	epics, err := p.projects.Epics(project)
 	if err != nil {
-		s.log.Warn("design step: read map", "ticket", ticket, "err", err)
+		p.log.Warn("design step: read map", "ticket", ticket, "err", err)
 		return false
 	}
 	for _, e := range epics {
@@ -90,45 +88,45 @@ func (s *Server) designFinal(ticket string) bool {
 
 // lastAssistantText reads the session's last assistant message from its claude
 // transcript, or from its codex rollout.
-func (s *Server) lastAssistantText(id string, meta sessions.Meta) (string, bool) {
+func (p *Prompt) lastAssistantText(id string, meta sessions.Meta) (string, bool) {
 	if meta.Harness == string(harness.Codex) {
-		text, ok, err := s.projects.LastCodexText(meta.ConversationID)
+		text, ok, err := p.projects.LastCodexText(meta.ConversationID)
 		if err != nil {
-			s.log.Warn("design actionable: read codex rollout", "session", id, "err", err)
+			p.log.Warn("design actionable: read codex rollout", "session", id, "err", err)
 		}
 		return text, ok && err == nil
 	}
-	path, ok := s.sessionChat.ClaudeTranscript(id, meta.ChatMeta())
+	path, ok := p.sessionChat.ClaudeTranscript(id, meta.ChatMeta())
 	if !ok {
 		return "", false
 	}
 	text, ok, err := transcript.LastAssistantText(path, transcript.NoTextCap)
 	if err != nil {
-		s.log.Warn("design actionable: read transcript", "session", id, "err", err)
+		p.log.Warn("design actionable: read transcript", "session", id, "err", err)
 	}
 	return text, ok && err == nil
 }
 
-// detectDesignActionable recomputes the Actionable of a Design session from
+// DetectDesignActionable recomputes the Actionable of a Design session from
 // its last assistant message: the newer turn supersedes an agent-raised one
 // and clears a derived one it no longer matches. A GxRaised one is never
 // touched.
-func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
+func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 	meta, err := sessions.ReadMeta(dir)
 	if err != nil {
 		meta = sessions.Meta{}
 	}
 	meta.ConversationID = design.Conversation
-	text, ok := s.lastAssistantText(id, meta)
+	text, ok := p.lastAssistantText(id, meta)
 	if !ok {
 		return
 	}
-	s.recovery.FileBadRoundBlocks(id, design, text)
-	a, matched := designActionable(text, design.Ticket, meta.Harness, s.designFinal(design.Ticket))
+	p.badRounds.FileBadRoundBlocks(id, design, text)
+	a, matched := designActionable(text, design.Ticket, meta.Harness, p.DesignFinal(design.Ticket))
 	outcome := actionableNone
-	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
+	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		var next wire.SessionActionable
-		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: sessprompt.MaxAutoSends})
+		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: MaxAutoSends})
 		if outcome == actionableNone {
 			return false
 		}
@@ -138,15 +136,15 @@ func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
 	switch outcome {
 	case actionableAdvance:
 		// A countdown that starts is silent: the person is told only if it does not send.
-		if s.prompt.StartAutoAdvance(id) {
-			s.events.Publish(wire.EventSessionChanged, id)
+		if p.StartAutoAdvance(id) {
+			p.events.Publish(wire.EventSessionChanged, id)
 			return
 		}
-		s.triggerBanner(id, sound.Attention, a.Reason)
+		p.sessions.TriggerBanner(id, sound.Attention, a.Reason)
 	case actionableCapped:
-		s.triggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", sessprompt.MaxAutoSends, a.Reason))
+		p.sessions.TriggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", MaxAutoSends, a.Reason))
 	case actionableRaised:
-		s.triggerBanner(id, sound.Attention, a.Reason)
+		p.sessions.TriggerBanner(id, sound.Attention, a.Reason)
 	}
 }
 
@@ -173,7 +171,7 @@ type actionablePolicy struct {
 	MaxAutoSends int
 }
 
-// decideActionable is the pure decision behind detectDesignActionable: the
+// decideActionable is the pure decision behind DetectDesignActionable: the
 // Actionable cur's meta should hold after a turn that matched a (or did not),
 // and what to do about it. A GxRaised one, or a session not waiting for the
 // person, is never touched.
@@ -201,12 +199,12 @@ func decideActionable(cur sessions.Meta, a wire.SessionActionable, matched bool,
 	return a, actionableAdvance
 }
 
-// raiseGxActionable saves an Actionable gx raises itself, replacing any
+// RaiseGxActionable saves an Actionable gx raises itself, replacing any
 // earlier one. The person's input does not clear it.
-func (s *Server) raiseGxActionable(dir, reason string, action []string) {
+func (p *Prompt) RaiseGxActionable(dir, reason string, action []string) {
 	id := filepath.Base(dir)
 	raised := false
-	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
+	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		if m.Status.State == wire.SessionExited {
 			return false
 		}
@@ -215,6 +213,6 @@ func (s *Server) raiseGxActionable(dir, reason string, action []string) {
 		return true
 	})
 	if raised {
-		s.triggerBanner(id, sound.Attention, reason)
+		p.sessions.TriggerBanner(id, sound.Attention, reason)
 	}
 }

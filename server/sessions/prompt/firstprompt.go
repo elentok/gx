@@ -17,7 +17,6 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server/sessions"
-	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/transcript"
 )
@@ -69,17 +68,6 @@ func (p *Prompt) NewFirstPrompt(dir, id string, run int) sessions.FirstPrompt {
 	return f
 }
 
-// DetectDesignActionable is sessions.Prompter's recompute of a Design
-// session's Actionable.
-func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
-	p.host.DetectDesignActionable(dir, id, design)
-}
-
-// SendAction is sessions.Prompter's send of an Action's prompts.
-func (p *Prompt) SendAction(dir, label string, action []string) {
-	p.host.RunActionSteps(dir, label, action)
-}
-
 // Stop ends the Starting clock when the watch ends.
 func (f *firstPrompt) Stop() { f.clock.Stop() }
 
@@ -104,7 +92,7 @@ func (f *firstPrompt) startTimedOut() {
 // Action.
 func (f *firstPrompt) raise(prompt, reason string) {
 	f.log.Warn("first prompt failed", "reason", reason)
-	f.p.host.RaiseGxActionable(f.dir, reason, []string{prompt})
+	f.p.RaiseGxActionable(f.dir, reason, []string{prompt})
 }
 
 // failed raises the Actionable for a nudge that gave up. Where the input is
@@ -215,7 +203,7 @@ func (f *firstPrompt) Start(signal, prompt string) {
 			f.log.Debug(errNudgeCancelled.Error())
 		case errors.Is(err, ErrDraft):
 			f.log.Info("draft would not clear")
-			f.p.host.RaiseGxActionable(f.dir, DraftReason, []string{prompt})
+			f.p.RaiseGxActionable(f.dir, DraftReason, []string{prompt})
 		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
 			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked),
 			errors.Is(err, agentrunner.ErrNotDelivered):
@@ -268,7 +256,7 @@ var errSessionBlocked = errors.New("session is blocked")
 // session is still Starting, so only Blocked refuses. A step that fails after
 // typing (blocked, ended) is only logged: the prompt was delivered.
 func (f *firstPrompt) deliverSlash(prompt string) error {
-	run, closeRun, err := f.p.host.OpenActionRun(f.dir, RunOpts{OnTyped: f.markTyped, Cancel: f.cancel})
+	run, closeRun, err := f.p.OpenActionRun(f.dir, RunOpts{OnTyped: f.markTyped, Cancel: f.cancel})
 	if err != nil {
 		return err
 	}

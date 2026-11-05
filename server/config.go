@@ -173,13 +173,13 @@ type Config struct {
 	LogLevel slog.Level
 
 	// ActionStepStartTimeout bounds how long an Action step waits for its
-	// prompt to go Working; zero means DefaultActionStepStartTimeout.
+	// prompt to go Working; zero means prompt.DefaultActionStepStartTimeout.
 	ActionStepStartTimeout time.Duration
 	// SessionExitCleanupDelay is how long the design cleanup of a session exit
 	// waits before it checks, so a test can make one run late.
 	SessionExitCleanupDelay time.Duration
 	// ActionSlashSettle is how long a slash step must stay Idle after typing
-	// to count as done; zero means DefaultActionSlashSettle.
+	// to count as done; zero means prompt.DefaultActionSlashSettle.
 	ActionSlashSettle time.Duration
 	// FirstPromptStartTimeout bounds the Starting time, counted from launch,
 	// before a pending first prompt is handed to a person; zero means

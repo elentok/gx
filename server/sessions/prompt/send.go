@@ -34,7 +34,7 @@ func (p *Prompt) sendPrompt(dir, text string) {
 		log.Info("send stopped", "err", err)
 	default:
 		log.Warn("send failed", "err", err)
-		p.host.RaiseGxActionable(dir, fmt.Sprintf("%s%v", sendFailedPrefix, err), []string{text})
+		p.RaiseGxActionable(dir, fmt.Sprintf("%s%v", sendFailedPrefix, err), []string{text})
 	}
 }
 
@@ -65,7 +65,7 @@ func isSingleSendCommand(text string) bool {
 // start no turn, so a nudge would run them twice. A swallowed Enter leaves the
 // text in the input box.
 func (p *Prompt) typeCommandOnce(dir, text string) error {
-	run, closeRun, err := p.host.OpenActionRun(dir, RunOpts{})
+	run, closeRun, err := p.OpenActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (p *Prompt) typeCommandOnce(dir, text string) error {
 }
 
 func (p *Prompt) nudgePrompt(dir, text string) error {
-	run, closeRun, err := p.host.OpenActionRun(dir, RunOpts{})
+	run, closeRun, err := p.OpenActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
 	}

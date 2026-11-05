@@ -36,6 +36,8 @@ var (
 	startWebDesign         = servertest.StartWebDesign
 	webSessionWrite        = servertest.WebSessionWrite
 	sessionToken           = servertest.SessionToken
+	startFakeSession       = servertest.StartFakeSession
+	idleWithAction         = servertest.IdleWithAction
 	startFakeSessionWith   = servertest.StartFakeSessionWith
 	startGrillingSessionIn = servertest.StartGrillingSessionIn
 	submitted              = servertest.Submitted

@@ -10,7 +10,8 @@ import (
 )
 
 // Routes lists the prompt and key sends, the auto-advance switch and its
-// cancel. All are web writes; the web variants need the state token of the
+// cancel, and the actionable and run-action writes, which the web mux does not
+// serve. The first four are web writes; the web variants need the state token of the
 // session the page saw. The getter is called per request, so a route can be
 // listed before its Prompt is built.
 func Routes(get func() *Prompt) []wire.Route {
@@ -42,6 +43,16 @@ func Routes(get func() *Prompt) []wire.Route {
 			WebHandler: func(w http.ResponseWriter, r *http.Request) {
 				p := get()
 				p.sessions.SessionWriteDesignWeb(p.cancelAutoAdvanceRoute)(w, r)
+			},
+		},
+		{
+			Pattern: "POST /v1/sessions/actionable",
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().actionableWrite(w, r) },
+		},
+		{
+			Pattern: "POST /v1/sessions/run-action",
+			Handler: func(w http.ResponseWriter, r *http.Request) {
+				sessions.SessionWrite(get().RunSessionAction)(w, r)
 			},
 		},
 	}

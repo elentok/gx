@@ -3,9 +3,6 @@ package server
 import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
-	"github.com/elentok/gx/server/sessions/chat"
-	sessprompt "github.com/elentok/gx/server/sessions/prompt"
-	"github.com/elentok/gx/server/wire"
 )
 
 // newManager copies the fields it needs from s at call time, so s must have
@@ -43,31 +40,4 @@ func (s *Server) FindTicket(address string) (queue.TicketRef, bool, error) {
 // newResumer needs s.sessions set.
 func newResumer(s *Server) *sessions.Resumer {
 	return sessions.NewResumer(s.sessions, s)
-}
-
-// promptHost is the root's sessprompt.Host.
-type promptHost struct{ s *Server }
-
-func (h promptHost) SendAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
-	return h.s.sendSessionAction(req, auto)
-}
-
-func (h promptHost) DetectDesignActionable(dir, id string, design chat.DesignRef) {
-	h.s.detectDesignActionable(dir, id, design)
-}
-
-func (h promptHost) RunActionSteps(dir, label string, action []string) {
-	h.s.sendAction(dir, label, action)
-}
-
-func (h promptHost) RaiseGxActionable(dir, reason string, action []string) {
-	h.s.raiseGxActionable(dir, reason, action)
-}
-
-func (h promptHost) OpenActionRun(dir string, opts sessprompt.RunOpts) (sessprompt.ActionRun, func(), error) {
-	run, closeRun, err := h.s.openActionRun(dir, actionRunOpts{onTyped: opts.OnTyped, cancel: opts.Cancel})
-	if err != nil {
-		return nil, nil, err
-	}
-	return runAdapter{run}, closeRun, nil
 }

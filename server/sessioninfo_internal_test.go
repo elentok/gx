@@ -6,12 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/sessions/chat"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
@@ -38,55 +36,6 @@ func TestDesignContinueAction_UsesAgentfakeDesignPromptPrefix(t *testing.T) {
 	action := chat.DesignContinueAction("gx:epic/03", "claude")
 	if len(action) != 2 || !strings.HasPrefix(action[1], agentfake.DesignPromptPrefix) {
 		t.Errorf("action = %q, want second entry to start with %q", action, agentfake.DesignPromptPrefix)
-	}
-}
-
-// A Codex session's run-end line is read from its rollout and raises a
-// Continue that resets with /new.
-func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
-	t.Parallel()
-	home := t.TempDir()
-	path := filepath.Join(home, "sessions", "2026", "10", "25", "rollout-2026-10-25T10-00-00-conv.jsonl")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	line := `{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"text":` + strconv.Quote(agentfake.DesignRunEnd) + `}]}}` + "\n"
-	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
-	meta := sessions.Meta{Harness: "codex", ConversationID: "conv"}
-
-	text, ok := s.lastAssistantText("s1", meta)
-	if !ok {
-		t.Fatal("lastAssistantText found no codex rollout")
-	}
-	a, matched := designActionable(text, "gx:epic/03", meta.Harness, false)
-	if !matched || len(a.Action) != 2 || a.Action[0] != "/new" {
-		t.Errorf("actionable = %+v, matched %v, want a Continue starting with /new", a, matched)
-	}
-}
-
-// A Codex turn with several agent messages keeps a round raised in an earlier one.
-func TestLastAssistantText_CodexTurnKeepsARoundFromAnEarlierMessage(t *testing.T) {
-	t.Parallel()
-	home := t.TempDir()
-	path := filepath.Join(home, "sessions", "2026", "10", "25", "rollout-2026-10-25T10-00-00-conv.jsonl")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	msg := func(role, text string) string {
-		return `{"type":"response_item","payload":{"type":"message","role":"` + role + `","content":[{"text":` + strconv.Quote(text) + `}]}}` + "\n"
-	}
-	rollout := msg("assistant", "old turn") + msg("user", "go") + msg("assistant", "❓ **Q1** - **Alpha**: one two") + msg("assistant", "Waiting for you.")
-	if err := os.WriteFile(path, []byte(rollout), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	s := withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
-
-	text, ok := s.lastAssistantText("s1", sessions.Meta{Harness: "codex", ConversationID: "conv"})
-	if !ok || !grillround.HasMarker(text) || strings.Contains(text, "old turn") {
-		t.Errorf("text = %q, ok %v; want the last turn's round", text, ok)
 	}
 }
 

@@ -105,7 +105,7 @@ var allowed = map[string]int{
 	"server/server_notify_test.go":                         1,
 	"server/server_test.go":                                1,
 	"server/sessionchatwatch_test.go":                      2,
-	"server/sessions_action_test.go":                       7,
+	"server/sessions/prompt/action_test.go":                7,
 	"server/sessions/prompt/autoadvance_countdown_test.go": 6,
 	"server/sessions/prompt/autoadvance_guard_test.go":     2,
 	"server/sessions/prompt/keys_test.go":                  2, // negative waits: no nudge follows a person's key; a guarded key keeps the countdown

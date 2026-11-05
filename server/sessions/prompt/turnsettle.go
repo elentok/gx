@@ -64,7 +64,7 @@ wait:
 		return
 	}
 	if design.Conversation != "" {
-		p.host.DetectDesignActionable(dir, id, design)
+		p.DetectDesignActionable(dir, id, design)
 	}
 	p.events.Publish(wire.EventSessionChatChanged, id)
 }
