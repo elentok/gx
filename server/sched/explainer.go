@@ -1,7 +1,4 @@
-// Package explain says why a stored ticket is or is not claimable: the
-// scheduler's own verdict, then the server's queue, slot and hold state. It
-// also builds the pending rows, the claim holds and the check-lock label.
-package explain
+package sched
 
 import (
 	"encoding/json"
@@ -16,47 +13,40 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
-// Host is the scheduling policy the root server owns: the claim pass reads the
-// same numbers, so a rule changed there explains the wait here.
-type Host interface {
-	PerRootLimit(root queue.RootRef) int
-	ProjectAtCap(project string) (running, limit int, atCap bool)
-	ConcurrencyLimit() int
-	// NextUntracked is the first frontier ticket of e with no registry entry.
-	NextUntracked(project string, e tickets.Epic) (tickets.Ticket, bool)
+// ExplainerDeps are the parts the explanation reads. Scheduler is the claim
+// pass itself: it reads the same numbers, so a rule changed there explains the
+// wait here.
+type ExplainerDeps struct {
+	Scheduler *Scheduler
+	StateDir  string
+	Settings  *settings.Holder
+	Registry  *runs.Registry
+	Guards    *runs.Guards
+	Projects  *projects.Registry
+	Harness   *harnesschoice.Harness
+	Herdr     *HerdrWatch
+	Limits    *limits.Limits
+	Rec       *merge.Reconciler
+	Disks     *disk.Disk
+	Queue     *queue.Queue
+	Events    *broker.Broker
 }
 
-// Deps are the server's parts the explanation reads.
-type Deps struct {
-	Host     Host
-	StateDir string
-	Settings *settings.Holder
-	Registry *runs.Registry
-	Guards   *runs.Guards
-	Projects *projects.Registry
-	Harness  *harnesschoice.Harness
-	Herdr    *sched.HerdrWatch
-	Limits   *limits.Limits
-	Rec      *merge.Reconciler
-	Disks    *disk.Disk
-	Queue    *queue.Queue
-	Events   *broker.Broker
-}
-
-// Explainer answers the explain questions.
+// Explainer says why a stored ticket is or is not claimable: the scheduler's
+// own verdict, then the server's queue, slot and hold state. It also builds
+// the pending rows, the claim holds and the check-lock label.
 type Explainer struct {
-	Deps
+	ExplainerDeps
 	verdicts verdictLog
 }
 
-// New builds an Explainer over d.
-func New(d Deps) *Explainer { return &Explainer{Deps: d} }
+// NewExplainer builds an Explainer over d.
+func NewExplainer(d ExplainerDeps) *Explainer { return &Explainer{ExplainerDeps: d} }
 
 // verdictLog remembers the verdict word last seen per queued ticket, to tell
 // when one changed.

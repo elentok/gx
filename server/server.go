@@ -36,7 +36,6 @@ import (
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
-	"github.com/elentok/gx/server/explain"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
@@ -140,7 +139,7 @@ type Server struct {
 	reclaimer *sched.Reclaimer
 	launcher  *sched.Launcher
 	guards    *runs.Guards
-	explain   *explain.Explainer
+	explain   *sched.Explainer
 	// sessions creates, stops and watches the sessions; resumer brings them back.
 	sessions *sessions.Manager
 	resumer  *sessions.Resumer
@@ -454,15 +453,17 @@ func New(cfg Config) (*Server, error) {
 	s.web.Bind()
 	// A down herdr never stops the server; it is reported and retried.
 	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
-	s.explain = newExplainer(s)
 	// The scheduler and the launcher call each other, so the launcher is set after both exist.
 	s.scheduler = sched.NewScheduler(sched.SchedulerDeps{
 		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
 		Index: s.idx, Writer: s.writer, Settings: &s.settings, Migrator: s.migrator, Queue: s.queue,
 		Budget: s.budget, Disks: s.disks, Rec: s.rec, Merger: s.merger, Guards: s.guards,
-		Harness: s.harness, Herdr: s.herdr, Explain: claimExplainer{s.explain},
+		Harness: s.harness, Herdr: s.herdr,
 		Env: s.cfg.Env, PollInterval: s.cfg.PollInterval, TicketStore: s.cfg.TicketStore,
 	})
+	// The explanation reads the scheduler's caps and the claim pass asks it for holds.
+	s.explain = newExplainer(s)
+	s.scheduler.Explain = s.explain
 	s.launcher = sched.NewLauncher(sched.LauncherDeps{
 		Log: s.log, Host: s.scheduler, Projects: s.projects, Recovery: s.recovery, Sessions: s.sessions,
 		Settings: &s.settings, Registry: s.registry, Guards: s.guards, Events: s.events, Index: s.idx,
@@ -493,7 +494,6 @@ var routeTable = []struct {
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/restart/check", restartCheckRoute},
 	{"POST /v1/restart", restartWriteRoute},
-	{"GET /v1/tickets/explain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.explain.Handle(w, r) }},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

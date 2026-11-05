@@ -1,4 +1,4 @@
-package explain
+package sched
 
 import (
 	"cmp"
@@ -107,14 +107,14 @@ func (x *Explainer) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr ticke
 	}
 	// Every full cap is named, not just the first one hit.
 	var full []string
-	rootCap := x.Host.PerRootLimit(queue.RootOf(addr))
+	rootCap := x.Scheduler.PerRootLimit(queue.RootOf(addr))
 	if n, limit := x.Registry.CountRoot(root), rootCap; n >= limit {
 		full = append(full, fmt.Sprintf("epic cap %d/%d", n, limit))
 	}
-	if n, limit, atCap := x.Host.ProjectAtCap(addr.Project); atCap {
+	if n, limit, atCap := x.Scheduler.ProjectAtCap(addr.Project); atCap {
 		full = append(full, fmt.Sprintf("project cap %d/%d", n, limit))
 	}
-	limit, running := x.Host.ConcurrencyLimit(), x.Registry.Count()
+	limit, running := x.Scheduler.ConcurrencyLimit(), x.Registry.Count()
 	free := limit - running
 	if free <= 0 {
 		full = append(full, fmt.Sprintf("global cap %d/%d", running, limit))

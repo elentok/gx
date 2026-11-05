@@ -1,10 +1,9 @@
-package explain
+package sched
 
 import (
 	"time"
 
 	harnesschoice "github.com/elentok/gx/server/harness"
-	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -32,7 +31,7 @@ func (x *Explainer) ClaimHold(project string, t tickets.Ticket, rh harnesschoice
 	if limited, held := x.Registry.RateLimitHeld(string(agent)); held {
 		return Hold{Verdict: RateLimitVerdict(limited.RateLimitReset)}, true
 	}
-	if sched.AnsweredSession(t) == "" {
+	if AnsweredSession(t) == "" {
 		if v, held := x.Limits.UsageGate(agent, time.Now()); held {
 			return Hold{Verdict: v}, true
 		}

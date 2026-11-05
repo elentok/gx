@@ -227,7 +227,7 @@ func (s *Scheduler) claimRoot(item wire.QueueItem) (bool, error) {
 		}
 		s.Guards.Refused.Set(ticketAddr, false)
 		resolved := s.Harness.ResolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t)
-		if s.Explain.ClaimHeld(addr.Project, t, resolved.ResolvedHarness) {
+		if _, held := s.Explain.ClaimHold(addr.Project, t, resolved.ResolvedHarness); held {
 			return false, nil
 		}
 		return s.Launcher.ClaimAndLaunch(root, addr, t, repo, resolved.Harness, loaded)

@@ -18,15 +18,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// ClaimExplainer is what the claim pass asks the explanation for: whether a
-// rule holds a ticket back, and a flush of the changes the pass caused.
-type ClaimExplainer interface {
-	// ClaimHeld reports whether a claim hold names the ticket.
-	ClaimHeld(project string, t tickets.Ticket, rh harnesschoice.ResolvedHarness) bool
-	// PublishChanges streams the explanation changes since the last pass.
-	PublishChanges()
-}
-
 // SchedulerDeps is what a Scheduler is built from.
 type SchedulerDeps struct {
 	Log      *slog.Logger
@@ -45,7 +36,7 @@ type SchedulerDeps struct {
 	Guards   *runs.Guards
 	Harness  *harnesschoice.Harness
 	Herdr    *HerdrWatch
-	Explain  ClaimExplainer
+	Explain  *Explainer
 	// Launcher is set once the launcher exists: it calls back into the
 	// scheduler for the base rules.
 	Launcher *Launcher

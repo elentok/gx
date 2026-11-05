@@ -1,4 +1,4 @@
-package explain
+package sched
 
 import (
 	"github.com/elentok/gx/check"

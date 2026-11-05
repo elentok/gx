@@ -1,4 +1,4 @@
-package explain
+package sched
 
 import (
 	"path/filepath"
@@ -98,7 +98,7 @@ func (x *Explainer) NextQueuedTicket(epic tickets.Address, epicsOf func(project 
 	}
 	for _, e := range epics {
 		if filepath.Base(e.Path) == epic.Epic {
-			return x.Host.NextUntracked(epic.Project, e)
+			return x.Scheduler.NextUntracked(epic.Project, e)
 		}
 	}
 	return tickets.Ticket{}, false

@@ -29,6 +29,7 @@ var (
 	newSlackHook            = servertest.NewSlackHook
 	pauseBlocked            = servertest.PauseBlocked
 	startBlockable          = servertest.StartBlockable
+	startTicketWrites       = servertest.StartTicketWrites
 	waitForChat             = servertest.WaitForChat
 	leaveIteration          = servertest.LeaveIteration
 	markWaiting             = servertest.MarkWaiting

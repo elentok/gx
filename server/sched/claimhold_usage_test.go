@@ -1,4 +1,4 @@
-package explain_test
+package sched_test
 
 import (
 	"encoding/json"
@@ -11,9 +11,9 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/server/explain"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/tickets"
 )
@@ -30,7 +30,7 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	// Its own claude: the host may have none, as on CI.
 	lookPath := func(file string) (string, error) { return "/fake/bin/" + file, nil }
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.LookPath = lookPath })
-	x := explain.New(explain.Deps{Harness: h.Server.Harness(), Limits: h.Server.Limits(), Registry: h.Server.Registry()})
+	x := sched.NewExplainer(sched.ExplainerDeps{Harness: h.Server.Harness(), Limits: h.Server.Limits(), Registry: h.Server.Registry()})
 
 	now := time.Now()
 	dir := filepath.Join(nativerunner.AgentsRoot(h.StateDir, "proj"), "a")
@@ -59,7 +59,7 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	h.Server.Registry().Put(runs.TrackedRun{Run: runs.Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}})
 	h.Server.Registry().MarkRateLimit("proj:e/01", true, reset)
 	hold, held = x.ClaimHold("proj", tickets.Ticket{}, rh)
-	if !held || hold.Verdict != explain.RateLimitVerdict(reset) {
+	if !held || hold.Verdict != sched.RateLimitVerdict(reset) {
 		t.Errorf("hold and gate = %+v, %v; want the hold's verdict", hold, held)
 	}
 }

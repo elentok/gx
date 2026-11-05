@@ -1,4 +1,4 @@
-package explain_test
+package sched_test
 
 import (
 	"context"

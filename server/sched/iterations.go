@@ -16,13 +16,14 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// Routes lists the live iterations and the queue's scheduling decisions. The
-// getter is called per request, so a route can be listed before its Scheduler
-// is built.
-func Routes(get func() *Scheduler) []wire.Route {
+// Routes lists the live iterations, the queue's scheduling decisions and the
+// ticket explanation. The getters are called per request, so a route can be
+// listed before its Scheduler is built.
+func Routes(get func() *Scheduler, explainer func() *Explainer) []wire.Route {
 	return []wire.Route{
 		{Pattern: "GET /v1/iterations", Handler: func(w http.ResponseWriter, r *http.Request) { get().iterations(w, r) }},
 		{Pattern: "GET /v1/queue", Handler: func(w http.ResponseWriter, r *http.Request) { get().queueView(w, r) }},
+		{Pattern: "GET /v1/tickets/explain", Handler: func(w http.ResponseWriter, r *http.Request) { explainer().Handle(w, r) }},
 	}
 }
 
