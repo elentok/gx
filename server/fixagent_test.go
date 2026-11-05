@@ -16,8 +16,6 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const repairToken = servertest.RepairToken
-
 // startFixAgent seeds epic "loop" in project proj with ticket 01 paused for repair.
 func startFixAgent(t *testing.T, seed func(store string)) designsFixture {
 	t.Helper()

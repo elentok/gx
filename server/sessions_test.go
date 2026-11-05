@@ -3,7 +3,6 @@ package server_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -543,20 +542,6 @@ func title(t *testing.T, conv, title string) {
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionTitle, Title: title}); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func screenHas(t *testing.T, c *nativerunner.HolderClient, text string) bool {
-	t.Helper()
-	rows, _, err := c.Screen(0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return strings.Contains(strings.Join(rows, "\n"), text)
-}
-
-func waitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
-	t.Helper()
-	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("the screen to show %q", text), func() bool { return screenHas(t, c, text) })
 }
 
 // killHolder SIGKILLs the session's holder, leaving its child, and returns

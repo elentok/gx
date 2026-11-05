@@ -111,6 +111,26 @@ func (f *SchedFixture) Git(t *testing.T, args ...string) string {
 	return string(out)
 }
 
+// GitOut runs git in dir and returns its trimmed output.
+func GitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// Reload reloads the server's config and returns the result.
+func Reload(t *testing.T, h *Harness) wire.ReloadResult {
+	t.Helper()
+	res, err := h.Client.ReloadConfig(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
 // AssertMerged checks each ticket is done, its commit is on the feature branch
 // and no iteration branch is left behind.
 func (f *SchedFixture) AssertMerged(t *testing.T, ids ...string) {

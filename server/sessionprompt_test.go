@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -34,27 +33,13 @@ func startPromptSession(t *testing.T) promptFixture {
 // typed prompt's turn to start, for a test that must act inside it.
 func startPromptSessionWithGrace(t *testing.T, grace time.Duration) promptFixture {
 	t.Helper()
-	cfg := t.TempDir()
-	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = grace }, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
-	if err != nil || res.Session == nil {
-		t.Fatalf("create = %+v, %v", res, err)
-	}
-	id := res.Session.ID
-	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
-	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
-	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	return promptFixture{designsFixture: f, id: id, conv: conv, transcript: filepath.Join(cfg, "projects", "-repo", conv+".jsonl")}
+	p := servertest.StartPromptSession(t, grace)
+	return promptFixture{designsFixture: fromShared(p.DesignsFixture), id: p.ID, conv: p.Conv, transcript: p.Transcript}
 }
 
 func (f promptFixture) prompt(t *testing.T, text string) wire.SessionResult {
 	t.Helper()
-	res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Text: text})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
+	return servertest.PromptFixture{DesignsFixture: f.shared(), ID: f.id, Conv: f.conv, Transcript: f.transcript}.Prompt(t, text)
 }
 
 func TestSessionPrompt_TypesMultiLineTextAsOnePrompt(t *testing.T) {

@@ -32,19 +32,16 @@ type designsFixture struct {
 // in project proj, whose repo is the trunk checkout, with the web mux up.
 func startDesigns(t *testing.T, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
-	store := t.TempDir()
-	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
-	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
-	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return startDesignsIn(t, store, opts...)
+	return fromShared(servertest.StartDesigns(t, opts...))
 }
 
 // startDesignsIn is startDesigns on a store the caller has already seeded.
 func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
-	d := servertest.StartDesignsIn(t, store, opts...)
+	return fromShared(servertest.StartDesignsIn(t, store, opts...))
+}
+
+func fromShared(d servertest.DesignsFixture) designsFixture {
 	return designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck}
 }
 

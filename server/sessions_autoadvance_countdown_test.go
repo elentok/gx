@@ -14,19 +14,10 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const (
-	runEndText     = "Done.\n✅ Map: drafted. Next: start a fresh session"
-	countdownDelay = time.Second
-)
+const countdownDelay = time.Second
 
-// endTurn runs a working-then-idle turn on the session.
-func endTurn(t *testing.T, f *grillingFixture) {
-	t.Helper()
-	report(t, f.conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
-	report(t, f.conv, agentfake.Control{State: "idle"})
-}
-
+// grillingFixture is the root view of servertest.GrillingFixture, with the
+// lowercase fields its many callers use.
 type grillingFixture struct {
 	h    *servertest.Harness
 	ctx  context.Context
@@ -34,6 +25,11 @@ type grillingFixture struct {
 	id   string
 	conv string
 	path string
+}
+
+func endTurn(t *testing.T, f *grillingFixture) {
+	t.Helper()
+	servertest.EndTurn(t, &servertest.GrillingFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, ID: f.id, Conv: f.conv, Path: f.path})
 }
 
 func startAdvancing(t *testing.T, store string) *grillingFixture {

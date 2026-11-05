@@ -41,7 +41,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	started := chat.waitStarted(t) // so the pause message never shares a post with it
+	started := chat.WaitStarted(t) // so the pause message never shares a post with it
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:epic-a/01")
 
-	if posts := chat.postsSince(started); len(posts) != 1 || !strings.Contains(posts[0], "Herdr rejected Codex integration") {
+	if posts := chat.PostsSince(started); len(posts) != 1 || !strings.Contains(posts[0], "Herdr rejected Codex integration") {
 		t.Errorf("chat sends = %v, want exactly 1 carrying the launch error", posts)
 	}
 	if got := len(fake.ResumeIDs(label)); got != 1 {

@@ -97,8 +97,6 @@ func TestSessionChatChanged_IdleSessionPublishesNothing(t *testing.T) {
 	}
 }
 
-const turnDurationLine = `{"type":"system","subtype":"turn_duration","durationMs":100}`
-
 // Claude reports idle before it writes the turn's last lines, so the final
 // message lands after the poll stopped.
 func TestSessionChatChanged_TurnWrittenAfterIdlePublishes(t *testing.T) {

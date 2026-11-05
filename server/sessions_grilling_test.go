@@ -6,15 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -25,73 +21,6 @@ import (
 func startGrillingSession(t *testing.T, ticket string) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
 	t.Helper()
 	return startGrillingSessionIn(t, ticket, t.TempDir())
-}
-
-// startGrillingSessionIn is startGrillingSession on a store the caller has
-// already seeded.
-func startGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
-	t.Helper()
-	cfg := t.TempDir()
-	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
-	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
-	// A caller may seed the map with a design_step first.
-	if mapFile := filepath.Join(store, "proj", "map", "ticket.md"); !strings.Contains(string(mustRead(mapFile)), "kind: map") {
-		if err := os.WriteFile(mapFile, []byte("---\nkind: map\n---\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), withAlerts(true, true), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}, opts...)
-	h := servertest.StartWithStore(t, store, opts...)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	t.Cleanup(cancel)
-	evs, err := h.Client.Events(ctx, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	res, err := h.Client.CreateSession(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
-	if err != nil || res.Session == nil {
-		t.Fatalf("create = %+v, %v", res, err)
-	}
-	id := res.Session.ID
-	conv, _ := readMeta(t, h, id)["conversation_id"].(string)
-	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl")
-}
-
-// mustRead is a file's content, or nil when it does not exist yet.
-func mustRead(path string) []byte {
-	b, _ := os.ReadFile(path)
-	return b
-}
-
-// storeWithMapStep is a ticket store whose map epic is a map at step.
-func storeWithMapStep(t *testing.T, step string) string {
-	t.Helper()
-	store := t.TempDir()
-	dir := filepath.Join(store, "proj", "map")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte("---\nkind: map\ndesign_step: "+step+"\n---\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return store
-}
-
-func writeAssistantMessage(t *testing.T, path, text string) {
-	t.Helper()
-	line, err := json.Marshal(map[string]any{
-		"type":    "assistant",
-		"message": map[string]any{"content": []map[string]any{{"type": "text", "text": text}}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, append(line, '\n'), 0o644); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestGrilling_DetectedOnIdleForDesignSessions(t *testing.T) {
@@ -260,23 +189,5 @@ func TestSessionChat_StepChangeAloneRefreshesNext(t *testing.T) {
 		return got.Next != nil && len(got.Next.Action.Action) == 0
 	}) {
 		t.Fatalf("next = %+v after the map moved to branch, want no action", got.Next)
-	}
-}
-
-func clearByInput(t *testing.T, h *servertest.Harness, id string) {
-	t.Helper()
-	c, err := nativerunner.DialHolder(filepath.Join(h.SessionsDir, id))
-	if err != nil {
-		t.Fatal(err)
-	}
-	att, err := c.Attach()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Closing right after the send can drop the key before the holder reads it, so the
-	// attachment lives until the test ends.
-	t.Cleanup(func() { att.Close() })
-	if err := att.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
-		t.Fatal(err)
 	}
 }

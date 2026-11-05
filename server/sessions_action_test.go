@@ -17,18 +17,6 @@ import (
 // which samples on a ticker, to see it.
 const actionWatchSettle = 200 * time.Millisecond
 
-// idleWithAction brings the session Idle and raises an Actionable carrying
-// action.
-func idleWithAction(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, conv string, action ...string) {
-	t.Helper()
-	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	res, err := h.Client.MarkSessionActionable(ctx, wire.MarkActionableRequest{ID: id, Reason: "ready", Action: action})
-	if err != nil || res.Refused {
-		t.Fatalf("mark actionable = %+v, %v", res, err)
-	}
-}
-
 func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)

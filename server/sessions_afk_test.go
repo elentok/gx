@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/server/wire"
 
@@ -26,22 +25,13 @@ func startAFKSession(t *testing.T, afk bool) (*servertest.Harness, *slackHook, i
 	h, ctx, evs, id, conv := startBannerSession(t, func(c *server.Config) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: testFlushInterval}
 	})
-	started := chat.waitStarted(t)
+	started := chat.WaitStarted(t)
 	if _, err := h.Client.SetAFK(ctx, &afk); err != nil {
 		t.Fatal(err)
 	}
 	return h, chat, started, gate, id, func(c agentfake.Control, state string) {
 		reach(ctx, t, h, evs, id, conv, c, state)
 	}
-}
-
-// postsAfterAlert waits for the banner and a chat flush, then returns the posts after from.
-func (h *slackHook) postsAfterAlert(hs *servertest.Harness, from int) []string {
-	waitAlerts(hs, 1)
-	time.Sleep(5 * testFlushInterval) // negative wait: no event marks the chat flush, so give it a few intervals
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return append([]string(nil), h.posts[from:]...)
 }
 
 func TestSessionAFK_DoneSendsBannerTextToChatEvenOnScreen(t *testing.T) {
@@ -52,7 +42,7 @@ func TestSessionAFK_DoneSendsBannerTextToChatEvenOnScreen(t *testing.T) {
 	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Focused: true, Session: id})
 
 	step(agentfake.Control{State: "done"}, wire.SessionIdle)
-	posts := chat.postsSince(started)
+	posts := chat.PostsSince(started)
 	if len(posts) != 1 || !strings.Contains(posts[0], "proj · fix-build") || !strings.Contains(posts[0], "Done") {
 		t.Errorf("chat posts = %q, want one with the banner text", posts)
 	}
@@ -65,7 +55,7 @@ func TestSessionAFK_OffSendsNoChat(t *testing.T) {
 	t.Parallel()
 	h, chat, started, _, _, step := startAFKSession(t, false)
 	step(agentfake.Control{State: "done"}, wire.SessionIdle)
-	if posts := chat.postsAfterAlert(h, started); len(posts) != 0 {
+	if posts := chat.PostsAfterAlert(h, started); len(posts) != 0 {
 		t.Errorf("chat posts = %q, want none", posts)
 	}
 	if banners := h.Banners.Sent(); len(banners) != 1 {
@@ -81,7 +71,7 @@ func TestSessionAFK_NotificationsDisabledSuppressesChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	step(agentfake.Control{State: "done"}, wire.SessionIdle)
-	if posts := chat.postsAfterAlert(h, started); len(posts) != 0 {
+	if posts := chat.PostsAfterAlert(h, started); len(posts) != 0 {
 		t.Errorf("chat posts = %q, want none while muted", posts)
 	}
 	if banners := h.Banners.Sent(); len(banners) != 1 {

@@ -153,11 +153,3 @@ func markRead(ctx context.Context, t *testing.T, h *servertest.Harness, id strin
 		t.Fatalf("mark read = %+v, %v; want the session read", res, err)
 	}
 }
-
-func reportFocus(ctx context.Context, t *testing.T, h *servertest.Harness, r wire.FocusReport) {
-	t.Helper()
-	res, err := h.Client.ReportFocus(ctx, r)
-	if err != nil || res.Refused {
-		t.Fatalf("report focus = %+v, %v", res, err)
-	}
-}

@@ -1411,8 +1411,3 @@ func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 		})
 	}
 }
-
-func waitFor(t *testing.T, ok func() bool) {
-	t.Helper()
-	servertest.Await(t, ok)
-}

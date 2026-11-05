@@ -57,7 +57,7 @@ var allowed = map[site]entry{
 	{"server/disk/diskwatch.go", ruleChildEnv}:            {1, reasonTool},
 	{"sound/sound.go", ruleChildEnv}:                      {1, reasonTool},
 	{"server/servertest/fakecodex.go", ruleChildEnv}:      {1, reasonTool},
-	{"server/servertest/schedfixture.go", ruleChildEnv}:   {1, reasonTool},
+	{"server/servertest/schedfixture.go", ruleChildEnv}:   {2, reasonTool},
 	{"testutil/claudeenv/claudeenv.go", ruleChildEnv}:     {1, reasonTool},
 	{"gocachegate/gocachegate.go", ruleChildEnv}:          {1, reasonTool},
 	{"testutil/agentfake/codexhooks.go", ruleChildEnv}:    {1, reasonChild},

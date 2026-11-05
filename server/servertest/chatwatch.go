@@ -17,6 +17,9 @@ const ChatPollTestInterval = 50 * time.Millisecond
 
 const ChatLine = `{"type":"assistant","uuid":"a","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"hi"}]}}`
 
+const TurnDurationLine = `{"type":"system","subtype":"turn_duration","durationMs":100}`
+
+// CodexMessageLine is a Codex assistant message line.
 const CodexMessageLine = `{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hi"}]}}`
 
 // WriteTranscript replaces the transcript at path with lines.

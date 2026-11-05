@@ -16,37 +16,6 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-func withAlerts(banners, sounds bool) func(*server.Config) {
-	return func(c *server.Config) {
-		c.Settings.AgentsBanners = banners
-		c.Settings.AgentsSounds.Enabled = sounds
-	}
-}
-
-func startBannerSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
-	t.Helper()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Name: "fix-build"}, append([]func(*server.Config){withAlerts(true, true)}, opts...)...)
-	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, wire.SessionWorking)
-	return h, ctx, evs, id, conv
-}
-
-func reach(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, conv string, c agentfake.Control, state string) {
-	t.Helper()
-	report(t, conv, c)
-	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == state })
-}
-
-// waitAlerts waits past the banner delay and returns what was sent.
-func waitAlerts(h *servertest.Harness, want int) ([]osnotify.Notification, []sound.Name) {
-	servertest.Poll(3*servertest.SessionBannerDelay, func() bool {
-		return len(h.Banners.Sent()) >= want && len(h.Sounds.Played()) >= want
-	})
-	if want == 0 {
-		time.Sleep(2 * servertest.SessionBannerDelay) // negative wait: an alert would fire within the banner delay
-	}
-	return h.Banners.Sent(), h.Sounds.Played()
-}
-
 func TestSessionBanner_DoneSendsOneAfterDelay(t *testing.T) {
 	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
@@ -199,20 +168,4 @@ func TestSessionBanner_StopDropsPending(t *testing.T) {
 	if banners, sounds := waitAlerts(h, 0); len(banners) != 0 || len(sounds) != 0 {
 		t.Errorf("banners = %+v, sounds = %v; want none", banners, sounds)
 	}
-}
-
-// openTUI opens a flushed event stream as client, returning its close.
-func openTUI(ctx context.Context, t *testing.T, h *servertest.Harness, client string) context.CancelFunc {
-	t.Helper()
-	tuiCtx, drop := context.WithCancel(ctx)
-	t.Cleanup(drop)
-	evs, err := h.Client.EventsAs(tuiCtx, 0, client)
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		for range evs {
-		}
-	}()
-	return drop
 }

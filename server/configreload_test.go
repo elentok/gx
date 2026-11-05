@@ -23,15 +23,6 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-func reload(t *testing.T, h *servertest.Harness) wire.ReloadResult {
-	t.Helper()
-	res, err := h.Client.ReloadConfig(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
-}
-
 func maxAgents(n int) map[string]any {
 	return map[string]any{"execution-queue": map[string]any{"max-agents": n}}
 }

@@ -107,17 +107,15 @@ var allowed = map[string]int{
 	"server/sessionkeys_test.go":                    2, // negative waits: no nudge follows a person's key; a guarded key keeps the countdown
 	"server/sessionprompt_test.go":                  5, // four negative waits: no nudge or Continue follows a typed / command; a failure is not raised within the grace window
 	"server/sessions_action_test.go":                7,
-	"server/sessions_afk_test.go":                   1,
 	"server/sessions_autoadvance_countdown_test.go": 6,
 	"server/sessions_autoadvance_guard_test.go":     2,
-	"server/sessions_banner_test.go":                2,
+	"server/sessions_banner_test.go":                1,
 	"server/sessions_failstart_test.go":             1,
 	"server/sessions_failure_banner_test.go":        1,
 	"server/sessions_firstprompt_failure_test.go":   1,
 	"server/sessions_firstprompt_launch_test.go":    1, // negative wait: a resend would come within a few ResendEvery
 	"server/sessions_firstprompt_test.go":           3,
 	"server/sessions_test.go":                       1,
-	"server/slackhook_test.go":                      1,
 	"server/limits/tokenpoll_test.go":               2, // poll loop with a deadline; negative wait: no poll while a migration is held
 	"server/trunkconflict_claim_test.go":            1,
 	"server/servertest/ptyrunner_test.go":           3, // negative waits: a wrong reap or kill would come within a few polls

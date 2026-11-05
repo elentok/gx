@@ -36,7 +36,7 @@ func startWebFocus(t *testing.T) *webFocus {
 		c.WebAddr = "127.0.0.1:0"
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: testFlushInterval}
 	})
-	started := chat.waitStarted(t)
+	started := chat.WaitStarted(t)
 	afk := true
 	if _, err := h.Client.SetAFK(ctx, &afk); err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func TestWebFocus_VisibleTabSilencesBannerAndAFKChat(t *testing.T) {
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", true, f.id)
 	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
-	if posts := f.chat.postsAfterAlert(f.h, f.started); len(posts) != 0 {
+	if posts := f.chat.PostsAfterAlert(f.h, f.started); len(posts) != 0 {
 		t.Errorf("chat posts = %q, want none", posts)
 	}
 	if banners, sounds := f.h.Banners.Sent(), f.h.Sounds.Played(); len(banners) != 0 || len(sounds) != 0 {
@@ -106,7 +106,7 @@ func TestWebFocus_HiddenTabSilencesNothing(t *testing.T) {
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", false, f.id)
 	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
-	if posts := f.chat.postsAfterAlert(f.h, f.started); len(posts) != 1 {
+	if posts := f.chat.PostsAfterAlert(f.h, f.started); len(posts) != 1 {
 		t.Errorf("chat posts = %q, want one", posts)
 	}
 	if banners := f.h.Banners.Sent(); len(banners) != 1 {
@@ -121,7 +121,7 @@ func TestWebFocus_TUIStillSilencesBannerOnly(t *testing.T) {
 	openTUI(ctx, t, f.h, "tui-1")
 	reportFocus(ctx, t, f.h, wire.FocusReport{Client: "tui-1", Focused: true, Session: f.id})
 	f.step(agentfake.Control{State: "done"}, wire.SessionIdle)
-	if posts := f.chat.postsAfterAlert(f.h, f.started); len(posts) != 1 {
+	if posts := f.chat.PostsAfterAlert(f.h, f.started); len(posts) != 1 {
 		t.Errorf("chat posts = %q, want one", posts)
 	}
 	if banners := f.h.Banners.Sent(); len(banners) != 0 {

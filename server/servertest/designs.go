@@ -3,6 +3,8 @@ package servertest
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -72,6 +74,55 @@ func (f DesignsFixture) Live(t *testing.T) []wire.SessionInfo {
 		}
 	}
 	return out
+}
+
+// StartDesigns starts a server with a map epic "map" and a plain epic "plain"
+// in project proj, whose repo is the trunk checkout, with the web mux up.
+func StartDesigns(t *testing.T, opts ...func(*server.Config)) DesignsFixture {
+	t.Helper()
+	store := t.TempDir()
+	WriteTicket(t, store, "proj", "map", "01", "first", "")
+	WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return StartDesignsIn(t, store, opts...)
+}
+
+// PromptFixture is a design session on a fake program with an input box,
+// Idle, whose transcript lives under the config dir.
+type PromptFixture struct {
+	DesignsFixture
+	ID, Conv, Transcript string
+}
+
+// StartPromptSession starts a PromptFixture. grace is how long the server
+// waits for a typed prompt's turn to start; a test that must act inside that
+// turn passes a longer one.
+func StartPromptSession(t *testing.T, grace time.Duration) PromptFixture {
+	t.Helper()
+	cfg := t.TempDir()
+	f := StartDesigns(t, func(c *server.Config) { c.PromptGrace = grace }, WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))
+	res, err := f.H.Client.CreateSession(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	id := res.Session.ID
+	conv, _ := ReadMeta(t, f.H, id)["conversation_id"].(string)
+	WaitForHolder(t, filepath.Join(f.H.SessionsDir, id))
+	Report(t, conv, agentfake.Control{State: "idle"})
+	WaitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	return PromptFixture{DesignsFixture: f, ID: id, Conv: conv, Transcript: filepath.Join(cfg, "projects", "-repo", conv+".jsonl")}
+}
+
+// Prompt sends text to the session as a prompt.
+func (f PromptFixture) Prompt(t *testing.T, text string) wire.SessionResult {
+	t.Helper()
+	res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: text})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
 }
 
 // Fix starts the Fix agent for the ticket at address.

@@ -806,7 +806,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 	servertest.RegisterTurn(h) // the agent finishes without committing, so the ticket pauses
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	started := chat.waitStarted(t) // so the pause message never shares a post with it
+	started := chat.WaitStarted(t) // so the pause message never shares a post with it
 
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
@@ -831,7 +831,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 		}
 	}
 
-	posts := chat.postsSince(started)
+	posts := chat.PostsSince(started)
 	if len(posts) != 1 {
 		t.Fatalf("chat sends = %d, want exactly 1: %v", len(posts), posts)
 	}

@@ -168,13 +168,13 @@ func TestFailureBanner_AFKChatCarriesTheLink(t *testing.T) {
 	f := startFailureBannerSession(t, true, func(c *server.Config) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
-	started := chat.waitStarted(t)
+	started := chat.WaitStarted(t)
 	afk := true
 	if _, err := f.h.Client.SetAFK(f.ctx, &afk); err != nil {
 		t.Fatal(err)
 	}
 	f.stall(t)
-	posts := chat.postsAfterAlert(f.h, started)
+	posts := chat.PostsAfterAlert(f.h, started)
 	if len(posts) != 1 || !strings.Contains(posts[0], f.base+"/#/d/proj:map") {
 		t.Errorf("chat posts = %q, want one with the Design link", posts)
 	}
