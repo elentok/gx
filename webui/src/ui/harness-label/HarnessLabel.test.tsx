@@ -20,6 +20,14 @@ describe("HarnessLabel", () => {
     expect(container.textContent).toBe("Codex GPT-5.5 · Strongest · xhigh");
   });
 
+  it("shows the harness dot beside a model label only when asked, without repeating the name", () => {
+    const off = renderThemed(<HarnessLabel {...full} />);
+    expect(off.container.querySelector("i")).toBeNull();
+    const on = renderThemed(<HarnessLabel {...full} dot />);
+    expect(on.container.querySelector("i")).not.toBeNull();
+    expect(on.container.textContent).toBe("Codex GPT-5.5 · Strongest · xhigh");
+  });
+
   it("reads <Harness> CLI default before a reply", () => {
     const { container } = renderThemed(<HarnessLabel {...full} model={modelName("", "codex")} effort="" />);
     expect(container.textContent).toContain("Codex CLI default");

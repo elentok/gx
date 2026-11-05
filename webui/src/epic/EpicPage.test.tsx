@@ -224,6 +224,7 @@ test("loop rows show harness chips and queue notes; done rows and map rows show 
   expect(await chips("04")).toBe("Claude Sonnet 5.5 · Worker · medium");
   expect(await chips("06")).toBe("Claude CLI default · Worker");
   expect(await chips("05")).toBeUndefined();
+  expect((await cardOf("04")).querySelector("[data-chips] i")).not.toBeNull();
   cleanup();
   live([tk("01")], "map");
   expect((await cardOf("01")).querySelector("[data-chips]")).toBeNull();

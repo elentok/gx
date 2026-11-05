@@ -15,6 +15,7 @@ export function HarnessLabel({
   model,
   effort,
   note,
+  dot = false,
 }: {
   harness: string;
   tierLabel: string;
@@ -22,17 +23,21 @@ export function HarnessLabel({
   effort: string;
   /** Server text for a queue row (`pinned`, `follows default`). */
   note?: string;
+  /** Ticket cards show the harness dot before the line; the Design header does not. */
+  dot?: boolean;
 }) {
-  const showHarness = harness && !model;
+  // The model label already names the harness, so the dot never repeats the name beside one.
+  const showName = harness && !model;
+  const showDot = harness && (dot || !model);
   const parts = [model, tierLabel, effort, note ?? ""].filter(Boolean);
   // One inline flow: it wraps between words (a real space), never inside the harness or a word.
   const words = parts.flatMap((part) => part.split(" · "));
   return (
     <Text as="span" fontFamily="mono" fontSize="12px" color="text.dim">
-      {showHarness && (
+      {showDot && (
         <Box as="span" display="inline-flex" alignItems="center" gap="5px" whiteSpace="nowrap" mr="2">
           <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
-          {NAMES[harness] ?? harness}
+          {showName && (NAMES[harness] ?? harness)}
         </Box>
       )}
       {words.map((word, i, rest) => (

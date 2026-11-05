@@ -105,6 +105,8 @@ test("118. Codex queue rows", async ({ page, start }) => {
     await expect(chips(page, "codex-running")).toContainText("Codex");
     // The row shows its pinned note until the worker claims it, which is slow under load.
     await expect(chips(page, "codex-running")).toContainText("Worker", { timeout: 45_000 });
+    // Verification 39: a running card's chip keeps its harness dot.
+    await expect(chips(page, "codex-running").locator("i")).toHaveCount(1);
     await go(page, "#/e/demo:claude-running");
     await expect(chips(page, "claude-running")).toContainText("Claude");
     await go(page, "#/e/demo:pinned");

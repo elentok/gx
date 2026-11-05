@@ -210,7 +210,7 @@ function Line({
       </Box>
       {chips && (
         <Box data-chips pl={wide ? "88px" : "80px"} minW="0">
-          <HarnessLabel {...chips} />
+          <HarnessLabel {...chips} dot />
         </Box>
       )}
       </Box>
