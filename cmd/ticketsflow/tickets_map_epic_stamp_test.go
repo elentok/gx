@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
@@ -73,8 +74,8 @@ func TestRunTicketsEpicAdd_MapMissingTotalsStampsNoTokens(t *testing.T) {
 
 func TestExecute_TicketsSet_MapCompletedAtStampsConversationTotals(t *testing.T) {
 	cwd, project := mapWithConversations(t, false, sumRecs()...)
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }, env: envFor(t)}
-	if err := execute([]string{"tickets", "set", "mine:m", "--completed-at=now"}, d); err != nil {
+	d := Deps{Env: cmdbase.Env{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}, Getwd: func() (string, error) { return cwd, nil }, Env: envFor(t)}}
+	if err := execute(t, []string{"tickets", "set", "mine:m", "--completed-at=now"}, d); err != nil {
 		t.Fatal(err)
 	}
 	m := tickets.LoadEpicTicketMD(filepath.Join(project, "m"))
@@ -85,8 +86,8 @@ func TestExecute_TicketsSet_MapCompletedAtStampsConversationTotals(t *testing.T)
 
 func TestExecute_TicketsSet_PreRecordingMapCompletedAtStampsNoTokens(t *testing.T) {
 	cwd, project := mapWithConversations(t, true, sumRecs()...)
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }, env: envFor(t)}
-	if err := execute([]string{"tickets", "set", "mine:m", "--completed-at=now"}, d); err != nil {
+	d := Deps{Env: cmdbase.Env{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}, Getwd: func() (string, error) { return cwd, nil }, Env: envFor(t)}}
+	if err := execute(t, []string{"tickets", "set", "mine:m", "--completed-at=now"}, d); err != nil {
 		t.Fatal(err)
 	}
 	m := tickets.LoadEpicTicketMD(filepath.Join(project, "m"))

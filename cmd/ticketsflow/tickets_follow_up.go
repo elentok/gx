@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ import (
 // files one writes the same shape. The ticket is always draft + research; a
 // body asking for anything else is refused. Every check runs before anything
 // is written.
-func runTicketsFollowUpAdd(d deps, epicPath, body, category string, jsonOut bool, w io.Writer) error {
+func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, jsonOut bool, w io.Writer) error {
 	if filepath.Base(filepath.Clean(epicPath)) != tickets.FollowUpsEpic {
 		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: "follow-up add targets a " + tickets.FollowUpsEpic + " epic, not " + filepath.Base(epicPath)}
 	}
@@ -76,7 +76,7 @@ func runTicketsFollowUpAdd(d deps, epicPath, body, category string, jsonOut bool
 	if err != nil {
 		return err
 	}
-	ticketscmd.PingServer(d.base(), path)
+	ticketscmd.PingServer(d.Env, path)
 	return ticketscmd.PrintTicketRef(path, jsonOut, w)
 }
 

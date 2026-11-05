@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"fmt"
@@ -15,12 +15,12 @@ import (
 // project whose title or ## Problem contains any of words (case-insensitive),
 // so a dedupe reads a few hits instead of two whole listings. An archived hit
 // also shows its close reason. An empty project means the cwd project.
-func runTicketsFollowUpSearch(d deps, project string, words []string, w io.Writer) error {
+func runTicketsFollowUpSearch(d Deps, project string, words []string, w io.Writer) error {
 	words = searchWords(words)
 	if len(words) == 0 {
 		return fmt.Errorf("follow-up search needs at least one word")
 	}
-	root, project, err := ticketref.ResolveProject(d.base(), project)
+	root, project, err := ticketref.ResolveProject(d.Env, project)
 	if err != nil {
 		return err
 	}

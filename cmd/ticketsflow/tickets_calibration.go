@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"fmt"
@@ -102,14 +102,14 @@ func writeCalibration(w io.Writer, c Calibration, asJSON bool) error {
 	return nil
 }
 
-func newTicketsCalibrationCmd(d deps) *cobra.Command {
+func newTicketsCalibrationCmd(d Deps) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "calibration <project:epic>",
 		Short: "print the epic's median work-to-expected ratio over its finished implement tickets",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
+			cwd, err := d.Getwd()
 			if err != nil {
 				return err
 			}

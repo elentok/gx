@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"fmt"
@@ -60,7 +60,7 @@ func resolveEpicTarget(cfgDirs config.Dirs, cwd, arg string) (projectDir, projec
 	return "", "", "", &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: fmt.Sprintf("no project %q", project)}
 }
 
-func newTicketsEpicCmd(d deps) *cobra.Command {
+func newTicketsEpicCmd(d Deps) *cobra.Command {
 	epicCmd := &cobra.Command{
 		Use:   "epic",
 		Short: "create and manage epics",
@@ -71,12 +71,12 @@ func newTicketsEpicCmd(d deps) *cobra.Command {
 		Short: "create an epic's ticket.md (kind map or loop, status draft or open)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
+			cwd, err := d.Getwd()
 			if err != nil {
 				return err
 			}
 			if body != "" {
-				if body, err = cmdbase.ReadBodyArg(d.stdin, body); err != nil {
+				if body, err = cmdbase.ReadBodyArg(d.Stdin, body); err != nil {
 					return err
 				}
 			}
@@ -93,13 +93,13 @@ func newTicketsEpicCmd(d deps) *cobra.Command {
 // newTicketsEpicSetCmd is `tickets set project:epic` under the epic group;
 // --blocked-by takes whole-epic tokens ("other" or "project:other") and runs
 // the same project-wide check as a ticket's, writing nothing on failure.
-func newTicketsEpicSetCmd(d deps) *cobra.Command {
+func newTicketsEpicSetCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <project:epic>",
 		Short: "validated writes to an epic's ticket.md (kind, status, destination_unconfirmed, blocked_by)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
+			cwd, err := d.Getwd()
 			if err != nil {
 				return err
 			}
@@ -111,7 +111,7 @@ func newTicketsEpicSetCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return ticketscmd.RunEpicSet(d.dirs(), c, path, c.OutOrStdout(), d.getwd, d.dial())
+			return ticketscmd.RunEpicSet(d.dirs(), c, path, c.OutOrStdout(), d.Getwd, d.Dial())
 		},
 	}
 	cmd.Flags().String("kind", "", "set kind (map or loop)")

@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 
 // setupEpicBlockedByProject is project "mine" with loop epics e and x and map
 // epic m, each holding ticket 01; x/01 waits on xBlockedBy when set.
-func setupEpicBlockedByProject(t *testing.T, xBlockedBy string) (d deps, ticketMD string) {
+func setupEpicBlockedByProject(t *testing.T, xBlockedBy string) (d Deps, ticketMD string) {
 	t.Helper()
 	d, ticketMD = setupEpicSetProject(t)
 	project := filepath.Dir(filepath.Dir(ticketMD))
@@ -35,7 +35,7 @@ func setupEpicBlockedByProject(t *testing.T, xBlockedBy string) (d deps, ticketM
 func TestTicketsEpicSet_BlockedByWritesWholeEpicToken(t *testing.T) {
 	d, ticketMD := setupEpicBlockedByProject(t, "")
 
-	if err := execute([]string{"tickets", "epic", "set", "mine:e", "--blocked-by", "x"}, d); err != nil {
+	if err := execute(t, []string{"tickets", "epic", "set", "mine:e", "--blocked-by", "x"}, d); err != nil {
 		t.Fatalf("epic set: %v", err)
 	}
 	raw, _ := os.ReadFile(ticketMD)
@@ -58,7 +58,7 @@ func TestTicketsEpicSet_BlockedByRefusals(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d, ticketMD := setupEpicBlockedByProject(t, tc.xBlockedBy)
-			err := execute([]string{"tickets", "epic", "set", "mine:e", "--blocked-by", tc.ref}, d)
+			err := execute(t, []string{"tickets", "epic", "set", "mine:e", "--blocked-by", tc.ref}, d)
 			var addrErr *tickets.AddressError
 			switch {
 			case err == nil:
@@ -80,8 +80,8 @@ func TestTicketsValidate_ReportsBadEpicLevelBlockedBy(t *testing.T) {
 	if err := os.WriteFile(ticketMD, []byte("---\nkind: loop\nstatus: open\nblocked_by:\n  - nope\n---\n\n# e\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	d.stdout, d.stderr = &bytes.Buffer{}, &bytes.Buffer{}
-	err := execute([]string{"tickets", "validate", filepath.Join(filepath.Dir(ticketMD), "issues", "01-a.md")}, d)
+	d.Stdout, d.Stderr = &bytes.Buffer{}, &bytes.Buffer{}
+	err := execute(t, []string{"tickets", "validate", filepath.Join(filepath.Dir(ticketMD), "issues", "01-a.md")}, d)
 	if want := `ticket.md: epic e: blocked_by unknown-epic: "nope" names no epic in this project`; err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("err = %v, want it to contain %q", err, want)
 	}

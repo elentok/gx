@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"os"
@@ -26,10 +26,10 @@ const (
 )
 
 // verifyRepo is a project with docs/specs/demo.md, a plan file and a manifest path.
-func verifyRepo(t *testing.T, plan string) (d deps, project, dir, planPath, manifest string) {
+func verifyRepo(t *testing.T, plan string) (d Deps, project, dir, planPath, manifest string) {
 	t.Helper()
 	d, project, manifest = setupPublish(t)
-	cwd, _ := d.getwd()
+	cwd, _ := d.Getwd()
 	if err := os.MkdirAll(filepath.Join(cwd, "docs", "specs"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestVerifyPlan_TablePrintsEstimates(t *testing.T) {
 
 func TestVerifyPlan_PrintsEntries(t *testing.T) {
 	d, _, _, plan, _ := verifyRepo(t, "stories:\n  - story: 1\n    web_flows: 8\n  - story: 2\n    web_flows: 1\n")
-	if err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan}, d); err != nil {
+	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan}, d); err != nil {
 		t.Fatalf("verify-plan: %v", err)
 	}
 	wantLines(t, publishOut(d), "verify-part-1: window=63K", "over budget", "verify-part-2:", "verify-collect: window=30K blocked_by=verify-part-1,verify-part-2")
@@ -64,13 +64,13 @@ func TestVerifyPlan_PrintsEntries(t *testing.T) {
 func TestVerifyPlan_BadPlanFails(t *testing.T) {
 	d, _, dir, _, _ := verifyRepo(t, "stories: []\n")
 	empty := filepath.Join(dir, "plan.yaml")
-	if err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", empty}, d); err == nil {
+	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", empty}, d); err == nil {
 		t.Error("empty plan: want error")
 	}
-	if err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", filepath.Join(dir, "missing.yaml")}, d); err == nil {
+	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", filepath.Join(dir, "missing.yaml")}, d); err == nil {
 		t.Error("missing plan: want error")
 	}
-	if err := execute([]string{"tickets", "verify-plan", "mine:demo-impl"}, d); err == nil {
+	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl"}, d); err == nil {
 		t.Error("no --plan: want error")
 	}
 }
@@ -86,7 +86,7 @@ func readManifestFile(t *testing.T, path string) string {
 
 func TestVerifyPlan_OnePartWritesLoneEntry(t *testing.T) {
 	d, _, dir, plan, _ := verifyRepo(t, smallPlan)
-	if err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", filepath.Join(dir, "verify.yaml")}, d); err != nil {
+	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", filepath.Join(dir, "verify.yaml")}, d); err != nil {
 		t.Fatalf("verify-plan: %v", err)
 	}
 	got := readManifestFile(t, filepath.Join(dir, "verify.yaml"))
@@ -107,7 +107,7 @@ func TestVerifyPlan_OnePartWritesLoneEntry(t *testing.T) {
 func TestVerifyPlan_SeveralPartsWriteCollect(t *testing.T) {
 	d, _, dir, plan, _ := verifyRepo(t, bigPlan)
 	m := filepath.Join(dir, "verify.yaml")
-	if err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", m}, d); err != nil {
+	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", m}, d); err != nil {
 		t.Fatalf("verify-plan: %v", err)
 	}
 	got := readManifestFile(t, m)
@@ -135,7 +135,7 @@ func TestVerifyPlan_SeveralPartsWriteCollect(t *testing.T) {
 func TestVerifyPlan_MissingStoryFails(t *testing.T) {
 	d, _, dir, plan, _ := verifyRepo(t, "stories:\n  - story: 9\n    cli_checks: 1\n")
 	m := filepath.Join(dir, "verify.yaml")
-	err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", m}, d)
+	err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", m}, d)
 	if err == nil || !strings.Contains(err.Error(), "story 9") {
 		t.Fatalf("err = %v, want a story 9 error", err)
 	}
@@ -146,7 +146,7 @@ func TestVerifyPlan_MissingStoryFails(t *testing.T) {
 
 func TestVerifyPlan_MissingMockStateFails(t *testing.T) {
 	d, _, dir, plan, _ := verifyRepo(t, "stories:\n  - story: 1\n    mock_states: [nosuch]\n")
-	err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", filepath.Join(dir, "v.yaml")}, d)
+	err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", filepath.Join(dir, "v.yaml")}, d)
 	if err == nil || !strings.Contains(err.Error(), "nosuch") {
 		t.Fatalf("err = %v, want a nosuch error", err)
 	}
@@ -157,10 +157,10 @@ func TestVerifyPlan_MissingMockStateFails(t *testing.T) {
 // adds nothing.
 func TestVerifyPlan_PublishesWithImplementTickets(t *testing.T) {
 	d, project, _, plan, manifest := verifyRepo(t, smallPlan)
-	if err := execute([]string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", manifest}, d); err != nil {
+	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan, "--manifest", manifest}, d); err != nil {
 		t.Fatalf("verify-plan: %v", err)
 	}
-	if err := execute([]string{"tickets", "publish", "mine:demo-impl", "--manifest", manifest, "--allow-check-misses"}, d); err != nil {
+	if err := execute(t, []string{"tickets", "publish", "mine:demo-impl", "--manifest", manifest, "--allow-check-misses"}, d); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	names := strings.Join(issueNames(t, project, "demo-impl"), " ")
@@ -172,7 +172,7 @@ func TestVerifyPlan_PublishesWithImplementTickets(t *testing.T) {
 	if !strings.Contains(raw, want) {
 		t.Errorf("verify ticket lacks the word-for-word entry:\n%s", raw)
 	}
-	if err := execute([]string{"tickets", "ensure-verify", "mine:demo-impl"}, d); err != nil {
+	if err := execute(t, []string{"tickets", "ensure-verify", "mine:demo-impl"}, d); err != nil {
 		t.Fatalf("ensure-verify: %v", err)
 	}
 	if got := strings.Join(issueNames(t, project, "demo-impl"), " "); got != names {

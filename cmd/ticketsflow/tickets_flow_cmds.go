@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"io"
@@ -9,18 +9,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ticketsFlowCommands returns the flow-side verbs of `gx tickets`: epic,
+// Commands returns the flow-side verbs of `gx tickets`: epic,
 // publish, follow-up, the ensure verbs, verify-plan, calibration, lint-claims
 // and filter-run-log.
-func ticketsFlowCommands(d deps) []*cobra.Command {
+func Commands(d Deps) []*cobra.Command {
 	return []*cobra.Command{
 		newTicketsCalibrationCmd(d),
-		ticketref.NewEpicScopedCmd(d.base(), "ensure-code-review <epic>",
+		ticketref.NewEpicScopedCmd(d.Env, "ensure-code-review <epic>",
 			"no-op if the epic has a code-review ticket, else stamp out a stub",
 			func(epicPath string, _ []string, out io.Writer) error {
 				return runTicketsEnsureCodeReview(epicPath, out)
 			}),
-		ticketref.NewEpicScopedCmd(d.base(), "ensure-verify <epic>",
+		ticketref.NewEpicScopedCmd(d.Env, "ensure-verify <epic>",
 			"no-op if the epic has a verify ticket, else stamp out a stub",
 			func(epicPath string, _ []string, out io.Writer) error {
 				return runTicketsEnsureVerify(epicPath, out)
@@ -34,7 +34,7 @@ func ticketsFlowCommands(d deps) []*cobra.Command {
 	}
 }
 
-func newTicketsFollowUpCmd(d deps) *cobra.Command {
+func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 	followUpCmd := &cobra.Command{
 		Use:   "follow-up",
 		Short: "work with follow-ups, the contributor outbox",
@@ -51,11 +51,11 @@ func newTicketsFollowUpCmd(d deps) *cobra.Command {
 			"  Evidence (bug only)",
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			epicPath, _, err := ticketref.ResolveAddTarget(d.base(), args[0], "")
+			epicPath, _, err := ticketref.ResolveAddTarget(d.Env, args[0], "")
 			if err != nil {
 				return err
 			}
-			body, err := cmdbase.ReadBodyArg(d.stdin, followUpBody)
+			body, err := cmdbase.ReadBodyArg(d.Stdin, followUpBody)
 			if err != nil {
 				return err
 			}
@@ -83,10 +83,10 @@ func newTicketsFollowUpCmd(d deps) *cobra.Command {
 	return followUpCmd
 }
 
-func newTicketsFilterRunLogCmd(d deps) *cobra.Command {
+func newTicketsFilterRunLogCmd(d Deps) *cobra.Command {
 	var filterTicket string
 	var filterEvents []string
-	cmd := ticketref.NewEpicScopedCmd(d.base(), "filter-run-log <epic>",
+	cmd := ticketref.NewEpicScopedCmd(d.Env, "filter-run-log <epic>",
 		"print an epic's run-log.jsonl events, filtered by ticket/event type",
 		func(epicPath string, _ []string, out io.Writer) error {
 			return runTicketsFilterRunLog(epicPath, filterTicket, filterEvents, out)

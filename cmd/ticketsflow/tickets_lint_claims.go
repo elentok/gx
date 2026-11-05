@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
@@ -17,14 +18,14 @@ import (
 	"github.com/elentok/gx/tickets/ticketspec"
 )
 
-func newTicketsLintClaimsCmd(d deps) *cobra.Command {
+func newTicketsLintClaimsCmd(d Deps) *cobra.Command {
 	var manifest string
 	c := &cobra.Command{
 		Use:   "lint-claims <project:epic> [--manifest <file>]",
 		Short: "check that the commands, paths, tests and flows a ticket quotes exist",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
+			cwd, err := d.Getwd()
 			if err != nil {
 				return err
 			}
@@ -37,7 +38,7 @@ func newTicketsLintClaimsCmd(d deps) *cobra.Command {
 				return err
 			}
 			if report.Refused() {
-				return &ExitError{Code: 1}
+				return &cmdbase.ExitError{Code: 1}
 			}
 			return nil
 		},
@@ -57,7 +58,7 @@ func shortHeadAt(cwd string) (string, error) {
 
 // lintEpicClaims lints the epic's open tickets, or the manifest's entries when
 // manifestPath is set, against the checkout at cwd, and prints the report.
-func lintEpicClaims(d deps, cwd, commit, epicPath, manifestPath string, w io.Writer) (ticketspec.LintReport, error) {
+func lintEpicClaims(d Deps, cwd, commit, epicPath, manifestPath string, w io.Writer) (ticketspec.LintReport, error) {
 	root, err := git.Toplevel(cwd)
 	if err != nil {
 		return ticketspec.LintReport{}, err
@@ -85,7 +86,7 @@ func lintEpicClaims(d deps, cwd, commit, epicPath, manifestPath string, w io.Wri
 
 	env := ticketspec.LintEnv{
 		Root:    root,
-		Command: commandChecker(newRootCmd(d)),
+		Command: commandChecker(d.CommandTree()),
 		GoTests: ticketspec.LoadGoTestNames(root),
 		Flows:   ticketspec.LoadFlowCatalog(root),
 		TopDirs: topLevelDirs(root),

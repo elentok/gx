@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"encoding/json"
@@ -12,6 +12,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
@@ -197,10 +198,10 @@ func printBundledAdvisories(w io.Writer, cwd string, plan *publishPlan) {
 	}
 }
 
-// fileWriter is deps.writeFile, or os.WriteFile.
-func (d deps) fileWriter() func(string, []byte, os.FileMode) error {
-	if d.writeFile != nil {
-		return d.writeFile
+// fileWriter is Deps.WriteFile, or os.WriteFile.
+func (d Deps) fileWriter() func(string, []byte, os.FileMode) error {
+	if d.WriteFile != nil {
+		return d.WriteFile
 	}
 	return os.WriteFile
 }
@@ -209,8 +210,8 @@ func (d deps) fileWriter() func(string, []byte, os.FileMode) error {
 // every ticket is written as draft, checked, then all are opened in one pass at
 // the end. Any failure removes what this run wrote (and the epic, if it created
 // it), so a retry assigns the same IDs.
-func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) (err error) {
-	cwd, err := d.getwd()
+func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) (err error) {
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -245,15 +246,15 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 
 	// The lint report goes to stderr when the table is JSON, so stdout stays parseable.
 	lintOut := w
-	if jsonOut && d.stderr != nil {
-		lintOut = d.stderr
+	if jsonOut && d.Stderr != nil {
+		lintOut = d.Stderr
 	}
 	report, err := lintEpicClaims(d, cwd, commit, epicPath, manifestPath, lintOut)
 	if err != nil {
 		return err
 	}
 	if report.Refused() && !allowClaimMisses {
-		return &ExitError{Code: 1}
+		return &cmdbase.ExitError{Code: 1}
 	}
 	printBundledAdvisories(lintOut, cwd, plan)
 
@@ -303,7 +304,7 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 		}
 	}
 	for _, t := range plan.Tickets {
-		ticketscmd.PingServer(d.base(), t.Path)
+		ticketscmd.PingServer(d.Env, t.Path)
 	}
 	return printPublished(w, plan.rows(), jsonOut)
 }
@@ -345,7 +346,7 @@ func printPublished(w io.Writer, rows []publishedTicket, jsonOut bool) error {
 	return tw.Flush()
 }
 
-func newTicketsPublishCmd(d deps) *cobra.Command {
+func newTicketsPublishCmd(d Deps) *cobra.Command {
 	var manifest string
 	var dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool
 	cmd := &cobra.Command{

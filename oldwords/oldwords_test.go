@@ -101,8 +101,10 @@ var allowed = map[string]allowance{
 	"webui/src/generated/server.ts":                 allow("generated from the wire fields above", "park", "needsanswer"),
 	"webui/src/epic/rows.ts":                        allow("maps the legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
 	// Tests of the read shim, the hidden aliases and the kept wire names.
-	"cmd/server_parity_test.go": allow("lists the hidden drain, park and unpark routes", "drain", "park"),
-	"cmd/tickets_alias_test.go": allow("tests the retired land, reset, unpark and drain aliases", "park", "land", "reset", "drain"), "cmd/cmdtest/fixtures.go": allow("LegacyStatusTicket is a migrate input with the legacy needs-answer status", "needsanswer"),
+	"cmd/server_parity_test.go":                              allow("lists the hidden drain, park and unpark routes", "drain", "park"),
+	"cmd/tickets_alias_test.go":                              allow("tests the retired land, reset, unpark and drain aliases", "park", "land", "reset", "drain"),
+	"cmd/tickets/tickets_alias_test.go":                      allow("tests the retired land, reset, unpark and drain aliases", "park", "land", "reset"),
+	"cmd/cmdtest/fixtures.go":                                allow("LegacyStatusTicket is a migrate input with the legacy needs-answer status", "needsanswer"),
 	"cmd/ticketsmigrate/ticketsmigrate.go":                   allow("migrate help names the legacy Needs Answer section", "needsanswer"),
 	"cmd/ticketsmigrate/tickets_migrate_test.go":             allow("migrate input uses the legacy statuses", "park", "needsanswer", "needsrepair"),
 	"cmd/ticketsmigrate/tickets_migrate_pause_test.go":       allow("migrate input uses the legacy statuses, park_kind and headings", "park", "land", "needsanswer", "needsrepair"),

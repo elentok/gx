@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -311,5 +312,29 @@ func TestExecute_WtUnknownSubcommand(t *testing.T) {
 	err := execute([]string{"wt", "bogus"}, d)
 	if err == nil {
 		t.Fatal("expected error for unknown wt subcommand")
+	}
+}
+
+// lint-claims checks claims against the real, lazily built command tree: a
+// `gx tickets` verb and a `gx server` verb resolve, an unknown one is a miss.
+func TestLintClaims_RealCommandTree(t *testing.T) {
+	repo, project := setupShowProject(t)
+	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-claims.md",
+		"---\nid: \"07\"\nstatus: open\ntype: implement\n---\n\n# 07\n\n## Test seams\n\n"+
+			"`gx tickets show` and `gx server start` and `gx tickets nosuch` and `gx server nosuch`.\n")
+
+	out, err := runIn(t, repo, "tickets", "lint-claims", "mine:epic")
+	if err == nil {
+		t.Fatalf("lint-claims exit 0, want misses:\n%s", out)
+	}
+	for _, want := range []string{"miss: 07: gx tickets nosuch", "miss: 07: gx server nosuch"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	for _, bad := range []string{"gx tickets show", "gx server start"} {
+		if strings.Contains(out, "miss: 07: "+bad) {
+			t.Errorf("%q should resolve in the real tree:\n%s", bad, out)
+		}
 	}
 }

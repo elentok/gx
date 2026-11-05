@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/cmd/tickets"
+	"github.com/elentok/gx/cmd/ticketsflow"
 	"github.com/elentok/gx/cmd/ticketsmigrate"
 
 	"github.com/spf13/cobra"
@@ -22,7 +23,11 @@ func newTicketsCmd(d deps) *cobra.Command {
 		serverapi.NewAskCmd(d.serverapiDeps()),
 		serverapi.NewAnswerCmd(d.serverapiDeps(), false),
 	}
-	return tickets.New(d.ticketsDeps(), append(extra, ticketsFlowCommands(d)...)...)
+	flow := ticketsflow.Commands(ticketsflow.Deps{
+		Env:         d.base(),
+		CommandTree: func() *cobra.Command { return newRootCmd(d) },
+	})
+	return tickets.New(d.ticketsDeps(), append(extra, flow...)...)
 }
 
 func newVersionCmd(d deps) *cobra.Command {

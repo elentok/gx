@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/tickets/ticketspec"
 )
 
@@ -19,10 +20,10 @@ const shapeSections = "\n## Test seams\n\nnone — covered elsewhere\n\n## Where
 
 // setupPublish is project "mine" with a manifest of three tickets (b waits on a,
 // c on b) and their body files in a temp dir.
-func setupPublish(t *testing.T) (d deps, project, manifest string) {
+func setupPublish(t *testing.T) (d Deps, project, manifest string) {
 	t.Helper()
 	cwd, project := setupEpicAddProject(t)
-	d = deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }, env: envFor(t)}
+	d = Deps{Env: cmdbase.Env{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}, Getwd: func() (string, error) { return cwd, nil }, Env: envFor(t)}, CommandTree: fakeTree}
 	dir := t.TempDir()
 	for _, n := range []string{"a", "b", "c"} {
 		writeTicketFile(t, filepath.Join(dir, n+".md"), "# "+n+"\n\nsee {{a}}\n"+shapeSections)
@@ -52,7 +53,7 @@ func writeManifest(t *testing.T, dir, content string) string {
 	return path
 }
 
-func publishOut(d deps) string { return d.stdout.(*bytes.Buffer).String() }
+func publishOut(d Deps) string { return d.Stdout.(*bytes.Buffer).String() }
 
 func issueNames(t *testing.T, project, epic string) []string {
 	t.Helper()
@@ -73,7 +74,7 @@ func issueNames(t *testing.T, project, epic string) []string {
 func TestPublishCreatesDraftLoopEpicAndOpensTickets(t *testing.T) {
 	d, project, manifest := setupPublish(t)
 
-	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	out := publishOut(d)
@@ -98,7 +99,7 @@ func TestPublishCreatesDraftLoopEpicAndOpensTickets(t *testing.T) {
 func TestPublishJSONAndDryRun(t *testing.T) {
 	d, project, manifest := setupPublish(t)
 
-	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest, "--dry-run", "--json"}, d); err != nil {
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest, "--dry-run", "--json"}, d); err != nil {
 		t.Fatalf("dry-run: %v", err)
 	}
 	var rows []publishedTicket
@@ -120,7 +121,7 @@ func TestPublishIntoExistingEpicKeepsItsTickets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	got := strings.Join(issueNames(t, project, "e"), " ")
@@ -141,14 +142,14 @@ func TestPublishRollback(t *testing.T) {
 			}
 			wantFiles := len(issueNames(t, project, "e"))
 			writes := 0
-			d.writeFile = func(path string, data []byte, perm os.FileMode) error {
+			d.WriteFile = func(path string, data []byte, perm os.FileMode) error {
 				writes++
 				if writes == 3 { // the last draft
 					return errors.New("disk full")
 				}
 				return os.WriteFile(path, data, perm)
 			}
-			if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
+			if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
 				t.Fatalf("existing=%v: publish succeeded despite the fault", existing)
 			}
 			if got := len(issueNames(t, project, "e")); got != wantFiles {
@@ -158,9 +159,9 @@ func TestPublishRollback(t *testing.T) {
 				t.Errorf("existing=%v: epic dir presence wrong after rollback (err=%v)", existing, err)
 			}
 
-			d.writeFile = nil
-			d.stdout = &bytes.Buffer{}
-			if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest, "--json"}, d); err != nil {
+			d.WriteFile = nil
+			d.Stdout = &bytes.Buffer{}
+			if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest, "--json"}, d); err != nil {
 				t.Fatalf("existing=%v: retry: %v", existing, err)
 			}
 			var rows []publishedTicket
@@ -181,14 +182,14 @@ func TestPublishRollback(t *testing.T) {
 func TestPublishRollbackWhenOpeningFails(t *testing.T) {
 	d, project, manifest := setupPublish(t)
 	writes := 0
-	d.writeFile = func(path string, data []byte, perm os.FileMode) error {
+	d.WriteFile = func(path string, data []byte, perm os.FileMode) error {
 		writes++
 		if writes == 6 { // the last open
 			return errors.New("disk full")
 		}
 		return os.WriteFile(path, data, perm)
 	}
-	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
 		t.Fatal("publish succeeded despite the fault")
 	}
 	if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
@@ -199,7 +200,7 @@ func TestPublishRollbackWhenOpeningFails(t *testing.T) {
 func TestPublishOpensOnce(t *testing.T) {
 	d, _, manifest := setupPublish(t)
 	var statuses []string
-	d.writeFile = func(path string, data []byte, perm os.FileMode) error {
+	d.WriteFile = func(path string, data []byte, perm os.FileMode) error {
 		status := "draft"
 		if strings.Contains(string(data), "status: open") {
 			status = "open"
@@ -207,7 +208,7 @@ func TestPublishOpensOnce(t *testing.T) {
 		statuses = append(statuses, status)
 		return os.WriteFile(path, data, perm)
 	}
-	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	if got := strings.Join(statuses, " "); got != "draft draft draft open open open" {
@@ -222,7 +223,7 @@ func TestPublishInvalidTicketPrintsOnlyThatAndWritesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d)
+	err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d)
 	if err == nil || err.Error() != `b: unknown type "task"` {
 		t.Fatalf("err = %v, want only ticket b's type failure", err)
 	}
@@ -259,7 +260,7 @@ func TestPublishManifestRefusalsWriteNothing(t *testing.T) {
 			dir := filepath.Dir(manifest)
 			writeTicketFile(t, filepath.Join(dir, "bad.md"), "see {{nope}}\n")
 			writeManifest(t, dir, content)
-			if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
+			if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
 				t.Fatal("publish succeeded")
 			}
 			if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
@@ -270,19 +271,19 @@ func TestPublishManifestRefusalsWriteNothing(t *testing.T) {
 }
 
 // publishLint publishes one ticket of type typ with the given body.
-func publishLint(t *testing.T, typ, body string, extra ...string) (d deps, project string, err error) {
+func publishLint(t *testing.T, typ, body string, extra ...string) (d Deps, project string, err error) {
 	t.Helper()
 	d, project, manifest := setupPublish(t)
 	dir := filepath.Dir(manifest)
 	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n"+body+"\n"+shapeSections)
 	writeManifest(t, dir, "- {slug: a, type: "+typ+", body: a.md}\n")
-	err = execute(append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d)
+	err = execute(t, append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d)
 	return d, project, err
 }
 
 func TestPublishClaimMissRefusesAndWritesNothing(t *testing.T) {
 	d, project, err := publishLint(t, "implement", "see `docs/nowhere.md`")
-	var ee *ExitError
+	var ee *cmdbase.ExitError
 	if !errors.As(err, &ee) || ee.Code != 1 {
 		t.Fatalf("err = %v, want exit 1", err)
 	}
@@ -331,7 +332,7 @@ func TestPublishPlannedNameDoesNotRefuse(t *testing.T) {
 	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n## What to build\n\nAdd `docs/nowhere.md`.\n"+shapeSections)
 	writeTicketFile(t, filepath.Join(dir, "b.md"), "# b\n\n## Test seams\n\nuse `docs/nowhere.md`\n\n## Where to look\n\nnowhere\n")
 	writeManifest(t, dir, "- {slug: a, type: implement, body: a.md}\n- {slug: b, type: implement, blocked_by: [a], body: b.md}\n")
-	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
 		t.Fatalf("publish: %v\n%s", err, publishOut(d))
 	}
 	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-a.md 02-b.md" {
@@ -340,13 +341,13 @@ func TestPublishPlannedNameDoesNotRefuse(t *testing.T) {
 }
 
 // publishShape publishes one ticket whose body is exactly body.
-func publishShape(t *testing.T, typ string, window int, body string, extra ...string) (d deps, project string, err error) {
+func publishShape(t *testing.T, typ string, window int, body string, extra ...string) (d Deps, project string, err error) {
 	t.Helper()
 	d, project, manifest := setupPublish(t)
 	dir := filepath.Dir(manifest)
 	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n"+body)
 	writeManifest(t, dir, fmt.Sprintf("- {slug: a, type: %s, expected_context_window: %d, body: a.md}\n", typ, window))
-	err = execute(append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d)
+	err = execute(t, append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d)
 	return d, project, err
 }
 
@@ -453,7 +454,7 @@ func TestPublishStampsCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	cwd, _ := d.getwd()
+	cwd, _ := d.Getwd()
 	out, err := exec.Command("git", "-C", cwd, "rev-parse", "--short", "HEAD").Output()
 	if err != nil {
 		t.Fatal(err)

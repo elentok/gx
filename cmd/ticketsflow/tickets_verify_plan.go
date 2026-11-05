@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/tickets/ticketspec"
 )
 
-func newTicketsVerifyPlanCmd(d deps) *cobra.Command {
+func newTicketsVerifyPlanCmd(d Deps) *cobra.Command {
 	var planPath, manifestPath string
 	var table bool
 	c := &cobra.Command{
@@ -27,7 +27,7 @@ func newTicketsVerifyPlanCmd(d deps) *cobra.Command {
 			if len(args) != 1 || planPath == "" {
 				return fmt.Errorf("verify-plan needs <project:epic> and --plan <plan.yaml>, or --table")
 			}
-			cwd, err := d.getwd()
+			cwd, err := d.Getwd()
 			if err != nil {
 				return err
 			}

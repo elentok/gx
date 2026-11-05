@@ -1,4 +1,4 @@
-package cmd
+package ticketsflow
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 )
@@ -49,7 +50,7 @@ func (f *lintFixture) file(rel, content string) {
 func (f *lintFixture) lint(extra ...string) (string, int) {
 	f.t.Helper()
 	out, err := runIn(f.t, f.repo, append([]string{"tickets", "lint-claims", "mine:epic"}, extra...)...)
-	var ee *ExitError
+	var ee *cmdbase.ExitError
 	switch {
 	case err == nil:
 		return out, 0
