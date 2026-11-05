@@ -1,4 +1,4 @@
-package server_test
+package sessions_test
 
 import (
 	"encoding/json"

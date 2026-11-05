@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -78,22 +76,12 @@ func reportIteration(t *testing.T, path, status string) {
 
 func (f *schedFixture) featureWorktree(t *testing.T) string {
 	t.Helper()
-	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(f.Repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return filepath.Join(wtDir, schedEpic)
+	return f.FeatureWorktree(t)
 }
 
-// assertFeatureKept checks the feature worktree and the epic branch survived.
 func (f *schedFixture) assertFeatureKept(t *testing.T, when string) {
 	t.Helper()
-	if _, err := os.Stat(f.featureWorktree(t)); err != nil {
-		t.Errorf("feature worktree gone after %s: %v", when, err)
-	}
-	if strings.TrimSpace(f.Git(t, "branch", "--list", schedEpic)) == "" {
-		t.Errorf("branch %s gone after %s", schedEpic, when)
-	}
+	f.AssertFeatureKept(t, when)
 }
 
 func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {

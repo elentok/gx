@@ -2,6 +2,7 @@ package servertest
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -145,5 +147,26 @@ func (f *SchedFixture) AssertMerged(t *testing.T, ids ...string) {
 	}
 	if left := strings.TrimSpace(f.Git(t, "branch", "--list", "ralph-loop/*")); left != "" {
 		t.Errorf("iteration branches left behind:\n%s", left)
+	}
+}
+
+// FeatureWorktree is the epic's feature worktree path.
+func (f *SchedFixture) FeatureWorktree(t *testing.T) string {
+	t.Helper()
+	wtDir, err := ralphloop.DefaultDeps().WorktreeDir(f.Repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(wtDir, SchedEpic)
+}
+
+// AssertFeatureKept checks the feature worktree and the epic branch survived.
+func (f *SchedFixture) AssertFeatureKept(t *testing.T, when string) {
+	t.Helper()
+	if _, err := os.Stat(f.FeatureWorktree(t)); err != nil {
+		t.Errorf("feature worktree gone after %s: %v", when, err)
+	}
+	if strings.TrimSpace(f.Git(t, "branch", "--list", SchedEpic)) == "" {
+		t.Errorf("branch %s gone after %s", SchedEpic, when)
 	}
 }

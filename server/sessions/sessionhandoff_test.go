@@ -1,4 +1,4 @@
-package server_test
+package sessions_test
 
 import (
 	"os"
@@ -69,7 +69,7 @@ func TestChartingHandoff_AutoAdvanceRestartsUnderWorkerArgs(t *testing.T) {
 	f := startHandoff(t, "chart", servertest.WithAutoAdvanceDelay(200*time.Millisecond))
 	setMapStep(t, f.store, "resolve-tickets")
 	writeAssistantMessage(t, filepath.Join(f.cfg, "projects", "-repo", f.conv+".jsonl"), runEndText)
-	endTurn(t, &grillingFixture{h: f.h, ctx: f.ctx, evs: f.evs, id: f.id, conv: f.conv})
+	servertest.EndTurn(t, &servertest.GrillingFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, ID: f.id, Conv: f.conv})
 	f.wantRestartedOnWorker(t)
 }
 

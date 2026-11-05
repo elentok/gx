@@ -1,8 +1,9 @@
-package server_test
+package sessions_test
 
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -561,4 +562,151 @@ func killHolder(t *testing.T, h *servertest.Harness, id string) int {
 		t.Fatal(err)
 	}
 	return child
+}
+
+func TestReportSessionStep_StoredWhileBusyAndClearedOnIdle(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, conv := startFakeSession(t)
+	report(t, conv, agentfake.Control{State: "working"})
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+
+	res, err := h.Client.ReportSessionStep(ctx, wire.ReportStepRequest{ID: id, Step: "resolve-tickets", Title: "Add the cache"})
+	if err != nil || res.Refused || res.Session == nil {
+		t.Fatalf("report step = %+v, %v", res, err)
+	}
+	if s := res.Session; s.ReportedStep != "resolve-tickets" || s.ReportedTitle != "Add the cache" {
+		t.Errorf("session = step %q, title %q; want the reported ones", s.ReportedStep, s.ReportedTitle)
+	}
+	if saved := readMeta(t, h, id); saved["reported_step"] != "resolve-tickets" || saved["reported_title"] != "Add the cache" {
+		t.Errorf("saved meta = %v, want the step and title", saved)
+	}
+
+	report(t, conv, agentfake.Control{State: "done"})
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	if got.ReportedStep != "" || got.ReportedTitle != "" {
+		t.Errorf("after idle = step %q, title %q; want both cleared", got.ReportedStep, got.ReportedTitle)
+	}
+}
+
+func TestReportSessionStep_Refusals(t *testing.T) {
+	t.Parallel()
+	h, ctx, _, id, _ := startFakeSession(t)
+	for name, tc := range map[string]struct {
+		req    wire.ReportStepRequest
+		reason string
+	}{
+		"no step":         {wire.ReportStepRequest{ID: id}, wire.ReasonSessionBadRequest},
+		"unknown session": {wire.ReportStepRequest{ID: "abcdef", Step: "spec"}, wire.ReasonSessionUnknown},
+	} {
+		res, err := h.Client.ReportSessionStep(ctx, tc.req)
+		if err != nil || !res.Refused || res.Reason != tc.reason {
+			t.Errorf("%s: report = %+v, %v; want refused %s", name, res, err, tc.reason)
+		}
+	}
+}
+
+func TestSessionCreate_TierDefaultsToWorker(t *testing.T) {
+	t.Parallel()
+	h, _, _, id, _ := startFakeSession(t)
+	if tier := readMeta(t, h, id)["tier"]; tier != "worker" {
+		t.Errorf("meta tier = %v, want worker", tier)
+	}
+}
+
+func TestSessionCreate_TierIsSavedAndResumeKeepsIt(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{Tier: "strongest"})
+	if tier := readMeta(t, h, id)["tier"]; tier != "strongest" {
+		t.Fatalf("meta tier = %v, want strongest", tier)
+	}
+	stopFakeSession(ctx, t, h, evs, id)
+	if r, err := h.Client.ResumeSession(ctx, id); err != nil || r.Refused {
+		t.Fatalf("resume = %+v, %v", r, err)
+	}
+	if tier := readMeta(t, h, id)["tier"]; tier != "strongest" {
+		t.Errorf("meta tier after resume = %v, want strongest", tier)
+	}
+}
+
+func TestSessionCreate_UnknownTierIsRefused(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Tier: "huge"})
+	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionBadRequest {
+		t.Errorf("create = %+v, %v; want a bad-request refusal", res, err)
+	}
+}
+
+func TestWebSessionCreate_TierIsSaved(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	code, res := f.webCreate(t, `{"project":"proj","dir":"`+f.projectRoot(t)+`","tier":"light"}`)
+	if code != http.StatusOK || res.Refused || res.Session == nil {
+		t.Fatalf("create = %d %+v", code, res)
+	}
+	if tier := readMeta(t, f.h, res.Session.ID)["tier"]; tier != "light" {
+		t.Errorf("meta tier = %v, want light", tier)
+	}
+}
+
+func TestSessionStatus_Promptable(t *testing.T) {
+	t.Parallel()
+	for name, c := range map[string]struct {
+		st   wire.SessionStatus
+		want bool
+	}{
+		"idle":                  {wire.SessionStatus{State: wire.SessionIdle}, true},
+		"turn over, shell left": {wire.SessionStatus{State: wire.SessionWorking, Background: true}, true},
+		"working":               {wire.SessionStatus{State: wire.SessionWorking}, false},
+		"blocked":               {wire.SessionStatus{State: wire.SessionBlocked}, false},
+		"starting":              {wire.SessionStatus{State: wire.SessionStarting}, false},
+	} {
+		if got := c.st.Promptable(); got != c.want {
+			t.Errorf("%s: Promptable = %v, want %v", name, got, c.want)
+		}
+	}
+}
+
+func TestFocusSession_TargetsLastFocusedTUI(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, _ := startFakeSession(t)
+	openTUI(ctx, t, h, "tui-1")
+	openTUI(ctx, t, h, "tui-2")
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Focused: true})
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-2", Focused: true})
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-2"})
+
+	res, err := h.Client.FocusSession(ctx, id)
+	if err != nil || res.Refused || res.Client != "tui-2" {
+		t.Fatalf("focus = %+v, %v; want target tui-2", res, err)
+	}
+	if ev := servertest.WaitForEvent(ctx, t, evs, wire.EventSessionFocus, ""); ev.Address != id || ev.Client != "tui-2" {
+		t.Errorf("focus event = %+v, want session %s on tui-2", ev, id)
+	}
+}
+
+func TestFocusSession_NoTUISucceedsWithNoTarget(t *testing.T) {
+	t.Parallel()
+	h, ctx, _, id, _ := startFakeSession(t)
+	drop := openTUI(ctx, t, h, "tui-1")
+	reportFocus(ctx, t, h, wire.FocusReport{Client: "tui-1", Focused: true})
+	drop()
+	waitFor(t, func() bool {
+		res, err := h.Client.ReportFocus(ctx, wire.FocusReport{Client: "tui-1"})
+		return err == nil && res.Reason == wire.ReasonFocusNotConnected
+	})
+
+	res, err := h.Client.FocusSession(ctx, id)
+	if err != nil || res.Refused || res.Client != "" {
+		t.Fatalf("focus = %+v, %v; want success with no target", res, err)
+	}
+}
+
+func TestFocusSession_RefusesUnknownID(t *testing.T) {
+	t.Parallel()
+	h, ctx, _, _, _ := startFakeSession(t)
+	res, err := h.Client.FocusSession(ctx, "nope")
+	if err != nil || res.Reason != wire.ReasonSessionUnknown {
+		t.Fatalf("focus = %+v, %v; want %s", res, err, wire.ReasonSessionUnknown)
+	}
 }

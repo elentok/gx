@@ -1,4 +1,4 @@
-package server_test
+package sessions_test
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func TestInstallFailure_PausesAndDiscardsTheIterationWorktree(t *testing.T) {
 	if out := f.Git(t, "worktree", "list"); strings.Count(strings.TrimSpace(out), "\n") != 1 {
 		t.Errorf("want only the repo and the feature worktree, got:\n%s", out)
 	}
-	f.assertFeatureKept(t, "install failure")
+	f.AssertFeatureKept(t, "install failure")
 }
 
 func TestInstallFailure_MergeTicketKeepsTheFeatureWorktree(t *testing.T) {
@@ -66,5 +66,5 @@ func TestInstallFailure_MergeTicketKeepsTheFeatureWorktree(t *testing.T) {
 	f, starts := runFailingInstall(t, "merge")
 
 	assertPausedOnInstallFailure(t, f, starts)
-	f.assertFeatureKept(t, "install failure")
+	f.AssertFeatureKept(t, "install failure")
 }

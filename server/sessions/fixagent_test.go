@@ -1,4 +1,4 @@
-package server_test
+package sessions_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/wire"
 
@@ -247,4 +248,36 @@ func TestFixAgent_WebNeedsTheStateToken(t *testing.T) {
 	if code, out := post(repairToken); code != http.StatusOK || servertest.ReasonOf(t, out) != "" {
 		t.Errorf("current token = %d %s", code, out)
 	}
+}
+
+func TestFixAgent_RunsOnStrongestAndResumeKeepsIt(t *testing.T) {
+	t.Parallel()
+	h, addr, _ := startRemoteFix(t, false)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.Client.FixAgent(ctx, wire.FixAgentRequest{Address: addr})
+	if err != nil || res.Refused || res.Session == nil {
+		t.Fatalf("fix = %+v, %v", res, err)
+	}
+	id := res.Session.ID
+	want := map[string]any{"tier": "strongest", "model": "opus", "effort": "high"}
+	check := func(when string) {
+		t.Helper()
+		meta := readMeta(t, h, id)
+		for k, v := range want {
+			if meta[k] != v {
+				t.Errorf("meta %s %s = %v, want %v", when, k, meta[k], v)
+			}
+		}
+	}
+	check("after start")
+	stopFakeSession(ctx, t, h, evs, id)
+	if r, err := h.Client.ResumeSession(ctx, id); err != nil || r.Refused {
+		t.Fatalf("resume = %+v, %v", r, err)
+	}
+	check("after resume")
 }
