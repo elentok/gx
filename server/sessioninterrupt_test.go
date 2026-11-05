@@ -13,24 +13,24 @@ import (
 
 func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 	t.Parallel()
-	f := startPromptSession(t)
-	report(t, f.conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
-	res, err := f.h.Client.InterruptSession(f.ctx, f.id)
+	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	report(t, f.Conv, agentfake.Control{State: "working"})
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	res, err := f.H.Client.InterruptSession(f.Ctx, f.ID)
 	if err != nil || res.Refused {
 		t.Fatalf("interrupt = %+v, %v", res, err)
 	}
-	waitForSubmitted(t, f.conv, strconv.Quote(agentfake.ProgramInterruptEntry)+"\n")
+	waitForSubmitted(t, f.Conv, strconv.Quote(agentfake.ProgramInterruptEntry)+"\n")
 }
 
 func TestSessionInterrupt_RefusesAnIdleSession(t *testing.T) {
 	t.Parallel()
-	f := startPromptSession(t)
-	res, err := f.h.Client.InterruptSession(f.ctx, f.id)
+	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	res, err := f.H.Client.InterruptSession(f.Ctx, f.ID)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotWorking {
 		t.Errorf("interrupt while idle = %+v, %v; want %s", res, err, wire.ReasonSessionNotWorking)
 	}
-	if got := submitted(t, f.conv); got != "" {
+	if got := submitted(t, f.Conv); got != "" {
 		t.Errorf("a refused interrupt sent keys: %q", got)
 	}
 }

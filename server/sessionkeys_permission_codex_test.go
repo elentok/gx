@@ -2,10 +2,9 @@ package server_test
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
-	"time"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/nativerunner"
@@ -17,33 +16,12 @@ import (
 // parallel. withDialog makes the fake draw its own approval dialog.
 func startCodexPermissionSession(t *testing.T, withDialog bool) promptFixture {
 	t.Helper()
-	conv := "thread-perm-" + strings.ReplaceAll(t.Name(), "/", "-")
-	env := []string{agentfake.CodexIDEnv + "=" + conv}
-	grace := firstPromptGrace
-	if withDialog {
-		// An answer ends the fake's turn, which runs its hooks first.
-		env = append(env, agentfake.CodexNoPermissionHookEnv+"=1")
-		grace = 10 * time.Second
-	}
-	f := startCodexPromptSessionWithGrace(t, grace, env...)
-	f.conv = conv
-	if withDialog {
-		// A deny ends a turn, so there must be one.
-		if res := f.prompt(t, "run it"); res.Refused {
-			t.Fatalf("prompt = %+v", res)
-		}
-		waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
-	}
-	return f
+	return fromPrompt(servertest.StartCodexPermissionSession(t, withDialog))
 }
 
-// blockCodex opens Codex's approval dialog for command, which nothing but a
-// key answers. An empty command leaves a dialog gx cannot read.
 func (f promptFixture) blockCodex(t *testing.T, command string) {
 	t.Helper()
-	f.block(t, agentfake.Control{Action: agentfake.ActionPermission, Command: command})
-	// The fake reports Blocked before it draws the dialog.
-	waitForScreen(t, waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id)), "Blocked by hook")
+	f.fixture().BlockCodex(t, command)
 }
 
 func TestSessionKeys_CodexScreenDialogTakesYAndEsc(t *testing.T) {

@@ -186,7 +186,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `tickets/detail`, `epics` and `epics/detail`. The root implements its `Deps`;
   `server/designs/` holds the Design sessions (open, worktree, delete, and the cleanup the Manager
   and the rescan call back), with `Routes()` for `designs/open`, `designs/delete` and
-  `designs/worktree`
+  `designs/worktree`;
+  `server/sessions/prompt/` will hold the session prompts (scaffolding only so far; its tests share
+  `servertest/promptsession.go`)
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail)
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

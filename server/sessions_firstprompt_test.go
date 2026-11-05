@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const firstPromptGrace = 300 * time.Millisecond
+const firstPromptGrace = servertest.FirstPromptGrace
 
 // startFirstPromptSession starts a session with an input box and a first
 // prompt, still waiting for its ready report.

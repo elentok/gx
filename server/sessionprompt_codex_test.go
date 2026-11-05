@@ -1,16 +1,12 @@
 package server_test
 
 import (
-	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -28,26 +24,7 @@ func startCodexPromptSession(t *testing.T, extraEnv ...string) promptFixture {
 // wait for an answer to take effect, for a test whose fake does real work first.
 func startCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEnv ...string) promptFixture {
 	t.Helper()
-	codexPromptConv := "thread-server-prompt-" + strings.ReplaceAll(t.Name(), "/", "-")
-	bin := servertest.FakeCodexDir(t)
-	home := t.TempDir()
-	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = grace },
-		servertest.WithChatHarness("codex"),
-		servertest.WithEnv(append([]string{
-			"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
-			"HOME=" + home,
-			"CODEX_HOME=" + filepath.Join(home, ".codex"),
-			agentfake.CodexIDEnv + "=" + codexPromptConv,
-			agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t),
-		}, extraEnv...)...))
-	res, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
-	if err != nil || res.Session == nil {
-		t.Fatalf("create = %+v, %v", res, err)
-	}
-	id := res.Session.ID
-	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	return promptFixture{designsFixture: f, id: id, conv: codexPromptConv}
+	return fromPrompt(servertest.StartCodexPromptSessionWithGrace(t, grace, extraEnv...))
 }
 
 func TestSessionPrompt_CodexIsRefusedWhileWorkingAndTypedAtIdle(t *testing.T) {

@@ -16,14 +16,14 @@ import (
 )
 
 // permissionRead GETs the permission route on the web mux.
-func (f promptFixture) permissionRead(t *testing.T, id string) (int, string) {
+func permissionRead(t *testing.T, f servertest.PromptFixture, id string) (int, string) {
 	t.Helper()
-	return servertest.WebDoCookie(t, http.MethodGet, f.base+"/v1/sessions/permission?session="+id, f.ck)
+	return servertest.WebDoCookie(t, http.MethodGet, f.Base+"/v1/sessions/permission?session="+id, f.Ck)
 }
 
-func (f promptFixture) wantPermission(t *testing.T, want wire.SessionPermissionResponse) {
+func wantPermission(t *testing.T, f servertest.PromptFixture, want wire.SessionPermissionResponse) {
 	t.Helper()
-	code, body := f.permissionRead(t, f.id)
+	code, body := permissionRead(t, f, f.ID)
 	var got wire.SessionPermissionResponse
 	if err := json.Unmarshal([]byte(body), &got); err != nil || code != http.StatusOK {
 		t.Fatalf("permission = %d %q (%v)", code, body, err)
@@ -54,29 +54,29 @@ func TestSessionPermission_ClaudeDialogs(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			f := startPromptSession(t)
-			f.blockOn(t, tc.rows)
-			f.wantPermission(t, tc.want)
+			f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+			f.BlockOn(t, tc.rows)
+			wantPermission(t, f, tc.want)
 		})
 	}
 }
 
 func TestSessionPermission_CodexHookRequestGivesItsText(t *testing.T) {
 	t.Parallel()
-	f := startCodexPermissionSession(t, false)
-	dir := filepath.Join(f.h.SessionsDir, f.id)
+	f := servertest.StartCodexPermissionSession(t, false)
+	dir := filepath.Join(f.H.SessionsDir, f.ID)
 	if err := nativerunner.WritePermissionRequest(dir, nativerunner.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
 		t.Fatal(err)
 	}
-	f.block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
-	f.wantPermission(t, wire.SessionPermissionResponse{Kind: "prompt", Text: "rg foo", RequestID: "req-1"})
+	f.Block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
+	wantPermission(t, f, wire.SessionPermissionResponse{Kind: "prompt", Text: "rg foo", RequestID: "req-1"})
 }
 
 func TestSessionPermission_CodexScreenOnly(t *testing.T) {
 	t.Parallel()
-	f := startCodexPermissionSession(t, true)
-	f.blockCodex(t, "rg foo")
-	code, body := f.permissionRead(t, f.id)
+	f := servertest.StartCodexPermissionSession(t, true)
+	f.BlockCodex(t, "rg foo")
+	code, body := permissionRead(t, f, f.ID)
 	var got wire.SessionPermissionResponse
 	if err := json.Unmarshal([]byte(body), &got); err != nil || code != http.StatusOK {
 		t.Fatalf("permission = %d %q (%v)", code, body, err)
@@ -88,15 +88,15 @@ func TestSessionPermission_CodexScreenOnly(t *testing.T) {
 
 func TestSessionPermission_Refusals(t *testing.T) {
 	t.Parallel()
-	f := startPromptSession(t)
-	seedSession(t, f, "seeded-exited", wire.SessionExited)
+	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	servertest.SeedSession(t, f, "seeded-exited", wire.SessionExited)
 	for name, tc := range map[string]struct{ id, want string }{
-		"not blocked": {f.id, wire.ReasonNotBlocked},
+		"not blocked": {f.ID, wire.ReasonNotBlocked},
 		"exited":      {"seeded-exited", wire.ReasonSessionNotLive},
 		"unknown":     {"nope", wire.ReasonSessionUnknown},
 	} {
 		t.Run(name, func(t *testing.T) {
-			code, body := f.permissionRead(t, tc.id)
+			code, body := permissionRead(t, f, tc.id)
 			if code == http.StatusOK || servertest.ReasonOf(t, body) != tc.want {
 				t.Errorf("permission = %d %s, want refusal %s", code, body, tc.want)
 			}
@@ -106,8 +106,8 @@ func TestSessionPermission_Refusals(t *testing.T) {
 
 func TestSessionPermission_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
-	f := startPromptSession(t)
-	code, body := f.permissionRead(t, "queue-agent-x")
+	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	code, body := permissionRead(t, f, "queue-agent-x")
 	if code == http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionReadOnly {
 		t.Errorf("permission = %d %s, want refusal %s", code, body, wire.ReasonSessionReadOnly)
 	}

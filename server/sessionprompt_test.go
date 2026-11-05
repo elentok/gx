@@ -33,13 +33,21 @@ func startPromptSession(t *testing.T) promptFixture {
 // typed prompt's turn to start, for a test that must act inside it.
 func startPromptSessionWithGrace(t *testing.T, grace time.Duration) promptFixture {
 	t.Helper()
-	p := servertest.StartPromptSession(t, grace)
+	return fromPrompt(servertest.StartPromptSession(t, grace))
+}
+
+// fixture is the servertest fixture the shared methods run on.
+func (f promptFixture) fixture() servertest.PromptFixture {
+	return servertest.PromptFixture{DesignsFixture: f.shared(), ID: f.id, Conv: f.conv, Transcript: f.transcript}
+}
+
+func fromPrompt(p servertest.PromptFixture) promptFixture {
 	return promptFixture{designsFixture: fromShared(p.DesignsFixture), id: p.ID, conv: p.Conv, transcript: p.Transcript}
 }
 
 func (f promptFixture) prompt(t *testing.T, text string) wire.SessionResult {
 	t.Helper()
-	return servertest.PromptFixture{DesignsFixture: f.shared(), ID: f.id, Conv: f.conv, Transcript: f.transcript}.Prompt(t, text)
+	return f.fixture().Prompt(t, text)
 }
 
 func TestSessionPrompt_TypesMultiLineTextAsOnePrompt(t *testing.T) {

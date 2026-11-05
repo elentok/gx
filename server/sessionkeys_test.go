@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,44 +18,18 @@ import (
 
 func (f promptFixture) keys(t *testing.T, req wire.SessionKeysRequest) wire.SessionResult {
 	t.Helper()
-	if req.ID == "" {
-		req.ID = f.id
-	}
-	res, err := f.h.Client.KeysSession(f.ctx, req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
+	return f.fixture().Keys(t, req)
 }
 
 // keysWeb posts the request to the web mux and returns the refusal reason.
 func (f promptFixture) keysWeb(t *testing.T, req wire.SessionKeysRequest) string {
 	t.Helper()
-	if req.ID == "" {
-		req.ID = f.id
-	}
-	body, err := json.Marshal(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	code, out := servertest.WebPostJSON(t, f.base+"/v1/sessions/keys", string(body), f.ck, "", servertest.JSONPost(f.base))
-	if code != 200 {
-		t.Fatalf("web keys = %d %s", code, out)
-	}
-	return servertest.ReasonOf(t, out)
+	return f.fixture().KeysWeb(t, req)
 }
 
-// seedSession writes a session record with no holder behind it.
 func seedSession(t *testing.T, f promptFixture, id, state string) {
 	t.Helper()
-	dir := filepath.Join(f.h.SessionsDir, id)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	meta, _ := json.Marshal(map[string]any{"id": id, "harness": "claude", "project": "proj", "dir": t.TempDir(), "status": map[string]any{"state": state}})
-	if err := os.WriteFile(filepath.Join(dir, "meta.json"), meta, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	servertest.SeedSession(t, f.fixture(), id, state)
 }
 
 func TestSessionKeys_Refusals(t *testing.T) {

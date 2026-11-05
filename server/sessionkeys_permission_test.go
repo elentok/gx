@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -26,33 +25,22 @@ func permissionDialog(header string, options ...string) []string {
 
 func (f promptFixture) block(t *testing.T, c agentfake.Control) {
 	t.Helper()
-	if err := agentfake.SendProgramControl(f.conv, c); err != nil {
-		t.Fatal(err)
-	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+	f.fixture().Block(t, c)
 }
 
-// blockOn opens a dialog that Enter or Esc closes.
 func (f promptFixture) blockOn(t *testing.T, rows []string) {
 	t.Helper()
-	f.block(t, agentfake.Control{Action: agentfake.ActionDialogBlock, Dialog: rows, Message: "run ls?"})
+	f.fixture().BlockOn(t, rows)
 }
 
 func (f promptFixture) permission(t *testing.T, decision, requestID string) wire.SessionResult {
 	t.Helper()
-	return f.keys(t, wire.SessionKeysRequest{Permission: decision, RequestID: requestID})
+	return f.fixture().Permission(t, decision, requestID)
 }
 
-// nothingSent closes the dialog from the fake's side and sends a Tab: any key
-// the refused answer sent would be logged ahead of it.
 func (f promptFixture) nothingSent(t *testing.T) {
 	t.Helper()
-	report(t, f.conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-	if res := f.keys(t, wire.SessionKeysRequest{Key: "Tab"}); res.Refused {
-		t.Fatalf("tab = %+v", res)
-	}
-	waitForSubmitted(t, f.conv, strconv.Quote("<tab>")+"\n")
+	f.fixture().NothingSent(t)
 }
 
 func TestSessionKeys_PermissionAllowSendsEnterAndDenySendsEsc(t *testing.T) {
