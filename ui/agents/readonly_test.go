@@ -21,7 +21,7 @@ import (
 func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) {
 	t.Helper()
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
-	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = "/sessions"
 	m.dial = h.dial
 	m.showQueue, m.showDesign = true, true
@@ -43,7 +43,7 @@ func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) 
 // group hidden and opens its panel read-only.
 func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
-	m := NewModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
 	m.sessionsDir = "/sessions"
 	m.dial = h.dial
 	m.opened = true

@@ -61,7 +61,7 @@ func TestLeader_NextAndPreviousSession(t *testing.T) {
 
 func attentionModel(t *testing.T) Model {
 	t.Helper()
-	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	st := &viewmodel.State{Sessions: []wire.SessionInfo{
 		{ID: "a", Project: "gx", Status: idleStatus},
 		{ID: "b", Project: "gx", Status: idleStatus, Unread: wire.SessionUnread{Unread: true}},

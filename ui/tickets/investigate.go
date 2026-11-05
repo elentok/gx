@@ -14,13 +14,13 @@ import (
 // investigateCmd starts the server's Fix agent for address and lands on its
 // Agents-tab row. A second start finds the existing session by its name; any
 // other refusal is a toast.
-func investigateCmd(api ServerAPI, address string) tea.Cmd {
-	if api == nil {
+func investigateCmd(api ServerAPI, sessions SessionsAPI, address string) tea.Cmd {
+	if api == nil || sessions == nil {
 		return notify.Warning(serverNotRunning)
 	}
 	return func() tea.Msg {
 		ctx := context.Background()
-		res, err := api.FixAgent(ctx, wire.FixAgentRequest{Address: address})
+		res, err := sessions.FixAgent(ctx, wire.FixAgentRequest{Address: address})
 		switch {
 		case err != nil:
 			return notify.Error("investigate: " + err.Error())()

@@ -26,7 +26,7 @@ func groupSessions() []wire.SessionInfo {
 
 func groupsModel(t *testing.T, dirs config.Dirs) Model {
 	t.Helper()
-	m := NewModel(&fakeSessionClient{}, ui.Settings{Dirs: dirs})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{Dirs: dirs})
 	m.opened = true
 	m = withState(t, m, &viewmodel.State{Sessions: groupSessions()}, ticketsui.ServerLinkUp)
 	return m
@@ -95,7 +95,7 @@ func TestGroups_SelectedAgentShowsWhileItsGroupIsHidden(t *testing.T) {
 }
 
 func TestGroups_PendingSelectShowsTheAgent(t *testing.T) {
-	m := NewModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
 	m.opened = true
 	m.pendingSelect = "d1"
 	m = withState(t, m, &viewmodel.State{Sessions: groupSessions()}, ticketsui.ServerLinkUp)

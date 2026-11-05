@@ -46,10 +46,12 @@ type pageActivatedMsg struct{}
 // Model is the Agents tab: the server's interactive sessions.
 type Model struct {
 	// client is nil when no server client could be built.
-	client   SessionClient
-	settings ui.Settings
-	link     ticketsui.ServerLink
-	loaded   bool
+	client SessionClient
+	// sessionAPI is nil exactly when client is.
+	sessionAPI Sessions
+	settings   ui.Settings
+	link       ticketsui.ServerLink
+	loaded     bool
 	// sessions is in sidebar order (see orderedSessions); cursor indexes it.
 	sessions    []wire.SessionInfo
 	cursor      int
@@ -113,13 +115,13 @@ type Model struct {
 }
 
 // NewModel builds the tab; a nil client means there is no server to reach.
-func NewModel(client SessionClient, settings ui.Settings) Model {
+func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, mainMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]formProject, error) { return listFormProjects(settings.TicketStore) },
+	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, mainMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]formProject, error) { return listFormProjects(settings.TicketStore) },
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
-		m.reporter = &focusReporter{client: client}
+		m.reporter = &focusReporter{sessions: sessions}
 	}
 	if data, err := settings.Dirs.DataDir(); err == nil {
 		m.sessionsDir = filepath.Join(data, "sessions")

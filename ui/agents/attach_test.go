@@ -150,7 +150,7 @@ var idleStatus = wire.SessionStatus{State: wire.SessionIdle}
 // holders, and returns the pending dial.
 func attachModel(t *testing.T, h *fakeHolders) (Model, tea.Cmd) {
 	t.Helper()
-	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = "/sessions"
 	m.dial = h.dial
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
@@ -468,7 +468,7 @@ var startingStatus = wire.SessionStatus{State: wire.SessionStarting}
 func startingModel(t *testing.T) (Model, tea.Cmd, *fakeHolders) {
 	t.Helper()
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}, down: map[string]bool{"a": true}}
-	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = "/sessions"
 	m.dial = h.dial
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
@@ -583,7 +583,7 @@ func TestAttach_ExitSwitchesToTheExitedView(t *testing.T) {
 
 func TestAttach_QueueAgentDialsItsHolderDir(t *testing.T) {
 	var dialedDir string
-	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = "/sessions"
 	m.dial = func(dir string) (AttachStream, []string, error) {
 		dialedDir = dir

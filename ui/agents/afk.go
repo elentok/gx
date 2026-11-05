@@ -18,9 +18,9 @@ func (m Model) toggleAFKCmd() tea.Cmd {
 	if m.client == nil {
 		return nil
 	}
-	client := m.client
+	sessions := m.sessionAPI
 	return func() tea.Msg {
-		res, err := client.SetAFK(context.Background(), nil)
+		res, err := sessions.SetAFK(context.Background(), nil)
 		return afkMsg{result: res, err: err}
 	}
 }

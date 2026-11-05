@@ -111,7 +111,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
 	tm := ticketsui.NewModel(root, s, keys.New(Bindings()))
 	if m.settings.Server != nil {
-		tm = tm.WithServer(m.settings.Server.Client).WithCwdProject(cwdProjectName(s.TicketStore, root))
+		tm = tm.WithServer(m.settings.Server.Client).WithSessions(m.settings.Server.Sessions).WithCwdProject(cwdProjectName(s.TicketStore, root))
 	}
 	return tm
 }
@@ -129,16 +129,16 @@ func cwdProjectName(store, root string) string {
 func (m Model) newQueueModel(root string, s ui.Settings, focusEpic string) ticketsui.QueueModel {
 	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings())).WithFocusEpic(focusEpic)
 	if m.settings.Server != nil {
-		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
+		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start).WithSessions(m.settings.Server.Sessions)
 	}
 	return qm
 }
 
 func (m Model) newAgentsModel(s ui.Settings) agentsui.Model {
 	if m.settings.Server == nil {
-		return agentsui.NewModel(nil, s)
+		return agentsui.NewModel(nil, nil, s)
 	}
-	return agentsui.NewModel(m.settings.Server.Client, s).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
+	return agentsui.NewModel(m.settings.Server.Client, m.settings.Server.Sessions, s).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
 		WithCwdProject(cwdProjectName(s.TicketStore, m.settings.ActiveWorktreePath))
 }
 

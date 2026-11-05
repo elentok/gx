@@ -94,14 +94,14 @@ func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
 // the map's design worktree when the server hands one out, else in the
 // project's trunk checkout, resolved from storePath off the UI thread. A
 // refusal opens no form.
-func startSessionCmd(api ServerAPI, storePath, address string) tea.Cmd {
+func startSessionCmd(sessions SessionsAPI, storePath, address string) tea.Cmd {
 	project, short, _ := strings.Cut(address, ":")
 	epic, _, _ := strings.Cut(address, "/")
 	return func() tea.Msg {
 		var dir, note, agent string
 		madeWorktree := false
-		if api != nil {
-			res, err := api.DesignWorktree(context.Background(), wire.DesignWorktreeRequest{Epic: epic})
+		if sessions != nil {
+			res, err := sessions.DesignWorktree(context.Background(), wire.DesignWorktreeRequest{Epic: epic})
 			switch {
 			case err == nil && res.Refused:
 				return notify.Error("start session refused: " + res.Message)()

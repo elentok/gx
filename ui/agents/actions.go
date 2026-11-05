@@ -46,7 +46,7 @@ func (m Model) stopSelected() (tea.Model, tea.Cmd) {
 	}
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:    "Stop session " + displayName(s) + "?",
-		AcceptCmd: sessionActionCmd("stop", m.client.StopSession, s.ID),
+		AcceptCmd: sessionActionCmd("stop", m.sessionAPI.Stop, s.ID),
 	})
 	return m, nil
 }
@@ -61,7 +61,7 @@ func (m Model) removeSelected() (tea.Model, tea.Cmd) {
 	if s.Queue {
 		return m, notify.Info(queueStopHint)
 	}
-	remove := sessionActionCmd("remove", m.client.RemoveSession, s.ID)
+	remove := sessionActionCmd("remove", m.sessionAPI.Remove, s.ID)
 	if s.Status.State != wire.SessionExited {
 		return m, remove
 	}
@@ -77,7 +77,7 @@ func (m Model) resumeSelected() (tea.Model, tea.Cmd) {
 	if s.Queue {
 		return m, notify.Info(queueStopHint)
 	}
-	return m, sessionActionCmd("resume", m.client.ResumeSession, s.ID)
+	return m, sessionActionCmd("resume", m.sessionAPI.Resume, s.ID)
 }
 
 // actionSteps is what running a's Action does, one line per step: its prompts
@@ -104,7 +104,7 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 	if s.Actionable.IsQueue() {
 		accept = queueActionCmd(m.client, s.Actionable.Target)
 	} else {
-		accept = sessionActionCmd("run action", m.client.RunSessionAction, s.ID)
+		accept = sessionActionCmd("run action", m.sessionAPI.RunAction, s.ID)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:     "Run action on " + displayName(s) + "?",
@@ -186,7 +186,7 @@ func (m Model) markReadSelected() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	return m, sessionActionCmd("mark read", m.client.MarkSessionRead, s.ID)
+	return m, sessionActionCmd("mark read", m.sessionAPI.MarkRead, s.ID)
 }
 
 // sessionMenuPickMsg carries a menu pick back to Update: the session actions
@@ -294,10 +294,10 @@ func (m Model) updateMenuPick(msg sessionMenuPickMsg) (tea.Model, tea.Cmd) {
 	case "auto-advance":
 		s, _ := m.selected()
 		return m, sessionActionCmd("auto-advance", func(ctx context.Context, id string) (wire.SessionResult, error) {
-			return m.client.SetAutoAdvance(ctx, id, !s.AutoAdvance)
+			return m.sessionAPI.SetAutoAdvance(ctx, id, !s.AutoAdvance)
 		}, s.ID)
 	case "cancel-auto-advance":
-		return m, sessionActionCmd("cancel auto-advance", m.client.CancelAutoAdvance, msg.id)
+		return m, sessionActionCmd("cancel auto-advance", m.sessionAPI.CancelAutoAdvance, msg.id)
 	}
 	return m, nil
 }

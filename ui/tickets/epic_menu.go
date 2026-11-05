@@ -197,7 +197,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	case actionYankEpic:
 		return m, m.yankTicketSummary()
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.sessions, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
 
 // queueWhy is the reason Add epic to queue is dim, or "" when it applies.

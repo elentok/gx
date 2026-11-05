@@ -110,7 +110,8 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 		{"gx:map/01", false, StartSessionMsg{Project: "gx", Name: "map/01", Prompt: "/gx-design gx:map/01", Ticket: "gx:map/01"}},
 	} {
 		var calls []string
-		m := startSessionModel(t).WithServer(fakeServerAPI{calls: &calls})
+		api := fakeServerAPI{calls: &calls}
+		m := startSessionModel(t).WithServer(api).WithSessions(api)
 		var cmd tea.Cmd
 		if tc.epicRow {
 			_, cmd = chooseTicketMenuItem(t, openEpicMenuOn(t, m, tc.address), "Start session")
@@ -132,7 +133,7 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 
 func TestStartSession_FillsDirWithTheDesignWorktree(t *testing.T) {
 	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Path: "/wt/design-map"}}
-	m := startSessionModel(t).WithServer(api)
+	m := startSessionModel(t).WithServer(api).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	msg, ok := cmd().(StartSessionMsg)
 	if !ok {
@@ -145,7 +146,7 @@ func TestStartSession_FillsDirWithTheDesignWorktree(t *testing.T) {
 
 func TestStartSession_CarriesTheRebaseNoteAndTrustFlag(t *testing.T) {
 	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Path: "/wt/design-map", Note: "not rebased: dirty"}}
-	m := startSessionModel(t).WithServer(api)
+	m := startSessionModel(t).WithServer(api).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	msg, ok := cmd().(StartSessionMsg)
 	if !ok {
@@ -158,7 +159,7 @@ func TestStartSession_CarriesTheRebaseNoteAndTrustFlag(t *testing.T) {
 
 func TestStartSession_ServerErrorIsShownAndOpensNoForm(t *testing.T) {
 	api := fakeServerAPI{designWorktreeErr: errors.New("500 boom")}
-	m := startSessionModel(t).WithServer(api)
+	m := startSessionModel(t).WithServer(api).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	got := cmd()
 	if _, form := got.(StartSessionMsg); form {
@@ -171,7 +172,7 @@ func TestStartSession_ServerErrorIsShownAndOpensNoForm(t *testing.T) {
 
 func TestStartSession_NotRunningFallsBackToTrunk(t *testing.T) {
 	api := fakeServerAPI{designWorktreeErr: syscall.ECONNREFUSED}
-	m := startSessionModel(t).WithServer(api)
+	m := startSessionModel(t).WithServer(api).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	msg, ok := cmd().(StartSessionMsg)
 	if !ok {
@@ -184,7 +185,7 @@ func TestStartSession_NotRunningFallsBackToTrunk(t *testing.T) {
 
 func TestStartSession_RefusalShowsMessageAndOpensNoForm(t *testing.T) {
 	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Refused: true, Message: "another session is live"}}
-	m := startSessionModel(t).WithServer(api)
+	m := startSessionModel(t).WithServer(api).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	got := cmd()
 	if _, form := got.(StartSessionMsg); form {

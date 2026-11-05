@@ -107,6 +107,7 @@ type Model struct {
 	// serverAPI feeds vm (server_mode.go); nil keeps the tab reading the
 	// store for good.
 	serverAPI ServerAPI
+	sessions  SessionsAPI
 	// link is the link half of the last WithServerState delivery; nothing else
 	// writes it (server_link.go).
 	link ServerLink

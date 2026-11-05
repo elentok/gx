@@ -29,7 +29,7 @@ func terminalSession(st wire.SessionStatus) wire.SessionInfo {
 // the update returns so the last screen loads.
 func terminalModel(t *testing.T, s wire.SessionInfo, sessionsDir string) Model {
 	t.Helper()
-	m := NewModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: true})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: true})
 	m.now = func() time.Time { return terminalNow }
 	m.sessionsDir = sessionsDir
 	m.hideSidebar = true

@@ -37,12 +37,17 @@ type ServerAPI interface {
 	EpicStashMerge(ctx context.Context, address string) (wire.QueueResult, error)
 	Detail(ctx context.Context, address string) (wire.TicketDetail, error)
 	Repair(ctx context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error)
-	DesignWorktree(ctx context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error)
 	Iterations(ctx context.Context) ([]wire.IterationInfo, error)
 	TicketChanged(ctx context.Context, address string) error
-	FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error)
 	DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error)
 	SetDefaultHarness(ctx context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error)
+}
+
+// SessionsAPI is the slice of *apiclient.Sessions the tickets and queue tabs
+// use: the design worktree behind "start session" and the Fix agent.
+type SessionsAPI interface {
+	DesignWorktree(ctx context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error)
+	FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error)
 }
 
 // showQueueIfAdded follows an add-to-queue toast with a switch to the Queue
@@ -63,6 +68,13 @@ type ResnapshotRequestedMsg struct{}
 // (server_refresh.go).
 func (m Model) WithServer(api ServerAPI) Model {
 	m.serverAPI = api
+	return m
+}
+
+// WithSessions gives the tab the session sub-client; nil leaves "start session"
+// and "investigate" unavailable.
+func (m Model) WithSessions(s SessionsAPI) Model {
+	m.sessions = s
 	return m
 }
 

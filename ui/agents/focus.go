@@ -79,7 +79,7 @@ func (m Model) reportFocus() { m.reporter.report(m.focusReport()) }
 // focusReporter sends focus reports in order, off the update loop, dropping
 // any superseded before it was sent.
 type focusReporter struct {
-	client SessionClient
+	sessions Sessions
 
 	mu             sync.Mutex
 	lastViewedPath string
@@ -127,7 +127,7 @@ func (r *focusReporter) send(rep wire.FocusReport, lastViewedPath string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), focusReportTimeout)
 	defer cancel()
-	res, err := r.client.ReportFocus(ctx, rep)
+	res, err := r.sessions.ReportFocus(ctx, rep)
 	if err == nil && !res.Refused {
 		return
 	}

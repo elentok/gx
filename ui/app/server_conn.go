@@ -31,10 +31,18 @@ type ServerClient interface {
 	EventsAs(ctx context.Context, since uint64, client string) (<-chan wire.Event, error)
 }
 
+// ServerSessions is the session sub-client: what the Agents, Tickets and
+// Queue tabs each use of it, together.
+type ServerSessions interface {
+	agentsui.Sessions
+	ticketsui.SessionsAPI
+}
+
 // ServerDeps is how the shell reaches the server. A nil Settings.Server (no
 // client could be built) leaves the shell permanently down.
 type ServerDeps struct {
-	Client ServerClient
+	Client   ServerClient
+	Sessions ServerSessions
 	// Build is this client's build id, compared with the server's.
 	Build string
 	// Start launches the server (the Queue tab's "s" when the server is down).

@@ -45,7 +45,7 @@ func fixtureSessions() []wire.SessionInfo {
 func sidebarModel(t *testing.T, nerd bool, sessions []wire.SessionInfo, width, height int) Model {
 	t.Helper()
 	dirs := config.DirsFrom([]string{"HOME=" + t.TempDir()})
-	m := NewModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd, Dirs: dirs})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd, Dirs: dirs})
 	// Start on the first session in the sidebar, past the opening focus.
 	m.opened = true
 	m.showQueue, m.showDesign = true, true
@@ -291,7 +291,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 	idle := []wire.SessionInfo{{ID: "a", Project: "gx", Status: wire.SessionStatus{State: wire.SessionIdle}}}
 	working := []wire.SessionInfo{{ID: "w", Project: "gx", Status: wire.SessionStatus{State: wire.SessionWorking}}}
 
-	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = "" // no attach, so a cmd can only be a tick
 	if _, cmd := m.WithServerState(&viewmodel.State{Sessions: idle}, ticketsui.ServerLinkUp); cmd != nil {
 		t.Fatal("tick scheduled with no Working session")
@@ -313,7 +313,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 		offscreen = append(offscreen, idle[0])
 	}
 	offscreen = append(offscreen, working...)
-	fresh := NewModel(&fakeSessionClient{}, ui.Settings{})
+	fresh := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	fresh.sessionsDir = ""
 	sized := update1(t, fresh, tea.WindowSizeMsg{Width: 70, Height: 10})
 	if _, cmd := sized.WithServerState(&viewmodel.State{Sessions: offscreen}, ticketsui.ServerLinkUp); cmd != nil {
@@ -323,7 +323,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 
 func TestJump_SpinnerTicksForAWorkingSessionWithTheSidebarHidden(t *testing.T) {
 	working := []wire.SessionInfo{{ID: "w", Name: "worker", Project: "gx", Status: wire.SessionStatus{State: wire.SessionWorking}}}
-	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = ""
 	m.hideSidebar = true
 	m = withState(t, m, &viewmodel.State{Sessions: working}, ticketsui.ServerLinkUp)

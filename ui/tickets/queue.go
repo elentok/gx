@@ -125,6 +125,7 @@ type QueueModel struct {
 	// queue_server_down.go). link is only ever set by WithServerState; a tab
 	// with no client is delivered ServerLinkDown, so it shows the banner too.
 	serverAPI   ServerAPI
+	sessions    SessionsAPI
 	serverStart func(context.Context) error
 	link        ServerLink
 	// olderServer: see Model.olderServer.

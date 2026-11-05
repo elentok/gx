@@ -39,7 +39,7 @@ func openedModel(t *testing.T, f *fakeSessionClient, lastViewed string, sessions
 			t.Fatal(err)
 		}
 	}
-	m := NewModel(f, ui.Settings{}).WithLastViewedFile(path)
+	m := newTestModel(f, ui.Settings{}).WithLastViewedFile(path)
 	// Runs before TempDir's cleanup: a late save would race its removal.
 	t.Cleanup(func() { waitIdle(t, m.reporter) })
 	m.sessionsDir = "/sessions"
@@ -201,13 +201,13 @@ func TestFocus_SavesTheSessionOnScreen(t *testing.T) {
 	m.reporter.mu.Lock()
 	path := m.reporter.lastViewedPath
 	m.reporter.mu.Unlock()
-	if got := NewModel(nil, ui.Settings{}).WithLastViewedFile(path).lastViewed; got != "a" {
+	if got := NewModel(nil, nil, ui.Settings{}).WithLastViewedFile(path).lastViewed; got != "a" {
 		t.Fatalf("saved last viewed %q, want a", got)
 	}
 }
 
 func TestFocus_ViewEnablesFocusReporting(t *testing.T) {
-	if !NewModel(nil, ui.Settings{}).View().ReportFocus {
+	if !NewModel(nil, nil, ui.Settings{}).View().ReportFocus {
 		t.Fatal("focus reporting off: focus and blur would never arrive")
 	}
 }

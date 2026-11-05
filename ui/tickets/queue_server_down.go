@@ -28,6 +28,12 @@ func (m QueueModel) WithServerLink(api ServerAPI, start func(context.Context) er
 	return m
 }
 
+// WithSessions gives the tab the session sub-client; see Model.WithSessions.
+func (m QueueModel) WithSessions(s SessionsAPI) QueueModel {
+	m.sessions = s
+	return m
+}
+
 func cmdProbeRequested() tea.Msg { return ProbeRequestedMsg{} }
 
 // serverDown reports the down banner state: the link the shell last delivered.

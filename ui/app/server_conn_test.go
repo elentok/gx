@@ -34,12 +34,20 @@ type fakeServerClient struct {
 	slow     bool
 }
 
+// fakeSessions is the session sub-client; only ReportFocus is reached.
+type fakeSessions struct {
+	agentsui.Sessions
+	ticketsui.SessionsAPI
+}
+
+var _ ServerSessions = fakeSessions{}
+
 func (f *fakeServerClient) EventsAs(ctx context.Context, since uint64, _ string) (<-chan wire.Event, error) {
 	return f.Events(ctx, since)
 }
 
 // ReportFocus is reached: the Agents tab reports on every update.
-func (f *fakeServerClient) ReportFocus(context.Context, wire.FocusReport) (wire.SessionResult, error) {
+func (fakeSessions) ReportFocus(context.Context, wire.FocusReport) (wire.SessionResult, error) {
 	return wire.SessionResult{}, nil
 }
 
@@ -77,7 +85,7 @@ func newServerShellOn(t *testing.T, client ServerClient, tab nav.TabID) Model {
 	m := New(*repo, Settings{
 		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
-		Server:             &ServerDeps{Client: client, Build: "test"},
+		Server:             &ServerDeps{Client: client, Sessions: fakeSessions{}, Build: "test"},
 		Settings: ui.Settings{
 			TicketStore: t.TempDir(),
 			Dirs:        config.DirsFrom([]string{"HOME=" + t.TempDir()}),

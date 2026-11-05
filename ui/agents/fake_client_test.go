@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui"
 )
 
 // fakeSessionClient records every call and answers with result.
@@ -27,7 +28,16 @@ type fakeSessionClient struct {
 	focusResult wire.SessionResult
 }
 
-var _ SessionClient = (*fakeSessionClient)(nil)
+// One recorder plays both the client and its Sessions sub-client, so a test
+// reads every call from one calls list.
+var (
+	_ SessionClient = (*fakeSessionClient)(nil)
+	_ Sessions      = (*fakeSessionClient)(nil)
+)
+
+func newTestModel(f *fakeSessionClient, settings ui.Settings) Model {
+	return NewModel(f, f, settings)
+}
 
 func (f *fakeSessionClient) record(call string) (wire.SessionResult, error) {
 	f.mu.Lock()
@@ -43,23 +53,23 @@ func (f *fakeSessionClient) CreateSession(_ context.Context, req wire.CreateSess
 	return f.record("create " + req.Project)
 }
 
-func (f *fakeSessionClient) StopSession(_ context.Context, id string) (wire.SessionResult, error) {
+func (f *fakeSessionClient) Stop(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("stop " + id)
 }
 
-func (f *fakeSessionClient) RemoveSession(_ context.Context, id string) (wire.SessionResult, error) {
+func (f *fakeSessionClient) Remove(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("remove " + id)
 }
 
-func (f *fakeSessionClient) ResumeSession(_ context.Context, id string) (wire.SessionResult, error) {
+func (f *fakeSessionClient) Resume(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("resume " + id)
 }
 
-func (f *fakeSessionClient) MarkSessionRead(_ context.Context, id string) (wire.SessionResult, error) {
+func (f *fakeSessionClient) MarkRead(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("mark-read " + id)
 }
 
-func (f *fakeSessionClient) RunSessionAction(_ context.Context, id string) (wire.SessionResult, error) {
+func (f *fakeSessionClient) RunAction(_ context.Context, id string) (wire.SessionResult, error) {
 	return f.record("action " + id)
 }
 
