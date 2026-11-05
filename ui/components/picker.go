@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/fuzzy"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -57,7 +58,7 @@ func (s PickerState) Matches() []PickerMatch {
 	}
 	var groups []*group
 	for _, it := range s.Items {
-		score, pos, ok := ui.FuzzyScore(s.Filter, it.Label)
+		score, pos, ok := fuzzy.Score(s.Filter, it.Label)
 		if !ok {
 			continue
 		}
@@ -189,7 +190,7 @@ func RenderPickerList(state PickerState, width int) string {
 			continue
 		}
 		m := matches[r.match]
-		text := "  " + ui.HighlightMatches(m.Item.Label, m.Pos)
+		text := "  " + fuzzy.HighlightMatches(m.Item.Label, m.Pos)
 		if m.Item.Badge != "" {
 			text += " " + stylePickerBadge.Render(m.Item.Badge)
 		}

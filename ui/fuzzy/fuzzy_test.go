@@ -1,4 +1,4 @@
-package ui
+package fuzzy
 
 import "testing"
 
@@ -24,8 +24,8 @@ func TestFuzzyMatch(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := FuzzyMatch(tc.query, tc.fields...); got != tc.want {
-				t.Fatalf("FuzzyMatch(%q, %q) = %v, want %v", tc.query, tc.fields, got, tc.want)
+			if got := Match(tc.query, tc.fields...); got != tc.want {
+				t.Fatalf("Match(%q, %q) = %v, want %v", tc.query, tc.fields, got, tc.want)
 			}
 		})
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/fuzzy"
 )
 
 const createMaxWidth = 80
@@ -265,7 +266,7 @@ func boolCmp(a, b bool) int {
 // positions that fall in the label.
 func (f *createForm) match(e *formEntry) bool {
 	name := f.projects[e.project].Name
-	score, pos, ok := ui.FuzzyScore(f.query, name+" "+entryLabel(f.home, *e))
+	score, pos, ok := fuzzy.Score(f.query, name+" "+entryLabel(f.home, *e))
 	if !ok {
 		return false
 	}
@@ -579,7 +580,7 @@ func (m Model) renderPicker(innerW int) []string {
 			continue
 		}
 		e := f.matches[r.entry]
-		text := "    " + ui.HighlightMatches(entryLabel(f.home, e), e.pos)
+		text := "    " + fuzzy.HighlightMatches(entryLabel(f.home, e), e.pos)
 		if !e.newWorktree() {
 			if n := m.dirSessions(e.dir); n > 0 {
 				text += ui.StyleMuted.Render("  " + plural(n, "session"))

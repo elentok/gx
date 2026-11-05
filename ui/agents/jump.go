@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/fuzzy"
 )
 
 const jumpMaxWidth = 100
@@ -38,7 +39,7 @@ func (j *jumpPopup) attention() bool { return !j.projectOrder }
 func (m Model) jumpMatches() []int {
 	var out []int
 	for i, s := range m.sessions {
-		if ui.FuzzyMatch(m.jump.query, displayName(s), s.Project, s.Dir) {
+		if fuzzy.Match(m.jump.query, displayName(s), s.Project, s.Dir) {
 			out = append(out, i)
 		}
 	}

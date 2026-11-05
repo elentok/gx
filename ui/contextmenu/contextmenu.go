@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/fuzzy"
 )
 
 // Group places an item under a header; groups render in declaration order.
@@ -105,7 +106,7 @@ func (m Menu[T]) visible() []Item[T] {
 	}
 	var out []Item[T]
 	for _, it := range m.items {
-		if ui.FuzzyMatch(m.filter, it.Label) {
+		if fuzzy.Match(m.filter, it.Label) {
 			out = append(out, it)
 		}
 	}

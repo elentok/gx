@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/fuzzy"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -33,7 +34,7 @@ func (s MenuState) Visible() []MenuItem {
 	}
 	out := make([]MenuItem, 0, len(s.Items))
 	for _, it := range s.Items {
-		if ui.FuzzyMatch(s.Filter, it.Label, it.Detail) {
+		if fuzzy.Match(s.Filter, it.Label, it.Detail) {
 			out = append(out, it)
 		}
 	}

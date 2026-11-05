@@ -1,9 +1,11 @@
-package ui
+package fuzzy
 
 import (
 	"slices"
 	"strings"
 	"unicode"
+
+	"github.com/elentok/gx/ui"
 )
 
 // Fuzzy score weights: every matched rune scores, more so at a word start or
@@ -15,12 +17,12 @@ const (
 	maxGapPenalty    = 8
 )
 
-// FuzzyScore matches each space-separated term of query against text as an
+// Score matches each space-separated term of query against text as an
 // in-order subsequence, ignoring case, and ranks the match (unlike
-// FuzzyMatch). ok is false when a term does not match; pos is the matched
+// Match). ok is false when a term does not match; pos is the matched
 // rune indices of text, ascending. An empty query matches everything with
 // score 0.
-func FuzzyScore(query, text string) (score int, pos []int, ok bool) {
+func Score(query, text string) (score int, pos []int, ok bool) {
 	runes := lowerRunes(text)
 	for _, term := range strings.Fields(query) {
 		s, p, found := bestTermMatch(lowerRunes(term), runes)
@@ -108,7 +110,7 @@ func HighlightMatches(text string, pos []int) string {
 			j++
 		}
 		if matched {
-			b.WriteString(StyleFilterMatch.Render(string(runes[i:j])))
+			b.WriteString(ui.StyleFilterMatch.Render(string(runes[i:j])))
 		} else {
 			b.WriteString(string(runes[i:j]))
 		}
