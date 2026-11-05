@@ -18,6 +18,8 @@ var ptyChecks = []Check{
 	{Runner: "pty", Name: "trust-screen", Mode: Fixture, Session: "pty-trust", Run: checkTrustScreen},
 	{Runner: "pty", Name: "permission-dialog", Mode: Fixture, Session: "pty-dialog", Run: checkPermissionDialog},
 	{Runner: "pty", Name: "rate-limit-transcript", Mode: Fixture, Session: "pty-rate-limit", Run: checkRateLimitTranscript},
+	{Runner: "pty", Name: "image-paste", Mode: Fixture, Session: "pty-image-paste", Run: checkImagePaste},
+	{Runner: "pty", Name: "image-paste-slash-record", Mode: Live, Session: "pty-image-slash", Run: checkImageSlash},
 	{Runner: "pty", Name: "holder-survives-kickstart", Mode: Live, Run: checkHolderSurvivesKickstart},
 }
 

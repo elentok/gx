@@ -3,6 +3,7 @@ package claudedoctor_test
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -30,6 +31,72 @@ func TestMain(m *testing.M) {
 		agentfake.TUIClaude()
 	}
 	os.Exit(m.Run())
+}
+
+func fakeImagePty(t *testing.T) *nativerunner.Pty {
+	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.MkdirTemp("", "gxd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(root) })
+	home := t.TempDir()
+	return &nativerunner.Pty{Root: root, Holder: []string{exe}, Claude: exe,
+		Env:          []string{"HOME=" + home, "CLAUDE_CONFIG_DIR=", holderEnv + "=1", agentfake.TUIEnv + "=1", agentfake.TUITrustEnv + "=1"},
+		PollInterval: 10 * time.Millisecond, StartTimeout: 10 * time.Second, PromptGrace: 500 * time.Millisecond}
+}
+
+// chatCwd is a cwd whose fake plays a plain prompt as a chat turn, so the
+// transcript gets the prompt's lines.
+func chatCwd(t *testing.T) string {
+	t.Helper()
+	cwd := t.TempDir()
+	raw, err := json.Marshal(agentfake.WorkerConfig{Chat: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, agentfake.WorkerConfigFile), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return cwd
+}
+
+func TestPtyImagePaste_ChipAndImageBlockUnderDataDirWithSpace(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data dir")
+	rec, err := claudedoctor.PtyImagePaste(fakeImagePty(t), chatCwd(t), dataDir)
+	if err != nil {
+		t.Fatalf("PtyImagePaste: %v", err)
+	}
+	if r := runCheck(t, "image-paste", rec); r.Status != claudedoctor.Pass {
+		t.Errorf("image-paste: %s %s", r.Status, r.Detail)
+	}
+}
+
+// runCheck runs the one named pty check on a live recording.
+func runCheck(t *testing.T, name string, rec claudedoctor.Recording) claudedoctor.Result {
+	t.Helper()
+	src := claudedoctor.Source{Live: true, Session: func(string) (claudedoctor.Recording, error) { return rec, nil }}
+	for _, c := range claudedoctor.Table {
+		if c.Name == name {
+			return claudedoctor.Run([]claudedoctor.Check{c}, "pty", src)[0]
+		}
+	}
+	t.Fatalf("no check %s", name)
+	return claudedoctor.Result{}
+}
+
+func TestPtyImageSlash_RecordsChipOutcome(t *testing.T) {
+	rec, err := claudedoctor.PtyImageSlash(fakeImagePty(t), t.TempDir(), filepath.Join(t.TempDir(), "data dir"))
+	if err != nil {
+		t.Fatalf("PtyImageSlash: %v", err)
+	}
+	if r := runCheck(t, "image-paste-slash-record", rec); r.Status != claudedoctor.Pass {
+		t.Errorf("image-paste-slash-record: %s %s", r.Status, r.Detail)
+	}
 }
 
 func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
@@ -83,7 +150,7 @@ func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
 	for _, r := range claudedoctor.Run(table, "pty", src) {
 		ran[r.Name] = r.Status != claudedoctor.Skip
 		// The recording ends at the trust dialog; no permission dialog is shown.
-		if r.Status == claudedoctor.Fail && r.Name != "permission-dialog" {
+		if r.Status == claudedoctor.Fail && r.Name != "permission-dialog" && r.Name != "image-paste" {
 			t.Errorf("%s failed on the live recording: %s", r.Name, r.Detail)
 		}
 	}

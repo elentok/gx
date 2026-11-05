@@ -72,6 +72,10 @@ func liveDoctorSource() claudedoctor.Source {
 				return claudedoctor.Recording{Events: events}, err
 			case "pty-status", "pty-trust":
 				return ptyRun()
+			case "pty-image-paste":
+				return liveImage(env, claudedoctor.PtyImagePaste)
+			case "pty-image-slash":
+				return liveImage(env, claudedoctor.PtyImageSlash)
 			}
 			return claudedoctor.Recording{}, fmt.Errorf("%w: %s", claudedoctor.ErrNoLiveSession, name)
 		},
@@ -107,6 +111,27 @@ func livePty(env []string) (claudedoctor.Recording, error) {
 		_, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 30*time.Second)
 		return err
 	})
+}
+
+// liveImage runs one real claude through drive with a fresh cwd and an image
+// folder, each in its own temp dir.
+func liveImage(env []string, drive func(p *nativerunner.Pty, cwd, dataDir string) (claudedoctor.Recording, error)) (claudedoctor.Recording, error) {
+	root, err := os.MkdirTemp("", "gxd")
+	if err != nil {
+		return claudedoctor.Recording{}, err
+	}
+	defer os.RemoveAll(root)
+	cwd, err := os.MkdirTemp("", "gx-doctor-pty-")
+	if err != nil {
+		return claudedoctor.Recording{}, err
+	}
+	defer os.RemoveAll(cwd)
+	dataDir, err := os.MkdirTemp("", "gx-doctor-img-")
+	if err != nil {
+		return claudedoctor.Recording{}, err
+	}
+	defer os.RemoveAll(dataDir)
+	return drive(&nativerunner.Pty{Root: root, Env: env}, cwd, dataDir)
 }
 
 // liveTurn runs one real headless turn and returns its raw events.

@@ -65,7 +65,7 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FixtureSource: %v", err)
 	}
-	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "permission-dialog": Pass, "rate-limit-transcript": Pass, "holder-survives-kickstart": Skip}
+	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "permission-dialog": Pass, "rate-limit-transcript": Pass, "image-paste": Pass, "image-paste-slash-record": Skip, "holder-survives-kickstart": Skip}
 	got := map[string]Result{}
 	for _, r := range Run(Table, "pty", src) {
 		got[r.Name] = r
@@ -98,6 +98,43 @@ func TestCheckRateLimitTranscript_FailsWithoutARateLimit(t *testing.T) {
 	} {
 		if detail, ok := checkRateLimitTranscript(in); ok {
 			t.Errorf("%s: passed (%s)", name, detail)
+		}
+	}
+}
+
+func TestCheckImagePaste_FailsWithoutChipOrImageBlock(t *testing.T) {
+	t.Parallel()
+	src, _ := FixtureSource()
+	good, err := src.Session("pty-image-paste")
+	if err != nil {
+		t.Fatal(err)
+	}
+	textOnly := []json.RawMessage{json.RawMessage(`{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Image #1] "}]}}`)}
+	jpeg := []json.RawMessage{json.RawMessage(`{"type":"user","message":{"role":"user","content":[{"type":"image","source":{"media_type":"image/jpeg"}}]}}`)}
+	cases := map[string]struct {
+		rec  Recording
+		want string
+	}{
+		"no image block": {Recording{Events: textOnly, Frames: good.Frames}, "no image block"},
+		"wrong type":     {Recording{Events: jpeg, Frames: good.Frames}, "image/jpeg"},
+		"no chip":        {Recording{Events: good.Events, Frames: []string{"> "}}, "chip"},
+	}
+	for name, c := range cases {
+		detail, ok := checkImagePaste(Input{Recording: c.rec})
+		if ok || !strings.Contains(detail, c.want) {
+			t.Errorf("%s: ok=%v detail=%q, want a failure mentioning %q", name, ok, detail, c.want)
+		}
+	}
+	if detail, ok := checkImagePaste(Input{Recording: good}); !ok {
+		t.Errorf("recorded paste failed: %s", detail)
+	}
+}
+
+func TestCheckImageSlash_NeverFails(t *testing.T) {
+	t.Parallel()
+	for _, rec := range []Recording{{}, {Frames: []string{"[Image #1] /model"}}} {
+		if detail, ok := checkImageSlash(Input{Recording: rec}); !ok {
+			t.Errorf("record-only check failed: %s", detail)
 		}
 	}
 }
