@@ -150,6 +150,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   (`TranscriptPaths`, `FileCache`, `AuthFailures`), the parsed-chat `Cache`, the Grilling round and
   run-end parsers, `DesignContinueAction` and `AcceptsKeys`. It reaches the sessions through the
   `Source` interface (the root implements it as `chatSource`); its tests use a fake `Source`;
+  `server/sessions/` holds the interactive sessions: the `Manager` (create, stop, remove, focus,
+  banner, watches, state) and the `Resumer` (resume, restore, handoff, link, step, fix agent), with
+  `Routes()`. It imports `chat` (never the reverse); the root implements its `Host`, `Prompter`
+  and back-call interfaces and calls `Watches.Close()` at the `session-watches-close` shutdown step;
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

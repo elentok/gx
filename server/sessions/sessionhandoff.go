@@ -32,7 +32,7 @@ func (rs *Resumer) chartingHandoffDue(meta Meta, action []string) bool {
 		rs.mg.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == ralphloop.TierStrongest &&
 		slices.Equal(action, chat.DesignContinueAction(meta.Ticket, meta.Harness)) &&
-		rs.mg.DesignLaunchTier(meta.Ticket) == ralphloop.TierWorker
+		rs.mg.Maps.DesignLaunchTier(meta.Ticket) == ralphloop.TierWorker
 }
 
 // HandoffRefusal is why a Continue of action must not start: it is a charting

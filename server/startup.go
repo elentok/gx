@@ -43,7 +43,7 @@ func (s *Server) startAfterMigrations(ctx context.Context) bool {
 	// Running agents stay invisible to a restart, only a little later.
 	s.startupStep("reclaim-runs", s.reclaimRuns)
 	s.logFlushingRunners()
-	s.sessions.PruneAgentLogs(time.Now())
+	s.sessions.Logs.Prune(time.Now())
 	return true
 }
 

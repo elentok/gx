@@ -2,12 +2,15 @@ package sessions
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	harnesschoice "github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -24,15 +27,23 @@ type Reattacher interface {
 	Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error)
 }
 
-func (mg *Manager) logRetention() time.Duration {
-	if d := mg.settings.Load().LogRetention; d > 0 {
+// AgentLogs prunes the agent logs of every project.
+type AgentLogs struct {
+	ticketStore string
+	log         *slog.Logger
+	settings    *settings.Holder
+	harness     *harnesschoice.Harness
+}
+
+func (al *AgentLogs) logRetention() time.Duration {
+	if d := al.settings.Load().LogRetention; d > 0 {
 		return d
 	}
 	return nativerunner.DefaultLogRetention
 }
 
 // KeepPruned prunes agent logs daily; Serve already pruned once at start.
-func (mg *Manager) KeepPruned(ctx context.Context) {
+func (al *AgentLogs) KeepPruned(ctx context.Context) {
 	ticker := time.NewTicker(pruneInterval)
 	defer ticker.Stop()
 	for {
@@ -40,34 +51,34 @@ func (mg *Manager) KeepPruned(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-ticker.C:
-			mg.PruneAgentLogs(now)
+			al.Prune(now)
 		}
 	}
 }
 
-// PruneAgentLogs removes expired logs of every project's agent directories,
+// Prune removes expired logs of every project's agent directories,
 // whatever runner is configured: the headless runner walks the agents root and
 // prunes each directory by the runner its meta.json names. A paused ticket's
 // logs stay: a person may still need them.
-func (mg *Manager) PruneAgentLogs(now time.Time) {
-	dirs, err := tickets.ProjectDirs(mg.cfg.TicketStore)
+func (al *AgentLogs) Prune(now time.Time) {
+	dirs, err := tickets.ProjectDirs(al.ticketStore)
 	if err != nil {
-		mg.log.Warn("prune agent logs", "err", err)
+		al.log.Warn("prune agent logs", "err", err)
 		return
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
-		p, ok := mg.harness.RunnerNamed(string(agentrunner.ChoiceHeadless), project).(logPruner)
+		p, ok := al.harness.RunnerNamed(string(agentrunner.ChoiceHeadless), project).(logPruner)
 		if !ok {
 			continue
 		}
 		paused := pausedLabels(dir)
-		pruned, err := p.Prune(mg.logRetention(), now, func(label string) bool { return paused[label] })
+		pruned, err := p.Prune(al.logRetention(), now, func(label string) bool { return paused[label] })
 		if err != nil {
-			mg.log.Warn("prune agent logs", "project", project, "err", err)
+			al.log.Warn("prune agent logs", "project", project, "err", err)
 		}
 		if len(pruned) > 0 {
-			mg.log.Info("pruned agent logs", "project", project, "labels", pruned)
+			al.log.Info("pruned agent logs", "project", project, "labels", pruned)
 		}
 	}
 }

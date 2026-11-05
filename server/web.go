@@ -142,8 +142,6 @@ func (s *Server) webHandler() http.Handler {
 			s.snapshot(w, r)
 		case r.URL.Path == "/v1/tickets/detail":
 			s.detail(w, r)
-		case r.URL.Path == "/v1/sessions":
-			s.sessionsRead(w, r)
 		case r.URL.Path == "/v1/epics":
 			s.epicList(w, r)
 		case r.URL.Path == "/v1/epics/detail":
@@ -166,34 +164,25 @@ func (s *Server) webHandler() http.Handler {
 // read-only GETs, each with the handler the web mux uses: the web variants
 // require a state token. There is deliberately no withdraw or undo route.
 var webWrites = map[string]func(*Server) http.HandlerFunc{
-	"POST /v1/tickets/answer":     func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.ticketAnswer) },
-	"POST /v1/tickets/resume":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
-	"POST /v1/tickets/unpark":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
-	"POST /v1/tickets/retry":      func(s *Server) http.HandlerFunc { return s.retryWrite(true) },
-	"POST /v1/tickets/merge":      func(s *Server) http.HandlerFunc { return repairWriteWeb(s.mergeInQueue) },
-	"POST /v1/tickets/start-over": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.startOverInQueue) },
-	"POST /v1/epics/merge":        func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.epicMerge) },
-	"POST /v1/epics/stash-merge":  func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.epicStashMerge) },
-	"POST /v1/agents/answer":      func(s *Server) http.HandlerFunc { return queue.Handler(s.agentAnswerWeb) },
-	"POST /v1/sessions/stop":      func(s *Server) http.HandlerFunc { return s.sessionWriteAgentWeb(s.sessions.StopSession) },
-	"POST /v1/sessions/remove":    func(s *Server) http.HandlerFunc { return s.sessionWriteAgentWeb(s.sessions.RemoveSession) },
-	"POST /v1/sessions/resume":    func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.resumer.ResumeSession) },
-	"POST /v1/sessions/prompt":    func(s *Server) http.HandlerFunc { return s.sessionPromptWeb() },
-	"POST /v1/sessions/keys":      func(s *Server) http.HandlerFunc { return s.sessionKeysWeb() },
-	"POST /v1/sessions/create":    func(s *Server) http.HandlerFunc { return s.sessionCreateWeb },
-	"POST /v1/sessions/interrupt": func(s *Server) http.HandlerFunc {
-		return s.sessionWriteDesignWeb(s.sessions.InterruptSession)
-	},
+	"POST /v1/tickets/answer":        func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.ticketAnswer) },
+	"POST /v1/tickets/resume":        func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
+	"POST /v1/tickets/unpark":        func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
+	"POST /v1/tickets/retry":         func(s *Server) http.HandlerFunc { return s.retryWrite(true) },
+	"POST /v1/tickets/merge":         func(s *Server) http.HandlerFunc { return repairWriteWeb(s.mergeInQueue) },
+	"POST /v1/tickets/start-over":    func(s *Server) http.HandlerFunc { return repairWriteWeb(s.startOverInQueue) },
+	"POST /v1/epics/merge":           func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.epicMerge) },
+	"POST /v1/epics/stash-merge":     func(s *Server) http.HandlerFunc { return queue.HandlerWeb(s.epicStashMerge) },
+	"POST /v1/agents/answer":         func(s *Server) http.HandlerFunc { return queue.Handler(s.agentAnswerWeb) },
+	"POST /v1/sessions/prompt":       func(s *Server) http.HandlerFunc { return s.sessionPromptWeb() },
+	"POST /v1/sessions/keys":         func(s *Server) http.HandlerFunc { return s.sessionKeysWeb() },
 	"POST /v1/sessions/auto-advance": func(s *Server) http.HandlerFunc { return s.sessionAutoAdvanceWeb() },
 	"POST /v1/sessions/auto-advance/cancel": func(s *Server) http.HandlerFunc {
 		return s.sessionWriteDesignWeb(s.cancelAutoAdvanceRoute)
 	},
-	"POST /v1/designs/open":      func(s *Server) http.HandlerFunc { return s.designOpenWeb() },
-	"POST /v1/designs/delete":    func(s *Server) http.HandlerFunc { return s.designDeleteWrite },
-	"POST /v1/tickets/fix-agent": func(s *Server) http.HandlerFunc { return s.fixAgentWeb() },
-	"POST /v1/sessions/focus":    func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
-	"POST /v1/restart":           func(s *Server) http.HandlerFunc { return s.restartWrite },
-	"POST /v1/client-errors":     func(s *Server) http.HandlerFunc { return s.clientErrorReport },
+	"POST /v1/designs/open":   func(s *Server) http.HandlerFunc { return s.designOpenWeb() },
+	"POST /v1/designs/delete": func(s *Server) http.HandlerFunc { return s.designDeleteWrite },
+	"POST /v1/restart":        func(s *Server) http.HandlerFunc { return s.restartWrite },
+	"POST /v1/client-errors":  func(s *Server) http.HandlerFunc { return s.clientErrorReport },
 }
 
 func (s *Server) webNow() time.Time {

@@ -506,33 +506,12 @@ var routeTable = []struct {
 	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentAnswer)(w, r) }},
 	// Interactive sessions; /v1/agents/* is the loop agents'.
-	{"GET /v1/sessions", (*Server).sessionsRead},
-	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
-	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessions.SessionWrite(s.sessions.StopSession)(w, r)
-	}},
-	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessions.SessionWrite(s.sessions.RemoveSession)(w, r)
-	}},
-	{"POST /v1/sessions/mark-read", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessions.SessionWrite(s.markSessionRead)(w, r)
-	}},
-	{"POST /v1/sessions/focus", (*Server).sessionFocusWrite},
-	{"POST /v1/sessions/show", func(s *Server, w http.ResponseWriter, r *http.Request) { sessions.SessionWrite(s.focusSession)(w, r) }},
 	{"POST /v1/sessions/actionable", (*Server).sessionActionableWrite},
-	{"POST /v1/sessions/link", (*Server).sessionLinkWrite},
-	{"POST /v1/sessions/step", (*Server).sessionStepWrite},
 	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) {
 		sessions.SessionWrite(s.runSessionAction)(w, r)
 	}},
-	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessions.SessionWrite(s.resumer.ResumeSession)(w, r)
-	}},
 	{"POST /v1/sessions/prompt", (*Server).sessionPromptWrite},
 	{"POST /v1/sessions/keys", (*Server).sessionKeysWrite},
-	{"POST /v1/sessions/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessions.SessionWrite(s.sessions.InterruptSession)(w, r)
-	}},
 	{"POST /v1/sessions/auto-advance", (*Server).sessionAutoAdvanceWrite},
 	{"POST /v1/sessions/auto-advance/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) {
 		sessions.SessionWrite(s.cancelAutoAdvanceRoute)(w, r)
@@ -540,7 +519,6 @@ var routeTable = []struct {
 	{"POST /v1/designs/open", (*Server).designOpenWrite},
 	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
 	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
-	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.
@@ -765,7 +743,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	claimDone := make(chan struct{})
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
 	pruneDone := make(chan struct{})
-	go func() { defer close(pruneDone); s.sessions.KeepPruned(freshCtx) }()
+	go func() { defer close(pruneDone); s.sessions.Logs.KeepPruned(freshCtx) }()
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.budget.KeepPolled(freshCtx) }()
 	tokensDone := make(chan struct{})

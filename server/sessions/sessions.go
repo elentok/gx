@@ -122,7 +122,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 	}
 	tier := cmp.Or(req.Tier, ralphloop.TierWorker)
 	if sc.LaunchDesign {
-		tier = mg.DesignLaunchTier(req.Ticket)
+		tier = mg.Maps.DesignLaunchTier(req.Ticket)
 	}
 	meta := Meta{
 		Harness:        req.Harness,
@@ -132,7 +132,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		Name:           req.Name,
 		Ticket:         req.Ticket,
 		LaunchDesign:   sc.LaunchDesign,
-		Design:         sc.design || (req.Ticket != "" && mg.OnMapEpic(req.Ticket)),
+		Design:         sc.design || (req.Ticket != "" && mg.Maps.OnMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
 		RemoteControl:  sc.remoteControl,
 		RebaseNote:     req.RebaseNote,
@@ -149,7 +149,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 	}
 	if meta.Design && meta.Ticket != "" {
 		// Cosmetic: a failed stamp must not fail the session.
-		if err := mg.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
+		if err := mg.Maps.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
 			mg.log.Warn("stamp design start", "session", meta.ID, "ticket", meta.Ticket, "err", err)
 		}
 	}

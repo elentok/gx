@@ -21,7 +21,7 @@ func (mg *Manager) SweepDesignCounts() {
 		if r.Grilling != nil {
 			continue
 		}
-		if !r.Design && !(r.Ticket != "" && mg.OnMapEpic(r.Ticket)) {
+		if !r.Design && !(r.Ticket != "" && mg.Maps.OnMapEpic(r.Ticket)) {
 			continue
 		}
 		if err := mg.recountGrilling(agentrunner.Kind(r.Harness), r.ID, r.Dir); err != nil {

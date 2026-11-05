@@ -58,6 +58,9 @@ type Manager struct {
 	banners sessionBanners
 	host    Host
 	Watches *sessionWatches
+	// Logs prunes the agent logs; Maps answers for the map epic of an address.
+	Logs *AgentLogs
+	Maps *MapEpics
 	// prompter is the prompt, turn and auto-advance side the watch loop calls.
 	prompter Prompter
 	// designs is the design cleanup the remove path calls back.
@@ -93,6 +96,8 @@ func NewManager(d ManagerDeps) *Manager {
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
 		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, host: d.Host,
 		Watches: NewSessionWatches(), prompter: d.Prompter,
+		Logs:    &AgentLogs{ticketStore: d.Cfg.TicketStore, log: d.Log, settings: d.Settings, harness: d.Harness},
+		Maps:    &MapEpics{projects: d.Projects},
 		designs: d.Designs, rollouts: d.Rollouts,
 	}
 }
