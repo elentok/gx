@@ -67,4 +67,4 @@ func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
 
 // WebAuth is the web login gate, nil unless the web listener is bound. Tests
 // outside the package read its seams through here.
-func (s *Server) WebAuth() *webauth.Gate { return s.webAuth }
+func (s *Server) WebAuth() *webauth.Gate { return s.web.Gate() }

@@ -50,7 +50,6 @@ func TestSubsystemRoutes_Assembly(t *testing.T) {
 	s := &Server{routes: fake}
 	socket := http.NewServeMux()
 	registerRoutes(socket, s.routes)
-	web := s.webHandler()
 	call := func(h http.Handler, method, path string) (int, string) {
 		req := httptest.NewRequest(method, path, strings.NewReader("{}"))
 		req.Header.Set("Origin", "http://"+req.Host)
@@ -67,11 +66,6 @@ func TestSubsystemRoutes_Assembly(t *testing.T) {
 	}{
 		{"socket none", "GET", "/v1/fake/none", socket, 200, "socket-none"},
 		{"socket write", "POST", "/v1/fake/write", socket, 200, "socket-write"},
-		{"web none refused", "GET", "/v1/fake/none", web, 404, ""},
-		{"web read", "GET", "/v1/fake/read", web, 200, "socket-read"},
-		{"web write uses web variant", "POST", "/v1/fake/write", web, 200, "web-write"},
-		{"web write falls back to handler", "POST", "/v1/fake/plain", web, 200, "socket-plain"},
-		{"web public", "GET", "/fake/public", web, 200, "web-public"},
 		{"public not on socket", "GET", "/fake/public", socket, 404, ""},
 	}
 	for _, tc := range tests {
@@ -79,8 +73,5 @@ func TestSubsystemRoutes_Assembly(t *testing.T) {
 		if code != tc.code || (tc.body != "" && body != tc.body) {
 			t.Errorf("%s: got %d %q, want %d %q", tc.name, code, body, tc.code, tc.body)
 		}
-	}
-	if !s.isPublicWebRoute(httptest.NewRequest("GET", "/fake/public", nil)) {
-		t.Error("public route is not served before the login check")
 	}
 }

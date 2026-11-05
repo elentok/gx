@@ -24,8 +24,8 @@ func (s *Server) reloadAppliers() settings.Appliers {
 		},
 		After: []settings.Applier{
 			func(old, next Settings) func() {
-				if s.webCerts != nil && !reflect.DeepEqual(old.WebAllowedHosts, next.WebAllowedHosts) {
-					if err := s.webCerts.Reissue(); err != nil {
+				if certs := s.web.Certs(); certs != nil && !reflect.DeepEqual(old.WebAllowedHosts, next.WebAllowedHosts) {
+					if err := certs.Reissue(); err != nil {
 						s.log.Error("web certificate re-issue failed", "err", err)
 					}
 				}

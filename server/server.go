@@ -49,7 +49,7 @@ import (
 	"github.com/elentok/gx/server/ticketops"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
-	"github.com/elentok/gx/server/webtls"
+	"github.com/elentok/gx/server/webhttp"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
@@ -97,29 +97,20 @@ type Server struct {
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
 	// prompt holds the auto-advance countdowns and the turn settling.
-	prompt      *sessprompt.Prompt
-	lock        *serverLock
-	ln          net.Listener
-	tcp         net.Listener // nil unless Config.TCPAddr is set
-	http        *http.Server
-	tcpHTTP     *http.Server // the socket's routes behind refuseBrowsers
-	web         net.Listener // nil unless Config.WebAddr is set and bound
-	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
-	webHTTP     *http.Server
-	webErr      string        // why the web bind failed
-	webListenIP net.IP        // nil when the listener binds every interface
-	webCerts    *webtls.Certs // nil unless the web listener is bound
-	clientErrs  ipLimiter
-	// webAuth is the web login store; nil unless the web listener is bound.
-	webAuth    *webauth.Gate
-	webStreams webStreams
-	logf       *rotatingFile
-	log        *slog.Logger
-	idx        *index.Index
-	harness    *harnesschoice.Harness
-	projects   *projects.Registry
-	migrator   *projects.Migrator
-	checks     *projects.Checks
+	prompt   *sessprompt.Prompt
+	lock     *serverLock
+	ln       net.Listener
+	tcp      net.Listener // nil unless Config.TCPAddr is set
+	http     *http.Server
+	tcpHTTP  *http.Server // the socket's routes behind refuseBrowsers
+	web      *webhttp.Web // the web listener; off unless Config.WebAddr is set and bound
+	logf     *rotatingFile
+	log      *slog.Logger
+	idx      *index.Index
+	harness  *harnesschoice.Harness
+	projects *projects.Registry
+	migrator *projects.Migrator
+	checks   *projects.Checks
 
 	queue     *queue.Queue
 	afk       *queue.AFK
@@ -457,7 +448,8 @@ func New(cfg Config) (*Server, error) {
 	registerRoutes(mux, s.routes)
 	s.http = &http.Server{Handler: mux}
 	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
-	s.bindWeb()
+	s.web = s.newWeb()
+	s.web.Bind()
 	// A down herdr never stops the server; it is reported and retried.
 	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
 	s.launcher = sched.NewLauncher(sched.LauncherDeps{
@@ -478,13 +470,13 @@ var routeTable = []struct {
 	handler func(*Server, http.ResponseWriter, *http.Request)
 }{
 	{"GET /v1/handshake", (*Server).handshake},
-	{"GET /v1/web/info", (*Server).webInfo},
-	{"POST /v1/web/new-root", (*Server).webNewRoot},
-	{"POST /v1/web/reset", (*Server).webReset},
-	{"POST /v1/web/reset-authenticator", (*Server).webResetAuthenticator},
-	{"GET /v1/web/login-list", (*Server).webLoginListCLI},
-	{"POST /v1/web/login-revoke", (*Server).webLoginRevokeCLI},
-	{"POST /v1/web/set-password", (*Server).webSetPasswordCLI},
+	{"GET /v1/web/info", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.Info(w, r) }},
+	{"POST /v1/web/new-root", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.NewRoot(w, r) }},
+	{"POST /v1/web/reset", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.Reset(w, r) }},
+	{"POST /v1/web/reset-authenticator", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.ResetAuthenticator(w, r) }},
+	{"GET /v1/web/login-list", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.LoginList(w, r) }},
+	{"POST /v1/web/login-revoke", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.LoginRevoke(w, r) }},
+	{"POST /v1/web/set-password", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.SetPassword(w, r) }},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
@@ -599,7 +591,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if id := webauth.LoginIDFrom(ctx); id != "" {
 		var untrack func()
-		ctx, untrack = s.webStreams.track(ctx, id)
+		ctx, untrack = s.web.Track(ctx, id)
 		defer untrack()
 	}
 	if client := r.URL.Query().Get("client"); client != "" {
@@ -647,12 +639,12 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr}
+	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.web.Err()}
 	h.HerdrText, h.HerdrUnavailable = s.herdr.Banner()
 	h.Migrating = s.migrator.Migrating()
-	if s.web != nil {
+	if s.web.Listener() != nil {
 		var err error
-		if h.WebSetupPending, _, err = s.webAuth.SetupState(); err != nil {
+		if h.WebSetupPending, _, err = s.web.Gate().SetupState(); err != nil {
 			s.log.Error("web setup state unavailable", "err", err)
 		}
 	}
@@ -684,12 +676,12 @@ func (s *Server) Serve(ctx context.Context) error {
 	shutdown := func() error {
 		return errors.Join(s.http.Shutdown(context.Background()), s.tcpHTTP.Shutdown(context.Background()))
 	}
-	if s.web != nil {
+	if ln := s.web.Listener(); ln != nil {
 		shutdown = func() error {
-			return errors.Join(s.http.Shutdown(context.Background()), s.tcpHTTP.Shutdown(context.Background()), s.webHTTP.Shutdown(context.Background()))
+			return errors.Join(s.http.Shutdown(context.Background()), s.tcpHTTP.Shutdown(context.Background()), s.web.Shutdown(context.Background()))
 		}
-		lns = append(lns, s.web)
-		go func() { errc <- s.webHTTP.Serve(s.web) }()
+		lns = append(lns, ln)
+		go func() { errc <- s.web.Serve() }()
 	}
 	go s.migrator.MigrateAll(ctx)
 	// recoverMerges, reclaimRuns, the log prune and the first scan run in

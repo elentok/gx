@@ -1,13 +1,13 @@
-package server
+package webhttp
 
 import (
 	"context"
 	"sync"
 )
 
-// webStreams tracks the open event streams by web login id, so signing a web
+// streams tracks the open event streams by web login id, so signing a web
 // login out can end its streams. The zero value is ready to use.
-type webStreams struct {
+type streams struct {
 	mu     sync.Mutex
 	next   int
 	cancel map[string]map[int]context.CancelFunc
@@ -15,7 +15,7 @@ type webStreams struct {
 
 // track returns a context that ends with ctx or when the login's streams are
 // closed, and the function that stops tracking it.
-func (ws *webStreams) track(ctx context.Context, loginID string) (context.Context, func()) {
+func (ws *streams) track(ctx context.Context, loginID string) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	ws.mu.Lock()
 	defer ws.mu.Unlock()
@@ -40,7 +40,7 @@ func (ws *webStreams) track(ctx context.Context, loginID string) (context.Contex
 }
 
 // closeLogins ends every open stream of the given web logins.
-func (ws *webStreams) closeLogins(ids ...string) {
+func (ws *streams) closeLogins(ids ...string) {
 	ws.mu.Lock()
 	defer ws.mu.Unlock()
 	for _, id := range ids {

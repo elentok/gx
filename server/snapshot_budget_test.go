@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/elentok/gx/server/webhttp"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -32,7 +33,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
 		t.Fatal(err)
 	}
-	route, ok := findRoute(s.routes, "GET /v1/budget", wire.WebNone)
+	route, ok := webhttp.FindRoute(s.routes, "GET /v1/budget", wire.WebNone)
 	if !ok {
 		t.Fatal("no GET /v1/budget route")
 	}
