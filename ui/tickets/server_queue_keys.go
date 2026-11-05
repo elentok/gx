@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // serverDoneMsg reports a finished server write: ok is the success toast, and a
@@ -102,7 +103,7 @@ func (m QueueModel) handleServerDeleteKey() (tea.Model, tea.Cmd) {
 // proposal, and the refusal becomes the toast.
 func (m QueueModel) handleServerApproveKey() (tea.Model, tea.Cmd) {
 	row, ok := m.selectedQueueRow()
-	if m.tickets == nil || !ok || !hasPendingProposal(row.ticket.Body) {
+	if m.tickets == nil || !ok || !rowactions.HasPendingProposal(row.ticket.Body) {
 		return m, nil
 	}
 	api, addr := m.tickets, row.ticket.Path
@@ -185,10 +186,10 @@ func (m QueueModel) updateServerKeys(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 			return m, notify.Error("refused: " + msg.problem), true
 		}
 		return m, notify.Success(msg.ok), true
-	case serverWriteMsg:
-		return m, msg.toast(), true
-	case epicQueuedMsg:
-		return m, msg.toast(), true
+	case rowactions.ServerWriteMsg:
+		return m, msg.Toast(), true
+	case rowactions.EpicQueuedMsg:
+		return m, msg.Toast(), true
 	case serverRemovedMsg:
 		note := notify.Success(fmt.Sprintf("removed %d ticket(s) from the queue", msg.removed))
 		if msg.problem != "" {

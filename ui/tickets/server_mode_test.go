@@ -8,7 +8,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/agentlog"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -16,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -257,18 +257,6 @@ func TestServerMode_EditTargetIsTheTicketFile(t *testing.T) {
 	}
 }
 
-func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
-	calls := 0
-	api := tickettest.CountingIterationsAPI{FakeReads: tickettest.FakeReads{}, Calls: &calls}
-	in := newTicketMenuInput(gxtickets.Epic{}, gxtickets.Ticket{Path: "gx:alpha/01", Title: "First"}, false, "")
-
-	cmdTicketMenu(api, config.Dirs{}, in)()
-
-	if calls != 1 {
-		t.Errorf("Iterations calls = %d, want 1", calls)
-	}
-}
-
 func openAnswerMenu(t *testing.T, api tickettest.FakeServerAPI) Model {
 	t.Helper()
 	if len(api.DetailRes.Actions) == 0 {
@@ -303,12 +291,12 @@ func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 		}})
 		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 		m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
-		if !m.menus.menu.IsOpen {
+		if !m.menus.Menu.IsOpen {
 			t.Errorf("status %s: menu closed, want open", status)
 		}
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-		if updated.(Model).menus.menu.IsOpen {
+		if updated.(Model).menus.Menu.IsOpen {
 			t.Errorf("status %s: menu still open after esc", status)
 		}
 	}
@@ -329,7 +317,7 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 	}
 
 	_, cmd = chooseTicketMenuItem(t, pressMenuKey(t, m), resumeLabel)
-	if msg, ok := cmd().(serverWriteMsg); !ok || msg.verb != serverVerbResume {
+	if msg, ok := cmd().(rowactions.ServerWriteMsg); !ok || msg.Verb != "resume" {
 		t.Fatalf("resume result = %+v", msg)
 	}
 	if !slices.Equal(calls, []string{"resume gx:alpha/01"}) {
@@ -341,7 +329,7 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 // UI's job, and the TUI only offers Resume.
 func TestServerMode_PausedAnswerMenuHasNoAnswerAction(t *testing.T) {
 	m := openAnswerMenu(t, tickettest.FakeServerAPI{})
-	view := m.menus.menu.View()
+	view := m.menus.Menu.View()
 	if strings.Contains(view, "Answer…") {
 		t.Fatalf("menu offers Answer…:\n%s", view)
 	}

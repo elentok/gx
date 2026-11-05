@@ -9,112 +9,112 @@ import (
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
-// The root half of rowMenus: each tab model adapts itself to menuTab and
-// forwards its Update cases. Nothing here belongs with the menus, which never
-// see Model or QueueModel.
+// The root half of rowactions.Menus: each tab model adapts itself to
+// rowactions.Tab and forwards its Update cases. Nothing here belongs with the
+// menus, which never see Model or QueueModel.
 
-// modelMenuTab and queueMenuTab adapt a tab model to menuTab.
+// modelMenuTab and queueMenuTab adapt a tab model to rowactions.Tab.
 type modelMenuTab struct{ m Model }
 
 type queueMenuTab struct{ m QueueModel }
 
-func (m Model) menuEnv() menuEnv {
-	return menuEnv{
-		serverAPI: m.serverAPI, admin: m.admin, reads: m.reads, sessions: m.sessions,
-		tickets: m.tickets, queue: m.queue, link: m.link, settings: m.settings,
-		width: m.width, worktreeRoot: m.worktreeRoot,
+func (m Model) menuEnv() rowactions.Env {
+	return rowactions.Env{
+		ServerAPI: m.serverAPI, Admin: m.admin, Reads: m.reads, Sessions: m.sessions,
+		Tickets: m.tickets, Queue: m.queue, Link: m.link, Settings: m.settings,
+		Width: m.width, WorktreeRoot: m.worktreeRoot,
 	}
 }
 
-func (m QueueModel) menuEnv() menuEnv {
-	return menuEnv{
-		serverAPI: m.serverAPI, admin: m.admin, reads: m.reads, sessions: m.sessions,
-		tickets: m.tickets, queue: m.queue, link: m.link, settings: m.settings,
-		width: m.width, worktreeRoot: m.worktreeRoot,
+func (m QueueModel) menuEnv() rowactions.Env {
+	return rowactions.Env{
+		ServerAPI: m.serverAPI, Admin: m.admin, Reads: m.reads, Sessions: m.sessions,
+		Tickets: m.tickets, Queue: m.queue, Link: m.link, Settings: m.settings,
+		Width: m.width, WorktreeRoot: m.worktreeRoot,
 	}
 }
 
-func (t modelMenuTab) env() menuEnv                             { return t.m.menuEnv() }
-func (t modelMenuTab) modalOpen() bool                          { return t.m.ModalOpen() }
-func (t modelMenuTab) yankSummary() tea.Cmd                     { return t.m.yankTicketSummary() }
-func (t modelMenuTab) yankFilePath() tea.Cmd                    { return t.m.yankTicketFilePath() }
-func (t modelMenuTab) editFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmdEditSelectedFile(s) }
+func (t modelMenuTab) Env() rowactions.Env                      { return t.m.menuEnv() }
+func (t modelMenuTab) ModalOpen() bool                          { return t.m.ModalOpen() }
+func (t modelMenuTab) YankSummary() tea.Cmd                     { return t.m.yankTicketSummary() }
+func (t modelMenuTab) YankFilePath() tea.Cmd                    { return t.m.yankTicketFilePath() }
+func (t modelMenuTab) EditFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmdEditSelectedFile(s) }
 
-func (t modelMenuTab) selection() menuSelection {
+func (t modelMenuTab) Selection() rowactions.Selection {
 	m := t.m
 	r, ok := m.selectedRow()
 	if !ok {
-		return menuSelection{}
+		return rowactions.Selection{}
 	}
 	epic := m.epicAt(r)
 	if r.isEpic() {
-		return menuSelection{
-			ok: true, isEpic: true, epic: epic, archived: r.archived,
-			session:   rowactions.EpicSession(m.vm.Sessions, epic.Path),
-			queueable: epicQueueable(epic, m.vm.Queue),
-			actions:   epicSummaryActions(m.vm.Epics, epic.Name),
+		return rowactions.Selection{
+			OK: true, IsEpic: true, Epic: epic, Archived: r.archived,
+			Session:   rowactions.EpicSession(m.vm.Sessions, epic.Path),
+			Queueable: rowactions.EpicQueueable(epic, m.vm.Queue),
+			Actions:   rowactions.EpicSummaryActions(m.vm.Epics, epic.Name),
 		}
 	}
 	ticket := epic.Tickets[r.ticketIdx]
-	return menuSelection{
-		ok: true, epic: epic, ticket: ticket, archived: r.archived,
-		session:    rowactions.TicketSession(m.vm.Sessions, epic.Path, ticket),
-		queueAgent: rowactions.QueueAgentOf(m.vm.Sessions, ticket.Path),
+	return rowactions.Selection{
+		OK: true, Epic: epic, Ticket: ticket, Archived: r.archived,
+		Session:    rowactions.TicketSession(m.vm.Sessions, epic.Path, ticket),
+		QueueAgent: rowactions.QueueAgentOf(m.vm.Sessions, ticket.Path),
 	}
 }
 
-func (t queueMenuTab) env() menuEnv                             { return t.m.menuEnv() }
-func (t queueMenuTab) modalOpen() bool                          { return t.m.ModalOpen() }
-func (t queueMenuTab) yankSummary() tea.Cmd                     { return t.m.yankQueueTicketSummary() }
-func (t queueMenuTab) yankFilePath() tea.Cmd                    { return t.m.yankQueueTicketFilePath() }
-func (t queueMenuTab) editFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmdEditSelectedFile(s) }
+func (t queueMenuTab) Env() rowactions.Env                      { return t.m.menuEnv() }
+func (t queueMenuTab) ModalOpen() bool                          { return t.m.ModalOpen() }
+func (t queueMenuTab) YankSummary() tea.Cmd                     { return t.m.yankQueueTicketSummary() }
+func (t queueMenuTab) YankFilePath() tea.Cmd                    { return t.m.yankQueueTicketFilePath() }
+func (t queueMenuTab) EditFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmdEditSelectedFile(s) }
 
-func (t queueMenuTab) selection() menuSelection {
+func (t queueMenuTab) Selection() rowactions.Selection {
 	m := t.m
 	if epic, ok := m.selectedQueueEpic(); ok {
-		return menuSelection{
-			ok: true, isEpic: true, epic: epic,
-			queueable: epicQueueable(epic, m.checkedPaths()),
-			actions:   m.summaries[epic.Name].Actions,
+		return rowactions.Selection{
+			OK: true, IsEpic: true, Epic: epic,
+			Queueable: rowactions.EpicQueueable(epic, m.checkedPaths()),
+			Actions:   m.summaries[epic.Name].Actions,
 		}
 	}
 	r, ok := m.selectedQueueRow()
 	if !ok {
-		return menuSelection{}
+		return rowactions.Selection{}
 	}
-	return menuSelection{ok: true, epic: r.epic, ticket: r.ticket}
+	return rowactions.Selection{OK: true, Epic: r.epic, Ticket: r.ticket}
 }
 
 // handleSuggestedActionsKey applies the "m" keymap.
 func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
-	cmd := m.menus.handleKey(modelMenuTab{m})
+	cmd := m.menus.HandleKey(modelMenuTab{m})
 	return m, cmd
 }
 
-func (m Model) handleTicketMenuReady(msg ticketMenuReadyMsg) (Model, tea.Cmd) {
-	cmd := m.menus.handleReady(msg, modelMenuTab{m})
+func (m Model) handleTicketMenuReady(msg rowactions.TicketReadyMsg) (Model, tea.Cmd) {
+	cmd := m.menus.HandleReady(msg, modelMenuTab{m})
 	return m, cmd
 }
 
-func (m Model) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.Cmd) {
-	return m, m.menus.handleTicketPick(msg, modelMenuTab{m}).cmd
+func (m Model) handleTicketMenuPick(msg rowactions.TicketPickMsg) (tea.Model, tea.Cmd) {
+	return m, m.menus.HandleTicketPick(msg, modelMenuTab{m}).Cmd
 }
 
-func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
-	return m, m.menus.handleEpicPick(msg, modelMenuTab{m})
+func (m Model) handleEpicMenuPick(msg rowactions.EpicPickMsg) (tea.Model, tea.Cmd) {
+	return m, m.menus.HandleEpicPick(msg, modelMenuTab{m})
 }
 
 func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
-	return resumeEnter(modelMenuTab{m})
+	return rowactions.ResumeEnter(modelMenuTab{m})
 }
 
 func (m Model) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Ticket, archived bool) bool {
-	return m.menus.hasSuggestedActions(m.menuEnv(), epic, ticket, archived)
+	return m.menus.HasSuggestedActions(m.menuEnv(), epic, ticket, archived)
 }
 
 // selectedTicketPath is the selected ticket row's path, or "" off a ticket.
 func (m Model) selectedTicketPath() string {
-	return modelMenuTab{m}.selection().ticketPath()
+	return modelMenuTab{m}.Selection().TicketPath()
 }
 
 // menuAnchor is the selected sidebar row on screen, under the panel's
@@ -127,9 +127,9 @@ func (m Model) menuAnchor() contextmenu.Anchor {
 	return contextmenu.Anchor{X: 1, Y: 1 + line, H: h}
 }
 
-// handleStatusChanged applies statusChangedMsg. Up mode does nothing: the
-// store watch turns the file write into a ticket-changed event. Down mode has
-// no stream, so it reloads from disk.
+// handleStatusChanged applies rowactions.StatusChangedMsg. Up mode does
+// nothing: the store watch turns the file write into a ticket-changed event.
+// Down mode has no stream, so it reloads from disk.
 func (m Model) handleStatusChanged() (tea.Model, tea.Cmd) {
 	if m.readsDisk() {
 		return m, m.cmdLoadDisk()
@@ -151,7 +151,7 @@ func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.C
 
 // handleQueueTicketMenuKey applies the "m" keymap.
 func (m QueueModel) handleQueueTicketMenuKey() (tea.Model, tea.Cmd) {
-	cmd := m.menus.handleKey(queueMenuTab{m})
+	cmd := m.menus.HandleKey(queueMenuTab{m})
 	return m, cmd
 }
 
@@ -161,25 +161,25 @@ func (m QueueModel) selectedQueuePath() string {
 	return r.ticket.Path
 }
 
-func (m QueueModel) handleTicketMenuReady(msg ticketMenuReadyMsg) (QueueModel, tea.Cmd) {
-	cmd := m.menus.handleReady(msg, queueMenuTab{m})
+func (m QueueModel) handleTicketMenuReady(msg rowactions.TicketReadyMsg) (QueueModel, tea.Cmd) {
+	cmd := m.menus.HandleReady(msg, queueMenuTab{m})
 	return m, cmd
 }
 
-func (m QueueModel) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.Cmd) {
-	res := m.menus.handleTicketPick(msg, queueMenuTab{m})
-	if res.approve {
+func (m QueueModel) handleTicketMenuPick(msg rowactions.TicketPickMsg) (tea.Model, tea.Cmd) {
+	res := m.menus.HandleTicketPick(msg, queueMenuTab{m})
+	if res.Approve {
 		return m.handleServerApproveKey()
 	}
-	return m, res.cmd
+	return m, res.Cmd
 }
 
-func (m QueueModel) handleQueueEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
-	return m, m.menus.handleEpicPick(msg, queueMenuTab{m})
+func (m QueueModel) handleQueueEpicMenuPick(msg rowactions.EpicPickMsg) (tea.Model, tea.Cmd) {
+	return m, m.menus.HandleEpicPick(msg, queueMenuTab{m})
 }
 
 func (m QueueModel) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Ticket) bool {
-	return m.menus.hasSuggestedActions(m.menuEnv(), epic, ticket, false)
+	return m.menus.HasSuggestedActions(m.menuEnv(), epic, ticket, false)
 }
 
 // selectedQueueEpic is the selected epic header's epic; ok is false off one.

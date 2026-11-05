@@ -23,15 +23,15 @@ import (
 
 // requestQueueMenu presses "m" and returns the ready message its cmd
 // resolves, not yet delivered.
-func requestQueueMenu(t *testing.T, m QueueModel) (QueueModel, ticketMenuReadyMsg) {
+func requestQueueMenu(t *testing.T, m QueueModel) (QueueModel, rowactions.TicketReadyMsg) {
 	t.Helper()
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	if cmd == nil {
 		t.Fatal("m issued no cmd")
 	}
-	ready, ok := cmd().(ticketMenuReadyMsg)
+	ready, ok := cmd().(rowactions.TicketReadyMsg)
 	if !ok {
-		t.Fatalf("m resolved to %T, want ticketMenuReadyMsg", ready)
+		t.Fatalf("m resolved to %T, want rowactions.TicketReadyMsg", ready)
 	}
 	return updated.(QueueModel), ready
 }
@@ -41,7 +41,7 @@ func openQueueMenu(t *testing.T, m QueueModel) QueueModel {
 	m, ready := requestQueueMenu(t, m)
 	updated, _ := m.Update(ready)
 	m = updated.(QueueModel)
-	if !m.menus.menu.IsOpen {
+	if !m.menus.Menu.IsOpen {
 		t.Fatal("context menu did not open")
 	}
 	return m
@@ -80,11 +80,11 @@ func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) 
 	m := queueWithTicket(t, newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls, DetailRes: d}), schema.PauseManual, nil)
 	m, ready := requestQueueMenu(t, m)
 
-	in := newTicketMenuInput(m.epics[0], m.epics[0].Tickets[0], false, "")
-	in.detail = &d
-	tabs := ticketMenuItems(in)
+	// The Tickets tab's menu for the same ticket, without the Queue group.
+	var tabsMenu rowactions.Menus
+	tabs := tabsMenu.HandleKey(queueMenuTab{m})().(rowactions.TicketReadyMsg).Items
 	want := slices.Insert(groupsOf(tabs), slices.Index(groupsOf(tabs), contextmenu.EditCopy), contextmenu.Queue)
-	if got := groupsOf(ready.items); !slices.Equal(got, want) {
+	if got := groupsOf(ready.Items); !slices.Equal(got, want) {
 		t.Errorf("groups = %v, want %v", got, want)
 	}
 
@@ -97,13 +97,13 @@ func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) 
 	if cmd == nil {
 		t.Fatal("resume issued no cmd")
 	}
-	if msg, ok := cmd().(serverWriteMsg); !ok || msg.problem != "" {
+	if msg, ok := cmd().(rowactions.ServerWriteMsg); !ok || msg.Problem != "" {
 		t.Fatalf("resume result = %+v", msg)
 	}
 	if !slices.Equal(calls, []string{"resume gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
 	}
-	if m.menus.menu.IsOpen {
+	if m.menus.Menu.IsOpen {
 		t.Error("menu still open after a pick")
 	}
 }
@@ -126,7 +126,7 @@ func TestQueueTicketMenu_ServerTicketMutesEnableUnmute(t *testing.T) {
 	})
 	m = selectFirstQueueTicketRow(t, m)
 	_, ready := requestQueueMenu(t, m)
-	item := itemByLabel(t, ready.items, "Unmute & Reopen")
+	item := itemByLabel(t, ready.Items, "Unmute & Reopen")
 	if item.Disabled != "" || item.Group != contextmenu.Suggested {
 		t.Errorf("unmute = %+v, want enabled in Suggested", item)
 	}
@@ -140,7 +140,7 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 	_, ready := requestQueueMenu(t, m)
-	item := itemByLabel(t, ready.items, label)
+	item := itemByLabel(t, ready.Items, label)
 	if item.Group != contextmenu.Queue || item.Key != "A" || item.Disabled != "" {
 		t.Errorf("approve = group %v key %q disabled %q", item.Group, item.Key, item.Disabled)
 	}
@@ -155,8 +155,8 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
 	_, ready = requestQueueMenu(t, m)
-	if got := itemByLabel(t, ready.items, label).Disabled; got != noProposal {
-		t.Errorf("approve with no proposal disabled = %q, want %q", got, noProposal)
+	if got := itemByLabel(t, ready.Items, label).Disabled; got != "no recovery proposal" {
+		t.Errorf("approve with no proposal disabled = %q, want %q", got, "no recovery proposal")
 	}
 }
 
@@ -173,7 +173,7 @@ func TestQueueTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 
 	m, ready := requestQueueMenu(t, m)
 	for _, label := range append(orchestrationLabels(), "Approve recovery proposal") {
-		if got := itemByLabel(t, ready.items, label).Disabled; got != rowactions.ServerNotRunning {
+		if got := itemByLabel(t, ready.Items, label).Disabled; got != rowactions.ServerNotRunning {
 			t.Errorf("%s disabled = %q, want %q", label, got, rowactions.ServerNotRunning)
 		}
 	}
@@ -211,7 +211,7 @@ func TestQueueTicketMenu_StaleLivenessOpensNothing(t *testing.T) {
 			m, ready := requestQueueMenu(t, m)
 			m = stale(m)
 			updated, _ := m.Update(ready)
-			if updated.(QueueModel).menus.menu.IsOpen {
+			if updated.(QueueModel).menus.Menu.IsOpen {
 				t.Error("a stale liveness result opened the menu")
 			}
 		})

@@ -6,11 +6,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/notify"
 )
-
-var ticketsClipboardWrite = clip.Write
 
 // formatTicketSummary renders a ticket for the "yy" chord: "{epic} - {id}
 // {title}", mirroring the "%s %s" id+title format already used across this
@@ -28,9 +25,9 @@ func (m Model) yankTicketSummary() tea.Cmd {
 	}
 	epic := m.epicAt(r)
 	if r.isEpic() {
-		return m.editor.yank(epic.Name, "epic")
+		return m.editor.Yank(epic.Name, "epic")
 	}
-	return m.editor.yank(formatTicketSummary(epic.Name, epic.Tickets[r.ticketIdx]), "ticket")
+	return m.editor.Yank(formatTicketSummary(epic.Name, epic.Tickets[r.ticketIdx]), "ticket")
 }
 
 // yankTicketFilePath implements the Tickets tab's "yf" chord: copies the
@@ -40,20 +37,20 @@ func (m Model) yankTicketFilePath() tea.Cmd {
 	if !ok {
 		return notify.Warning(warning)
 	}
-	return m.editor.yank(path, "file path")
+	return m.editor.Yank(path, "file path")
 }
 
 // yankQueueTicketSummary is the Queue tab's counterpart to
 // Model.yankTicketSummary ("yy").
 func (m QueueModel) yankQueueTicketSummary() tea.Cmd {
 	if epic, ok := m.selectedQueueEpic(); ok {
-		return m.editor.yank(epic.Name, "epic")
+		return m.editor.Yank(epic.Name, "epic")
 	}
 	r, ok := m.selectedQueueRow()
 	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	return m.editor.yank(formatTicketSummary(r.epic.Name, r.ticket), "ticket")
+	return m.editor.Yank(formatTicketSummary(r.epic.Name, r.ticket), "ticket")
 }
 
 // yankQueueTicketFilePath is the Queue tab's counterpart to
@@ -63,5 +60,5 @@ func (m QueueModel) yankQueueTicketFilePath() tea.Cmd {
 	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	return m.editor.yank(r.ticket.FilePath(), "file path")
+	return m.editor.Yank(r.ticket.FilePath(), "file path")
 }

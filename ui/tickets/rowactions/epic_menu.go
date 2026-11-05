@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -16,16 +16,15 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/preview"
-	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
-// epicMenuPickMsg carries an epic Context menu pick back to Update. status is
+// EpicPickMsg carries an epic Context menu pick back to Update. Status is
 // set for a Status pick.
-type epicMenuPickMsg struct {
-	target rowactions.TicketTarget
-	action string
-	status schema.Status
+type EpicPickMsg struct {
+	Target TicketTarget
+	Action string
+	Status schema.Status
 }
 
 const (
@@ -59,28 +58,28 @@ type epicMenuInput struct {
 // epicMenuItems lists every action for an epic, in the shape of
 // ticketMenuItems: an action that applies is Suggested, one that doesn't is
 // dim with the reason.
-func epicMenuItems(in epicMenuInput) []contextmenu.Item[rowactions.TicketTarget] {
-	item := func(label, key string, group contextmenu.Group, disabled string, msg epicMenuPickMsg) contextmenu.Item[rowactions.TicketTarget] {
-		return contextmenu.Item[rowactions.TicketTarget]{
+func epicMenuItems(in epicMenuInput) []contextmenu.Item[TicketTarget] {
+	item := func(label, key string, group contextmenu.Group, disabled string, msg EpicPickMsg) contextmenu.Item[TicketTarget] {
+		return contextmenu.Item[TicketTarget]{
 			Label: label, Key: key, Group: group, Disabled: disabled,
-			Run: func(t rowactions.TicketTarget) tea.Cmd {
+			Run: func(t TicketTarget) tea.Cmd {
 				msg := msg
-				msg.target = t
+				msg.Target = t
 				return func() tea.Msg { return msg }
 			},
 		}
 	}
-	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[rowactions.TicketTarget] {
-		return item(label, key, group, disabled, epicMenuPickMsg{action: action})
+	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[TicketTarget] {
+		return item(label, key, group, disabled, EpicPickMsg{Action: action})
 	}
 	epic := in.epic
 
-	var items []contextmenu.Item[rowactions.TicketTarget]
+	var items []contextmenu.Item[TicketTarget]
 	if epic.IsMap {
 		if in.session != "" {
-			items = append(items, rowactions.GoToSessionItem(in.session))
+			items = append(items, GoToSessionItem(in.session))
 		}
-		items = append(items, pick(rowactions.StartSessionLabel, "", rowactions.ActionStartSession, contextmenu.Suggested, ""))
+		items = append(items, pick(StartSessionLabel, "", ActionStartSession, contextmenu.Suggested, ""))
 	}
 	mergeWhy := firstReason(reasonIf(!epic.AllDone(), ticketsNotDone), reasonIf(!epic.MergedAt.IsZero(), alreadyMerged))
 	mergeGroup := contextmenu.Server
@@ -91,7 +90,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[rowactions.TicketTarget]
 	if in.branch != "" {
 		mergeLabel += " into " + in.branch
 	}
-	mergeItem := pick(mergeLabel, "", rowactions.ActionMerge, mergeGroup, firstReason(in.serverReason, mergeWhy))
+	mergeItem := pick(mergeLabel, "", ActionMerge, mergeGroup, firstReason(in.serverReason, mergeWhy))
 	if len(in.actions) == 0 {
 		items = append(items, mergeItem)
 	}
@@ -106,7 +105,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[rowactions.TicketTarget]
 		v, ok := schema.VerbOfWord(word)
 		switch word {
 		case wire.ActionStashMerge:
-			it := pick(v.Label(), "", rowactions.ActionStashMerge, contextmenu.Suggested, blockedWhy)
+			it := pick(v.Label(), "", ActionStashMerge, contextmenu.Suggested, blockedWhy)
 			it.Help = v.Tooltip()
 			items = append(items, it)
 		case wire.ActionMerge:
@@ -121,7 +120,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[rowactions.TicketTarget]
 	current := schema.Status(strings.ToLower(strings.TrimSpace(epic.Status)))
 	for _, status := range epicDirectStatuses {
 		items = append(items, item("Set "+string(status), "", contextmenu.Status,
-			reasonIf(status == current, "already "+string(status)), epicMenuPickMsg{status: status}))
+			reasonIf(status == current, "already "+string(status)), EpicPickMsg{Status: status}))
 	}
 
 	items = append(items,
@@ -140,9 +139,9 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[rowactions.TicketTarget]
 	return items
 }
 
-// epicSummaryActions is the Actions of the summary for address, nil when the
+// EpicSummaryActions is the Actions of the summary for address, nil when the
 // server sent none.
-func epicSummaryActions(sums []wire.EpicSummary, address string) []string {
+func EpicSummaryActions(sums []wire.EpicSummary, address string) []string {
 	for _, s := range sums {
 		if s.Address == address {
 			return s.Actions
@@ -151,10 +150,10 @@ func epicSummaryActions(sums []wire.EpicSummary, address string) []string {
 	return nil
 }
 
-func openEpicContextMenu(menu contextmenu.Menu[rowactions.TicketTarget], in epicMenuInput) contextmenu.Menu[rowactions.TicketTarget] {
+func openEpicContextMenu(menu contextmenu.Menu[TicketTarget], in epicMenuInput) contextmenu.Menu[TicketTarget] {
 	// In server mode Name is the "project:epic" address the merge and start
 	// session want; Path is what the selection is matched against.
-	target := rowactions.TicketTarget{Address: in.epic.Path, EpicName: in.epic.Name}
+	target := TicketTarget{Address: in.epic.Path, EpicName: in.epic.Name}
 	return menu.Open(target, fmt.Sprintf("Epic %q", in.epic.Name), epicMenuItems(in))
 }
 
@@ -169,10 +168,10 @@ func queueWhy(epic tickets.Epic, queueable bool) string {
 	return reasonIf(!queueable, nothingToQueue)
 }
 
-// epicQueueable reports whether epic has an open ticket and no queue entry
+// EpicQueueable reports whether epic has an open ticket and no queue entry
 // yet. It goes by the frontmatter status, not the rendered one, so blocked
 // tickets count and the server decides on them.
-func epicQueueable(epic tickets.Epic, queue []string) bool {
+func EpicQueueable(epic tickets.Epic, queue []string) bool {
 	if epic.QueueRefusal() != tickets.QueueRefusalNone || slices.Contains(queue, epic.Path) {
 		return false
 	}
@@ -182,29 +181,30 @@ func epicQueueable(epic tickets.Epic, queue []string) bool {
 	})
 }
 
-// epicQueuedMsg reports a finished Add epic to queue: how many addresses the
+// EpicQueuedMsg reports a finished Add epic to queue: how many addresses the
 // server took and the refusals as "address: reason".
-type epicQueuedMsg struct {
-	queued   int
-	refusals []string
+type EpicQueuedMsg struct {
+	Queued   int
+	Refusals []string
 }
 
-func (msg epicQueuedMsg) toast() tea.Cmd {
-	return tabapi.QueuedToast(msg.queued, msg.refusals)
+// Toast reports the queue outcome on the status line.
+func (msg EpicQueuedMsg) Toast() tea.Cmd {
+	return tabapi.QueuedToast(msg.Queued, msg.Refusals)
 }
 
 // cmdQueueEpic queues the epic as one entry and reports the outcome as an
-// epicQueuedMsg.
+// EpicQueuedMsg.
 func cmdQueueEpic(q tabapi.QueueAPI, epicAddress string) tea.Cmd {
 	return func() tea.Msg {
 		queued, refusals := tabapi.QueueAddresses(context.Background(), q.Add, []string{epicAddress})
-		return epicQueuedMsg{queued: queued, refusals: refusals}
+		return EpicQueuedMsg{Queued: queued, Refusals: refusals}
 	}
 }
 
-// epicFile is epic's ticket.md: resolved by address under store in server
+// EpicFile is epic's ticket.md: resolved by address under store in server
 // mode, else from its directory.
-func epicFile(store string, epic tickets.Epic) (string, error) {
+func EpicFile(store string, epic tickets.Epic) (string, error) {
 	if project, name, ok := tickets.ParseEpicAddress(epic.Path); ok {
 		return tickets.EpicTicketMDPath(filepath.Join(store, project), project, name)
 	}
@@ -218,7 +218,7 @@ func epicFile(store string, epic tickets.Epic) (string, error) {
 // a running server, like cmdApplyTicketStatus.
 func cmdApplyEpicStatus(tix tabapi.TicketsAPI, store string, epic tickets.Epic, status schema.Status) tea.Cmd {
 	return func() tea.Msg {
-		file, err := epicFile(store, epic)
+		file, err := EpicFile(store, epic)
 		if err == nil {
 			s := string(status)
 			err = tickets.UpdateEpicFields(file, tickets.EpicUpdate{Status: &s})
@@ -229,6 +229,6 @@ func cmdApplyEpicStatus(tix tabapi.TicketsAPI, store string, epic tickets.Epic, 
 		if tix != nil {
 			_ = tix.Changed(context.Background(), epic.Path)
 		}
-		return statusChangedMsg{}
+		return StatusChangedMsg{}
 	}
 }

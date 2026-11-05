@@ -7,9 +7,10 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
-var muted = []schema.MuteRecord{{EventType: "notification-storm"}}
+var muted = tickettest.Muted
 
 func queueWithTicket(t *testing.T, m QueueModel, reason schema.PauseReason, mutes []schema.MuteRecord) QueueModel {
 	t.Helper()

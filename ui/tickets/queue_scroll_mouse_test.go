@@ -331,9 +331,9 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	} {
 		updated, cmd := m.Update(click)
 		got := updated.(QueueModel)
-		if got.queueTree.SelectedIndex() != start || got.menus.menu.IsOpen || got.menus.pending != "" || cmd != nil {
+		if got.queueTree.SelectedIndex() != start || got.menus.Menu.IsOpen || got.menus.Pending != "" || cmd != nil {
 			t.Errorf("%s: expected a right click to do nothing, got selection=%d menuOpen=%v pending=%q cmd=%v",
-				name, got.queueTree.SelectedIndex(), got.menus.menu.IsOpen, got.menus.pending, cmd != nil)
+				name, got.queueTree.SelectedIndex(), got.menus.Menu.IsOpen, got.menus.Pending, cmd != nil)
 		}
 	}
 
@@ -342,14 +342,14 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	if m.queueTree.SelectedIndex() != secondTicket {
 		t.Fatalf("expected right click to select row %d, got %d", secondTicket, m.queueTree.SelectedIndex())
 	}
-	if want := tickettest.TicketPath(root, "alpha", "02-second.md"); m.menus.pending != want || cmd == nil {
-		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.menus.pending, cmd != nil)
+	if want := tickettest.TicketPath(root, "alpha", "02-second.md"); m.menus.Pending != want || cmd == nil {
+		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.menus.Pending, cmd != nil)
 	}
 
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicName])})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != rowOf[nodeEpicName] || !m.menus.menu.IsOpen || !strings.Contains(m.menus.menu.View(), "Add epic to queue") {
-		t.Fatalf("expected the epic menu open on the epic header, got selection=%d view:\n%s", m.queueTree.SelectedIndex(), m.menus.menu.View())
+	if m.queueTree.SelectedIndex() != rowOf[nodeEpicName] || !m.menus.Menu.IsOpen || !strings.Contains(m.menus.Menu.View(), "Add epic to queue") {
+		t.Fatalf("expected the epic menu open on the epic header, got selection=%d view:\n%s", m.queueTree.SelectedIndex(), m.menus.Menu.View())
 	}
 }
 

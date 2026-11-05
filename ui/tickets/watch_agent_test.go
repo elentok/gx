@@ -249,14 +249,14 @@ func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
 	undo := failOnNativeLog(t)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	undo()
-	if updated.(Model).menus.menu.IsOpen {
+	if updated.(Model).menus.Menu.IsOpen {
 		t.Fatal("menu opened before liveness resolved")
 	}
 	if cmd == nil {
 		t.Fatal("m issued no cmd")
 	}
 	updated, _ = updated.(Model).Update(cmd())
-	if !updated.(Model).menus.menu.IsOpen {
+	if !updated.(Model).menus.Menu.IsOpen {
 		t.Error("menu closed after liveness resolved, want open")
 	}
 }
@@ -288,7 +288,7 @@ func TestMenuReady_DroppedWhenStale(t *testing.T) {
 			m, ready := requestMenu(t)
 			updated, _ := m.Update(key)
 			updated, _ = updated.(Model).Update(ready)
-			if updated.(Model).menus.menu.IsOpen {
+			if updated.(Model).menus.Menu.IsOpen {
 				t.Error("stale ready message opened the menu")
 			}
 		})
@@ -300,7 +300,7 @@ func TestMenuReady_DroppedAfterLeavingAndReturning(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	updated, _ = updated.(Model).Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	updated, _ = updated.(Model).Update(ready)
-	if updated.(Model).menus.menu.IsOpen {
+	if updated.(Model).menus.Menu.IsOpen {
 		t.Error("ready message opened the menu after the selection moved away")
 	}
 }
@@ -310,7 +310,7 @@ func TestMenuReady_DeliveredOnce(t *testing.T) {
 	updated, _ := m.Update(ready)
 	updated, _ = updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	updated, _ = updated.(Model).Update(ready)
-	if updated.(Model).menus.menu.IsOpen {
+	if updated.(Model).menus.Menu.IsOpen {
 		t.Error("a second delivery of the same ready message reopened the menu")
 	}
 }
@@ -428,7 +428,7 @@ func TestWatch_NoOrPrunedLogDims(t *testing.T) {
 		t.Run(name+"/tickets", func(t *testing.T) {
 			fakeNativeLog(t, c.log, c.err)
 			_, ready := requestTicketMenu(t, watchTicketTab(t, "claimed"))
-			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NoAgentLog {
+			if got := itemByLabel(t, ready.Items, "Watch").Disabled; got != rowactions.NoAgentLog {
 				t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 			}
 		})
@@ -436,7 +436,7 @@ func TestWatch_NoOrPrunedLogDims(t *testing.T) {
 			fakeNativeLog(t, c.log, c.err)
 			m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
 			_, ready := requestQueueMenu(t, m)
-			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NoAgentLog {
+			if got := itemByLabel(t, ready.Items, "Watch").Disabled; got != rowactions.NoAgentLog {
 				t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 			}
 		})
@@ -498,17 +498,17 @@ func TestWatch_HerdrDimReasons(t *testing.T) {
 		fakeHerdrOnlyLog(t)
 		m := watchTicketTab(t, "claimed").WithServer(herdrAPI("codex", "")).WithReads(tickettest.FakeReads{FakeServerAPI: herdrAPI("codex", "")})
 		_, ready := requestTicketMenu(t, m)
-		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NotForCodex {
+		if got := itemByLabel(t, ready.Items, "Watch").Disabled; got != rowactions.NotForCodex {
 			t.Errorf("Watch disabled = %q, want %q", got, rowactions.NotForCodex)
 		}
-		if got := itemByLabel(t, ready.items, "Go to pane").Disabled; got != "" {
+		if got := itemByLabel(t, ready.Items, "Go to pane").Disabled; got != "" {
 			t.Errorf("Go to pane disabled = %q, want enabled", got)
 		}
 	})
 	t.Run("no server", func(t *testing.T) {
 		fakeHerdrOnlyLog(t)
 		_, ready := requestTicketMenu(t, selectTicketRow(t, loadedModelWithTicket(t)))
-		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != rowactions.NoAgentLog {
+		if got := itemByLabel(t, ready.Items, "Watch").Disabled; got != rowactions.NoAgentLog {
 			t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 		}
 	})
@@ -529,7 +529,7 @@ func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
 		fakeHerdrOnlyLog(t)
 		focused := fakeFocus(t)
 		_, ready := requestTicketMenu(t, watchTicketTab(t, "claimed"))
-		if hasItem(ready.items, "Go to pane") {
+		if hasItem(ready.Items, "Go to pane") {
 			t.Error("Go to pane shown for a ticket with no herdr agent")
 		}
 		m, ready := requestTicketMenu(t, watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", "")).WithReads(tickettest.FakeReads{FakeServerAPI: herdrAPI("claude", "")}))
@@ -547,7 +547,7 @@ func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
 		fakeHerdrOnlyLog(t)
 		focused := fakeFocus(t)
 		m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
-		if _, ready := requestQueueMenu(t, m); hasItem(ready.items, "Go to pane") {
+		if _, ready := requestQueueMenu(t, m); hasItem(ready.Items, "Go to pane") {
 			t.Error("Go to pane shown for a ticket with no herdr agent")
 		}
 		m.serverAPI, m.reads = herdrAPI("codex", ""), tickettest.FakeReads{FakeServerAPI: herdrAPI("codex", "")}

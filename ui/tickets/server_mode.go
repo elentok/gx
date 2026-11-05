@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
@@ -118,8 +119,8 @@ func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
 // updateServer handles the server-mode messages; ok is false for any other msg.
 func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
-	case epicQueuedMsg:
-		return m, showQueueIfAdded(msg.queued, msg.toast()), true
+	case rowactions.EpicQueuedMsg:
+		return m, showQueueIfAdded(msg.Queued, msg.Toast()), true
 
 	case serverDoneMsg:
 		if msg.problem != "" {
@@ -127,8 +128,8 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		}
 		return m, notify.Success(msg.ok), true
 
-	case serverWriteMsg:
-		return m, msg.toast(), true
+	case rowactions.ServerWriteMsg:
+		return m, msg.Toast(), true
 	}
 	return m, nil, false
 }

@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -23,7 +22,7 @@ import (
 // guard — a person hand-closing a blocked ticket from the TUI is exactly the
 // silent-assertion this ticket exists to prevent.
 func statusChangeCmd(tix tabapi.TicketsAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
-	file, address := rowactions.ResolveTicketPath(store, ticket.Path)
+	file, address := ResolveTicketPath(store, ticket.Path)
 
 	if status == schema.StatusOpen {
 		if err := checkTicketBodyBeforeOpen(file); err != nil {
@@ -64,9 +63,9 @@ func checkTicketBodyBeforeOpen(path string) error {
 	return nil
 }
 
-// statusChangedMsg reports that cmdApplyTicketStatus's write finished
+// StatusChangedMsg reports that cmdApplyTicketStatus's write finished
 // successfully, so updateInner can trigger the same reload cmdRefresh uses.
-type statusChangedMsg struct{}
+type StatusChangedMsg struct{}
 
 // cmdApplyTicketStatus performs the validated write in a Cmd (not inline in
 // applyStatusChange) so a filesystem error surfaces as a toast rather than a
@@ -82,6 +81,6 @@ func cmdApplyTicketStatus(tix tabapi.TicketsAPI, file, address string, status sc
 		if tix != nil && address != "" {
 			_ = tix.Changed(context.Background(), address)
 		}
-		return statusChangedMsg{}
+		return StatusChangedMsg{}
 	}
 }

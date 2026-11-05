@@ -19,7 +19,7 @@ func openEpicMenuOn(t *testing.T, m Model, name string) Model {
 	selectEpicRow(t, &m, name)
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	m = updated.(Model)
-	if !m.menus.menu.IsOpen {
+	if !m.menus.Menu.IsOpen {
 		t.Fatalf("m on epic %s opened no menu", name)
 	}
 	return m
@@ -69,7 +69,7 @@ func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithMergeDim(t *testing.T)
 	setCollapsedSection(&m, sectionMerged, false)
 
 	m = openEpicMenuOn(t, m, "gx:alpha")
-	if !menuHasReason(m, alreadyMerged) {
-		t.Errorf("open menu has no item dim for %q", alreadyMerged)
+	if !menuHasReason(m, "already merged") {
+		t.Errorf("open menu has no item dim for %q", "already merged")
 	}
 }

@@ -32,7 +32,7 @@ import (
 type Model struct {
 	worktreeRoot string
 	settings     ui.Settings
-	editor       rowEditor
+	editor       rowactions.Editor
 	keys         keys.Manager // this tab's own navigation/collapse bindings
 	help         help.Model
 
@@ -86,7 +86,7 @@ type Model struct {
 	confirm confirm.Model
 
 	// menus is the "m"-triggered Context menu on a ticket or epic row.
-	menus rowMenus
+	menus rowactions.Menus
 
 	// watch backs the Watch agent modal (watch_agent.go).
 	watch rowactions.WatchModal
@@ -127,7 +127,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 	return Model{
 		worktreeRoot:      worktreeRoot,
 		settings:          settings,
-		editor:            rowEditor{worktreeRoot: worktreeRoot, settings: settings},
+		editor:            rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
 		keys:              km,
 		sidebarTree:       sidebarTree,
 		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys), settings.About),
@@ -145,7 +145,7 @@ func (m Model) KeyManager() keys.Manager { return m.keys }
 // shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
 // duck-type) stay routed to the search query instead of switching tabs.
 func (m Model) InputFocused() bool {
-	if m.help.InputFocused() || m.menus.menu.IsOpen {
+	if m.help.InputFocused() || m.menus.Menu.IsOpen {
 		return true
 	}
 	_, ok := m.activeInputSearch()
@@ -156,7 +156,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.menus.menu.IsOpen || m.confirm.IsOpen || m.watch.IsOpen()
+	return m.help.IsOpen || m.menus.Menu.IsOpen || m.confirm.IsOpen || m.watch.IsOpen()
 }
 
 func (m Model) Init() tea.Cmd {
@@ -173,8 +173,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(Model)
-	if nm.menus.pending != nm.selectedTicketPath() {
-		nm.menus.pending = ""
+	if nm.menus.Pending != nm.selectedTicketPath() {
+		nm.menus.Pending = ""
 	}
 	nm.refreshHover(msg)
 	nm.syncPreviewViewport()
@@ -237,7 +237,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case editFileFinishedMsg:
+	case rowactions.EditFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 
 	case rowactions.WatchLoadedMsg:
@@ -248,13 +248,13 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.watch, cmd = m.watch.Step(msg)
 		return m, cmd
 
-	case ticketMenuReadyMsg:
+	case rowactions.TicketReadyMsg:
 		return m.handleTicketMenuReady(msg)
 
-	case ticketMenuPickMsg:
+	case rowactions.TicketPickMsg:
 		return m.handleTicketMenuPick(msg)
 
-	case epicMenuPickMsg:
+	case rowactions.EpicPickMsg:
 		return m.handleEpicMenuPick(msg)
 
 	case tea.KeyPressMsg:
@@ -268,23 +268,23 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
-		if m.menus.menu.IsOpen {
+		if m.menus.Menu.IsOpen {
 			var cmd tea.Cmd
-			m.menus.menu, cmd = m.menus.menu.Update(msg)
+			m.menus.Menu, cmd = m.menus.Menu.Update(msg)
 			return m, cmd
 		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
 		if msg.String() == "esc" {
-			m.menus.pending = ""
+			m.menus.Pending = ""
 		}
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.menus.menu.IsOpen {
+		if m.menus.Menu.IsOpen {
 			var cmd tea.Cmd
-			m.menus.menu, cmd = m.menus.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
+			m.menus.Menu, cmd = m.menus.Menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
 		if m.watch.IsOpen() {
@@ -308,7 +308,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMotionMsg:
 		return m.handleMouseMotion(msg)
 
-	case statusChangedMsg:
+	case rowactions.StatusChangedMsg:
 		return m.handleStatusChanged()
 	}
 	return m, nil
@@ -474,8 +474,8 @@ func (m Model) View() tea.View {
 		return newHoverView("\n  Initializing…")
 	}
 	content := m.normalView()
-	if m.menus.menu.IsOpen {
-		content = m.menus.menu.Overlay(content, m.menuAnchor(), m.width, m.height)
+	if m.menus.Menu.IsOpen {
+		content = m.menus.Menu.Overlay(content, m.menuAnchor(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

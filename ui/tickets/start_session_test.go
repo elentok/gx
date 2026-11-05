@@ -20,7 +20,7 @@ import (
 )
 
 func menuHasStartSession(m Model) bool {
-	return m.menus.menu.IsOpen && strings.Contains(m.menus.menu.View(), rowactions.StartSessionLabel)
+	return m.menus.Menu.IsOpen && strings.Contains(m.menus.Menu.View(), rowactions.StartSessionLabel)
 }
 
 func selectTicketByAddress(t *testing.T, m *Model, address string) {
@@ -57,7 +57,7 @@ func TestStartSession_OfferedOnMapEpicAndItsOpenTicketsOnly(t *testing.T) {
 	}{{"gx:map/01", true}, {"gx:map/02", false}, {"gx:loop/01", false}} {
 		selectTicketByAddress(t, &m, tc.address)
 		_, ready := requestTicketMenu(t, m)
-		got := slices.ContainsFunc(ready.items, func(it contextmenu.Item[rowactions.TicketTarget]) bool {
+		got := slices.ContainsFunc(ready.Items, func(it contextmenu.Item[rowactions.TicketTarget]) bool {
 			return it.Label == rowactions.StartSessionLabel
 		})
 		if got != tc.want {
@@ -81,10 +81,8 @@ func TestStartSession_CompletedMapEpicSuggestsStartAndMerge(t *testing.T) {
 	m = updated.(Model)
 	setCollapsedSection(&m, sectionCompleteMaps, false)
 	selectEpicRow(t, &m, "gx:done-map")
-	r, _ := m.selectedRow()
-	items := epicMenuItems(epicMenuInput{epic: m.epicAt(r)})
 	var suggested []string
-	for _, it := range items {
+	for _, it := range openEpicMenuOn(t, m, "gx:done-map").menus.Menu.Items() {
 		if it.Group == contextmenu.Suggested {
 			suggested = append(suggested, it.Label)
 		}

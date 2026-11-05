@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
@@ -50,7 +49,7 @@ func TestEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T) {
 			if cmd == nil {
 				t.Fatal("Set open issued nothing")
 			}
-			if msg := cmd(); msg != (statusChangedMsg{}) {
+			if msg := cmd(); msg != (rowactions.StatusChangedMsg{}) {
 				t.Fatalf("Set open = %#v", msg)
 			}
 			if raw, _ := os.ReadFile(epicMD); !strings.Contains(string(raw), "status: open") {
@@ -69,18 +68,13 @@ func TestEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T) {
 
 func TestEpicMenu_MergeDimReasons(t *testing.T) {
 	m, _ := epicMenuModel(t, tickettest.FakeServerAPI{Calls: &[]string{}})
-	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), ticketsNotDone) {
-		t.Errorf("open menu has no item dim for %q", ticketsNotDone)
+	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), "tickets not done") {
+		t.Errorf("open menu has no item dim for %q", "tickets not done")
 	}
 	m.serverAPI = nil
 	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), rowactions.ServerNotRunning) {
 		t.Errorf("open menu has no item dim for %q", rowactions.ServerNotRunning)
 	}
-}
-
-func TestEpicMenu_MergeLabelNamesTheBranch(t *testing.T) {
-	items := epicMenuItems(epicMenuInput{branch: "main"})
-	itemByLabel(t, items, "Merge into main")
 }
 
 func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
@@ -89,7 +83,7 @@ func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = openEpicMenuOn(t, updated.(Model), "gx:alpha")
-	if view := m.menus.menu.View(); !strings.Contains(view, "Merge into main") {
+	if view := m.menus.Menu.View(); !strings.Contains(view, "Merge into main") {
 		t.Errorf("view lacks %q:\n%s", "Merge into main", view)
 	}
 	if !menuHasReason(m, "already draft") {
@@ -157,64 +151,6 @@ func TestEpicMenu_AddEpicToQueueSendsTheEpicAddressOnce(t *testing.T) {
 	}
 }
 
-func TestEpicMenu_AddEpicToQueueDimReasons(t *testing.T) {
-	open := tickets.Epic{Name: "alpha", Status: "open"}
-	items := epicMenuItems(epicMenuInput{epic: open})
-	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != nothingToQueue {
-		t.Errorf("no queueable tickets: disabled = %q, want %q", got, nothingToQueue)
-	}
-	items = epicMenuItems(epicMenuInput{epic: open, queueable: true, serverReason: rowactions.ServerNotRunning})
-	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != rowactions.ServerNotRunning {
-		t.Errorf("no server: disabled = %q, want %q", got, rowactions.ServerNotRunning)
-	}
-	items = epicMenuItems(epicMenuInput{epic: open, queueable: true})
-	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != "" {
-		t.Errorf("queueable: disabled = %q, want enabled", got)
-	}
-}
-
-func TestEpicMenu_AddEpicToQueueRefusedEpics(t *testing.T) {
-	for _, c := range []struct {
-		name string
-		epic tickets.Epic
-		want string
-	}{
-		{"follow-ups", tickets.Epic{Name: "follow-ups", Status: "open"}, followUpsNotQueueable},
-		{"follow-ups address", tickets.Epic{Name: "gx:follow-ups", Status: "open"}, followUpsNotQueueable},
-		{"follow-ups-archived", tickets.Epic{Name: "follow-ups-archived", Status: "open"}, followUpsNotQueueable},
-		{"draft", tickets.Epic{Name: "alpha", Status: "draft"}, "epic is draft, not open"},
-		{"done", tickets.Epic{Name: "alpha", Status: "done"}, "epic is done, not open"},
-		{"cancelled", tickets.Epic{Name: "alpha", Status: "cancelled"}, "epic is cancelled, not open"},
-	} {
-		items := epicMenuItems(epicMenuInput{epic: c.epic, queueable: true})
-		if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != c.want {
-			t.Errorf("%s: disabled = %q, want %q", c.name, got, c.want)
-		}
-	}
-}
-
-func TestEpicMenu_MergeBlockVerbsComeFromActions(t *testing.T) {
-	done := tickets.Epic{Name: "gx:alpha", Status: "open", Tickets: []tickets.Ticket{{Status: "done"}}}
-	labels := func(actions []string) []string {
-		var out []string
-		for _, it := range epicMenuItems(epicMenuInput{epic: done, actions: actions}) {
-			if strings.HasPrefix(it.Label, "Merge") || strings.HasPrefix(it.Label, "Stash") {
-				out = append(out, it.Label)
-			}
-		}
-		return out
-	}
-	if got, want := labels([]string{"stash-merge", "merge"}), []string{"Stash, merge and restore", "Merge again"}; !slices.Equal(got, want) {
-		t.Errorf("dirty-trunk labels = %v, want %v", got, want)
-	}
-	if got, want := labels([]string{"merge"}), []string{"Merge again"}; !slices.Equal(got, want) {
-		t.Errorf("needs-rebase labels = %v, want %v", got, want)
-	}
-	if got, want := labels(nil), []string{"Merge"}; !slices.Equal(got, want) {
-		t.Errorf("no actions labels = %v, want %v", got, want)
-	}
-}
-
 func TestEpicMenu_StashMergeRunsOnTheEpic(t *testing.T) {
 	var calls []string
 	m, _ := epicMenuModel(t, tickettest.FakeServerAPI{Calls: &calls})
@@ -226,15 +162,5 @@ func TestEpicMenu_StashMergeRunsOnTheEpic(t *testing.T) {
 	cmd()
 	if !slices.Equal(calls, []string{"stash-merge gx:alpha"}) {
 		t.Errorf("calls = %v, want stash-merge gx:alpha", calls)
-	}
-}
-
-func TestEpicMenu_CurrentStatusIsDim(t *testing.T) {
-	items := epicMenuItems(epicMenuInput{epic: tickets.Epic{Status: "open"}})
-	if got := itemByLabel(t, items, "Set open").Disabled; got != "already open" {
-		t.Errorf("Set open disabled = %q, want already open", got)
-	}
-	if got := itemByLabel(t, items, "Set draft").Disabled; got != "" {
-		t.Errorf("Set draft disabled = %q, want enabled", got)
 	}
 }

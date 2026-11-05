@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -25,7 +26,7 @@ func assertOnlyToast(t *testing.T, name string, cmd tea.Cmd) {
 func TestWrites_TicketsTabOnlyToasts(t *testing.T) {
 	m := newServerModel(t)
 	for name, msg := range map[string]tea.Msg{
-		"epic":   epicQueuedMsg{refusals: []string{"gx:a/01: refused"}},
+		"epic":   rowactions.EpicQueuedMsg{Refusals: []string{"gx:a/01: refused"}},
 		"action": serverDoneMsg{ok: "paused"},
 	} {
 		_, cmd := m.Update(msg)
@@ -33,9 +34,9 @@ func TestWrites_TicketsTabOnlyToasts(t *testing.T) {
 	}
 }
 
-// The status menu and the answer editor both finish with statusChangedMsg.
+// The status menu and the answer editor both finish with StatusChangedMsg.
 func TestStatusChanged_UpModeMakesNoRefetch(t *testing.T) {
-	_, cmd := newServerModel(t).Update(statusChangedMsg{})
+	_, cmd := newServerModel(t).Update(rowactions.StatusChangedMsg{})
 	if cmd != nil {
 		t.Errorf("up mode returned a command (%T); the stream event carries the change", cmd())
 	}
@@ -43,7 +44,7 @@ func TestStatusChanged_UpModeMakesNoRefetch(t *testing.T) {
 
 func TestStatusChanged_DownModeReloadsDisk(t *testing.T) {
 	down, _ := withLink(newServerModel(t), tabapi.ServerLinkDown)
-	_, cmd := down.Update(statusChangedMsg{})
+	_, cmd := down.Update(rowactions.StatusChangedMsg{})
 	if cmd == nil {
 		t.Fatal("down mode did not reload")
 	}
@@ -68,7 +69,7 @@ func TestWrites_QueueTabOnlyToasts(t *testing.T) {
 func TestWrites_AddToQueueSwitchesToQueueTab(t *testing.T) {
 	m := newServerModel(t)
 	for name, msg := range map[string]tea.Msg{
-		"epic": epicQueuedMsg{queued: 2},
+		"epic": rowactions.EpicQueuedMsg{Queued: 2},
 	} {
 		_, cmd := m.Update(msg)
 		if cmd == nil {

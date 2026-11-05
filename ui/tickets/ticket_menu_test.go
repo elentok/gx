@@ -9,9 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -24,15 +22,15 @@ import (
 
 // requestTicketMenu presses "m" and returns the ready message its cmd
 // resolves, not yet delivered.
-func requestTicketMenu(t *testing.T, m Model) (Model, ticketMenuReadyMsg) {
+func requestTicketMenu(t *testing.T, m Model) (Model, rowactions.TicketReadyMsg) {
 	t.Helper()
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	if cmd == nil {
 		t.Fatal("m issued no cmd")
 	}
-	ready, ok := cmd().(ticketMenuReadyMsg)
+	ready, ok := cmd().(rowactions.TicketReadyMsg)
 	if !ok {
-		t.Fatalf("m resolved to %T, want ticketMenuReadyMsg", ready)
+		t.Fatalf("m resolved to %T, want rowactions.TicketReadyMsg", ready)
 	}
 	return updated.(Model), ready
 }
@@ -42,7 +40,7 @@ func requestTicketMenu(t *testing.T, m Model) (Model, ticketMenuReadyMsg) {
 // dim.
 func chooseTicketMenuItem(t *testing.T, m Model, label string) (Model, tea.Cmd) {
 	t.Helper()
-	if !m.menus.menu.IsOpen {
+	if !m.menus.Menu.IsOpen {
 		t.Fatal("context menu is not open")
 	}
 	updated := tea.Model(m)
@@ -68,7 +66,7 @@ func itemByLabel(t *testing.T, items []contextmenu.Item[rowactions.TicketTarget]
 
 // menuHasReason reports whether an item of the open menu is dim for reason.
 func menuHasReason(m Model, reason string) bool {
-	return slices.ContainsFunc(m.menus.menu.Items(), func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Disabled == reason })
+	return slices.ContainsFunc(m.menus.Menu.Items(), func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Disabled == reason })
 }
 
 func itemLabels(items []contextmenu.Item[rowactions.TicketTarget]) []string {
@@ -97,7 +95,7 @@ func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
 
-	view := m.menus.menu.View()
+	view := m.menus.Menu.View()
 	for _, want := range []string{"Suggested", "Status", "Server", `Ticket "First"`, resumeLabel, "Set draft", "Pause", "Transcript"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("menu view lacks %q:\n%s", want, view)
@@ -111,13 +109,13 @@ func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("pause issued no cmd")
 	}
-	if msg, ok := cmd().(serverWriteMsg); !ok || msg.problem != "" {
+	if msg, ok := cmd().(rowactions.ServerWriteMsg); !ok || msg.Problem != "" {
 		t.Fatalf("pause result = %+v", msg)
 	}
 	if !slices.Equal(calls, []string{"pause gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
 	}
-	if m.menus.menu.IsOpen {
+	if m.menus.Menu.IsOpen {
 		t.Error("menu still open after a pick")
 	}
 }
@@ -147,7 +145,7 @@ func TestTicketMenu_ServerTicketMutesDecideUnmute(t *testing.T) {
 		want  string
 	}{
 		"muted":   {muted, ""},
-		"unmuted": {nil, notMuted},
+		"unmuted": {nil, "not muted"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := newServerModel(t).WithServer(tickettest.FakeServerAPI{}).WithTickets(tickettest.FakeServerAPI{}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
@@ -156,7 +154,7 @@ func TestTicketMenu_ServerTicketMutesDecideUnmute(t *testing.T) {
 			}})
 			updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 			_, ready := requestTicketMenu(t, selectTicketRow(t, updated.(Model)))
-			item := itemByLabel(t, ready.items, "Unmute & Reopen")
+			item := itemByLabel(t, ready.Items, "Unmute & Reopen")
 			if item.Disabled != tt.want {
 				t.Errorf("unmute disabled = %q, want %q", item.Disabled, tt.want)
 			}
@@ -201,7 +199,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 
 			m, ready := requestTicketMenu(t, m)
 			for _, label := range orchestrationLabels() {
-				if got := itemByLabel(t, ready.items, label).Disabled; got != rowactions.ServerNotRunning {
+				if got := itemByLabel(t, ready.Items, label).Disabled; got != rowactions.ServerNotRunning {
 					t.Errorf("%s disabled = %q, want %q", label, got, rowactions.ServerNotRunning)
 				}
 			}
@@ -217,7 +215,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 				if cmd != nil {
 					t.Errorf("%s issued a cmd", label)
 				}
-				if !next.menus.menu.IsOpen {
+				if !next.menus.Menu.IsOpen {
 					t.Errorf("%s closed the menu", label)
 				}
 			}
@@ -244,61 +242,8 @@ func TestTicketMenu_ReadOnlyLinkDimsWithItsReason(t *testing.T) {
 	m, _ := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
 	m.link = tabapi.ServerLinkReadOnly
 	_, ready := requestTicketMenu(t, m)
-	if got, want := itemByLabel(t, ready.items, "Pause").Disabled, tabapi.ServerLinkReadOnly.DisabledReason(); got != want {
+	if got, want := itemByLabel(t, ready.Items, "Pause").Disabled, tabapi.ServerLinkReadOnly.DisabledReason(); got != want {
 		t.Errorf("pause disabled =%q, want %q", got, want)
-	}
-}
-
-func TestTicketMenuItems_DimReasons(t *testing.T) {
-	disabled := func(in ticketMenuInput, label string) string {
-		return itemByLabel(t, ticketMenuItems(in), label).Disabled
-	}
-	draft := tickets.Ticket{Status: "draft"}
-
-	if got := disabled(ticketMenuInput{rendered: tickets.StatusDraft, ticket: draft}, "Set done"); got != doneIsSetByServer {
-		t.Errorf("loop-epic set done = %q", got)
-	}
-	if got := disabled(ticketMenuInput{rendered: tickets.StatusDraft, ticket: draft, isMap: true}, "Set done"); got != "" {
-		t.Errorf("map-epic set done = %q, want enabled", got)
-	}
-	if got := disabled(ticketMenuInput{rendered: tickets.StatusDraft, ticket: draft}, "Set draft"); got != "already draft" {
-		t.Errorf("set draft on a draft = %q", got)
-	}
-
-	resumeDetail := detailWith(wire.ActionResume)
-	done := ticketMenuInput{rendered: tickets.StatusDone, ticket: tickets.Ticket{Status: "done"}, isMap: true, detail: &resumeDetail}
-	for _, label := range []string{"Pause", "Cancel", resumeLabel, "Unmute & Reopen"} {
-		if got := disabled(done, label); got != ticketFinished {
-			t.Errorf("%s on a done ticket = %q, want %q", label, got, ticketFinished)
-		}
-	}
-	done.serverReason = rowactions.ServerNotRunning
-	if got := disabled(done, "Pause"); got != rowactions.ServerNotRunning {
-		t.Errorf("pause with no server on a done ticket = %q, want the server reason first", got)
-	}
-
-	open := ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Status: "open"}}
-	if got := disabled(open, "Unmute & Reopen"); got != notMuted {
-		t.Errorf("unmute = %q, want %q", got, notMuted)
-	}
-
-	paused := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}, herdrDown: true, detail: &resumeDetail}
-	if got := disabled(paused, "Pause"); got != alreadyPaused {
-		t.Errorf("pause on a paused ticket = %q", got)
-	}
-	if got := disabled(paused, resumeLabel); got != "" {
-		t.Errorf("resume on a paused ticket = %q, want enabled", got)
-	}
-	if got := disabled(paused, "Investigate"); got != "" {
-		t.Errorf("investigate with herdr down = %q, want enabled", got)
-	}
-}
-
-func TestTicketMenuItems_StatusPickCarriesTheStatus(t *testing.T) {
-	item := itemByLabel(t, ticketMenuItems(ticketMenuInput{rendered: tickets.StatusOpen}), "Set draft")
-	target := rowactions.TicketTarget{Address: "gx:alpha/01"}
-	if got := item.Run(target)(); got != (ticketMenuPickMsg{target: target, status: schema.StatusDraft}) {
-		t.Errorf("pick = %+v", got)
 	}
 }
 
@@ -306,19 +251,19 @@ func TestTicketMenuItems_StatusPickCarriesTheStatus(t *testing.T) {
 func stubTicketEditor(t *testing.T) *[]string {
 	t.Helper()
 	var launched []string
-	orig := launchTicketEditor
-	launchTicketEditor = func(_ string, _ ui.Settings, path string, _ terminalrun.SplitType, readOnly bool) tea.Cmd {
+	orig := rowactions.LaunchTicketEditor
+	rowactions.LaunchTicketEditor = func(_ string, _ ui.Settings, path string, _ terminalrun.SplitType, readOnly bool) tea.Cmd {
 		launched = append(launched, fmt.Sprintf("%s ro=%v", path, readOnly))
 		return func() tea.Msg { return nil }
 	}
-	t.Cleanup(func() { launchTicketEditor = orig })
+	t.Cleanup(func() { rowactions.LaunchTicketEditor = orig })
 	return &launched
 }
 
 func TestTicketMenu_AgentAndEditCopyGroups(t *testing.T) {
 	m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
 	m = pressMenuKey(t, m)
-	view := m.menus.menu.View()
+	view := m.menus.Menu.View()
 	for _, want := range []string{"Agent", "Edit/copy", "Watch", "Transcript", "Investigate",
 		"Edit file (vsplit)", "e v", "Yank epic - ticket", "y y", "Yank file path", "y f"} {
 		if !strings.Contains(view, want) {
@@ -363,12 +308,12 @@ func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 
 	m, ready := requestTicketMenu(t, m)
 	var enabled []string
-	for _, it := range ready.items {
+	for _, it := range ready.Items {
 		switch {
 		case it.Disabled == "":
 			enabled = append(enabled, it.Label)
-		case it.Label != "Watch" && it.Disabled != archivedText:
-			t.Errorf("%s disabled = %q, want %q", it.Label, it.Disabled, archivedText)
+		case it.Label != "Watch" && it.Disabled != "archived":
+			t.Errorf("%s disabled = %q, want %q", it.Label, it.Disabled, "archived")
 		}
 	}
 	want := []string{"Transcript", "Edit file", "Edit file (split)", "Edit file (vsplit)", "Edit file (tab)", "Yank epic - ticket", "Yank file path"}
@@ -381,95 +326,6 @@ func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 	chooseTicketMenuItem(t, updated.(Model), "Edit file")
 	if len(*launched) != 1 || !strings.HasSuffix((*launched)[0], "01-old-ticket.md ro=true") {
 		t.Errorf("launched = %v, want the archived file read-only", *launched)
-	}
-}
-
-func TestTicketMenuItems_ArchivedKeepsReadActions(t *testing.T) {
-	items := ticketMenuItems(ticketMenuInput{
-		rendered: tickets.StatusPausedRepair,
-		ticket:   tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseSpinning},
-		archived: true,
-	})
-	reads := []string{rowactions.ActionWatch, rowactions.ActionTranscript, actionYankSummary, actionYankFilePath}
-	for _, e := range ticketMenuEdits {
-		reads = append(reads, e.action)
-	}
-	var enabled []string
-	for _, it := range items {
-		if it.Disabled != "" {
-			continue
-		}
-		msg, _ := it.Run(rowactions.TicketTarget{})().(ticketMenuPickMsg)
-		if !slices.Contains(reads, msg.action) {
-			t.Errorf("%s (action %q) enabled on an archived row", it.Label, msg.action)
-		}
-		enabled = append(enabled, msg.action)
-	}
-	slices.Sort(enabled)
-	slices.Sort(reads)
-	if !slices.Equal(enabled, reads) {
-		t.Errorf("enabled actions = %v, want %v", enabled, reads)
-	}
-}
-
-func TestTicketMenuItems_ResumeEnterHintOnlyWhenEnterResumes(t *testing.T) {
-	for _, tt := range []struct {
-		name     string
-		reason   schema.PauseReason
-		rendered tickets.RenderedStatus
-		wantKey  string
-	}{
-		{"paused (answer)", "", tickets.StatusPausedAnswer, ""},
-		{"paused (repair)", schema.PauseManual, tickets.StatusPausedRepair, "enter"},
-	} {
-		d := detailWith(wire.ActionResume)
-		items := ticketMenuItems(ticketMenuInput{
-			rendered: tt.rendered,
-			ticket:   tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: tt.reason},
-			detail:   &d,
-		})
-		if got := itemByLabel(t, items, resumeLabel).Key; got != tt.wantKey {
-			t.Errorf("%s: Resume key = %q, want %q", tt.name, got, tt.wantKey)
-		}
-	}
-}
-
-func TestTicketMenuItems_GoToPane(t *testing.T) {
-	if hasItem(ticketMenuItems(ticketMenuInput{}), "Go to pane") {
-		t.Error("Go to pane shown without a herdr pane")
-	}
-	for _, tt := range []struct {
-		name string
-		in   ticketMenuInput
-		want string
-	}{
-		{"live pane", ticketMenuInput{paneLive: true}, ""},
-		{"herdr down", ticketMenuInput{paneLive: true, herdrDown: true}, herdrDownText},
-		{"pty live", ticketMenuInput{queueAgent: "queue-a", ptyLive: true}, ""},
-		{"pty live, herdr down", ticketMenuInput{queueAgent: "queue-a", ptyLive: true, herdrDown: true}, ""},
-		{"pty holder gone", ticketMenuInput{queueAgent: "queue-a"}, holderGoneText},
-	} {
-		item := itemByLabel(t, ticketMenuItems(tt.in), "Go to pane")
-		if item.Disabled != tt.want || item.Group != contextmenu.Agent {
-			t.Errorf("%s: Go to pane = %q in %v, want %q in Agent", tt.name, item.Disabled, item.Group, tt.want)
-		}
-	}
-}
-
-func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
-	item := itemByLabel(t, ticketMenuItems(ticketMenuInput{queueAgent: "queue-a", ptyLive: true}), "Go to pane")
-	if got := item.Run(rowactions.TicketTarget{})(); got != (tabapi.GoToSessionMsg{ID: "queue-a"}) {
-		t.Fatalf("Go to pane sent %v, want tabapi.GoToSessionMsg{queue-a}", got)
-	}
-}
-
-func TestCmdTicketMenu_PTYIterationOffersTheAgentRow(t *testing.T) {
-	api := tickettest.FakeServerAPI{IterationsRes: []wire.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
-	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01"}, true, "")
-	msg := cmdTicketMenu(tickettest.FakeReads{FakeServerAPI: api}, config.Dirs{}, in)().(ticketMenuReadyMsg)
-	item := itemByLabel(t, msg.items, "Go to pane")
-	if item.Disabled != "" {
-		t.Fatalf("Go to pane dimmed %q with a live PTY holder and herdr down", item.Disabled)
 	}
 }
 

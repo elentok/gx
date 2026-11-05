@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -32,7 +33,7 @@ func pressQueueMenuKey(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
 	next, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	m = next.(QueueModel)
-	if !m.menus.menu.IsOpen {
+	if !m.menus.Menu.IsOpen {
 		t.Fatal("m on the epic header opened no menu")
 	}
 	return m
@@ -41,8 +42,11 @@ func pressQueueMenuKey(t *testing.T, m QueueModel) QueueModel {
 func TestQueueEpicMenu_HeaderOpensTheFullEpicMenu(t *testing.T) {
 	m := pressQueueMenuKey(t, queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &[]string{}}))
 
-	view := m.menus.menu.View()
-	items := epicMenuItems(epicMenuInput{epic: m.epics[0]})
+	view := m.menus.Menu.View()
+	// The Tickets tab's menu for the same epic: the Queue tab offers it whole.
+	var tabs rowactions.Menus
+	tabs.HandleKey(queueMenuTab{m})
+	items := tabs.Menu.Items()
 	if len(items) == 0 {
 		t.Fatal("epic menu has no items")
 	}
@@ -91,7 +95,7 @@ func TestQueueEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T)
 	if cmd == nil {
 		t.Fatal("Set open issued no cmd")
 	}
-	if msg := cmd(); msg != (statusChangedMsg{}) {
+	if msg := cmd(); msg != (rowactions.StatusChangedMsg{}) {
 		t.Fatalf("Set open = %#v", msg)
 	}
 	if raw, _ := os.ReadFile(epicMD); !strings.Contains(string(raw), "status: open") {

@@ -42,7 +42,7 @@ func ticketMenuLabels(t *testing.T, m Model, address string) []string {
 	t.Helper()
 	selectTicketByAddress(t, &m, address)
 	_, ready := requestTicketMenu(t, m)
-	return menuLabels(ready.items)
+	return menuLabels(ready.Items)
 }
 
 func TestGoToSession_EpicMenuMatchesEpicOrAnyTicketSession(t *testing.T) {
@@ -58,14 +58,14 @@ func TestGoToSession_EpicMenuMatchesEpicOrAnyTicketSession(t *testing.T) {
 	} {
 		m := goToSessionModel(t, "open", wire.SessionInfo{ID: "s1", Ticket: tc.ticket})
 		m = openEpicMenuOn(t, m, "gx:map")
-		if got := m.menus.menu.IsOpen && menuViewHas(m, rowactions.GoToSessionLabel); got != tc.want {
+		if got := m.menus.Menu.IsOpen && menuViewHas(m, rowactions.GoToSessionLabel); got != tc.want {
 			t.Errorf("%s: go to session offered = %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }
 
 func menuViewHas(m Model, label string) bool {
-	return strings.Contains(m.menus.menu.View(), label)
+	return strings.Contains(m.menus.Menu.View(), label)
 }
 
 func TestGoToSession_TicketMenuMatching(t *testing.T) {

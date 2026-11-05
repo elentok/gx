@@ -11,7 +11,7 @@ import (
 
 // e-prefix chords: edit the selected ticket's underlying file, mirroring the
 // Tickets tab's own edit-file chord (model_keys.go) via the shared
-// editTicketFile helper (model_runtime.go).
+// rowactions.Editor.
 const (
 	bindingQueueEditInPlace keys.BindingID = "edit"
 	bindingQueueEditHSplit  keys.BindingID = "edit-hsplit"
@@ -28,13 +28,13 @@ func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd
 	if !ok {
 		return notify.Warning("nothing selected")
 	}
-	return m.editor.edit(file, splitType, false)
+	return m.editor.Edit(file, splitType, false)
 }
 
 // selectedEditTarget is the file the selected row's address resolves to.
 func (m QueueModel) selectedEditTarget() (file string, ok bool) {
 	if epic, ok := m.selectedQueueEpic(); ok {
-		file, err := epicFile(m.settings.TicketStore, epic)
+		file, err := rowactions.EpicFile(m.settings.TicketStore, epic)
 		return file, err == nil
 	}
 	row, ok := m.selectedQueueRow()
@@ -45,6 +45,6 @@ func (m QueueModel) selectedEditTarget() (file string, ok bool) {
 	return file, true
 }
 
-func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {
-	return m, m.editor.finished(msg)
+func (m QueueModel) handleEditFileFinished(msg rowactions.EditFileFinishedMsg) (QueueModel, tea.Cmd) {
+	return m, m.editor.Finished(msg)
 }

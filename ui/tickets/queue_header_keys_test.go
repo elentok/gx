@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // TestQueueHeaderStateMatchesPrototype covers ticket 05's Option B redesign
@@ -255,7 +256,7 @@ func TestQueueEditChordLaunchesEditorOnSelectedTicket(t *testing.T) {
 			// terminal setting) — the acceptance criterion is that the
 			// finished-edit message routes back into QueueModel without a
 			// type-assertion panic.
-			updated, _ = m.Update(editFileFinishedMsg{})
+			updated, _ = m.Update(rowactions.EditFileFinishedMsg{})
 			m = updated.(QueueModel)
 		})
 	}

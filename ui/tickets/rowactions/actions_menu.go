@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 // actionsMenuResult is an accepted Context menu action, keyed by the row's
 // address (Path), for dispatchMenuAction.

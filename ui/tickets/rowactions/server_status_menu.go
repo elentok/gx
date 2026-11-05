@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -57,17 +56,17 @@ func isWebOnlyVerb(verb string) bool {
 	return false
 }
 
-// serverWriteMsg reports a finished server verb: the refusal or error, if any.
-type serverWriteMsg struct {
-	verb    string
-	problem string
+// ServerWriteMsg reports a finished server verb: the refusal or error, if any.
+type ServerWriteMsg struct {
+	Verb    string
+	Problem string
 }
 
 // cmdServerWrite issues verb for address through the server. With no server
 // it writes nothing: orchestration writes have no file fallback.
 func cmdServerWrite(admin tabapi.AdminAPI, tix tabapi.TicketsAPI, verb, address string) tea.Cmd {
 	if admin == nil || tix == nil {
-		return notify.Warning(rowactions.ServerNotRunning)
+		return notify.Warning(ServerNotRunning)
 	}
 	if isWebOnlyVerb(verb) {
 		return notify.Warning(verb + " needs the web UI")
@@ -108,19 +107,20 @@ func cmdServerWrite(admin tabapi.AdminAPI, tix tabapi.TicketsAPI, verb, address 
 		}
 		switch {
 		case err != nil:
-			return serverWriteMsg{verb: verb, problem: err.Error()}
+			return ServerWriteMsg{Verb: verb, Problem: err.Error()}
 		case res.Refused:
-			return serverWriteMsg{verb: verb, problem: res.Message}
+			return ServerWriteMsg{Verb: verb, Problem: res.Message}
 		}
-		return serverWriteMsg{verb: verb}
+		return ServerWriteMsg{Verb: verb}
 	}
 }
 
-func (msg serverWriteMsg) toast() tea.Cmd {
-	if msg.problem != "" {
-		return notify.Error(msg.verb + " refused: " + msg.problem)
+// Toast reports the verb's outcome on the status line.
+func (msg ServerWriteMsg) Toast() tea.Cmd {
+	if msg.Problem != "" {
+		return notify.Error(msg.Verb + " refused: " + msg.Problem)
 	}
-	return notify.Success(msg.verb + " done")
+	return notify.Success(msg.Verb + " done")
 }
 
 // cmdRunFirstAction reads the ticket's detail and runs its first action; with

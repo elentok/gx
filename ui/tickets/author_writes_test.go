@@ -21,7 +21,7 @@ import (
 // applyStatus runs the status write and returns the toast it produced, if any.
 func applyStatus(t *testing.T, m Model, status schema.Status) string {
 	t.Helper()
-	_, cmd := m.handleTicketMenuPick(ticketMenuPickMsg{target: rowactions.TicketTarget{Address: m.selectedTicketPath()}, status: status})
+	_, cmd := m.handleTicketMenuPick(rowactions.TicketPickMsg{Target: rowactions.TicketTarget{Address: m.selectedTicketPath()}, Status: status})
 	if cmd == nil {
 		t.Fatal("status change issued nothing")
 	}
@@ -58,7 +58,7 @@ func TestAuthorWrites_WorkWithoutAServer(t *testing.T) {
 
 func TestAuthorWrites_DoneOnlyOnMapEpics(t *testing.T) {
 	m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
-	if toast := applyStatus(t, m, schema.StatusDone); toast != doneIsSetByServer || tickettest.ReadStatus(t, file) != "draft" {
+	if toast := applyStatus(t, m, schema.StatusDone); toast != "done is set by the server" || tickettest.ReadStatus(t, file) != "draft" {
 		t.Errorf("loop epic: toast %q, status %q", toast, tickettest.ReadStatus(t, file))
 	}
 

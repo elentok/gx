@@ -1,4 +1,4 @@
-package tickets
+package rowactions
 
 import (
 	"fmt"
@@ -15,17 +15,16 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
-	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
-// ticketMenuPickMsg carries a menu pick back to Update: the actions need the
-// model, which an item's Run cannot reach. status is set for a Status pick.
-type ticketMenuPickMsg struct {
-	target rowactions.TicketTarget
-	action string
-	status schema.Status
+// TicketPickMsg carries a menu pick back to Update: the actions need the
+// model, which an item's Run cannot reach. Status is set for a Status pick.
+type TicketPickMsg struct {
+	Target TicketTarget
+	Action string
+	Status schema.Status
 }
 
 // ticketMenuInput is what ticketMenuItems needs; liveness is resolved off the
@@ -71,56 +70,56 @@ const actionApprove = "approve"
 // ticketMenuItems lists every action for a ticket. Each is built once in its
 // own group and moved to Suggested when it is suggested; one that doesn't
 // apply is dim with the reason.
-func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[rowactions.TicketTarget] {
-	item := func(label, key string, group contextmenu.Group, disabled string, msg ticketMenuPickMsg) contextmenu.Item[rowactions.TicketTarget] {
-		if in.archived && !archivedAllowed(group, msg.action) {
+func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[TicketTarget] {
+	item := func(label, key string, group contextmenu.Group, disabled string, msg TicketPickMsg) contextmenu.Item[TicketTarget] {
+		if in.archived && !archivedAllowed(group, msg.Action) {
 			disabled = archivedText
 		}
-		return contextmenu.Item[rowactions.TicketTarget]{
+		return contextmenu.Item[TicketTarget]{
 			Label: label, Key: key, Group: group, Disabled: disabled,
-			Run: func(t rowactions.TicketTarget) tea.Cmd {
+			Run: func(t TicketTarget) tea.Cmd {
 				msg := msg
-				msg.target = t
+				msg.Target = t
 				return func() tea.Msg { return msg }
 			},
 		}
 	}
-	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[rowactions.TicketTarget] {
-		return item(label, key, group, disabled, ticketMenuPickMsg{action: action})
+	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[TicketTarget] {
+		return item(label, key, group, disabled, TicketPickMsg{Action: action})
 	}
 	finished := ""
 	if in.rendered.Terminal() {
 		finished = ticketFinished
 	}
-	server := func(label, key, action, why string) contextmenu.Item[rowactions.TicketTarget] {
+	server := func(label, key, action, why string) contextmenu.Item[TicketTarget] {
 		return pick(label, key, action, contextmenu.Server, firstReason(in.serverReason, finished, why))
 	}
-	suggest := func(suggested bool, it contextmenu.Item[rowactions.TicketTarget]) contextmenu.Item[rowactions.TicketTarget] {
+	suggest := func(suggested bool, it contextmenu.Item[TicketTarget]) contextmenu.Item[TicketTarget] {
 		if suggested {
 			it.Group = contextmenu.Suggested
 		}
 		return it
 	}
 	paused := isRepairPause(in.ticket)
-	answer := rowactions.ResumeSuggested(in.rendered)
+	answer := ResumeSuggested(in.rendered)
 	// The first recovery item is what "enter" runs on a repair pause; an answer
 	// pause's verbs need their own confirmation, so they get no hint.
-	var recovery []contextmenu.Item[rowactions.TicketTarget]
-	for i, a := range rowactions.RecoveryActions(in.detail) {
-		it := server(a.Label, reasonIf(paused && i == 0, "enter"), rowactions.RecoverPrefix+a.Word, "")
+	var recovery []contextmenu.Item[TicketTarget]
+	for i, a := range RecoveryActions(in.detail) {
+		it := server(a.Label, reasonIf(paused && i == 0, "enter"), RecoverPrefix+a.Word, "")
 		it.Help = a.Help
 		if a.Recommended {
-			it.Label += rowactions.RecommendedMark
+			it.Label += RecommendedMark
 		}
 		recovery = append(recovery, suggest(answer || a.Recommended, it))
 	}
 
-	var items []contextmenu.Item[rowactions.TicketTarget]
+	var items []contextmenu.Item[TicketTarget]
 	if in.isMap && in.session != "" {
-		items = append(items, rowactions.GoToSessionItem(in.session))
+		items = append(items, GoToSessionItem(in.session))
 	}
 	if in.isMap && in.rendered == tickets.StatusOpen {
-		items = append(items, pick(rowactions.StartSessionLabel, "", rowactions.ActionStartSession, contextmenu.Suggested, ""))
+		items = append(items, pick(StartSessionLabel, "", ActionStartSession, contextmenu.Suggested, ""))
 	}
 
 	current := schema.Status(strings.ToLower(strings.TrimSpace(in.ticket.Status)))
@@ -132,33 +131,33 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[rowactions.TicketTar
 		case status == schema.StatusDone && !in.isMap:
 			why = doneIsSetByServer
 		}
-		items = append(items, item("Set "+string(status), "", contextmenu.Status, why, ticketMenuPickMsg{status: status}))
+		items = append(items, item("Set "+string(status), "", contextmenu.Status, why, TicketPickMsg{Status: status}))
 	}
 
-	unmute := rowactions.UnmuteSuggested(in.ticket)
+	unmute := UnmuteSuggested(in.ticket)
 	items = append(items, server("Pause", "", serverVerbPause, reasonIf(paused, alreadyPaused)))
 	items = append(items, recovery...)
 	items = append(items,
 		server("Cancel", "", serverVerbCancel, ""),
 		// A mute outlives the status (see actionUnmuteReopen), so a finished
 		// ticket keeps its Unmute.
-		suggest(unmute, pick("Unmute & Reopen", "", rowactions.ActionUnmuteReopen, contextmenu.Server,
+		suggest(unmute, pick("Unmute & Reopen", "", ActionUnmuteReopen, contextmenu.Server,
 			firstReason(in.serverReason, reasonIf(!unmute, firstReason(finished, notMuted))))),
-		pick("Watch", "", rowactions.ActionWatch, contextmenu.Agent, in.watchReason),
-		pick("Transcript", "", rowactions.ActionTranscript, contextmenu.Agent, ""),
-		suggest(rowactions.InvestigateSuggested(in.rendered),
-			pick("Investigate", "", rowactions.ActionInvestigate, contextmenu.Agent, "")))
+		pick("Watch", "", ActionWatch, contextmenu.Agent, in.watchReason),
+		pick("Transcript", "", ActionTranscript, contextmenu.Agent, ""),
+		suggest(InvestigateSuggested(in.rendered),
+			pick("Investigate", "", ActionInvestigate, contextmenu.Agent, "")))
 	switch {
 	case in.queueAgent != "":
 		// A PTY pane is the Agents tab's live panel, so herdr being down is moot.
-		it := pick("Go to pane", "", rowactions.ActionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
+		it := pick("Go to pane", "", ActionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
 		if it.Disabled == "" {
 			id := in.queueAgent
-			it.Run = func(rowactions.TicketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } }
+			it.Run = func(TicketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } }
 		}
 		items = append(items, it)
 	case in.paneLive:
-		items = append(items, pick("Go to pane", "", rowactions.ActionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
+		items = append(items, pick("Go to pane", "", ActionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
 	}
 
 	if in.onQueue {
@@ -178,7 +177,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[rowactions.TicketTar
 // archivedAllowed reports whether an item reads rather than writes, so an
 // archived row keeps it. Edits open an archived file read-only.
 func archivedAllowed(group contextmenu.Group, action string) bool {
-	return group == contextmenu.EditCopy || action == rowactions.ActionWatch || action == rowactions.ActionTranscript
+	return group == contextmenu.EditCopy || action == ActionWatch || action == ActionTranscript
 }
 
 const (
@@ -236,27 +235,27 @@ func firstReason(reasons ...string) string {
 // server takes them.
 func serverReason(api tabapi.ServerAPI, link tabapi.ServerLink) string {
 	if api == nil || link == tabapi.ServerLinkDown {
-		return rowactions.ServerNotRunning
+		return ServerNotRunning
 	}
 	return link.DisabledReason()
 }
 
-// ticketMenuReadyMsg carries a ticket's Context menu whose agent liveness was
+// TicketReadyMsg carries a ticket's Context menu whose agent liveness was
 // resolved off the Update goroutine.
-type ticketMenuReadyMsg struct {
-	target rowactions.TicketTarget
-	prompt string
-	items  []contextmenu.Item[rowactions.TicketTarget]
-	// detailErr is the failed detail read; the menu opens without recovery items.
-	detailErr error
+type TicketReadyMsg struct {
+	Target TicketTarget
+	Prompt string
+	Items  []contextmenu.Item[TicketTarget]
+	// DetailErr is the failed detail read; the menu opens without recovery items.
+	DetailErr error
 }
 
-// toast shows a failed detail read on the status line.
-func (msg ticketMenuReadyMsg) toast() tea.Cmd {
-	if msg.detailErr == nil {
+// Toast shows a failed detail read on the status line.
+func (msg TicketReadyMsg) Toast() tea.Cmd {
+	if msg.DetailErr == nil {
 		return nil
 	}
-	return notify.Error("ticket detail: " + msg.detailErr.Error())
+	return notify.Error("ticket detail: " + msg.DetailErr.Error())
 }
 
 // newTicketMenuInput is what both tabs read from a ticket row when "m" is
@@ -278,26 +277,26 @@ func cmdTicketMenu(api tabapi.ReadsAPI, dirs config.Dirs, in ticketMenuInput) te
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.
 	epicName, _, _ := tickets.SplitTrailerValue(address)
-	target := rowactions.TicketTarget{Address: address, EpicName: epicName, TicketID: in.ticket.DisplayNumber()}
+	target := TicketTarget{Address: address, EpicName: epicName, TicketID: in.ticket.DisplayNumber()}
 	prompt := fmt.Sprintf("Ticket %q", in.ticket.Title)
 	return func() tea.Msg {
-		api := rowactions.SnapshotIterations(api)
-		it, live := rowactions.ServerIteration(api, address)
+		api := SnapshotIterations(api)
+		it, live := ServerIteration(api, address)
 		in.paneLive = live && it.Tab != ""
 		if live && it.QueueAgent != "" {
 			in.queueAgent, in.ptyLive = it.QueueAgent, true
 		}
-		in.watchReason = rowactions.WatchReason(api, dirs, rowactions.AgentAddress(address, target.TicketID))
+		in.watchReason = WatchReason(api, dirs, AgentAddress(address, target.TicketID))
 		var err error
-		in.detail, err = rowactions.TicketDetail(api, address)
-		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in), detailErr: err}
+		in.detail, err = TicketDetail(api, address)
+		return TicketReadyMsg{Target: target, Prompt: prompt, Items: ticketMenuItems(in), DetailErr: err}
 	}
 }
 
 // ticketMenuReadyApplies reports whether a resolved menu may open: the user
 // may have moved on, or opened another overlay, while ps ran.
-func ticketMenuReadyApplies(msg ticketMenuReadyMsg, pending, selected string, modalOpen bool) bool {
-	address := msg.target.Address
+func ticketMenuReadyApplies(msg TicketReadyMsg, pending, selected string, modalOpen bool) bool {
+	address := msg.Target.Address
 	return pending == address && selected == address && !modalOpen
 }
 
@@ -307,15 +306,15 @@ func ticketMenuReadyApplies(msg ticketMenuReadyMsg, pending, selected string, mo
 func ticketHasSuggestedActions(in ticketMenuInput) bool {
 	// The row has no detail yet, so an answer pause's recovery items (suggested
 	// once the menu opens) are counted here.
-	if rowactions.ResumeSuggested(in.rendered) && in.serverReason == "" && !in.archived {
+	if ResumeSuggested(in.rendered) && in.serverReason == "" && !in.archived {
 		return true
 	}
-	return slices.ContainsFunc(ticketMenuItems(in), func(it contextmenu.Item[rowactions.TicketTarget]) bool {
+	return slices.ContainsFunc(ticketMenuItems(in), func(it contextmenu.Item[TicketTarget]) bool {
 		return it.Group == contextmenu.Suggested && it.Disabled == ""
 	})
 }
 
-func targetResult(t rowactions.TicketTarget, action string) actionsMenuResult {
+func targetResult(t TicketTarget, action string) actionsMenuResult {
 	return actionsMenuResult{
 		Done: true, Accepted: true,
 		Path: t.Address, EpicName: t.EpicName, TicketID: t.TicketID,

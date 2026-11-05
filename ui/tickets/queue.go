@@ -31,7 +31,7 @@ type QueueModel struct {
 	now          func() time.Time
 	worktreeRoot string
 	settings     ui.Settings
-	editor       rowEditor
+	editor       rowactions.Editor
 	checked      map[string]bool
 	checkOrder   map[string]uint64
 	// live is epicName -> ticket identifier -> running state, derived from the
@@ -85,7 +85,7 @@ type QueueModel struct {
 	entriesCache *queueEntriesCache
 
 	// menus is the Tickets tab's row menu plus the Queue group.
-	menus        rowMenus
+	menus        rowactions.Menus
 	watch        rowactions.WatchModal
 	runningEpics map[string]bool
 	paused       bool
@@ -156,14 +156,14 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		now:              time.Now,
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
-		editor:           rowEditor{worktreeRoot: worktreeRoot, settings: settings},
+		editor:           rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
 		checked:          map[string]bool{},
 		checkOrder:       map[string]uint64{},
 		live:             map[string]map[string]rowfmt.LiveTicketState{},
 		implementSpinner: sp,
 		runningEpics:     map[string]bool{},
 		confirm:          confirm.New(),
-		menus:            rowMenus{onQueue: true},
+		menus:            rowactions.Menus{OnQueue: true},
 		search:           search.NewModel(),
 		keys:             km,
 		queueTree:        queueTree,
@@ -207,8 +207,8 @@ type queueSpinnerRestartMsg struct{}
 func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(QueueModel)
-	if nm.menus.pending != nm.selectedQueuePath() {
-		nm.menus.pending = ""
+	if nm.menus.Pending != nm.selectedQueuePath() {
+		nm.menus.Pending = ""
 	}
 	nm.refreshQueueHover(msg)
 	nm.syncQueuePreviewViewport()
@@ -272,7 +272,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseWheel(msg)
 	case tea.MouseMotionMsg:
 		return m.handleQueueMouseMotion(msg)
-	case editFileFinishedMsg:
+	case rowactions.EditFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case rowactions.WatchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
@@ -281,11 +281,11 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.watch, cmd = m.watch.Step(msg)
 		return m, cmd
-	case ticketMenuReadyMsg:
+	case rowactions.TicketReadyMsg:
 		return m.handleTicketMenuReady(msg)
-	case ticketMenuPickMsg:
+	case rowactions.TicketPickMsg:
 		return m.handleTicketMenuPick(msg)
-	case epicMenuPickMsg:
+	case rowactions.EpicPickMsg:
 		return m.handleQueueEpicMenuPick(msg)
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
@@ -298,9 +298,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
-		if m.menus.menu.IsOpen {
+		if m.menus.Menu.IsOpen {
 			var cmd tea.Cmd
-			m.menus.menu, cmd = m.menus.menu.Update(msg)
+			m.menus.Menu, cmd = m.menus.Menu.Update(msg)
 			return m, cmd
 		}
 		if m.confirm.IsOpen {
@@ -310,7 +310,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateHarnessPickerKey(msg)
 		}
 		if msg.String() == "esc" {
-			m.menus.pending = ""
+			m.menus.Pending = ""
 		}
 		if m.preview.Focus == preview.FocusPreview {
 			return m.handleQueuePreviewKey(msg)
@@ -327,9 +327,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleQueueKey(msg)
 	case tea.MouseClickMsg:
-		if m.menus.menu.IsOpen {
+		if m.menus.Menu.IsOpen {
 			var cmd tea.Cmd
-			m.menus.menu, cmd = m.menus.menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
+			m.menus.Menu, cmd = m.menus.Menu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
 		if m.watch.IsOpen() {

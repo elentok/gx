@@ -9,16 +9,17 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
-// stubClipboard swaps ticketsClipboardWrite for the test's duration, so these
-// tests must not run in parallel.
+// stubClipboard swaps rowactions.ClipboardWrite for the test's duration, so
+// these tests must not run in parallel.
 func stubClipboard(t *testing.T) *string {
 	t.Helper()
 	var got string
-	orig := ticketsClipboardWrite
-	ticketsClipboardWrite = func(s string) error { got = s; return nil }
-	t.Cleanup(func() { ticketsClipboardWrite = orig })
+	orig := rowactions.ClipboardWrite
+	rowactions.ClipboardWrite = func(s string) error { got = s; return nil }
+	t.Cleanup(func() { rowactions.ClipboardWrite = orig })
 	return &got
 }
 
