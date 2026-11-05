@@ -94,6 +94,9 @@ type SessionActionable struct {
 	Action   []string `json:"action,omitempty"`
 	Target   string   `json:"target,omitempty"`
 	GxRaised bool     `json:"gx_raised,omitempty"`
+	// Images are the ids of Prompt images a failed send did not paste; running
+	// the Action pastes them before its one prompt.
+	Images []string `json:"images,omitempty"`
 	// Grilling marks the Actionable of a gx-design grilling round, so clients
 	// do not match its Reason text.
 	Grilling bool `json:"grilling,omitempty"`

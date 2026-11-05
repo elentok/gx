@@ -138,8 +138,9 @@ func imageSent(sessionDir, id string) bool {
 }
 
 // resolveImages is the absolute paths of the saved, unsent images ids name, in
-// order, or the refusal that stops the prompt.
-func (p *Prompt) resolveImages(sessionDir string, ids []string) ([]string, *wire.SessionResult) {
+// order, or the refusal that stops the prompt. resend allows images already
+// marked sent: a failed send's replay pastes them again.
+func (p *Prompt) resolveImages(sessionDir string, ids []string, resend bool) ([]string, *wire.SessionResult) {
 	if len(ids) > wire.MaxPromptImages {
 		r := sessions.Refusal(wire.ReasonImageTooMany, fmt.Sprintf("at most %d images per prompt", wire.MaxPromptImages))
 		return nil, &r
@@ -153,7 +154,7 @@ func (p *Prompt) resolveImages(sessionDir string, ids []string) ([]string, *wire
 			r := sessions.Refusal(wire.ReasonImageNotFound, fmt.Sprintf("no image %s in this session", id))
 			return nil, &r
 		}
-		if imageSent(sessionDir, id) || slices.Contains(ids[:len(paths)], id) {
+		if (!resend && imageSent(sessionDir, id)) || slices.Contains(ids[:len(paths)], id) {
 			r := sessions.Refusal(wire.ReasonImageSent, fmt.Sprintf("image %s was already sent", id))
 			return nil, &r
 		}

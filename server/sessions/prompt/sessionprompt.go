@@ -78,15 +78,11 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	}
 	var imgs imageSet
 	if !req.Continue {
-		paths, refusal := p.resolveImages(dir, req.Images)
+		paths, refusal := p.resolveImages(dir, req.Images, false)
 		if refusal != nil {
 			return *refusal, nil
 		}
-		imgs = imageSet{paths: paths, done: func() {
-			if err := p.markImagesSent(dir, req.Images); err != nil {
-				p.log.Warn("marking images sent", "session", req.ID, "err", err)
-			}
-		}}
+		imgs = p.imageSetOf(dir, req.Images, paths)
 	}
 	if source == promptSourceWeb {
 		last, err := p.lastChatMessageID(req.ID, meta)

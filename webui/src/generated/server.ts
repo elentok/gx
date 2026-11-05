@@ -2206,6 +2206,11 @@ export interface SessionActionable {
   target?: string;
   gx_raised?: boolean;
   /**
+   * Images are the ids of Prompt images a failed send did not paste; running
+   * the Action pastes them before its one prompt.
+   */
+  images?: string[];
+  /**
    * Grilling marks the Actionable of a gx-design grilling round, so clients
    * do not match its Reason text.
    */

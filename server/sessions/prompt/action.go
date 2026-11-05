@@ -40,6 +40,15 @@ func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 	if res, refused := p.resumer.HandoffRefusal(meta, action); refused {
 		return res, nil
 	}
+	// A failed send's images go back through the prompt route's send.
+	var imgs imageSet
+	if ids := meta.Actionable.Images; len(ids) > 0 && len(action) == 1 {
+		paths, refusal := p.resolveImages(dir, ids, true)
+		if refusal != nil {
+			return *refusal, nil
+		}
+		imgs = p.imageSetOf(dir, ids, paths)
+	}
 	meta.Actionable = wire.SessionActionable{}
 	if auto {
 		meta.AutoSends++
@@ -51,7 +60,11 @@ func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 		return wire.SessionResult{}, err
 	}
 	p.events.Publish(wire.EventSessionChanged, req.ID)
-	p.resumer.StartContinue(dir, meta, "Action", action)
+	if len(imgs.ids) > 0 {
+		p.sessions.Watches.Start(func() { p.sendPrompt(dir, action[0], imgs) })
+	} else {
+		p.resumer.StartContinue(dir, meta, "Action", action)
+	}
 	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
 }

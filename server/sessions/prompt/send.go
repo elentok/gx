@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/nativerunner/holder"
 )
 
 const sendFailedPrefix = "Send failed: "
@@ -35,7 +34,10 @@ func (p *Prompt) sendPrompt(dir, text string, imgs imageSet) {
 		log.Info("send stopped", "err", err)
 	default:
 		log.Warn("send failed", "err", err)
-		p.RaiseGxActionable(dir, fmt.Sprintf("%s%v", sendFailedPrefix, err), []string{text})
+		p.raiseActionable(dir, wire.SessionActionable{
+			Reason: fmt.Sprintf("%s%v", sendFailedPrefix, err), Action: []string{text},
+			Images: imgs.ids, GxRaised: true,
+		})
 	}
 }
 
@@ -98,23 +100,35 @@ func (p *Prompt) nudgePrompt(dir, text string, imgs imageSet) error {
 }
 
 // imageSet is the Prompt images a send pastes before its text. The zero value
-// pastes nothing. done runs once the pastes succeed.
+// pastes nothing. paths[i] is the saved file of ids[i]; sent runs for an id
+// once its own paste succeeds.
 type imageSet struct {
+	ids   []string
 	paths []string
-	done  func()
+	sent  func(id string)
 }
 
 // paste pastes each image path as its own bracketed paste, in order.
-func (s imageSet) paste(c *holder.HolderClient) error {
-	for _, path := range s.paths {
+func (s imageSet) paste(c interface{ Paste(string) error }) error {
+	for i, path := range s.paths {
 		if err := c.Paste(path); err != nil {
 			return err
 		}
-	}
-	if len(s.paths) > 0 && s.done != nil {
-		s.done()
+		if s.sent != nil {
+			s.sent(s.ids[i])
+		}
 	}
 	return nil
+}
+
+// imageSetOf is the imageSet for resolved ids, marking each sent in dir as its
+// paste succeeds.
+func (p *Prompt) imageSetOf(dir string, ids, paths []string) imageSet {
+	return imageSet{ids: ids, paths: paths, sent: func(id string) {
+		if err := p.markImagesSent(dir, []string{id}); err != nil {
+			p.log.Warn("marking image sent", "session", filepath.Base(dir), "image", id, "err", err)
+		}
+	}}
 }
 
 // withText is the text typed after the pastes: one space separates it from

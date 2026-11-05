@@ -202,13 +202,20 @@ func decideActionable(cur sessions.Meta, a wire.SessionActionable, matched bool,
 // RaiseGxActionable saves an Actionable gx raises itself, replacing any
 // earlier one. The person's input does not clear it.
 func (p *Prompt) RaiseGxActionable(dir, reason string, action []string) {
+	p.raiseActionable(dir, wire.SessionActionable{Reason: reason, Action: action, GxRaised: true})
+}
+
+// raiseActionable is RaiseGxActionable for an Actionable with more than a
+// reason and prompts.
+func (p *Prompt) raiseActionable(dir string, a wire.SessionActionable) {
 	id := filepath.Base(dir)
+	reason := a.Reason
 	raised := false
 	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		if m.Status.State == wire.SessionExited {
 			return false
 		}
-		m.Actionable = wire.SessionActionable{Reason: reason, Action: action, GxRaised: true}
+		m.Actionable = a
 		raised = true
 		return true
 	})
