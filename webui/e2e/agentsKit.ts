@@ -49,6 +49,22 @@ export const composer = (page: Page) => page.getByRole("form", { name: "Composer
 export const messageBox = (page: Page) => composer(page).getByRole("textbox", { name: "Message" });
 export const sendButton = (page: Page) => composer(page).getByRole("button", { name: "Send", exact: true });
 
+export const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+export const file = (name: string, mimeType: string, buffer: Buffer) => ({ name, mimeType, buffer });
+export const png = (n: number) => file(`pic-${n}.png`, "image/png", PNG);
+
+export const thumbs = (page: Page) => page.getByRole("button", { name: "Remove image" });
+export const addInput = (page: Page) => page.getByTestId("image-input");
+
+/** Opens the first idle plain session at desktop width with its composer showing. */
+export async function idleSession(page: Page, fixture: Fixture) {
+  const idle = (await sessions(fixture)).find((s) => s.status.state === "idle" && !s.design && !s.queue)!;
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await go(page, `#/agents/${idle.id}`);
+  await expect(composer(page)).toBeVisible();
+  return idle;
+}
+
 /** The completion menu under the composer and its rows. */
 export const commandMenu = (page: Page) => page.getByRole("listbox", { name: "Commands" });
 export const commandRows = (page: Page) => commandMenu(page).getByRole("option");
