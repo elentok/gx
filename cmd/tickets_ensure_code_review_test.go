@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -22,9 +23,9 @@ func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "widget-epic"))
 	testutil.Mkdir(t, filepath.Join(project, ".archive"))
 
-	names, err := completeEpicNames(config.DirsFrom(envFor(t)), repoDir)
+	names, err := ticketref.CompleteEpicNames(config.DirsFrom(envFor(t)), repoDir)
 	if err != nil {
-		t.Fatalf("completeEpicNames: %v", err)
+		t.Fatalf("CompleteEpicNames: %v", err)
 	}
 
 	want := map[string]bool{"bugs-05": true, "widget-epic": true}

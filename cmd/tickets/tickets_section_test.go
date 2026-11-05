@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -27,10 +28,10 @@ func newAddEpic(t *testing.T) (epicPath, issuesDir string) {
 func TestRunTicketsAddBody_CreatesOpenTicketUnderParent(t *testing.T) {
 	t.Parallel()
 	epicPath, issuesDir := newAddEpic(t)
-	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "12", "child", "## What to build\n\nDo it.\n", addFrontmatter{}, false, &stdout, io.Discard); err != nil {
+	if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, "12", "child", "## What to build\n\nDo it.\n", addFrontmatter{}, false, &stdout, io.Discard); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -59,11 +60,11 @@ func TestRunTicketsAddBody_CreatesOpenTicketUnderParent(t *testing.T) {
 func TestRunTicketsAddBody_MergesBodyFrontmatter(t *testing.T) {
 	t.Parallel()
 	epicPath, issuesDir := newAddEpic(t)
-	writeTicket(t, filepath.Join(issuesDir, "01-first.md"), "01", "open", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "01-first.md"), "01", "open", "implement")
 	body := "---\nid: \"07\"\nstatus: open\nblocked_by: [\"01\"]\ntype: grilling\nexpected_context_window: 60000\n---\n\n# Decide it\n\n## Question\n\nWhich?\n"
 
 	var stdout, stderr bytes.Buffer
-	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "decide", body, addFrontmatter{}, false, &stdout, &stderr); err != nil {
+	if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, "", "decide", body, addFrontmatter{}, false, &stdout, &stderr); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -99,7 +100,7 @@ func TestRunTicketsAddBody_BadBodyFrontmatterRefusesWithoutWriting(t *testing.T)
 			t.Parallel()
 			epicPath, issuesDir := newAddEpic(t)
 			body := "---\n" + fm + "---\n\n# T\n\nBody.\n"
-			if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "bad", body, addFrontmatter{}, false, io.Discard, io.Discard); err == nil {
+			if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, "", "bad", body, addFrontmatter{}, false, io.Discard, io.Discard); err == nil {
 				t.Fatal("want a refusal")
 			}
 			if entries, _ := os.ReadDir(issuesDir); len(entries) != 0 {
@@ -114,7 +115,7 @@ func TestRunTicketsAddBody_EmptyBodyFailsWithoutWriting(t *testing.T) {
 	epicPath, issuesDir := newAddEpic(t)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "empty", "  \n", addFrontmatter{}, false, &stdout, io.Discard); err == nil {
+	if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, "", "empty", "  \n", addFrontmatter{}, false, &stdout, io.Discard); err == nil {
 		t.Fatal("want error for empty body, got nil")
 	}
 	entries, _ := os.ReadDir(issuesDir)
@@ -128,7 +129,7 @@ func TestRunTicketsAddBody_JSON(t *testing.T) {
 	epicPath, _ := newAddEpic(t)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "thing", "body\n", addFrontmatter{}, true, &stdout, io.Discard); err != nil {
+	if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, "", "thing", "body\n", addFrontmatter{}, true, &stdout, io.Discard); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 	var got struct{ Address, Path string }
@@ -184,10 +185,10 @@ func TestRunTicketsSection_WritesAndPrintsAddress(t *testing.T) {
 	t.Parallel()
 	_, issuesDir := newAddEpic(t)
 	path := filepath.Join(issuesDir, "01-a.md")
-	writeTicket(t, path, "01", "open", "implement")
+	cmdtest.WriteTicket(t, path, "01", "open", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "hello\n", false, false, &stdout); err != nil {
+	if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "hello\n", false, false, &stdout); err != nil {
 		t.Fatalf("runTicketsSection: %v", err)
 	}
 	raw, _ := os.ReadFile(path)
@@ -207,13 +208,13 @@ func TestRunTicketsSection_BlankContentRefusedUnlessCleared(t *testing.T) {
 	for _, blank := range []string{"", " \n\t\n"} {
 		_, issuesDir := newAddEpic(t)
 		path := filepath.Join(issuesDir, "01-a.md")
-		writeTicket(t, path, "01", "open", "implement")
-		if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "keep me\n", false, false, io.Discard); err != nil {
+		cmdtest.WriteTicket(t, path, "01", "open", "implement")
+		if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "keep me\n", false, false, io.Discard); err != nil {
 			t.Fatalf("seed: %v", err)
 		}
 		before, _ := os.ReadFile(path)
 
-		err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", blank, false, false, io.Discard)
+		err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", blank, false, false, io.Discard)
 		if err == nil || !strings.Contains(err.Error(), "--clear") {
 			t.Errorf("blank %q: err = %v, want a refusal naming --clear", blank, err)
 		}
@@ -221,7 +222,7 @@ func TestRunTicketsSection_BlankContentRefusedUnlessCleared(t *testing.T) {
 			t.Errorf("blank %q changed the ticket:\n%s", blank, after)
 		}
 
-		if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "", true, false, io.Discard); err != nil {
+		if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "", true, false, io.Discard); err != nil {
 			t.Fatalf("clear: %v", err)
 		}
 		if after, _ := os.ReadFile(path); strings.Contains(string(after), "keep me") {

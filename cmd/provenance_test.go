@@ -28,7 +28,7 @@ func TestTicketsSetJSON_DirectHuman(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: cmdtest.NonAgentGetwd(t)}
 	if err := execute([]string{"tickets", "set", path, "--type=implement", "--json"}, d); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestTicketsSetJSON_IterationStatusFromAgent(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: agentGetwd(t, "ralph-loop/epic")}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: cmdtest.AgentGetwd(t, "ralph-loop/epic")}
 	if err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--json"}, d); err != nil {
 		t.Fatalf("execute: %v", err)
 	}

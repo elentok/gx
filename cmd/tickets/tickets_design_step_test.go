@@ -1,15 +1,23 @@
-package cmd
+package tickets
 
 import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
+func setupEpicSetDeps(t *testing.T) (Deps, string) {
+	t.Helper()
+	env, ticketMD := cmdtest.SetupEpicSetProject(t)
+	return Deps{Env: env}, ticketMD
+}
+
 func TestTicketsSet_DesignStep(t *testing.T) {
-	setMap := func(t *testing.T) (deps, string) {
-		d, ticketMD := setupEpicSetProject(t)
-		if err := execute([]string{"tickets", "set", "mine:e", "--kind=map"}, d); err != nil {
+	setMap := func(t *testing.T) (Deps, string) {
+		d, ticketMD := setupEpicSetDeps(t)
+		if err := execute(t, []string{"tickets", "set", "mine:e", "--kind=map"}, d); err != nil {
 			t.Fatal(err)
 		}
 		return d, ticketMD
@@ -17,7 +25,7 @@ func TestTicketsSet_DesignStep(t *testing.T) {
 
 	t.Run("stores a valid step", func(t *testing.T) {
 		d, ticketMD := setMap(t)
-		if err := execute([]string{"tickets", "set", "mine:e", "--design-step=review"}, d); err != nil {
+		if err := execute(t, []string{"tickets", "set", "mine:e", "--design-step=review"}, d); err != nil {
 			t.Fatalf("set: %v", err)
 		}
 		if raw, _ := os.ReadFile(ticketMD); !strings.Contains(string(raw), "design_step: review") {
@@ -28,8 +36,8 @@ func TestTicketsSet_DesignStep(t *testing.T) {
 	t.Run("pings the server with the epic address", func(t *testing.T) {
 		d, _ := setMap(t)
 		cl, pings := fakeMoveServer(t, nil, nil)
-		d.serverClient = cl
-		if err := execute([]string{"tickets", "set", "mine:e", "--design-step=review"}, d); err != nil {
+		d.Env.NewClient = cl
+		if err := execute(t, []string{"tickets", "set", "mine:e", "--design-step=review"}, d); err != nil {
 			t.Fatalf("set: %v", err)
 		}
 		if len(*pings) != 1 || (*pings)[0] != "mine:e" {
@@ -40,7 +48,7 @@ func TestTicketsSet_DesignStep(t *testing.T) {
 	t.Run("refuses an unknown step and writes nothing", func(t *testing.T) {
 		d, ticketMD := setMap(t)
 		before, _ := os.ReadFile(ticketMD)
-		if err := execute([]string{"tickets", "set", "mine:e", "--design-step=nope"}, d); err == nil {
+		if err := execute(t, []string{"tickets", "set", "mine:e", "--design-step=nope"}, d); err == nil {
 			t.Fatal("want an error")
 		}
 		if after, _ := os.ReadFile(ticketMD); string(after) != string(before) {
@@ -50,17 +58,17 @@ func TestTicketsSet_DesignStep(t *testing.T) {
 
 	t.Run("backward move needs the flag", func(t *testing.T) {
 		d, ticketMD := setMap(t)
-		if err := execute([]string{"tickets", "set", "mine:e", "--design-step=review"}, d); err != nil {
+		if err := execute(t, []string{"tickets", "set", "mine:e", "--design-step=review"}, d); err != nil {
 			t.Fatal(err)
 		}
-		err := execute([]string{"tickets", "set", "mine:e", "--design-step=resolve-tickets"}, d)
+		err := execute(t, []string{"tickets", "set", "mine:e", "--design-step=resolve-tickets"}, d)
 		if err == nil || !strings.Contains(err.Error(), "--allow-backward") {
 			t.Fatalf("err = %v, want a refusal naming --allow-backward", err)
 		}
 		if raw, _ := os.ReadFile(ticketMD); !strings.Contains(string(raw), "design_step: review") {
 			t.Errorf("refused move changed the step:\n%s", raw)
 		}
-		if err := execute([]string{"tickets", "set", "mine:e", "--design-step=resolve-tickets", "--allow-backward"}, d); err != nil {
+		if err := execute(t, []string{"tickets", "set", "mine:e", "--design-step=resolve-tickets", "--allow-backward"}, d); err != nil {
 			t.Fatalf("with flag: %v", err)
 		}
 		if raw, _ := os.ReadFile(ticketMD); !strings.Contains(string(raw), "design_step: resolve-tickets") {
@@ -69,11 +77,11 @@ func TestTicketsSet_DesignStep(t *testing.T) {
 	})
 
 	t.Run("refused on a loop epic", func(t *testing.T) {
-		d, ticketMD := setupEpicSetProject(t)
-		if err := execute([]string{"tickets", "set", "mine:e", "--design-step=spec"}, d); err == nil {
+		d, ticketMD := setupEpicSetDeps(t)
+		if err := execute(t, []string{"tickets", "set", "mine:e", "--design-step=spec"}, d); err == nil {
 			t.Fatal("want an error")
 		}
-		if raw, _ := os.ReadFile(ticketMD); string(raw) != epicTicketMD {
+		if raw, _ := os.ReadFile(ticketMD); string(raw) != cmdtest.EpicTicketMD {
 			t.Errorf("ticket.md changed:\n%s", raw)
 		}
 	})

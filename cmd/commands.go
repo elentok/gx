@@ -1,41 +1,39 @@
 package cmd
 
 import (
+	"io"
+
 	"github.com/elentok/gx/cmd/serverapi"
+	"github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/cmd/ticketsmigrate"
-	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/config"
 
 	"github.com/spf13/cobra"
 )
 
-func newTicketsCmd(d deps) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "tickets",
-		Aliases: []string{"tk"},
-		Short:   "open the tickets UI",
-		Args:    cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.tui.RunTab(nav.TabTickets)
+// ticketsDeps is the `gx tickets` hooks joined with the shared env.
+func (d deps) ticketsDeps() tickets.Deps {
+	return tickets.Deps{
+		Env:     d.base(),
+		OpenTab: d.tui.RunTab,
+		PrintSection: func(dirs config.Dirs, cwd, addr, section string, w io.Writer) error {
+			return runTicketsShow(dirs, cwd, addr, false, section, w)
 		},
 	}
-	cmd.AddCommand(
+}
+
+func newTicketsCmd(d deps) *cobra.Command {
+	extra := []*cobra.Command{
 		newTicketsValidateCmd(d),
 		newTicketsShowCmd(d),
 		newTicketsLogCmd(d),
-		newTicketsSetCmd(d),
 		ticketsmigrate.New(ticketsmigrate.Deps{Env: d.base()}),
 		newTicketsRootCmd(d),
 		newTicketsEpicsCmd(d),
-		newTicketsSchemaCmd(),
-		newTicketsAddCmd(d),
 		serverapi.NewAskCmd(d.serverapiDeps()),
 		serverapi.NewAnswerCmd(d.serverapiDeps(), false),
-		newTicketsSectionCmd(d),
-		newTicketsMoveCmd(d),
-		newTicketsCloseCmd(d),
-	)
-	cmd.AddCommand(ticketsFlowCommands(d)...)
-	return cmd
+	}
+	return tickets.New(d.ticketsDeps(), append(extra, ticketsFlowCommands(d)...)...)
 }
 
 func newVersionCmd(d deps) *cobra.Command {

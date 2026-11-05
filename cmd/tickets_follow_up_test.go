@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -26,7 +27,7 @@ func TestExecute_TicketsFollowUpAdd_FilesDraftResearch(t *testing.T) {
 	if got := strings.TrimSpace(out); got != "mine:follow-ups/01" {
 		t.Errorf("printed %q, want mine:follow-ups/01", got)
 	}
-	tk, err := schema.ParseTicket(addedPath(t, filepath.Join(project, "follow-ups"), out))
+	tk, err := schema.ParseTicket(cmdtest.AddedPath(t, filepath.Join(project, "follow-ups"), out))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +47,7 @@ func TestExecute_TicketsFollowUpAdd_FilesDraftResearch(t *testing.T) {
 	if !strings.Contains(out, "theirs:follow-ups/01") {
 		t.Errorf("json output %q lacks the address", out)
 	}
-	tk, err = schema.ParseTicket(addedPath(t, filepath.Join(theirs, "follow-ups"), "theirs:follow-ups/01"))
+	tk, err = schema.ParseTicket(cmdtest.AddedPath(t, filepath.Join(theirs, "follow-ups"), "theirs:follow-ups/01"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +63,7 @@ func TestExecute_TicketsFollowUpAdd_CategoryFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tk, err := schema.ParseTicket(addedPath(t, filepath.Join(project, "follow-ups"), out))
+	tk, err := schema.ParseTicket(cmdtest.AddedPath(t, filepath.Join(project, "follow-ups"), out))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,15 +150,20 @@ func TestExecute_TicketsFollowUpAdd_HelpListsRequiredSections(t *testing.T) {
 }
 
 func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testing.T) {
-	f := setupCloseProject(t)
-	fu := filepath.Join(f.project, tickets.FollowUpsEpic, "issues")
+	repo := testutil.TempRepo(t)
+	project := addProject(t, isolateTicketStore(t), "mine", repo)
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.FollowUpsEpic))
+	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
+	if err := os.MkdirAll(fu, 0755); err != nil {
+		t.Fatal(err)
+	}
 	testutil.WriteFile(t, fu, "05-disk.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Cleanup\n\n## Problem\n\nThe Disk fills up.\n")
 	testutil.WriteFile(t, fu, "06-menu.md", "---\nid: \"06\"\nstatus: open\ntype: research\n---\n\n# 06 — Menu\n\n## Problem\n\nEscape misbehaves.\n\n## Suggested fix\n\nguard\n")
-	if _, err := runIn(t, f.repo, "tickets", "close", "follow-ups/06", "--reason", "obsolete"); err != nil {
+	if _, err := runIn(t, repo, "tickets", "close", "follow-ups/06", "--reason", "obsolete"); err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := runIn(t, f.repo, "tickets", "follow-up", "search", "disk", "escape")
+	out, err := runIn(t, repo, "tickets", "follow-up", "search", "disk", "escape")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +173,7 @@ func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testi
 	}
 
 	// A word only in a non-Problem section does not match.
-	out, err = runIn(t, f.repo, "tickets", "follow-up", "search", "--project", "mine", "guard")
+	out, err = runIn(t, repo, "tickets", "follow-up", "search", "--project", "mine", "guard")
 	if err != nil || out != "" {
 		t.Errorf("search guard = %q, %v; want no hits", out, err)
 	}

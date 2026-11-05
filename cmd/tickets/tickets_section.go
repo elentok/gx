@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 // ticket body with content, under the per-ticket lock, and prints the ticket's
 // address. Blank content is refused unless clear is set: an empty stdin (a
 // probe piped through head, a failed upstream command) must not wipe a section.
-func runTicketsSection(d deps, path, heading, content string, clear, jsonOut bool, w io.Writer) error {
+func runTicketsSection(d Deps, path, heading, content string, clear, jsonOut bool, w io.Writer) error {
 	if strings.TrimSpace(content) == "" && !clear {
 		return fmt.Errorf("refusing to blank section %q: content is empty (pass --clear to blank it on purpose)", heading)
 	}
@@ -24,7 +24,7 @@ func runTicketsSection(d deps, path, heading, content string, clear, jsonOut boo
 		if err := tickets.SetEpicSection(path, heading, content); err != nil {
 			return err
 		}
-		return printTicketRef(path, jsonOut, w)
+		return PrintTicketRef(path, jsonOut, w)
 	}
 	err := schema.UpdateTicketWithBody(path, func(_ *schema.Ticket, body *string) {
 		*body = schema.SetSection(*body, heading, content)
@@ -32,6 +32,6 @@ func runTicketsSection(d deps, path, heading, content string, clear, jsonOut boo
 	if err != nil {
 		return err
 	}
-	pingServer(d, path)
-	return printTicketRef(path, jsonOut, w)
+	PingServer(d.Env, path)
+	return PrintTicketRef(path, jsonOut, w)
 }

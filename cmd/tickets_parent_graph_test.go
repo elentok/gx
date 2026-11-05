@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 // writeEpicTicket writes one ticket into scratchDir/<epic>/issues/, creating
@@ -124,7 +126,7 @@ func TestExecute_TicketsSet_AcceptsDraftStatus(t *testing.T) {
 	path := filepath.Join(dir, "01-first.md")
 	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: cmdtest.NonAgentGetwd(t)}
 	if err := execute([]string{"tickets", "set", path, "--status=draft"}, d); err != nil {
 		t.Fatalf("execute tickets set --status=draft: %v", err)
 	}

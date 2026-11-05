@@ -12,6 +12,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -302,7 +303,7 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 		}
 	}
 	for _, t := range plan.Tickets {
-		pingServer(d, t.Path)
+		ticketscmd.PingServer(d.base(), t.Path)
 	}
 	return printPublished(w, plan.rows(), jsonOut)
 }

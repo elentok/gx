@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"context"
@@ -21,8 +21,8 @@ import (
 // to another epic of the same project, written directly like `add`. Both epic
 // locks are held, in path order, from the checks through the write; the new
 // file is written before the old one is deleted so a crash never loses the ticket.
-func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w io.Writer) error {
-	cwd, err := d.getwd()
+func runTicketsMove(d Deps, addr, target, slug string, dryRun, jsonOut bool, w io.Writer) error {
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -34,8 +34,8 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	root := filepath.Dir(srcEpicPath)
 
 	dstProject, dstEpic := a.Project, target
-	if m := projectEpicRe.FindStringSubmatch(target); m != nil {
-		dstProject, dstEpic = m[1], m[2]
+	if project, epic, ok := ticketref.SplitProjectEpic(target); ok {
+		dstProject, dstEpic = project, epic
 	}
 	if dstProject != a.Project {
 		if _, err := ticketref.ProjectRoot(d.dirs(), cwd, dstProject); err != nil {
@@ -60,7 +60,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	}
 	defer unlock()
 
-	if err := refuseIfActive(d.dirs(), d.dial(), a); err != nil {
+	if err := refuseIfActive(d.dirs(), d.Dial(), a); err != nil {
 		return err
 	}
 
@@ -76,7 +76,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 		return err
 	}
 	// The old file is gone, so both sides are pinged by address, not by path.
-	pingLabels(d.dial(), plan.From.String(), plan.To.String())
+	pingLabels(d.Dial(), plan.From.String(), plan.To.String())
 	return printMove(w, plan, jsonOut, "")
 }
 

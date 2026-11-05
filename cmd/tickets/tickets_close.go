@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ var closeReasons = []string{"fixed", "obsolete", "duplicate", "not-worth-it"}
 // runTicketsClose cancels one draft/open follow-up with a recorded reason and
 // moves it into the project's archive epic, in one step. Every refusal runs
 // before anything is written.
-func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
+func runTicketsClose(d Deps, addr, reason, note string, w io.Writer) error {
 	if !slices.Contains(closeReasons, reason) {
 		return &tickets.AddressError{Code: tickets.CodeCloseReason, Msg: fmt.Sprintf("reason %q; want one of %s", reason, strings.Join(closeReasons, ", "))}
 	}
@@ -32,7 +32,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	if reason == "duplicate" && note == "" {
 		return &tickets.AddressError{Code: tickets.CodeCloseNoteNeeded, Msg: "a duplicate needs --note naming the kept ticket's address"}
 	}
-	cwd, err := d.getwd()
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	}
 	root := filepath.Dir(filepath.Dir(filepath.Dir(src.Path)))
 
-	if err := refuseIfActive(d.dirs(), d.dial(), a); err != nil {
+	if err := refuseIfActive(d.dirs(), d.Dial(), a); err != nil {
 		return err
 	}
 
@@ -76,7 +76,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 		}
 		return err
 	}
-	pingServer(d, p.NewPath)
+	PingServer(d.Env, p.NewPath)
 	return printMove(w, p, false, "")
 }
 
@@ -84,8 +84,8 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 // into the archive, keeping its status. A cancelled one without a Resolution
 // gets one naming its original address. An empty project argument means the
 // cwd project.
-func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
-	root, project, err := ticketref.ResolveProject(d.base(), project)
+func runTicketsCloseSweep(d Deps, project string, w io.Writer) error {
+	root, project, err := ticketref.ResolveProject(d.Env, project)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		pingServer(d, p.NewPath)
+		PingServer(d.Env, p.NewPath)
 		if err := printMove(w, p, false, ""); err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ func archiveTicket(root string, a tickets.Address, src tickets.Ticket, opts tick
 	return p, ticketmove.ApplyMove(p)
 }
 
-func newTicketsCloseCmd(d deps) *cobra.Command {
+func newTicketsCloseCmd(d Deps) *cobra.Command {
 	var reason, note string
 	var sweep, sweepDone bool
 	closeCmd := &cobra.Command{

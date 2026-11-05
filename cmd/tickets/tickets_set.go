@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"fmt"
@@ -131,7 +131,7 @@ Evolve fields (optional, validated):
   destination_unconfirmed (bool), design_step (map epics only)
 `
 
-func newTicketsSetCmd(d deps) *cobra.Command {
+func newTicketsSetCmd(d Deps) *cobra.Command {
 	var (
 		status                string
 		blockedBy             string
@@ -147,11 +147,11 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 		Short: "validated, sparse frontmatter writes to a ticket, by address or file path",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			path, err := ticketref.ResolveTicketRef(d.dirs(), d.getwd, args[0])
+			path, err := ticketref.ResolveTicketRef(d.dirs(), d.Getwd, args[0])
 			if err != nil {
 				return err
 			}
-			return runTicketsSet(d.dirs(), c, path, c.OutOrStdout(), c.ErrOrStderr(), d.getwd, d.dial())
+			return runTicketsSet(d.dirs(), c, path, c.OutOrStdout(), c.ErrOrStderr(), d.Getwd, d.Dial())
 		},
 	}
 
@@ -190,10 +190,10 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-// runEpicSet is runTicketsSet for an epic's ticket.md, validated against the
+// RunEpicSet is runTicketsSet for an epic's ticket.md, validated against the
 // epic schema rather than the ticket one. A server-stamped field refuses with
 // tickets.CodeServerStamped before anything is written.
-func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
+func RunEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
 	epicDir := filepath.Dir(path)
 	// Nothing completes a map by itself unless a -impl epic appears, so a person may.
 	handCompletable := tickets.IsMapEpic(epicDir)
@@ -396,7 +396,7 @@ func mapDoneStamp(dirs config.Dirs, c *cobra.Command, path string) (*conversatio
 // call. Flags never passed leave their Ticket field exactly as parsed.
 func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
 	if ticketref.IsEpicTicketMD(path) {
-		return runEpicSet(dirs, c, path, w, getwd, dial)
+		return RunEpicSet(dirs, c, path, w, getwd, dial)
 	}
 	if c.Flags().Changed("exported-at") {
 		return fmt.Errorf("%s: exported_at is gx-managed and not settable via `tickets set`", path)

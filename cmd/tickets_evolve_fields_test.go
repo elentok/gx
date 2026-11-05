@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 func validateTicket(t *testing.T, frontmatter string) error {
@@ -83,7 +85,7 @@ func TestExecute_TicketsSet_RefusesExportedAt(t *testing.T) {
 	const content = "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n"
 	writeTicketFile(t, path, content)
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: cmdtest.NonAgentGetwd(t)}
 	err := execute([]string{"tickets", "set", path, "--exported-at=2026-01-02T03:04:05Z"}, d)
 	if err == nil || !strings.Contains(err.Error(), "exported_at") {
 		t.Fatalf("err = %v, want a refusal naming exported_at", err)

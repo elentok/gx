@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/repair"
@@ -29,9 +28,8 @@ func TestRunTicketsAdd_WaitsForProjectMigrationAndSaysSo(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(project, "project.json"), []byte("{}"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	defer projectlock.SetWaitHookDelayForTest(50 * time.Millisecond)()
 	var notice cmdtest.SyncBuffer
-	defer cmdbase.RegisterMigrationWaitNotice(&notice)()
+	cmdtest.SetWaitHook(t, &notice, 50*time.Millisecond)
 
 	unlock, err := projectlock.Exclusive(project)
 	if err != nil {
@@ -40,7 +38,7 @@ func TestRunTicketsAdd_WaitsForProjectMigrationAndSaysSo(t *testing.T) {
 	done := make(chan error, 1)
 	var stdout bytes.Buffer
 	go func() {
-		done <- runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "new-thing", &stdout)
+		done <- runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "", "new-thing", &stdout)
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -70,12 +68,12 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "implement")
-	writeTicket(t, filepath.Join(issuesDir, "02-do-other-thing.md"), "02", "done", "implement")
-	writeTicket(t, filepath.Join(issuesDir, "03-do-third-thing.md"), "03", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "02-do-other-thing.md"), "02", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "03-do-third-thing.md"), "03", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "do-fourth-thing", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "", "do-fourth-thing", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
@@ -83,7 +81,7 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	if got, want := strings.TrimSpace(stdout.String()), repair.EpicTicketLabel(epicPath, "04"); got != want {
 		t.Fatalf("stdout = %q, want canonical address %q", got, want)
 	}
-	if got := addedPath(t, epicPath, stdout.String()); got != wantPath {
+	if got := cmdtest.AddedPath(t, epicPath, stdout.String()); got != wantPath {
 		t.Fatalf("address %q resolves to %q, want %q", stdout.String(), got, wantPath)
 	}
 	ticket, err := schema.ParseTicket(wantPath)
@@ -103,7 +101,7 @@ func TestRunTicketsAddBody_NewEpicWritesTicketMD(t *testing.T) {
 	epicPath := filepath.Join(t.TempDir(), "new-epic")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
+	if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -114,7 +112,7 @@ func TestRunTicketsAddBody_NewEpicWritesTicketMD(t *testing.T) {
 	if want := "---\nstatus: open\n---\n\n# new-epic\n"; string(raw) != want {
 		t.Errorf("epic ticket.md = %q, want %q", raw, want)
 	}
-	if _, err := schema.ParseTicket(addedPath(t, epicPath, stdout.String())); err != nil {
+	if _, err := schema.ParseTicket(cmdtest.AddedPath(t, epicPath, stdout.String())); err != nil {
 		t.Errorf("added ticket: %v", err)
 	}
 }
@@ -127,7 +125,7 @@ func TestRunTicketsAddBody_ExistingEpicKeepsTicketMD(t *testing.T) {
 	testutil.WriteFile(t, epicPath, "ticket.md", want)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
+	if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -143,7 +141,7 @@ func TestRunTicketsAdd_ExistingEpicWithoutTicketMDIsRepaired(t *testing.T) {
 	testutil.Mkdir(t, filepath.Join(epicPath, "issues"))
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "x", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "", "x", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
@@ -163,11 +161,11 @@ func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 	testutil.EnsureEpicTicketMD(t, epicPath)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "do-thing", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "", "do-thing", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
-	gotPath := addedPath(t, epicPath, stdout.String())
+	gotPath := cmdtest.AddedPath(t, epicPath, stdout.String())
 	ticket, err := schema.ParseTicket(gotPath)
 	if err != nil {
 		t.Fatalf("stub ticket failed validation: %v", err)
@@ -188,11 +186,11 @@ func TestRunTicketsAddBody_StampsCreatedAndOriginalAddress(t *testing.T) {
 
 	for _, parent := range []string{"", "01"} {
 		var stdout bytes.Buffer
-		if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, parent, "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
+		if err := runTicketsAddBody(testDeps(t, nil, nil, nil), epicPath, parent, "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 			t.Fatalf("runTicketsAddBody(parent %q): %v", parent, err)
 		}
 		printed := strings.TrimSpace(stdout.String())
-		tk, err := schema.ParseTicket(addedPath(t, epicPath, printed))
+		tk, err := schema.ParseTicket(cmdtest.AddedPath(t, epicPath, printed))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -212,7 +210,7 @@ func TestRunTicketsAdd_EmptySlugFails(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "", &stdout)
+	err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "", "", &stdout)
 	if err == nil {
 		t.Fatal("runTicketsAdd with empty slug: want error, got nil")
 	}
@@ -233,22 +231,22 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-a", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
-	firstPath := addedPath(t, epicPath, stdout.String())
+	firstPath := cmdtest.AddedPath(t, epicPath, stdout.String())
 	if firstPath != filepath.Join(issuesDir, "12a-child-a.md") {
 		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12a-child-a.md"))
 	}
 
 	stdout.Reset()
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-b", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "12", "child-b", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
-	secondPath := addedPath(t, epicPath, stdout.String())
+	secondPath := cmdtest.AddedPath(t, epicPath, stdout.String())
 	if secondPath != filepath.Join(issuesDir, "12b-child-b.md") {
 		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b-child-b.md"))
 	}
@@ -262,13 +260,13 @@ func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-a", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
-	gotPath := addedPath(t, epicPath, stdout.String())
+	gotPath := cmdtest.AddedPath(t, epicPath, stdout.String())
 
 	ticket, err := schema.ParseTicket(gotPath)
 	if err != nil {
@@ -292,7 +290,7 @@ func TestRunTicketsAdd_LeavesParentUntouched(t *testing.T) {
 		t.Fatalf("mkdir issues: %v", err)
 	}
 	parentPath := filepath.Join(issuesDir, "12-parent.md")
-	writeTicket(t, parentPath, "12", "done", "implement")
+	cmdtest.WriteTicket(t, parentPath, "12", "done", "implement")
 
 	before, err := os.ReadFile(parentPath)
 	if err != nil {
@@ -300,7 +298,7 @@ func TestRunTicketsAdd_LeavesParentUntouched(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-a", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
@@ -321,22 +319,22 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12b-child.md"), "12b", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "12b-child.md"), "12b", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12b", "grandchild-1", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "12b", "grandchild-1", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
-	firstPath := addedPath(t, epicPath, stdout.String())
+	firstPath := cmdtest.AddedPath(t, epicPath, stdout.String())
 	if firstPath != filepath.Join(issuesDir, "12b1-grandchild-1.md") {
 		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12b1-grandchild-1.md"))
 	}
 
 	stdout.Reset()
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12b", "grandchild-2", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "12b", "grandchild-2", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
-	secondPath := addedPath(t, epicPath, stdout.String())
+	secondPath := cmdtest.AddedPath(t, epicPath, stdout.String())
 	if secondPath != filepath.Join(issuesDir, "12b2-grandchild-2.md") {
 		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b2-grandchild-2.md"))
 	}
@@ -350,13 +348,13 @@ func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12b1-child.md"), "12b1", "done", "implement")
+	cmdtest.WriteTicket(t, filepath.Join(issuesDir, "12b1-child.md"), "12b1", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12b1", "sibling", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "12b1", "sibling", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd(parent=12b1): %v", err)
 	}
-	gotPath := addedPath(t, epicPath, stdout.String())
+	gotPath := cmdtest.AddedPath(t, epicPath, stdout.String())
 	if gotPath != filepath.Join(issuesDir, "12b2-sibling.md") {
 		t.Fatalf("stdout = %q, want %q", gotPath, filepath.Join(issuesDir, "12b2-sibling.md"))
 	}
@@ -381,7 +379,7 @@ func TestRunTicketsAdd_ConcurrentCallsAllocateDistinctIDs(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			var buf bytes.Buffer
-			errs[i] = runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "concurrent", &buf)
+			errs[i] = runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "", "concurrent", &buf)
 			paths[i] = strings.TrimSpace(buf.String())
 		}(i)
 	}
@@ -402,21 +400,9 @@ func TestRunTicketsAdd_ConcurrentCallsAllocateDistinctIDs(t *testing.T) {
 	}
 }
 
-// addedPath resolves the address `add` printed back to the stub's file.
-func addedPath(t *testing.T, epicPath, out string) string {
-	t.Helper()
-	addr := strings.TrimSpace(out)
-	id := addr[strings.LastIndex(addr, "/")+1:]
-	matches, err := filepath.Glob(filepath.Join(epicPath, "issues", id+"-*.md"))
-	if err != nil || len(matches) != 1 {
-		t.Fatalf("address %q resolves to files %v (err %v), want exactly one", addr, matches, err)
-	}
-	return matches[0]
-}
-
 func TestExecute_TicketsAdd_CrossProject(t *testing.T) {
-	repo, project := setupShowProject(t)
-	theirs := addProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
+	repo, project := cmdtest.SetupShowProject(t)
+	theirs := cmdtest.AddProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
 	cwd := t.TempDir()
 
 	out, err := runIn(t, repo, "tickets", "add", "theirs:inbox", "--slug", "hello", "--body",
@@ -446,7 +432,7 @@ func TestExecute_TicketsAdd_CrossProject(t *testing.T) {
 }
 
 func TestExecute_TicketsAdd_FieldFlags(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 
 	if _, err := runIn(t, repo, "tickets", "add", "mine:inbox", "--slug", "first", "--body", "# First\n"); err != nil {
 		t.Fatalf("add first: %v", err)
@@ -468,7 +454,7 @@ func TestExecute_TicketsAdd_FieldFlags(t *testing.T) {
 }
 
 func TestExecute_TicketsAdd_FieldFlagErrors(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 
 	for name, args := range map[string][]string{
 		"conflicts with body": {"--body", "---\ntype: research\n---\n\n# X\n", "--type", "research"},
@@ -493,7 +479,7 @@ func TestExecute_TicketsAdd_FieldFlagErrors(t *testing.T) {
 }
 
 func TestExecute_TicketsAdd_FollowUpsNeedsCategory(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 
 	_, err := runIn(t, repo, "tickets", "add", "mine:follow-ups", "--slug", "x", "--body", "# X\n\ntext\n")
 	var ae *tickets.AddressError

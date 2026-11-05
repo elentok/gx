@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/testutil"
 	"github.com/spf13/cobra"
 )
@@ -20,7 +21,7 @@ func TestNewEpicScopedCmd_ResolvesEpicArgAndInvokesRun(t *testing.T) {
 	var gotEpicPath string
 	var gotArgs []string
 	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: cmdtest.EnvFor(t)}
-	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(epicPath string, args []string, out io.Writer) error {
+	cmd := ticketref.NewEpicScopedCmd(d.base(), "widget <epic>", "test command", func(epicPath string, args []string, out io.Writer) error {
 		gotEpicPath = epicPath
 		gotArgs = args
 		_, err := io.WriteString(out, "ok")
@@ -49,7 +50,7 @@ func TestNewEpicScopedCmd_GetwdErrorPropagates(t *testing.T) {
 	t.Parallel()
 	wantErr := errors.New("boom")
 	d := deps{getwd: func() (string, error) { return "", wantErr }}
-	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error {
+	cmd := ticketref.NewEpicScopedCmd(d.base(), "widget <epic>", "test command", func(string, []string, io.Writer) error {
 		t.Fatal("run should not be called when getwd fails")
 		return nil
 	})
@@ -65,7 +66,7 @@ func TestNewEpicScopedCmd_GetwdErrorPropagates(t *testing.T) {
 func TestNewEpicScopedCmd_RequiresExactlyOneArg(t *testing.T) {
 	t.Parallel()
 	d := deps{getwd: func() (string, error) { return "", nil }}
-	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error {
+	cmd := ticketref.NewEpicScopedCmd(d.base(), "widget <epic>", "test command", func(string, []string, io.Writer) error {
 		t.Fatal("run should not be called with a missing arg")
 		return nil
 	})
@@ -86,7 +87,7 @@ func TestNewEpicScopedCmd_ValidArgsFunctionListsEpicNames(t *testing.T) {
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "bugs-05"))
 
 	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: cmdtest.EnvFor(t)}
-	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })
+	cmd := ticketref.NewEpicScopedCmd(d.base(), "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })
 
 	names, directive := cmd.ValidArgsFunction(cmd, nil, "")
 	if directive != cobra.ShellCompDirectiveNoFileComp {
@@ -106,7 +107,7 @@ func TestNewEpicScopedCmd_ValidArgsFunctionListsEpicNames(t *testing.T) {
 func TestNewEpicScopedCmd_ValidArgsFunctionErrorsWhenGetwdFails(t *testing.T) {
 	t.Parallel()
 	d := deps{getwd: func() (string, error) { return "", errors.New("boom") }}
-	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })
+	cmd := ticketref.NewEpicScopedCmd(d.base(), "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })
 
 	_, directive := cmd.ValidArgsFunction(cmd, nil, "")
 	if directive != cobra.ShellCompDirectiveError {

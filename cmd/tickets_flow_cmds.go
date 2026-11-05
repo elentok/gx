@@ -15,12 +15,12 @@ import (
 func ticketsFlowCommands(d deps) []*cobra.Command {
 	return []*cobra.Command{
 		newTicketsCalibrationCmd(d),
-		newEpicScopedCmd(d, "ensure-code-review <epic>",
+		ticketref.NewEpicScopedCmd(d.base(), "ensure-code-review <epic>",
 			"no-op if the epic has a code-review ticket, else stamp out a stub",
 			func(epicPath string, _ []string, out io.Writer) error {
 				return runTicketsEnsureCodeReview(epicPath, out)
 			}),
-		newEpicScopedCmd(d, "ensure-verify <epic>",
+		ticketref.NewEpicScopedCmd(d.base(), "ensure-verify <epic>",
 			"no-op if the epic has a verify ticket, else stamp out a stub",
 			func(epicPath string, _ []string, out io.Writer) error {
 				return runTicketsEnsureVerify(epicPath, out)
@@ -51,7 +51,7 @@ func newTicketsFollowUpCmd(d deps) *cobra.Command {
 			"  Evidence (bug only)",
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			epicPath, _, err := resolveAddTarget(d, args[0], "")
+			epicPath, _, err := ticketref.ResolveAddTarget(d.base(), args[0], "")
 			if err != nil {
 				return err
 			}
@@ -86,7 +86,7 @@ func newTicketsFollowUpCmd(d deps) *cobra.Command {
 func newTicketsFilterRunLogCmd(d deps) *cobra.Command {
 	var filterTicket string
 	var filterEvents []string
-	cmd := newEpicScopedCmd(d, "filter-run-log <epic>",
+	cmd := ticketref.NewEpicScopedCmd(d.base(), "filter-run-log <epic>",
 		"print an epic's run-log.jsonl events, filtered by ticket/event type",
 		func(epicPath string, _ []string, out io.Writer) error {
 			return runTicketsFilterRunLog(epicPath, filterTicket, filterEvents, out)
@@ -94,36 +94,4 @@ func newTicketsFilterRunLogCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&filterTicket, "ticket", "", "only events for this ticket id")
 	cmd.Flags().StringArrayVar(&filterEvents, "event", nil, "only events of this type (repeatable)")
 	return cmd
-}
-
-// newEpicScopedCmd builds a cobra command that takes a single epic argument:
-// cwd resolution, ticketref.ResolveEpicArg, and shell-completion via completeEpicNames
-// are wired once here so epic-scoped subcommands (ensure-code-review, add,
-// filter-run-log, ...) don't each hand-roll the same boilerplate. run
-// receives the resolved epic path, the raw args (for any extra positional
-// args beyond the epic), and the command's output writer.
-func newEpicScopedCmd(d deps, use, short string, run func(epicPath string, args []string, out io.Writer) error) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			cwd, err := d.getwd()
-			if err != nil {
-				return err
-			}
-			return run(ticketref.ResolveEpicArg(d.dirs(), args[0], cwd), args, c.OutOrStdout())
-		},
-		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-			cwd, err := d.getwd()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			names, err := completeEpicNames(d.dirs(), cwd)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			return names, cobra.ShellCompDirectiveNoFileComp
-		},
-	}
 }

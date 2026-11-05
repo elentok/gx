@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ func TestRunTicketsAdd_PrintsAddressNotPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "do-thing", &stdout); err != nil {
+	if err := runTicketsAdd(testDeps(t, nil, nil, nil), epicPath, "", "do-thing", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	got := strings.TrimSpace(stdout.String())

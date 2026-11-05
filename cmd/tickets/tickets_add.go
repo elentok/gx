@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"errors"
@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -32,15 +31,15 @@ import (
 // becomes the stub's filename suffix (<id>-<slug>.md), so the file is written
 // with a real name instead of a placeholder the caller has to remember to
 // rename.
-func runTicketsAdd(d deps, epicPath, parent, slug string, w io.Writer) error {
-	path, _, err := createTicket(epicPath, parent, slug, nil, addFrontmatter{})
+func runTicketsAdd(d Deps, epicPath, parent, slug string, w io.Writer) error {
+	path, _, err := CreateTicket(epicPath, parent, slug, nil, addFrontmatter{})
 	if err != nil {
 		return err
 	}
-	pingServer(d, path)
+	PingServer(d.Env, path)
 	// The address, like everywhere else the CLI names a ticket: `set` and
 	// `section` accept it to fill the stub in, and `show` gives the path.
-	return printTicketRef(path, false, w)
+	return PrintTicketRef(path, false, w)
 }
 
 // runTicketsAddBody is runTicketsAdd for agents: the ticket arrives with its
@@ -49,9 +48,9 @@ func runTicketsAdd(d deps, epicPath, parent, slug string, w io.Writer) error {
 //
 // The fields come from flags (see addFieldFlags) or, kept for older callers,
 // from a frontmatter block opening the body: its settable fields are merged in
-// rather than written as a second block. See bodyFrontmatter.
-func runTicketsAddBody(d deps, epicPath, parent, slug, body string, flags addFrontmatter, jsonOut bool, w, stderr io.Writer) error {
-	fm, text, err := bodyFrontmatter(body)
+// rather than written as a second block. See BodyFrontmatter.
+func runTicketsAddBody(d Deps, epicPath, parent, slug, body string, flags addFrontmatter, jsonOut bool, w, stderr io.Writer) error {
+	fm, text, err := BodyFrontmatter(body)
 	if err != nil {
 		return err
 	}
@@ -67,7 +66,7 @@ func runTicketsAddBody(d deps, epicPath, parent, slug, body string, flags addFro
 		}
 		parent = fm.Parent
 	}
-	path, notices, err := createTicket(epicPath, parent, slug, &text, fm)
+	path, notices, err := CreateTicket(epicPath, parent, slug, &text, fm)
 	if err != nil {
 		return err
 	}
@@ -77,8 +76,8 @@ func runTicketsAddBody(d deps, epicPath, parent, slug, body string, flags addFro
 		}
 	}
 	printNotices(stderr, notices)
-	pingServer(d, path)
-	return printTicketRef(path, jsonOut, w)
+	PingServer(d.Env, path)
+	return PrintTicketRef(path, jsonOut, w)
 }
 
 // addFrontmatter is what `add --body` takes from a frontmatter block at the
@@ -193,9 +192,9 @@ func (fm addFrontmatter) validate() error {
 	return nil
 }
 
-// bodyFrontmatter splits a leading frontmatter block off body and validates
+// BodyFrontmatter splits a leading frontmatter block off body and validates
 // it. A body with no block returns a zero addFrontmatter and body unchanged.
-func bodyFrontmatter(body string) (addFrontmatter, string, error) {
+func BodyFrontmatter(body string) (addFrontmatter, string, error) {
 	var fm addFrontmatter
 	yamlPart, text, ok := schema.SplitFrontmatter(strings.TrimLeft(body, "\n"))
 	if !ok {
@@ -220,11 +219,11 @@ func bodyFrontmatter(body string) (addFrontmatter, string, error) {
 	return fm, text, nil
 }
 
-// createTicket allocates the next id under the epic lock and writes the new
+// CreateTicket allocates the next id under the epic lock and writes the new
 // ticket file, returning its path and tickets.CheckBlockedByWrite's notices. A
 // nil body writes the empty draft stub; a non-nil body writes an open ticket
 // carrying it, with fm's fields applied.
-func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter) (string, []string, error) {
+func CreateTicket(epicPath, parent, slug string, body *string, fm addFrontmatter) (string, []string, error) {
 	if slug == "" {
 		return "", nil, errors.New("slug is required")
 	}
@@ -322,43 +321,9 @@ func printNotices(w io.Writer, notices []string) {
 	}
 }
 
-// projectEpicRe matches `project:epic`, the cross-project spelling of an epic.
-var projectEpicRe = regexp.MustCompile(`^([^:/\s]+):([^:/\s]+)$`)
-
-// resolveAddTarget turns add's argument into the epic to allocate in and the
-// parent ticket id: an epic (name or path) as before, `project:epic` for an
-// epic of another registered project, or a ticket address, which names the
-// epic and the parent in one go.
-func resolveAddTarget(d deps, arg, parentFlag string) (epicPath, parent string, err error) {
-	cwd, err := d.getwd()
-	if err != nil {
-		return "", "", err
-	}
-	epicPath = ticketref.ResolveEpicArg(d.dirs(), arg, cwd)
-	if info, statErr := os.Stat(epicPath); statErr == nil && info.IsDir() {
-		return epicPath, parentFlag, nil
-	}
-	if m := projectEpicRe.FindStringSubmatch(arg); m != nil {
-		root, err := ticketref.ProjectRoot(d.dirs(), cwd, m[1])
-		if err != nil {
-			return "", "", err
-		}
-		return filepath.Join(root, m[2]), parentFlag, nil
-	}
-	_, t, findErr := ticketref.FindTicket(d.dirs(), cwd, arg)
-	if findErr != nil {
-		// Not an address either: let the epic path's own error surface.
-		return epicPath, parentFlag, nil
-	}
-	if parentFlag != "" {
-		return "", "", errors.New("--parent conflicts with a ticket address argument")
-	}
-	return filepath.Dir(filepath.Dir(t.Path)), t.Identifier, nil
-}
-
-// printTicketRef prints the ticket at path by address, or as {address, path}
+// PrintTicketRef prints the ticket at path by address, or as {address, path}
 // JSON.
-func printTicketRef(path string, jsonOut bool, w io.Writer) error {
+func PrintTicketRef(path string, jsonOut bool, w io.Writer) error {
 	label := ticketref.TicketLabel(path)
 	if !jsonOut {
 		_, err := fmt.Fprintln(w, label)

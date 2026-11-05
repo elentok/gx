@@ -3,28 +3,8 @@ package cmd
 import (
 	"io"
 
-	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// completeEpicNames lists the current epic directory names under cwd's repo,
-// read live off disk, for the ensure-code-review command's shell completion.
-func completeEpicNames(dirs config.Dirs, cwd string) ([]string, error) {
-	root, err := tickets.RootForDirs(dirs, cwd)
-	if err != nil {
-		return nil, err
-	}
-	epics, err := tickets.Load(root)
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(epics))
-	for _, epic := range epics {
-		names = append(names, epic.Name)
-	}
-	return names, nil
-}
 
 // runTicketsEnsureCodeReview checks whether epicPath already has a `type:
 // code-review` ticket among its published issues. If one exists, it's a

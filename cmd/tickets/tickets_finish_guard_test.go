@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ type finishFixture struct {
 func newFinishFixture(t *testing.T) *finishFixture {
 	t.Helper()
 	repoDir, _ := cmdtest.MergeTestRepo(t, map[string]string{"e": "e"})
-	projectDir := addProject(t, isolateTicketStore(t), "p", repoDir)
+	projectDir := cmdtest.AddProject(t, cmdtest.IsolateTicketStore(t), "p", repoDir)
 	wt := filepath.Join(repoDir, "item-01")
 	testutil.MustGitExported(t, repoDir, "worktree", "add", "-b", "ralph-loop/e-item-01", wt, "e")
 	testutil.MustGitExported(t, wt, "config", "user.email", "test@test.com")
@@ -35,9 +35,9 @@ func newFinishFixture(t *testing.T) *finishFixture {
 		t.Fatal(err)
 	}
 	ticket := filepath.Join(projectDir, "e", "issues", "01-x.md")
-	writeTicketFile(t, ticket, "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
-	writeTicketFile(t, filepath.Join(projectDir, "e", "issues", "02-flaky.md"), "---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
-	writeTicketFile(t, filepath.Join(projectDir, "e", "issues", "03-other.md"), "---\nid: \"03\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, ticket, "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "02-flaky.md"), "---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "03-other.md"), "---\nid: \"03\"\nstatus: open\ntype: implement\n---\nBody.\n")
 	return &finishFixture{wt: wt, projectDir: projectDir, ticket: ticket}
 }
 
@@ -61,7 +61,7 @@ func (f *finishFixture) recordTree(t *testing.T, tree string, exit int, kindFilt
 	if err != nil {
 		t.Fatal(err)
 	}
-	dirs := config.DirsFrom(envFor(t))
+	dirs := config.DirsFrom(cmdtest.EnvFor(t))
 	dataDir, err := dirs.DataDir()
 	if err != nil {
 		t.Fatal(err)
@@ -82,8 +82,8 @@ func (f *finishFixture) recordTree(t *testing.T, tree string, exit int, kindFilt
 
 func (f *finishFixture) finish(t *testing.T, extra ...string) error {
 	t.Helper()
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return f.wt, nil }, env: envFor(t)}
-	return execute(append([]string{"tickets", "set", f.ticket, "--iteration-status=finished"}, extra...), d)
+	d := testDeps(t, &bytes.Buffer{}, &bytes.Buffer{}, func() (string, error) { return f.wt, nil })
+	return execute(t, append([]string{"tickets", "set", f.ticket, "--iteration-status=finished"}, extra...), d)
 }
 
 func (f *finishFixture) assertUnwritten(t *testing.T) {

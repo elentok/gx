@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -8,32 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// nonAgentGetwd returns a getwd fake pointed at a plain (non-git) tempdir, so
-// git.CurrentBranch fails and checkAgentStatusGuard treats the caller as an
-// unrecognised branch — i.e. not an iteration agent. Existing tests use it to
-// keep exercising hand-driven-caller behavior unaffected by the guard.
-func nonAgentGetwd(t *testing.T) func() (string, error) {
-	t.Helper()
-	dir := t.TempDir()
-	return func() (string, error) { return dir, nil }
-}
-
-// agentGetwd returns a getwd fake pointed at a real git repo checked out on
-// branch, so git.CurrentBranch resolves to it for checkAgentStatusGuard.
-func agentGetwd(t *testing.T, branch string) func() (string, error) {
-	t.Helper()
-	dir := testutil.TempRepo(t)
-	if err := git.CreateBranch(git.Repo{Root: dir}, branch); err != nil {
-		t.Fatalf("create branch %s: %v", branch, err)
-	}
-	return func() (string, error) { return dir, nil }
-}
 
 func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
 	t.Parallel()
@@ -77,12 +55,12 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
 
-	err := execute([]string{"tickets", "set", path, "--status=draft", "--blocked-by=01,03"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=draft", "--blocked-by=01,03"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -105,10 +83,10 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 func TestExecute_TicketsSet_ModelFields(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
-	if err := execute([]string{"tickets", "set", path, "--model-ran=opus", "--model-expected=sonnet"}, d); err != nil {
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
+	if err := execute(t, []string{"tickets", "set", path, "--model-ran=opus", "--model-expected=sonnet"}, d); err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
 	got, err := schema.ParseTicket(path)
@@ -124,12 +102,12 @@ func TestExecute_TicketsSet_Parent(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--parent=04"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--parent=04"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -150,12 +128,12 @@ func TestExecute_TicketsSet_SplitAliasFlagsRemoved(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--split-from=04", "--split=04c,04d"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--split-from=04", "--split=04c,04d"}, d)
 	if err == nil {
 		t.Fatal("expected an unknown-flag error, got nil")
 	}
@@ -168,12 +146,12 @@ func TestExecute_TicketsSet_CodeReviewFixesFlagRemoved(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--code-review-fixes=none"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--code-review-fixes=none"}, d)
 	if err == nil {
 		t.Fatal("expected an unknown-flag error, got nil")
 	}
@@ -186,12 +164,12 @@ func TestExecute_TicketsSet_RefusedFieldUnknownFlag(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--actual-context-window=100"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--actual-context-window=100"}, d)
 	if err == nil {
 		t.Fatal("expected an unknown-flag error, got nil")
 	}
@@ -205,12 +183,12 @@ func TestExecute_TicketsSet_ValidationFailureWritesNothing(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	original := "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n"
-	writeTicketFile(t, path, original)
+	cmdtest.WriteTicketFile(t, path, original)
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
 
-	err := execute([]string{"tickets", "set", path, "--status=bogus-status"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=bogus-status"}, d)
 	if err == nil {
 		t.Fatal("expected a validation error, got nil")
 	}
@@ -231,12 +209,12 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
 
-	err := execute([]string{"tickets", "set", path, "--commitless=true"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--commitless=true"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -259,10 +237,10 @@ func TestExecute_TicketsSet_OrchestrationStatusesRefused(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "04b-ticket.md")
 			original := "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n"
-			writeTicketFile(t, path, original)
+			cmdtest.WriteTicketFile(t, path, original)
 
-			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
-			err := execute([]string{"tickets", "set", path, "--status=" + status}, d)
+			d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
+			err := execute(t, []string{"tickets", "set", path, "--status=" + status}, d)
 			if err == nil || !strings.Contains(err.Error(), "orchestration status") {
 				t.Fatalf("error = %v, want an orchestration-status refusal", err)
 			}
@@ -282,16 +260,16 @@ func TestExecute_TicketsSet_MapEpicClaimsAndCloses(t *testing.T) {
 	if err := os.MkdirAll(epic, 0755); err != nil {
 		t.Fatal(err)
 	}
-	writeTicketFile(t, filepath.Join(epic, "ticket.md"), "---\nkind: map\nstatus: open\n---\n# Map\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(epic, "ticket.md"), "---\nkind: map\nstatus: open\n---\n# Map\n")
 	if err := os.MkdirAll(filepath.Join(epic, "issues"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(epic, "issues", "04-pick.md")
-	writeTicketFile(t, path, "---\nid: \"04\"\nstatus: open\ntype: grilling\n---\nBody.\n")
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04\"\nstatus: open\ntype: grilling\n---\nBody.\n")
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
 
 	for _, args := range [][]string{{"--status=claimed"}, {"--status=done", "--commitless=true"}} {
-		if err := execute(append([]string{"tickets", "set", path}, args...), d); err != nil {
+		if err := execute(t, append([]string{"tickets", "set", path}, args...), d); err != nil {
 			t.Fatalf("set %v: %v", args, err)
 		}
 	}
@@ -303,7 +281,7 @@ func TestExecute_TicketsSet_MapEpicClaimsAndCloses(t *testing.T) {
 		t.Errorf("ticket = %q, want claimed_at and done_at stamped", raw)
 	}
 
-	err := execute([]string{"tickets", "set", path, "--status=paused"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=paused"}, d)
 	if err == nil || !strings.Contains(err.Error(), "orchestration status") {
 		t.Errorf("paused in a map epic: error = %v, want refusal", err)
 	}
@@ -313,12 +291,12 @@ func TestExecute_TicketsSet_StatusOpenRefusedWithEmptyBody(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\n")
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
+	d := testDeps(t, &stdout, &stderr, cmdtest.NonAgentGetwd(t))
 
-	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=open"}, d)
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -339,12 +317,12 @@ func TestExecute_TicketsSet_StatusOpenAcceptedWithBody(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
 
-	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -362,12 +340,12 @@ func TestExecute_TicketsSet_RepairPausedToOpenAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: paused\npause_reason: merge-error\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: paused\npause_reason: merge-error\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
 
-	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v, want a repair pause -> open to be accepted", err)
 	}
@@ -385,13 +363,16 @@ func TestExecute_TicketsValidate_AcceptsBodylessDraft(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\n")
 
-	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
-
-	if err := execute([]string{"tickets", "validate", path}, d); err != nil {
-		t.Fatalf("execute tickets validate: %v, want a body-less draft accepted", err)
+	// `tickets validate` lives in root until the next ticket; check the
+	// per-file schema rule it applies directly.
+	tk, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatalf("parse ticket: %v", err)
+	}
+	if err := schema.Validate(tk); err != nil {
+		t.Fatalf("schema.Validate: %v, want a body-less draft accepted", err)
 	}
 }
 
@@ -399,12 +380,12 @@ func TestExecute_TicketsSet_IterationStatusWorkingAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--iteration-status=working"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--iteration-status=working"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -422,12 +403,12 @@ func TestExecute_TicketsSet_IterationStatusInvalidRejected(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--iteration-status=bogus"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--iteration-status=bogus"}, d)
 	if err == nil {
 		t.Fatal("expected a validation error, got nil")
 	}
@@ -440,12 +421,12 @@ func TestExecute_TicketsSet_IterationStatusFinishedBareAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--iteration-status=finished"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v, want a bare finished report accepted — the zero-commit check belongs to ralphloop's merge path, not this CLI guard", err)
 	}
@@ -464,11 +445,11 @@ func TestExecute_TicketsSet_IterationStatusFinishedBareAccepted(t *testing.T) {
 func TestExecute_TicketsSet_IterationStatusStampsIterationFinishedAt(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
 
 	before := time.Now().Add(-time.Second)
-	if err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d); err != nil {
+	if err := execute(t, []string{"tickets", "set", path, "--iteration-status=finished"}, d); err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
 	got, err := schema.ParseTicket(path)
@@ -486,7 +467,7 @@ func TestExecute_TicketsSet_IterationStatusStampsIterationFinishedAt(t *testing.
 		t.Errorf("ticket file = %q, want an iteration_finished_at key", raw)
 	}
 
-	if err := execute([]string{"tickets", "set", path, "--iteration-status=working"}, d); err != nil {
+	if err := execute(t, []string{"tickets", "set", path, "--iteration-status=working"}, d); err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
 	if got, _ = schema.ParseTicket(path); !got.IterationFinishedAt.IsZero() {
@@ -498,12 +479,12 @@ func TestExecute_TicketsSet_IterationStatusFinishedWithCommitlessAccepted(t *tes
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--commitless=true"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--iteration-status=finished", "--commitless=true"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -521,10 +502,10 @@ func TestExecute_TicketsSet_CommitlessTransitionClearsBase(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nbase: \"02\"\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nbase: \"02\"\n---\nBody.\n")
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-	err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--commitless=true"}, d)
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+	err := execute(t, []string{"tickets", "set", path, "--iteration-status=finished", "--commitless=true"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -542,10 +523,10 @@ func TestExecute_TicketsSet_NonCommitlessWriteKeepsBase(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nbase: \"02\"\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nbase: \"02\"\n---\nBody.\n")
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-	if err := execute([]string{"tickets", "set", path, "--iteration-status=working"}, d); err != nil {
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+	if err := execute(t, []string{"tickets", "set", path, "--iteration-status=working"}, d); err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
 
@@ -562,12 +543,12 @@ func TestExecute_TicketsSet_IterationStatusFinishedAlreadyCommitlessOnDiskAccept
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ncommitless: true\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ncommitless: true\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--iteration-status=finished"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v, want already-commitless-on-disk to satisfy the guard", err)
 	}
@@ -587,10 +568,10 @@ func TestExecute_TicketsSet_RefusesWithoutOpenQuestionNamingVerb(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "04b-ticket.md")
-			writeTicketFile(t, path, "---\nid: \"04b\"\n"+c.frontmatter+"\ntype: implement\n---\nBody.\n")
+			cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\n"+c.frontmatter+"\ntype: implement\n---\nBody.\n")
 
-			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-			err := execute([]string{"tickets", "set", path, c.flag}, d)
+			d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+			err := execute(t, []string{"tickets", "set", path, c.flag}, d)
 			if err == nil || !strings.Contains(err.Error(), "gx tickets "+c.verb) {
 				t.Fatalf("err = %v, want a refusal naming `gx tickets %s`", err, c.verb)
 			}
@@ -602,16 +583,16 @@ func TestExecute_TicketsSet_IterationStatusAskingAcceptedWithOpenQuestion(t *tes
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 	q := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "Which?", Text: "Which?", Handoff: "Resume after the answer."}
 	if _, err := tickets.AppendLog(path, q); err != nil {
 		t.Fatal(err)
 	}
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--iteration-status=asking"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--iteration-status=asking"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v, want asking accepted with an open question", err)
 	}
@@ -629,12 +610,12 @@ func TestExecute_TicketsSet_ClearingListField(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\nblocked_by: [\"01\", \"03\"]\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\nblocked_by: [\"01\", \"03\"]\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "set", path, "--blocked-by="}, d)
+	err := execute(t, []string{"tickets", "set", path, "--blocked-by="}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -655,12 +636,12 @@ func TestExecute_TicketsSet_AgentBranch_NonPromotionStatusRefused(t *testing.T) 
 			t.Parallel()
 			dir := t.TempDir()
 			path := filepath.Join(dir, "04b-ticket.md")
-			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+			cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 			var stdout, stderr bytes.Buffer
-			d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+			d := testDeps(t, &stdout, &stderr, cmdtest.AgentGetwd(t, "ralph-loop/widget-item-04b"))
 
-			err := execute([]string{"tickets", "set", path, "--status=" + status}, d)
+			err := execute(t, []string{"tickets", "set", path, "--status=" + status}, d)
 			if err == nil {
 				t.Fatalf("expected --status=%s to be refused on a ralph-loop/* branch, got nil", status)
 			}
@@ -686,12 +667,12 @@ func TestExecute_TicketsSet_AgentBranch_DraftToOpenAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), cmdtest.AgentGetwd(t, "ralph-loop/widget-item-04b"))
 
-	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v, want draft -> open accepted on a ralph-loop/* branch", err)
 	}
@@ -709,12 +690,12 @@ func TestExecute_TicketsSet_AgentBranch_AlreadyOpenToOpenRefused(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+	d := testDeps(t, &stdout, &stderr, cmdtest.AgentGetwd(t, "ralph-loop/widget-item-04b"))
 
-	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=open"}, d)
 	if err == nil {
 		t.Fatal("expected --status=open on an already-open ticket to be refused (not a draft promotion), got nil")
 	}
@@ -727,12 +708,12 @@ func TestExecute_TicketsSet_AgentBranch_PausedRefused(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
 			path := filepath.Join(dir, "04b-ticket.md")
-			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+			cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 			var stdout, stderr bytes.Buffer
-			d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
+			d := testDeps(t, &stdout, &stderr, cmdtest.AgentGetwd(t, "ralph-loop/widget-item-04b"))
 
-			err := execute([]string{"tickets", "set", path, "--status=" + status}, d)
+			err := execute(t, []string{"tickets", "set", path, "--status=" + status}, d)
 			if err == nil {
 				t.Fatalf("expected --status=%s to be refused, got nil", status)
 			}
@@ -744,15 +725,15 @@ func TestExecute_TicketsSet_UnrecognisedBranch_StatusAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	// "main" isn't a ralph-loop/* branch, so a hand-driven caller working on
 	// it must never be caught by the guard, even for a status the guard would
 	// otherwise refuse for an iteration agent.
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: agentGetwd(t, "widget-hand-driven")}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), cmdtest.AgentGetwd(t, "widget-hand-driven"))
 
-	err := execute([]string{"tickets", "set", path, "--status=draft"}, d)
+	err := execute(t, []string{"tickets", "set", path, "--status=draft"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v, want an unrecognised branch to never be refused", err)
 	}

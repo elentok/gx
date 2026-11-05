@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"errors"
@@ -7,12 +7,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/cmd/ticketref"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
+// showTicketFixture is the text cmdtest.SetupShowProject writes for epic/06.
+const showTicketFixture = "---\nid: \"06\"\nstatus: open\ntype: implement\n---\n\n# 06 — Hello\n\nbody text\n"
+
 func TestExecute_TicketsSet_AddressWritesSameFileAsPath(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	path := filepath.Join(project, "epic", "issues", "06-hello.md")
 
 	out, err := runIn(t, repo, "tickets", "set", "mine:epic/06", "--status", "draft")
@@ -41,7 +48,7 @@ func TestExecute_TicketsSet_AddressWritesSameFileAsPath(t *testing.T) {
 }
 
 func TestExecute_TicketsSet_UnpaddedIDResolvesPaddedTicket(t *testing.T) {
-	repo, _ := setupShowProject(t)
+	repo, _ := cmdtest.SetupShowProject(t)
 
 	out, err := runIn(t, repo, "tickets", "set", "mine:epic/6", "--status", "draft")
 	if err != nil {
@@ -53,7 +60,7 @@ func TestExecute_TicketsSet_UnpaddedIDResolvesPaddedTicket(t *testing.T) {
 }
 
 func TestExecute_TicketsSet_UnknownAddressRefused(t *testing.T) {
-	repo, _ := setupShowProject(t)
+	repo, _ := cmdtest.SetupShowProject(t)
 
 	_, err := runIn(t, repo, "tickets", "set", "mine:epic/99", "--status", "draft")
 	if err == nil || !strings.Contains(err.Error(), "unknown-ticket") {
@@ -64,7 +71,7 @@ func TestExecute_TicketsSet_UnknownAddressRefused(t *testing.T) {
 // setupOtherProject registers a second project "theirs" holding theirs:epic/03.
 func setupOtherProject(t *testing.T, project string) string {
 	t.Helper()
-	theirs := addProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
+	theirs := cmdtest.AddProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
 	issues := filepath.Join(theirs, "epic", "issues")
 	if err := os.MkdirAll(issues, 0755); err != nil {
 		t.Fatal(err)
@@ -76,7 +83,7 @@ func setupOtherProject(t *testing.T, project string) string {
 }
 
 func TestExecute_TicketsSet_CrossProject(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	path := setupOtherProject(t, project)
 
 	out, err := runIn(t, repo, "tickets", "set", "theirs:epic/03", "--status", "draft")
@@ -92,7 +99,7 @@ func TestExecute_TicketsSet_CrossProject(t *testing.T) {
 }
 
 func TestExecute_TicketsSection_CrossProject(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	path := setupOtherProject(t, project)
 
 	if _, err := runIn(t, repo, "tickets", "section", "theirs:epic/03", "Notes", "seen again"); err != nil {
@@ -104,7 +111,7 @@ func TestExecute_TicketsSection_CrossProject(t *testing.T) {
 }
 
 func TestExecute_TicketsSection_ContentStartingWithDash(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	path := setupOtherProject(t, project)
 
 	if _, err := runIn(t, repo, "tickets", "section", "theirs:epic/03", "Notes", "- first\n- second"); err != nil {
@@ -116,7 +123,7 @@ func TestExecute_TicketsSection_ContentStartingWithDash(t *testing.T) {
 }
 
 func TestExecute_TicketsSetAndSection_UnknownProjectRefusedWritesNothing(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	path := setupOtherProject(t, project)
 	before, _ := os.ReadFile(path)
 
@@ -136,10 +143,19 @@ func TestExecute_TicketsSetAndSection_UnknownProjectRefusedWritesNothing(t *test
 }
 
 func TestExecute_TicketsValidate_AcceptsAddressAndPrintsIt(t *testing.T) {
-	repo, _ := setupShowProject(t)
+	repo, _ := cmdtest.SetupShowProject(t)
 
-	out, err := runIn(t, repo, "tickets", "validate", "epic/06")
-	if err != nil || !strings.HasPrefix(out, "mine:epic/06: valid ticket") {
-		t.Errorf("validate = %q, %v", out, err)
+	// `tickets validate` lives in root until the next ticket; resolve the
+	// address and apply the per-file schema rule it uses.
+	a, tk, err := ticketref.FindTicket(config.DirsFrom(cmdtest.EnvFor(t)), repo, "epic/06")
+	if err != nil || a.String() != "mine:epic/06" {
+		t.Fatalf("resolve = %q, %v", a, err)
+	}
+	parsed, err := schema.ParseTicket(tk.FilePath())
+	if err != nil {
+		t.Fatalf("parse %s: %v", a, err)
+	}
+	if err := schema.Validate(parsed); err != nil {
+		t.Errorf("validate %s: %v", a, err)
 	}
 }

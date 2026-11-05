@@ -209,9 +209,9 @@ kept as history of what the code did at the time, not as a description of today'
   already sound. Regression tests: `TestEpic_UnresolvedBlockers_MisparentedGrandchildStillEnforced`,
   `TestEpic_UnresolvedBlockers_MisparentedSelfDoesNotDeadlockOnOwnBlocker`,
   `TestEpic_UnresolvedBlockers_SharedOpenDescendantCheckedIndependently` (`tickets/status_test.go`);
-  `TestRunTicketsAdd_BackfillsParentChildren` (`cmd/tickets_add_test.go`);
+  `TestRunTicketsAdd_BackfillsParentChildren` (`cmd/tickets/tickets_add_test.go`);
   `TestExecute_TicketsSet_StatusDoneRefusedWithUnresolvedBlocker`,
-  `TestExecute_TicketsSet_StatusDoneForcedWithUnresolvedBlockerWarns` (`cmd/tickets_set_test.go`).
+  `TestExecute_TicketsSet_StatusDoneForcedWithUnresolvedBlockerWarns` (`cmd/tickets/tickets_set_test.go`).
 - **A commitless mid-flight-fork placeholder's own `Blocked by:` was never enforced, letting its
   whole fork chain start before the real blocker finished.** `tickets.Epic.fullyDone` (used by
   `UnresolvedBlockers` to resolve whether a named blocker is really done) only checked
@@ -229,7 +229,7 @@ kept as history of what the code did at the time, not as a description of today'
   `TestEpic_UnresolvedBlockers_TransitiveThroughPrematurelyDoneForkPlaceholder` in
   `tickets/status_test.go`.
 - **`gx tickets add --parent <id>` allocates the correct lettered ID but never writes `parent` into
-  the new ticket's own frontmatter.** `cmd/tickets_add.go`'s `runTicketsAdd` only used `parent` to
+  the new ticket's own frontmatter.** `cmd/tickets/tickets_add.go`'s `runTicketsAdd` only used `parent` to
   compute the new ID via `tickets.NextTicketID`; the stub `schema.Ticket{}` literal never set
   `stub.Parent`, despite `gx-local-tracker.md`'s "Mid-flight forking" section documenting this
   command as the one that sets `parent` "at creation." Every forked ticket created the documented
@@ -237,7 +237,7 @@ kept as history of what the code did at the time, not as a description of today'
   flagged as scheduler/Queue-tab-invisible. Found live: a forked ticket had no `parent` field
   despite the agent running `gx tickets add <epic> --parent <id> --slug ...` exactly as
   documented. Fixed by setting `stub.Parent` when `parent != ""` before marshaling
-  (`cmd/tickets_add.go`), regression test `TestRunTicketsAdd_WritesParentFrontmatter`; backfill an
+  (`cmd/tickets/tickets_add.go`), regression test `TestRunTicketsAdd_WritesParentFrontmatter`; backfill an
   affected ticket via `gx tickets set --parent <id>`.
 
 - **Telegram epic-complete notifications always fail with HTTP 400; ticket-finished ones work

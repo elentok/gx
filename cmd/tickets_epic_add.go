@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
@@ -110,7 +111,7 @@ func newTicketsEpicSetCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runEpicSet(d.dirs(), c, path, c.OutOrStdout(), d.getwd, d.dial())
+			return ticketscmd.RunEpicSet(d.dirs(), c, path, c.OutOrStdout(), d.getwd, d.dial())
 		},
 	}
 	cmd.Flags().String("kind", "", "set kind (map or loop)")

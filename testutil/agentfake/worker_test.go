@@ -28,7 +28,7 @@ func TestWorkTicket_FinishCommitsAndReports(t *testing.T) {
 	}
 }
 
-// The finish guard (cmd/tickets_finish_guard.go) wants a passing `gx check` on
+// The finish guard (cmd/tickets/tickets_finish_guard.go) wants a passing `gx check` on
 // the committed tree before a finished report.
 func TestWorkTicket_FinishChecksTheCommittedTreeBeforeReporting(t *testing.T) {
 	cfg, gxLog := WorkerEnv(t)

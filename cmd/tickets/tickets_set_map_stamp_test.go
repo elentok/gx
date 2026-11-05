@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
@@ -17,7 +18,7 @@ import (
 // createdAt, closes it with `set --status=done`, and returns the stored ticket.
 func closeMapTicket(t *testing.T, createdAt time.Time, recs ...conversations.Record) schema.Ticket {
 	t.Helper()
-	env := tempEnv(t)
+	env := cmdtest.TempEnv(t)
 	data, err := config.DirsFrom(env).DataDir()
 	if err != nil {
 		t.Fatal(err)
@@ -30,17 +31,18 @@ func closeMapTicket(t *testing.T, createdAt time.Time, recs ...conversations.Rec
 	if err := os.MkdirAll(filepath.Join(epic, "issues"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeTicketFile(t, filepath.Join(epic, "ticket.md"), "---\nkind: map\nstatus: open\n---\n# Map\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(epic, "ticket.md"), "---\nkind: map\nstatus: open\n---\n# Map\n")
 	path := filepath.Join(epic, "issues", "04-pick.md")
-	writeTicketFile(t, path, "---\nid: \"04\"\nstatus: claimed\ntype: grilling\ncreated_at: "+createdAt.UTC().Format(time.RFC3339)+"\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04\"\nstatus: claimed\ntype: grilling\ncreated_at: "+createdAt.UTC().Format(time.RFC3339)+"\n---\nBody.\n")
 	for _, r := range recs {
 		r.Ticket = ticketref.TicketLabel(path)
 		if err := conversations.Save(root, r); err != nil {
 			t.Fatal(err)
 		}
 	}
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: env}
-	if err := execute([]string{"tickets", "set", path, "--status=done", "--commitless=true"}, d); err != nil {
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
+	d.Env.Env = env
+	if err := execute(t, []string{"tickets", "set", path, "--status=done", "--commitless=true"}, d); err != nil {
 		t.Fatal(err)
 	}
 	tk, err := schema.ParseTicket(path)

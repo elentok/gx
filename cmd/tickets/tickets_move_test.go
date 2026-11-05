@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -31,9 +31,9 @@ type moveFixture struct {
 
 func setupMoveProject(t *testing.T) moveFixture {
 	t.Helper()
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
-	project := addProject(t, store, "mine", repo)
+	project := cmdtest.AddProject(t, store, "mine", repo)
 	for _, e := range []string{"src", "dst"} {
 		testutil.EnsureEpicTicketMD(t, filepath.Join(project, e))
 		if err := os.MkdirAll(filepath.Join(project, e, "issues"), 0755); err != nil {
@@ -137,7 +137,7 @@ func TestExecute_TicketsMove_CarriesLogAlong(t *testing.T) {
 
 func TestExecute_TicketsMove_Refusals(t *testing.T) {
 	f := setupMoveProject(t)
-	other := addProject(t, filepath.Dir(f.project), "elsewhere", filepath.Join(t.TempDir(), "x"))
+	other := cmdtest.AddProject(t, filepath.Dir(f.project), "elsewhere", filepath.Join(t.TempDir(), "x"))
 	testutil.EnsureEpicTicketMD(t, filepath.Join(other, "far"))
 
 	for _, tc := range []struct {
@@ -209,7 +209,7 @@ func TestExecute_TicketsMove_JSONShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("move --json: %v", err)
 	}
-	m := decodeJSON(t, []byte(out))
+	m := cmdtest.DecodeJSON(t, []byte(out))
 	if m["from"] != "mine:src/03" || m["to"] != "mine:dst/03" || m["via"] != "direct" {
 		t.Errorf("json = %v", m)
 	}
@@ -300,7 +300,7 @@ func TestExecute_TicketsMove_RewritesInboundRefsAndWarnsOnProse(t *testing.T) {
 		t.Errorf("epic ticket.md not rewritten:\n%s", md)
 	}
 
-	m := decodeJSON(t, []byte(out))
+	m := cmdtest.DecodeJSON(t, []byte(out))
 	rewritten, _ := m["rewritten"].([]any)
 	for _, p := range []string{
 		filepath.Join(f.project, "src", "issues", "02-second.md"),
@@ -398,14 +398,9 @@ func listMentions(items []any, sub string) bool {
 // replaced; the state dir is isolated so the persisted files are the test's.
 func moveWithServer(t *testing.T, f moveFixture, cl func() (*apiclient.Client, error)) error {
 	t.Helper()
-	d := deps{
-		stdout:       bytes.NewBuffer(nil),
-		stderr:       bytes.NewBuffer(nil),
-		getwd:        func() (string, error) { return f.repo, nil },
-		serverClient: cl,
-		env:          envFor(t),
-	}
-	return execute([]string{"tickets", "move", "src/01", "dst"}, d)
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), func() (string, error) { return f.repo, nil })
+	d.Env.NewClient = cl
+	return execute(t, []string{"tickets", "move", "src/01", "dst"}, d)
 }
 
 func fakeMoveServer(t *testing.T, queue []wire.QueueItem, live []wire.IterationInfo) (func() (*apiclient.Client, error), *[]string) {
@@ -473,7 +468,7 @@ func TestTicketsMove_ServerDownReadsPersistedQueueAndRuns(t *testing.T) {
 	for _, file := range []string{"queue.json", "runs.json"} {
 		t.Run(file, func(t *testing.T) {
 			f := setupMoveProject(t)
-			stateDir := envValue(envFor(t), "XDG_STATE_HOME")
+			stateDir := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_STATE_HOME")
 			if err := os.MkdirAll(filepath.Join(stateDir, "gx"), 0o755); err != nil {
 				t.Fatal(err)
 			}

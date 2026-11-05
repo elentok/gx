@@ -32,6 +32,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Help group IDs; root assigns them by command name.
+const (
+	groupTicketContent = "ticket-content"
+	groupServer        = "server"
+)
+
 // ExitError is the one alias root keeps, so main.go needs no import of cmdbase.
 type ExitError = cmdbase.ExitError
 

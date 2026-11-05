@@ -1,8 +1,9 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
 	"errors"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,21 +19,7 @@ import (
 // 02, open-with-run-history 03 and cancelled 04, plus an unrelated epic.
 func setupCloseProject(t *testing.T) moveFixture {
 	t.Helper()
-	store := isolateTicketStore(t)
-	repo := testutil.TempRepo(t)
-	project := addProject(t, store, "mine", repo)
-	for _, e := range []string{tickets.FollowUpsEpic, "work"} {
-		testutil.EnsureEpicTicketMD(t, filepath.Join(project, e))
-		if err := os.MkdirAll(filepath.Join(project, e, "issues"), 0755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
-	testutil.WriteFile(t, fu, "01-one.md", "---\nid: \"01\"\nstatus: open\ntype: research\n---\n\n# 01 — One\n\nbody\n")
-	testutil.WriteFile(t, fu, "02-two.md", "---\nid: \"02\"\nstatus: done\ntype: research\n---\n\n# 02 — Two\n")
-	testutil.WriteFile(t, fu, "03-run.md", "---\nid: \"03\"\nstatus: open\ntype: research\nsession_ids:\n  - abc\n---\n\n# 03 — Run\n")
-	testutil.WriteFile(t, fu, "04-gone.md", "---\nid: \"04\"\nstatus: cancelled\ntype: research\n---\n\n# 04 — Gone\n")
-	testutil.WriteFile(t, filepath.Join(project, "work", "issues"), "01-w.md", "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# 01\n")
+	repo, project := cmdtest.SetupCloseProject(t)
 	return moveFixture{repo: repo, project: project}
 }
 
@@ -158,14 +145,9 @@ func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
 			f := setupCloseProject(t)
 			cl, pings := fakeMoveServer(t, tc.queue, tc.live)
 			before := moveTreeSnapshot(t, f.project)
-			d := deps{
-				env:          envFor(t),
-				stdout:       bytes.NewBuffer(nil),
-				stderr:       bytes.NewBuffer(nil),
-				getwd:        func() (string, error) { return f.repo, nil },
-				serverClient: cl,
-			}
-			err := execute([]string{"tickets", "close", "follow-ups/01", "--reason", "fixed"}, d)
+			d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), func() (string, error) { return f.repo, nil })
+			d.Env.NewClient = cl
+			err := execute(t, []string{"tickets", "close", "follow-ups/01", "--reason", "fixed"}, d)
 			requireMoveActive(t, err)
 			if after := moveTreeSnapshot(t, f.project); after != before {
 				t.Errorf("refusal wrote something:\nbefore %s\nafter  %s", before, after)

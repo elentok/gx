@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
@@ -39,7 +40,7 @@ func runTicketsFollowUpAdd(d deps, epicPath, body, category string, jsonOut bool
 		return &tickets.AddressError{Code: tickets.CodeTypeOverride, Msg: fmt.Sprintf("a follow-up is always filed research, not %q", asked.Type)}
 	}
 
-	fm, text, err := bodyFrontmatter(body)
+	fm, text, err := ticketscmd.BodyFrontmatter(body)
 	if err != nil {
 		return err
 	}
@@ -71,12 +72,12 @@ func runTicketsFollowUpAdd(d deps, epicPath, body, category string, jsonOut bool
 
 	fm.Status = string(schema.StatusDraft)
 	fm.Type = string(schema.TypeResearch)
-	path, _, err := createTicket(epicPath, "", followUpSlug(text), &text, fm)
+	path, _, err := ticketscmd.CreateTicket(epicPath, "", followUpSlug(text), &text, fm)
 	if err != nil {
 		return err
 	}
-	pingServer(d, path)
-	return printTicketRef(path, jsonOut, w)
+	ticketscmd.PingServer(d.base(), path)
+	return ticketscmd.PrintTicketRef(path, jsonOut, w)
 }
 
 var slugUnsafeRe = regexp.MustCompile(`[^a-z0-9]+`)
