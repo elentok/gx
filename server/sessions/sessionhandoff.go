@@ -101,7 +101,7 @@ func (rs *Resumer) beginHandoff(dir, id string) (string, bool) {
 // restartOnWorker ends the old conversation like an agent exit, records a new
 // one and launches it under the worker tier. The caller holds metaMu.
 func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
-	rs.mg.saveConversationTotals(*meta, old)
+	rs.mg.Conv.SaveTotals(meta.ConvSession(), old)
 	conv, err := nativerunner.NewUUID()
 	if err != nil {
 		return err
@@ -111,7 +111,7 @@ func (rs *Resumer) restartOnWorker(dir string, meta *Meta, old string) error {
 	meta.HandoffTier = true
 	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", chat.TicketEpic(meta.Ticket))
 	meta.Actionable = wire.SessionActionable{}
-	rs.mg.recordConversation(*meta)
+	rs.mg.Conv.Record(meta.ConvSession())
 	if err := clearOldHolder(dir); err != nil {
 		return err
 	}

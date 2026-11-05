@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/sessions/convrecord"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/ralphloop"
@@ -102,6 +103,10 @@ type Meta struct {
 // grilling round, not agent- or gx-raised), the session waits for the person,
 // whatever its harness. Call sites add their own conditions: the
 // detector needs a live turn and the cap, the switch needs no countdown running.
+func (m Meta) ConvSession() convrecord.Session {
+	return convrecord.Session{ID: m.ID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, ConversationID: m.ConversationID, Design: m.Design}
+}
+
 func (m Meta) CanAutoAdvance() bool {
 	a := m.Actionable
 	return !m.AutoAdvanceOff && a.Derived && !a.Grilling && len(a.Action) > 0 &&

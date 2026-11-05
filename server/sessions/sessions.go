@@ -22,7 +22,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
@@ -155,7 +154,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		}
 	}
 	id := meta.ID
-	mg.recordConversation(meta)
+	mg.Conv.Record(meta.ConvSession())
 	mg.Watches.MetaMu.Lock()
 	err = mg.startSessionHolder(dir, &meta, req.Cols, req.Rows, false)
 	if err != nil {
@@ -176,48 +175,6 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 func (mg *Manager) applyTier(meta *Meta, tier ralphloop.Tier) {
 	meta.Tier = tier
 	meta.Model, meta.Effort = ralphloop.ResolveTier(mg.projects.AgentsConfig(meta.Project), ralphloop.AgentFor(meta.Harness), tier)
-}
-
-// recordConversation keeps the session's current conversation on the record,
-// counted toward its current Session ticket. A session with no ticket records
-// nothing.
-func (mg *Manager) recordConversation(m Meta) {
-	if m.Ticket == "" || m.ConversationID == "" {
-		return
-	}
-	err := conversations.Save(mg.cfg.ConversationsDir, conversations.Record{
-		ID: m.ConversationID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, Design: m.Design, RecordedAt: time.Now(),
-	})
-	if err != nil {
-		mg.log.Warn("record conversation", "session", m.ID, "err", err)
-	}
-}
-
-// saveConversationTotals saves the tokens and cost of the ended conversation
-// on its record, so stamps never re-read a transcript that may have aged out.
-// An unreadable transcript leaves the record without totals.
-func (mg *Manager) saveConversationTotals(m Meta, conversation string) {
-	if m.Ticket == "" || conversation == "" {
-		return
-	}
-	agent := ralphloop.AgentFor(m.Harness)
-	home, err := mg.projects.EnvHome()
-	if err != nil {
-		mg.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
-		return
-	}
-	codexHome, _ := mg.projects.CodexHome()
-	tokens, cost, err := ralphloop.SessionsTotals(ralphloop.SessionHomes{Claude: home, Codex: codexHome}, []ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
-	if err != nil {
-		mg.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
-		return
-	}
-	if err := conversations.SaveTotals(mg.cfg.ConversationsDir, conversation, conversations.Totals{TotalTokens: int(tokens), Cost: cost}); err != nil {
-		mg.log.Warn("save conversation totals", "session", m.ID, "conversation", conversation, "err", err)
-	}
-	if m.Design {
-		mg.saveConversationGrilling(m, conversation)
-	}
 }
 
 // addSessionWorktree makes worktree name from the project's trunk, as the

@@ -1,4 +1,4 @@
-package sessions
+package convrecord_test
 
 import (
 	"log/slog"
@@ -8,25 +8,22 @@ import (
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server/projects"
-	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/sessions/convrecord"
 )
 
-func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
+type fakeHost struct{ claude, codex string }
+
+func (h fakeHost) EnvHome() (string, error)   { return h.claude, nil }
+func (h fakeHost) CodexHome() (string, error) { return h.codex, nil }
+func (h fakeHost) OnMapEpic(string) bool      { return false }
+
+func TestSaveTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 	t.Parallel()
-	home := t.TempDir()
 	codexHome := t.TempDir()
 	root := t.TempDir()
-	m := Meta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
-	env := []string{"HOME=" + home, "CODEX_HOME=" + codexHome}
-	log := slog.New(slog.DiscardHandler)
-	mg := &Manager{
-		cfg:      SessionsConfig{ConversationsDir: root, Env: env},
-		log:      log,
-		projects: projects.NewRegistry(func() projects.Env { return projects.Env{Env: env} }, log, nil, &settings.Holder{}, nil, nil),
-		Watches:  NewSessionWatches(),
-	}
-	mg.recordConversation(m)
+	s := convrecord.Session{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
+	rec := &convrecord.Recorder{Dir: root, Log: slog.New(slog.DiscardHandler), Host: fakeHost{claude: t.TempDir(), codex: codexHome}}
+	rec.Record(s)
 
 	dir := filepath.Join(codexHome, "sessions", "2026", "01", "02")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -40,12 +37,12 @@ func TestSaveConversationTotals_CodexDesignSavesGrillingCounts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mg.saveConversationTotals(m, m.ConversationID)
-	rec, err := conversations.Read(root, m.ConversationID)
+	rec.SaveTotals(s, s.ConversationID)
+	got, err := conversations.Read(root, s.ConversationID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !rec.Design || len(rec.Grilling) != 1 || rec.Grilling[0].MessageID != "o3" {
-		t.Errorf("record = %+v; want the Design flag and one counted round", rec)
+	if !got.Design || len(got.Grilling) != 1 || got.Grilling[0].MessageID != "o3" {
+		t.Errorf("record = %+v; want the Design flag and one counted round", got)
 	}
 }

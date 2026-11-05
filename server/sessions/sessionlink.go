@@ -49,7 +49,7 @@ func (rs *Resumer) linkSession(req wire.LinkSessionRequest) (wire.SessionResult,
 	var info wire.SessionInfo
 	if err := rs.mg.UpdateSessionMeta(dir, req.ID, func(m *Meta) bool {
 		m.Ticket, m.Design = ticket, m.Design || design
-		rs.mg.recordConversation(*m)
+		rs.mg.Conv.Record(m.ConvSession())
 		info = m.Info()
 		return true
 	}); err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/sessions/convrecord"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
@@ -62,6 +63,8 @@ type Manager struct {
 	// Logs prunes the agent logs; Maps answers for the map epic of an address.
 	Logs *AgentLogs
 	Maps *MapEpics
+	// Conv keeps the sessions' conversations on the record.
+	Conv *convrecord.Recorder
 	// prompter is the prompt, turn and auto-advance side the watch loop calls.
 	prompter Prompter
 	// designs is the design cleanup the remove path calls back.
@@ -93,16 +96,26 @@ type ManagerDeps struct {
 
 // NewManager builds the Manager from d.
 func NewManager(d ManagerDeps) *Manager {
+	maps := &MapEpics{projects: d.Projects}
 	return &Manager{
 		cfg: d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
 		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, queue: d.Queue, host: d.Host,
 		Watches: NewSessionWatches(), prompter: d.Prompter,
 		Logs:    &AgentLogs{ticketStore: d.Cfg.TicketStore, log: d.Log, settings: d.Settings, harness: d.Harness},
-		Maps:    &MapEpics{projects: d.Projects},
+		Maps:    maps,
+		Conv:    &convrecord.Recorder{Dir: d.Cfg.ConversationsDir, Log: d.Log, Host: convHost{d.Projects, maps}},
 		designs: d.Designs, rollouts: d.Rollouts,
 	}
 }
+
+// convHost is the convrecord.Host over the project registry and the map epics.
+type convHost struct {
+	*projects.Registry
+	maps *MapEpics
+}
+
+func (h convHost) OnMapEpic(address string) bool { return h.maps.OnMapEpic(address) }
 
 // Resumer brings sessions back: resume, restore, auto-resume, handoff, link,
 // step and the fix agent.

@@ -727,7 +727,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	usageDone := make(chan struct{})
 	go func() { defer close(usageDone); s.limits.Run(freshCtx) }()
 	sweepDone := make(chan struct{})
-	go func() { defer close(sweepDone); s.sessions.SweepDesignCounts() }()
+	go func() { defer close(sweepDone); s.sessions.Conv.SweepDesignCounts() }()
 	s.health.FileStartIncident(time.Now())
 	var err error
 	select {

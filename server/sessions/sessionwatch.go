@@ -179,10 +179,10 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 					}
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
-					mg.saveConversationTotals(*m, m.ConversationID)
+					mg.Conv.SaveTotals(m.ConvSession(), m.ConversationID)
 					harness.CarryEditorOverride(m.ConversationID, msg.ConversationID)
 					m.ConversationID = msg.ConversationID
-					mg.recordConversation(*m)
+					mg.Conv.Record(m.ConvSession())
 					changed = true
 				}
 				if m.AutoName && msg.DisplayName != "" && msg.DisplayName != m.Name {
@@ -330,7 +330,7 @@ func (mg *Manager) recordSessionExit(m *Meta, exit string) bool {
 			mg.TriggerBanner(m.ID, sound.Done, "")
 		}
 	}
-	mg.saveConversationTotals(*m, m.ConversationID)
+	mg.Conv.SaveTotals(m.ConvSession(), m.ConversationID)
 	m.Status, m.StatusChangedAt, m.Exit = wire.SessionStatus{State: wire.SessionExited}, time.Now(), exit
 	m.RestoreCrashed = exit == wire.SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < chat.RestoreCrashWindow
 	m.FirstPrompt = ""
