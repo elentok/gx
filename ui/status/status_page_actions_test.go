@@ -73,7 +73,7 @@ func TestHandleActionResultRecordsOutput(t *testing.T) {
 		output: "some action output",
 	})
 
-	if !m.output.HasContent() {
+	if !m.git.HasOutput() {
 		t.Fatal("expected output to be recorded when result has output")
 	}
 }

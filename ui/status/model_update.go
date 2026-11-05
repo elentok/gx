@@ -67,17 +67,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		m.keys.Reset()
 		return m, cmd
 	}
-	if m.bump.IsOpen {
-		return m.handleBumpUpdate(msg)
-	}
-	if m.push.IsOpen {
-		return m.handlePushUpdate(msg)
-	}
-	if m.pull.IsOpen {
-		return m.handlePullUpdate(msg)
-	}
-	if m.stash.IsOpen {
-		return m.handleStashUpdate(msg)
+	if m.git.ActionOpen() {
+		return m.handleGitUpdate(msg)
 	}
 	switch msg := msg.(type) {
 	case gotoPRMsg:
@@ -210,9 +201,9 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 		m.help = next
 		return m, cmd
 	}
-	if m.output.IsOpen {
+	if m.git.OutputOpen() {
 		var cmd tea.Cmd
-		m.output, cmd = m.output.Update(msg)
+		m.git, cmd, _ = m.git.Update(msg)
 		return m, cmd
 	}
 	if m.handleMouseWheel(msg) {
@@ -250,9 +241,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.runningOpen {
 		return m.handleRunningKey(msg)
 	}
-	if m.output.IsOpen {
-		next, cmd := m.output.Update(msg)
-		m.output = next
+	if m.git.OutputOpen() {
+		var cmd tea.Cmd
+		m.git, cmd, _ = m.git.Update(msg)
 		return m, cmd
 	}
 	if m.confirmOpen {

@@ -27,7 +27,7 @@ func TestPushKeyOpensPushModel(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'P', Text: "P", ShiftedCode: 'P'})
 	m = updated.(Model)
 
-	if !m.push.IsOpen {
+	if !m.git.PushOpen() {
 		t.Fatalf("expected push key to open push.Model")
 	}
 }

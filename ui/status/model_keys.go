@@ -129,7 +129,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		}
 		return m, nil
 	case bindingViewOutput:
-		if !m.output.HasContent() {
+		if !m.git.HasOutput() {
 			return m, notify.Info(ui.MessageNoOutput())
 		}
 		m.openOutputModal()
@@ -163,10 +163,10 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 	case bindingRenderMode:
 		return m, m.toggleRenderMode()
 	case bindingPull:
-		cmd := m.pull.Open(m.worktreeRoot)
+		cmd := m.git.OpenPull(m.worktreeRoot)
 		return m, cmd
 	case bindingPush:
-		if err := m.push.Open(m.worktreeRoot); err != nil {
+		if err := m.git.OpenPush(m.worktreeRoot); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
@@ -186,7 +186,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		}
 		return m, nil
 	case bindingBump:
-		if err := m.bump.Open(m.worktreeRoot); err != nil {
+		if err := m.git.OpenBump(m.worktreeRoot); err != nil {
 			m.showGitError(err)
 		}
 		return m, nil
@@ -195,13 +195,13 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 			return m, notify.Info("nothing to stash")
 		}
 		m.keys.Reset()
-		return m, m.stash.Open(m.worktreeRoot, false)
+		return m, m.git.OpenStash(m.worktreeRoot, false)
 	case bindingStashStaged:
 		if !m.hasStashableChanges(true) {
 			return m, notify.Info("nothing staged to stash")
 		}
 		m.keys.Reset()
-		return m, m.stash.Open(m.worktreeRoot, true)
+		return m, m.git.OpenStash(m.worktreeRoot, true)
 	case bindingEditInPlace:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case bindingEditHSplit:

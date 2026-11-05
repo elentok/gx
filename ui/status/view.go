@@ -39,20 +39,14 @@ func (m Model) View() tea.View {
 		}
 	}
 
-	if m.bump.IsOpen {
-		out = ui.OverlayCenter(out, m.bump.View(m.width), m.width, m.height)
-	} else if m.push.IsOpen {
-		out = ui.OverlayCenter(out, m.push.View(m.width), m.width, m.height)
-	} else if m.pull.IsOpen {
-		out = ui.OverlayCenter(out, m.pull.View(m.width), m.width, m.height)
-	} else if m.stash.IsOpen {
-		out = ui.OverlayCenter(out, m.stash.View(m.width), m.width, m.height)
+	if gitView, ok := m.git.ViewAction(m.width); ok {
+		out = ui.OverlayCenter(out, gitView, m.width, m.height)
 	} else if m.credentialOpen {
 		out = ui.OverlayCenter(out, m.credentialModalView(), m.width, m.height)
 	} else if m.runningOpen {
 		out = ui.OverlayCenter(out, m.runningModalView(), m.width, m.height)
-	} else if m.output.IsOpen {
-		out = ui.OverlayCenter(out, m.output.View(), m.width, m.height)
+	} else if m.git.OutputOpen() {
+		out = ui.OverlayCenter(out, m.git.ViewOutput(), m.width, m.height)
 	} else if m.confirmOpen {
 		out = ui.OverlayCenter(out, m.confirmModalView(), m.width, m.height)
 	} else if m.errorOpen {

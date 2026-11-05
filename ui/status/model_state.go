@@ -8,15 +8,11 @@ import (
 
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/bump"
+	"github.com/elentok/gx/ui/gitops"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
-	"github.com/elentok/gx/ui/output"
-	"github.com/elentok/gx/ui/pull"
-	"github.com/elentok/gx/ui/push"
-	"github.com/elentok/gx/ui/stash"
 	"github.com/elentok/gx/ui/status/diffarea"
 	"github.com/elentok/gx/ui/tree"
 
@@ -47,10 +43,7 @@ type Model struct {
 	activeFilePath string
 	diffReloadSeq  int
 
-	bump  bump.Model
-	push  push.Model
-	pull  pull.Model
-	stash stash.Model
+	git gitops.Model
 
 	confirmOpen             bool
 	confirmTitle            string
@@ -76,7 +69,6 @@ type Model struct {
 	credentialPrompt        string
 	credentialInput         textinput.Model
 	credentialSecret        bool
-	output                  output.Model
 	keys                    keys.Manager
 
 	overlay             imagediff.Overlay
@@ -152,11 +144,7 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 		diffarea:         diffarreaModel,
 		statusData:       statusData{},
 		fileTreeModel:    fileTreeModel,
-		output:           output.New(),
-		bump:             bump.New(),
-		push:             push.New(),
-		pull:             pull.New(),
-		stash:            stash.New(),
+		git:              gitops.New(),
 
 		overlay: imagediff.NewOverlay(imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
 		fetchImageDiffBlobs: func(file stage.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool) {

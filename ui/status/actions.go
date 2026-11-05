@@ -342,11 +342,11 @@ func stageActionOutputTitle(kind stageActionKind) string {
 }
 
 func (m *Model) recordCommandOutput(title, out string) {
-	m.output.Set(title, out)
+	m.git.SetOutput(title, out)
 }
 
 func (m *Model) openOutputModal() {
-	m.output.Open(m.width, m.height)
+	m.git.OpenOutput(m.width, m.height)
 	m.keys.Reset()
 }
 

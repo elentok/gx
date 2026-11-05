@@ -1,12 +1,5 @@
 package status
 
-import (
-	"github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/stash"
-
-	tea "charm.land/bubbletea/v2"
-)
-
 // hasStashableChanges reports whether the current file list holds anything that
 // the requested stash variant would capture. Untracked files are excluded: the
 // stash is run without --include-untracked (out of scope), so `git stash push`
@@ -21,26 +14,4 @@ func (m Model) hasStashableChanges(stagedOnly bool) bool {
 		}
 	}
 	return false
-}
-
-func (m Model) handleStashUpdate(msg tea.Msg) (Model, tea.Cmd) {
-	next, cmd, result := m.stash.Update(msg)
-	m.stash = next
-	if !result.Done {
-		return m, cmd
-	}
-	if result.Err != nil {
-		m.output.Set("Stash output", result.Err.Error())
-		return m, notify.Error("stash failed: " + result.Err.Error())
-	}
-	switch result.Outcome {
-	case stash.OutcomeStashed:
-		label := "stashed all changes"
-		if result.StagedOnly {
-			label = "stashed staged changes"
-		}
-		return m, tea.Batch(notify.Success(label), m.refreshPreserveScroll(), statusRepoMutatedCmd())
-	default:
-		return m, nil
-	}
 }

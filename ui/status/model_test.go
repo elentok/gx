@@ -2376,7 +2376,7 @@ func TestGOOpensOutputModal(t *testing.T) {
 
 	m := newTestModelDefault(repo)
 	m.ready = true
-	m.output.Set("test", "hello")
+	m.git.SetOutput("test", "hello")
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if cmd != nil {
@@ -2393,7 +2393,7 @@ func TestGOOpensOutputModal(t *testing.T) {
 	// command launch, which is what this test guards against.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	m = updated.(Model)
-	if !m.output.IsOpen {
+	if !m.git.OutputOpen() {
 		t.Fatalf("expected go to open output modal")
 	}
 }

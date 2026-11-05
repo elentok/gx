@@ -10,7 +10,7 @@ import (
 )
 
 func (m Model) InputFocused() bool {
-	return m.bump.InputFocused() || m.push.InputFocused() || m.pull.InputFocused() || m.stash.InputFocused() || m.help.InputFocused() ||
+	return m.git.InputFocused() || m.help.InputFocused() ||
 		m.searchInputFocused()
 }
 
@@ -23,8 +23,7 @@ func (m Model) searchInputFocused() bool {
 
 func (m Model) ModalOpen() bool {
 	return m.runningOpen || m.confirmOpen || m.errorOpen || m.credentialOpen ||
-		m.bump.IsOpen || m.push.IsOpen || m.pull.IsOpen || m.stash.IsOpen ||
-		m.output.IsOpen || m.help.IsOpen
+		m.git.IsOpen() || m.help.IsOpen
 }
 
 func (m *Model) computeSearchMatches(query string) []search.Match {

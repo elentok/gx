@@ -44,7 +44,7 @@ func sendStashStagedChord(m Model) (Model, tea.Cmd) {
 
 func expectNothingToStash(t *testing.T, m Model, cmd tea.Cmd) {
 	t.Helper()
-	if m.stash.IsOpen {
+	if m.git.StashOpen() {
 		t.Fatal("stash modal should not open")
 	}
 	if cmd == nil {
@@ -94,7 +94,7 @@ func TestStashAll_OpensModalOnDirtyTree(t *testing.T) {
 	m.ready = true
 
 	m, _ = sendStashAllChord(m)
-	if !m.stash.IsOpen {
+	if !m.git.StashOpen() {
 		t.Fatal("expected stash modal to open on a dirty tree")
 	}
 }
@@ -110,7 +110,7 @@ func TestStashAll_StashedResultNotifiesAndRefreshes(t *testing.T) {
 	m.ready = true
 
 	m, _ = sendStashAllChord(m)
-	if !m.stash.IsOpen {
+	if !m.git.StashOpen() {
 		t.Fatal("expected stash modal to open")
 	}
 
@@ -123,7 +123,7 @@ func TestStashAll_StashedResultNotifiesAndRefreshes(t *testing.T) {
 	// Enter batches the stash cmd with a spinner tick; flatten the batch and
 	// route the (private) done-msg back through the seam.
 	m, follow := runBatch(m, cmd)
-	if m.stash.IsOpen {
+	if m.git.StashOpen() {
 		t.Fatal("expected stash sub-model to close after success")
 	}
 	if follow == nil {
@@ -141,7 +141,7 @@ func TestStashStaged_NothingStagedShowsNotice(t *testing.T) {
 	m.ready = true
 
 	m, cmd := sendStashStagedChord(m)
-	if m.stash.IsOpen {
+	if m.git.StashOpen() {
 		t.Fatal("stash modal should not open when nothing staged")
 	}
 	if cmd == nil {
@@ -169,10 +169,10 @@ func TestStashStaged_OpensStagedModalWhenStagedChangesExist(t *testing.T) {
 	m.ready = true
 
 	m, _ = sendStashStagedChord(m)
-	if !m.stash.IsOpen {
+	if !m.git.StashOpen() {
 		t.Fatal("expected stash modal to open")
 	}
-	if !m.stash.StagedOnly() {
+	if !m.git.StashStagedOnly() {
 		t.Fatal("expected stash sub-model to be in staged-only mode")
 	}
 }
