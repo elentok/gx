@@ -1,5 +1,6 @@
 import { MapStepCurrent, MapStepDone, ProgressDone } from "../generated/server";
 import type { EpicDetail, EpicDetailRow } from "./detail";
+import { modelName, type ModelLabel } from "../modelName";
 import type { Tone } from "../ui/tone";
 import { ticketPath } from "../hrefs";
 import { epicBadge } from "../view";
@@ -213,7 +214,7 @@ export function cardMeta(row: EpicDetailRow, ctx: RowContext): string {
 const designDoneTime = (row: EpicDetailRow) =>
   row.elapsed !== undefined && row.elapsed >= 60 ? formatDuration(row.elapsed) : undefined;
 
-export type RowChips = { harness: string; tierLabel: string; model: string; effort: string; note: string };
+export type RowChips = { harness: string; tierLabel: string; model: ModelLabel; effort: string; note: string };
 
 const TIER_LABELS: Record<string, string> = { light: "Light", worker: "Worker", strongest: "Strongest" };
 
@@ -225,14 +226,14 @@ export function rowChips(row: EpicDetailRow): RowChips | undefined {
     return {
       harness: row.harness,
       tierLabel: TIER_LABELS[row.tier ?? ""] ?? "",
-      model: row.model ?? "",
+      model: modelName(row.model ?? "", row.harness),
       effort: row.effort ?? "",
       note: "",
     };
   }
   // "follows default" is the common case, so it is not worth a line on the card.
   if (bucketOf(row) !== "waiting" || !row.harness_note || row.harness_note === "follows default") return undefined;
-  return { harness: row.harness ?? "", tierLabel: "", model: "", effort: "", note: row.harness_note };
+  return { harness: row.harness ?? "", tierLabel: "", model: modelName(""), effort: "", note: row.harness_note };
 }
 
 // A done row's dim meta: elapsed time (or "cancelled"), then cost for a loop row, then the fork note.

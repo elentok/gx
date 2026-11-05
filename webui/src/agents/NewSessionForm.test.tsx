@@ -99,7 +99,7 @@ test("the tier picker lists three tiers with their models, defaults to worker an
   const { posts, onCreated } = mount();
   await ready();
   const picker = screen.getByRole("combobox", { name: "Tier" }) as HTMLSelectElement;
-  expect([...picker.options].map((o) => o.textContent)).toEqual(["Light (haiku)", "Worker (sonnet)", "Strongest (opus)"]);
+  expect([...picker.options].map((o) => o.textContent)).toEqual(["Light (Claude Haiku)", "Worker (Claude Sonnet)", "Strongest (Claude Opus)"]);
   expect(picker.value).toBe("worker");
   fireEvent.change(picker, { target: { value: "strongest" } });
   submit();

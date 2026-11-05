@@ -119,7 +119,7 @@ test.describe("147. Resume on worker", () => {
     await page.evaluate((hash) => (location.hash = hash), "#/t/demo:mismatch-epic/01");
 
     await expect(page.getByText("Wrong model").first()).toBeVisible();
-    await expect(recovery(page).getByText("Ran on claude-opus-4, expected claude-sonnet-4.")).toBeVisible();
+    await expect(recovery(page).getByText("Ran on Claude Opus 4, expected Claude Sonnet 4.")).toBeVisible();
     await expect(recovery(page).getByRole("button")).toHaveText([/^Resume on worker$/]);
 
     await recovery(page).getByRole("button", nav("Resume on worker")).click();

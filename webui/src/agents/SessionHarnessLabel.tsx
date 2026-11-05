@@ -1,4 +1,5 @@
 import type { SessionInfo } from "../generated/server";
+import { modelName } from "../modelName";
 import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
 import { TIERS } from "./NewSessionForm";
 
@@ -10,7 +11,7 @@ export function SessionHarnessLabel({ session: s }: { session: SessionInfo }) {
     <HarnessLabel
       harness={s.harness}
       tierLabel={known && !s.model && !tierLabel ? (TIERS.find((t) => t.id === "worker")?.label ?? "") : tierLabel}
-      model={s.model ?? ""}
+      model={known ? modelName(s.model ?? "", s.harness) : modelName("")}
       effort={s.effort ?? ""}
       switched={s.model_switched ?? false}
     />

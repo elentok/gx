@@ -20,6 +20,7 @@ import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
 import { Chip } from "../ui/chip/Chip";
 import { CommandMenu, type CommandMenuRow } from "../ui/command-menu/CommandMenu";
+import { modelName } from "../modelName";
 import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
 import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
@@ -671,10 +672,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "HarnessLabel",
     cases: [
-      { label: "claude full", node: <HarnessLabel harness="claude" tierLabel="Worker" model="sonnet-4.6" effort="high" switched={false} /> },
-      { label: "codex full", node: <HarnessLabel harness="codex" tierLabel="Strongest" model="gpt-5.5" effort="xhigh" switched={false} /> },
-      { label: "no reply yet", node: <HarnessLabel harness="codex" tierLabel="Worker" model="" effort="" switched={false} /> },
-      { label: "switched", node: <HarnessLabel harness="claude" tierLabel="Worker" model="opus-4.7" effort="high" switched /> },
+      { label: "claude full", node: <HarnessLabel harness="claude" tierLabel="Worker" model={modelName("claude-sonnet-4-6", "claude")} effort="high" switched={false} /> },
+      { label: "codex full", node: <HarnessLabel harness="codex" tierLabel="Strongest" model={modelName("gpt-5.5", "codex")} effort="xhigh" switched={false} /> },
+      { label: "no reply yet", node: <HarnessLabel harness="codex" tierLabel="Worker" model={modelName("", "codex")} effort="" switched={false} /> },
+      { label: "switched", node: <HarnessLabel harness="claude" tierLabel="Worker" model={modelName("claude-opus-4-7", "claude")} effort="high" switched /> },
     ],
   },
   {

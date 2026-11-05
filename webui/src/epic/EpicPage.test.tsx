@@ -213,14 +213,16 @@ test("loop rows show harness chips and queue notes; done rows and map rows show 
     tk("01", { harness_note: "follows default" }),
     tk("02", { harness: "codex", harness_note: "pinned" }),
     tk("03", { harness: "claude", harness_note: "keeps Claude (ran before)" }),
-    tk("04", { rendered_status: "claimed", harness: "codex", tier: "strongest", model: "gpt-x", effort: "high" }),
+    tk("04", { rendered_status: "claimed", harness: "claude", tier: "worker", model: "claude-sonnet-5-5", effort: "medium" }),
+    tk("06", { rendered_status: "claimed", harness: "claude", tier: "worker" }),
     tk("05", { rendered_status: "done", harness: "codex", harness_note: "pinned" }),
   ]);
   const chips = async (id: string) => (await cardOf(id)).querySelector("[data-chips]")?.textContent;
   expect(await chips("01")).toBeUndefined();
   expect(await chips("02")).toBe("Codexpinned");
   expect(await chips("03")).toBe("Claudekeeps Claude (ran before)");
-  expect(await chips("04")).toBe("CodexStrongest · gpt-x · high");
+  expect(await chips("04")).toBe("Claude Sonnet 5.5 · Worker · medium");
+  expect(await chips("06")).toBe("Claude CLI default · Worker");
   expect(await chips("05")).toBeUndefined();
   cleanup();
   live([tk("01")], "map");

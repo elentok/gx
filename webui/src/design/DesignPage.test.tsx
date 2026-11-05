@@ -120,9 +120,8 @@ test("the Epics tab counts the other Needs-you cards from the loaded list", asyn
 
 test("the header shows the harness, tier and model of a Codex session, and nothing without a session", async () => {
   render([map("a")], [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })]);
-  expect(await screen.findByText("Codex")).toBeTruthy();
+  expect(await screen.findByText("Codex GPT-5.3-Codex · medium")).toBeTruthy();
   expect(screen.getByText("Worker")).toBeTruthy();
-  expect(screen.getByText("gpt-5.3-codex · medium")).toBeTruthy();
   cleanup();
   render([map("a")], []);
   await screen.findByRole("heading", { level: 1 });

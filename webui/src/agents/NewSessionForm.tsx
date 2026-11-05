@@ -2,6 +2,7 @@ import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useCompletion } from "../commands/useCompletion";
 import type { CommandTarget, FetchCommands } from "../commands/useCommandList";
+import { modelName } from "../modelName";
 import { useWide } from "../useWide";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { ProjectWorktrees } from "../generated/server";
@@ -18,6 +19,9 @@ export const TIERS = [
   { id: "worker", label: "Worker" },
   { id: "strongest", label: "Strongest" },
 ];
+
+// The picker is Claude-only and a tier reads as the family: "Worker (Claude Sonnet)".
+const tierModel = (id: string) => modelName(id, "claude");
 
 /** The First prompt textarea with the `/` menu. The session is always Claude; the list is read for the chosen worktree, or the project root when one is being created. */
 function PromptField({ value, onChange, target, fetcher }: { value: string; onChange: (text: string) => void; target: CommandTarget; fetcher?: FetchCommands }) {
@@ -169,7 +173,7 @@ export function NewSessionForm({
               <chakra.select aria-label="Tier" value={tier} onChange={(e) => setTier(e.target.value)} {...field} h="40px" appearance="none" pr="8">
                 {TIERS.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {current?.tiers[t.id] ? `${t.label} (${current.tiers[t.id]})` : t.label}
+                    {current?.tiers[t.id] ? `${t.label} (${tierModel(current.tiers[t.id])})` : t.label}
                   </option>
                 ))}
               </chakra.select>

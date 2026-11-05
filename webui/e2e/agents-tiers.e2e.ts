@@ -19,7 +19,7 @@ test("95. New Agents tab session tiers", async ({ page, start }) => {
   await newSession(page);
 
   // Three tiers, each with the model it runs under; Worker is the default.
-  await expect(tierSelect(page).locator("option")).toHaveText(["Light (haiku)", "Worker (sonnet)", "Strongest (opus)"]);
+  await expect(tierSelect(page).locator("option")).toHaveText(["Light (Claude Haiku)", "Worker (Claude Sonnet)", "Strongest (Claude Opus)"]);
   await expect(tierSelect(page)).toHaveValue("worker");
   await promptBox(page).fill("worker words");
   await createButton(page).click();
@@ -47,7 +47,7 @@ test("95. New Agents tab session tiers", async ({ page, start }) => {
   const resumed = (await fixture.cli("agents", "resume", strongest.id)).trim();
   await expect.poll(async () => (await sessions(fixture)).find((s) => s.id === resumed)?.tier).toBe("strongest");
   await go(page, `#/agents/${resumed}`);
-  await expect(page.getByText("opus · max").first()).toBeVisible();
+  await expect(page.getByText("Claude Opus · max").first()).toBeVisible();
 });
 
 test("97. Session model label follows the handoff", async ({ page, start }) => {
@@ -55,5 +55,5 @@ test("97. Session model label follows the handoff", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const auto = (await sessions(fixture)).find((s) => s.ticket?.includes("handoff-auto"))!;
   await go(page, `#/agents/${auto.id}`);
-  await expect(page.getByText("sonnet · medium", { exact: true })).toBeVisible();
+  await expect(page.getByText("Claude Sonnet · medium",{ exact: true })).toBeVisible();
 });

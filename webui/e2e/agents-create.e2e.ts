@@ -77,7 +77,7 @@ test("85. Create session", async ({ page, start }) => {
   await sidebar(page).getByRole("button", { name: "New session in other" }).click();
   await createButton(page).click();
   const interactive = await created(fixture, beforeOther);
-  const label = page.getByText("sonnet · medium", { exact: true });
+  const label = page.getByText("Claude Sonnet · medium",{ exact: true });
   await expect(label).toHaveAttribute("title", "Worker tier");
   await ask(fixture, interactive.id, "hello");
   await expect(label).toHaveAttribute("title", "Worker tier");

@@ -24,8 +24,13 @@ test.each([
   ["waiting, pinned", { harness: "codex", harness_note: "pinned" }, { harness: "codex", tierLabel: "", model: "", effort: "", note: "pinned" }],
   [
     "running",
-    { rendered_status: "claimed", harness: "codex", tier: "strongest", model: "gpt-x", effort: "high" },
-    { harness: "codex", tierLabel: "Strongest", model: "gpt-x", effort: "high", note: "" },
+    { rendered_status: "claimed", harness: "claude", tier: "worker", model: "claude-sonnet-5-5", effort: "medium" },
+    { harness: "claude", tierLabel: "Worker", model: "Claude Sonnet 5.5", effort: "medium", note: "" },
+  ],
+  [
+    "running, no model yet",
+    { rendered_status: "claimed", harness: "claude", tier: "worker" },
+    { harness: "claude", tierLabel: "Worker", model: "Claude CLI default", effort: "", note: "" },
   ],
   ["a done row", { rendered_status: "done", harness: "codex", harness_note: "pinned" }, undefined],
   ["a map row with no fields", {}, undefined],

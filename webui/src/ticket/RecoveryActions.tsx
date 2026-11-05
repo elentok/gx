@@ -1,5 +1,6 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
+import { modelName } from "../modelName";
 import {
   ActionChooseBase,
   ActionResume,
@@ -91,7 +92,7 @@ export function RecoveryActions({
       {detail.recommendation && <Text whiteSpace="pre-wrap">{detail.recommendation.diagnosis}</Text>}
       {detail.model_ran && detail.model_expected && (
         <Text>
-          Ran on {detail.model_ran}, expected {detail.model_expected}.
+          Ran on {modelName(detail.model_ran)}, expected {modelName(detail.model_expected)}.
         </Text>
       )}
       {bases.length > 0 && actions.includes(ActionChooseBase) && (

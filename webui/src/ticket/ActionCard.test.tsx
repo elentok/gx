@@ -165,8 +165,7 @@ test("a model-mismatch pause shows both models and one Resume on worker button t
     }),
   );
   const c = await screen.findByRole("group", { name: "Action card" });
-  expect(c.textContent).toContain("claude-opus-4");
-  expect(c.textContent).toContain("claude-sonnet-4");
+  expect(c.textContent).toContain("Ran on Claude Opus 4, expected Claude Sonnet 4.");
   expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Resume on worker" }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalled());

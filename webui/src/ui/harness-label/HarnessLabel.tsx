@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import { Fragment, type ReactNode } from "react";
+import type { ModelLabel } from "../../modelName";
 
 const NAMES: Record<string, string> = { claude: "Claude", codex: "Codex" };
 
@@ -27,9 +28,8 @@ function Pill({ children, title }: { children: ReactNode; title?: string }) {
 }
 
 /**
- * `harness · tier · model effort`. Props are plain strings so any row can use it.
- * A tier with no model yet reads `<Tier> · CLI default`; nothing is shown for the tier and model
- * when all three are empty.
+ * `model · tier · effort`. The model reads as its `modelName`, which already names the harness, so
+ * the harness mark shows only when there is no model label (a queue note with a pinned harness).
  */
 export function HarnessLabel({
   harness,
@@ -42,7 +42,7 @@ export function HarnessLabel({
 }: {
   harness: string;
   tierLabel: string;
-  model: string;
+  model: ModelLabel;
   effort: string;
   switched: boolean;
   /** Server text for a queue row, as one more dim chip (`pinned`, `follows default`). */
@@ -51,22 +51,15 @@ export function HarnessLabel({
   plain?: boolean;
 }) {
   const tierTitle = tierLabel ? `${tierLabel} tier` : undefined;
+  const showHarness = harness && !model;
   const modelText = [model, effort].filter(Boolean).join(" · ");
-  const known = tierLabel || model || effort;
   if (plain) {
-    // The harness dot already says "Claude", so `claude-sonnet-5-5` reads `sonnet-5-5`.
-    const shortModel = [model.replace(/^claude-/, ""), effort].filter(Boolean).join(" · ");
-    const parts = [
-      known && model && tierLabel ? tierLabel : "",
-      known && model ? shortModel : "",
-      known && !model ? [tierLabel, "CLI default", effort].filter(Boolean).join(" · ") : "",
-      note ?? "",
-    ].filter(Boolean);
+    const parts = [model, tierLabel, effort, note ?? ""].filter(Boolean);
     // One inline flow: it wraps between words (a real space), never inside the harness or a word.
     const words = parts.flatMap((part) => part.split(" · "));
     return (
       <Text as="span" fontFamily="mono" fontSize="12px" color="text.dim">
-        {harness && (
+        {showHarness && (
           <Box as="span" display="inline-flex" alignItems="center" gap="5px" whiteSpace="nowrap" mr="2">
             <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
             {NAMES[harness] ?? harness}
@@ -86,15 +79,14 @@ export function HarnessLabel({
   }
   return (
     <Box as="span" display="inline-flex" flexWrap="wrap" alignItems="center" gap="2">
-      {harness && (
+      {showHarness && (
         <Pill>
           <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
           {NAMES[harness] ?? harness}
         </Pill>
       )}
-      {known && model && tierLabel && <Pill title={tierTitle}>{tierLabel}</Pill>}
-      {known && model && <Pill title={tierTitle}>{modelText}</Pill>}
-      {known && !model && <Pill title={tierTitle}>{[tierLabel, "CLI default", effort].filter(Boolean).join(" · ")}</Pill>}
+      {model && <Pill title={tierTitle}>{modelText}</Pill>}
+      {tierLabel && <Pill title={tierTitle}>{tierLabel}</Pill>}
       {note && <Pill>{note}</Pill>}
       {switched && (
         <Text as="span" fontSize="sm" color="text.dim">

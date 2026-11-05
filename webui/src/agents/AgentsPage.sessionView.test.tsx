@@ -48,36 +48,36 @@ test("a round in the chat shows no question sheet", async () => {
 
 test("the header shows tier and model chips with a tier tooltip, and CLI default until a model is reported", async () => {
   render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5", effort: "high" })], "/agents/s-1", true, chatOf(chat()));
-  const label = await screen.findByText("claude-opus-5 · high");
+  const label = await screen.findByText("Claude Opus 5 · high");
   expect(label.getAttribute("title")).toBe("Strongest tier");
   expect(screen.getByText("Strongest")).toBeTruthy();
   expect(screen.queryByText("switched by hand")).toBeNull();
   cleanup();
   render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5" })], "/agents/s-1", true, chatOf(chat()));
-  expect(await screen.findByText("claude-opus-5")).toBeTruthy();
+  expect(await screen.findByText("Claude Opus 5")).toBeTruthy();
   cleanup();
   render([session("s-1", "p", { name: "one", tier: "worker" })], "/agents/s-1", true, chatOf(chat()));
-  expect(await screen.findByText("Worker · CLI default")).toBeTruthy();
+  expect(await screen.findByText("Claude CLI default")).toBeTruthy();
+  expect(screen.getByText("Worker")).toBeTruthy();
 });
 
 test.each([
-  ["strongest", "opus", "max", "Strongest tier"],
-  ["worker", "sonnet", "medium", "Worker tier"],
-])("the %s tier shows %s · %s with the %s tooltip", async (tier, model, effort, title) => {
+  ["strongest", "opus", "Claude Opus", "max", "Strongest tier"],
+  ["worker", "sonnet", "Claude Sonnet", "medium", "Worker tier"],
+])("the %s tier shows %s · %s with the %s tooltip", async (tier, model, name, effort, title) => {
   render([session("s-1", "p", { name: "one", tier, model, effort })], "/agents/s-1", true, chatOf(chat()));
-  expect((await screen.findByText(`${model} · ${effort}`, { selector: "[title]" })).getAttribute("title")).toBe(title);
+  expect((await screen.findByText(`${name} · ${effort}`, { selector: "[title]" })).getAttribute("title")).toBe(title);
 });
 
 test("the header of a Codex session with a hand-switched model says so", async () => {
   render([session("s-1", "p", { name: "one", harness: "codex", tier: "worker", model: "gpt-5.5", effort: "xhigh", model_switched: true })], "/agents/s-1", true, chatOf(chat()));
-  expect(await screen.findByText("Codex")).toBeTruthy();
-  expect(screen.getByText("gpt-5.5 · xhigh")).toBeTruthy();
+  expect(await screen.findByText("Codex GPT-5.5 · xhigh")).toBeTruthy();
   expect(screen.getByText("switched by hand")).toBeTruthy();
 });
 
 test("a session with a model and no tier has a tooltip that names no tier", async () => {
   render([session("s-1", "p", { name: "one", model: "claude-sonnet-5-5" })], "/agents/s-1", true, chatOf(chat()));
-  const label = await screen.findByText("claude-sonnet-5-5");
+  const label = await screen.findByText("Claude Sonnet 5.5");
   expect(label.getAttribute("title")).toBeNull();
 });
 
