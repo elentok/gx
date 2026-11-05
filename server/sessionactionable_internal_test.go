@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/sessions/chat"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -102,9 +103,10 @@ func modelTestServer(t *testing.T, cwd string, lines ...string) *Server {
 	return withChat(withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}))
 }
 
-// withChat gives a bare test Server the session chat that New builds.
+// withChat gives a bare test Server the session chat and prompt that New builds.
 func withChat(s *Server) *Server {
 	s.sessionChat = chat.New(chat.Deps{Config: chat.Config{Env: s.cfg.Env}, Source: chatSource{s}, Log: s.log})
+	s.prompt = sessprompt.New(sessprompt.Deps{Log: s.log})
 	return s
 }
 
@@ -151,7 +153,7 @@ func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 	if got := s.SessionInfo(meta).Model; got != "claude-opus-5-5" {
 		t.Fatalf("model = %q, want claude-opus-5-5", got)
 	}
-	path, ok := s.sessionChat.ClaudeTranscript("s1", chatMeta(meta))
+	path, ok := s.sessionChat.ClaudeTranscript("s1", meta.ChatMeta())
 	if !ok {
 		t.Fatal("no transcript")
 	}

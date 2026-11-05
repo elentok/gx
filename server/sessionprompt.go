@@ -94,7 +94,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 		if res, refused := s.resumer.HandoffRefusal(meta, action); refused {
 			return res, nil
 		}
-		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
+		s.prompt.CancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
 		meta.Actionable = wire.SessionActionable{}
 		meta.AutoSends = 0
 		if err := sessions.WriteMeta(dir, meta); err != nil {
@@ -132,7 +132,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 // auto-advance countdown, resets the auto-send count and clears a derived
 // Continue. The caller holds metaMu.
 func (s *Server) notePersonTyped(dir string, meta sessions.Meta, why string) error {
-	stopped := s.cancelAutoAdvance(meta.ID, why)
+	stopped := s.prompt.CancelAutoAdvance(meta.ID, why)
 	changed := meta.AutoSends != 0
 	meta.AutoSends = 0
 	if !stopped && !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
@@ -152,7 +152,7 @@ func (s *Server) notePersonTyped(dir string, meta sessions.Meta, why string) err
 // lastChatMessageID is the id of the newest visible message of the session's
 // chat, or "" with none.
 func (s *Server) lastChatMessageID(id string, meta sessions.Meta) (string, error) {
-	path, kind, ok := s.sessionChat.Transcript(id, chatMeta(meta))
+	path, kind, ok := s.sessionChat.Transcript(id, meta.ChatMeta())
 	if !ok {
 		return "", nil
 	}

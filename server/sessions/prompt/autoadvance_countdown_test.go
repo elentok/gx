@@ -1,7 +1,6 @@
-package server_test
+package prompt_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,45 +13,6 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const countdownDelay = servertest.CountdownDelay
-
-// grillingFixture is the root view of servertest.GrillingFixture, with the
-// lowercase fields its many callers use.
-type grillingFixture struct {
-	h    *servertest.Harness
-	ctx  context.Context
-	evs  <-chan wire.Event
-	id   string
-	conv string
-	path string
-}
-
-func endTurn(t *testing.T, f *grillingFixture) {
-	t.Helper()
-	servertest.EndTurn(t, &servertest.GrillingFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, ID: f.id, Conv: f.conv, Path: f.path})
-}
-
-func startAdvancing(t *testing.T, store string) *grillingFixture {
-	t.Helper()
-	g := servertest.StartAdvancing(t, store)
-	return &grillingFixture{g.H, g.Ctx, g.Evs, g.ID, g.Conv, g.Path}
-}
-
-func sessionSnapshot(t *testing.T, f *grillingFixture) wire.SessionInfo {
-	t.Helper()
-	snap, err := f.h.Client.Sessions(f.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range snap {
-		if s.ID == f.id {
-			return s
-		}
-	}
-	t.Fatalf("session %s not in the snapshot", f.id)
-	return wire.SessionInfo{}
-}
-
 func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 	t.Parallel()
 	for name, text := range map[string]string{
@@ -61,19 +21,19 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := startAdvancing(t, storeWithMapStep(t, "spec"))
-			c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-			writeAssistantMessage(t, f.path, text)
+			c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+			writeAssistantMessage(t, f.Path, text)
 			endTurn(t, f)
-			got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+			got := waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 			if !got.AutoAdvanceAt.After(time.Now().Add(-time.Second)) || got.Actionable.Reason == "" {
 				t.Errorf("session = %+v, want a running countdown over a raised Continue", got)
 			}
-			if b, s := f.h.Banners.Sent(), f.h.Sounds.Played(); len(b) != 0 || len(s) != 0 {
+			if b, s := f.H.Banners.Sent(), f.H.Sounds.Played(); len(b) != 0 || len(s) != 0 {
 				t.Errorf("banners = %v, sounds = %v at countdown start, want none", b, s)
 			}
 			waitForScreen(t, c, "/clear")
 			waitForScreen(t, c, "/gx-design map")
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
+			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
 		})
 	}
 }
@@ -81,14 +41,14 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 func TestAutoAdvance_RunEndWithBackgroundTaskSendsContinue(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	report(t, f.conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool {
+	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	report(t, f.Conv, agentfake.Control{State: "working"})
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool {
 		return s.Status.State == wire.SessionWorking && !s.Status.Background
 	})
-	writeAssistantMessage(t, f.path, runEndText)
-	report(t, f.conv, agentfake.Control{State: "background"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool {
+	writeAssistantMessage(t, f.Path, runEndText)
+	report(t, f.Conv, agentfake.Control{State: "background"})
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool {
 		return s.Status.Background && s.AutoAdvanceAt != nil
 	})
 	waitForScreen(t, c, "/clear")
@@ -113,24 +73,24 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 				// done while the session is live. Seeding done would race the first
 				// rescan, which can run before the session exists and then never again.
 				f := startAdvancing(t, storeWithMapStep(t, "spec"))
-				mapMD := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
+				mapMD := filepath.Join(f.H.TicketStore, "proj", "map", "ticket.md")
 				if err := os.WriteFile(mapMD, []byte("---\nkind: map\ndesign_step: "+tc.step+"\n---\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
-				if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+				if err := f.H.Client.TicketChanged(f.Ctx, "proj:map"); err != nil {
 					t.Fatal(err)
 				}
-				waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+				waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 				if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
 					t.Errorf("countdown = %v, want none", got.AutoAdvanceAt)
 				}
 				return
 			}
 			f := startAdvancing(t, storeWithMapStep(t, tc.step))
-			c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-			writeAssistantMessage(t, f.path, tc.text)
+			c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+			writeAssistantMessage(t, f.Path, tc.text)
 			endTurn(t, f)
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 			time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 			if screenHas(t, c, "/clear") {
 				t.Error("an ending that never advances sent /clear")
@@ -145,13 +105,13 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 func TestAutoAdvance_SwitchOffStartsNoCountdown(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
+	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	if res, err := f.H.Client.SetAutoAdvance(f.Ctx, f.ID, false); err != nil || res.Refused {
 		t.Fatalf("switch off = %+v, %v", res, err)
 	}
-	writeAssistantMessage(t, f.path, runEndText)
+	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
-	got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
+	got := waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 	if got.AutoAdvanceAt != nil || screenHas(t, c, "/clear") {
 		t.Errorf("session = %+v, want no countdown and nothing sent", got)
@@ -162,10 +122,10 @@ func TestAutoAdvance_SwitchOffStartsNoCountdown(t *testing.T) {
 func startCountdown(t *testing.T) (*grillingFixture, *nativerunner.HolderClient) {
 	t.Helper()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	writeAssistantMessage(t, f.path, runEndText)
+	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 	return f, c
 }
 
@@ -181,7 +141,7 @@ func wantStopped(t *testing.T, f *grillingFixture, c *nativerunner.HolderClient)
 	if got.AutoAdvanceAt != nil || got.Actionable.Reason == "" || len(got.Actionable.Action) == 0 {
 		t.Errorf("session = %+v, want no countdown and Continue raised", got)
 	}
-	if b, s := f.h.Banners.Sent(), f.h.Sounds.Played(); len(b) != 1 || len(s) != 1 {
+	if b, s := f.H.Banners.Sent(), f.H.Sounds.Played(); len(b) != 1 || len(s) != 1 {
 		t.Errorf("banners = %v, sounds = %v, want one of each", b, s)
 	}
 }
@@ -189,7 +149,7 @@ func wantStopped(t *testing.T, f *grillingFixture, c *nativerunner.HolderClient)
 func TestAutoAdvance_CancelStopsTheSend(t *testing.T) {
 	t.Parallel()
 	f, c := startCountdown(t)
-	if res, err := f.h.Client.CancelAutoAdvance(f.ctx, f.id); err != nil || res.Refused {
+	if res, err := f.H.Client.CancelAutoAdvance(f.Ctx, f.ID); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	wantStopped(t, f, c)
@@ -198,14 +158,14 @@ func TestAutoAdvance_CancelStopsTheSend(t *testing.T) {
 func TestAutoAdvance_PaneInputStopsTheSendAndKeepsContinue(t *testing.T) {
 	t.Parallel()
 	f, c := startCountdown(t)
-	clearByInput(t, f.h, f.id)
+	clearByInput(t, f.H, f.ID)
 	wantStopped(t, f, c)
 }
 
 func TestAutoAdvance_PageNoteStopsTheSendAndKeepsContinue(t *testing.T) {
 	t.Parallel()
 	f, c := startCountdown(t)
-	if res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Text: "a note"}); err != nil || res.Refused {
+	if res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: "a note"}); err != nil || res.Refused {
 		t.Fatalf("prompt = %+v, %v", res, err)
 	}
 	wantStopped(t, f, c)
@@ -214,7 +174,7 @@ func TestAutoAdvance_PageNoteStopsTheSendAndKeepsContinue(t *testing.T) {
 func TestAutoAdvance_ManualContinueStopsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f, _ := startCountdown(t)
-	if res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Continue: true}); err != nil || res.Refused {
+	if res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Continue: true}); err != nil || res.Refused {
 		t.Fatalf("continue = %+v, %v", res, err)
 	}
 	if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
@@ -225,7 +185,7 @@ func TestAutoAdvance_ManualContinueStopsTheCountdown(t *testing.T) {
 func TestAutoAdvance_RunActionStopsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f, _ := startCountdown(t)
-	if res, err := f.h.Client.RunSessionAction(f.ctx, f.id); err != nil || res.Refused {
+	if res, err := f.H.Client.RunSessionAction(f.Ctx, f.ID); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
@@ -236,7 +196,7 @@ func TestAutoAdvance_RunActionStopsTheCountdown(t *testing.T) {
 func TestAutoAdvance_SwitchOffDuringTheCountdownStopsTheSend(t *testing.T) {
 	t.Parallel()
 	f, c := startCountdown(t)
-	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
+	if res, err := f.H.Client.SetAutoAdvance(f.Ctx, f.ID, false); err != nil || res.Refused {
 		t.Fatalf("switch off = %+v, %v", res, err)
 	}
 	wantStopped(t, f, c)
@@ -245,15 +205,15 @@ func TestAutoAdvance_SwitchOffDuringTheCountdownStopsTheSend(t *testing.T) {
 func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
+	if res, err := f.H.Client.SetAutoAdvance(f.Ctx, f.ID, false); err != nil || res.Refused {
 		t.Fatalf("switch off = %+v, %v", res, err)
 	}
-	writeAssistantMessage(t, f.path, runEndText)
+	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
-	servertest.WaitFor(t, 5*time.Second, "the banner", func() bool { return len(f.h.Banners.Sent()) > 0 })
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
+	servertest.WaitFor(t, 5*time.Second, "the banner", func() bool { return len(f.H.Banners.Sent()) > 0 })
 	time.Sleep(countdownDelay) // negative wait: a countdown would end within this window and add a second banner
-	if b := f.h.Banners.Sent(); len(b) != 1 {
+	if b := f.H.Banners.Sent(); len(b) != 1 {
 		t.Errorf("banners = %v, want one", b)
 	}
 }
@@ -261,13 +221,13 @@ func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
 func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	writeAssistantMessage(t, f.path, runEndText)
-	report(t, f.conv, agentfake.Control{State: "working"})
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	writeAssistantMessage(t, f.Path, runEndText)
+	report(t, f.Conv, agentfake.Control{State: "working"})
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 
-	f.h.Restart(t)
-	report(t, f.conv, agentfake.Control{State: "idle"})
+	f.H.Restart(t)
+	report(t, f.Conv, agentfake.Control{State: "idle"})
 	servertest.WaitFor(t, 10*time.Second, "the session to go idle after the restart", func() bool {
 		return sessionSnapshot(t, f).Status.State == wire.SessionIdle
 	})
@@ -283,12 +243,12 @@ func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
 func TestAutoAdvance_RestartDropsTheCountdownAndNeverStartsOne(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	writeAssistantMessage(t, f.path, runEndText)
+	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 
-	f.h.Restart(t)
+	f.H.Restart(t)
 	time.Sleep(2 * countdownDelay) // negative wait: a revived countdown would end within this window
 	if s := sessionSnapshot(t, f); s.AutoAdvanceAt != nil || s.Actionable.Reason == "" || len(s.Actionable.Action) == 0 {
 		t.Errorf("session after restart = %+v, want no countdown and Continue raised", s)

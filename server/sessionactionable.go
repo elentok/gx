@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/grillround"
@@ -97,7 +98,7 @@ func (s *Server) lastAssistantText(id string, meta sessions.Meta) (string, bool)
 		}
 		return text, ok && err == nil
 	}
-	path, ok := s.sessionChat.ClaudeTranscript(id, chatMeta(meta))
+	path, ok := s.sessionChat.ClaudeTranscript(id, meta.ChatMeta())
 	if !ok {
 		return "", false
 	}
@@ -127,7 +128,7 @@ func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
 	outcome := actionableNone
 	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		var next wire.SessionActionable
-		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: maxAutoSends})
+		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: sessprompt.MaxAutoSends})
 		if outcome == actionableNone {
 			return false
 		}
@@ -137,13 +138,13 @@ func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
 	switch outcome {
 	case actionableAdvance:
 		// A countdown that starts is silent: the person is told only if it does not send.
-		if s.startAutoAdvance(id) {
+		if s.prompt.StartAutoAdvance(id) {
 			s.events.Publish(wire.EventSessionChanged, id)
 			return
 		}
 		s.triggerBanner(id, sound.Attention, a.Reason)
 	case actionableCapped:
-		s.triggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", maxAutoSends, a.Reason))
+		s.triggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", sessprompt.MaxAutoSends, a.Reason))
 	case actionableRaised:
 		s.triggerBanner(id, sound.Attention, a.Reason)
 	}

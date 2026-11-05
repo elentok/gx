@@ -60,6 +60,7 @@ var allowed = map[site]entry{
 	{"server/servertest/schedfixture.go", ruleChildEnv}:   {2, reasonTool},
 	{"server/servertest/recoveryrig.go", ruleChildEnv}:    {1, reasonTool},
 	{"server/servertest/mergehelpers.go", ruleChildEnv}:   {1, reasonTool},
+	{"server/servertest/promptsession.go", ruleEnvRead}:   {1, reasonChild},
 	{"testutil/claudeenv/claudeenv.go", ruleChildEnv}:     {1, reasonTool},
 	{"gocachegate/gocachegate.go", ruleChildEnv}:          {1, reasonTool},
 	{"testutil/agentfake/codexhooks.go", ruleChildEnv}:    {1, reasonChild},

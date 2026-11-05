@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/wire"
 )
 
 // newManager copies the fields it needs from s at call time, so s must have
@@ -51,11 +52,11 @@ func (p serverPrompter) NewFirstPrompt(dir, id string, run int) sessions.FirstPr
 }
 
 func (p serverPrompter) MarkTurn(dir, id string) (chat.TurnMark, bool) {
-	return p.s.markTurn(dir, id)
+	return p.s.prompt.MarkTurn(dir, id)
 }
 
 func (p serverPrompter) SettleTurn(dir, id string, mark chat.TurnMark, design chat.DesignRef, cancel <-chan struct{}) {
-	p.s.settleTurn(dir, id, mark, design, cancel)
+	p.s.prompt.SettleTurn(dir, id, mark, design, cancel)
 }
 
 func (p serverPrompter) DetectDesignActionable(dir, id string, design chat.DesignRef) {
@@ -67,5 +68,16 @@ func (p serverPrompter) SendAction(dir, label string, action []string) {
 }
 
 func (p serverPrompter) CancelAutoAdvance(id, why string) bool {
-	return p.s.cancelAutoAdvance(id, why)
+	return p.s.prompt.CancelAutoAdvance(id, why)
+}
+
+// promptHost is the root's sessprompt.Host.
+type promptHost struct{ s *Server }
+
+func (h promptHost) SendAction(req wire.SessionRequest, auto bool) (wire.SessionResult, error) {
+	return h.s.sendSessionAction(req, auto)
+}
+
+func (h promptHost) DetectDesignActionable(dir, id string, design chat.DesignRef) {
+	h.s.detectDesignActionable(dir, id, design)
 }

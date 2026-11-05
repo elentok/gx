@@ -20,6 +20,7 @@ import (
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/ticketwrite"
@@ -53,6 +54,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
 		epics.Routes(func() *epics.Epics { return s.epics }),
 		designs.Routes(func() *designs.Designs { return s.designs }),
+		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
 	)
 }

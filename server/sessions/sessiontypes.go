@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"time"
 
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/ralphloop"
@@ -105,6 +106,15 @@ func (m Meta) CanAutoAdvance() bool {
 	a := m.Actionable
 	return !m.AutoAdvanceOff && a.Derived && !a.Grilling && len(a.Action) > 0 &&
 		m.Status.Promptable()
+}
+
+// ChatMeta is the part of the meta the chat reads.
+func (m Meta) ChatMeta() chat.Meta {
+	return chat.Meta{
+		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket,
+		ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
+		Status: m.Status, Exit: m.Exit, RestoreCrashed: m.RestoreCrashed,
+	}
 }
 
 func (m Meta) Info() wire.SessionInfo {

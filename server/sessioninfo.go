@@ -10,28 +10,19 @@ import (
 // chatSource is the chat's view of the server's sessions.
 type chatSource struct{ s *Server }
 
-// chatMeta is the part of a session's meta the chat reads.
-func chatMeta(m sessions.Meta) chat.Meta {
-	return chat.Meta{
-		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket,
-		ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
-		Status: m.Status, Exit: m.Exit, RestoreCrashed: m.RestoreCrashed,
-	}
-}
-
 func (c chatSource) SessionDir(id string) (string, chat.Meta, wire.SessionResult, error) {
 	dir, m, res, err := c.s.sessions.SessionDir(id)
-	return dir, chatMeta(m), res, err
+	return dir, m.ChatMeta(), res, err
 }
 
 func (c chatSource) ReadableSession(id string) (string, chat.Meta, wire.SessionResult, error) {
 	dir, m, res, err := c.s.readableSession(id)
-	return dir, chatMeta(m), res, err
+	return dir, m.ChatMeta(), res, err
 }
 
 func (c chatSource) ReadMeta(dir string) (chat.Meta, error) {
 	m, err := sessions.ReadMeta(dir)
-	return chatMeta(m), err
+	return m.ChatMeta(), err
 }
 
 func (c chatSource) CheckProjectDir(project, dir string) (*wire.SessionResult, error) {
@@ -48,14 +39,14 @@ func (c chatSource) HasChatReader(h string) bool    { return c.s.settings.Load()
 // SessionInfo is m.info() plus the failure that needs a transcript read, the
 // reported model and the running countdown.
 func (s *Server) SessionInfo(m sessions.Meta) wire.SessionInfo {
-	cm := chatMeta(m)
+	cm := m.ChatMeta()
 	info := m.Info()
 	info.Model = s.sessionChat.ReportedModel(cm)
 	info.ModelSwitched = chat.ModelSwitched(m.Model, info.Model)
 	if m.Harness == string(harness.Codex) {
 		info.Effort = s.sessionChat.ReportedCodexTurn(cm).Effort
 	}
-	if at := s.autoAdvances.deadline(m.ID); !at.IsZero() {
+	if at := s.prompt.AutoAdvanceDeadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at
 	}
 	info.Failure = s.sessionChat.Failure(cm)

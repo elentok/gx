@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/sessions"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -45,7 +46,7 @@ func (s *Server) sendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 	if auto {
 		meta.AutoSends++
 	} else {
-		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you ran the action")
+		s.prompt.CancelAutoAdvance(req.ID, "Auto-advance stopped: you ran the action")
 		meta.AutoSends = 0
 	}
 	if err := sessions.WriteMeta(dir, meta); err != nil {
@@ -96,9 +97,9 @@ func (s *Server) sendAction(dir, label string, action []string) {
 	i, err := s.runAction(dir, action)
 	switch {
 	case err == nil:
-	case errors.Is(err, errDraft):
+	case errors.Is(err, sessprompt.ErrDraft):
 		s.log.Info("draft would not clear", "session", filepath.Base(dir), "unsent", len(action)-i)
-		s.raiseGxActionable(dir, draftReason, action[i:])
+		s.raiseGxActionable(dir, sessprompt.DraftReason, action[i:])
 	case errors.Is(err, errServerStopping), errors.Is(err, errWentBlocked), errors.Is(err, errNotIdle):
 		// Shutdown is not a failure, and Blocked or a busy session already shows.
 		s.log.Info(strings.ToLower(label)+" stopped", "session", filepath.Base(dir), "err", err)
@@ -181,11 +182,11 @@ func (r *actionRun) typeStep(i int, prompt string) error {
 	if !r.s.projects.Typing().ReadyToType(r.s.projects.TypingIO(r.dir, r.holder, "action-step")) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
-	if err := r.s.clearDraft(r.dir, r.holder); err != nil {
+	if err := r.s.prompt.ClearDraft(r.dir, r.holder); err != nil {
 		return err
 	}
 	r.convChanged = false
-	before, _ := inputState(r.holder)
+	before, _ := sessprompt.InputState(r.holder)
 	r.s.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", promptHead(prompt), "input_before", before)
 	if err := sessions.TypeSessionPrompt(r.dir, prompt); err != nil {
 		return err
@@ -313,7 +314,7 @@ func (r *actionRun) waitForSlash() (string, error) {
 		switch {
 		case expired && (working || !r.promptable()):
 		case expired:
-			pressed, err := r.pressEnterIfStillTyped()
+			pressed, err := r.s.prompt.PressEnterIfStillTyped(r.dir, r.holder)
 			if pressed {
 				r.s.log.Debug("action step settle enter", "session", filepath.Base(r.dir))
 			}

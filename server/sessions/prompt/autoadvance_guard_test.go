@@ -1,4 +1,4 @@
-package server_test
+package prompt_test
 
 import (
 	"path/filepath"
@@ -8,31 +8,25 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-func autoSends(t *testing.T, f *grillingFixture) int {
-	t.Helper()
-	n, _ := readMeta(t, f.h, f.id)["auto_sends"].(float64)
-	return int(n)
-}
-
 // autoSendOnce ends a turn on the run-end line and waits for the countdown to
 // send Continue.
 func autoSendOnce(t *testing.T, f *grillingFixture) {
 	t.Helper()
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
 }
 
 func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-	writeAssistantMessage(t, f.path, runEndText)
+	waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	writeAssistantMessage(t, f.Path, runEndText)
 	for range 5 {
 		autoSendOnce(t, f)
 	}
 	endTurn(t, f)
-	waitUntil(t, "the guard's banner", func() bool { return len(f.h.Banners.Sent()) > 0 })
+	waitUntil(t, "the guard's banner", func() bool { return len(f.H.Banners.Sent()) > 0 })
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 
 	got := sessionSnapshot(t, f)
@@ -42,7 +36,7 @@ func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
 	if n := autoSends(t, f); n != 5 {
 		t.Errorf("auto sends = %d, want 5", n)
 	}
-	if b, s := f.h.Banners.Sent(), f.h.Sounds.Played(); len(b) != 1 || len(s) != 1 {
+	if b, s := f.H.Banners.Sent(), f.H.Sounds.Played(); len(b) != 1 || len(s) != 1 {
 		t.Errorf("banners = %v, sounds = %v, want one of each", b, s)
 	}
 }
@@ -50,16 +44,16 @@ func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
 func TestAutoAdvance_InputAndSwitchFlipResetTheCount(t *testing.T) {
 	t.Parallel()
 	for name, input := range map[string]func(t *testing.T, f *grillingFixture){
-		"pane input":  func(t *testing.T, f *grillingFixture) { clearByInput(t, f.h, f.id) },
+		"pane input":  func(t *testing.T, f *grillingFixture) { clearByInput(t, f.H, f.ID) },
 		"switch flip": func(t *testing.T, f *grillingFixture) { setSwitch(t, f, false) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := startAdvancing(t, storeWithMapStep(t, "spec"))
-			waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-			writeAssistantMessage(t, f.path, runEndText)
+			waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+			writeAssistantMessage(t, f.Path, runEndText)
 			autoSendOnce(t, f)
 			endTurn(t, f)
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 			if n := autoSends(t, f); n != 1 {
 				t.Fatalf("auto sends = %d before the input, want 1", n)
 			}
@@ -71,7 +65,7 @@ func TestAutoAdvance_InputAndSwitchFlipResetTheCount(t *testing.T) {
 
 func setSwitch(t *testing.T, f *grillingFixture, on bool) {
 	t.Helper()
-	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, on); err != nil || res.Refused {
+	if res, err := f.H.Client.SetAutoAdvance(f.Ctx, f.ID, on); err != nil || res.Refused {
 		t.Fatalf("switch = %+v, %v", res, err)
 	}
 }
@@ -79,18 +73,18 @@ func setSwitch(t *testing.T, f *grillingFixture, on bool) {
 func TestAutoAdvance_SwitchingOnOverARaisedContinueStartsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 	setSwitch(t, f, false)
-	writeAssistantMessage(t, f.path, runEndText)
+	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 	if screenHas(t, c, "/clear") || sessionSnapshot(t, f).AutoAdvanceAt != nil {
 		t.Fatal("a countdown ran with the switch off")
 	}
 
 	setSwitch(t, f, true)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 	waitForScreen(t, c, "/clear")
 	waitForScreen(t, c, "/gx-design map")
 }

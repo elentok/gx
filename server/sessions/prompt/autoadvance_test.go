@@ -1,4 +1,4 @@
-package server_test
+package prompt_test
 
 import (
 	"net/http"
@@ -12,28 +12,28 @@ import (
 
 func TestSessionAutoAdvance_FlipsTheSwitchOnADesignSession(t *testing.T) {
 	t.Parallel()
-	f := startPromptSession(t)
+	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
 	snapshotSwitch := func() bool {
-		snap, err := f.h.Client.Snapshot(f.ctx)
+		snap, err := f.H.Client.Snapshot(f.Ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, s := range snap.Sessions {
-			if s.ID == f.id {
+			if s.ID == f.ID {
 				return s.AutoAdvance
 			}
 		}
-		t.Fatalf("no session %s", f.id)
+		t.Fatalf("no session %s", f.ID)
 		return false
 	}
 	if !snapshotSwitch() {
 		t.Error("a new session has auto-advance off")
 	}
-	if _, ok := readMeta(t, f.h, f.id)["auto_advance_off"]; ok {
+	if _, ok := readMeta(t, f.H, f.ID)["auto_advance_off"]; ok {
 		t.Error("a new session's meta records the switch; an old one has no such field")
 	}
 	for _, on := range []bool{false, true} {
-		res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, on)
+		res, err := f.H.Client.SetAutoAdvance(f.Ctx, f.ID, on)
 		if err != nil || res.Refused || res.Session == nil || res.Session.AutoAdvance != on {
 			t.Fatalf("set auto-advance %v = %+v, %v", on, res, err)
 		}
@@ -45,8 +45,8 @@ func TestSessionAutoAdvance_FlipsTheSwitchOnADesignSession(t *testing.T) {
 
 func TestSessionAutoAdvance_RefusesAPlainAndAnUnknownSession(t *testing.T) {
 	t.Parallel()
-	f := startPromptSession(t)
-	plain, err := f.h.Client.CreateSession(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	plain, err := f.H.Client.CreateSession(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || plain.Session == nil {
 		t.Fatalf("create = %+v, %v", plain, err)
 	}
@@ -54,7 +54,7 @@ func TestSessionAutoAdvance_RefusesAPlainAndAnUnknownSession(t *testing.T) {
 		{"plain", plain.Session.ID, wire.ReasonSessionNotDesign},
 		{"unknown", "nope", wire.ReasonSessionUnknown},
 	} {
-		res, err := f.h.Client.SetAutoAdvance(f.ctx, tc.id, false)
+		res, err := f.H.Client.SetAutoAdvance(f.Ctx, tc.id, false)
 		if err != nil || !res.Refused || res.Reason != tc.want {
 			t.Errorf("%s session = %+v, %v; want %s", tc.name, res, err, tc.want)
 		}

@@ -233,10 +233,10 @@ type Config struct {
 	// zero means defaultTranscriptMissTTL and a negative value remembers none.
 	TranscriptMissTTL time.Duration
 	// TurnSettleTimeout caps how long an idle edge waits for claude to write
-	// the end of its turn; zero means defaultTurnSettleTimeout.
+	// the end of its turn; zero means sessprompt.DefaultTurnSettleTimeout.
 	TurnSettleTimeout time.Duration
 	// AutoAdvanceDelay is the countdown before the server sends a run-end
-	// Continue; zero means DefaultAutoAdvanceDelay and a negative value turns
+	// Continue; zero means sessprompt.DefaultAutoAdvanceDelay and a negative value turns
 	// auto-advance off.
 	AutoAdvanceDelay time.Duration
 	// CommandListAge is how long a command list is served from the cache;

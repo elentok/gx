@@ -1,4 +1,4 @@
-package server
+package prompt
 
 import (
 	"errors"
@@ -12,15 +12,15 @@ import (
 
 // sessionTyping is the only harness the server types into. It serves the parts
 // that read no env; ReadyToType reads claude's config, so it goes through
-// Server.typing.
+// projects.Registry.
 var sessionTyping = harness.ClaudeTyping()
 
-// errDraft means a person's draft would not clear, so gx did not type.
-var errDraft = errors.New("input would not clear")
+// ErrDraft means a person's draft would not clear, so gx did not type.
+var ErrDraft = errors.New("input would not clear")
 
-// draftReason is the reason of the Actionable gx raises when a draft would
+// DraftReason is the reason of the Actionable gx raises when a draft would
 // not clear.
-const draftReason = "input would not clear"
+const DraftReason = "input would not clear"
 
 // Clearing a draft: each round presses the clear key draftClearPresses times
 // (Ctrl+U on an empty input does nothing), then rereads the input until it
@@ -33,12 +33,12 @@ const (
 	draftSettlePoll   = 25 * time.Millisecond
 )
 
-// clearDraft empties a person's draft before gx types. The placeholder is not
+// ClearDraft empties a person's draft before gx types. The placeholder is not
 // a draft: the harness check tells them apart by its dim style. A check that
 // can't decide types as before.
-func (s *Server) clearDraft(dir string, c *nativerunner.HolderClient) error {
-	log := s.log.With("session", filepath.Base(dir))
-	if state, _ := inputState(c); state != harness.InputNotEmpty {
+func (p *Prompt) ClearDraft(dir string, c *nativerunner.HolderClient) error {
+	log := p.log.With("session", filepath.Base(dir))
+	if state, _ := InputState(c); state != harness.InputNotEmpty {
 		log.Debug("draft check", "holds_draft", false)
 		return nil
 	}
@@ -51,7 +51,7 @@ func (s *Server) clearDraft(dir string, c *nativerunner.HolderClient) error {
 		// The agent redraws a moment after the keys land.
 		settle := time.Now().Add(draftSettleWait)
 		for {
-			state, err := inputState(c)
+			state, err := InputState(c)
 			if err != nil {
 				return err
 			}
@@ -67,13 +67,13 @@ func (s *Server) clearDraft(dir string, c *nativerunner.HolderClient) error {
 	}
 	rows, _ := c.StyledScreen()
 	log.Info("draft would not clear", "screen", strings.Join(rows, "\n"))
-	return errDraft
+	return ErrDraft
 }
 
-// inputState runs the harness empty check when the holder serves styled rows.
+// InputState runs the harness empty check when the holder serves styled rows.
 // A holder that doesn't, or a read that fails, is InputUndecided; the error is
 // for callers that report it.
-func inputState(c *nativerunner.HolderClient) (harness.InputState, error) {
+func InputState(c *nativerunner.HolderClient) (harness.InputState, error) {
 	if !c.Supports(nativerunner.OpScreenStyled) {
 		return harness.InputUndecided, nil
 	}
@@ -84,7 +84,7 @@ func inputState(c *nativerunner.HolderClient) (harness.InputState, error) {
 	return sessionTyping.InputIsEmpty(rows), nil
 }
 
-// settleEnters caps the Enters pressEnterIfStillTyped presses, enterGap apart.
+// settleEnters caps the Enters PressEnterIfStillTyped presses, enterGap apart.
 // Claude holds a paste it stripped invisible characters from for review and
 // swallows an Enter or two before it sends.
 var (
@@ -92,19 +92,19 @@ var (
 	enterGap     = time.Second
 )
 
-// pressEnterIfStillTyped is the rule for a slash prompt that ended without
+// PressEnterIfStillTyped is the rule for a slash prompt that ended without
 // the session reacting: while the harness empty check says the prompt is still
 // in the input, press Enter, up to settleEnters times. An empty input, or a
 // check that can't decide, presses nothing.
-func (r *actionRun) pressEnterIfStillTyped() (pressed bool, err error) {
-	log := r.s.log.With("session", filepath.Base(r.dir))
+func (p *Prompt) PressEnterIfStillTyped(dir string, holder *nativerunner.HolderClient) (pressed bool, err error) {
+	log := p.log.With("session", filepath.Base(dir))
 	for i := range settleEnters {
-		state, err := inputState(r.holder)
+		state, err := InputState(holder)
 		if err != nil || state != harness.InputNotEmpty {
 			log.Info("input check at settle", "attempt", i, "state", state, "err", err)
 			return pressed, err
 		}
-		if err := r.holder.SendKeys("\r"); err != nil {
+		if err := holder.SendKeys("\r"); err != nil {
 			return pressed, err
 		}
 		pressed = true

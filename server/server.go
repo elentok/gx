@@ -42,6 +42,7 @@ import (
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions/chat"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/ticketwrite"
@@ -110,20 +111,20 @@ type Server struct {
 	health     *health.Health
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
-	// autoAdvances holds the running auto-advance countdowns.
-	autoAdvances autoAdvances
-	lock         *serverLock
-	ln           net.Listener
-	tcp          net.Listener // nil unless Config.TCPAddr is set
-	http         *http.Server
-	tcpHTTP      *http.Server // the socket's routes behind refuseBrowsers
-	web          net.Listener // nil unless Config.WebAddr is set and bound
-	webDev       http.Handler // nil unless Config.WebDevURL is set and valid
-	webHTTP      *http.Server
-	webErr       string        // why the web bind failed
-	webListenIP  net.IP        // nil when the listener binds every interface
-	webCerts     *webtls.Certs // nil unless the web listener is bound
-	clientErrs   ipLimiter
+	// prompt holds the auto-advance countdowns and the turn settling.
+	prompt      *sessprompt.Prompt
+	lock        *serverLock
+	ln          net.Listener
+	tcp         net.Listener // nil unless Config.TCPAddr is set
+	http        *http.Server
+	tcpHTTP     *http.Server // the socket's routes behind refuseBrowsers
+	web         net.Listener // nil unless Config.WebAddr is set and bound
+	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
+	webHTTP     *http.Server
+	webErr      string        // why the web bind failed
+	webListenIP net.IP        // nil when the listener binds every interface
+	webCerts    *webtls.Certs // nil unless the web listener is bound
+	clientErrs  ipLimiter
 	// webAuth is the web login store; nil unless the web listener is bound.
 	webAuth    *webauth.Gate
 	webStreams webStreams
@@ -202,7 +203,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.StallThreshold = chat.DefaultStallThreshold
 	}
 	if cfg.TurnSettleTimeout == 0 {
-		cfg.TurnSettleTimeout = defaultTurnSettleTimeout
+		cfg.TurnSettleTimeout = sessprompt.DefaultTurnSettleTimeout
 	}
 	if cfg.TranscriptMissTTL == 0 {
 		cfg.TranscriptMissTTL = chat.DefaultTranscriptMissTTL
@@ -435,8 +436,13 @@ func New(cfg Config) (*Server, error) {
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.designs = designs.New(s.designsDeps())
+	s.prompt = sessprompt.New(sessprompt.Deps{
+		Cfg: sessprompt.Config{AutoAdvanceDelay: cfg.AutoAdvanceDelay, TurnSettleTimeout: cfg.TurnSettleTimeout},
+		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings, Host: promptHost{s},
+	})
 	s.sessions = newManager(s)
 	s.designs.GiveSessions(s.sessions)
+	s.prompt.GiveSessions(s.sessions)
 	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
 	s.epics = epics.New(s.epicsDeps())
@@ -505,10 +511,6 @@ var routeTable = []struct {
 	}},
 	{"POST /v1/sessions/prompt", (*Server).sessionPromptWrite},
 	{"POST /v1/sessions/keys", (*Server).sessionKeysWrite},
-	{"POST /v1/sessions/auto-advance", (*Server).sessionAutoAdvanceWrite},
-	{"POST /v1/sessions/auto-advance/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) {
-		sessions.SessionWrite(s.cancelAutoAdvanceRoute)(w, r)
-	}},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

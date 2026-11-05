@@ -187,8 +187,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/designs/` holds the Design sessions (open, worktree, delete, and the cleanup the Manager
   and the rescan call back), with `Routes()` for `designs/open`, `designs/delete` and
   `designs/worktree`;
-  `server/sessions/prompt/` will hold the session prompts (scaffolding only so far; its tests share
-  `servertest/promptsession.go`)
+  `server/sessions/prompt/` holds the auto-advance countdown, turn settle, draft clearing and the
+  start clock (more of the session prompts move in later), with `Routes()` for
+  `sessions/auto-advance` and `/cancel`; the root implements its `Host`; its tests share
+  `servertest/promptsession.go`
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail)
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners

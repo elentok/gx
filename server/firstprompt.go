@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/server/sessions"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -50,44 +51,8 @@ type firstPrompt struct {
 	id          string
 	run         int
 	timeout     time.Duration
-	clock       *startClock
+	clock       *sessprompt.StartClock
 }
-
-// startClock counts only time spent Starting, so a dialog a person answers
-// (Blocked) does not use it up. Only the watch loop touches it; the timer
-// callback reads the session's state from its meta.
-type startClock struct {
-	timeout time.Duration
-	timer   *time.Timer
-	since   time.Time
-	spent   time.Duration
-}
-
-// startStartClock starts the clock at launch; onTimeout fires when the
-// session has spent timeout Starting.
-func startStartClock(timeout time.Duration, onTimeout func()) *startClock {
-	return &startClock{
-		timeout: timeout,
-		timer:   time.AfterFunc(timeout, onTimeout),
-		since:   time.Now(),
-	}
-}
-
-// track pauses the clock outside Starting and resumes it with what is left.
-func (c *startClock) track(state string) {
-	starting := state == wire.SessionStarting || state == ""
-	switch {
-	case starting && c.since.IsZero():
-		c.since = time.Now()
-		c.timer.Reset(c.timeout - c.spent)
-	case !starting && !c.since.IsZero():
-		c.spent += time.Since(c.since)
-		c.since = time.Time{}
-		c.timer.Stop()
-	}
-}
-
-func (c *startClock) stop() { c.timer.Stop() }
 
 func (s *Server) newFirstPrompt(dir, id string, run int) *firstPrompt {
 	f := &firstPrompt{
@@ -95,12 +60,12 @@ func (s *Server) newFirstPrompt(dir, id string, run int) *firstPrompt {
 		cancel: make(chan struct{}), turnStarted: make(chan struct{}),
 		timeout: cmp.Or(s.cfg.FirstPromptStartTimeout, DefaultFirstPromptStartTimeout),
 	}
-	f.clock = startStartClock(f.timeout, f.startTimedOut)
+	f.clock = sessprompt.NewStartClock(f.timeout, f.startTimedOut)
 	return f
 }
 
 // Stop ends the Starting clock when the watch ends.
-func (f *firstPrompt) Stop() { f.clock.stop() }
+func (f *firstPrompt) Stop() { f.clock.Stop() }
 
 // startTimedOut hands a still-pending prompt to a person when the session is
 // Starting at the deadline.
@@ -204,7 +169,7 @@ func (f *firstPrompt) Observe(state string, ready harness.ReadySignal) string {
 // NoteState closes turnStarted on the first Working after gx typed: the watch
 // sees a turn start even where the holder's Turn counter does not move.
 func (f *firstPrompt) NoteState(state string) {
-	f.clock.track(state)
+	f.clock.Track(state)
 	if state == wire.SessionWorking && f.typed.Load() {
 		f.turnOnce.Do(func() { close(f.turnStarted) })
 	}
@@ -232,9 +197,9 @@ func (f *firstPrompt) Start(signal, prompt string) {
 		switch {
 		case errors.Is(err, errNudgeCancelled):
 			f.log.Debug(errNudgeCancelled.Error())
-		case errors.Is(err, errDraft):
+		case errors.Is(err, sessprompt.ErrDraft):
 			f.log.Info("draft would not clear")
-			f.s.raiseGxActionable(f.dir, draftReason, []string{prompt})
+			f.s.raiseGxActionable(f.dir, sessprompt.DraftReason, []string{prompt})
 		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
 			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked),
 			errors.Is(err, agentrunner.ErrNotDelivered):
@@ -262,7 +227,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 	if !f.typing().ReadyToType(f.s.projects.TypingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
-	if err := f.s.clearDraft(f.dir, c); err != nil {
+	if err := f.s.prompt.ClearDraft(f.dir, c); err != nil {
 		return err
 	}
 	caps := claudeui.DefaultNudgeCaps
@@ -502,7 +467,7 @@ func (p *holderPrompter) ReadyToType() bool {
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.
 func (p *holderPrompter) InputEmpty() (bool, bool, error) {
-	state, err := inputState(p.c)
+	state, err := sessprompt.InputState(p.c)
 	if err != nil {
 		return false, false, err
 	}

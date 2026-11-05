@@ -1,27 +1,28 @@
-package server
+package prompt
 
 import (
+	"os"
+	"time"
+
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
-	"os"
-	"time"
 )
 
-// defaultTurnSettleTimeout caps the wait for claude's end-of-turn line. A
+// DefaultTurnSettleTimeout caps the wait for claude's end-of-turn line. A
 // turn cut short by Esc may never write one.
-const defaultTurnSettleTimeout = 2 * time.Second
+const DefaultTurnSettleTimeout = 2 * time.Second
 
 const turnSettlePoll = 50 * time.Millisecond
 
-// markTurn records the transcript of a session that just went idle. A session
+// MarkTurn records the transcript of a session that just went idle. A session
 // whose harness has no chat, or no transcript yet, is not marked.
-func (s *Server) markTurn(dir, id string) (chat.TurnMark, bool) {
+func (p *Prompt) MarkTurn(dir, id string) (chat.TurnMark, bool) {
 	meta, err := sessions.ReadMeta(dir)
-	if err != nil || !s.settings.Load().HasChatReader(meta.Harness) {
+	if err != nil || !p.settings.Load().HasChatReader(meta.Harness) {
 		return chat.TurnMark{}, false
 	}
-	path, kind, ok := s.sessionChat.Transcript(id, chatMeta(meta))
+	path, kind, ok := p.sessionChat.Transcript(id, meta.ChatMeta())
 	if !ok {
 		return chat.TurnMark{}, false
 	}
@@ -32,14 +33,14 @@ func (s *Server) markTurn(dir, id string) (chat.TurnMark, bool) {
 	return chat.TurnMark{Path: path, Size: info.Size(), Kind: kind}, true
 }
 
-// settleTurn waits for claude to finish writing the turn that just ended.
+// SettleTurn waits for claude to finish writing the turn that just ended.
 // Claude reports idle before it flushes the turn's last lines, so the idle
 // edge's own reads (the page's chat, the Design check) can miss the final
-// message. When the transcript grew since mark, settleTurn redoes the Design
+// message. When the transcript grew since mark, SettleTurn redoes the Design
 // check and announces the chat again. The session turning busy (cancel) ends
 // the wait.
-func (s *Server) settleTurn(dir, id string, mark chat.TurnMark, design chat.DesignRef, cancel <-chan struct{}) {
-	deadline := time.NewTimer(s.cfg.TurnSettleTimeout)
+func (p *Prompt) SettleTurn(dir, id string, mark chat.TurnMark, design chat.DesignRef, cancel <-chan struct{}) {
+	deadline := time.NewTimer(p.cfg.TurnSettleTimeout)
 	defer deadline.Stop()
 	tick := time.NewTicker(turnSettlePoll)
 	defer tick.Stop()
@@ -51,7 +52,7 @@ wait:
 		select {
 		case <-cancel:
 			return
-		case <-s.sessions.Watches.Stop:
+		case <-p.sessions.Watches.Stop:
 			return
 		case <-deadline.C:
 			break wait
@@ -63,7 +64,7 @@ wait:
 		return
 	}
 	if design.Conversation != "" {
-		s.detectDesignActionable(dir, id, design)
+		p.host.DetectDesignActionable(dir, id, design)
 	}
-	s.events.Publish(wire.EventSessionChatChanged, id)
+	p.events.Publish(wire.EventSessionChatChanged, id)
 }

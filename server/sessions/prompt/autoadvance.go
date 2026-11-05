@@ -1,4 +1,4 @@
-package server
+package prompt
 
 import (
 	"cmp"
@@ -14,9 +14,9 @@ import (
 // server sends it.
 const DefaultAutoAdvanceDelay = 10 * time.Second
 
-// maxAutoSends is how many auto-sends in a row the server makes before it
+// MaxAutoSends is how many auto-sends in a row the server makes before it
 // leaves the Continue for the person.
-const maxAutoSends = 5
+const MaxAutoSends = 5
 
 // autoAdvances holds the running countdowns, one per session. They live in
 // memory only: a restart drops them and leaves the Continue raised.
@@ -81,65 +81,69 @@ func (a *autoAdvances) finish(id string, c *autoAdvance) bool {
 	return true
 }
 
-// startAutoAdvance counts down, then sends the session's Continue action. It
+// AutoAdvanceDeadline is when the session's countdown ends; zero with none
+// running.
+func (p *Prompt) AutoAdvanceDeadline(id string) time.Time { return p.autoAdvances.deadline(id) }
+
+// StartAutoAdvance counts down, then sends the session's Continue action. It
 // reports false, starting nothing, when the countdown is off in the server
 // config.
-func (s *Server) startAutoAdvance(id string) bool {
-	delay := cmp.Or(s.cfg.AutoAdvanceDelay, DefaultAutoAdvanceDelay)
+func (p *Prompt) StartAutoAdvance(id string) bool {
+	delay := cmp.Or(p.cfg.AutoAdvanceDelay, DefaultAutoAdvanceDelay)
 	if delay < 0 {
 		return false
 	}
-	c := s.autoAdvances.begin(id, time.Now().Add(delay))
-	s.sessions.Watches.Start(func() {
+	c := p.autoAdvances.begin(id, time.Now().Add(delay))
+	p.sessions.Watches.Start(func() {
 		timer := time.NewTimer(delay)
 		defer timer.Stop()
 		select {
 		case <-timer.C:
 		case <-c.cancel:
 			return
-		case <-s.sessions.Watches.Stop:
+		case <-p.sessions.Watches.Stop:
 			return
 		}
-		if !s.autoAdvances.finish(id, c) {
+		if !p.autoAdvances.finish(id, c) {
 			return
 		}
-		s.events.Publish(wire.EventSessionChanged, id)
-		s.sendAutoAdvance(id)
+		p.events.Publish(wire.EventSessionChanged, id)
+		p.sendAutoAdvance(id)
 	})
 	return true
 }
 
-// cancelAutoAdvance stops the session's countdown, leaving the Continue raised,
+// CancelAutoAdvance stops the session's countdown, leaving the Continue raised,
 // and tells the person why it did not send. It reports whether one was running.
-func (s *Server) cancelAutoAdvance(id, why string) bool {
-	if !s.autoAdvances.stop(id) {
+func (p *Prompt) CancelAutoAdvance(id, why string) bool {
+	if !p.autoAdvances.stop(id) {
 		return false
 	}
-	s.events.Publish(wire.EventSessionChanged, id)
-	s.triggerBanner(id, sound.Attention, why)
+	p.events.Publish(wire.EventSessionChanged, id)
+	p.sessions.TriggerBanner(id, sound.Attention, why)
 	return true
 }
 
 // cancelAutoAdvanceRoute is the cancel route: it stops a running countdown and
 // is a no-op with none.
-func (s *Server) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionResult, error) {
-	_, meta, res, err := s.sessions.SessionDir(req.ID)
+func (p *Prompt) cancelAutoAdvanceRoute(req wire.SessionRequest) (wire.SessionResult, error) {
+	_, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
-	s.cancelAutoAdvance(req.ID, "Auto-advance cancelled")
+	p.CancelAutoAdvance(req.ID, "Auto-advance cancelled")
 	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
 }
 
 // sendAutoAdvance sends the Continue action if the session still waits on it
 // with the switch on.
-func (s *Server) sendAutoAdvance(id string) {
-	_, meta, res, err := s.sessions.SessionDir(id)
+func (p *Prompt) sendAutoAdvance(id string) {
+	_, meta, res, err := p.sessions.SessionDir(id)
 	if res.Refused || err != nil || !meta.CanAutoAdvance() {
 		return
 	}
-	if res, err := s.sendSessionAction(wire.SessionRequest{ID: id}, true); err != nil || res.Refused {
-		s.log.Info("auto-advance not sent", "session", id, "err", err, "reason", res.Reason)
+	if res, err := p.host.SendAction(wire.SessionRequest{ID: id}, true); err != nil || res.Refused {
+		p.log.Info("auto-advance not sent", "session", id, "err", err, "reason", res.Reason)
 	}
 }
