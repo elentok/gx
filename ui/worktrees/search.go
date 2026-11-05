@@ -3,6 +3,8 @@ package worktrees
 import (
 	"strings"
 
+	"github.com/elentok/gx/git"
+
 	tea "charm.land/bubbletea/v2"
 	uisearch "github.com/elentok/gx/ui/search"
 )
@@ -53,7 +55,7 @@ func (s searchModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
 	switch msg := msg.(type) {
 	case tea.PasteMsg:
 		s.model.Start(msg.Content)
-		return s, nil, modalResult{apply: Model.updateSearchMatches}
+		return s, nil, modalResult{action: searchQueryChanged{}}
 	case tea.KeyPressMsg:
 		return s.updateKey(msg)
 	}
@@ -63,9 +65,7 @@ func (s searchModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
 func (s searchModal) updateKey(msg tea.KeyPressMsg) (modal, tea.Cmd, modalResult) {
 	switch msg.String() {
 	case "esc", "enter":
-		return s, nil, modalResult{close: true, apply: func(m Model) (Model, tea.Cmd) {
-			return m.exitSearchMode(), nil
-		}}
+		return s, nil, modalResult{close: true, action: searchClosed{}}
 	case "ctrl+n":
 		if n := s.model.MatchesCount(); n > 0 {
 			return s.stepTo((s.model.Cursor() + 1) % n)
@@ -84,26 +84,26 @@ func (s searchModal) updateKey(msg tea.KeyPressMsg) (modal, tea.Cmd, modalResult
 		return s, nil, modalResult{}
 	}
 	if result.QueryChanged {
-		return s, nil, modalResult{apply: Model.updateSearchMatches}
+		return s, nil, modalResult{action: searchQueryChanged{}}
 	}
 	if result.CursorChanged {
-		return s, nil, modalResult{apply: Model.jumpToCurrentMatch}
+		return s, nil, modalResult{action: searchCursorMoved{}}
 	}
 	return s, cmd, modalResult{}
 }
 
 func (s searchModal) stepTo(idx int) (modal, tea.Cmd, modalResult) {
 	s.model.SetCursor(idx)
-	return s, nil, modalResult{apply: Model.jumpToCurrentMatch}
+	return s, nil, modalResult{action: searchCursorMoved{}}
 }
 
-func (m Model) computeSearchMatches(query string) []uisearch.Match {
+func computeSearchMatches(worktrees []git.Worktree, query string) []uisearch.Match {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
 		return nil
 	}
 	matches := make([]uisearch.Match, 0)
-	for i, wt := range m.worktrees {
+	for i, wt := range worktrees {
 		if strings.Contains(strings.ToLower(wt.Name), q) || strings.Contains(strings.ToLower(wt.Branch), q) {
 			matches = append(matches, uisearch.Match{DataIndex: i})
 		}
@@ -118,7 +118,7 @@ func (m Model) updateSearchMatches() (Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	matches := m.computeSearchMatches(s.model.Query())
+	matches := computeSearchMatches(m.worktrees, s.model.Query())
 	s.model.SetMatches(matches)
 	m.modal = s
 	if len(matches) > 0 {

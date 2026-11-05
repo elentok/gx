@@ -57,9 +57,9 @@ func (p pushDivergedModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
 	item, _ := p.menu.Selected()
 	switch item.Value {
 	case "rebase":
-		return p, cmdRebaseRef(p.wt, p.divergence.Upstream, p.log), modalResult{close: true, spinner: "Rebasing " + p.wt.Name + "..."}
+		return p, nil, modalResult{close: true, spinner: "Rebasing " + p.wt.Name + "...", action: rebase{wt: p.wt, upstream: p.divergence.Upstream, log: p.log}}
 	case "force":
-		return p, cmdStartPromptableJob(promptableJobForcePush, p.wt, p.log, false), modalResult{close: true}
+		return p, nil, modalResult{close: true, action: forcePush{wt: p.wt, log: p.log}}
 	default:
 		return p, notify.Info(ui.MessageAborted("push")), modalResult{close: true}
 	}

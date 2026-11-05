@@ -57,29 +57,9 @@ func (p pasteModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
 	case "esc", "q":
 		return p, nil, modalResult{close: true}
 	case "p":
-		return p, nil, modalResult{close: true, apply: func(m Model) (Model, tea.Cmd) {
-			if wt := m.cursorWorktree(); wt != nil {
-				return m, cmdPaste(p.clipboard, *wt)
-			}
-			return m, nil
-		}}
+		return p, nil, modalResult{close: true, action: pasteHere{clipboard: p.clipboard}}
 	case "up", "k", "down", "j":
-		return p, nil, modalResult{apply: func(m Model) (Model, tea.Cmd) {
-			prevCursor := m.table.Cursor()
-			var tableCmd tea.Cmd
-			m.table, tableCmd = m.table.Update(k)
-			if m.table.Cursor() != prevCursor && len(m.worktrees) > 0 {
-				m.table.SetRows(m.buildRows())
-				m.previewLoading = true
-				m.previewUpstream = ""
-				m.previewAheadCommits = nil
-				m.previewBehindCommits = nil
-				m.previewChanges = nil
-				m.viewport.SetContent(m.previewContent())
-				return m, tea.Batch(tableCmd, cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]))
-			}
-			return m, tableCmd
-		}}
+		return p, nil, modalResult{action: moveCursor{key: k}}
 	}
 	return p, nil, modalResult{}
 }

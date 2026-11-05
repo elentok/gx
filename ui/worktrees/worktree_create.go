@@ -40,24 +40,19 @@ func newWorktreeInput() textinput.Model {
 }
 
 func (m Model) enterNewMode() Model {
-	return m.openNewPrompt(cmdNewWorktree)
+	return m.openNewPrompt(nameNew)
 }
 
 func (m Model) enterNewAndOpenMode() Model {
-	return m.openNewPrompt(cmdNewWorktreeAndOpen)
+	return m.openNewPrompt(nameNewAndOpen)
 }
 
-// openNewPrompt opens the new-worktree prompt; create builds the command for a
-// submitted name.
-func (m Model) openNewPrompt(create func(repo git.Repo, name string) tea.Cmd) Model {
+// openNewPrompt opens the new-worktree prompt; kind picks the command a
+// submitted name runs.
+func (m Model) openNewPrompt(kind nameKind) Model {
 	return m.openModal(textPrompt{
 		title: "New Worktree",
 		input: newWorktreeInput(),
-		submit: func(m Model, name string) (Model, tea.Cmd) {
-			if m.repo.Trunk == "" {
-				return m.showError("cannot create worktree: " + m.trunkProblem()), nil
-			}
-			return m, create(m.repo, name)
-		},
+		kind:  kind,
 	})
 }

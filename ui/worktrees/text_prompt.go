@@ -16,8 +16,8 @@ const textPromptDesiredWidth = 50
 type textPrompt struct {
 	title string
 	input textinput.Model
-	// submit runs against the page with the trimmed, non-empty name.
-	submit func(m Model, name string) (Model, tea.Cmd)
+	// kind picks the page command the trimmed, non-empty name feeds.
+	kind nameKind
 }
 
 func (textPrompt) bottomAnchored() {}
@@ -36,9 +36,7 @@ func (p textPrompt) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
 			if name == "" {
 				return p, nil, modalResult{close: true}
 			}
-			return p, nil, modalResult{close: true, apply: func(m Model) (Model, tea.Cmd) {
-				return p.submit(m, name)
-			}}
+			return p, nil, modalResult{close: true, action: submitName{kind: p.kind, name: name}}
 		}
 	} else if _, ok := msg.(tea.PasteMsg); !ok {
 		return p, nil, modalResult{unhandled: true}

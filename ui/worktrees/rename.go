@@ -47,12 +47,6 @@ func (m Model) enterRenameMode() Model {
 	return m.openModal(textPrompt{
 		title: "Rename Worktree",
 		input: newRenameInput(wt.Name),
-		submit: func(m Model, newName string) (Model, tea.Cmd) {
-			wt := m.cursorWorktree()
-			if wt == nil || newName == wt.Name {
-				return m, nil
-			}
-			return m, cmdRename(m.repo, *wt, newName)
-		},
+		kind:  nameRename,
 	})
 }

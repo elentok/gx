@@ -65,13 +65,11 @@ func (y yankModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
 		if len(files) == 0 {
 			return y, nil, modalResult{close: true}
 		}
-		return y, nil, modalResult{close: true, apply: func(m Model) (Model, tea.Cmd) {
-			return m.enterPasteMode(clipboardState{
-				srcPath: y.source.Path,
-				srcName: y.source.Name,
-				files:   files,
-			})
-		}}
+		return y, nil, modalResult{close: true, action: openPaste{clipboard: clipboardState{
+			srcPath: y.source.Path,
+			srcName: y.source.Name,
+			files:   files,
+		}}}
 	}
 	y.checklist = y.checklist.Update(k.String())
 	return y, nil, modalResult{}

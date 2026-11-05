@@ -16,14 +16,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type promptableJobKind int
-
-const (
-	promptableJobPushFetch promptableJobKind = iota
-	promptableJobPush
-	promptableJobForcePush
-)
-
 type dirtyState struct {
 	hasModified  bool
 	hasUntracked bool

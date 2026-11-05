@@ -6,6 +6,14 @@ import (
 	"github.com/elentok/gx/ui/components"
 )
 
+type promptableJobKind int
+
+const (
+	promptableJobPushFetch promptableJobKind = iota
+	promptableJobPush
+	promptableJobForcePush
+)
+
 // jobs is the promptable git job (push, fetch, force-push) currently running.
 // The credential modal shares its runner to answer prompts.
 type jobs struct {
