@@ -46,8 +46,8 @@ func pressRebaseIn(repoDir, store string) (Model, tea.Cmd) {
 
 func TestRebaseTargetFollowsTrunk(t *testing.T) {
 	m, _ := pressRebase(t, "develop")
-	if !strings.Contains(m.modals.confirm.title, "on origin/develop?") {
-		t.Fatalf("confirm title = %q, want rebase on origin/develop", m.modals.confirm.title)
+	if !strings.Contains(m.modals.Confirm().Title, "on origin/develop?") {
+		t.Fatalf("confirm title = %q, want rebase on origin/develop", m.modals.Confirm().Title)
 	}
 }
 
@@ -56,8 +56,8 @@ func TestRebaseTargetLocalOnlyTrunk(t *testing.T) {
 	testutil.MustGitExported(t, repoDir, "branch", "local-trunk", "develop")
 	_, store := testutil.RegisterProject(t, repoDir, "local-trunk")
 	m, _ := pressRebaseIn(repoDir, store)
-	if !strings.Contains(m.modals.confirm.title, "on local-trunk?") {
-		t.Fatalf("confirm title = %q, want rebase on local-trunk", m.modals.confirm.title)
+	if !strings.Contains(m.modals.Confirm().Title, "on local-trunk?") {
+		t.Fatalf("confirm title = %q, want rebase on local-trunk", m.modals.Confirm().Title)
 	}
 }
 
@@ -76,8 +76,8 @@ func TestRebaseMissingTrunkWarnsWithoutFallback(t *testing.T) {
 
 func assertWarning(t *testing.T, m Model, cmd tea.Cmd, want string) {
 	t.Helper()
-	if m.modals.confirmOpen {
-		t.Fatalf("want no confirm, got %q", m.modals.confirm.title)
+	if m.modals.ConfirmOpen() {
+		t.Fatalf("want no confirm, got %q", m.modals.Confirm().Title)
 	}
 	if cmd == nil {
 		t.Fatal("want a warning")

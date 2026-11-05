@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/stage"
+	"github.com/elentok/gx/ui/status/stagemodal"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -199,12 +200,16 @@ func (m *Model) openDiscardStatusConfirm() {
 		return
 	}
 
-	m.openConfirm(title, lines, confirmDiscardStatus, "", "")
-	m.modals.confirm.discardUntracked = entry.Kind == statusEntryFile && entry.File.IsUntracked()
-	m.modals.confirm.paths = uniqueNonEmpty(restorePaths)
-	m.modals.confirm.deletePaths = uniqueNonEmpty(deletePaths)
-	m.modals.confirm.displayPath = entry.Path
-	m.modals.confirm.preservePath = entry.Path
+	m.openConfirmRequest(stagemodal.ConfirmRequest{
+		Title:            title,
+		Lines:            lines,
+		Action:           stagemodal.ConfirmDiscardStatus,
+		DiscardUntracked: entry.Kind == statusEntryFile && entry.File.IsUntracked(),
+		Paths:            uniqueNonEmpty(restorePaths),
+		DeletePaths:      uniqueNonEmpty(deletePaths),
+		DisplayPath:      entry.Path,
+		PreservePath:     entry.Path,
+	})
 }
 
 func statusDiscardPathsForLeaves(files []stage.StageFileStatus) (restorePaths, deletePaths []string) {

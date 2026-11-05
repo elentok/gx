@@ -41,16 +41,16 @@ func (m Model) View() tea.View {
 
 	if gitView, ok := m.git.ViewAction(m.width); ok {
 		out = ui.OverlayCenter(out, gitView, m.width, m.height)
-	} else if m.modals.credentialOpen {
-		out = ui.OverlayCenter(out, m.modals.credentialView(), m.width, m.height)
-	} else if m.modals.runningOpen {
-		out = ui.OverlayCenter(out, m.modals.runningView(), m.width, m.height)
+	} else if m.modals.CredentialOpen() {
+		out = ui.OverlayCenter(out, m.modals.CredentialView(), m.width, m.height)
+	} else if m.modals.RunningOpen() {
+		out = ui.OverlayCenter(out, m.modals.RunningView(), m.width, m.height)
 	} else if m.git.OutputOpen() {
 		out = ui.OverlayCenter(out, m.git.ViewOutput(), m.width, m.height)
-	} else if m.modals.confirmOpen {
-		out = ui.OverlayCenter(out, m.modals.confirmView(m.width), m.width, m.height)
-	} else if m.modals.errorOpen {
-		out = ui.OverlayCenter(out, m.modals.errorView(), m.width, m.height)
+	} else if m.modals.ConfirmOpen() {
+		out = ui.OverlayCenter(out, m.modals.ConfirmView(m.width), m.width, m.height)
+	} else if m.modals.ErrorOpen() {
+		out = ui.OverlayCenter(out, m.modals.ErrorView(), m.width, m.height)
 	} else if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	} else if chordHints := m.keys.ChordHints(); len(chordHints) > 0 {
@@ -78,7 +78,6 @@ func (m *Model) showGitError(err error) {
 	}
 	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
 	vp.SetContent(err.Error())
-	m.modals.errorVP = vp
-	m.modals.errorOpen = true
+	m.modals.OpenError(vp)
 	m.keys.Reset()
 }

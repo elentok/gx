@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/status/stagemodal"
 )
 
 func TestExecGitCaptureRunsCommand(t *testing.T) {
@@ -56,21 +57,26 @@ func TestOpenAmendConfirmOpensWithDetails(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'A', Text: "A", ShiftedCode: 'A'})
 	m = updated.(Model)
 
-	if !m.modals.confirmOpen {
+	if !m.modals.ConfirmOpen() {
 		t.Fatal("expected amend confirm dialog to be open after A key")
 	}
-	if !strings.Contains(m.modals.confirm.title, "Amend") {
-		t.Errorf("unexpected confirmTitle: %q", m.modals.confirm.title)
+	if !strings.Contains(m.modals.Confirm().Title, "Amend") {
+		t.Errorf("unexpected confirmTitle: %q", m.modals.Confirm().Title)
 	}
+}
+
+// showIdleRunning opens the running modal without starting its action.
+func showIdleRunning(m *Model) {
+	m.modals.OpenRunning(m.width, m.height, "idle", stagemodal.NewRunner(stagemodal.ActionAmend, m.worktreeRoot, "", ""))
 }
 
 func TestHandleActionResultRecordsOutput(t *testing.T) {
 	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 
-	_ = m.handleActionResult(stageActionResult{
-		kind:   actionAmend,
-		output: "some action output",
+	_ = m.handleActionResult(stagemodal.ActionResult{
+		Kind:   stagemodal.ActionAmend,
+		Output: "some action output",
 	})
 
 	if !m.git.HasOutput() {
@@ -81,14 +87,14 @@ func TestHandleActionResultRecordsOutput(t *testing.T) {
 func TestHandleActionResultWithErrorClosesRunning(t *testing.T) {
 	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
-	m.modals.runningOpen = true
+	showIdleRunning(&m)
 
-	_ = m.handleActionResult(stageActionResult{
-		kind: actionAmend,
-		err:  errors.New("git failed"),
+	_ = m.handleActionResult(stagemodal.ActionResult{
+		Kind: stagemodal.ActionAmend,
+		Err:  errors.New("git failed"),
 	})
 
-	if m.modals.runningOpen {
+	if m.modals.RunningOpen() {
 		t.Fatal("expected runningOpen=false after error result")
 	}
 }
@@ -96,17 +102,17 @@ func TestHandleActionResultWithErrorClosesRunning(t *testing.T) {
 func TestHandleActionResultPromptPopStashOpensConfirm(t *testing.T) {
 	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
-	m.modals.runningOpen = true
+	showIdleRunning(&m)
 
-	_ = m.handleActionResult(stageActionResult{
-		kind:           actionRebase,
-		promptPopStash: true,
+	_ = m.handleActionResult(stagemodal.ActionResult{
+		Kind:           stagemodal.ActionRebase,
+		PromptPopStash: true,
 	})
 
-	if !m.modals.confirmOpen {
+	if !m.modals.ConfirmOpen() {
 		t.Fatal("expected confirmOpen=true when promptPopStash is set")
 	}
-	if m.modals.runningOpen {
+	if m.modals.RunningOpen() {
 		t.Fatal("expected runningOpen=false after promptPopStash")
 	}
 }
@@ -115,11 +121,11 @@ func TestHandleActionResultSuccessReturnsCmd(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
 	m.ready = true
-	m.modals.runningOpen = true
+	showIdleRunning(&m)
 
-	cmd := m.handleActionResult(stageActionResult{kind: actionRebase})
+	cmd := m.handleActionResult(stagemodal.ActionResult{Kind: stagemodal.ActionRebase})
 
-	if m.modals.runningOpen {
+	if m.modals.RunningOpen() {
 		t.Fatal("expected runningOpen=false after successful result")
 	}
 	if cmd == nil {
@@ -131,9 +137,9 @@ func TestHandleActionResultAmendNotifyCmd(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
 	m.ready = true
-	m.modals.runningOpen = true
+	showIdleRunning(&m)
 
-	cmd := m.handleActionResult(stageActionResult{kind: actionAmend})
+	cmd := m.handleActionResult(stagemodal.ActionResult{Kind: stagemodal.ActionAmend})
 
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from successful amend result")
@@ -144,9 +150,9 @@ func TestHandleActionResultPopStashNotifyCmd(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	m := newTestModelDefault(repo)
 	m.ready = true
-	m.modals.runningOpen = true
+	showIdleRunning(&m)
 
-	cmd := m.handleActionResult(stageActionResult{kind: actionPopStashRebase})
+	cmd := m.handleActionResult(stagemodal.ActionResult{Kind: stagemodal.ActionPopStashRebase})
 
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from successful pop stash rebase result")

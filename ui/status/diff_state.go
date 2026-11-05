@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/status/stagemodal"
 )
 
 func (m *Model) colorizeDiffsSync(filePath, unstagedRaw, stagedRaw string, sideBySide bool, renderWidth int) (unstagedColor, stagedColor string) {
@@ -250,10 +251,14 @@ func (m *Model) openDiscardDiffConfirm() tea.Cmd {
 		return notify.Error(err.Error())
 	}
 
-	m.openConfirm(title, lines, confirmDiscardUnstaged, "", "")
-	m.modals.confirm.paths = []string{file.Path}
-	m.modals.confirm.patch = patch
-	m.modals.confirm.patchUnidiffZero = unidiffZero
+	m.openConfirmRequest(stagemodal.ConfirmRequest{
+		Title:            title,
+		Lines:            lines,
+		Action:           stagemodal.ConfirmDiscardUnstaged,
+		Paths:            []string{file.Path},
+		Patch:            patch,
+		PatchUnidiffZero: unidiffZero,
+	})
 	return nil
 }
 

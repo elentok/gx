@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/stagemodal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -61,7 +62,7 @@ func TestOpenHelpFromSearchEndsSearch(t *testing.T) {
 func TestOpenHelpWithModalOpenDoesNothing(t *testing.T) {
 	t.Parallel()
 	m := newOpenHelpModel(t)
-	m.modals.confirmOpen = true
+	m.modals.OpenConfirm(stagemodal.ConfirmRequest{})
 
 	if m = sendOpenHelp(m); m.help.IsOpen {
 		t.Fatal("expected help to stay closed while a modal is open")

@@ -80,7 +80,7 @@ func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m = updated.(Model)
-	if !m.modals.confirmOpen {
+	if !m.modals.ConfirmOpen() {
 		t.Fatalf("expected discard confirmation to open")
 	}
 
@@ -116,7 +116,7 @@ func TestFiletreeDDiscardsDirectoryAfterConfirm(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m = updated.(Model)
-	if !m.modals.confirmOpen {
+	if !m.modals.ConfirmOpen() {
 		t.Fatalf("expected discard confirmation to open for directory")
 	}
 
@@ -157,7 +157,7 @@ func TestDiffUnstagedDDiscardsLineAfterConfirm(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m = updated.(Model)
-	if !m.modals.confirmOpen {
+	if !m.modals.ConfirmOpen() {
 		t.Fatalf("expected discard confirmation in unstaged diff")
 	}
 
@@ -190,7 +190,7 @@ func TestDiffStagedDUnstagesSelectionWithoutConfirm(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m = updated.(Model)
 
-	if m.modals.confirmOpen {
+	if m.modals.ConfirmOpen() {
 		t.Fatalf("did not expect discard confirm in staged diff; d should unstage")
 	}
 	unstaged, err := stage.DiffPath(repo, "line.txt", false, 1)

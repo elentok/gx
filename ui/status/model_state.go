@@ -1,7 +1,6 @@
 package status
 
 import (
-	"regexp"
 	"time"
 
 	"github.com/elentok/gx/git"
@@ -14,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/status/stagemodal"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -40,7 +40,7 @@ type Model struct {
 
 	git gitops.Model
 
-	modals stageModals
+	modals stagemodal.Model
 	keys   keys.Manager
 
 	overlay             imagediff.Overlay
@@ -63,7 +63,6 @@ func DefaultSettings() ui.Settings {
 
 type flashTickMsg struct{}
 type renderTickMsg struct{}
-type actionPollMsg struct{}
 type diffReloadMsg struct{ seq int }
 type statusStartupLoadMsg struct{}
 
@@ -88,11 +87,6 @@ type editCommentFinishedMsg struct {
 }
 
 const statusDiffReloadDebounce = 100 * time.Millisecond
-
-var (
-	ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`)
-	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`) // OSC ... BEL/ST
-)
 
 func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initialPath string, extraKeys keys.Manager) Model {
 	if settings.DiffContextLines < 0 {

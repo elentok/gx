@@ -1,6 +1,9 @@
-package status
+// Package stagemodal owns the stage page's action modals: confirm, running
+// output, credential prompt and error.
+package stagemodal
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -12,48 +15,52 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// confirmRequest is everything a confirm modal needs to ask a question and, on
+var (
+	ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`)
+	ansiOSCRe = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)`) // OSC ... BEL/ST
+)
+
+// ConfirmRequest is everything a confirm modal needs to ask a question and, on
 // acceptance, to act on the answer.
-type confirmRequest struct {
-	title            string
-	lines            []string
-	yes              bool
-	action           stageConfirmAction
-	remote           string
-	branch           string
-	paths            []string
-	deletePaths      []string
-	patch            string
-	patchUnidiffZero bool
-	discardUntracked bool
-	displayPath      string
-	preservePath     string
+type ConfirmRequest struct {
+	Title            string
+	Lines            []string
+	Yes              bool
+	Action           ConfirmAction
+	Remote           string
+	Branch           string
+	Paths            []string
+	DeletePaths      []string
+	Patch            string
+	PatchUnidiffZero bool
+	DiscardUntracked bool
+	DisplayPath      string
+	PreservePath     string
 }
 
-// ModalResult reports what a modal decided. The zero value means nothing
-// happened that the Model must act on.
-type ModalResult struct {
+// Result reports what a modal decided. The zero value means nothing
+// happened that the owner must act on.
+type Result struct {
 	// Accepted is set with Confirm when the user accepted a confirm request.
 	Accepted bool
-	Confirm  confirmRequest
+	Confirm  ConfirmRequest
 	// Finished is set with Action when the running action produced its result.
 	Finished bool
-	Action   stageActionResult
+	Action   ActionResult
 	// CredentialOpened is set when the running action asked for a credential.
 	CredentialOpened bool
 }
 
-// stageModals owns the stage-action modals: confirm, running output,
-// credential prompt and error.
-type stageModals struct {
+// Model owns the stage-action modals.
+type Model struct {
 	confirmOpen bool
-	confirm     confirmRequest
+	confirm     ConfirmRequest
 
 	runningOpen    bool
 	runningTitle   string
 	runningVP      viewport.Model
 	runningContent string
-	runningRunner  *stageActionRunner
+	runningRunner  *Runner
 	runningDone    bool
 
 	credentialOpen   bool
@@ -65,13 +72,47 @@ type stageModals struct {
 	errorVP   viewport.Model
 }
 
-func (s stageModals) Open() bool {
+func (s Model) Open() bool {
 	return s.credentialOpen || s.runningOpen || s.confirmOpen || s.errorOpen
+}
+
+func (s Model) ConfirmOpen() bool    { return s.confirmOpen }
+func (s Model) RunningOpen() bool    { return s.runningOpen }
+func (s Model) CredentialOpen() bool { return s.credentialOpen }
+func (s Model) ErrorOpen() bool      { return s.errorOpen }
+
+// Confirm returns the current confirm request.
+func (s Model) Confirm() ConfirmRequest { return s.confirm }
+
+// RunningContent returns the sanitized output shown in the running modal.
+func (s Model) RunningContent() string { return s.runningContent }
+
+// Cancellable reports whether a started action is still running.
+func (s Model) Cancellable() bool {
+	return s.runningRunner != nil && !s.runningDone
+}
+
+// Cancel asks the running action to stop, if there is one.
+func (s Model) Cancel() {
+	if s.Cancellable() {
+		s.runningRunner.Cancel()
+	}
+}
+
+// CloseRunning hides the running modal.
+func (s *Model) CloseRunning() {
+	s.runningOpen = false
+}
+
+// OpenError shows vp in the error modal.
+func (s *Model) OpenError(vp viewport.Model) {
+	s.errorVP = vp
+	s.errorOpen = true
 }
 
 // Update routes a key to the open modal, in the order credential, running,
 // confirm, error.
-func (s stageModals) Update(msg tea.KeyPressMsg) (stageModals, tea.Cmd, ModalResult) {
+func (s Model) Update(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	switch {
 	case s.credentialOpen:
 		return s.updateCredential(msg)
@@ -82,24 +123,24 @@ func (s stageModals) Update(msg tea.KeyPressMsg) (stageModals, tea.Cmd, ModalRes
 	case s.errorOpen:
 		return s.updateError(msg)
 	}
-	return s, nil, ModalResult{}
+	return s, nil, Result{}
 }
 
-func (s stageModals) updateRunning(msg tea.KeyPressMsg) (stageModals, tea.Cmd, ModalResult) {
+func (s Model) updateRunning(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	if s.runningDone {
 		switch msg.String() {
 		case "esc", "enter":
 			s.runningOpen = false
 			s.runningRunner = nil
-			return s, nil, ModalResult{}
+			return s, nil, Result{}
 		}
 	}
 	var cmd tea.Cmd
 	s.runningVP, cmd = s.runningVP.Update(msg)
-	return s, cmd, ModalResult{}
+	return s, cmd, Result{}
 }
 
-func (s stageModals) updateCredential(msg tea.KeyPressMsg) (stageModals, tea.Cmd, ModalResult) {
+func (s Model) updateCredential(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	switch msg.String() {
 	case "esc":
 		if s.runningRunner != nil {
@@ -107,54 +148,54 @@ func (s stageModals) updateCredential(msg tea.KeyPressMsg) (stageModals, tea.Cmd
 		}
 		s.credentialOpen = false
 		s.credentialPrompt = ""
-		return s, nil, ModalResult{}
+		return s, nil, Result{}
 	case "enter":
 		if s.runningRunner != nil {
 			_ = s.runningRunner.SubmitPromptInput(s.credentialInput.Value())
 		}
 		s.credentialOpen = false
 		s.credentialPrompt = ""
-		return s, nil, ModalResult{}
+		return s, nil, Result{}
 	}
 	var cmd tea.Cmd
 	s.credentialInput, cmd = s.credentialInput.Update(msg)
-	return s, cmd, ModalResult{}
+	return s, cmd, Result{}
 }
 
-func (s stageModals) updateConfirm(msg tea.KeyPressMsg) (stageModals, tea.Cmd, ModalResult) {
-	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, s.confirm.yes)
+func (s Model) updateConfirm(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
+	nextYes, decided, accepted, handled := components.UpdateConfirm(msg, s.confirm.Yes)
 	if !handled {
-		return s, nil, ModalResult{}
+		return s, nil, Result{}
 	}
-	s.confirm.yes = nextYes
+	s.confirm.Yes = nextYes
 	if !decided {
-		return s, nil, ModalResult{}
+		return s, nil, Result{}
 	}
 	req := s.confirm
 	s.confirmOpen = false
-	s.confirm.action = confirmNone
+	s.confirm.Action = ConfirmNone
 	if accepted {
-		return s, nil, ModalResult{Accepted: true, Confirm: req}
+		return s, nil, Result{Accepted: true, Confirm: req}
 	}
-	return s, nil, ModalResult{}
+	return s, nil, Result{}
 }
 
-func (s stageModals) updateError(msg tea.KeyPressMsg) (stageModals, tea.Cmd, ModalResult) {
+func (s Model) updateError(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	switch msg.String() {
 	case "esc", "enter":
 		s.errorOpen = false
-		return s, nil, ModalResult{}
+		return s, nil, Result{}
 	}
 	var cmd tea.Cmd
 	s.errorVP, cmd = s.errorVP.Update(msg)
-	return s, cmd, ModalResult{}
+	return s, cmd, Result{}
 }
 
 // Poll drains the running action's output, opens the credential prompt when it
 // asks for one and reports its result once. It reschedules itself while the
 // running modal is waiting on the action.
-func (s stageModals) Poll() (stageModals, tea.Cmd, ModalResult) {
-	var res ModalResult
+func (s Model) Poll() (Model, tea.Cmd, Result) {
+	var res Result
 	if s.runningRunner != nil {
 		if chunk := s.runningRunner.Consume(); chunk != "" {
 			s.appendRunningOutput(chunk)
@@ -177,12 +218,12 @@ func (s stageModals) Poll() (stageModals, tea.Cmd, ModalResult) {
 		}
 	}
 	if s.runningOpen && !s.runningDone {
-		return s, actionPollCmd(), res
+		return s, PollCmd(), res
 	}
 	return s, nil, res
 }
 
-func (s *stageModals) appendRunningOutput(chunk string) {
+func (s *Model) appendRunningOutput(chunk string) {
 	if chunk == "" {
 		return
 	}
@@ -217,7 +258,9 @@ func newCredentialInput(secret bool) textinput.Model {
 	return ti
 }
 
-func (s *stageModals) openRunning(width, height int, title string, runner *stageActionRunner) {
+// OpenRunning shows the running modal for runner. The caller starts the
+// runner.
+func (s *Model) OpenRunning(width, height int, title string, runner *Runner) {
 	vpW := width * 2 / 3
 	if vpW < 56 {
 		vpW = 56
@@ -237,17 +280,16 @@ func (s *stageModals) openRunning(width, height int, title string, runner *stage
 	s.runningDone = false
 	s.runningTitle = title
 	s.runningRunner = runner
-	runner.Start()
 }
 
-func (s *stageModals) openConfirm(req confirmRequest) {
-	req.lines = append([]string{}, req.lines...)
-	req.yes = true
+func (s *Model) OpenConfirm(req ConfirmRequest) {
+	req.Lines = append([]string{}, req.Lines...)
+	req.Yes = true
 	s.confirmOpen = true
 	s.confirm = req
 }
 
-func (s stageModals) runningView() string {
+func (s Model) RunningView() string {
 	title := s.runningTitle
 	if title == "" {
 		title = "Running"
@@ -267,7 +309,7 @@ func (s stageModals) runningView() string {
 	)
 }
 
-func (s stageModals) credentialView() string {
+func (s Model) CredentialView() string {
 	input := s.credentialInput.View()
 	if input == "" {
 		input = " "
@@ -284,23 +326,23 @@ func (s stageModals) credentialView() string {
 	)
 }
 
-func (s stageModals) confirmView(width int) string {
-	prompt := s.confirm.title
-	if len(s.confirm.lines) > 0 {
-		prompt = prompt + "\n\n" + strings.Join(s.confirm.lines, "\n")
+func (s Model) ConfirmView(width int) string {
+	prompt := s.confirm.Title
+	if len(s.confirm.Lines) > 0 {
+		prompt = prompt + "\n\n" + strings.Join(s.confirm.Lines, "\n")
 	}
 	return components.RenderConfirmModal(
 		prompt,
-		s.confirm.yes,
+		s.confirm.Yes,
 		ui.ColorYellow,
 		ui.ColorGreen,
 		ui.ColorRed,
 		ui.ColorSubtle,
-		maxInt(56, width/2),
+		max(56, width/2),
 	)
 }
 
-func (s stageModals) errorView() string {
+func (s Model) ErrorView() string {
 	return components.RenderOutputModal(
 		"Error",
 		s.errorVP.View(),

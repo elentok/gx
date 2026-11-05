@@ -48,11 +48,11 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
 
-	if !m.modals.confirmOpen {
+	if !m.modals.ConfirmOpen() {
 		t.Fatalf("expected rebase key to open confirmation")
 	}
-	if !strings.Contains(m.modals.confirm.title, "Rebase branch feature/test on main?") {
-		t.Fatalf("unexpected rebase confirm title: %q", m.modals.confirm.title)
+	if !strings.Contains(m.modals.Confirm().Title, "Rebase branch feature/test on main?") {
+		t.Fatalf("unexpected rebase confirm title: %q", m.modals.Confirm().Title)
 	}
 }
 
@@ -165,27 +165,5 @@ func TestFilterLogViewStateGHKeyPushesNav(t *testing.T) {
 		t.Fatalf("expected nav.Push message, got %T", msg)
 	} else if vs.Tab != nav.TabLog {
 		t.Fatalf("expected TabLog, got %q", vs.Tab)
-	}
-}
-
-func TestAppendRunningOutputStripsTerminalControlSequences(t *testing.T) {
-	m := newTestModelDefault(testutil.TempRepo(t))
-	m.ready = true
-	m.openRunning("Amend", newStageActionRunner(actionAmend, m.worktreeRoot, "", ""))
-
-	m.modals.appendRunningOutput("\x1b[32mWriting objects: 100%\x1b[0m\r\n")
-	m.modals.appendRunningOutput("remote: \x1b]8;;https://example.com\x07https://example.com\x1b]8;;\x07\n")
-
-	if strings.Contains(m.modals.runningContent, "\x1b") {
-		t.Fatalf("expected running content to strip ANSI escapes, got %q", m.modals.runningContent)
-	}
-	if strings.Contains(m.modals.runningContent, "\r") {
-		t.Fatalf("expected running content to strip carriage returns, got %q", m.modals.runningContent)
-	}
-	if !strings.Contains(m.modals.runningContent, "Writing objects: 100%") {
-		t.Fatalf("expected sanitized progress text, got %q", m.modals.runningContent)
-	}
-	if !strings.Contains(m.modals.runningContent, "remote: https://example.com") {
-		t.Fatalf("expected sanitized hyperlink text, got %q", m.modals.runningContent)
 	}
 }

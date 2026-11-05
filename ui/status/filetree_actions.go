@@ -7,109 +7,109 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/stage"
-	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/status/diffarea"
+	"github.com/elentok/gx/ui/status/stagemodal"
 )
 
-func (m *Model) handleActionResult(res stageActionResult) tea.Cmd {
-	if strings.TrimSpace(res.output) != "" {
-		m.recordCommandOutput(stageActionOutputTitle(res.kind), res.output)
+func (m *Model) handleActionResult(res stagemodal.ActionResult) tea.Cmd {
+	if strings.TrimSpace(res.Output) != "" {
+		m.recordCommandOutput(stagemodal.OutputTitle(res.Kind), res.Output)
 	}
-	if res.promptPopStash {
-		m.openConfirm("Pop stash after rebase failure?", []string{"The rebase failed after stashing changes.", "Pop the stash now?"}, confirmRebasePopStash, "", "")
-		m.modals.runningOpen = false
+	if res.PromptPopStash {
+		m.openConfirm("Pop stash after rebase failure?", []string{"The rebase failed after stashing changes.", "Pop the stash now?"}, stagemodal.ConfirmRebasePopStash, "", "")
+		m.modals.CloseRunning()
 		return nil
 	}
-	if res.err != nil {
-		m.showGitError(fmt.Errorf("%w\n%s", res.err, strings.TrimSpace(res.output)))
-		m.modals.runningOpen = false
+	if res.Err != nil {
+		m.showGitError(fmt.Errorf("%w\n%s", res.Err, strings.TrimSpace(res.Output)))
+		m.modals.CloseRunning()
 		return nil
 	}
 	var notifyCmd tea.Cmd
-	switch res.kind {
-	case actionRebase:
+	switch res.Kind {
+	case stagemodal.ActionRebase:
 		notifyCmd = notify.Success(ui.MessageComplete("rebase"))
-	case actionPopStashRebase:
+	case stagemodal.ActionPopStashRebase:
 		notifyCmd = notify.Info("stash restored")
-	case actionAmend:
+	case stagemodal.ActionAmend:
 		notifyCmd = notify.Success("amended last commit")
 	}
-	m.modals.runningOpen = false
+	m.modals.CloseRunning()
 	return tea.Batch(notifyCmd, m.refresh())
 }
 
 // confirmAccept runs the action of a confirm request the modal closed with an
 // accepted answer.
-func (m Model) confirmAccept(req confirmRequest) (Model, tea.Cmd) {
-	if !req.yes {
+func (m Model) confirmAccept(req stagemodal.ConfirmRequest) (Model, tea.Cmd) {
+	if !req.Yes {
 		return m, nil
 	}
 
-	switch req.action {
-	case confirmRebase:
-		titleTarget := strings.TrimSpace(req.remote)
+	switch req.Action {
+	case stagemodal.ConfirmRebase:
+		titleTarget := strings.TrimSpace(req.Remote)
 		if titleTarget == "" {
 			var err error
-			if titleTarget, err = detectRebaseTarget(m.settings.TicketStore, m.worktreeRoot); err != nil {
+			if titleTarget, err = stagemodal.DetectRebaseTarget(m.settings.TicketStore, m.worktreeRoot); err != nil {
 				return m, notify.Warning(err.Error())
 			}
 		}
-		runner := newStageActionRunner(actionRebase, m.worktreeRoot, titleTarget, req.branch)
-		runner.store = m.settings.TicketStore
+		runner := stagemodal.NewRunner(stagemodal.ActionRebase, m.worktreeRoot, titleTarget, req.Branch)
+		runner.Store = m.settings.TicketStore
 		m.openRunning("Rebase on "+titleTarget, runner)
-		return m, actionPollCmd()
-	case confirmRebasePopStash:
-		runner := newStageActionRunner(actionPopStashRebase, m.worktreeRoot, "", "")
+		return m, stagemodal.PollCmd()
+	case stagemodal.ConfirmRebasePopStash:
+		runner := stagemodal.NewRunner(stagemodal.ActionPopStashRebase, m.worktreeRoot, "", "")
 		m.openRunning("Pop stash", runner)
-		return m, actionPollCmd()
-	case confirmAmend:
-		runner := newStageActionRunner(actionAmend, m.worktreeRoot, "", "")
+		return m, stagemodal.PollCmd()
+	case stagemodal.ConfirmAmend:
+		runner := stagemodal.NewRunner(stagemodal.ActionAmend, m.worktreeRoot, "", "")
 		m.openRunning("Amend commit", runner)
-		return m, actionPollCmd()
-	case confirmDiscardStatus:
-		if req.discardUntracked {
-			if err := stage.DiscardUntrackedPath(m.worktreeRoot, req.paths[0]); err != nil {
+		return m, stagemodal.PollCmd()
+	case stagemodal.ConfirmDiscardStatus:
+		if req.DiscardUntracked {
+			if err := stage.DiscardUntrackedPath(m.worktreeRoot, req.Paths[0]); err != nil {
 				m.showGitError(err)
 				return m, nil
 			}
 		} else {
-			if err := stage.RestorePaths(m.worktreeRoot, req.paths); err != nil {
+			if err := stage.RestorePaths(m.worktreeRoot, req.Paths); err != nil {
 				m.showGitError(err)
 				return m, nil
 			}
 		}
-		if len(req.deletePaths) > 0 {
-			for _, path := range req.deletePaths {
+		if len(req.DeletePaths) > 0 {
+			for _, path := range req.DeletePaths {
 				if err := stage.DiscardUntrackedPath(m.worktreeRoot, path); err != nil {
 					m.showGitError(err)
 					return m, nil
 				}
 			}
 		}
-		displayPath := req.displayPath
-		if displayPath == "" && len(req.paths) > 0 {
-			displayPath = req.paths[0]
+		displayPath := req.DisplayPath
+		if displayPath == "" && len(req.Paths) > 0 {
+			displayPath = req.Paths[0]
 		}
-		preservePath := req.preservePath
+		preservePath := req.PreservePath
 		if preservePath == "" {
 			preservePath = displayPath
 		}
 		return m, tea.Batch(notify.Success("discarded "+displayPath), m.reload(preservePath))
-	case confirmDiscardUnstaged:
-		if err := stage.ApplyPatchToWorktree(m.worktreeRoot, req.patch, true, req.patchUnidiffZero); err != nil {
+	case stagemodal.ConfirmDiscardUnstaged:
+		if err := stage.ApplyPatchToWorktree(m.worktreeRoot, req.Patch, true, req.PatchUnidiffZero); err != nil {
 			m.showGitError(err)
 			return m, nil
 		}
 		if m.diffarea.ActiveSection == diffarea.SectionUnstaged {
 			m.diffarea.DisableVisual()
 		}
-		cmd := m.reload(req.paths[0])
+		cmd := m.reload(req.Paths[0])
 		if m.focus == focusDiff {
 			m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 		}
-		return m, tea.Batch(notify.Success("discarded "+req.paths[0]), cmd)
+		return m, tea.Batch(notify.Success("discarded "+req.Paths[0]), cmd)
 	}
 	return m, nil
 }
@@ -122,14 +122,14 @@ func (m *Model) prepareRebaseConfirm() error {
 	if branch == "" || branch == "HEAD" {
 		return fmt.Errorf("cannot rebase: detached HEAD")
 	}
-	target, err := detectRebaseTarget(m.settings.TicketStore, m.worktreeRoot)
+	target, err := stagemodal.DetectRebaseTarget(m.settings.TicketStore, m.worktreeRoot)
 	if err != nil {
 		return rebaseTargetError{err}
 	}
 	m.openConfirm(
 		fmt.Sprintf("Rebase branch %s on %s?", branch, target),
 		nil,
-		confirmRebase,
+		stagemodal.ConfirmRebase,
 		target,
 		branch,
 	)
@@ -141,16 +141,6 @@ func (m *Model) prepareRebaseConfirm() error {
 type rebaseTargetError struct{ error }
 
 func (e rebaseTargetError) Unwrap() error { return e.error }
-
-// detectRebaseTarget resolves trunk on every call, so a project.json edit
-// applies at once. A missing trunk is an error, never a guessed branch.
-func detectRebaseTarget(store, root string) (string, error) {
-	repo, err := ticketgit.OpenRepoIn(store, root)
-	if err != nil {
-		return "", err
-	}
-	return git.TrunkBaseRef(repo.Root, repo.Trunk), nil
-}
 
 func (m *Model) openAmendConfirm() error {
 	subject, files, err := amendPreview(m.worktreeRoot)
@@ -168,7 +158,7 @@ func (m *Model) openAmendConfirm() error {
 	if len(files) > limit {
 		lines = append(lines, "...")
 	}
-	m.openConfirm("Amend last commit?", lines, confirmAmend, "", "")
+	m.openConfirm("Amend last commit?", lines, stagemodal.ConfirmAmend, "", "")
 	return nil
 }
 

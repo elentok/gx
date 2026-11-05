@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/stagemodal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -89,7 +90,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m, renderTickCmd()
 	case statusStartupLoadMsg:
 		return m.handleStartupLoad()
-	case actionPollMsg:
+	case stagemodal.PollMsg:
 		return m.handleActionPoll()
 	case diffReloadMsg:
 		return m.handleDiffReload(msg)
@@ -160,7 +161,7 @@ func (m Model) handleStartupLoad() (Model, tea.Cmd) {
 
 func (m Model) handleActionPoll() (Model, tea.Cmd) {
 	var pollCmd, actionCmd tea.Cmd
-	var res ModalResult
+	var res stagemodal.Result
 	m.modals, pollCmd, res = m.modals.Poll()
 	if res.CredentialOpened {
 		m.keys.Reset()
@@ -207,8 +208,8 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
-		if m.modals.runningOpen && !m.modals.runningDone && m.modals.runningRunner != nil {
-			m.modals.runningRunner.Cancel()
+		if m.modals.RunningOpen() && m.modals.Cancellable() {
+			m.modals.Cancel()
 			return m, notify.Info("cancel requested")
 		}
 		if m.settings.EnableNavigation {
@@ -217,9 +218,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	if msg.String() == "q" && !m.settings.EnableNavigation {
-		if m.modals.runningRunner != nil && !m.modals.runningDone {
-			m.modals.runningRunner.Cancel()
-		}
+		m.modals.Cancel()
 		return m, tea.Quit
 	}
 	if msg.String() == "?" {
@@ -229,7 +228,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 	if m.modals.Open() {
 		var cmd tea.Cmd
-		var res ModalResult
+		var res stagemodal.Result
 		m.modals, cmd, res = m.modals.Update(msg)
 		if res.Accepted {
 			return m.confirmAccept(res.Confirm)
