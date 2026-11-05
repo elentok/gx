@@ -77,6 +77,15 @@ func TestParseConfig(t *testing.T) {
 	}
 }
 
+func TestParseConfigUnknownFieldNamesRebuild(t *testing.T) {
+	for _, bad := range []string{`{"test":{"full":"t","newfield":1}}`, `{"newkind":"x"}`} {
+		_, err := ParseConfig([]byte(bad))
+		if err == nil || !strings.Contains(err.Error(), RebuildHint) {
+			t.Errorf("%s: err = %v, want it to contain %q", bad, err, RebuildHint)
+		}
+	}
+}
+
 func TestRepoChecksLimits(t *testing.T) {
 	raw, err := os.ReadFile("../.gx/checks.json")
 	if err != nil {

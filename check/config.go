@@ -119,6 +119,10 @@ func parseDuration(key string, raw json.RawMessage) (time.Duration, error) {
 	return d, nil
 }
 
+// RebuildHint is appended to an unknown-field or unknown-kind error: the usual
+// cause is an installed gx older than the config's repo.
+const RebuildHint = "this gx may be older than the repo; rebuild it with `go install github.com/elentok/gx@latest` (in the gx repo: `go install .`)"
+
 // Config maps a kind to its command; a missing kind is unconfigured.
 type Config map[string]Command
 
@@ -134,7 +138,7 @@ func ParseConfig(data []byte) (Config, error) {
 			continue
 		}
 		if !slices.Contains(Kinds, key) {
-			return nil, fmt.Errorf("unknown kind %q (want %s)", key, strings.Join(Kinds, ", "))
+			return nil, fmt.Errorf("unknown kind %q (want %s); %s", key, strings.Join(Kinds, ", "), RebuildHint)
 		}
 		c, err := parseCommand(top[key])
 		if err != nil {
@@ -166,6 +170,9 @@ func parseCommand(raw json.RawMessage) (Command, error) {
 		dec := json.NewDecoder(bytes.NewReader(raw))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&pair); err != nil {
+			if strings.Contains(err.Error(), "unknown field") {
+				return Command{}, fmt.Errorf("%v; %s", err, RebuildHint)
+			}
 			return Command{}, fmt.Errorf("want {\"changed\": string, \"full\": string}: %v", err)
 		}
 		if pair.Full == nil || *pair.Full == "" {
