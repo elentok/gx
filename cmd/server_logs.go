@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/cmd/cmdbase"
 )
 
 type serverLogsOpts struct {
@@ -18,8 +20,6 @@ type serverLogsOpts struct {
 	JSON   bool
 	Level  string
 }
-
-const logFollowInterval = 200 * time.Millisecond
 
 // runServerLogs prints the server's slog JSON file, optionally following it
 // until ctx is done.
@@ -65,7 +65,7 @@ func runServerLogs(ctx context.Context, path string, opts serverLogsOpts, w io.W
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(logFollowInterval):
+		case <-time.After(cmdbase.LogFollowInterval):
 		}
 		// A shrunk file means the server rotated it; start over on the new one.
 		if info, serr := os.Stat(path); serr == nil && info.Size() < offset {

@@ -68,7 +68,7 @@ var allowed = map[string]allowance{
 	// Hidden aliases.
 	"config/config.go":             allow("resume-on-start alias", "resumeonstart"),
 	"apiclient/queue.go":           allow("QueueDrain alias client for the hidden drain route", "drain"),
-	"cmd/server_reads.go":          allow("hidden drain and park command aliases", "drain", "park"),
+	"cmd/serverapi/server_reads.go": allow("hidden drain and park command aliases", "drain", "park"),
 	"server/ticketops/routes.go":   allow("hidden /v1/tickets/unpark route", "park"),
 	"server/ticketwrite/routes.go": allow("hidden /v1/tickets/park route", "park"),
 	"server/queue/routes.go":       allow("hidden /v1/queue/drain route", "drain"),
@@ -94,7 +94,7 @@ var allowed = map[string]allowance{
 	"server/index/reads.go":                         allow("persisted lock kind \"land\"", "land"),
 	"server/wire/mergerecover.go":                   allow("persisted event kind land-rolled-back", "land"),
 	"server/ticketops/repair.go":                    allow("hidden unpark verb and the persisted unpark answer choice", "park"),
-	"cmd/server_repair.go":                          allow("hidden unpark verb alias", "park"),
+	"cmd/serverapi/server_repair.go":                allow("hidden unpark verb alias", "park"),
 	"ralphloop/merge/lock.go":                       allow("on-disk land-locks state dir; renaming would orphan live locks", "land"),
 	"ralphloop/notify/notification_text.go":         allow("chat headlines \"needs answer\" and \"needs repair\"", "needsanswer", "needsrepair"),
 	"ralphloop/supervise/waitforfinish_recovery.go": allow("comment names the legacy Needs Answer heading", "needsanswer"),

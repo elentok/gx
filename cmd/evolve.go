@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
@@ -159,14 +160,14 @@ func submitRetro(ctx context.Context, env evolveEnv, w, errW io.Writer, project,
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
-	d := decideOneOff(res, false)
-	if d.notice != "" {
-		fmt.Fprintln(errW, d.notice)
+	d := serverapi.DecideOneOff(res, false)
+	if d.Notice != "" {
+		fmt.Fprintln(errW, d.Notice)
 	}
-	if d.printAddress {
+	if d.PrintAddress {
 		fmt.Fprintln(w, res.Address)
 	}
-	return d.err
+	return d.Err
 }
 
 // runEvolveSkip marks the epic as deliberately not evolved: evolved_at and

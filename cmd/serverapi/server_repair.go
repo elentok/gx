@@ -1,0 +1,129 @@
+package serverapi
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/server/ticketops"
+	"github.com/elentok/gx/server/wire"
+	"github.com/spf13/cobra"
+)
+
+// addServerRepairCmds adds the four repair verbs to `gx server tickets`. They
+// send the caller's cwd and branch; the server evaluates the guards.
+func addServerRepairCmds(parent *cobra.Command, d Deps) {
+	var req wire.RepairRequest
+	var jsonOut bool
+	verb := func(name, use, short string, args cobra.PositionalArgs, flags func(*cobra.Command)) *cobra.Command {
+		c := &cobra.Command{
+			Use:   use,
+			Short: short,
+			Args:  args,
+			RunE: func(c *cobra.Command, args []string) error {
+				req.Address = args[0]
+				cwd, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				req.Cwd = cwd
+				// An unreadable branch (not a repo) means no guard applies.
+				req.Branch, _ = git.CurrentBranch(cwd)
+				cl, err := d.Dial()()
+				if err != nil {
+					return err
+				}
+				direct := func(verb string, req wire.RepairRequest) (wire.RepairResult, error) {
+					return directRepair(d.Dirs(), verb, req)
+				}
+				return runServerRepair(c.Context(), cl, c.OutOrStdout(), jsonOut, name, req, direct)
+			},
+		}
+		c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+		if flags != nil {
+			flags(c)
+		}
+		parent.AddCommand(c)
+		return c
+	}
+
+	verb("merge", "merge <project:epic/NN>", "merge a stuck ticket's commits onto the feature branch and mark it done", cobra.ExactArgs(1), func(c *cobra.Command) {
+		c.Flags().StringVar(&req.From, "from", "", "exclusive base of an explicit commit range (requires --to)")
+		c.Flags().StringVar(&req.To, "to", "", "tip of an explicit commit range (requires --from)")
+		c.Flags().BoolVar(&req.IgnoreLiveTab, "ignore-live-tab", false, "merge even though the iteration's agent session exists")
+		c.Flags().BoolVar(&req.Continue, "continue", false, "finish a conflicted merge after resolving it")
+		c.Flags().BoolVar(&req.Abort, "abort", false, "abandon a conflicted merge")
+	})
+	verb("start-over", "start-over <project:epic/NN>", "send a stuck ticket back to open and keep its commits on a backup branch", cobra.ExactArgs(1), func(c *cobra.Command) {
+		c.Flags().StringVar(&req.Reason, "reason", "", "why the ticket is being started over (required)")
+		c.Flags().BoolVar(&req.Force, "force", false, "allow starting over a done ticket")
+		c.Flags().BoolVar(&req.DeleteBranch, "delete-branch", false, "delete the backup branch instead of keeping it under ralph-loop/attic/")
+	})
+	verb("resume", "resume <project:epic/NN>", "reopen a paused ticket and retire its Paused section into Comments", cobra.ExactArgs(1), func(c *cobra.Command) {
+		c.Flags().StringVar(&req.Tier, "tier", "", "run the next launch on this tier once (light, worker, strongest)")
+	})
+	verb("unpark", "unpark <project:epic/NN>", "alias of resume", cobra.ExactArgs(1), nil).Hidden = true
+	verb("verify", "verify <project:epic[/NN]>", "report whether each ticket's commits merged into the feature branch", cobra.ExactArgs(1), nil)
+}
+
+const directNotice = "server not running — ran directly under merge lock"
+
+// directRepair runs a verb in-process against the configured ticket store.
+func directRepair(dirs config.Dirs, verb string, req wire.RepairRequest) (wire.RepairResult, error) {
+	cfg, err := dirs.Load()
+	if err != nil {
+		return wire.RepairResult{}, err
+	}
+	return ticketops.RunRepairDirect(cfg.TicketStore.Path, verb, req)
+}
+
+// runServerRepair never starts the server. The repair verbs are the only
+// server writes with a fallback: a dead socket runs them directly via `direct`,
+// since they must work when the server is what's broken.
+func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, verb string, req wire.RepairRequest,
+	direct func(verb string, req wire.RepairRequest) (wire.RepairResult, error)) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := cl.Admin.Repair(ctx, verb, req)
+	switch {
+	case apiclient.IsNotRunning(err):
+		if res, err = direct(verb, req); err != nil {
+			return fmt.Errorf("direct %s failed: %w", verb, err)
+		}
+		if !jsonOut {
+			fmt.Fprintln(w, directNotice)
+		}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		via := cmdbase.ViaServer
+		if res.Via == wire.ViaDirect {
+			via = wire.ViaDirect
+		}
+		stamped, err := cmdbase.StampProvenance(res, via, cmdbase.ActorRecovery)
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(stamped)
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	var out bytes.Buffer
+	if err := json.Indent(&out, res.Data, "", "  "); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(w, out.String())
+	return err
+}

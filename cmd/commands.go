@@ -399,7 +399,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	cmd.AddCommand(followUpCmd)
 	cmd.AddCommand(newTicketsEpicCmd(d))
 	cmd.AddCommand(newTicketsAskCmd(d))
-	cmd.AddCommand(newTicketsAnswerCmd(d, false))
+	cmd.AddCommand(cmdbase.NewTicketsAnswerCmd(d.base(), false))
 	var sectionJSON, sectionClear bool
 	sectionCmd := &cobra.Command{
 		Use:   "section <addr|path> <heading> [<content|->]",

@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/cmd/doctor"
 	"github.com/elentok/gx/cmd/limits"
 	"github.com/elentok/gx/cmd/project"
+	"github.com/elentok/gx/cmd/serverapi"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
 	"github.com/elentok/gx/codexsession"
@@ -132,6 +133,12 @@ func (d deps) projectDeps() project.Deps {
 	s := project.DefaultDeps(d.env, d.stdinIsTerminal)
 	s.Env = d.base()
 	return s
+}
+
+// serverapiDeps is the `gx server` API verbs' hook joined with the shared env.
+// stdinIsTerminal stays in root deps because other commands read it too.
+func (d deps) serverapiDeps() serverapi.Deps {
+	return serverapi.Deps{Env: d.base(), StdinIsTerminal: d.stdinIsTerminal}
 }
 
 // dirs resolves the config, data and state directories from the deps env.

@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/limits"
+	"github.com/elentok/gx/cmd/serverapi"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -114,7 +115,7 @@ stop does not wait for running tickets.`,
 	logs.Flags().StringVar(&logOpts.Level, "level", "", "minimum level to show: debug, info, warn or error")
 	logs.Flags().BoolVar(&logOpts.JSON, "json", false, "print raw JSON lines instead of pretty output")
 	cmd.AddCommand(logs)
-	cmd.AddCommand(newServerSnapshotCmd(d), newServerEventsCmd(d), newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDefaultHarnessCmd(d), newServerDefaultHarnessSetCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerRestartCheckCmd(d), newServerRestartNowCmd(d), newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d), newServerWebResetAuthenticatorCmd(d), newServerWebLoginsCmd(d), newServerWebRevokeCmd(d), newServerWebPasswordCmd(d))
+	cmd.AddCommand(serverapi.Commands(d.serverapiDeps())...)
 	return cmd
 }
 
@@ -397,7 +398,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		}
 	}
 	if info.WebSetupCode != "" {
-		if _, err = fmt.Fprintln(w, setupCodeLine(info.WebSetupCode, info.WebSetupExpires)); err != nil {
+		if _, err = fmt.Fprintln(w, cmdbase.SetupCodeLine(info.WebSetupCode, info.WebSetupExpires)); err != nil {
 			return err
 		}
 	}
@@ -422,7 +423,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		}
 	}
 	if info.Config != nil {
-		if err = writeConfigBlock(w, *info.Config, time.Now()); err != nil {
+		if err = cmdbase.WriteConfigBlock(w, *info.Config, time.Now()); err != nil {
 			return err
 		}
 	}

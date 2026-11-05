@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
@@ -12,6 +13,9 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/spf13/cobra"
 )
+
+// LogFollowInterval is how often a followed log (server or agent) is polled.
+const LogFollowInterval = 200 * time.Millisecond
 
 // ServerClient returns the real client for the server's socket under dirs.
 func ServerClient(dirs config.Dirs) (*apiclient.Client, error) {
