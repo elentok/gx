@@ -18,6 +18,27 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// outcome is one iteration's or one merge's result.
+type outcome struct {
+	ticket tickets.Ticket
+	err    error
+	// built is true when this outcome is a build that finished with commits
+	// ready to merge (ahead > 0): iteration_status: finished is already
+	// written.
+	built bool
+	// pausedOnChild is true when this outcome is a merge outcome whose
+	// cherry-pick hit errConflictResolutionUnresolved: the ticket was paused
+	// (repair) on a conflict-resolution child, not merged — it stays claimed on
+	// disk. err is nil on this path (pausing already handled the failure).
+	pausedOnChild bool
+	// childReason names the conflict-resolution child and why it failed, on a
+	// pausedOnChild outcome; the server pauses the parent with it.
+	childReason string
+	// mergeDeferred is set by mergeOne when the merge lock was held or a human's
+	// conflict marker is pending.
+	mergeDeferred bool
+}
+
 // mergeDeferRetryInterval is how long the worker waits before retrying a merge
 // it deferred; a var so tests can shorten it.
 var mergeDeferRetryInterval = 2 * time.Second

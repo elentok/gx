@@ -21,6 +21,14 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// ticketAddress is the canonical "project:epic/NN" address of the ticket
+// file at ticketPath (<root>/<epic>/issues/NN-<slug>.md), the only form
+// iteration prompts hand to agents.
+func ticketAddress(t tickets.Ticket) string {
+	a, _ := tickets.AddressOfPath(t.Path, t.Identifier)
+	return a.String()
+}
+
 // FinishOutcome is how a finished iteration ended without an error: the ticket
 // merged, or it paused with a status and kind. A failed finish is the error
 // return of FinishIteration, never an outcome.

@@ -30,7 +30,7 @@ import (
 
 // conflictResolver is a fake stand-in for the real "/resolving-merge-
 // conflicts" agent production Ralph-loop launches on a cherry-pick conflict
-// (see resolveCherryPickConflict in iteration.go): hooked into fakeDeps'
+// (see resolveCherryPickConflict in conflict.go): hooked into fakeDeps'
 // Runner, it recognizes the same skill prompt, then — instead of an LLM turn
 // — does the deterministic real-git equivalent of what that skill instructs
 // an agent to do: verify it's running in the feature worktree with a
