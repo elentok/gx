@@ -9,6 +9,8 @@ export interface MoreActionsItem {
   label: ReactNode;
   /** A smaller line under the label. */
   hint?: ReactNode;
+  /** Puts the hint on the label's row, at the right edge, instead of under it. */
+  inlineHint?: boolean;
   danger?: boolean;
   /** False keeps the menu open after the pick. */
   closeOnSelect?: boolean;
@@ -98,8 +100,9 @@ export function MoreActionsMenu({
                   closeOnSelect={it.closeOnSelect}
                   disabled={it.disabled}
                   onClick={it.onSelect}
-                  flexDirection="column"
-                  alignItems="flex-start"
+                  {...(it.inlineHint
+                    ? { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: "10px" }
+                    : { flexDirection: "column", alignItems: "flex-start" })}
                   {...item}
                   {...(it.danger && { color: "tone.paused.fg" })}
                 >

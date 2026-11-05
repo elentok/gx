@@ -26,6 +26,20 @@ describe("MoreActionsMenu", () => {
     expect(getAllByRole("separator")).toHaveLength(1);
   });
 
+  it("lays an inline hint on the label's row and a plain hint under it", async () => {
+    const s = [
+      [
+        { value: "a", label: "Inline", hint: "h", inlineHint: true, onSelect: vi.fn() },
+        { value: "b", label: "Below", hint: "h", onSelect: vi.fn() },
+      ],
+    ];
+    const { getByRole, findByRole } = renderMenu(true, s);
+    fireEvent.click(getByRole("button", { name: "More actions" }));
+    const inline = await findByRole("menuitem", { name: /Inline/ });
+    expect(getComputedStyle(inline).flexDirection).toBe("row");
+    expect(getComputedStyle(getByRole("menuitem", { name: /Below/ })).flexDirection).toBe("column");
+  });
+
   it("closes on pick and runs the item", async () => {
     const copy = vi.fn();
     const { getByRole, findByRole, queryByRole } = renderMenu(true, sections(copy));

@@ -269,7 +269,7 @@ export function DesignActionsMenu({
         />
       ),
     });
-  sections.push([{ value: "copy-design-id", label: "Copy design ID", hint: address, onSelect: () => void copyText(address, null) }]);
+  sections.push([{ value: "copy-design-id", label: "Copy design ID", hint: address, inlineHint: true, onSelect: () => void copyText(address, null) }]);
   if (canDelete && confirming)
     sections.push({
       content: (

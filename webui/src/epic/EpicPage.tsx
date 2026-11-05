@@ -236,6 +236,7 @@ function EpicMenu({ address }: { address: string }) {
             value: "copy-epic-id",
             label: "Copy epic ID",
             hint: address,
+            inlineHint: true,
             onSelect: () => void copyText(address, null),
           },
         ],
