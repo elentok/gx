@@ -385,7 +385,7 @@ func TestSearchConfirmedSyncsToCrossPane(t *testing.T) {
 	}
 
 	// Counter for inactive section should be non-empty (advisor check)
-	counter := m.searchCounterForDiffSection(diffarea.SectionStaged)
+	counter := m.diffarea.SearchCounter(diffarea.SectionStaged, m.focus == focusDiff, m.settings.UseNerdFontIcons)
 	if inactive.MatchesCount() > 0 && counter == "" {
 		t.Fatal("expected non-empty counter for inactive section when it has matches")
 	}

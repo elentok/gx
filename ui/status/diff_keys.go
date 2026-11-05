@@ -14,7 +14,7 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if result.Handled {
 		m.diffarea.SetNavMode(m.diffarea.ActiveSectionModel().NavMode())
 		if result.SearchConfirmed {
-			m.syncSearchToInactivePane()
+			m.diffarea.SyncSearchToInactive()
 		}
 		return m, cmd
 	}

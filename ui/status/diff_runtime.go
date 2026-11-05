@@ -1,6 +1,10 @@
 package status
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"github.com/elentok/gx/ui/status/diffarea"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func (m *Model) switchDiffSection() {
 	m.diffarea.ToggleSection()
@@ -12,6 +16,10 @@ func (m *Model) focusDiffPane() { m.focus = focusDiff }
 
 func (m *Model) diffLoadEnv() diffLoadEnv {
 	file, ok := m.selectedStatusFile()
+	_, diffW := m.splitWidth()
+	if m.diffarea.Fullscreen && m.focus == focusDiff {
+		diffW = m.width
+	}
 	return diffLoadEnv{
 		host:         m,
 		diffarea:     &m.diffarea,
@@ -19,9 +27,31 @@ func (m *Model) diffLoadEnv() diffLoadEnv {
 		home:         m.settings.Home(),
 		file:         file,
 		hasFile:      ok,
-		contextLines: m.currentDiffContextLines(),
-		renderWidth:  m.deltaRenderWidth(),
+		contextLines: m.diffarea.ContextLines(),
+		renderWidth:  diffarea.RenderWidth(diffW, m.settings.UseNerdFontIcons),
 	}
+}
+
+func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
+	if !m.diffarea.AdjustContextLines(delta) {
+		return nil
+	}
+	cmd := m.reloadDiffsForSelection()
+	m.syncDiffViewports()
+	if m.focus == focusDiff {
+		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
+	}
+	return cmd
+}
+
+func (m *Model) toggleRenderMode() tea.Cmd {
+	if !m.diffarea.ToggleRenderMode() {
+		return nil
+	}
+	cmd := m.reloadDiffsForSelection()
+	m.syncDiffViewports()
+	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
+	return cmd
 }
 
 func (m *Model) diffActionCtx() diffActionCtx {

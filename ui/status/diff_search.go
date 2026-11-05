@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/status/diffarea"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -53,18 +54,12 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) syncSearchToInactivePane() {
-	active := m.diffarea.ActiveSectionModel()
-	inactive := m.diffarea.InactiveSectionModel()
-	query := active.Search().Query()
-	diffMatches := inactive.ComputeSearchMatches(query)
-	searchMatches := make([]search.Match, len(diffMatches))
-	for i, dm := range diffMatches {
-		searchMatches[i] = search.Match{DataIndex: dm.RawIndex, ViewportRow: dm.DisplayIndex}
+func (m Model) searchCounterForFiletreePane() string {
+	search := m.filetree.model.Search()
+	if m.focus != focusFiletree || !search.HasQuery() || search.MatchesCount() == 0 {
+		return ""
 	}
-	inactive.Search().Start(query)
-	inactive.Search().SetMatches(searchMatches)
-	inactive.Search().DismissAndKeepResults()
+	return diffarea.SearchCounterText(m.settings.UseNerdFontIcons, search.Cursor(), search.MatchesCount())
 }
 
 func (m Model) filetreeEntrySearchText(entry tree.Entry[stage.StageFileStatus]) string {

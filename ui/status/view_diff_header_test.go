@@ -23,7 +23,7 @@ func newDiffHeaderTestModel(t *testing.T) Model {
 }
 
 func sectionHeader(m Model, section diffarea.Section) string {
-	pane := m.renderSectionPane(80, 20, section)
+	pane := m.diffarea.RenderSection(80, 20, section, m.diffPaneInput())
 	return ansi.Strip(strings.SplitN(pane, "\n", 2)[0])
 }
 

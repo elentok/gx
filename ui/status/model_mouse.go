@@ -2,8 +2,6 @@ package status
 
 import (
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -44,7 +42,7 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 		return false
 	}
 
-	diffviewModel := m.mouseTargetSection(y-diffY, diffH)
+	diffviewModel := m.diffarea.SectionAt(y-diffY, diffH)
 	if diffviewModel == nil {
 		return false
 	}
@@ -84,27 +82,4 @@ func (m Model) diffRect(mainH int) (x, y, w, h int, ok bool) {
 	}
 	filetreeW, diffW := m.splitWidth()
 	return filetreeW, 0, diffW, mainH, true
-}
-
-func (m *Model) mouseTargetSection(relY, diffH int) *diffview.Model {
-	if diffH <= 0 {
-		return nil
-	}
-	expandedH, collapsedH := diffPaneHeights(diffH)
-	if m.diffarea.ActiveSection == diffarea.SectionStaged {
-		if relY < collapsedH {
-			return m.diffarea.SectionModel(diffarea.SectionUnstaged)
-		}
-		if relY < collapsedH+expandedH {
-			return m.diffarea.SectionModel(diffarea.SectionStaged)
-		}
-		return nil
-	}
-	if relY < expandedH {
-		return m.diffarea.SectionModel(diffarea.SectionUnstaged)
-	}
-	if relY < expandedH+collapsedH {
-		return m.diffarea.SectionModel(diffarea.SectionStaged)
-	}
-	return nil
 }

@@ -26,10 +26,9 @@ type Model struct {
 	height int
 	ready  bool
 
-	focus            focusPane
-	diffarea         diffarea.Model
-	diffContextLines int
-	filetree         filetreePane
+	focus    focusPane
+	diffarea diffarea.Model
+	filetree filetreePane
 
 	err  error
 	help help.Model
@@ -86,19 +85,19 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 	}
 	statusKeys := newStatusManager()
 	diffarreaModel := diffarea.NewModel(settings.UseNerdFontIcons)
+	diffarreaModel.SetContextLines(settings.DiffContextLines)
 	fileTreeModel := tree.NewModel[stage.StageFileStatus](toggleStageBinding, discardBinding)
 	m := Model{
-		worktreeRoot:     worktreeRoot,
-		isBareRepo:       isBareRepo,
-		settings:         settings,
-		initialPath:      initialPath,
-		diffContextLines: settings.DiffContextLines,
-		help:             help.NewModel(append(help.BuildSections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys(), extraKeys), diffHeaderHelpSection()), settings.About),
-		keys:             statusKeys,
-		focus:            focusFiletree,
-		diffarea:         diffarreaModel,
-		filetree:         filetreePane{model: fileTreeModel},
-		git:              gitops.New(),
+		worktreeRoot: worktreeRoot,
+		isBareRepo:   isBareRepo,
+		settings:     settings,
+		initialPath:  initialPath,
+		help:         help.NewModel(append(help.BuildSections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys(), extraKeys), diffHeaderHelpSection()), settings.About),
+		keys:         statusKeys,
+		focus:        focusFiletree,
+		diffarea:     diffarreaModel,
+		filetree:     filetreePane{model: fileTreeModel},
+		git:          gitops.New(),
 
 		overlay: imagediff.NewOverlay(imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
 		fetchImageDiffBlobs: func(file stage.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool) {

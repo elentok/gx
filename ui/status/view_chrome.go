@@ -5,7 +5,6 @@ import (
 
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/status/diffarea"
 )
 
 func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool) string {
@@ -15,21 +14,6 @@ func (m Model) renderFiletreePanelWithBorderTitle(width, height int, title, righ
 		accent = ui.ColorBlue
 	}
 	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active, titleColor, accent, true))
-}
-
-func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle string, lines []string, active bool, section diffarea.Section) string {
-	highlightMoved := m.diffarea.Flash.Active && m.diffarea.Flash.Section == section
-	titleColor := ui.ColorOrange
-	if section == diffarea.SectionStaged {
-		titleColor = ui.ColorGreen
-	}
-	accent := color.Color(nil)
-	if active || highlightMoved {
-		accent = titleColor
-	}
-	opts := ui.PanelOptionsFor(width, height, title, rightTitle, lines, active || highlightMoved, titleColor, accent, false)
-	opts.RightTitleStyled = true
-	return ui.RenderPanel(opts)
 }
 
 type filetreePaneIcons struct {

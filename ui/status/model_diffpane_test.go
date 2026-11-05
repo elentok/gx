@@ -115,20 +115,20 @@ func TestAdjustDiffContextLinesInDiffFocus(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.currentDiffContextLines() != 1 {
-		t.Fatalf("expected initial diff context 1, got %d", m.currentDiffContextLines())
+	if m.diffarea.ContextLines() != 1 {
+		t.Fatalf("expected initial diff context 1, got %d", m.diffarea.ContextLines())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	m = updated.(Model)
-	if m.currentDiffContextLines() != 2 {
-		t.Fatalf("expected diff context 2 after ], got %d", m.currentDiffContextLines())
+	if m.diffarea.ContextLines() != 2 {
+		t.Fatalf("expected diff context 2 after ], got %d", m.diffarea.ContextLines())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
-	if m.currentDiffContextLines() != 1 {
-		t.Fatalf("expected diff context 1 after [, got %d", m.currentDiffContextLines())
+	if m.diffarea.ContextLines() != 1 {
+		t.Fatalf("expected diff context 1 after [, got %d", m.diffarea.ContextLines())
 	}
 }
 
@@ -276,8 +276,8 @@ func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	m = updated.(Model)
-	if m.currentDiffContextLines() != 2 {
-		t.Fatalf("expected session diff context 2 after [, got %d", m.currentDiffContextLines())
+	if m.diffarea.ContextLines() != 2 {
+		t.Fatalf("expected session diff context 2 after [, got %d", m.diffarea.ContextLines())
 	}
 	if m.settings.DiffContextLines != 3 {
 		t.Fatalf("expected settings diff context to remain 3, got %d", m.settings.DiffContextLines)
@@ -285,8 +285,8 @@ func TestAdjustDiffContextLinesIsSessionOnly(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	m = updated.(Model)
-	if m.currentDiffContextLines() != 3 {
-		t.Fatalf("expected session diff context 3 after ], got %d", m.currentDiffContextLines())
+	if m.diffarea.ContextLines() != 3 {
+		t.Fatalf("expected session diff context 3 after ], got %d", m.diffarea.ContextLines())
 	}
 }
 
@@ -586,7 +586,7 @@ func TestHunkOverflowViewportMarkers(t *testing.T) {
 		m.syncDiffViewports()
 
 		m.diffarea.Unstaged.Viewport().SetYOffset(3)
-		pane := m.renderSectionPane(80, 10, diffarea.SectionUnstaged)
+		pane := m.diffarea.RenderSection(80, 10, diffarea.SectionUnstaged, m.diffPaneInput())
 
 		if strings.Contains(pane, "hunk>view") {
 			t.Fatalf("unexpected legacy hunk>view indicator in pane:\n%s", pane)
@@ -659,7 +659,7 @@ func TestStageSearchDiffUsesRightEdgeIndicatorInHunkMode(t *testing.T) {
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
 	m.diffarea.SetNavMode(diffview.NavModeHunk)
 
-	pane := m.renderSectionPane(80, 12, diffarea.SectionUnstaged)
+	pane := m.diffarea.RenderSection(80, 12, diffarea.SectionUnstaged, m.diffPaneInput())
 	if !strings.Contains(ansi.Strip(pane), "needle") {
 		t.Fatalf("expected search match text highlighted in diff pane")
 	}

@@ -258,7 +258,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.keys.Reset()
 			m.diffarea.SetNavMode(m.diffarea.ActiveSectionModel().NavMode())
 			if result.SearchConfirmed {
-				m.syncSearchToInactivePane()
+				m.diffarea.SyncSearchToInactive()
 			}
 			if activeWrap := m.diffarea.ActiveSectionModel().WrapEnabled(); activeWrap != m.diffarea.Wrap() {
 				m.diffarea.SetWrap(activeWrap)

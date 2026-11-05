@@ -30,6 +30,7 @@ type Model struct {
 	Fullscreen       bool
 	wrap             bool
 	useNerdFontIcons bool
+	contextLines     int
 	Unstaged         diffview.Model
 	Staged           diffview.Model
 	Flash            FlashState

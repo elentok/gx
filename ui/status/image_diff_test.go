@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/kittygraphics"
+	"github.com/elentok/gx/ui/status/diffarea"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -240,7 +241,7 @@ func TestImageDiffPanelGeometryUsesMainContentHeight(t *testing.T) {
 	if !ok {
 		t.Fatal("expected a diff rect")
 	}
-	expandedH, _ := diffPaneHeights(diffH)
+	expandedH, _ := diffarea.PaneHeights(diffH)
 	_, _, _, rows, ok := m.PanelGeometry()
 	if !ok {
 		t.Fatal("expected panel geometry")

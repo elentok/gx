@@ -76,7 +76,7 @@ func (m Model) PanelGeometry() (originCol, originRow, availCols, availRows int, 
 		return 0, 0, 0, 0, false
 	}
 
-	expandedH, collapsedH := diffPaneHeights(diffH)
+	expandedH, collapsedH := diffarea.PaneHeights(diffH)
 	paneY, paneH := diffY, expandedH
 	if m.diffarea.ActiveSection == diffarea.SectionStaged {
 		paneY = diffY + collapsedH

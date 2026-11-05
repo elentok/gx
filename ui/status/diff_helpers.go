@@ -2,7 +2,6 @@ package status
 
 import (
 	"github.com/elentok/gx/git/stage"
-	"github.com/elentok/gx/ui/status/diffarea"
 )
 
 type statusDiffFileSelection struct {
@@ -14,22 +13,6 @@ type statusDiffFileSelection struct {
 
 type statusDiffSelection struct {
 	file statusDiffFileSelection
-}
-
-func (m Model) diffEmptyMessage() string {
-	return "No file selected"
-}
-
-func (m Model) sectionTitle(section diffarea.Section) string {
-	if section == diffarea.SectionStaged {
-		return "Staged"
-	}
-	return "Unstaged"
-}
-
-func (m Model) sectionHasContent(section diffarea.Section) bool {
-	data := m.diffarea.SectionModel(section).Data()
-	return data.HasContent()
 }
 
 func (m Model) selectedStatusFile() (statusDiffFileSelection, bool) {

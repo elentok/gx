@@ -2,204 +2,37 @@ package status
 
 import (
 	"fmt"
-	"image/color"
 	"os"
 	"path/filepath"
 
 	"github.com/elentok/gx/git/stage"
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/diffview"
-	"github.com/elentok/gx/ui/diffview/diffcore"
-	"github.com/elentok/gx/ui/diffview/diffrender"
 	"github.com/elentok/gx/ui/status/diffarea"
-
-	"charm.land/lipgloss/v2"
 )
 
+func (m *Model) diffPaneInput() diffarea.PaneInput {
+	in := diffarea.PaneInput{
+		DiffFocused: m.focus == focusDiff,
+		NerdFont:    m.settings.UseNerdFontIcons,
+		BinaryLines: m.appendBinaryDiffLines,
+	}
+	if file, ok := m.selectedStatusFile(); ok {
+		in.File = diffarea.DisplayedPath(file.stageFile)
+	}
+	return in
+}
+
 func (m *Model) renderDiffPane(width, height int) string {
-	if height <= 0 || width <= 0 {
-		return ""
-	}
-
-	expandedH, collapsedH := diffPaneHeights(height - 1) // seam row
-	seam := ui.RenderSeamRow(width, ui.SeamColor)
-	if m.diffarea.ActiveSection == diffarea.SectionStaged {
-		top := m.renderSectionPane(width, collapsedH, diffarea.SectionUnstaged)
-		bottom := m.renderSectionPane(width, expandedH, diffarea.SectionStaged)
-		return lipgloss.JoinVertical(lipgloss.Left, top, seam, bottom)
-	}
-
-	top := m.renderSectionPane(width, expandedH, diffarea.SectionUnstaged)
-	bottom := m.renderSectionPane(width, collapsedH, diffarea.SectionStaged)
-	return lipgloss.JoinVertical(lipgloss.Left, top, seam, bottom)
+	return m.diffarea.Render(width, height, m.diffPaneInput())
 }
 
-func (m *Model) renderSectionPane(width, height int, section diffarea.Section) string {
-	if width <= 0 || height <= 0 {
-		return ""
-	}
-	innerW := maxInt(1, width-2)
-	innerH := maxInt(1, height-2)
-
-	activeSection := m.focus == focusDiff && m.diffarea.ActiveSection == section
-	collapsed := !activeSection && height <= collapsedDiffSectionHeight
-
-	bodyH := innerH
-	if bodyH < 0 {
-		bodyH = 0
-	}
-
-	title := m.sectionTitle(section)
-	diffviewModel := m.diffarea.SectionModel(section)
-	diff := diffviewModel.DataRef()
-	accent := ui.ColorOrange
-	if section == diffarea.SectionStaged {
-		accent = ui.ColorGreen
-	}
-	diffviewModel.Viewport().SetHeight(maxInt(0, bodyH))
-	diffviewModel.Viewport().SetWidth(innerW)
-
-	titleText := m.diffSectionPaneTitle(title, section, !collapsed)
-	if si := diffrender.ParseSymlinkDiffInfo(diff.Parsed); si.IsSymlink {
-		if label := si.TitleLabel(); label != "" {
-			titleText += " " + label
-		}
-	}
-	if m.diffarea.Fullscreen {
-		titleText += " [fullscreen]"
-	}
-	rightTitleText := m.diffSectionHeaderOptions(diffviewModel, section, activeSection, accent)
-
-	lines := make([]string, 0, bodyH)
-	if len(diff.ViewLines) == 0 && diffcore.HasBinaryDiff(diff.Parsed) {
-		lines = m.appendBinaryDiffLines(lines, bodyH, innerW)
-	}
-	if len(lines) == 0 && bodyH > 0 {
-		if placeholder := m.sectionPlaceholder(section, collapsed); placeholder != "" {
-			lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(placeholder))
-		}
-	}
-
-	if len(lines) == 0 {
-		lines = diffviewModel.RenderRows(bodyH, activeSection, diffview.RenderOpts{
-			AccentColor: accent,
-			InnerWidth:  innerW,
-			SearchMatch: func(displayIdx int) (bool, bool) {
-				return diffviewModel.SearchMatchAt(displayIdx)
-			},
-			SearchQuery: diffviewModel.Search().Query(),
-		})
-	}
-	for len(lines) < bodyH {
-		lines = append(lines, "")
-	}
-	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection, section)
-}
-
-// diffSectionHeaderOptions builds the pre-styled right side of a diff panel
-// header. Only the focused panel shows the diff options; the others keep just
-// their scroll % and search counter.
-func (m Model) diffSectionHeaderOptions(diffviewModel *diffview.Model, section diffarea.Section, focused bool, accent color.Color) string {
-	dim := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	search := m.searchCounterForDiffSection(section)
-	if !focused {
-		if text := diffview.JoinDot(diffviewModel.ScrollPercentText(), search); text != "" {
-			return dim.Render(text)
-		}
-		return ""
-	}
-	context := fmt.Sprintf("±%d", m.currentDiffContextLines())
-	out := dim.Render(diffview.JoinDot(m.navModeLabel(), context, diffviewModel.ScrollPercentText(), search))
-	if m.diffarea.Wrap() {
-		wrap := "wrap"
-		if icon := ui.Icons(m.settings.UseNerdFontIcons).Wrap; icon != "" {
-			wrap = icon + " " + wrap
-		}
-		out = lipgloss.NewStyle().Foreground(accent).Render(wrap) + dim.Render(" · ") + out
-	}
-	if diffviewModel.DataRef().VisualActive {
-		out = ui.RenderChip("VISUAL", accent) + " " + out
-	}
-	return out
-}
-
-const collapsedDiffSectionHeight = 3
-
-func diffPaneHeights(total int) (expanded, collapsed int) {
-	if total <= 0 {
-		return 0, 0
-	}
-	collapsed = collapsedDiffSectionHeight
-	if total < collapsed+3 {
-		collapsed = maxInt(1, total-3)
-	}
-	if collapsed < 0 {
-		collapsed = 0
-	}
-	expanded = total - collapsed
-	if expanded <= 0 {
-		expanded = total
-		collapsed = 0
-	}
-	return expanded, collapsed
-}
-
-func (m Model) sectionPaneTitle(title string, section diffarea.Section) string {
-	if !m.sectionHasContent(section) {
-		return title + " (empty)"
-	}
-	return title
-}
-
-func (m Model) diffSectionPaneTitle(title string, section diffarea.Section, expanded bool) string {
-	if !expanded {
-		return m.sectionPaneTitle(title, section)
-	}
-	file, ok := m.selectedStatusFile()
-	if !ok {
-		return m.sectionPaneTitle(title, section)
-	}
-	return title + ": " + m.diffDisplayedPath(file.stageFile)
-}
-
-func (m Model) diffDisplayedPath(file stage.StageFileStatus) string {
-	if file.IsRenamed() && file.RenameFrom != "" {
-		return file.RenameFrom + " -> " + file.Path
-	}
-	return file.Path
-}
-
-func (m Model) sectionPlaceholder(section diffarea.Section, collapsed bool) string {
-	if _, ok := m.selectedStatusFile(); !ok {
-		return m.diffEmptyMessage()
-	}
-	if !m.sectionHasContent(section) {
-		if collapsed {
-			return "empty"
-		}
-		return "No changes"
-	}
-	return ""
-}
 func (m *Model) syncDiffViewports() {
 	_, diffW := m.splitWidth()
 	filetreeH, diffH := m.splitHeight(m.mainContentHeight())
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
-	vpW := maxInt(1, diffW-4)
-	wrapWidth := maxInt(1, vpW-2)
-	reflowSectionLines(m.diffarea.SectionModel(diffarea.SectionUnstaged), wrapWidth, m.diffarea.Wrap())
-	reflowSectionLines(m.diffarea.SectionModel(diffarea.SectionStaged), wrapWidth, m.diffarea.Wrap())
-
-	expandedH, collapsedH := diffPaneHeights(diffH - 1)
-	m.diffarea.SyncViewports(vpW, expandedH, collapsedH)
+	m.diffarea.SyncForSize(diffW, diffH)
 	m.filetree.model.SetVisibleHeight(m.filetreeInnerHeight(filetreeH))
-}
-
-func reflowSectionLines(diffviewModel *diffview.Model, wrapWidth int, wrap bool) {
-	diffviewModel.EnableWrap(wrap)
-	diffviewModel.Reflow(wrapWidth)
 }
 
 func (m Model) binarySummaryLine() string {
