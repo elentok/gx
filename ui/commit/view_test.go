@@ -255,7 +255,7 @@ func TestView_FiletreeSearchOverlayAppearsInView(t *testing.T) {
 func TestInputFocused_DiffSearchDelegatesIntoDiffModel(t *testing.T) {
 	m := Model{ready: true, width: 100, height: 20, sidebar: filesPane{fileTreeModel: tree.NewModel[stage.CommitFile]()}}
 	m.focusDiff = true
-	m.diffModel.Search().Start("diff")
+	m.diff.diffModel.Search().Start("diff")
 	if !m.InputFocused() {
 		t.Fatal("expected InputFocused=true when diffModel search is active")
 	}

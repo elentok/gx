@@ -38,9 +38,9 @@ func TestFilterLogViewStateIncludesLineRangeWhenDiffFocusedHunkMode(t *testing.T
 	m := newTestModel(repo, "HEAD")
 	m.ready = true
 	m.focusDiff = true
-	m.diffModel.SetNavMode(diffview.NavModeHunk)
+	m.diff.diffModel.SetNavMode(diffview.NavModeHunk)
 
-	data := m.diffModel.DataRef()
+	data := m.diff.diffModel.DataRef()
 	data.ActiveHunk = 0
 	data.Parsed.Hunks = []diffcore.ParsedHunk{{NewStart: 3, NewCount: 2}}
 
@@ -54,9 +54,9 @@ func TestFilterLogViewStateIncludesLineRangeWhenDiffFocusedHunkMode(t *testing.T
 func TestActiveLogLineRangeInHunkModeReturnsHunkBounds(t *testing.T) {
 	m := newTestModel(testutil.TempRepo(t), "HEAD")
 	m.ready = true
-	m.diffModel.SetNavMode(diffview.NavModeHunk)
+	m.diff.diffModel.SetNavMode(diffview.NavModeHunk)
 
-	data := m.diffModel.DataRef()
+	data := m.diff.diffModel.DataRef()
 	data.ActiveHunk = 0
 	data.Parsed.Hunks = []diffcore.ParsedHunk{{NewStart: 10, NewCount: 5}}
 
@@ -69,9 +69,9 @@ func TestActiveLogLineRangeInHunkModeReturnsHunkBounds(t *testing.T) {
 func TestActiveLogLineRangeInLineModeReturnsChangedLine(t *testing.T) {
 	m := newTestModel(testutil.TempRepo(t), "HEAD")
 	m.ready = true
-	m.diffModel.SetNavMode(diffview.NavModeLine)
+	m.diff.diffModel.SetNavMode(diffview.NavModeLine)
 
-	data := m.diffModel.DataRef()
+	data := m.diff.diffModel.DataRef()
 	data.ActiveLine = 0
 	data.Parsed.Changed = []diffcore.ChangedLine{{NewLine: 7}}
 
@@ -84,8 +84,8 @@ func TestActiveLogLineRangeInLineModeReturnsChangedLine(t *testing.T) {
 func TestActiveLogLineRangeReturnsZeroWhenNoActiveHunk(t *testing.T) {
 	m := newTestModel(testutil.TempRepo(t), "HEAD")
 	m.ready = true
-	m.diffModel.SetNavMode(diffview.NavModeHunk)
-	m.diffModel.DataRef().ActiveHunk = -1
+	m.diff.diffModel.SetNavMode(diffview.NavModeHunk)
+	m.diff.diffModel.DataRef().ActiveHunk = -1
 
 	start, end := m.activeLogLineRange()
 	if start != 0 || end != 0 {
@@ -140,7 +140,7 @@ func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
 		m := newDiffFocusModel(t)
 		updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 		m = updated.(Model)
-		if !m.diffModel.HasPendingChord() {
+		if !m.diff.diffModel.HasPendingChord() {
 			t.Fatal("after first g: expected diffview pending chord=true")
 		}
 		if len(m.keys.Prefix()) != 1 || m.keys.Prefix()[0] != "g" {
@@ -149,7 +149,7 @@ func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 		m = updated.(Model)
-		if m.diffModel.HasPendingChord() {
+		if m.diff.diffModel.HasPendingChord() {
 			t.Fatal("after g+esc: expected diffview pending chord=false")
 		}
 		if len(m.keys.Prefix()) != 0 {
@@ -164,13 +164,13 @@ func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
 		m := newDiffFocusModel(t)
 		updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 		m = updated.(Model)
-		if !m.diffModel.HasPendingChord() {
+		if !m.diff.diffModel.HasPendingChord() {
 			t.Fatal("after first g: expected diffview pending chord=true")
 		}
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 		m = updated.(Model)
-		if m.diffModel.HasPendingChord() {
+		if m.diff.diffModel.HasPendingChord() {
 			t.Fatal("after g+g: expected diffview pending chord=false")
 		}
 		if len(m.keys.Prefix()) != 0 {
@@ -194,7 +194,7 @@ func TestGChordBindingsReachableFromDiffFocus(t *testing.T) {
 		} else if vs.Tab != nav.TabLog {
 			t.Fatalf("expected TabLog, got %q", vs.Tab)
 		}
-		if m.diffModel.HasPendingChord() {
+		if m.diff.diffModel.HasPendingChord() {
 			t.Fatal("after g+h: expected diffview pending chord=false")
 		}
 		if len(m.keys.Prefix()) != 0 {

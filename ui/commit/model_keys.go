@@ -124,16 +124,16 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.focusHeader = false
 			return m, nil
 		}
-		if m.focusDiff && m.diffModel.Search().IsActive() {
-			m.diffModel.Search().DismissAndClear()
+		if m.focusDiff && m.diff.diffModel.Search().IsActive() {
+			m.diff.diffModel.Search().DismissAndClear()
 			return m, nil
 		}
 		if !m.focusDiff && m.sidebar.fileTreeModel.Search().IsActive() {
 			m.sidebar.fileTreeModel.Search().DismissAndClear()
 			return m, nil
 		}
-		if m.focusDiff && m.diffModel.DataRef().VisualActive {
-			m.diffModel.DisableVisual()
+		if m.focusDiff && m.diff.diffModel.DataRef().VisualActive {
+			m.diff.diffModel.DisableVisual()
 			return m, nil
 		}
 		if m.focusDiff {
@@ -307,8 +307,8 @@ func (m Model) filterLogViewState() nav.ViewState {
 }
 
 func (m Model) activeLogLineRange() (startLine, endLine int) {
-	data := m.diffModel.Data()
-	navMode := m.diffModel.NavMode()
+	data := m.diff.diffModel.Data()
+	navMode := m.diff.diffModel.NavMode()
 
 	if navMode == diffview.NavModeHunk {
 		if data.ActiveHunk >= 0 && data.ActiveHunk < len(data.Parsed.Hunks) {
@@ -347,7 +347,7 @@ func (m Model) handleTabFocusCycle() (tea.Model, tea.Cmd) {
 	} else {
 		m.focusDiff = true
 		m.focusHeader = false
-		m.ensureActiveVisible()
+		m.diff.ensureActiveVisible()
 	}
 	return m, nil
 }

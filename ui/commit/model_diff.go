@@ -1,8 +1,6 @@
 package commit
 
-import (
-	"github.com/elentok/gx/ui/diffview"
-)
+import tea "charm.land/bubbletea/v2"
 
 func (m *Model) diffPaneSize() (int, int) {
 	_, contentH := m.layoutHeights()
@@ -23,9 +21,9 @@ func (m *Model) syncDiffViewport() {
 	_, diffH := m.diffPaneSize()
 	bodyW := m.currentDiffRenderWidth()
 	bodyH := max(0, diffH-2)
-	m.diffModel.Reflow(bodyW)
-	m.diffModel.SyncViewport(bodyW, bodyH)
-	m.ensureActiveVisible()
+	m.diff.diffModel.Reflow(bodyW)
+	m.diff.diffModel.SyncViewport(bodyW, bodyH)
+	m.diff.ensureActiveVisible()
 	m.sidebar.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
 }
 
@@ -35,7 +33,7 @@ func (m *Model) moveToAdjacentFile(delta int) {
 	}
 	m.refreshDiff()
 	if m.focusDiff {
-		m.ensureActiveVisible()
+		m.diff.ensureActiveVisible()
 	}
 }
 
@@ -48,31 +46,13 @@ func (m *Model) filesInnerHeight() int {
 	return max(1, contentH-2)
 }
 
-func (m *Model) ensureActiveVisible() {
-	m.diffModel.EnsureActiveVisible(m.diffModel.NavMode())
+func (m *Model) adjustDiffContextLines(delta int) tea.Cmd {
+	if m.diff.adjustDiffContextLines(delta) {
+		m.refreshDiff()
+	}
+	return nil
 }
 
 func (m Model) editorLineForCurrentSelection() int {
-	if !m.focusDiff {
-		return 0
-	}
-	diff := m.diffModel.DataRef()
-	if m.diffModel.NavMode() == diffview.NavModeLine {
-		if diff.ActiveLine < 0 || diff.ActiveLine >= len(diff.Parsed.Changed) {
-			return 0
-		}
-		cl := diff.Parsed.Changed[diff.ActiveLine]
-		if cl.NewLine > 0 {
-			return cl.NewLine
-		}
-		return cl.OldLine
-	}
-	if diff.ActiveHunk < 0 || diff.ActiveHunk >= len(diff.Parsed.Hunks) {
-		return 0
-	}
-	h := diff.Parsed.Hunks[diff.ActiveHunk]
-	if h.NewStart > 0 {
-		return h.NewStart
-	}
-	return h.OldStart
+	return m.diff.editorLineForCurrentSelection(m.focusDiff)
 }

@@ -11,7 +11,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		m.help = next
 		return m, cmd
 	}
-	if m.commitOps.AmendOpen() || m.diffModel.Search().IsActive() || m.sidebar.fileTreeModel.Search().IsActive() {
+	if m.commitOps.AmendOpen() || m.diff.diffModel.Search().IsActive() || m.sidebar.fileTreeModel.Search().IsActive() {
 		return m, nil
 	}
 	mouse := msg.Mouse()
@@ -29,7 +29,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if idx == 0 {
-		m.diffModel.ScrollViewport(dir * 3)
+		m.diff.diffModel.ScrollViewport(dir * 3)
 	} else {
 		m.sidebar.fileTreeModel.SetVisibleHeight(m.filesInnerHeight())
 		m.sidebar.fileTreeModel.ScrollViewport(dir * 3)

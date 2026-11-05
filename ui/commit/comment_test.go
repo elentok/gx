@@ -22,9 +22,9 @@ func TestCommentLocationAndBodyWithValidDiffSelection(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffModel.SetNavMode(diffview.NavModeLine)
+	m.diff.diffModel.SetNavMode(diffview.NavModeLine)
 
-	data := m.diffModel.DataRef()
+	data := m.diff.diffModel.DataRef()
 	data.ActiveLine = 0
 	data.Parsed.Changed = []diffcore.ChangedLine{{NewLine: 1, Prefix: '-', Text: "old-1"}}
 	data.RawLines = []string{"-old-1"}
@@ -42,7 +42,7 @@ func TestCommentLocationAndBodyFallsBackToRawLines(t *testing.T) {
 	m.focusDiff = true
 
 	// Set raw lines without a valid hunk/line selection.
-	data := m.diffModel.DataRef()
+	data := m.diff.diffModel.DataRef()
 	data.RawLines = []string{"some raw content"}
 	data.ActiveHunk = -1
 	data.ActiveLine = -1
@@ -62,7 +62,7 @@ func TestCommentLocationAndBodyReturnsErrMsgWhenDiffModelEmpty(t *testing.T) {
 	m.ready = true
 
 	// Replace diffModel with a fully empty one (no raw lines, no hunks).
-	m.diffModel = diffview.NewModel(false)
+	m.diff.diffModel = diffview.NewModel(false)
 
 	cl := m.commentLocationAndBody()
 

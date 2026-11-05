@@ -166,20 +166,21 @@ func (m Model) layoutHeights() (bodyH, contentH int) {
 
 func (m Model) renderDiffPane(width, height int) string {
 	lines := []string{ui.StyleMuted.Render("no diff")}
-	if len(m.diffModel.Data().ViewLines) > 0 {
+	if len(m.diff.diffModel.Data().ViewLines) > 0 {
 		bodyH := max(1, height-2)
 		innerW := max(1, width-2)
-		lines = m.diffModel.RenderRows(bodyH, m.focusDiff, diffview.RenderOpts{
+		lines = m.diff.diffModel.RenderRows(bodyH, m.focusDiff, diffview.RenderOpts{
 			AccentColor: ui.ColorOrange,
 			InnerWidth:  innerW,
 			SearchMatch: func(displayIdx int) (bool, bool) {
-				return m.diffModel.SearchMatchAt(displayIdx)
+				return m.diff.diffModel.SearchMatchAt(displayIdx)
 			},
-			SearchQuery: m.diffModel.Search().Query(),
+			SearchQuery: m.diff.diffModel.Search().Query(),
 		})
-	} else if len(m.diffModel.Data().Parsed.Lines) > 0 {
-		if diffcore.HasBinaryDiff(m.diffModel.Data().Parsed) {
-			lines = m.binaryDiffLines(max(1, height-2), max(1, width-2))
+	} else if len(m.diff.diffModel.Data().Parsed.Lines) > 0 {
+		if diffcore.HasBinaryDiff(m.diff.diffModel.Data().Parsed) {
+			file, hasFile := m.sidebar.selectedCommitFile()
+			lines = m.diff.binaryDiffLines(m.settings.ImageDiffs, file, hasFile, max(1, height-2), max(1, width-2))
 		} else {
 			lines = []string{ui.StyleMuted.Render("no diff")}
 		}
@@ -195,12 +196,12 @@ func (m Model) renderDiffPane(width, height int) string {
 }
 
 func (m Model) diffTitle() string {
-	ctx := fmt.Sprintf("Context: %d", m.currentDiffContextLines())
-	return diffview.JoinDot(ctx, m.diffModel.StatusText(m.focusDiff), m.diffSearchCounterText())
+	ctx := fmt.Sprintf("Context: %d", m.diff.currentDiffContextLines())
+	return diffview.JoinDot(ctx, m.diff.diffModel.StatusText(m.focusDiff), m.diffSearchCounterText())
 }
 
 func (m Model) diffSearchCounterText() string {
-	s := m.diffModel.Search()
+	s := m.diff.diffModel.Search()
 	if !s.HasQuery() || s.MatchesCount() == 0 || !m.focusDiff {
 		return ""
 	}

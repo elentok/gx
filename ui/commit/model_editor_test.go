@@ -129,11 +129,11 @@ func TestEditorLineForCurrentSelectionInDiffModeCommit(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffModel.SetNavMode(diffview.NavModeLine)
+	m.diff.diffModel.SetNavMode(diffview.NavModeLine)
 
-	for i, cl := range m.diffModel.DataRef().Parsed.Changed {
+	for i, cl := range m.diff.diffModel.DataRef().Parsed.Changed {
 		if cl.NewLine == 2 {
-			m.diffModel.DataRef().ActiveLine = i
+			m.diff.diffModel.DataRef().ActiveLine = i
 			break
 		}
 	}

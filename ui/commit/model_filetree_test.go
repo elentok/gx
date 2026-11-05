@@ -53,7 +53,7 @@ func TestInitialSelectionChoosesFirstFileOverDirectory(t *testing.T) {
 	if entry.HasChildren {
 		t.Fatalf("expected initial selection to choose file entry, got %#v", entry)
 	}
-	if len(m.diffModel.Data().ViewLines) == 0 {
+	if len(m.diff.diffModel.Data().ViewLines) == 0 {
 		t.Fatal("expected initial file selection to load diff")
 	}
 }

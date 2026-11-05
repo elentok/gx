@@ -25,12 +25,12 @@ type commentLocation struct {
 }
 
 func (m *Model) commentLocationAndBody() commentLocation {
-	loc, body, yankErr := m.diffModel.FocusedLocationAndBody()
+	loc, body, yankErr := m.diff.diffModel.FocusedLocationAndBody()
 	if yankErr == "" {
 		return commentLocation{loc: loc, body: body, ok: true}
 	}
-	if len(m.diffModel.Data().RawLines) > 0 {
-		return commentLocation{body: m.diffModel.Data().RawLines, ok: true}
+	if len(m.diff.diffModel.Data().RawLines) > 0 {
+		return commentLocation{body: m.diff.diffModel.Data().RawLines, ok: true}
 	}
 	return commentLocation{errMsg: string(yankErr)}
 }

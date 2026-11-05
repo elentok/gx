@@ -79,7 +79,7 @@ func (m *Model) yankContentOnly() tea.Cmd {
 	if !m.focusDiff {
 		return notify.Warning("no diff selection to yank")
 	}
-	_, body, yankErr := m.diffModel.FocusedLocationAndBody()
+	_, body, yankErr := m.diff.diffModel.FocusedLocationAndBody()
 	if yankErr == diffview.FocusedYankErrNoHunk {
 		return notify.Warning(string(yankErr))
 	}
@@ -93,7 +93,7 @@ func (m *Model) yankContentOnly() tea.Cmd {
 }
 
 func (m *Model) focusedLocationAndBody() (string, []string, tea.Cmd, bool) {
-	loc, body, yankErr := m.diffModel.FocusedLocationAndBody()
+	loc, body, yankErr := m.diff.diffModel.FocusedLocationAndBody()
 	if yankErr != "" {
 		return "", nil, notify.Warning(string(yankErr)), false
 	}

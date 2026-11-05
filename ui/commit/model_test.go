@@ -114,21 +114,21 @@ func TestEnterFocusesDiffAndJKMoveInsideDiff(t *testing.T) {
 	if !m.focusDiff {
 		t.Fatalf("expected enter to focus diff")
 	}
-	if m.diffModel.NavMode() != diffview.NavModeHunk {
-		t.Fatalf("expected default nav mode hunk, got %v", m.diffModel.NavMode())
+	if m.diff.diffModel.NavMode() != diffview.NavModeHunk {
+		t.Fatalf("expected default nav mode hunk, got %v", m.diff.diffModel.NavMode())
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	m = updated.(Model)
-	if m.diffModel.NavMode() != diffview.NavModeLine {
-		t.Fatalf("expected t to switch to line mode, got %v", m.diffModel.NavMode())
+	if m.diff.diffModel.NavMode() != diffview.NavModeLine {
+		t.Fatalf("expected t to switch to line mode, got %v", m.diff.diffModel.NavMode())
 	}
 
-	before := m.diffModel.Data().ActiveLine
+	before := m.diff.diffModel.Data().ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.diffModel.Data().ActiveLine <= before {
-		t.Fatalf("expected j to move active line, before=%d after=%d", before, m.diffModel.Data().ActiveLine)
+	if m.diff.diffModel.Data().ActiveLine <= before {
+		t.Fatalf("expected j to move active line, before=%d after=%d", before, m.diff.diffModel.Data().ActiveLine)
 	}
 }
 

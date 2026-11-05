@@ -58,7 +58,7 @@ func TestYankLocationOnlyWithYLInDiffFocusIncludesLocation(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffModel.SetNavMode(diffview.NavModeLine)
+	m.diff.diffModel.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
@@ -91,7 +91,7 @@ func TestYankContentOnlyWithYYInDiffFocus(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffModel.SetNavMode(diffview.NavModeLine)
+	m.diff.diffModel.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)
@@ -185,7 +185,7 @@ func TestYankAllContextWithYAInDiff(t *testing.T) {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffModel.SetNavMode(diffview.NavModeLine)
+	m.diff.diffModel.SetNavMode(diffview.NavModeLine)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	m = updated.(Model)

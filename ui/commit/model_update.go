@@ -30,13 +30,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return
 		}
 		if model.overlaySignature() != before {
-			model.overlay.MarkDirty()
+			model.diff.overlay.MarkDirty()
 		}
-		if !model.overlay.Dirty() {
+		if !model.diff.overlay.Dirty() {
 			return
 		}
 		var disruptCmd tea.Cmd
-		model.overlay, disruptCmd = model.overlay.Disrupt(model.settings.ImageDiffs)
+		model.diff.overlay, disruptCmd = model.diff.overlay.Disrupt(model.settings.ImageDiffs)
 		cmd = tea.Batch(cmd, disruptCmd)
 		next = model
 	}()
@@ -92,9 +92,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if m.focusDiff {
-		if len(m.keys.Prefix()) == 0 || m.diffModel.HasPendingChord() {
-			updated, diffCmd, diffResult := m.diffModel.Update(msg)
-			m.diffModel = updated
+		if len(m.keys.Prefix()) == 0 || m.diff.diffModel.HasPendingChord() {
+			updated, diffCmd, diffResult := m.diff.diffModel.Update(msg)
+			m.diff.diffModel = updated
 			if diffResult.Handled && !diffResult.ChordInProgress {
 				m.keys.Reset()
 				if diffResult.NeedsReload {
@@ -119,7 +119,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			if ftResult.OpenSelected {
 				m.focusDiff = true
-				m.ensureActiveVisible()
+				m.diff.ensureActiveVisible()
 			}
 			if ftResult.RebuildRequested {
 				m.sidebar.rebuildCommitFiletree()

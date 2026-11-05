@@ -33,7 +33,7 @@ func newAIDiffModel(t *testing.T) Model {
 	m.height = 24
 	m.syncDiffViewport()
 	m.focusDiff = true
-	m.diffModel.SetNavMode(diffview.NavModeLine)
+	m.diff.diffModel.SetNavMode(diffview.NavModeLine)
 	return m
 }
 

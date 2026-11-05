@@ -1,10 +1,6 @@
 package commit
 
 import (
-	"strings"
-
-	"github.com/elentok/gx/git/stage"
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/imagediff"
 
 	tea "charm.land/bubbletea/v2"
@@ -39,7 +35,7 @@ func (m Model) overlaySignature() overlaySignature {
 		focusDiff:    m.focusDiff,
 		focusHeader:  m.focusHeader,
 		bodyExpanded: m.header.bodyExpanded,
-		scroll:       m.diffModel.Viewport().YOffset(),
+		scroll:       m.diff.diffModel.Viewport().YOffset(),
 		width:        m.width,
 		height:       m.height,
 		ready:        m.ready,
@@ -47,42 +43,11 @@ func (m Model) overlaySignature() overlaySignature {
 	}
 }
 
-// isImageDiffEligible reports whether file is a candidate for inline image-diff
-// rendering in the commit detail panel: extension allowlisted, config enabled,
-// and the host terminal supports kitty graphics. Otherwise behavior is the plain
-// "binary file" summary line.
-func (m *Model) isImageDiffEligible(file stage.CommitFile) bool {
-	if !m.settings.ImageDiffs {
-		return false
-	}
-	if !imagediff.HasImageExtension(file.Path) {
-		return false
-	}
-	return m.overlay.Capability().Supported
-}
-
-// binaryDiffLines returns the lines the diff pane renders for a binary file.
-// When the selected file is an image-diff candidate (and its last settle didn't
-// fall back), it reserves bodyH blank lines so bubbletea's layout accounts for
-// the overlay area — the kitty graphics are placed as a side effect, never
-// embedded here (ADR 0010). Otherwise it is the plain "binary file" summary.
-func (m Model) binaryDiffLines(bodyH, innerW int) []string {
-	if file, ok := m.sidebar.selectedCommitFile(); ok && m.isImageDiffEligible(file) && m.overlay.FallbackPath() != file.Path {
-		blank := strings.Repeat(" ", innerW)
-		lines := make([]string, 0, bodyH)
-		for range bodyH {
-			lines = append(lines, blank)
-		}
-		return lines
-	}
-	return []string{ui.StyleMuted.Render("binary file")}
-}
-
 // handleImageDiffSettle delegates the settled-placement decision to the overlay
 // controller, passing the commit Model itself as the SettleHost.
 func (m Model) handleImageDiffSettle(msg imagediff.SettleMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	m.overlay, cmd = m.overlay.HandleSettle(msg, m)
+	m.diff.overlay, cmd = m.diff.overlay.HandleSettle(msg, m)
 	return m, cmd
 }
 
@@ -90,7 +55,7 @@ func (m Model) handleImageDiffSettle(msg imagediff.SettleMsg) (tea.Model, tea.Cm
 // its own deactivation (tab switch away) here so the overlay doesn't float over
 // the next page (ADR 0010).
 func (m Model) OnDeactivate() tea.Cmd {
-	return m.overlay.OnDeactivate()
+	return m.diff.overlay.OnDeactivate()
 }
 
 // ModalOpen reports whether a centered modal currently occludes the diff panel.
@@ -104,11 +69,11 @@ func (m Model) ModalOpen() bool {
 // when (and only when) the detail panel is visible and that file is an
 // image-diff candidate.
 func (m Model) SelectedImageFile() (string, bool) {
-	if !m.screenVisible {
+	if !m.diff.screenVisible {
 		return "", false
 	}
 	file, ok := m.sidebar.selectedCommitFile()
-	if !ok || !m.isImageDiffEligible(file) {
+	if !ok || !m.diff.isImageDiffEligible(m.settings.ImageDiffs, file) {
 		return "", false
 	}
 	return file.Path, true
@@ -118,14 +83,14 @@ func (m Model) SelectedImageFile() (string, bool) {
 // screen cells, computed relative to the panel's own (0,0) then offset by the
 // injected screen origin (the panel never learns its origin from lipgloss.Join*).
 func (m Model) PanelGeometry() (originCol, originRow, availCols, availRows int, ok bool) {
-	if !m.screenVisible {
+	if !m.diff.screenVisible {
 		return 0, 0, 0, 0, false
 	}
 	relCol, relRow, w, h, ok := m.diffPaneBodyRect()
 	if !ok {
 		return 0, 0, 0, 0, false
 	}
-	return m.screenCol + relCol, m.screenRow + relRow, w, h, true
+	return m.diff.screenCol + relCol, m.diff.screenRow + relRow, w, h, true
 }
 
 // FetchBlobs implements imagediff.SettleHost: the selected file's old/new image
@@ -135,7 +100,7 @@ func (m Model) FetchBlobs() (old, newBytes []byte, oldOK, newOK bool) {
 	if !ok {
 		return nil, nil, false, false
 	}
-	return m.fetchImageDiffBlobs(m.ref, file)
+	return m.diff.fetchImageDiffBlobs(m.ref, file)
 }
 
 // diffPaneBodyRect returns the diff pane's body area (inside its border) in

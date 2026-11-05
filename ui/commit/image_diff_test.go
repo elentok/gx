@@ -77,14 +77,14 @@ func newCommitImageDiffModel(t *testing.T, repo string, capability kittygraphics
 	old := encodeTestPNG(t, 8, 8, color.RGBA{R: 255, A: 255})
 	newImg := encodeTestPNG(t, 16, 8, color.RGBA{G: 255, A: 255})
 	spies := &commitImageDiffSpies{capability: capability, old: old, new: newImg}
-	m.overlay = imagediff.NewOverlay(
+	m.diff.overlay = imagediff.NewOverlay(
 		func(data []byte) { spies.written = append(spies.written, data...) },
 		func() kittygraphics.Capability {
 			spies.detectCalls++
 			return spies.capability
 		},
 	)
-	m.fetchImageDiffBlobs = func(ref string, file stage.CommitFile) (oldBytes, newBytes []byte, oldOK, newOK bool) {
+	m.diff.fetchImageDiffBlobs = func(ref string, file stage.CommitFile) (oldBytes, newBytes []byte, oldOK, newOK bool) {
 		spies.fetchCalls++
 		return spies.old, spies.new, len(spies.old) > 0, len(spies.new) > 0
 	}
@@ -104,7 +104,7 @@ func TestCommitImageDiffPlacesAfterSettleWhenVisible(t *testing.T) {
 		t.Fatalf("expected WithScreenOrigin to schedule a settle when becoming visible")
 	}
 
-	updated, settleCmd := m.Update(imagediff.SettleMsg{Seq: m.overlay.SettleSeq()})
+	updated, settleCmd := m.Update(imagediff.SettleMsg{Seq: m.diff.overlay.SettleSeq()})
 	mm := updated.(Model)
 	if settleCmd != nil {
 		settleCmd()
@@ -113,7 +113,7 @@ func TestCommitImageDiffPlacesAfterSettleWhenVisible(t *testing.T) {
 	if spies.fetchCalls == 0 {
 		t.Fatalf("expected blob fetch once the panel settled on an eligible file")
 	}
-	if !mm.overlay.HasActivePlacements() {
+	if !mm.diff.overlay.HasActivePlacements() {
 		t.Fatalf("expected active placements after settling")
 	}
 	if !bytes.Contains(spies.written, []byte("\033_Ga=T,f=100,i=")) {
@@ -133,13 +133,13 @@ func TestCommitImageDiffStaysHiddenWhenNotVisible(t *testing.T) {
 
 	// Detail not visible (collapsed split): a settle must not place anything.
 	m, _ = m.WithScreenOrigin(40, 0, false)
-	updated, _ := m.Update(imagediff.SettleMsg{Seq: m.overlay.SettleSeq()})
+	updated, _ := m.Update(imagediff.SettleMsg{Seq: m.diff.overlay.SettleSeq()})
 	mm := updated.(Model)
 
 	if spies.fetchCalls != 0 {
 		t.Fatalf("expected no blob fetch while the detail is not visible, got %d", spies.fetchCalls)
 	}
-	if mm.overlay.HasActivePlacements() {
+	if mm.diff.overlay.HasActivePlacements() {
 		t.Fatalf("expected no placement while the detail is not visible")
 	}
 }
@@ -150,7 +150,7 @@ func TestCommitImageDiffUnsupportedTerminalFallsBack(t *testing.T) {
 	m, spies := newCommitImageDiffModel(t, repo, kittygraphics.Capability{Supported: false})
 
 	m, _ = m.WithScreenOrigin(0, 0, true)
-	updated, _ := m.Update(imagediff.SettleMsg{Seq: m.overlay.SettleSeq()})
+	updated, _ := m.Update(imagediff.SettleMsg{Seq: m.diff.overlay.SettleSeq()})
 	mm := updated.(Model)
 
 	if spies.fetchCalls != 0 {

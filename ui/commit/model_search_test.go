@@ -124,25 +124,25 @@ func TestDiffSearchMovesToMatchesAndNavigates(t *testing.T) {
 		updated, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		m = updated.(Model)
 	}
-	if m.diffModel.Search().MatchesCount() < 2 {
-		t.Fatalf("expected multiple diff matches, got %d", m.diffModel.Search().MatchesCount())
+	if m.diff.diffModel.Search().MatchesCount() < 2 {
+		t.Fatalf("expected multiple diff matches, got %d", m.diff.diffModel.Search().MatchesCount())
 	}
-	if !m.focusDiff || m.diffModel.NavMode() != diffview.NavModeLine {
+	if !m.focusDiff || m.diff.diffModel.NavMode() != diffview.NavModeLine {
 		t.Fatalf("expected diff search to focus diff in line mode")
 	}
 
-	first := m.diffModel.Data().ActiveLine
+	first := m.diff.diffModel.Data().ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m = updated.(Model)
-	if m.diffModel.Data().ActiveLine == first {
+	if m.diff.diffModel.Data().ActiveLine == first {
 		t.Fatalf("expected n to move to next diff match")
 	}
-	second := m.diffModel.Data().ActiveLine
+	second := m.diff.diffModel.Data().ActiveLine
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'N', Text: "N", ShiftedCode: 'N'})
 	m = updated.(Model)
-	if m.diffModel.Data().ActiveLine == second {
+	if m.diff.diffModel.Data().ActiveLine == second {
 		t.Fatalf("expected N to move to previous diff match")
 	}
 }

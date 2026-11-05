@@ -40,32 +40,18 @@ type Model struct {
 
 	header headerPane
 
-	commitDiffArea
+	diff    diffPane
 	sidebar filesPane
 
 	help help.Model
 	keys keys.Manager
 
 	commitOps commitops.Model
-
-	// Inline image-diff overlay (ADR 0010). The detail panel is composed into a
-	// split view and never learns its absolute screen position from
-	// lipgloss.Join*, so the container injects it via WithScreenOrigin.
-	overlay             imagediff.Overlay
-	screenCol           int
-	screenRow           int
-	screenVisible       bool
-	fetchImageDiffBlobs func(ref string, file stage.CommitFile) (old, newBytes []byte, oldOK, newOK bool)
 }
 
 type editCommentFinishedMsg struct {
 	err      error
 	splitApp string
-}
-
-type commitDiffArea struct {
-	diffModel        diffview.Model
-	diffContextLines int
 }
 
 func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraKeys keys.Manager) Model {
@@ -79,19 +65,19 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 			compiledRefRules: refrules.CompileRefRules(settings.LogConfig.ImportantRefs),
 			compiledHideRefs: refrules.CompileHideRefs(settings.LogConfig.HideRefs),
 		},
-		commitDiffArea: commitDiffArea{
+		diff: diffPane{
 			diffModel:        diffview.NewModel(settings.UseNerdFontIcons),
 			diffContextLines: settings.DiffContextLines,
+			overlay: imagediff.NewOverlay(
+				imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
+			fetchImageDiffBlobs: func(ref string, file stage.CommitFile) (old, newBytes []byte, oldOK, newOK bool) {
+				return stage.CommitImageDiffBlobs(worktreeRoot, ref, file)
+			},
 		},
 		sidebar: filesPane{
 			fileTreeModel: tree.NewModel[stage.CommitFile](),
 		},
 		keys: newCommitManager(),
-		overlay: imagediff.NewOverlay(
-			imagediff.WriteToStdout, imagediff.DefaultDetectCapability),
-		fetchImageDiffBlobs: func(ref string, file stage.CommitFile) (old, newBytes []byte, oldOK, newOK bool) {
-			return stage.CommitImageDiffBlobs(worktreeRoot, ref, file)
-		},
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, extraKeys), settings.About)
 	m.commitOps = commitops.New()
@@ -136,7 +122,7 @@ func (m Model) WithRef(ref string) (Model, tea.Cmd) {
 	m.ref = normalizedRef(ref)
 	m.reload()
 	var cmd tea.Cmd
-	m.overlay, cmd = m.overlay.Disrupt(m.settings.ImageDiffs)
+	m.diff.overlay, cmd = m.diff.overlay.Disrupt(m.settings.ImageDiffs)
 	return m, tea.Batch(cmd, m.cmdLoadTrunk())
 }
 
@@ -146,12 +132,12 @@ func (m Model) WithRef(ref string) (Model, tea.Cmd) {
 // disrupt cmd for the container to batch. A no-op call (unchanged origin) returns
 // no command so resizes that don't move the panel don't thrash placements.
 func (m Model) WithScreenOrigin(col, row int, visible bool) (Model, tea.Cmd) {
-	if m.screenCol == col && m.screenRow == row && m.screenVisible == visible {
+	if m.diff.screenCol == col && m.diff.screenRow == row && m.diff.screenVisible == visible {
 		return m, nil
 	}
-	m.screenCol, m.screenRow, m.screenVisible = col, row, visible
+	m.diff.screenCol, m.diff.screenRow, m.diff.screenVisible = col, row, visible
 	var cmd tea.Cmd
-	m.overlay, cmd = m.overlay.Disrupt(m.settings.ImageDiffs)
+	m.diff.overlay, cmd = m.diff.overlay.Disrupt(m.settings.ImageDiffs)
 	return m, cmd
 }
 
@@ -175,13 +161,13 @@ func (m *Model) reload() {
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.sidebar.files = nil
-		m.diffModel.SetData(diffview.NewDiffData())
+		m.diff.diffModel.SetData(diffview.NewDiffData())
 		m.header.headerOffset = 0
 		return
 	}
 	m.sidebar.files, m.err = stage.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
-		m.diffModel.SetData(diffview.NewDiffData())
+		m.diff.diffModel.SetData(diffview.NewDiffData())
 		m.header.headerOffset = 0
 		return
 	}
@@ -197,21 +183,22 @@ func (m *Model) reload() {
 func (m *Model) refreshDiff() {
 	file, ok := m.sidebar.selectedCommitFile()
 	if !ok {
-		m.diffModel.SetData(diffview.NewDiffData())
+		m.diff.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
-	rawDiff, err := stage.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffContextLines())
+	contextLines := m.diff.currentDiffContextLines()
+	rawDiff, err := stage.CommitFileDiffForRef(m.worktreeRoot, m.ref, file.Path, contextLines)
 	if err != nil {
 		m.err = err
-		m.diffModel.SetData(diffview.NewDiffData())
+		m.diff.diffModel.SetData(diffview.NewDiffData())
 		return
 	}
-	sideBySide := m.diffModel.RenderMode() == diffview.RenderModeSideBySide
-	colorDiff, err := stage.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.settings.Home(), m.ref, file.Path, m.currentDiffContextLines(), m.currentDiffRenderWidth(), sideBySide)
+	sideBySide := m.diff.diffModel.RenderMode() == diffview.RenderModeSideBySide
+	colorDiff, err := stage.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.settings.Home(), m.ref, file.Path, contextLines, m.currentDiffRenderWidth(), sideBySide)
 	if err != nil {
 		colorDiff = rawDiff
 	}
-	m.diffModel.BuildFromRaw(rawDiff, colorDiff)
+	m.diff.diffModel.BuildFromRaw(rawDiff, colorDiff)
 	m.syncDiffViewport()
 }
 
