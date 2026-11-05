@@ -50,7 +50,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:epic-a/01")

@@ -95,7 +95,7 @@ func TestQueue_MoveAndRemoveAcceptAnEpicAddress(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
 	h := servertest.StartWithStore(t, store)
 	for _, a := range []string{"proj:epic-a", "proj:epic-b"} {
-		if res, err := h.Client.QueueAdd(t.Context(), a, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(t.Context(), a, ""); err != nil || res.Refused {
 			t.Fatalf("add %s = %+v, %v", a, res, err)
 		}
 	}
@@ -122,7 +122,7 @@ func TestQueue_AddEpicAddressQueuesOneEntry(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.QueueAdd(t.Context(), "proj:epic-a", "")
+	res, err := h.Client.Queue.Add(t.Context(), "proj:epic-a", "")
 	if err != nil || res.Refused {
 		t.Fatalf("add = %+v, %v; want accepted", res, err)
 	}

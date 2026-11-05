@@ -47,7 +47,7 @@ func TestClaimHold_HarnessMissingHoldsTicket(t *testing.T) {
 			h.Programs.Missing(tc.missing)
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", tc.queueAs); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", tc.queueAs); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 
@@ -105,7 +105,7 @@ func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
 			h.Programs.Missing("codex")
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 

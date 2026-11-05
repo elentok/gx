@@ -30,7 +30,7 @@ func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
 		commitWork(t, p, "dep")
 		launched <- p
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:dep/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:dep/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 

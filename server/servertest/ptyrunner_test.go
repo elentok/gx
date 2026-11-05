@@ -59,7 +59,7 @@ func TestPty_OnTurnCommitsInTheWorktreeAndTheTicketMerges(t *testing.T) {
 		testutil.CommitAll(t, turn.Cwd, "agent work")
 		turns <- *turn
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -101,7 +101,7 @@ func TestPty_TheRunRecordsThePtyRunner(t *testing.T) {
 		entered <- struct{}{}
 		<-release
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	select {
@@ -121,7 +121,7 @@ func TestDefault_NoRunnerOptionRunsOnPtyWithOneStartAndNoHerdrCall(t *testing.T)
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo)
 	h.OnTurn(func(*Turn) {})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	WaitFor(t, 30*time.Second, "the launch", func() bool { return len(h.Starts()) == 1 })
@@ -143,7 +143,7 @@ func TestDefault_WithHerdrRecordsOneStartPerLaunch(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo, WithHerdr(HerdrIsTheSubject))
 	h.OnTurn(func(*Turn) {})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	WaitFor(t, 30*time.Second, "the launch", func() bool { return len(h.Starts()) == 1 })
@@ -162,7 +162,7 @@ func queueWithTurn(t *testing.T, h *Harness, hook func(*Turn)) {
 		hook(turn)
 		ran <- struct{}{}
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	select {
@@ -307,7 +307,7 @@ func TestPty_FailNextStartPausesTheTicketAndFailsOnlyOneStart(t *testing.T) {
 	t.Parallel()
 	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
 	h.FailNextStart(errors.New("boom"))
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -331,7 +331,7 @@ func TestPty_BlockStopsCountsAStopAndHoldsItUntilReleased(t *testing.T) {
 		testutil.WriteFile(t, turn.Cwd, "agent.txt", "work")
 		testutil.CommitAll(t, turn.Cwd, "agent work")
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -372,7 +372,7 @@ func TestPty_TranscriptIsWhatTheServerReadsForTheSession(t *testing.T) {
 	h.OnTurn(func(turn *Turn) {
 		turn.Transcript("The feature is already implemented on the feature branch.")
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -477,7 +477,7 @@ func TestPty_RestartBuildsFreshRunnersAndReclaimsTheLiveRun(t *testing.T) {
 	h := startPty(t, store, repo)
 	// A launch prompt must start a turn; a stalled one keeps the agent live.
 	h.OnTurn(func(turn *Turn) { turn.Stall() })
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	WaitFor(t, 30*time.Second, "the agent to read its prompt", func() bool {
@@ -573,7 +573,7 @@ func TestPty_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
 		st, err := ptyOf(t, h, "proj").Status(holder)
 		return err == nil && st.Waiting()
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 

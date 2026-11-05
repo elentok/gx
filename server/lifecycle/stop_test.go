@@ -30,7 +30,7 @@ func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for h.Stops() == 0 {
@@ -76,7 +76,7 @@ func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 	h.OnTurn(func(turn *servertest.Turn) { turn.Stall() }) // the agent keeps working
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitFor(t, 20*time.Second, "a run to start", func() bool { return len(h.Server.Runs()) > 0 })

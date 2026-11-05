@@ -47,7 +47,7 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	if res, err := h.Client.Queue.Pause(ctx); err != nil || res.Refused || res.Mode != wire.QueueModePaused {
 		t.Fatalf("pause: %+v, %v", res, err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	expectNoRun(t, h)
@@ -70,7 +70,7 @@ func TestFlush_IsFinishAndPause(t *testing.T) {
 	if res, err := h.Client.Queue.Pause(ctx); err != nil || res.Refused || res.Mode != wire.QueueModePaused {
 		t.Fatalf("flush: %+v, %v", res, err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	expectNoRun(t, h)

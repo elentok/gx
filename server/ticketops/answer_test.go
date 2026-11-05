@@ -197,7 +197,7 @@ func TestAnswer_GoneAgentThenCodexClaimStartsFromTheHandoff(t *testing.T) {
 	res, err := h.Client.Tickets.Answer(ctx, wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
 
-	if res, err := h.Client.QueueAdd(ctx, answerAddr, "codex"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, answerAddr, "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { return len(fake.Prompts("epic-a-iter-01")) > 0 && fake.Prompts("epic-a-iter-01")[0] != "" })

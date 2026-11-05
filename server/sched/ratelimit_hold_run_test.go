@@ -39,7 +39,7 @@ func TestRateLimitHold_RunKeepsSlotAndExplainsTheHold(t *testing.T) {
 			t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add first: %+v, %v", res, err)
 			}
 			servertest.WaitFor(t, 10*time.Second, "first ticket launches", func() bool {
@@ -67,7 +67,7 @@ func TestRateLimitHold_RunKeepsSlotAndExplainsTheHold(t *testing.T) {
 			}
 
 			// The held run still counts against the cap: a second ticket stays queued.
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add second: %+v, %v", res, err)
 			}
 			time.Sleep(200 * time.Millisecond) // negative wait: a launch would show within a few ticks

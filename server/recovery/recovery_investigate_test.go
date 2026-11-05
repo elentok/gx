@@ -33,7 +33,7 @@ func TestRecovery_UnmatchedPauseForksAQueuedInvestigateChildAndNeverRecurses(t *
 	h := startUnmatched(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/02", ""); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/02", ""); err != nil {
 		t.Fatal(err)
 	}
 

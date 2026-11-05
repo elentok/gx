@@ -20,7 +20,6 @@ import (
 type ServerAPI interface {
 	Snapshot(ctx context.Context) (wire.Snapshot, error)
 	Events(ctx context.Context, since uint64) (<-chan wire.Event, error)
-	QueueAdd(ctx context.Context, address, agent string) (wire.QueueResult, error)
 	BudgetOverride(ctx context.Context) (wire.BudgetResult, error)
 	Repair(ctx context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error)
 	DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, error)
@@ -30,6 +29,7 @@ type ServerAPI interface {
 // QueueAPI is the slice of *apiclient.Queue the tickets and queue tabs use.
 type QueueAPI interface {
 	Items(ctx context.Context) ([]wire.QueueItem, error)
+	Add(ctx context.Context, address, agent string) (wire.QueueResult, error)
 	Replace(ctx context.Context, project string, items []wire.QueueItem) (wire.QueueResult, error)
 	Remove(ctx context.Context, address string) (wire.QueueResult, error)
 	Pause(ctx context.Context) (wire.QueueResult, error)

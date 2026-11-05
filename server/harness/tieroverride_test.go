@@ -72,7 +72,7 @@ func TestResume_TierOverrideLaunchesOnceOnThatTier(t *testing.T) {
 	if tk, err := schema.ParseTicket(path); err != nil || tk.TierOverride != "strongest" {
 		t.Fatalf("after resume: override = %q, %v; want strongest", tk.TierOverride, err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 20*time.Second, "the first launch", func() bool { return rec.count() >= 1 })
@@ -99,7 +99,7 @@ func TestResume_WithoutTierLeavesTheWorkerModel(t *testing.T) {
 	if tk, err := schema.ParseTicket(path); err != nil || tk.TierOverride != "" {
 		t.Fatalf("override = %q, %v; want none", tk.TierOverride, err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 20*time.Second, "the launch", func() bool { return rec.count() >= 1 })
@@ -141,7 +141,7 @@ func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) 
 		c.Settings.Chat.FlushInterval = 20 * time.Millisecond
 	})
 
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 20*time.Second, "the model-mismatch pause", func() bool {

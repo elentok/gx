@@ -47,7 +47,7 @@ func TestLongTicket_AlertsOnceMarksTheTicketAndKeepsTheSessionRunning(t *testing
 		c.RecoverySettings.FollowUps = "proj:follow-ups"
 	})
 	longSession(h, longTicketTurns)
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -79,7 +79,7 @@ func TestLongTicket_ALaunchClearsTheMarkOfAnEarlierOne(t *testing.T) {
 	SetProjectRepo(t, store, "proj", repo)
 	h := StartWithStore(t, store, func(c *server.Config) { c.LongTicketTurns = 0 })
 	h.OnTurn(func(turn *Turn) { turn.Stall() })
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	WaitFor(t, 30*time.Second, "the launch to clear the mark", func() bool {

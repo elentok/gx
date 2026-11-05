@@ -534,7 +534,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-				return cl.QueueAdd(ctx, args[0], agent)
+				return cl.Queue.Add(ctx, args[0], agent)
 			})
 		},
 	}

@@ -39,7 +39,7 @@ func TestEpicList_CardTimePair(t *testing.T) {
 
 	before := time.Now().Add(-time.Second)
 	for _, addr := range []string{"proj:queued", "proj:one-offs/01"} {
-		if res, err := h.Client.QueueAdd(t.Context(), addr, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(t.Context(), addr, ""); err != nil || res.Refused {
 			t.Fatalf("queue add %s = %+v, %v", addr, res, err)
 		}
 	}

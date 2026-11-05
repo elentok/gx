@@ -40,7 +40,7 @@ func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, liv
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, first, "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, first, "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
@@ -87,7 +87,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
@@ -109,7 +109,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "codex"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "codex"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}

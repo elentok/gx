@@ -171,7 +171,7 @@ func TestDefaultHarness_NoticeCounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, addr := range []string{"inherit:epic/01", "override:epic/01"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, ""); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}

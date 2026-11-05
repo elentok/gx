@@ -33,7 +33,7 @@ func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
 		servertest.SetProjectRepo(t, store, "proj", repo)
 		fake := servertest.NewTurnRunner(func(string, string) {})
 		h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-		if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
 		servertest.WaitStatus(t, h.TicketStore+"/proj/epic-a/issues/01-first.md", schema.StatusLegacyAnswer)

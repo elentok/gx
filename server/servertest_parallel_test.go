@@ -31,7 +31,7 @@ func TestServertest_ParallelHarnessesEachDriveAHerdrLaunch(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			select {

@@ -75,7 +75,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", agent); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", agent); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {

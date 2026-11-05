@@ -21,7 +21,7 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 	t.Parallel()
 	h, repo := servertest.StartOneOffHarness(t)
 	ctx := context.Background()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("seed queue: %+v, %v", res, err)
 	}
 
@@ -122,7 +122,7 @@ func TestOneOff_FrontQueuesAtHead(t *testing.T) {
 	t.Parallel()
 	h, repo := servertest.StartOneOffHarness(t)
 	ctx := context.Background()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("seed queue: %+v, %v", res, err)
 	}
 	res, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "urgent", Cwd: repo, Front: true})
@@ -316,7 +316,7 @@ func TestOneOff_NumbersAboveTheArchiveAndQueuesTheRootOnce(t *testing.T) {
 	if err != nil || first.Refused || first.Address != "proj:one-offs/08" {
 		t.Fatalf("first = %+v, %v; want proj:one-offs/08", first, err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("queue epic-a: %+v, %v", res, err)
 	}
 	second, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "two", Cwd: repo, Name: "b"})
@@ -332,7 +332,7 @@ func TestOneOff_FrontMovesAQueuedRootToTheHead(t *testing.T) {
 	t.Parallel()
 	h, repo := servertest.StartOneOffHarness(t)
 	ctx := context.Background()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("queue epic-a: %+v, %v", res, err)
 	}
 	first, err := h.Client.Queue.OneOff(ctx, wire.OneOffRequest{Prompt: "one", Cwd: repo})

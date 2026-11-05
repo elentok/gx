@@ -31,7 +31,7 @@ func TestRateLimitHold_StopsNewClaimsOfThatHarnessOnly(t *testing.T) {
 	t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add first: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "first ticket launches", func() bool { return len(pty.Prompts("epic-a-iter-01")) > 0 })
@@ -42,10 +42,10 @@ func TestRateLimitHold_StopsNewClaimsOfThatHarnessOnly(t *testing.T) {
 		return err == nil && ex.Verdict == wire.VerdictRateLimited
 	})
 
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add claude: %+v, %v", res, err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-c/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-c/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add codex: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the codex ticket claims", func() bool { return len(pty.Prompts("epic-c-iter-01")) > 0 })
@@ -95,7 +95,7 @@ func TestRateLimitHold_RestartHoldsBeforeTheFirstClaim(t *testing.T) {
 	if res, err := h.Client.Queue.Pause(ctx); err != nil || res.Refused {
 		t.Fatalf("pause: %+v, %v", res, err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add second: %+v, %v", res, err)
 	}
 	h.Restart(t)

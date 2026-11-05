@@ -56,7 +56,7 @@ func TestHarnessLabel_WaitingNotes(t *testing.T) {
 	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:work/02", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:work/02", ""); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -87,7 +87,7 @@ func TestHarnessLabel_QueueItemAgentPins(t *testing.T) {
 	if _, err := h.Client.Queue.Pause(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:work/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:work/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	want := wire.HarnessLabel{Harness: "codex", HarnessNote: "pinned"}
@@ -105,7 +105,7 @@ func TestHarnessLabel_RunningRowCarriesTheRunsConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitKind(t, fake, "epic-a-iter-01")

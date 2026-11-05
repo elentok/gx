@@ -242,7 +242,7 @@ func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (a
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	// A launched run has seen its agent start the held turn; before that the agent is idle.

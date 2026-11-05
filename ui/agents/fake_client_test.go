@@ -33,10 +33,11 @@ type fakeSessionClient struct {
 var (
 	_ SessionClient = (*fakeSessionClient)(nil)
 	_ Sessions      = (*fakeSessionClient)(nil)
+	_ Queue         = (*fakeSessionClient)(nil)
 )
 
 func newTestModel(f *fakeSessionClient, settings ui.Settings) Model {
-	return NewModel(f, f, settings)
+	return NewModel(f, f, settings).WithQueue(f)
 }
 
 func (f *fakeSessionClient) record(call string) (wire.SessionResult, error) {
@@ -85,8 +86,8 @@ func (f *fakeSessionClient) Snapshot(context.Context) (wire.Snapshot, error) {
 	return f.snapshot, nil
 }
 
-// QueueAdd refuses the addresses in queueRefusals with the reason they map to.
-func (f *fakeSessionClient) QueueAdd(_ context.Context, address, _ string) (wire.QueueResult, error) {
+// Add refuses the addresses in queueRefusals with the reason they map to.
+func (f *fakeSessionClient) Add(_ context.Context, address, _ string) (wire.QueueResult, error) {
 	f.record("queue " + address)
 	if reason, ok := f.queueRefusals[address]; ok {
 		return wire.QueueResult{Refused: true, Message: reason}, nil

@@ -33,7 +33,7 @@ func TestHarnessClaim_WaitingTicketFollowsDefaultAtClaimTime(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	h, fake, path := startHarnessClaim(t, store)
 	ctx := context.Background()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	if k := servertest.WaitKind(t, fake, "epic-a-iter-01"); k != "claude" {
@@ -61,7 +61,7 @@ func TestHarnessClaim_UnpinnedTicketTypesClaimOnTheDefault(t *testing.T) {
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Type: typ})
 			h, fake, path := startHarnessClaim(t, store)
 			servertest.SwitchDefaultHarness(t, h, path, store, "codex")
-			if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			if k := servertest.WaitKind(t, fake, "epic-a-iter-01"); k != "codex" {

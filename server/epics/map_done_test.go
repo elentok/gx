@@ -28,7 +28,7 @@ func handMergeEpic(t *testing.T, blocker, mapName string) func() tickets.Epic {
 	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{blocker}})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:dep/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:dep/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	runGitIn(t, repo, "merge", "-q", "--ff-only", blocker)

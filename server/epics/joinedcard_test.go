@@ -179,7 +179,7 @@ func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
 		servertest.WriteEpicFiles(t, store, "m-impl", "---\nstatus: open\n---\n", tix)
 	})
 
-	if res, err := h.Client.QueueAdd(t.Context(), "proj:m-impl", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(t.Context(), "proj:m-impl", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
@@ -209,7 +209,7 @@ func TestEpicList_JoinedCardCarriesImplQueueSlot(t *testing.T) {
 	})
 
 	for _, name := range []string{"other", "queued-impl"} {
-		if res, err := h.Client.QueueAdd(t.Context(), "proj:"+name, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(t.Context(), "proj:"+name, ""); err != nil || res.Refused {
 			t.Fatalf("queue add %s = %+v, %v", name, res, err)
 		}
 	}

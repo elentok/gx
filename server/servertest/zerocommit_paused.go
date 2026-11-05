@@ -50,7 +50,7 @@ func PauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 	if headless {
 		fake := &stopCounter{TurnRunner: NewTurnRunner(func(string, string) {})}
 		p.H = StartWithStore(t, store, append([]func(*server.Config){WithRunner(fake)}, opts...)...)
-		if res, err := p.H.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		if res, err := p.H.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
 		WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)
@@ -64,7 +64,7 @@ func PauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 	} else {
 		p.H = StartWithStore(t, store, opts...)
 		p.H.OnTurn(func(turn *Turn) { turn.Transcript("done") })
-		if res, err := p.H.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		if res, err := p.H.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
 		WaitStatus(t, p.TicketPath, schema.StatusLegacyAnswer)

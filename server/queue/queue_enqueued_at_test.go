@@ -29,7 +29,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"proj:epic-a/01", "other:epic-b/01", "proj:epic-a/02"} {
-		if res, err := h.Client.QueueAdd(ctx, a, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, a, ""); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", a, res, err)
 		}
 	}
@@ -71,7 +71,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 	if res, err := h.Client.Queue.Remove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
-	res, err = h.Client.QueueAdd(ctx, "proj:epic-a/01", "")
+	res, err = h.Client.Queue.Add(ctx, "proj:epic-a/01", "")
 	if err != nil || res.Refused {
 		t.Fatalf("re-add: %+v, %v", res, err)
 	}

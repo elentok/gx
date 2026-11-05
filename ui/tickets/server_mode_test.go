@@ -21,7 +21,7 @@ import (
 
 type fakeServerAPI struct {
 	adds *[]wire.QueueItem
-	// addRes is what QueueAdd returns per address.
+	// addRes is what Queue.Add returns per address.
 	addRes map[string]wire.QueueResult
 	// calls records the ticket write verbs as "verb address" and the
 	// maintenance verbs by name.
@@ -106,7 +106,7 @@ func (f fakeQueue) Replace(_ context.Context, _ string, items []wire.QueueItem) 
 	return f.replaceRes, nil
 }
 
-func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (wire.QueueResult, error) {
+func (f fakeQueue) Add(_ context.Context, address, agent string) (wire.QueueResult, error) {
 	if f.adds != nil {
 		*f.adds = append(*f.adds, wire.QueueItem{Address: address, Agent: agent})
 	}

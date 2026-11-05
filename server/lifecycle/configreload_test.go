@@ -46,7 +46,7 @@ func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:epic-a/01", "proj:epic-b/01"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}

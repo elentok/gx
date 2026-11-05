@@ -23,7 +23,7 @@ func TestDeadlock_AllPausedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/02", ""); err != nil {
+	if _, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/02", ""); err != nil {
 		t.Fatal(err)
 	}
 	for range 3 {
@@ -46,7 +46,7 @@ func TestDeadlock_ErrorTicketPausesTheEpic(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store)
-	if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/02", ""); err != nil {
+	if _, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/02", ""); err != nil {
 		t.Fatal(err)
 	}
 	h.Server.Scheduler().ClaimNext()
@@ -90,7 +90,7 @@ func TestDeadlock_BlockedOrWaitingNextToPausedIsAllPaused(t *testing.T) {
 			h := servertest.StartWithStore(t, store)
 			for _, tk := range tickets {
 				if tk.opts.Status != "done" {
-					if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/"+tk.id, ""); err != nil {
+					if _, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/"+tk.id, ""); err != nil {
 						t.Fatal(err)
 					}
 					break
@@ -127,7 +127,7 @@ func TestDeadlock_AnswerOnlyPausesLogWaitingForAnswer(t *testing.T) {
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", c.second)
 			servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 			h := servertest.StartWithStore(t, store)
-			if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil {
+			if _, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", ""); err != nil {
 				t.Fatal(err)
 			}
 			h.Server.Scheduler().ClaimNext()
@@ -155,7 +155,7 @@ func TestDeadlock_MapEpicIsNeverDeadlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store)
-	_, _ = h.Client.QueueAdd(context.Background(), "proj:epic-a/02", "")
+	_, _ = h.Client.Queue.Add(context.Background(), "proj:epic-a/02", "")
 	for range 3 {
 		h.Server.Scheduler().ClaimNext()
 	}
@@ -173,7 +173,7 @@ func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", servertest.TicketOpts{Parent: "01"})
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store)
-	_, _ = h.Client.QueueAdd(context.Background(), "proj:epic-a/02", "")
+	_, _ = h.Client.Queue.Add(context.Background(), "proj:epic-a/02", "")
 	h.Server.Scheduler().ClaimNext()
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
 	got := runLogOf(t, h, events.Deadlocked)

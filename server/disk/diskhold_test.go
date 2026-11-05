@@ -73,7 +73,7 @@ func startHoldRig(t *testing.T, repos map[string]string, clean config.ByteSize, 
 
 func (r *holdRig) queue(t *testing.T, addr string) {
 	t.Helper()
-	if res, err := r.h.Client.QueueAdd(context.Background(), addr, "claude"); err != nil || res.Refused {
+	if res, err := r.h.Client.Queue.Add(context.Background(), addr, "claude"); err != nil || res.Refused {
 		t.Fatalf("queue %s = %+v, %v", addr, res, err)
 	}
 }
@@ -178,7 +178,7 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 		<-release
 		servertest.CommitWork(t, p, "epic-a")
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("queue = %+v, %v", res, err)
 	}
 	select {

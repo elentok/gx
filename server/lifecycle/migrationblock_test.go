@@ -38,7 +38,7 @@ func TestMigrationBlock_FailedProjectIsNotClaimedAndOthersAre(t *testing.T) {
 		var res wire.QueueResult
 		var err error
 		if !servertest.Poll(10*time.Second, func() bool {
-			res, err = f.H.Client.QueueAdd(ctx, addr, "claude")
+			res, err = f.H.Client.Queue.Add(ctx, addr, "claude")
 			return err == nil && !res.Refused
 		}) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)

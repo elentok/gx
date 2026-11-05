@@ -33,7 +33,7 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 			turn := newTurnRunner(func(_, _ string) { reportIteration(t, ticketPath, "asking") })
 			fake := c.wrap(turn)
 			h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-			if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", c.agent); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", c.agent); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
@@ -77,7 +77,7 @@ func testAskStaysAlive(t *testing.T, agent string, wrap func(*turnRunner) agentr
 	})
 	fake := wrap(turn)
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", agent); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", agent); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)

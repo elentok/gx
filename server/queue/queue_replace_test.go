@@ -46,7 +46,7 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"proj:epic-a/01", "other:epic-b/01", "proj:epic-a/02"} {
-		if res, err := h.Client.QueueAdd(ctx, a, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, a, ""); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", a, res, err)
 		}
 	}
@@ -79,7 +79,7 @@ func TestQueueRemove_CascadesToDescendants(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"proj:epic-a/01", "other:epic-b/01", "proj:epic-a/02"} {
-		if res, err := h.Client.QueueAdd(ctx, a, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, a, ""); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", a, res, err)
 		}
 	}
@@ -96,7 +96,7 @@ func TestQueue_ReplaceAndRemoveRefuseWhileAnIterationIsLive(t *testing.T) {
 	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	expectRun(t, h)

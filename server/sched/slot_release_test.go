@@ -41,7 +41,7 @@ func TestSlotRelease_QueuedRootClaimsAfterGrace(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 2 })

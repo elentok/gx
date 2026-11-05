@@ -47,7 +47,7 @@ func startOwnedRun(t *testing.T, r *pidRunner) *servertest.Harness {
 	t.Cleanup(h.Processes.Release)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	testutil.WaitFor(t, 10*time.Second, "the run to start", func() bool {

@@ -34,7 +34,7 @@ func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *
 		t.Fatal(err)
 	}
 	runGitIn(t, repo, "merge", "-q", "--ff-only", "landed")
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:other/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:other/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 

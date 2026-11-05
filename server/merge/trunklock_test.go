@@ -42,7 +42,7 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.QueueEpic(ctx, t, "01")
-	if res, err := f.H.Client.QueueAdd(ctx, "proj:"+other+"/01", "claude"); err != nil || res.Refused {
+	if res, err := f.H.Client.Queue.Add(ctx, "proj:"+other+"/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	var completed, paused []wire.Event

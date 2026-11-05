@@ -182,7 +182,7 @@ func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
 			var res wire.QueueResult
 			var err error
 			if !servertest.Poll(5*time.Second, func() bool {
-				res, err = h.Client.QueueAdd(ctx, "proj:one-offs/01", "")
+				res, err = h.Client.Queue.Add(ctx, "proj:one-offs/01", "")
 				return err == nil && !res.Refused
 			}) {
 				t.Fatalf("queue add: %+v, %v", res, err)

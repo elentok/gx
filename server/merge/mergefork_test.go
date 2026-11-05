@@ -127,7 +127,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 	f.H.Server.Rescan()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if res, err := f.H.Client.QueueAdd(ctx, "proj:dep/01", "claude"); err != nil || res.Refused {
+	if res, err := f.H.Client.Queue.Add(ctx, "proj:dep/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add dep: %+v, %v", res, err)
 	}
 	evs := f.QueueEpic(ctx, t, "01")

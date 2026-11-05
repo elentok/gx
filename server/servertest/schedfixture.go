@@ -89,7 +89,7 @@ func (f *SchedFixture) Subscribe(ctx context.Context, t *testing.T) <-chan wire.
 func (f *SchedFixture) QueueEpic(ctx context.Context, t *testing.T, firstID string) <-chan wire.Event {
 	t.Helper()
 	evs := f.Subscribe(ctx, t)
-	if res, err := f.H.Client.QueueAdd(ctx, "proj:"+SchedEpic+"/"+firstID, "claude"); err != nil || res.Refused {
+	if res, err := f.H.Client.Queue.Add(ctx, "proj:"+SchedEpic+"/"+firstID, "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	return evs

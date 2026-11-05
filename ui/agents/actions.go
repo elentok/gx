@@ -102,7 +102,7 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 	}
 	var accept tea.Cmd
 	if s.Actionable.IsQueue() {
-		accept = queueActionCmd(m.client, s.Actionable.Target)
+		accept = queueActionCmd(m.client, m.queue, s.Actionable.Target)
 	} else {
 		accept = sessionActionCmd("run action", m.sessionAPI.RunAction, s.ID)
 	}
@@ -155,14 +155,14 @@ type queueActionMsg struct {
 
 // queueActionCmd queues the open tickets of epic ("project:epic"). The queue
 // action never goes to the session as a prompt.
-func queueActionCmd(c SessionClient, epic string) tea.Cmd {
+func queueActionCmd(c SessionClient, q Queue, epic string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		snap, err := c.Snapshot(ctx)
 		if err != nil {
 			return queueActionMsg{err: err}
 		}
-		queued, refusals := ticketsui.QueueEpic(ctx, snap, c.QueueAdd, epic)
+		queued, refusals := ticketsui.QueueEpic(ctx, snap, q.Add, epic)
 		return queueActionMsg{epic: epic, queued: queued, refusals: refusals}
 	}
 }

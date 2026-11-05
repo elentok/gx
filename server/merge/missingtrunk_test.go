@@ -137,7 +137,7 @@ func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
 	time.Sleep(300 * time.Millisecond) // many polls pass with nothing queued
 
 	f.Git(t, "branch", "develop")
-	if res, err := f.H.Client.QueueAdd(ctx, "proj:"+schedEpic+"/01", "claude"); err != nil || res.Refused {
+	if res, err := f.H.Client.Queue.Add(ctx, "proj:"+schedEpic+"/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("re-add: %+v, %v", res, err)
 	}
 	countUntil(ctx, t, evs, counts, wire.EventRootCompleted)

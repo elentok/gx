@@ -20,7 +20,7 @@ func TestServerQueueAdd_RefusesWhenNoServerRunning(t *testing.T) {
 	var out bytes.Buffer
 	err := runServerQueueWrite(context.Background(), cl, &out, false,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-			return cl.QueueAdd(ctx, "proj:epic/01", "")
+			return cl.Queue.Add(ctx, "proj:epic/01", "")
 		})
 	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) || !strings.Contains(err.Error(), "gx server start") {
 		t.Errorf("err = %v; want server-not-running with the start hint", err)

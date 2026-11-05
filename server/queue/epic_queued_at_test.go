@@ -46,7 +46,7 @@ func TestQueueAdd_StampsQueuedAtOnceAndKeepsIt(t *testing.T) {
 	if got := queuedAtLine(epicTicketMD(t, storeDir, "e")); got != "" {
 		t.Fatalf("queued_at before enqueue = %q", got)
 	}
-	if res, err := h.Client.QueueAdd(t.Context(), "proj:e", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(t.Context(), "proj:e", ""); err != nil || res.Refused {
 		t.Fatalf("add = %+v, %v", res, err)
 	}
 	first := queuedAtLine(epicTicketMD(t, storeDir, "e"))
@@ -56,7 +56,7 @@ func TestQueueAdd_StampsQueuedAtOnceAndKeepsIt(t *testing.T) {
 	if res, err := h.Client.Queue.Remove(t.Context(), "proj:e"); err != nil || res.Refused {
 		t.Fatalf("remove = %+v, %v", res, err)
 	}
-	if res, err := h.Client.QueueAdd(t.Context(), "proj:e", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(t.Context(), "proj:e", ""); err != nil || res.Refused {
 		t.Fatalf("re-add = %+v, %v", res, err)
 	}
 	if got := queuedAtLine(epicTicketMD(t, storeDir, "e")); got != first {
@@ -100,7 +100,7 @@ func TestQueueAdd_DraftImplEpicRefusesEpicDraftAndWritesNothing(t *testing.T) {
 		servertest.WriteEpicFiles(t, store, "feature-impl", "---\nstatus: draft\n---\n", open)
 	})
 
-	res, err := h.Client.QueueAdd(t.Context(), "proj:feature-impl", "")
+	res, err := h.Client.Queue.Add(t.Context(), "proj:feature-impl", "")
 	if err != nil || !res.Refused || res.Reason != wire.ReasonEpicDraft {
 		t.Fatalf("add = %+v, %v; want refusal %s", res, err, wire.ReasonEpicDraft)
 	}

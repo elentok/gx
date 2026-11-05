@@ -61,7 +61,7 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	}
 	addCtx, addCancel := call()
 	defer addCancel()
-	if res, err := h.Client.QueueAdd(addCtx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(addCtx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 30*time.Second, "the claim-reread-mismatch verdict", func() bool {
@@ -111,7 +111,7 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, addr := range []string{"proj:epic-a/01", "proj:epic-b/01"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
@@ -167,7 +167,7 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
 		started := false
@@ -208,7 +208,7 @@ func TestRunner_SkipsAFrontierTicketThatIsAlreadyTracked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
@@ -255,7 +255,7 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, addr := range []string{"proj-a:epic-b/01", "proj-b:epic-c/01"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
@@ -296,7 +296,7 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 	defer cancel()
 
 	for _, addr := range []string{"proj:epic-a/01", "proj:epic-b/01"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
@@ -350,7 +350,7 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	ex, err := h.Client.Reads.Explain(ctx, "proj:epic-b/01")
@@ -385,7 +385,7 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	order := []string{"proj-a:epic-a/01", "proj-b:epic-b/01", "proj-a:epic-c/01"}
 	var last []wire.PendingRow
 	for _, addr := range order {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
@@ -479,7 +479,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 		}
 		streams = append(streams, evs)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for _, evs := range streams {

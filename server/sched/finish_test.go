@@ -42,7 +42,7 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -103,7 +103,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
@@ -142,7 +142,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			for ev := range evs {
@@ -179,7 +179,7 @@ func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 
@@ -233,7 +233,7 @@ func TestRunner_AFinishThatErrorsPausesTheTicketStuckAndFreesTheRoot(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
@@ -351,7 +351,7 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
@@ -407,7 +407,7 @@ func TestRunner_CodexEvolveLaunchGetsTheFollowUpsAndGxDirs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", tc.agent); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", tc.agent); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			for ev := range evs {

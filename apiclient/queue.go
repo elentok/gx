@@ -12,9 +12,9 @@ type Queue struct {
 	t *transport
 }
 
-// QueueAdd appends a ticket to the queue; agent "" takes the default.
-func (c *Client) QueueAdd(ctx context.Context, address, agent string) (wire.QueueResult, error) {
-	return c.queueWriteTo(ctx, "/v1/queue/add", wire.QueueRequest{Address: address, Agent: agent})
+// Add appends a ticket to the queue; agent "" takes the default.
+func (q *Queue) Add(ctx context.Context, address, agent string) (wire.QueueResult, error) {
+	return q.write(ctx, "add", wire.QueueRequest{Address: address, Agent: agent})
 }
 
 // List returns every ticket with the scheduler's verdict on it.

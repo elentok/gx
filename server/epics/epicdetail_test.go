@@ -201,7 +201,7 @@ func TestEpicDetail_Queueable(t *testing.T) {
 		servertest.WriteEpicFiles(t, store, "cancelled", "---\nstatus: cancelled\n---\n", open)
 	})
 
-	if res, err := h.Client.QueueAdd(t.Context(), "proj:queued", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(t.Context(), "proj:queued", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	for epic, want := range map[string]bool{

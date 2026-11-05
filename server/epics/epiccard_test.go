@@ -37,7 +37,7 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 		servertest.WriteEpicFiles(t, store, "empty", loop, map[string]string{})
 	})
 
-	if res, err := h.Client.QueueAdd(t.Context(), "proj:queued", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(t.Context(), "proj:queued", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
@@ -96,7 +96,7 @@ func TestEpicList_QueuedOneOffSortsBySlotAndReadsQueuedN(t *testing.T) {
 	})
 
 	for _, addr := range []string{"proj:q-first", "proj:one-offs/01", "proj:q-last"} {
-		if res, err := h.Client.QueueAdd(t.Context(), addr, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(t.Context(), addr, ""); err != nil || res.Refused {
 			t.Fatalf("queue add %s = %+v, %v", addr, res, err)
 		}
 	}
@@ -131,7 +131,7 @@ func TestEpicList_SectionSortOrders(t *testing.T) {
 	})
 
 	for _, name := range []string{"q-first", "q-second"} {
-		if res, err := h.Client.QueueAdd(t.Context(), "proj:"+name, ""); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(t.Context(), "proj:"+name, ""); err != nil || res.Refused {
 			t.Fatalf("queue add %s = %+v, %v", name, res, err)
 		}
 	}

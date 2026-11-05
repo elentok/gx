@@ -52,10 +52,10 @@ func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 			})
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add claude: %+v, %v", res, err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "codex"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "codex"); err != nil || res.Refused {
 				t.Fatalf("add codex: %+v, %v", res, err)
 			}
 			servertest.WaitFor(t, 10*time.Second, "the codex ticket claims", func() bool { return len(pty.Prompts("epic-b-iter-01")) > 0 })
@@ -91,7 +91,7 @@ func TestUsageGate_OverrideLetsAClaudeTicketClaim(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {
@@ -126,7 +126,7 @@ func TestUsageGate_LiftsAtResetWithNoNewSample(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {

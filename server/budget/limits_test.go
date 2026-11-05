@@ -115,7 +115,7 @@ func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	time.Sleep(250 * time.Millisecond) // negative wait: a launch would have come within a few 50ms polls
@@ -151,7 +151,7 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 		t.Errorf("projects = %v, want 3 each", status.Projects)
 	}
 	for _, addr := range []string{"proj-a:epic-a/01", "proj-b:epic-b/01"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
@@ -244,7 +244,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "a live run", func() bool { return len(h.Server.Runs()) > 0 })
@@ -344,7 +344,7 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "a live run", func() bool { return len(h.Server.Runs()) > 0 })
@@ -401,7 +401,7 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for i := 1; i <= n; i++ {
-		if _, err := h.Client.QueueAdd(ctx, fmt.Sprintf("proj:epic-a/%02d", i), "claude"); err != nil {
+		if _, err := h.Client.Queue.Add(ctx, fmt.Sprintf("proj:epic-a/%02d", i), "claude"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -478,7 +478,7 @@ func TestBudget_CodexRunIsNotMeteredOrKilled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for addr, agent := range map[string]string{"proj:epic-a/01": "claude", "proj:epic-b/01": "codex"} {
-		if _, err := h.Client.QueueAdd(ctx, addr, agent); err != nil {
+		if _, err := h.Client.Queue.Add(ctx, addr, agent); err != nil {
 			t.Fatal(err)
 		}
 	}

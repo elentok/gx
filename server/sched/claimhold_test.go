@@ -53,10 +53,10 @@ func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 				t.Fatalf("add codex: %+v, %v", res, err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add claude: %+v, %v", res, err)
 			}
 
@@ -119,7 +119,7 @@ func TestHerdrBanner_HiddenForCodexTicketOnPty(t *testing.T) {
 	t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "codex ticket launches on pty", func() bool {
@@ -160,7 +160,7 @@ func TestHerdrBanner_HiddenWhileNoTicketNeedsHerdr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add claude: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "claude ticket launches on pty", func() bool {

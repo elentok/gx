@@ -73,7 +73,7 @@ func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *test
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:"+schedEpic+"/02")
 
-	if res, err := f.H.Client.QueueAdd(ctx, "proj:other/01", "claude"); err != nil || res.Refused {
+	if res, err := f.H.Client.Queue.Add(ctx, "proj:other/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventTicketDone, "proj:other/01")

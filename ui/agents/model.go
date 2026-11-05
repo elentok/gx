@@ -49,9 +49,11 @@ type Model struct {
 	client SessionClient
 	// sessionAPI is nil exactly when client is.
 	sessionAPI Sessions
-	settings   ui.Settings
-	link       ticketsui.ServerLink
-	loaded     bool
+	// queue is nil exactly when client is.
+	queue    Queue
+	settings ui.Settings
+	link     ticketsui.ServerLink
+	loaded   bool
 	// sessions is in sidebar order (see orderedSessions); cursor indexes it.
 	sessions    []wire.SessionInfo
 	cursor      int
@@ -128,6 +130,12 @@ func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Mod
 	}
 	m.groupsPath = groupsFile(settings.Dirs)
 	m.showQueue, m.showDesign = loadGroups(m.groupsPath)
+	return m
+}
+
+// WithQueue gives the tab the queue sub-client.
+func (m Model) WithQueue(q Queue) Model {
+	m.queue = q
 	return m
 }
 

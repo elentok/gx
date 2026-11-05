@@ -38,7 +38,7 @@ func TestMigrate_SchedulerHoldsUntilTheRunEnds(t *testing.T) {
 	// after the release; the queue entry itself is written before that.
 	added := make(chan error, 1)
 	go func() {
-		res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "")
+		res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "")
 		if err == nil && res.Refused {
 			err = errors.New("refused: " + res.Message)
 		}

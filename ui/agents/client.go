@@ -10,7 +10,11 @@ import (
 // from the client itself; the session verbs live on Sessions.
 type SessionClient interface {
 	Snapshot(ctx context.Context) (wire.Snapshot, error)
-	QueueAdd(ctx context.Context, address, agent string) (wire.QueueResult, error)
+}
+
+// Queue is the slice of *apiclient.Queue the Agents tab uses for its queue action.
+type Queue interface {
+	Add(ctx context.Context, address, agent string) (wire.QueueResult, error)
 }
 
 // Sessions is the slice of *apiclient.Sessions the Agents tab uses to act on

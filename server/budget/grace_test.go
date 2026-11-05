@@ -65,7 +65,7 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 	h.Server.Budget().RecordSpend("spent", 8)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	waitRuns(ctx, t, h, 1)
@@ -153,7 +153,7 @@ func (f graceFixture) pauseKind(t *testing.T) string {
 // expectHeld checks the grace period's effect: nothing killed, no new start.
 func (f graceFixture) expectHeld(t *testing.T) {
 	t.Helper()
-	if _, err := f.h.Client.QueueAdd(f.ctx, "proj:epic-b/01", "claude"); err != nil {
+	if _, err := f.h.Client.Queue.Add(f.ctx, "proj:epic-b/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(200 * time.Millisecond) // negative wait: a launch would come within a few 50ms polls

@@ -50,7 +50,7 @@ func StartQueueRows(t *testing.T, runner string) (*Harness, NamedFake) {
 	fake := NewNamedFake(runnerfake.NewRunner(), runner)
 	h := StartWithStore(t, store, WithRunnerFor(fake, func(string, string) agentrunner.Runner { return fake }))
 	t.Cleanup(func() { fake.SetState(ResumeLabel, agentrunner.StateDone, "") })
-	if res, err := h.Client.QueueAdd(context.Background(), QueueRowTicket, "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), QueueRowTicket, "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(ResumeLabel)) > 0 })
@@ -73,7 +73,7 @@ func StartQueueChat(t *testing.T, text string) (*Harness, wire.SessionInfo, func
 		release = turn.Hold()
 		close(held)
 	})
-	if res, err := h.Client.QueueAdd(context.Background(), QueueRowTicket, "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), QueueRowTicket, "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	select {

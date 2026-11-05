@@ -191,7 +191,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.action {
 	case actionQueueEpic:
-		return m, cmdQueueEpic(m.serverAPI, epic.Path)
+		return m, cmdQueueEpic(m.queue, epic.Path)
 	case actionEditEpic:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case actionYankEpic:
@@ -247,9 +247,9 @@ func QueuedToast(queued int, refusals []string) tea.Cmd {
 
 // cmdQueueEpic queues the epic as one entry and reports the outcome as an
 // epicQueuedMsg.
-func cmdQueueEpic(api ServerAPI, epicAddress string) tea.Cmd {
+func cmdQueueEpic(q QueueAPI, epicAddress string) tea.Cmd {
 	return func() tea.Msg {
-		queued, refusals := QueueAddresses(context.Background(), api.QueueAdd, []string{epicAddress})
+		queued, refusals := QueueAddresses(context.Background(), q.Add, []string{epicAddress})
 		return epicQueuedMsg{queued: queued, refusals: refusals}
 	}
 }

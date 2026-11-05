@@ -70,7 +70,7 @@ func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
 	var out bytes.Buffer
 	err := runServerQueueWrite(context.Background(), cl, &out, true,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
-			return cl.QueueAdd(ctx, "p:e/01", "")
+			return cl.Queue.Add(ctx, "p:e/01", "")
 		})
 	if err != nil {
 		t.Fatalf("runServerQueueWrite: %v", err)

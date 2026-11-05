@@ -138,7 +138,7 @@ func (m Model) newAgentsModel(s ui.Settings) agentsui.Model {
 	if m.settings.Server == nil {
 		return agentsui.NewModel(nil, nil, s)
 	}
-	return agentsui.NewModel(m.settings.Server.Client, m.settings.Server.Sessions, s).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
+	return agentsui.NewModel(m.settings.Server.Client, m.settings.Server.Sessions, s).WithQueue(m.settings.Server.Queue).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
 		WithCwdProject(cwdProjectName(s.TicketStore, m.settings.ActiveWorktreePath))
 }
 

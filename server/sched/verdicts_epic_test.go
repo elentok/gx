@@ -41,7 +41,7 @@ func TestPending_WholeEpicEntryGivesOneRowForItsFrontierTicket(t *testing.T) {
 	h, _ := startCapHeldEpics(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	snap, err := h.Client.Snapshot(ctx)
@@ -58,7 +58,7 @@ func TestPending_WholeEpicEntrySkipsAFrontierTicketThatIsAlreadyRunning(t *testi
 	h.Server.Registry().PutRun("proj:epic-b/01", runs.Run{Address: "proj:epic-b/01"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	snap, err := h.Client.Snapshot(ctx)
@@ -78,7 +78,7 @@ func TestPending_TicketQueuedAloneAndItsWholeEpicGiveOneRow(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:epic-b", "proj:epic-b/01"} {
-		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
@@ -96,7 +96,7 @@ func TestPending_WholeEpicRowStreamsAVerdictChange(t *testing.T) {
 	h, repo := startCapHeldEpics(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	snap, err := h.Client.Snapshot(ctx)

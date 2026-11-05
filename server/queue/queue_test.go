@@ -31,7 +31,7 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 	}
 
 	for _, w := range []struct{ addr, agent string }{{"proj:epic-a/01", ""}, {"proj:epic-a/02", "codex"}, {"proj:epic-a/03", ""}} {
-		if res, err := h.Client.QueueAdd(ctx, w.addr, w.agent); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, w.addr, w.agent); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", w.addr, res, err)
 		}
 	}
@@ -83,7 +83,7 @@ func TestQueue_StoredAgentSurvivesDefaultSwitch(t *testing.T) {
 		t.Fatalf("default = %q, want claude", got)
 	}
 	for _, w := range []struct{ addr, agent string }{{"proj:epic-a/01", "claude"}, {"proj:epic-a/02", ""}} {
-		if res, err := h.Client.QueueAdd(ctx, w.addr, w.agent); err != nil || res.Refused {
+		if res, err := h.Client.Queue.Add(ctx, w.addr, w.agent); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", w.addr, res, err)
 		}
 	}
@@ -112,7 +112,7 @@ func TestQueue_Refusals(t *testing.T) {
 	}
 	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
-	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil {
+	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -121,13 +121,13 @@ func TestQueue_Refusals(t *testing.T) {
 		do     func() (wire.QueueResult, error)
 		reason string
 	}{
-		{"duplicate", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/01", "") }, wire.ReasonAlreadyQueued},
-		{"unknown ticket", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/99", "") }, wire.ReasonUnknownTicket},
-		{"bad address", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "nonsense", "") }, wire.ReasonInvalidAddress},
-		{"bad agent", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/02", "gpt") }, wire.ReasonInvalidAgent},
+		{"duplicate", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:epic-a/01", "") }, wire.ReasonAlreadyQueued},
+		{"unknown ticket", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:epic-a/99", "") }, wire.ReasonUnknownTicket},
+		{"bad address", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "nonsense", "") }, wire.ReasonInvalidAddress},
+		{"bad agent", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:epic-a/02", "gpt") }, wire.ReasonInvalidAgent},
 		{"remove unqueued", func() (wire.QueueResult, error) { return h.Client.Queue.Remove(ctx, "proj:epic-a/02") }, wire.ReasonNotQueued},
 		{"move unqueued", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/02", 1) }, wire.ReasonNotQueued},
-		{"map epic", func() (wire.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:map-epic/01", "") }, wire.ReasonMapEpic},
+		{"map epic", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:map-epic/01", "") }, wire.ReasonMapEpic},
 		{"move out of range", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/01", 2) }, wire.ReasonBadPosition},
 	}
 	for _, c := range cases {
@@ -149,7 +149,7 @@ func TestQueue_AddAcceptedWithoutConfig(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "")
+	res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "")
 	if err != nil || res.Refused {
 		t.Errorf("add = %+v, %v; want accepted", res, err)
 	}

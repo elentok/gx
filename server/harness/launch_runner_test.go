@@ -54,10 +54,10 @@ func TestLaunchRunner_CodexRunsOnPtyUnlessHerdrIsConfigured(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 				t.Fatalf("add codex: %+v, %v", res, err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+			if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add claude: %+v, %v", res, err)
 			}
 			for started := 0; started < 2; {

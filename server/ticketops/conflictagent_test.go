@@ -37,7 +37,7 @@ func runToConflict(t *testing.T, agents string, midRun func(store, repo string))
 		midRun(store, repo)
 	})
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")

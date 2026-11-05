@@ -87,7 +87,7 @@ func (m QueueModel) handleQueueEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea
 	}
 	switch msg.action {
 	case actionQueueEpic:
-		return m, cmdQueueEpic(m.serverAPI, epic.Path)
+		return m, cmdQueueEpic(m.queue, epic.Path)
 	case actionEditEpic:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case actionYankEpic:

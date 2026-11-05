@@ -76,7 +76,7 @@ func StartBlockable(t *testing.T, runnerName string, opts ...func(*server.Config
 		fake = PtyNamed{turn}
 	}
 	h := StartWithStore(t, store, append([]func(*server.Config){WithRunner(fake)}, opts...)...)
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	Await(t, func() bool { _, ok, _ := turn.Find(HolderLabel); return ok })

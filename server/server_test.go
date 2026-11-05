@@ -374,7 +374,7 @@ func herdrTicketStore(t *testing.T) string {
 
 func queueHerdrTicket(ctx context.Context, t *testing.T, h *servertest.Harness) {
 	t.Helper()
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("queue add: %+v, %v", res, err)
 	}
 }

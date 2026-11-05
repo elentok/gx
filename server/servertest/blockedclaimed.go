@@ -72,7 +72,7 @@ func StartBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*Har
 	MarkStarted(t, h)
 	h.Restart(t)
 	Await(t, func() bool { return len(h.Server.Runs()) == 1 })
-	if res, err := h.Client.QueueAdd(context.Background(), AnswerAddr, "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(context.Background(), AnswerAddr, "claude"); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	// A block raised while the launch still waits for the session to be ready fails

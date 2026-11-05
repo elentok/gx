@@ -46,7 +46,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		}
 	})
 
-	if res, err := h.Client.QueueAdd(t.Context(), "proj:queued", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(t.Context(), "proj:queued", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
@@ -278,7 +278,7 @@ func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(t.Context(), "proj:one-offs/01", ""); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(t.Context(), "proj:one-offs/01", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)
 	}
 	code, body := servertest.WebDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")

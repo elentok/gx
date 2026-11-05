@@ -23,7 +23,7 @@ func TestProjectRemove_RefusesWhileQueuedKeepsTickets(t *testing.T) {
 		return runProjectEdit(ctx, &bytes.Buffer{}, false, "removed", h.Client.Reads.RemoveProject, wire.ProjectRequest{Name: "proj"})
 	}
 
-	if q, err := h.Client.QueueAdd(ctx, "proj:epic/01", ""); err != nil || q.Refused {
+	if q, err := h.Client.Queue.Add(ctx, "proj:epic/01", ""); err != nil || q.Refused {
 		t.Fatalf("queue add: %+v, %v", q, err)
 	}
 	if err := remove(); err == nil || !strings.Contains(err.Error(), wire.ReasonProjectBusy) {

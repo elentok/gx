@@ -176,7 +176,7 @@ func (r *cleanRig) wantCalls(t *testing.T, n int) {
 
 func (r *cleanRig) queue(t *testing.T, addr string) {
 	t.Helper()
-	if res, err := r.h.Client.QueueAdd(context.Background(), addr, "claude"); err != nil || res.Refused {
+	if res, err := r.h.Client.Queue.Add(context.Background(), addr, "claude"); err != nil || res.Refused {
 		t.Fatalf("queue %s = %+v, %v", addr, res, err)
 	}
 }
