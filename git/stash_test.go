@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/git/internal/run"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -127,9 +128,9 @@ func listFiles(t *testing.T, dir string) []StageFileStatus {
 
 func stashList(t *testing.T, dir string) string {
 	t.Helper()
-	stdout, stderr, err := run(dir, []string{"stash", "list"})
+	stdout, stderr, err := run.Exec(dir, []string{"stash", "list"})
 	if err != nil {
-		t.Fatalf("stash list: %v\n%s", err, joinOutput(stdout, stderr))
+		t.Fatalf("stash list: %v\n%s", err, run.JoinOutput(stdout, stderr))
 	}
 	return stdout
 }

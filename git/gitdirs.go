@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"path/filepath"
 	"strings"
 )
@@ -10,7 +11,7 @@ import (
 // <common>/worktrees/<name>) and the absolute common git dir. They are equal
 // for a plain checkout.
 func GitDirs(dir string) (gitDir, commonDir string, err error) {
-	out, _, err := run(dir, []string{"rev-parse", "--absolute-git-dir", "--git-common-dir"})
+	out, _, err := run.Exec(dir, []string{"rev-parse", "--absolute-git-dir", "--git-common-dir"})
 	if err != nil {
 		return "", "", fmt.Errorf("%w at %q", ErrNoRepo, dir)
 	}

@@ -3,6 +3,7 @@ package git
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"path/filepath"
 	"strings"
 )
@@ -63,11 +64,11 @@ func IdentifyDir(dir string) (*DirInfo, error) {
 	// IdentifyDir runs on hot paths and every git child process is a fork/exec,
 	// so the common case (inside a worktree) is one rev-parse. --show-toplevel
 	// fails outside a worktree, which sends bare repos to the second call.
-	fields := strings.Split(runAllowFail(dir, []string{"rev-parse", "--git-dir", "--is-inside-work-tree", "--git-common-dir", "--show-toplevel"}), "\n")
+	fields := strings.Split(run.AllowFail(dir, []string{"rev-parse", "--git-dir", "--is-inside-work-tree", "--git-common-dir", "--show-toplevel"}), "\n")
 	if len(fields) == 4 && fields[1] == "true" {
 		return identifyWorktree(dir, fields[2], fields[3])
 	}
-	fields = strings.Split(runAllowFail(dir, []string{"rev-parse", "--git-dir", "--is-inside-work-tree", "--git-common-dir"}), "\n")
+	fields = strings.Split(run.AllowFail(dir, []string{"rev-parse", "--git-dir", "--is-inside-work-tree", "--git-common-dir"}), "\n")
 	if len(fields) != 3 || fields[0] == "" {
 		return nil, fmt.Errorf("%w at %q", ErrNoRepo, dir)
 	}
@@ -156,7 +157,7 @@ func identifyWorktree(dir, commonDir, topLevel string) (*DirInfo, error) {
 // when available, then falls back to local branch checks.
 func RemoteDefaultBranch(repoRoot string) string {
 	// Check origin/HEAD first (most reliable for cloned repos)
-	out := runAllowFail(repoRoot, []string{"symbolic-ref", "--short", "refs/remotes/origin/HEAD"})
+	out := run.AllowFail(repoRoot, []string{"symbolic-ref", "--short", "refs/remotes/origin/HEAD"})
 	if out != "" {
 		// out is like "origin/main" - strip the remote prefix
 		if _, after, ok := strings.Cut(out, "/"); ok {
@@ -165,10 +166,10 @@ func RemoteDefaultBranch(repoRoot string) string {
 	}
 
 	// Fall back to checking local branches
-	if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/main"}) != "" {
+	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/main"}) != "" {
 		return "main"
 	}
-	if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/master"}) != "" {
+	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/master"}) != "" {
 		return "master"
 	}
 

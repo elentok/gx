@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"strings"
 	"time"
 )
@@ -20,7 +21,7 @@ type FileOrigin struct {
 // repoRoot) and the path it had there, following renames. ok is false when the
 // file has no history, e.g. it is untracked.
 func FirstCommitOfFile(repoRoot, path string) (origin FileOrigin, ok bool, err error) {
-	out, _, err := run(repoRoot, []string{
+	out, _, err := run.Exec(repoRoot, []string{
 		"log", "--follow", "--name-status", "--format=@%cI\t%P", "--", path,
 	})
 	if err != nil {
@@ -53,7 +54,7 @@ func FirstCommitOfFile(repoRoot, path string) (origin FileOrigin, ok bool, err e
 // line. For a file whose current content has such a line, that commit is the
 // one that put it there. ok is false when no commit touches such a line.
 func LastCommitChangingLine(repoRoot, path, line string) (origin FileOrigin, ok bool, err error) {
-	out, _, err := run(repoRoot, []string{
+	out, _, err := run.Exec(repoRoot, []string{
 		"log", "--follow", "-G", line, "--format=@%cI\t%P", "--", path,
 	})
 	if err != nil {

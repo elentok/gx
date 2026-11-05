@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,7 +27,7 @@ func DiffPathWithDelta(worktreeRoot, home, path string, cached bool, sideBySide 
 		rawArgs = append(rawArgs, "--cached")
 	}
 	rawArgs = append(rawArgs, "--", path)
-	raw, _, err := run(worktreeRoot, rawArgs)
+	raw, _, err := run.Exec(worktreeRoot, rawArgs)
 	if err != nil {
 		return "", err
 	}
@@ -42,7 +43,7 @@ func DiffPathWithDelta(worktreeRoot, home, path string, cached bool, sideBySide 
 		fallbackArgs = append(fallbackArgs, "--cached")
 	}
 	fallbackArgs = append(fallbackArgs, "--", path)
-	fallbackOut, _, fallbackErr := run(worktreeRoot, fallbackArgs)
+	fallbackOut, _, fallbackErr := run.Exec(worktreeRoot, fallbackArgs)
 	if fallbackErr != nil {
 		return "", fallbackErr
 	}
@@ -103,7 +104,7 @@ func ColorizeDiff(worktreeRoot, home, path, rawDiff string, cached, sideBySide b
 		args = append(args, "--cached")
 	}
 	args = append(args, "--", path)
-	out, _, err := run(worktreeRoot, args)
+	out, _, err := run.Exec(worktreeRoot, args)
 	return out, err
 }
 
@@ -186,7 +187,7 @@ func createTempDeltaConfig(worktreeRoot, home string, sideBySide bool) (path str
 		}
 	}
 
-	gitDir := runAllowFail(worktreeRoot, []string{"rev-parse", "--git-dir"})
+	gitDir := run.AllowFail(worktreeRoot, []string{"rev-parse", "--git-dir"})
 	if gitDir != "" {
 		if !filepath.IsAbs(gitDir) {
 			gitDir = filepath.Join(worktreeRoot, gitDir)

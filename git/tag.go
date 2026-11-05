@@ -2,13 +2,14 @@ package git
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"strconv"
 	"strings"
 )
 
 // LastTag returns the most recent tag reachable from HEAD, or "v0.0.0" if none.
 func LastTag(root string) string {
-	tag := runAllowFail(root, []string{"describe", "--tags", "--abbrev=0", "--match", "v[0-9]*.[0-9]*.[0-9]*"})
+	tag := run.AllowFail(root, []string{"describe", "--tags", "--abbrev=0", "--match", "v[0-9]*.[0-9]*.[0-9]*"})
 	if tag == "" {
 		return "v0.0.0"
 	}
@@ -32,18 +33,18 @@ func ParseVersion(tag string) (major, minor, patch int, err error) {
 
 // CreateAnnotatedTag creates an annotated tag at HEAD.
 func CreateAnnotatedTag(root, tag, message string) error {
-	_, _, err := run(root, []string{"tag", "-a", tag, "-m", message})
+	_, _, err := run.Exec(root, []string{"tag", "-a", tag, "-m", message})
 	return err
 }
 
 // PushOrigin pushes the current branch to origin.
 func PushOrigin(root string) error {
-	_, _, err := run(root, []string{"push", "origin"})
+	_, _, err := run.Exec(root, []string{"push", "origin"})
 	return err
 }
 
 // PushTag pushes a specific tag to origin.
 func PushTag(root, tag string) error {
-	_, _, err := run(root, []string{"push", "origin", tag})
+	_, _, err := run.Exec(root, []string{"push", "origin", tag})
 	return err
 }

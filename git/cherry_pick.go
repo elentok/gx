@@ -3,6 +3,7 @@ package git
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,7 +19,7 @@ var ErrRefNotFound = errors.New("ref not found")
 func RevParse(dir, ref string) (string, error) {
 	// --verify --quiet exits 1 with no output for a missing ref; real git
 	// failures (bad repo, corrupt object) exit 128.
-	out, _, err := run(dir, []string{"rev-parse", "--verify", "--quiet", ref})
+	out, _, err := run.Exec(dir, []string{"rev-parse", "--verify", "--quiet", ref})
 	var runErr *RunError
 	if errors.As(err, &runErr) && runErr.Code == 1 {
 		return "", fmt.Errorf("%w: %s", ErrRefNotFound, ref)
@@ -31,13 +32,13 @@ func RevParse(dir, ref string) (string, error) {
 // stays correct even after refB has advanced past the point refA branched
 // from.
 func MergeBase(dir, refA, refB string) (string, error) {
-	out, _, err := run(dir, []string{"merge-base", refA, refB})
+	out, _, err := run.Exec(dir, []string{"merge-base", refA, refB})
 	return out, err
 }
 
 // CommitSubjects returns the subjects of fromExclusive..toRef, oldest first.
 func CommitSubjects(dir, fromExclusive, toRef string) ([]string, error) {
-	out, _, err := run(dir, []string{"log", "--reverse", "--format=%s", fromExclusive + ".." + toRef})
+	out, _, err := run.Exec(dir, []string{"log", "--reverse", "--format=%s", fromExclusive + ".." + toRef})
 	if err != nil || out == "" {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func CommitSubjects(dir, fromExclusive, toRef string) ([]string, error) {
 // tag reaches, oldest first, as "<short hash> <subject>" — what a detached
 // worktree's removal would leave dangling.
 func UnreachableCommits(dir string) ([]string, error) {
-	out, _, err := run(dir, []string{"log", "--reverse", "--format=%h %s", "HEAD", "--not", "--branches", "--remotes", "--tags"})
+	out, _, err := run.Exec(dir, []string{"log", "--reverse", "--format=%h %s", "HEAD", "--not", "--branches", "--remotes", "--tags"})
 	if err != nil || out == "" {
 		return nil, err
 	}
@@ -59,7 +60,7 @@ func UnreachableCommits(dir string) ([]string, error) {
 // doesn't (git rev-list --count fromExclusive..toRef) — zero means toRef has
 // landed nothing new since fromExclusive.
 func CommitsAhead(dir, fromExclusive, toRef string) (int, error) {
-	out, _, err := run(dir, []string{"rev-list", "--count", fromExclusive + ".." + toRef})
+	out, _, err := run.Exec(dir, []string{"rev-list", "--count", fromExclusive + ".." + toRef})
 	if err != nil {
 		return 0, err
 	}
@@ -76,7 +77,7 @@ func CommitsAhead(dir, fromExclusive, toRef string) (int, error) {
 // reports whether it moved branch; an attached HEAD, or one branch does not
 // lead to, is left alone.
 func AttachDetachedHead(dir, branch string) (bool, error) {
-	_, _, err := run(dir, []string{"symbolic-ref", "-q", "HEAD"})
+	_, _, err := run.Exec(dir, []string{"symbolic-ref", "-q", "HEAD"})
 	if err == nil {
 		return false, nil
 	}
@@ -87,7 +88,7 @@ func AttachDetachedHead(dir, branch string) (bool, error) {
 	if err != nil || !ahead {
 		return false, err
 	}
-	if _, _, err := run(dir, []string{"switch", "-q", "-C", branch}); err != nil {
+	if _, _, err := run.Exec(dir, []string{"switch", "-q", "-C", branch}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -99,7 +100,7 @@ func AttachDetachedHead(dir, branch string) (bool, error) {
 // commit — the common check behind confirming a commit that was cherry-
 // picked elsewhere is actually reachable from a branch's current tip.
 func IsAncestor(dir, ancestor, descendant string) (bool, error) {
-	_, _, err := run(dir, []string{"merge-base", "--is-ancestor", ancestor, descendant})
+	_, _, err := run.Exec(dir, []string{"merge-base", "--is-ancestor", ancestor, descendant})
 	if err == nil {
 		return true, nil
 	}
@@ -112,7 +113,7 @@ func IsAncestor(dir, ancestor, descendant string) (bool, error) {
 // DiffNames lists the paths whose content differs between the tips of refA and
 // refB (git diff --name-only refA refB).
 func DiffNames(dir, refA, refB string) ([]string, error) {
-	out, _, err := run(dir, []string{"diff", "--name-only", refA, refB})
+	out, _, err := run.Exec(dir, []string{"diff", "--name-only", refA, refB})
 	if err != nil || out == "" {
 		return nil, err
 	}
@@ -122,7 +123,7 @@ func DiffNames(dir, refA, refB string) ([]string, error) {
 // DiffLines counts the lines added and removed going from refA to refB. A
 // binary file has no line count and adds nothing.
 func DiffLines(dir, refA, refB string) (added, removed int, err error) {
-	out, _, err := run(dir, []string{"diff", "--numstat", refA, refB})
+	out, _, err := run.Exec(dir, []string{"diff", "--numstat", refA, refB})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -158,7 +159,7 @@ func TrailerLines(dir, ref, key string, match func(value string) bool) (added, r
 		if !match(value) {
 			continue
 		}
-		out, _, err := run(dir, []string{"show", "--numstat", "--format=", sha})
+		out, _, err := run.Exec(dir, []string{"show", "--numstat", "--format=", sha})
 		if err != nil {
 			return 0, 0, err
 		}
@@ -174,7 +175,7 @@ func TrailerLines(dir, ref, key string, match func(value string) bool) (added, r
 // the returned error is a *RunError and dir is left mid-cherry-pick with
 // conflict markers in place, same as running the command by hand.
 func CherryPickRange(dir, fromExclusive, toInclusive string) error {
-	_, _, err := run(dir, []string{"cherry-pick", fromExclusive + ".." + toInclusive})
+	_, _, err := run.Exec(dir, []string{"cherry-pick", fromExclusive + ".." + toInclusive})
 	return err
 }
 
@@ -182,14 +183,14 @@ func CherryPickRange(dir, fromExclusive, toInclusive string) error {
 // restores the worktree to its pre-cherry-pick state. The source iteration
 // branch remains untouched, so its commits can be landed again safely.
 func AbortCherryPick(dir string) error {
-	_, _, err := run(dir, []string{"cherry-pick", "--abort"})
+	_, _, err := run.Exec(dir, []string{"cherry-pick", "--abort"})
 	return err
 }
 
 // AbortRebase abandons the rebase currently in progress in dir and puts the
 // branch back at its pre-rebase tip.
 func AbortRebase(dir string) error {
-	_, _, err := run(dir, []string{"rebase", "--abort"})
+	_, _, err := run.Exec(dir, []string{"rebase", "--abort"})
 	return err
 }
 
@@ -240,7 +241,7 @@ func AppendTrailer(dir, key, value string) error {
 // trailer — see AppendTrailer for why a trailer survives what a diff/hash
 // can't.
 func AppendTrailers(dir string, trailers ...Trailer) error {
-	msg, _, err := run(dir, []string{"log", "-1", "--format=%B", "HEAD"})
+	msg, _, err := run.Exec(dir, []string{"log", "-1", "--format=%B", "HEAD"})
 	if err != nil {
 		return err
 	}
@@ -261,7 +262,7 @@ func AppendTrailers(dir string, trailers ...Trailer) error {
 // a "key: value" trailer line in its message (git log --grep), see
 // AppendTrailer.
 func TrailerCommitExists(dir, ref, key, value string) (bool, error) {
-	out, _, err := run(dir, []string{"log", "--format=%H", "--grep=^" + key + ": " + value + "$", ref})
+	out, _, err := run.Exec(dir, []string{"log", "--format=%H", "--grep=^" + key + ": " + value + "$", ref})
 	if err != nil {
 		return false, err
 	}
@@ -274,7 +275,7 @@ func TrailerCommitExists(dir, ref, key, value string) (bool, error) {
 // call per value being looked up. A commit with no such trailer contributes
 // nothing (the placeholder expands to an empty string, trimmed away here).
 func TrailerMap(dir, ref, key string) (map[string]string, error) {
-	out, _, err := run(dir, []string{"log", "--format=%H %(trailers:key=" + key + ",valueonly)", ref})
+	out, _, err := run.Exec(dir, []string{"log", "--format=%H %(trailers:key=" + key + ",valueonly)", ref})
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +302,7 @@ func TrailerMap(dir, ref, key string) (map[string]string, error) {
 // cherry-pick in that state ("cherry-pick is already in progress") even
 // though a CHERRY_PICK_HEAD-only check reports nothing in progress.
 func CherryPickInProgress(dir string) (bool, error) {
-	_, _, err := run(dir, []string{"rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"})
+	_, _, err := run.Exec(dir, []string{"rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"})
 	if err == nil {
 		return true, nil
 	}
@@ -309,7 +310,7 @@ func CherryPickInProgress(dir string) (bool, error) {
 		return false, err
 	}
 
-	gitDir, _, err := run(dir, []string{"rev-parse", "--git-dir"})
+	gitDir, _, err := run.Exec(dir, []string{"rev-parse", "--git-dir"})
 	if err != nil {
 		return false, err
 	}
@@ -327,7 +328,7 @@ func CherryPickInProgress(dir string) (bool, error) {
 // RebaseInProgress reports whether dir's worktree is stopped mid-rebase, by
 // either rebase backend.
 func RebaseInProgress(dir string) (bool, error) {
-	gitDir, _, err := run(dir, []string{"rev-parse", "--git-dir"})
+	gitDir, _, err := run.Exec(dir, []string{"rev-parse", "--git-dir"})
 	if err != nil {
 		return false, err
 	}
@@ -355,7 +356,7 @@ func UnappliedPatches(dir, upstream, head string) ([]string, error) {
 // cherry runs git cherry with args (upstream, head and an optional limit) and
 // returns how many commits it listed and the shas whose patch is not upstream.
 func cherry(dir string, args ...string) (total int, missing []string, err error) {
-	out, _, err := run(dir, append([]string{"cherry"}, args...))
+	out, _, err := run.Exec(dir, append([]string{"cherry"}, args...))
 	if err != nil {
 		return 0, nil, err
 	}

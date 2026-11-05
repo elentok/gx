@@ -6,13 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/git/internal/run"
 	"github.com/elentok/gx/testutil"
 )
 
 func TestIsHEAD_True(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
-	hash, _, err := run(dir, []string{"rev-parse", "HEAD"})
+	hash, _, err := run.Exec(dir, []string{"rev-parse", "HEAD"})
 	if err != nil {
 		t.Fatalf("rev-parse HEAD: %v", err)
 	}
@@ -31,7 +32,7 @@ func TestIsHEAD_False(t *testing.T) {
 	testutil.WriteFile(t, dir, "x.txt", "x")
 	testutil.CommitAll(t, dir, "second")
 	// get first commit hash
-	log, _, err := run(dir, []string{"log", "--format=%H", "-n", "2"})
+	log, _, err := run.Exec(dir, []string{"log", "--format=%H", "-n", "2"})
 	if err != nil {
 		t.Fatalf("git log: %v", err)
 	}
@@ -52,7 +53,7 @@ func TestIsHEAD_False(t *testing.T) {
 func TestIsCommitPushed_NotPushed(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
-	hash, _, err := run(dir, []string{"rev-parse", "HEAD"})
+	hash, _, err := run.Exec(dir, []string{"rev-parse", "HEAD"})
 	if err != nil {
 		t.Fatalf("rev-parse: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestStagedFiles_WithStagedFile(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 	testutil.WriteFile(t, dir, "staged.txt", "hello")
-	if _, _, err := run(dir, []string{"add", "staged.txt"}); err != nil {
+	if _, _, err := run.Exec(dir, []string{"add", "staged.txt"}); err != nil {
 		t.Fatalf("git add: %v", err)
 	}
 	files, err := StagedFiles(dir)
@@ -135,7 +136,7 @@ func TestAmendHead(t *testing.T) {
 func TestCommitFixup(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
-	hash, _, err := run(dir, []string{"rev-parse", "HEAD"})
+	hash, _, err := run.Exec(dir, []string{"rev-parse", "HEAD"})
 	if err != nil {
 		t.Fatalf("rev-parse: %v", err)
 	}
@@ -167,7 +168,7 @@ func TestRebaseAutosquash(t *testing.T) {
 	// Need at least two commits so hash^ resolves: initial + target
 	testutil.WriteFile(t, dir, "target.txt", "target\n")
 	testutil.CommitAll(t, dir, "target commit")
-	hash, _, err := run(dir, []string{"rev-parse", "HEAD"})
+	hash, _, err := run.Exec(dir, []string{"rev-parse", "HEAD"})
 	if err != nil {
 		t.Fatalf("rev-parse: %v", err)
 	}
@@ -187,7 +188,7 @@ func TestRebaseAutosquash(t *testing.T) {
 		t.Fatalf("RebaseAutosquash: %v\n%s", err, out)
 	}
 
-	log, _, err := run(dir, []string{"log", "--format=%H"})
+	log, _, err := run.Exec(dir, []string{"log", "--format=%H"})
 	if err != nil {
 		t.Fatalf("git log: %v", err)
 	}

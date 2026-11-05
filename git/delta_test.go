@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/git/internal/run"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -81,7 +82,7 @@ func TestColorizeDiff_FallbackWithoutDelta(t *testing.T) {
 	testutil.MustGitExported(t, dir, "add", "file.txt")
 
 	// Get the raw diff
-	raw, _, err := run(dir, []string{"diff", "--no-color", "--cached", "--", "file.txt"})
+	raw, _, err := run.Exec(dir, []string{"diff", "--no-color", "--cached", "--", "file.txt"})
 	if err != nil || raw == "" {
 		t.Skip("could not get raw diff")
 	}
@@ -103,7 +104,7 @@ func TestColorizeDiff_WithContent(t *testing.T) {
 	testutil.WriteFile(t, dir, "col.txt", "modified\n")
 	testutil.MustGitExported(t, dir, "add", "col.txt")
 
-	raw, _, err := run(dir, []string{"diff", "--no-color", "--cached", "--", "col.txt"})
+	raw, _, err := run.Exec(dir, []string{"diff", "--no-color", "--cached", "--", "col.txt"})
 	if err != nil || raw == "" {
 		t.Skip("could not get raw diff")
 	}

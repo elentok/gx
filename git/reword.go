@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"os"
 )
 
@@ -12,8 +13,8 @@ func RewordHead(root, message string) (string, error) {
 		return "", err
 	}
 	defer os.Remove(tmpFile)
-	stdout, stderr, err := run(root, []string{"commit", "--amend", "--only", "-F", tmpFile})
-	return joinOutput(stdout, stderr), err
+	stdout, stderr, err := run.Exec(root, []string{"commit", "--amend", "--only", "-F", tmpFile})
+	return run.JoinOutput(stdout, stderr), err
 }
 
 // RewordCommit rewrites the message of an arbitrary non-HEAD commit via interactive rebase.

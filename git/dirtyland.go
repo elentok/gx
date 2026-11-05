@@ -2,6 +2,7 @@ package git
 
 import (
 	"errors"
+	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,15 +34,15 @@ func SnapshotPaths(dir string, paths []string) (string, error) {
 		append([]string{"update-index", "--add", "--remove", "--"}, paths...),
 	}
 	for _, args := range steps {
-		if _, _, err := runEnv(dir, env, args); err != nil {
+		if _, _, err := run.WithEnv(dir, env, args); err != nil {
 			return "", err
 		}
 	}
-	tree, _, err := runEnv(dir, env, []string{"write-tree"})
+	tree, _, err := run.WithEnv(dir, env, []string{"write-tree"})
 	if err != nil {
 		return "", err
 	}
-	commit, _, err := runEnv(dir, env, []string{"commit-tree", tree, "-p", "HEAD", "-m", "gx backup of uncommitted files"})
+	commit, _, err := run.WithEnv(dir, env, []string{"commit-tree", tree, "-p", "HEAD", "-m", "gx backup of uncommitted files"})
 	return commit, err
 }
 
@@ -49,7 +50,7 @@ func SnapshotPaths(dir string, paths []string) (string, error) {
 // without touching any file. tree is the merged tree; when clean is false the
 // merge conflicts and each conflicting file in tree holds its conflict markers.
 func MergeSnapshotMarked(dir, snapshot, branch string) (tree string, clean bool, err error) {
-	out, _, err := run(dir, []string{"merge-tree", "--write-tree", "--merge-base=HEAD", snapshot, branch})
+	out, _, err := run.Exec(dir, []string{"merge-tree", "--write-tree", "--merge-base=HEAD", snapshot, branch})
 	var runErr *RunError
 	if errors.As(err, &runErr) && runErr.Code == 1 {
 		tree, _, _ = strings.Cut(runErr.Stdout, "\n")
@@ -64,7 +65,7 @@ func MergeSnapshotMarked(dir, snapshot, branch string) (tree string, clean bool,
 
 // treePaths is the subset of paths that exist in the tree-ish.
 func treePaths(dir, treeish string, paths []string) (map[string]bool, error) {
-	out, _, err := run(dir, append([]string{"ls-tree", "-r", "--name-only", "-z", treeish, "--"}, paths...))
+	out, _, err := run.Exec(dir, append([]string{"ls-tree", "-r", "--name-only", "-z", treeish, "--"}, paths...))
 	if err != nil {
 		return nil, err
 	}
@@ -93,12 +94,12 @@ func SetAside(dir string, paths []string) error {
 		}
 	}
 	if len(keep) > 0 {
-		if _, _, err := run(dir, append([]string{"checkout", "HEAD", "--"}, keep...)); err != nil {
+		if _, _, err := run.Exec(dir, append([]string{"checkout", "HEAD", "--"}, keep...)); err != nil {
 			return err
 		}
 	}
 	if len(drop) > 0 {
-		if _, _, err := run(dir, append([]string{"rm", "-q", "-f", "--cached", "--ignore-unmatch", "--"}, drop...)); err != nil {
+		if _, _, err := run.Exec(dir, append([]string{"rm", "-q", "-f", "--cached", "--ignore-unmatch", "--"}, drop...)); err != nil {
 			return err
 		}
 	}
@@ -128,19 +129,19 @@ func RestoreFromTree(dir, treeish string, paths []string) error {
 	if len(write) == 0 {
 		return nil
 	}
-	_, _, err = run(dir, append([]string{"restore", "--source=" + treeish, "--worktree", "--"}, write...))
+	_, _, err = run.Exec(dir, append([]string{"restore", "--source=" + treeish, "--worktree", "--"}, write...))
 	return err
 }
 
 // UpdateRef points ref at the object sha, creating it.
 func UpdateRef(repoRoot, ref, sha string) error {
-	_, _, err := run(repoRoot, []string{"update-ref", ref, sha})
+	_, _, err := run.Exec(repoRoot, []string{"update-ref", ref, sha})
 	return err
 }
 
 // DeleteRef removes ref; a missing ref is not an error.
 func DeleteRef(repoRoot, ref string) error {
-	_, _, err := run(repoRoot, []string{"update-ref", "-d", ref})
+	_, _, err := run.Exec(repoRoot, []string{"update-ref", "-d", ref})
 	return err
 }
 
@@ -152,7 +153,7 @@ type BackupRef struct {
 
 // ListBackupRefs lists the refs under BackupRefPrefix.
 func ListBackupRefs(repoRoot string) ([]BackupRef, error) {
-	out, _, err := run(repoRoot, []string{"for-each-ref", "--format=%(refname) %(committerdate:unix)", BackupRefPrefix})
+	out, _, err := run.Exec(repoRoot, []string{"for-each-ref", "--format=%(refname) %(committerdate:unix)", BackupRefPrefix})
 	if err != nil {
 		return nil, err
 	}

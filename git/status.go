@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"strconv"
 	"strings"
 )
@@ -84,18 +85,18 @@ func TrunkBaseRef(repoRoot, trunk string) string {
 	if trunk == "" {
 		return ""
 	}
-	if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + trunk}) != "" {
+	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + trunk}) != "" {
 		return "origin/" + trunk
 	}
-	if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/" + trunk}) != "" {
+	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/" + trunk}) != "" {
 		return trunk
 	}
 	return ""
 }
 
 func syncBetween(repoRoot, localRef, remoteRef string) (SyncStatus, error) {
-	localHash := runAllowFail(repoRoot, []string{"rev-parse", "--verify", localRef})
-	remoteHash := runAllowFail(repoRoot, []string{"rev-parse", "--verify", remoteRef})
+	localHash := run.AllowFail(repoRoot, []string{"rev-parse", "--verify", localRef})
+	remoteHash := run.AllowFail(repoRoot, []string{"rev-parse", "--verify", remoteRef})
 
 	if localHash == "" || remoteHash == "" {
 		return SyncStatus{Name: StatusUnknown}, nil
@@ -129,7 +130,7 @@ func syncBetween(repoRoot, localRef, remoteRef string) (SyncStatus, error) {
 }
 
 func revCount(repoRoot, fromRef, toRef string) (int, error) {
-	out, _, err := run(repoRoot, []string{"rev-list", "--count", fromRef + ".." + toRef})
+	out, _, err := run.Exec(repoRoot, []string{"rev-list", "--count", fromRef + ".." + toRef})
 	if err != nil {
 		return 0, err
 	}
@@ -143,7 +144,7 @@ func revCount(repoRoot, fromRef, toRef string) (int, error) {
 // WorktreeStatusSummary returns counts of staged, unstaged, and untracked
 // changes in the worktree at dir.
 func WorktreeStatusSummary(dir string) (staged, unstaged, untracked int, err error) {
-	out, _, err := runNoOptionalLocks(dir, []string{"status", "--porcelain=v1"})
+	out, _, err := run.NoOptionalLocks(dir, []string{"status", "--porcelain=v1"})
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -169,7 +170,7 @@ func WorktreeStatusSummary(dir string) (staged, unstaged, untracked int, err err
 // UncommittedPaths returns every path with uncommitted changes in the worktree:
 // each untracked file inside a new directory, and both paths of a rename or copy.
 func UncommittedPaths(worktreePath string) ([]string, error) {
-	out, _, err := runNoOptionalLocks(worktreePath, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
+	out, _, err := run.NoOptionalLocks(worktreePath, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +195,7 @@ func UncommittedPaths(worktreePath string) ([]string, error) {
 // UncommittedChanges returns modified, added, deleted, and untracked files in
 // the worktree at the given path.
 func UncommittedChanges(worktreePath string) ([]Change, error) {
-	out, _, err := runNoOptionalLocks(worktreePath, []string{"status", "--porcelain=v1"})
+	out, _, err := run.NoOptionalLocks(worktreePath, []string{"status", "--porcelain=v1"})
 	if err != nil {
 		return nil, err
 	}

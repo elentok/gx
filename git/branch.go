@@ -1,6 +1,10 @@
 package git
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/elentok/gx/git/internal/run"
+)
 
 // Branch represents a local or remote git branch.
 type Branch struct {
@@ -12,7 +16,7 @@ type Branch struct {
 
 // ListBranches returns all local and remote branches, excluding HEAD pointers.
 func ListBranches(repo Repo) ([]Branch, error) {
-	out, _, err := run(repo.Root, []string{"branch", "--all"})
+	out, _, err := run.Exec(repo.Root, []string{"branch", "--all"})
 	if err != nil {
 		return nil, err
 	}
@@ -49,13 +53,13 @@ func parseBranchLine(line string) Branch {
 
 // CurrentBranch returns the short name of the current branch in dir.
 func CurrentBranch(dir string) (string, error) {
-	out, _, err := run(dir, []string{"rev-parse", "--abbrev-ref", "HEAD"})
+	out, _, err := run.Exec(dir, []string{"rev-parse", "--abbrev-ref", "HEAD"})
 	return out, err
 }
 
 // TrackRemote configures an existing branch to track <remote>/<branch>.
 func TrackRemote(repoRoot, remote, branch string) error {
-	_, _, err := run(repoRoot, []string{"branch", "--set-upstream-to=" + remote + "/" + branch, branch})
+	_, _, err := run.Exec(repoRoot, []string{"branch", "--set-upstream-to=" + remote + "/" + branch, branch})
 	return err
 }
 
@@ -63,7 +67,7 @@ func TrackRemote(repoRoot, remote, branch string) error {
 // a local branch. It first checks the configured tracking branch, then falls
 // back to "origin/<branch>" if that ref exists. Returns "" if neither applies.
 func UpstreamBranch(repoRoot, branch string) string {
-	if up := runAllowFail(repoRoot, []string{
+	if up := run.AllowFail(repoRoot, []string{
 		"for-each-ref",
 		"--format=%(upstream:short)",
 		"refs/heads/" + branch,
@@ -72,7 +76,7 @@ func UpstreamBranch(repoRoot, branch string) string {
 	}
 	// Fall back to the conventional remote tracking ref, using the full path to
 	// avoid ambiguity with any local branch that happens to be named origin/<branch>.
-	if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + branch}) != "" {
+	if run.AllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + branch}) != "" {
 		return "origin/" + branch
 	}
 	return ""
@@ -80,7 +84,7 @@ func UpstreamBranch(repoRoot, branch string) string {
 
 // CreateBranch creates and checks out a new branch.
 func CreateBranch(repo Repo, name string) error {
-	_, _, err := run(repo.Root, []string{"checkout", "-b", name})
+	_, _, err := run.Exec(repo.Root, []string{"checkout", "-b", name})
 	return err
 }
 
@@ -90,13 +94,13 @@ func DeleteLocalBranch(repo Repo, name string, force bool) error {
 	if force {
 		flag = "-D"
 	}
-	_, _, err := run(repo.Root, []string{"branch", flag, name})
+	_, _, err := run.Exec(repo.Root, []string{"branch", flag, name})
 	return err
 }
 
 // DeleteRemoteBranch deletes a branch on the remote.
 func DeleteRemoteBranch(repo Repo, remoteName, branchName string) error {
-	_, _, err := run(repo.Root, []string{"push", "--delete", remoteName, branchName})
+	_, _, err := run.Exec(repo.Root, []string{"push", "--delete", remoteName, branchName})
 	return err
 }
 
@@ -110,7 +114,7 @@ func IsRebasedOnTrunk(repo Repo, branch string) (bool, error) {
 	if branch == "" || branch == repo.Trunk {
 		return true, nil
 	}
-	_, _, err := run(repo.Root, []string{"merge-base", "--is-ancestor", repo.Trunk, branch})
+	_, _, err := run.Exec(repo.Root, []string{"merge-base", "--is-ancestor", repo.Trunk, branch})
 	if err != nil {
 		if runErr, ok := err.(*RunError); ok && runErr.Code == 1 {
 			return false, nil // exit 1 = not an ancestor
@@ -122,6 +126,6 @@ func IsRebasedOnTrunk(repo Repo, branch string) (bool, error) {
 
 // RenameBranch renames a local branch from oldName to newName.
 func RenameBranch(repo Repo, oldName, newName string) error {
-	_, _, err := run(repo.Root, []string{"branch", "-m", oldName, newName})
+	_, _, err := run.Exec(repo.Root, []string{"branch", "-m", oldName, newName})
 	return err
 }

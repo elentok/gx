@@ -2,6 +2,8 @@ package git
 
 import (
 	"strings"
+
+	"github.com/elentok/gx/git/internal/run"
 )
 
 type CommitFile struct {
@@ -25,7 +27,7 @@ func CommitFilesForRef(repoRoot, ref string) ([]CommitFile, error) {
 	if isStashRef(ref) {
 		args = []string{"stash", "show", "-u", "--name-status", ref}
 	}
-	out, _, err := run(repoRoot, args)
+	out, _, err := run.Exec(repoRoot, args)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +71,7 @@ func CommitFileDiffForRef(repoRoot, ref, path string, contextLines int) (string,
 	if err != nil {
 		return "", err
 	}
-	out, _, err := run(repoRoot, args)
+	out, _, err := run.Exec(repoRoot, args)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +87,7 @@ func CommitFileDiffWithDeltaForRef(repoRoot, home, ref, path string, contextLine
 	if err != nil {
 		return "", err
 	}
-	raw, _, err := run(repoRoot, rawArgs)
+	raw, _, err := run.Exec(repoRoot, rawArgs)
 	if err != nil {
 		return "", err
 	}
@@ -100,7 +102,7 @@ func CommitFileDiffWithDeltaForRef(repoRoot, home, ref, path string, contextLine
 	if err != nil {
 		return "", err
 	}
-	out, _, err := run(repoRoot, colorArgs)
+	out, _, err := run.Exec(repoRoot, colorArgs)
 	if err != nil {
 		return "", err
 	}
@@ -204,11 +206,11 @@ func CommitImageDiffBlobs(repoRoot, ref string, file CommitFile) (oldBytes, newB
 }
 
 func pathExistsInTree(repoRoot, treeish, path string) (bool, error) {
-	_, _, err := run(repoRoot, []string{"cat-file", "-e", treeish + ":" + path})
+	_, _, err := run.Exec(repoRoot, []string{"cat-file", "-e", treeish + ":" + path})
 	if err == nil {
 		return true, nil
 	}
-	if _, _, parentErr := run(repoRoot, []string{"rev-parse", "--verify", treeish}); parentErr != nil {
+	if _, _, parentErr := run.Exec(repoRoot, []string{"rev-parse", "--verify", treeish}); parentErr != nil {
 		return false, parentErr
 	}
 	return false, nil

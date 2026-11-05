@@ -194,6 +194,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `herdr/` — herdr CLI/socket client
 - `runner/` — runs a child command with inherited stdio
 - `git/` — git operations
+  - `git/internal/run` — runs git children (`Run`, `RunWith`, `RunRaw`, `RunError`) and the `Exec`/`AllowFail` helpers; `git` re-exports the public names
 - `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
 - `e2e/` — end-to-end tests (slow, CI only)
 - `testutil/` — fakes and helpers: `testutil/agentfake`, `testutil/herdrfake`,

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/git/internal/run"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -224,7 +225,7 @@ func TestPush(t *testing.T) {
 		t.Fatalf("Push: %v", err)
 	}
 
-	out, _, err := run(remote, []string{"log", "--format=%s", "-n", "1"})
+	out, _, err := run.Exec(remote, []string{"log", "--format=%s", "-n", "1"})
 	if err != nil {
 		t.Fatalf("git log remote: %v", err)
 	}
@@ -268,7 +269,7 @@ func TestPull(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Pull: %v\n%s", err, out)
 	}
-	log, _, err := run(local, []string{"log", "--format=%s", "-n", "1"})
+	log, _, err := run.Exec(local, []string{"log", "--format=%s", "-n", "1"})
 	if err != nil {
 		t.Fatalf("git log: %v", err)
 	}

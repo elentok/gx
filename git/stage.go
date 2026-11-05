@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"path/filepath"
 	"sort"
@@ -44,7 +45,7 @@ func (s StageFileStatus) XY() string {
 
 // WorktreeRoot resolves dir to the root of the current non-bare worktree.
 func WorktreeRoot(dir string) (string, error) {
-	out := runAllowFail(dir, []string{"rev-parse", "--show-toplevel"})
+	out := run.AllowFail(dir, []string{"rev-parse", "--show-toplevel"})
 	if out == "" {
 		return "", fmt.Errorf("not inside a worktree: %s", dir)
 	}
@@ -79,7 +80,7 @@ func RepoRelativePath(cwd, rawPath, repoRoot string) (string, error) {
 
 // ListStageFiles returns status entries suitable for an interactive staging UI.
 func ListStageFiles(worktreeRoot string) ([]StageFileStatus, error) {
-	out, _, err := runNoOptionalLocks(worktreeRoot, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
+	out, _, err := run.NoOptionalLocks(worktreeRoot, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +124,7 @@ func ListStageFiles(worktreeRoot string) ([]StageFileStatus, error) {
 
 // UnstagePath removes path changes from the index while preserving worktree edits.
 func UnstagePath(worktreeRoot, path string) error {
-	_, _, err := run(worktreeRoot, []string{"reset", "-q", "HEAD", "--", path})
+	_, _, err := run.Exec(worktreeRoot, []string{"reset", "-q", "HEAD", "--", path})
 	return err
 }
 
@@ -135,7 +136,7 @@ func DiffPath(worktreeRoot, path string, cached bool, contextLines int) (string,
 		args = append(args, "--cached")
 	}
 	args = append(args, "--", path)
-	out, _, err := run(worktreeRoot, args)
+	out, _, err := run.Exec(worktreeRoot, args)
 	if err != nil {
 		return "", err
 	}
@@ -192,7 +193,7 @@ func ImageDiffBlobs(worktreeRoot string, file StageFileStatus, cached bool) (old
 }
 
 func gitObjectBytes(worktreeRoot, object string) ([]byte, bool) {
-	out := runRawAllowFail(worktreeRoot, []string{"cat-file", "-p", object})
+	out := run.RawAllowFail(worktreeRoot, []string{"cat-file", "-p", object})
 	if out == nil {
 		return nil, false
 	}
@@ -200,7 +201,7 @@ func gitObjectBytes(worktreeRoot, object string) ([]byte, bool) {
 }
 
 func gitObjectSize(worktreeRoot, object string) (int64, bool) {
-	out := strings.TrimSpace(runAllowFail(worktreeRoot, []string{"cat-file", "-s", object}))
+	out := strings.TrimSpace(run.AllowFail(worktreeRoot, []string{"cat-file", "-s", object}))
 	if out == "" {
 		return 0, false
 	}
@@ -270,7 +271,7 @@ func RestorePaths(worktreeRoot string, paths []string) error {
 	}
 	args := []string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}
 	args = append(args, paths...)
-	_, _, err := run(worktreeRoot, args)
+	_, _, err := run.Exec(worktreeRoot, args)
 	return err
 }
 
@@ -290,13 +291,13 @@ func DiscardUntrackedPath(worktreeRoot, relPath string) error {
 
 // StagePath stages a full path (used for untracked files).
 func StagePath(worktreeRoot, path string) error {
-	_, _, err := run(worktreeRoot, []string{"add", "--", path})
+	_, _, err := run.Exec(worktreeRoot, []string{"add", "--", path})
 	return err
 }
 
 // StageIntentPath records an intent-to-add entry without adding content.
 func StageIntentPath(worktreeRoot, path string) error {
-	_, _, err := run(worktreeRoot, []string{"add", "-N", "--", path})
+	_, _, err := run.Exec(worktreeRoot, []string{"add", "-N", "--", path})
 	return err
 }
 

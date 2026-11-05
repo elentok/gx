@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,7 +56,7 @@ type LogEntry struct {
 
 // HeadCommit returns the latest commit on the given branch.
 func HeadCommit(repoRoot, branch string) (Commit, error) {
-	out, _, err := run(repoRoot, []string{"log", "-1", "--pretty=format:%H\t%h\t%ci\t%s", branch})
+	out, _, err := run.Exec(repoRoot, []string{"log", "-1", "--pretty=format:%H\t%h\t%ci\t%s", branch})
 	if err != nil || out == "" {
 		return Commit{}, err
 	}
@@ -67,7 +68,7 @@ func HeadCommit(repoRoot, branch string) (Commit, error) {
 }
 
 func IsLocalBranch(repoRoot, ref string) bool {
-	out, _, err := run(repoRoot, []string{"branch", "--list", ref})
+	out, _, err := run.Exec(repoRoot, []string{"branch", "--list", ref})
 	if err != nil {
 		return false
 	}
@@ -79,7 +80,7 @@ func ResolveCommitish(repoRoot, ref string) (string, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
-	out, _, err := run(repoRoot, []string{"rev-parse", "--verify", ref + "^{commit}"})
+	out, _, err := run.Exec(repoRoot, []string{"rev-parse", "--verify", ref + "^{commit}"})
 	if err != nil {
 		return "", err
 	}
@@ -138,7 +139,7 @@ func LogEntriesFiltered(repoRoot, startRef string, limit int, filter LogFilter) 
 		args = append(args, "--follow", "--", filter.Path)
 	}
 
-	out, _, err := run(repoRoot, args)
+	out, _, err := run.Exec(repoRoot, args)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +182,7 @@ func CommitsBetween(repo Repo, fromRef, toRef string) ([]Commit, error) {
 }
 
 func commitsBetween(repo Repo, fromRef, toRef string) ([]Commit, error) {
-	mergeBase, _, err := run(repo.Root, []string{"merge-base", fromRef, toRef})
+	mergeBase, _, err := run.Exec(repo.Root, []string{"merge-base", fromRef, toRef})
 	if err != nil {
 		// No merge base (e.g. orphan branch) - return empty rather than error
 		return nil, nil
@@ -201,7 +202,7 @@ func BranchHistorySinceTrunk(repo Repo, branch, upstreamRef string) ([]BranchHis
 		return nil, nil
 	}
 
-	mergeBase, _, err := run(repo.Root, []string{"merge-base", baseRef, branch})
+	mergeBase, _, err := run.Exec(repo.Root, []string{"merge-base", baseRef, branch})
 	if err != nil {
 		return nil, nil
 	}
@@ -265,7 +266,7 @@ func BranchHistorySinceTrunk(repo Repo, branch, upstreamRef string) ([]BranchHis
 }
 
 func commitsFromRange(repoRoot, fromExclusive, toRef string) ([]Commit, error) {
-	out, _, err := run(repoRoot, []string{"log", "--pretty=format:%H\t%h\t%ci\t%s", strings.TrimSpace(fromExclusive) + ".." + toRef})
+	out, _, err := run.Exec(repoRoot, []string{"log", "--pretty=format:%H\t%h\t%ci\t%s", strings.TrimSpace(fromExclusive) + ".." + toRef})
 	if err != nil {
 		return nil, err
 	}

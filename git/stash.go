@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/git/internal/run"
 )
 
 // StashEntry represents one entry from `git stash list`.
@@ -16,7 +18,7 @@ type StashEntry struct {
 
 // StashList returns all stash entries for the repo at dir, newest first.
 func StashList(dir string) ([]StashEntry, error) {
-	out, _, err := run(dir, []string{"stash", "list", "--format=format:%gd%x09%at%x09%gs"})
+	out, _, err := run.Exec(dir, []string{"stash", "list", "--format=format:%gd%x09%at%x09%gs"})
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +84,8 @@ func StashPush(dir string, name string, stagedOnly bool) (string, error) {
 func runGitWithIndexLockRetry(dir string, args []string) (string, error) {
 	var lastOut string
 	for range 5 {
-		stdout, stderr, err := run(dir, args)
-		lastOut = joinOutput(stdout, stderr)
+		stdout, stderr, err := run.Exec(dir, args)
+		lastOut = run.JoinOutput(stdout, stderr)
 		if err == nil {
 			return lastOut, nil
 		}
@@ -93,39 +95,39 @@ func runGitWithIndexLockRetry(dir string, args []string) (string, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	// Final attempt after the retry budget is exhausted.
-	stdout, stderr, err := run(dir, args)
-	lastOut = joinOutput(stdout, stderr)
+	stdout, stderr, err := run.Exec(dir, args)
+	lastOut = run.JoinOutput(stdout, stderr)
 	return lastOut, err
 }
 
 // StashPop applies the most recent stash and removes it from the stash stack.
 func StashPop(dir string) (string, error) {
-	stdout, stderr, err := run(dir, []string{"stash", "pop"})
-	return joinOutput(stdout, stderr), err
+	stdout, stderr, err := run.Exec(dir, []string{"stash", "pop"})
+	return run.JoinOutput(stdout, stderr), err
 }
 
 // StashApply applies a specific stash entry without removing it from the stack.
 func StashApply(dir, ref string) (string, error) {
-	stdout, stderr, err := run(dir, []string{"stash", "apply", ref})
-	return joinOutput(stdout, stderr), err
+	stdout, stderr, err := run.Exec(dir, []string{"stash", "apply", ref})
+	return run.JoinOutput(stdout, stderr), err
 }
 
 // StashPopRef applies and removes a specific stash entry from the stack.
 func StashPopRef(dir, ref string) (string, error) {
-	stdout, stderr, err := run(dir, []string{"stash", "pop", ref})
-	return joinOutput(stdout, stderr), err
+	stdout, stderr, err := run.Exec(dir, []string{"stash", "pop", ref})
+	return run.JoinOutput(stdout, stderr), err
 }
 
 // StashDrop removes a specific stash entry from the stack without applying it.
 func StashDrop(dir, ref string) (string, error) {
-	stdout, stderr, err := run(dir, []string{"stash", "drop", ref})
-	return joinOutput(stdout, stderr), err
+	stdout, stderr, err := run.Exec(dir, []string{"stash", "drop", ref})
+	return run.JoinOutput(stdout, stderr), err
 }
 
 // Rebase rebases the current branch onto the given ref.
 func Rebase(dir string, onto string) (string, error) {
-	stdout, stderr, err := run(dir, []string{"rebase", onto})
-	return joinOutput(stdout, stderr), err
+	stdout, stderr, err := run.Exec(dir, []string{"rebase", onto})
+	return run.JoinOutput(stdout, stderr), err
 }
 
 func isIndexLockBusyErr(err error, output string) bool {

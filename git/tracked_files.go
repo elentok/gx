@@ -1,13 +1,17 @@
 package git
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/elentok/gx/git/internal/run"
+)
 
 // TrackedFilesUnder returns the paths (relative to dir) of every git-tracked
 // file under relPath, or an empty slice if none are tracked. dir must be a
 // real working tree (a plain repo root or a linked worktree) — a bare git
 // directory has no index to check against.
 func TrackedFilesUnder(dir, relPath string) ([]string, error) {
-	out, _, err := run(dir, []string{"ls-files", "--", relPath})
+	out, _, err := run.Exec(dir, []string{"ls-files", "--", relPath})
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"strings"
 	"time"
 )
@@ -64,7 +65,7 @@ func DetectPushDivergenceAfterFetch(worktreePath, branch string) (*PushDivergenc
 }
 
 func commitInfo(repoRoot, ref string) (CommitInfo, error) {
-	out, _, err := run(repoRoot, []string{"log", "-1", "--pretty=format:%h\t%ci\t%s", ref})
+	out, _, err := run.Exec(repoRoot, []string{"log", "-1", "--pretty=format:%h\t%ci\t%s", ref})
 	if err != nil {
 		return CommitInfo{}, err
 	}

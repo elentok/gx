@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/elentok/gx/git/internal/run"
 )
 
 // CloneBare clones repoURL using the .bare trick:
@@ -33,7 +35,7 @@ func CloneBare(repoURL, targetDir, cwd string) (string, error) {
 	}
 
 	bareDir := filepath.Join(outerDir, ".bare")
-	if _, _, err := run(cwd, []string{"clone", "--bare", repoURL, bareDir}); err != nil {
+	if _, _, err := run.Exec(cwd, []string{"clone", "--bare", repoURL, bareDir}); err != nil {
 		return "", err
 	}
 
@@ -49,22 +51,22 @@ func CloneBare(repoURL, targetDir, cwd string) (string, error) {
 	// populated, so ahead/behind status and upstream tracking won't work.
 	// We fix the refspec immediately after cloning so that subsequent fetches
 	// behave like a normal clone.
-	if _, _, err := run(bareDir, []string{"config", "remote.origin.fetch", expectedFetchRefspec}); err != nil {
+	if _, _, err := run.Exec(bareDir, []string{"config", "remote.origin.fetch", expectedFetchRefspec}); err != nil {
 		return "", err
 	}
 
 	// Populate refs/remotes/origin/* now that the refspec is correct.
-	if _, _, err := run(bareDir, []string{"fetch", "origin"}); err != nil {
+	if _, _, err := run.Exec(bareDir, []string{"fetch", "origin"}); err != nil {
 		return "", err
 	}
 
 	// Set upstream tracking for all local branches so that `git pull` works
 	// without having to specify a remote. git clone --bare doesn't configure
 	// branch.<name>.remote / branch.<name>.merge, so we do it manually.
-	if stdout, _, err := run(bareDir, []string{"branch", "--format=%(refname:short)"}); err == nil {
+	if stdout, _, err := run.Exec(bareDir, []string{"branch", "--format=%(refname:short)"}); err == nil {
 		for _, branch := range strings.Fields(stdout) {
 			// Ignore errors: if origin/<branch> doesn't exist, skip it.
-			_, _, _ = run(bareDir, []string{"branch", "--set-upstream-to=origin/" + branch, branch})
+			_, _, _ = run.Exec(bareDir, []string{"branch", "--set-upstream-to=origin/" + branch, branch})
 		}
 	}
 
@@ -88,9 +90,9 @@ func AddWorktreeFromRemote(repo Repo, worktreePath, branch, remoteBranch string)
 	if err := excludeWorktreeDir(repo); err != nil {
 		return err
 	}
-	if _, _, err := run(repo.Root, []string{"worktree", "add", worktreePath, branch}); err == nil {
+	if _, _, err := run.Exec(repo.Root, []string{"worktree", "add", worktreePath, branch}); err == nil {
 		return nil
 	}
-	_, _, err := run(repo.Root, []string{"worktree", "add", "--track", "-b", branch, worktreePath, remoteBranch})
+	_, _, err := run.Exec(repo.Root, []string{"worktree", "add", "--track", "-b", branch, worktreePath, remoteBranch})
 	return err
 }

@@ -3,6 +3,7 @@ package git
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 )
 
 // MergeOutcome is the result of MergeBranchInto. Merged is false when branch
@@ -78,7 +79,7 @@ func fastForwardRef(dir, target, oldSHA, branch string) (ok bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	if _, _, err := run(dir, []string{"update-ref", "refs/heads/" + target, newSHA, oldSHA}); err != nil {
+	if _, _, err := run.Exec(dir, []string{"update-ref", "refs/heads/" + target, newSHA, oldSHA}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -109,7 +110,7 @@ func MergeFastForward(dir, branch string) (ok bool, err error) {
 	if !ancestor {
 		return false, nil
 	}
-	if _, _, err := run(dir, []string{"merge", "--ff-only", branch}); err != nil {
+	if _, _, err := run.Exec(dir, []string{"merge", "--ff-only", branch}); err != nil {
 		return false, err
 	}
 	return true, nil

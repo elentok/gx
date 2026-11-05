@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/git/internal/run"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -21,7 +22,7 @@ func TestRewordHead(t *testing.T) {
 	}
 
 	// verify the commit message was changed
-	msg, _, err2 := run(dir, []string{"log", "-1", "--format=%s"})
+	msg, _, err2 := run.Exec(dir, []string{"log", "-1", "--format=%s"})
 	if err2 != nil {
 		t.Fatalf("git log: %v", err2)
 	}
@@ -78,7 +79,7 @@ func TestRewordCommit(t *testing.T) {
 	testutil.WriteFile(t, dir, "tip.txt", "tip\n")
 	testutil.CommitAll(t, dir, "tip commit")
 
-	log, _, err := run(dir, []string{"log", "--format=%H", "-n", "2"})
+	log, _, err := run.Exec(dir, []string{"log", "--format=%H", "-n", "2"})
 	if err != nil {
 		t.Fatalf("git log: %v", err)
 	}
@@ -90,7 +91,7 @@ func TestRewordCommit(t *testing.T) {
 		t.Fatalf("RewordCommit: %v\n%s", err, out)
 	}
 
-	fullLog, _, err := run(dir, []string{"log", "--format=%s"})
+	fullLog, _, err := run.Exec(dir, []string{"log", "--format=%s"})
 	if err != nil {
 		t.Fatalf("git log: %v", err)
 	}

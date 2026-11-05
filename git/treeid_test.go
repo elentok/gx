@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/git/internal/run"
 )
 
 func TestTreeID(t *testing.T) {
@@ -52,14 +54,14 @@ func TestTreeID(t *testing.T) {
 	if got := treeID(); got != withUntracked {
 		t.Errorf("staging changed the tree: %s", got)
 	}
-	if out, _, _ := run(dir, []string{"diff", "--cached", "--name-only"}); out != "new.txt" {
+	if out, _, _ := run.Exec(dir, []string{"diff", "--cached", "--name-only"}); out != "new.txt" {
 		t.Errorf("real index = %q, want only new.txt staged", out)
 	}
 }
 
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	if _, stderr, err := run(dir, args); err != nil {
+	if _, stderr, err := run.Exec(dir, args); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, stderr)
 	}
 }

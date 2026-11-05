@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"os/exec"
 	"strings"
@@ -232,7 +233,7 @@ func IsCommitMergedToTrunk(dir, trunk, hash string) (bool, error) {
 	if trunk == "" {
 		return false, ErrTrunkNotResolved
 	}
-	_, _, err := run(dir, []string{"merge-base", "--is-ancestor", hash, trunk})
+	_, _, err := run.Exec(dir, []string{"merge-base", "--is-ancestor", hash, trunk})
 	if err != nil {
 		if runErr, ok := err.(*RunError); ok && runErr.Code == 1 {
 			return false, nil

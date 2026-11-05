@@ -3,6 +3,8 @@ package git
 import (
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/git/internal/run"
 )
 
 type CommitDetails struct {
@@ -21,7 +23,7 @@ func CommitDetailsForRef(repoRoot, ref string) (CommitDetails, error) {
 	if ref == "" {
 		ref = "HEAD"
 	}
-	out, _, err := run(repoRoot, []string{
+	out, _, err := run.Exec(repoRoot, []string{
 		"show",
 		"--no-patch",
 		"--date=iso-strict",
