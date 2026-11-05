@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/cmd/tui"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
@@ -14,9 +16,8 @@ import (
 func TestExecute_AgentsOpensTheAgentsTab(t *testing.T) {
 	t.Parallel()
 	var tabs []nav.TabID
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
 		tui: tui.Deps{RunTab: func(tab nav.TabID) error {
 			tabs = append(tabs, tab)
 			return nil
@@ -35,9 +36,8 @@ func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
 	t.Parallel()
 	called := 0
 	var gotAllRepos bool
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
 		tui: tui.Deps{RunPRs: func(allRepos bool) error {
 			called++
 			gotAllRepos = allRepos
@@ -60,9 +60,8 @@ func TestExecute_PRsAllFlagDispatchesAllRepos(t *testing.T) {
 	t.Parallel()
 	called := 0
 	var gotAllRepos bool
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
 		tui: tui.Deps{RunPRs: func(allRepos bool) error {
 			called++
 			gotAllRepos = allRepos
@@ -84,9 +83,8 @@ func TestExecute_PRsAllFlagDispatchesAllRepos(t *testing.T) {
 func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 	t.Parallel()
 	called := 0
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
 		tui: tui.Deps{RunTab: func(tab nav.TabID) error {
 			if tab != nav.TabTickets {
 				t.Errorf("tab = %s, want tickets", tab)
@@ -107,9 +105,8 @@ func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 func TestExecute_TicketsAliasTk(t *testing.T) {
 	t.Parallel()
 	called := 0
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
 		tui: tui.Deps{RunTab: func(tab nav.TabID) error {
 			if tab != nav.TabTickets {
 				t.Errorf("tab = %s, want tickets", tab)
@@ -130,10 +127,12 @@ func TestExecute_TicketsAliasTk(t *testing.T) {
 func TestExecute_DefaultRunsStatus(t *testing.T) {
 	t.Parallel()
 	called := 0
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return testutil.TempRepo(t), nil },
+	d := Deps{
+		Env: cmdbase.Env{
+			Stdout: bytes.NewBuffer(nil),
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return testutil.TempRepo(t), nil },
+		},
 		tui: tui.Deps{RunStatus: func(_ string) error {
 			called++
 			return nil
@@ -153,10 +152,12 @@ func TestExecute_DefaultFromBareRootRunsWorktrees(t *testing.T) {
 	bareRoot := testutil.TempBareRepo(t)
 
 	statusCalled, worktreesCalled := 0, 0
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return bareRoot, nil },
+	d := Deps{
+		Env: cmdbase.Env{
+			Stdout: bytes.NewBuffer(nil),
+			Stderr: bytes.NewBuffer(nil),
+			Getwd:  func() (string, error) { return bareRoot, nil },
+		},
 		tui: tui.Deps{
 			RunStatus: func(_ string) error {
 				statusCalled++
@@ -183,9 +184,8 @@ func TestExecute_WorktreesAliases(t *testing.T) {
 		t.Run(args[0], func(t *testing.T) {
 			t.Parallel()
 			called := 0
-			d := deps{
-				stdout: bytes.NewBuffer(nil),
-				stderr: bytes.NewBuffer(nil),
+			d := Deps{
+				Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
 				tui: tui.Deps{RunWorktrees: func(_ string) error {
 					called++
 					return nil
@@ -203,10 +203,9 @@ func TestExecute_WorktreesAliases(t *testing.T) {
 
 func TestExecute_UnknownCommand(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		tui:    tui.Deps{RunWorktrees: func(_ string) error { return nil }},
+	d := Deps{
+		Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)},
+		tui: tui.Deps{RunWorktrees: func(_ string) error { return nil }},
 	}
 	err := execute([]string{"nope"}, d)
 	if err == nil {
@@ -223,10 +222,7 @@ func TestExecute_Version(t *testing.T) {
 		t.Run(args[0], func(t *testing.T) {
 			t.Parallel()
 			var stdout bytes.Buffer
-			d := deps{
-				stdout: &stdout,
-				stderr: bytes.NewBuffer(nil),
-			}
+			d := Deps{Env: cmdbase.Env{Stdout: &stdout, Stderr: bytes.NewBuffer(nil)}}
 			if err := execute(args, d); err != nil {
 				t.Fatalf("execute %v: %v", args, err)
 			}
@@ -240,10 +236,7 @@ func TestExecute_Help(t *testing.T) {
 		t.Run(args[0], func(t *testing.T) {
 			t.Parallel()
 			var stdout bytes.Buffer
-			d := deps{
-				stdout: &stdout,
-				stderr: bytes.NewBuffer(nil),
-			}
+			d := Deps{Env: cmdbase.Env{Stdout: &stdout, Stderr: bytes.NewBuffer(nil)}}
 			if err := execute(args, d); err != nil {
 				t.Fatalf("execute %v: %v", args, err)
 			}
@@ -256,10 +249,7 @@ func TestExecute_Help(t *testing.T) {
 
 func TestExecute_StatusWithTooManyArgs(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-	}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err := execute([]string{"status", "a", "b"}, d)
 	if err == nil || !strings.Contains(err.Error(), "usage") {
 		t.Fatalf("expected usage error, got: %v", err)
@@ -268,10 +258,7 @@ func TestExecute_StatusWithTooManyArgs(t *testing.T) {
 
 func TestExecute_LogWithTooManyArgs(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-	}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err := execute([]string{"log", "a", "b"}, d)
 	if err == nil || !strings.Contains(err.Error(), "usage") {
 		t.Fatalf("expected usage error, got: %v", err)
@@ -280,10 +267,7 @@ func TestExecute_LogWithTooManyArgs(t *testing.T) {
 
 func TestExecute_ShowWithTooManyArgs(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-	}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err := execute([]string{"show", "a", "b"}, d)
 	if err == nil || !strings.Contains(err.Error(), "usage") {
 		t.Fatalf("expected usage error, got: %v", err)
@@ -292,11 +276,11 @@ func TestExecute_ShowWithTooManyArgs(t *testing.T) {
 
 func TestExecute_StashifyNoArgs(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return t.TempDir(), nil },
-	}
+	d := Deps{Env: cmdbase.Env{
+		Stdout: bytes.NewBuffer(nil),
+		Stderr: bytes.NewBuffer(nil),
+		Getwd:  func() (string, error) { return t.TempDir(), nil },
+	}}
 	err := execute([]string{"stashify"}, d)
 	if err == nil || !strings.Contains(err.Error(), "usage") {
 		t.Fatalf("expected usage error, got: %v", err)
@@ -305,10 +289,7 @@ func TestExecute_StashifyNoArgs(t *testing.T) {
 
 func TestExecute_WtUnknownSubcommand(t *testing.T) {
 	t.Parallel()
-	d := deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: bytes.NewBuffer(nil),
-	}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err := execute([]string{"wt", "bogus"}, d)
 	if err == nil {
 		t.Fatal("expected error for unknown wt subcommand")
@@ -318,7 +299,7 @@ func TestExecute_WtUnknownSubcommand(t *testing.T) {
 // lint-claims checks claims against the real, lazily built command tree: a
 // `gx tickets` verb and a `gx server` verb resolve, an unknown one is a miss.
 func TestLintClaims_RealCommandTree(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-claims.md",
 		"---\nid: \"07\"\nstatus: open\ntype: implement\n---\n\n# 07\n\n## Test seams\n\n"+
 			"`gx tickets show` and `gx server start` and `gx tickets nosuch` and `gx server nosuch`.\n")

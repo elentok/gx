@@ -15,7 +15,7 @@ import (
 )
 
 // statusChangeCmd writes status to a row's ticket through schema.UpdateTicket,
-// mirroring `gx tickets set`'s own guards (cmd/tickets_set.go) for the two
+// mirroring `gx tickets set`'s own guards (cmd/tickets/tickets_set.go) for the two
 // transitions that can otherwise corrupt scheduling state: refusing
 // status=open on an empty body, and status=done while blocked_by is still
 // unresolved. Unlike the CLI's --force, the menu has no override for the done
@@ -48,7 +48,7 @@ func statusChangeCmd(tix tabapi.TicketsAPI, store string, epic tickets.Epic, tic
 // doneIsSetByServer refuses Set done on a loop-epic ticket.
 const doneIsSetByServer = "done is set by the server"
 
-// checkTicketBodyBeforeOpen mirrors cmd/tickets_set.go's checkBodyBeforeOpen:
+// checkTicketBodyBeforeOpen mirrors cmd/tickets/tickets_set.go's checkBodyBeforeOpen:
 // refuses to open a ticket with no body, since "nothing schedulable is
 // empty" is enforced at the draft-to-open transition rather than at rest
 // (schema.Validate keeps accepting a body-less draft).

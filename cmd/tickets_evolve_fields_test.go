@@ -7,14 +7,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 func validateTicket(t *testing.T, frontmatter string) error {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "01-a-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"01\"\n"+frontmatter+"---\nBody.\n")
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"01\"\n"+frontmatter+"---\nBody.\n")
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	return execute([]string{"tickets", "validate", path}, d)
 }
 
@@ -63,7 +64,7 @@ func TestExecute_TicketsValidate_EpicEvolveFields(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(epicDir, "ticket.md"), []byte("---\nstatus: open\n"+epicFM+"---\n\n# epic\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+		d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 		return execute([]string{"tickets", "validate", path}, d)
 	}
 
@@ -83,9 +84,9 @@ func TestExecute_TicketsSet_RefusesExportedAt(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "01-a-ticket.md")
 	const content = "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n"
-	writeTicketFile(t, path, content)
+	cmdtest.WriteTicketFile(t, path, content)
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: cmdtest.NonAgentGetwd(t)}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil), Getwd: cmdtest.NonAgentGetwd(t)}}
 	err := execute([]string{"tickets", "set", path, "--exported-at=2026-01-02T03:04:05Z"}, d)
 	if err == nil || !strings.Contains(err.Error(), "exported_at") {
 		t.Fatalf("err = %v, want a refusal naming exported_at", err)

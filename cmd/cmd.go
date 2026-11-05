@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"io"
 	"os"
 	"runtime"
 
-	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
 	agentcmd "github.com/elentok/gx/cmd/agent"
 	"github.com/elentok/gx/cmd/brief"
@@ -41,17 +39,14 @@ const (
 // ExitError is the one alias root keeps, so main.go needs no import of cmdbase.
 type ExitError = cmdbase.ExitError
 
-type deps struct {
-	stdin           io.Reader
-	stdout          io.Writer
-	stderr          io.Writer
-	getwd           func() (string, error)
-	confirmForce    func(string) (bool, error)
-	loadConfig      func() (config.Config, error)
-	getenv          func(string) string
-	goos            string
-	userHomeDir     func() (string, error)
-	stdinIsTerminal func() bool
+// Deps is the root's runtime context: the shared Env plus the hooks more than
+// one command package reads, and each package's own hooks.
+type Deps struct {
+	cmdbase.Env
+	ConfirmForce    func(string) (bool, error)
+	GOOS            string
+	UserHomeDir     func() (string, error)
+	StdinIsTerminal func() bool
 	// tui holds the hooks that open the full-screen UIs (its Env is unset;
 	// tuiDeps fills it). `gx tickets` and `gx agents` read RunTab too.
 	tui tui.Deps
@@ -67,130 +62,114 @@ type deps struct {
 	// config holds the `gx config` and `gx notify` hooks (its Env is unset;
 	// configDeps fills it).
 	config configcmd.Deps
-	// serverClient dials the server; nil means the real one (tests inject a fake).
-	serverClient func() (*apiclient.Client, error)
-	// env is the process environment every config dir is resolved from.
-	env []string
-}
-
-// base builds the shared runtime context from the deps' nine common members.
-func (d deps) base() cmdbase.Env {
-	return cmdbase.Env{
-		Stdin: d.stdin, Stdout: d.stdout, Stderr: d.stderr, Getwd: d.getwd,
-		Env: d.env, Getenv: d.getenv, LoadConfig: d.loadConfig, NewClient: d.serverClient,
-	}
 }
 
 // skillsDeps is the `gx skills` hooks joined with the shared env.
-func (d deps) skillsDeps() skillscmd.Deps {
+func (d Deps) skillsDeps() skillscmd.Deps {
 	s := d.skills
-	s.Env = d.base()
+	s.Env = d.Env
 	return s
 }
 
 // doctorDeps is the `gx doctor` hooks joined with the shared env.
-func (d deps) doctorDeps() doctor.Deps {
+func (d Deps) doctorDeps() doctor.Deps {
 	s := d.doctor
-	s.Env = d.base()
-	s.ConfirmForce = d.confirmForce
-	s.GOOS = d.goos
+	s.Env = d.Env
+	s.ConfirmForce = d.ConfirmForce
+	s.GOOS = d.GOOS
 	return s
 }
 
 // configDeps is the `gx config` and `gx notify` hooks joined with the shared env.
-func (d deps) configDeps() configcmd.Deps {
+func (d Deps) configDeps() configcmd.Deps {
 	s := d.config
-	s.Env = d.base()
+	s.Env = d.Env
 	return s
 }
 
 // claudeDeps is the `gx claude` hook joined with the shared env. userHomeDir
 // stays in root deps because `gx evolve` also reads it.
-func (d deps) claudeDeps() claudecmd.Deps {
-	return claudecmd.Deps{Env: d.base(), UserHomeDir: d.userHomeDir}
+func (d Deps) claudeDeps() claudecmd.Deps {
+	return claudecmd.Deps{Env: d.Env, UserHomeDir: d.UserHomeDir}
 }
 
 // codexDeps is the `gx codex` hook joined with the shared env.
-func (d deps) codexDeps() codexcmd.Deps {
-	return codexcmd.Deps{Env: d.base(), StdinIsTerminal: d.stdinIsTerminal}
+func (d Deps) codexDeps() codexcmd.Deps {
+	return codexcmd.Deps{Env: d.Env, StdinIsTerminal: d.StdinIsTerminal}
 }
 
 // projectDeps is the `gx project` hooks joined with the shared env. The editor
 // runs under the process env, so tests leave RunEditor to the package default.
-func (d deps) projectDeps() project.Deps {
-	s := project.DefaultDeps(d.env, d.stdinIsTerminal)
-	s.Env = d.base()
+func (d Deps) projectDeps() project.Deps {
+	s := project.DefaultDeps(d.Env.Env, d.StdinIsTerminal)
+	s.Env = d.Env
 	return s
 }
 
 // tuiDeps is the full-screen launchers' hooks joined with the shared env.
-func (d deps) tuiDeps() tui.Deps {
+func (d Deps) tuiDeps() tui.Deps {
 	s := d.tui
-	s.Env = d.base()
+	s.Env = d.Env
 	return s
 }
 
 // agentDeps is the `gx agent`, `gx agents` and `gx designs` hooks joined with
 // the shared env. RunTab stays in the tui deps because `gx tickets` also uses it.
-func (d deps) agentDeps() agentcmd.Deps {
+func (d Deps) agentDeps() agentcmd.Deps {
 	s := d.agent
-	s.Env = d.base()
+	s.Env = d.Env
 	s.OpenTab = d.tui.RunTab
 	return s
 }
 
 // gitopsDeps is the git-work verbs' hooks joined with the shared env.
 // confirmForce stays in root deps because `gx doctor` also reads it.
-func (d deps) gitopsDeps() gitops.Deps {
+func (d Deps) gitopsDeps() gitops.Deps {
 	s := gitops.DefaultDeps()
-	s.Env = d.base()
-	s.ConfirmForce = d.confirmForce
+	s.Env = d.Env
+	s.ConfirmForce = d.ConfirmForce
 	return s
 }
 
 // evolveDeps is the `gx evolve` hooks joined with the shared env. userHomeDir
 // and confirmForce stay in root deps because other commands read them too.
-func (d deps) evolveDeps() evolve.Deps {
-	return evolve.Deps{Env: d.base(), UserHomeDir: d.userHomeDir, ConfirmForce: d.confirmForce}
+func (d Deps) evolveDeps() evolve.Deps {
+	return evolve.Deps{Env: d.Env, UserHomeDir: d.UserHomeDir, ConfirmForce: d.ConfirmForce}
 }
 
 // serverapiDeps is the `gx server` API verbs' hook joined with the shared env.
 // stdinIsTerminal stays in root deps because other commands read it too.
-func (d deps) serverapiDeps() serverapi.Deps {
-	return serverapi.Deps{Env: d.base(), StdinIsTerminal: d.stdinIsTerminal}
+func (d Deps) serverapiDeps() serverapi.Deps {
+	return serverapi.Deps{Env: d.Env, StdinIsTerminal: d.StdinIsTerminal}
 }
 
 // serverctlDeps is the server lifecycle verbs' hooks joined with the shared env.
-func (d deps) serverctlDeps() serverctl.Deps {
-	return serverctl.Deps{Env: d.base(), Skills: d.skills}
+func (d Deps) serverctlDeps() serverctl.Deps {
+	return serverctl.Deps{Env: d.Env, Skills: d.skills}
 }
 
-// dirs resolves the config, data and state directories from the deps env.
-func (d deps) dirs() config.Dirs { return d.base().Dirs() }
-
-// dial returns the injected server client factory, or the real one.
-func (d deps) dial() func() (*apiclient.Client, error) { return d.base().Dial() }
-
-func defaultDeps() deps {
+func defaultDeps() Deps {
 	env := os.Environ()
 	dirs := config.DirsFrom(env)
 	cfg, _ := dirs.Load()
 	roots := sessionlookup.RootsFrom(env)
-	return deps{
-		env:    env,
-		stdin:  os.Stdin,
-		stdout: os.Stdout,
-		stderr: os.Stderr,
-		getwd:  os.Getwd,
-		confirmForce: func(prompt string) (bool, error) {
+	return Deps{
+		Env: cmdbase.Env{
+			Env:        env,
+			Stdin:      os.Stdin,
+			Stdout:     os.Stdout,
+			Stderr:     os.Stderr,
+			Getwd:      os.Getwd,
+			Getenv:     os.Getenv,
+			LoadConfig: dirs.Load,
+		},
+		ConfirmForce: func(prompt string) (bool, error) {
 			return confirm.RunWithNerd(prompt, cfg.UseNerdFontIcons)
 		},
+		GOOS:            runtime.GOOS,
+		UserHomeDir:     dirs.Home,
+		StdinIsTerminal: func() bool { return cmdbase.IsTerminalFile(os.Stdin) },
 		tui:             tui.DefaultDeps(dirs),
-		loadConfig:      dirs.Load,
-		getenv:          os.Getenv,
-		goos:            runtime.GOOS,
-		userHomeDir:     dirs.Home,
-		stdinIsTerminal: func() bool { return cmdbase.IsTerminalFile(os.Stdin) },
 		agent:           agentcmd.DefaultDeps(dirs, roots),
 		skills:          skillscmd.DefaultDeps(dirs, roots.CodexHome),
 		doctor:          doctor.DefaultDeps(),
@@ -203,7 +182,7 @@ func Execute(args []string) error {
 	config.WarnOnMigrateFailure(os.Stderr)
 	defer cmdbase.RegisterMigrationWaitNotice(os.Stderr)()
 	d := defaultDeps()
-	if dir, err := d.dirs().StateDir(); err == nil {
+	if dir, err := d.Dirs().StateDir(); err == nil {
 		logger.SetDir(dir)
 	}
 	return execute(args, d)
@@ -212,7 +191,7 @@ func Execute(args []string) error {
 // execute builds the cobra command tree from the given deps and runs it against
 // args. It is the seam used by tests (fake deps + captured args/output) and by
 // Execute (real deps + os.Args).
-func execute(args []string, d deps) error {
+func execute(args []string, d Deps) error {
 	if args == nil {
 		// A nil slice would make cobra fall back to os.Args[1:]; force an
 		// explicit empty arg list so "gx" with no arguments opens status.
@@ -220,8 +199,8 @@ func execute(args []string, d deps) error {
 	}
 	root := newRootCmd(d)
 	root.SetArgs(args)
-	root.SetOut(d.stdout)
-	root.SetErr(d.stderr)
+	root.SetOut(d.Stdout)
+	root.SetErr(d.Stderr)
 	return root.Execute()
 }
 
@@ -229,7 +208,7 @@ func execute(args []string, d deps) error {
 // tests can inject fakes. Errors and usage are silenced so that main.go remains
 // the single error printer and can unwrap *ExitError for stashify's exit-code
 // pass-through.
-func newRootCmd(d deps) *cobra.Command {
+func newRootCmd(d Deps) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "gx",
 		Short: "git worktree, status, log and more — as a TUI",
@@ -243,7 +222,7 @@ Run without a command to open the status UI.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// From a bare repo root there's no worktree to show a status for,
 			// so open the worktree UI — that's the management view for this layout.
-			if cwd, err := d.getwd(); err == nil {
+			if cwd, err := d.Getwd(); err == nil {
 				if info, err := git.IdentifyDir(cwd); err == nil && info.Repo.IsBare && info.WorktreeRoot == "" {
 					return d.tui.RunWorktrees("")
 				}
@@ -271,10 +250,10 @@ Run without a command to open the status UI.`,
 		newRecoveryCmd(d),
 		evolve.New(d.evolveDeps()),
 		project.New(d.projectDeps()),
-		limits.New(limits.Deps{Env: d.base()}),
-		limits.NewUsage(limits.Deps{Env: d.base()}),
-		limits.NewAFK(limits.Deps{Env: d.base()}),
-		limits.NewViMode(limits.Deps{Env: d.base()}),
+		limits.New(limits.Deps{Env: d.Env}),
+		limits.NewUsage(limits.Deps{Env: d.Env}),
+		limits.NewAFK(limits.Deps{Env: d.Env}),
+		limits.NewViMode(limits.Deps{Env: d.Env}),
 		gitops.NewMerge(d.gitopsDeps()),
 		gitops.NewCleanup(d.gitopsDeps()),
 		skillscmd.New(d.skillsDeps()),
@@ -284,9 +263,9 @@ Run without a command to open the status UI.`,
 		gitops.NewStashify(d.gitopsDeps()),
 		gitops.NewRun(d.gitopsDeps()),
 		agentcmd.NewHolder(),
-		term.New(term.Deps{Env: d.base(), GOOS: d.goos}),
-		brief.New(brief.Deps{Env: d.base(), CacheGate: brief.DefaultDeps().CacheGate}),
-		check.New(check.Deps{Env: d.base()}),
+		term.New(term.Deps{Env: d.Env, GOOS: d.GOOS}),
+		brief.New(brief.Deps{Env: d.Env, CacheGate: brief.DefaultDeps().CacheGate}),
+		check.New(check.Deps{Env: d.Env}),
 		doctor.New(d.doctorDeps()),
 		newVersionCmd(d),
 		serverctl.NewRestartCheck(d.serverctlDeps()),

@@ -6,18 +6,20 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdbase"
 )
 
 const widenNotice = "`other/01` needs commits; waiting for all of `other`"
 
-func blockedByDeps(dir, stdin string) (deps, *bytes.Buffer) {
+func blockedByDeps(dir, stdin string) (Deps, *bytes.Buffer) {
 	stderr := bytes.NewBuffer(nil)
-	return deps{
-		stdout: bytes.NewBuffer(nil),
-		stderr: stderr,
-		stdin:  strings.NewReader(stdin),
-		getwd:  func() (string, error) { return dir, nil },
-	}, stderr
+	return Deps{Env: cmdbase.Env{
+		Stdout: bytes.NewBuffer(nil),
+		Stderr: stderr,
+		Stdin:  strings.NewReader(stdin),
+		Getwd:  func() (string, error) { return dir, nil },
+	}}, stderr
 }
 
 func assertUnchanged(t *testing.T, path, want string) {
@@ -123,7 +125,7 @@ func TestExecute_TicketsValidate_SilentOnWidenedToken(t *testing.T) {
 	path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", "blocked_by:\n  - \"other/01\"\n"))
 
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	if err := execute([]string{"tickets", "validate", path}, deps{stdout: stdout, stderr: stderr}); err != nil {
+	if err := execute([]string{"tickets", "validate", path}, Deps{Env: cmdbase.Env{Stdout: stdout, Stderr: stderr}}); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
 	if out := stdout.String() + stderr.String(); strings.Contains(out, "needs commits") || strings.Contains(out, "widen") {

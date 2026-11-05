@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 // TestExecute_TicketsValidate_RejectsPreContractionShape covers the
@@ -60,10 +63,10 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "04-ticket.md")
-			writeTicketFile(t, path, tc.raw)
+			cmdtest.WriteTicketFile(t, path, tc.raw)
 
 			var stdout, stderr bytes.Buffer
-			err := execute([]string{"tickets", "validate", path}, deps{stdout: &stdout, stderr: &stderr})
+			err := execute([]string{"tickets", "validate", path}, Deps{Env: cmdbase.Env{Stdout: &stdout, Stderr: &stderr}})
 			if err == nil {
 				t.Fatalf("execute tickets validate: want an error, got none (stdout %q)", stdout.String())
 			}
@@ -77,11 +80,11 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04a-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: paused\npause_reason: self-reported\ntype: implement\nparent: \"04\"\n---\nBody.\n")
-	writeLogFile(t, path, logQuestionLine)
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04a\"\nstatus: paused\npause_reason: self-reported\ntype: implement\nparent: \"04\"\n---\nBody.\n")
+	cmdtest.WriteLogFile(t, path, cmdtest.LogQuestionLine)
 
 	var stdout, stderr bytes.Buffer
-	if err := execute([]string{"tickets", "validate", path}, deps{stdout: &stdout, stderr: &stderr}); err != nil {
+	if err := execute([]string{"tickets", "validate", path}, Deps{Env: cmdbase.Env{Stdout: &stdout, Stderr: &stderr}}); err != nil {
 		t.Fatalf("execute tickets validate: %v", err)
 	}
 }
@@ -91,10 +94,10 @@ func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 func TestExecute_TicketsSet_NoChildrenFlag(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
-	err := execute([]string{"tickets", "set", path, "--children=04c"}, deps{stdout: &stdout, stderr: &stderr})
+	err := execute([]string{"tickets", "set", path, "--children=04c"}, Deps{Env: cmdbase.Env{Stdout: &stdout, Stderr: &stderr}})
 	if err == nil {
 		t.Fatal("execute tickets set --children: want an unknown-flag error, got none")
 	}

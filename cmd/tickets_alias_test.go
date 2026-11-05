@@ -7,7 +7,7 @@ import (
 )
 
 func TestServerTicketsMergeAndStartOverReplaceLandAndReset(t *testing.T) {
-	root := newRootCmd(deps{})
+	root := newRootCmd(Deps{})
 	for _, verb := range []string{"merge", "start-over"} {
 		c, _, err := root.Find([]string{"server", "tickets", verb})
 		if err != nil || c.Name() != verb {
@@ -26,7 +26,7 @@ func TestServerTicketsMergeAndStartOverReplaceLandAndReset(t *testing.T) {
 }
 
 func TestServerTicketsPauseAndResumeKeepHiddenAliases(t *testing.T) {
-	root := newRootCmd(deps{})
+	root := newRootCmd(Deps{})
 	for verb, hidden := range map[string]bool{"pause": false, "resume": false, "park": true, "unpark": true} {
 		c, _, err := root.Find([]string{"server", "tickets", verb})
 		if err != nil || c.Name() != verb {
@@ -40,7 +40,7 @@ func TestServerTicketsPauseAndResumeKeepHiddenAliases(t *testing.T) {
 }
 
 func TestServerTicketsRetryHasHiddenRelaunchAlias(t *testing.T) {
-	root := newRootCmd(deps{})
+	root := newRootCmd(Deps{})
 	for verb, hidden := range map[string]bool{"retry": false, "relaunch": true} {
 		c, _, err := root.Find([]string{"server", "tickets", verb})
 		if err != nil || c.Name() != verb {
@@ -69,7 +69,7 @@ func TestServerTicketsRetryHasHiddenRelaunchAlias(t *testing.T) {
 }
 
 func TestServerQueueDrainIsHiddenButDispatches(t *testing.T) {
-	root := newRootCmd(deps{})
+	root := newRootCmd(Deps{})
 	c, _, err := root.Find([]string{"server", "queue", "drain"})
 	if err != nil || c.Name() != "drain" {
 		t.Fatalf("gx server queue drain: %v (found %v)", err, c.Name())
@@ -92,7 +92,7 @@ func TestServerQueueDrainIsHiddenButDispatches(t *testing.T) {
 }
 
 func TestRootHelpGroupsCommands(t *testing.T) {
-	root := newRootCmd(deps{})
+	root := newRootCmd(Deps{})
 	var help bytes.Buffer
 	root.SetOut(&help)
 	if err := root.Help(); err != nil {

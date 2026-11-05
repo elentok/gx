@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 )
 
@@ -20,7 +21,7 @@ func writeEpicTicket(t *testing.T, scratchDir, epic, filename, content string) s
 		t.Fatal(err)
 	}
 	path := filepath.Join(issues, filename)
-	writeTicketFile(t, path, content)
+	cmdtest.WriteTicketFile(t, path, content)
 	return path
 }
 
@@ -34,7 +35,7 @@ func TestExecute_TicketsSet_ParentAcceptedForExistingTicket(t *testing.T) {
 	writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
 	path := writeEpicTicket(t, dir, "e", "01a-fork.md", ticketFrontmatter("01a", ""))
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	if err := execute([]string{"tickets", "set", path, "--parent=01"}, d); err != nil {
 		t.Fatalf("execute tickets set --parent: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestExecute_TicketsSet_ParentRejectedWhenAbsentFromEpic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err = execute([]string{"tickets", "set", path, "--parent=09"}, d)
 	if err == nil {
 		t.Fatal("expected an error for a parent naming no ticket in the epic, got nil")
@@ -78,7 +79,7 @@ func TestExecute_TicketsSet_ParentRejectedWhenItWouldCloseACycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err = execute([]string{"tickets", "set", path, "--parent=01a"}, d)
 	if err == nil {
 		t.Fatal("expected an error for a parent inside the ticket's own fork subtree, got nil")
@@ -94,7 +95,7 @@ func TestExecute_TicketsValidate_ReportsInvalidParentEdge(t *testing.T) {
 	dir := t.TempDir()
 	path := writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", "parent: \"09\"\n"))
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err := execute([]string{"tickets", "validate", path}, d)
 	if err == nil {
 		t.Fatal("expected validate to reject a parent naming no ticket in the epic")
@@ -108,10 +109,10 @@ func TestExecute_TicketsValidate_AcceptsDraftStatus(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-first.md")
-	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: draft\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"01\"\nstatus: draft\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := Deps{Env: cmdbase.Env{Stdout: &stdout, Stderr: bytes.NewBuffer(nil)}}
 	if err := execute([]string{"tickets", "validate", path}, d); err != nil {
 		t.Fatalf("execute tickets validate: %v", err)
 	}
@@ -124,9 +125,9 @@ func TestExecute_TicketsSet_AcceptsDraftStatus(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-first.md")
-	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: cmdtest.NonAgentGetwd(t)}
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil), Getwd: cmdtest.NonAgentGetwd(t)}}
 	if err := execute([]string{"tickets", "set", path, "--status=draft"}, d); err != nil {
 		t.Fatalf("execute tickets set --status=draft: %v", err)
 	}

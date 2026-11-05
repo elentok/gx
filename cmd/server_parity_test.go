@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server"
 )
 
@@ -117,7 +119,7 @@ var routeVerbs = map[string]string{
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {
 	t.Parallel()
-	root := newRootCmd(deps{env: tempEnv(t)})
+	root := newRootCmd(Deps{Env: cmdbase.Env{Env: cmdtest.TempEnv(t)}})
 	patterns := server.RoutePatterns()
 	for _, p := range patterns {
 		verb, ok := routeVerbs[p]

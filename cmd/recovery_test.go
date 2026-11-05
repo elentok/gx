@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/recovery"
 )
@@ -45,7 +47,7 @@ func TestRecoveryCatalog_EmptyEntriesIsArray(t *testing.T) {
 }
 
 func TestRecoveryCatalog_ViaRootCommand(t *testing.T) {
-	root := newRootCmd(deps{env: envFor(t)})
+	root := newRootCmd(Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t)}})
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetArgs([]string{"recovery", "catalog", "--json"})

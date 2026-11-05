@@ -15,7 +15,7 @@ type CatalogInfo struct {
 	NotCatalogued map[string]string `json:"not_catalogued"`
 }
 
-func newRecoveryCmd(d deps) *cobra.Command {
+func newRecoveryCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "recovery",
 		Short: "recovery catalog commands",
@@ -27,7 +27,7 @@ func newRecoveryCmd(d deps) *cobra.Command {
 		Short: "print the recovery catalog with the user's kill switch and disables applied",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cfg, err := d.dirs().Load()
+			cfg, err := d.Dirs().Load()
 			if err != nil {
 				return err
 			}

@@ -74,7 +74,7 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   of a slower run.
 - `gx brief` tools: `go-test`, `go-build`, `go-vet`, `vitest`, `tsc`, `playwright`, `conflicts`.
   Any other name exits 2 with `unknown tool`. Use `gx brief go-build ./...` and
-  `gx brief go-vet ./cmd`, never `go build ./... | tail`.
+  `gx brief go-vet ./cmd/...`, never `go build ./... | tail`.
 - Quiet web runs, from anywhere in the repo (always pass `-C webui`; the shell cwd persists between
   calls, so never `cd webui`):
   - `gx brief -C webui vitest src/epic`
@@ -120,7 +120,7 @@ a gx CLI step. A new pause kind needs a row in the pause-to-verb table. See
 There is no `internal/` directory. Top-level packages live at the repo root:
 
 - `cmd/` — CLI commands (`gx tickets`, `gx agent`, ...)
-  - `cmd/` (root) — the command tree and the commands not yet moved out
+  - `cmd/` (root) — `Execute`, `newRootCmd`, `Deps` (embeds `cmdbase.Env`), the help groups, `gx recovery`, `gx version` and the `RoutePatterns` parity test (`server_parity_test.go`)
   - `cmd/cmdbase` — what every command package shares: `Env`, `ExitError`, provenance and JSON output, server-client helpers, `NewTicketsAnswerCmd` (root and `server tickets answer`), `LogFollowInterval`, `WriteConfigBlock` and `SetupCodeLine` (shared with `gx server status`)
   - `cmd/cmdtest` — test plumbing for the cmd packages (imports `testing`): `EnvFor`/`TempEnv`, `Main`/`MainWithGx` for TestMain, `Run` (mini root), `SetWaitHook`, ticket-store/git/server fixtures (`fixtures.go`: `IsolateTicketStore`, `AddProject`, `WriteTicketFile`, `MergeTestRepo`, `ShortTempDir`, ...)
   - `cmd/brief` — `gx brief` (`New`, `Deps` with the `go-clean-cache` gate hooks)
@@ -139,7 +139,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/serverctl` — `gx server` and its lifecycle verbs (start, stop, restart, status, logs, launchd agent, migrate hooks, preflight); `New(Deps, extra...)` takes the `serverapi` verbs as children, `NewRestartCheck`, `Starter` and `LiveProbe` are used by root and `ui`
   - `cmd/tui` — the full-screen launchers `gx worktrees`, `status`, `log`, `show`, `stash`, `prs` and the tab launcher (`NewWorktrees(Deps, extra...)`, `NewStatus`, `NewLog`, `NewShow`, `NewStash`, `NewPRs`, `RunTab`, `LogOptions`; `Deps` with the `Run*` hooks; `DefaultDeps`). Imports `serverctl.LiveProbe` and `serverctl.Starter`; never imports `cmd/gitops` (root passes the worktree subcommands in)
   - `cmd/serverapi` — the `gx server` verbs that only call the server API (`Commands`, `Deps` with the `StdinIsTerminal` hook for the web password prompt; `DecideOneOff` is called by `gx evolve`; also `NewAskCmd` and `NewAnswerCmd`, the `gx tickets ask|answer` verbs root registers)
-  - `cmd/tickets` — `gx tickets` and its edit verbs `set`, `add`, `section`, `move`, `close`, `schema` (`New(Deps, extra...)`; `Deps` = Env + `OpenTab` + a temporary `PrintSection`; hub helpers `BodyFrontmatter`, `CreateTicket`, `PrintTicketRef`, `PingServer`, `RunEpicSet`). Root passes the verbs not moved yet as extras. Shared epic-scoped helpers live in `cmd/ticketref` (`NewEpicScopedCmd`, `ResolveAddTarget`, `CompleteEpicNames`, `SplitProjectEpic`)
+  - `cmd/tickets` — `gx tickets` and its edit verbs `set`, `add`, `section`, `move`, `close`, `schema` (`New(Deps, extra...)`; `Deps` = Env + `OpenTab`; hub helpers `BodyFrontmatter`, `CreateTicket`, `PrintTicketRef`, `PingServer`, `RunEpicSet`). Root passes `ticketsmigrate`, `ask`, `answer` and the `ticketsflow` verbs as extras. Shared epic-scoped helpers live in `cmd/ticketref` (`NewEpicScopedCmd`, `ResolveAddTarget`, `CompleteEpicNames`, `SplitProjectEpic`)
   - `cmd/ticketsflow` — the workflow verbs of `gx tickets`: `epic`, `publish`, `follow-up`, the ensure verbs, `verify-plan`, `calibration`, `lint-claims`, `filter-run-log` (`Commands(Deps) []*cobra.Command`, passed to `tickets.New` as extras; `Deps` = Env + `WriteFile` + lazy `CommandTree` for lint-claims)
   - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
