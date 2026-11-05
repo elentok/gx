@@ -33,43 +33,55 @@ func cmdLoadYankData(wt git.Worktree) tea.Cmd {
 	}
 }
 
-// enterYankMode initiates loading the file list for the selected worktree.
+// yankModal is the checklist of a worktree's uncommitted files to copy.
+type yankModal struct {
+	source    git.Worktree
+	loading   bool // true until the file list arrives
+	checklist components.Checklist
+}
+
+// enterYankMode opens the yank modal and loads the file list for the selected
+// worktree.
 func (m Model) enterYankMode() (Model, tea.Cmd) {
 	wt := m.cursorWorktree()
 	if wt == nil {
 		return m, nil
 	}
-	m.mode = modeYank
-	m.yankLoading = true
-	m.yankSource = *wt
-	return m, cmdLoadYankData(*wt)
+	return m.openModal(yankModal{source: *wt, loading: true}), cmdLoadYankData(*wt)
 }
 
-// handleYankKey handles key events while the yank checklist modal is open.
-func (m Model) handleYankKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+// Update toggles checklist items, closes on esc, and on enter hands the
+// checked files on as the paste clipboard.
+func (y yankModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	k, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return y, nil, modalResult{unhandled: true}
+	}
+	switch k.String() {
 	case "esc":
-		m.mode = modeNormal
-		return m, nil
+		return y, nil, modalResult{close: true}
 	case "enter":
-		files := m.yankChecklist.Checked()
-		if len(files) > 0 {
+		files := y.checklist.Checked()
+		if len(files) == 0 {
+			return y, nil, modalResult{close: true}
+		}
+		return y, nil, modalResult{close: true, apply: func(m Model) (Model, tea.Cmd) {
 			return m.enterPasteMode(clipboardState{
-				srcPath: m.yankSource.Path,
-				srcName: m.yankSource.Name,
+				srcPath: y.source.Path,
+				srcName: y.source.Name,
 				files:   files,
 			})
-		}
-		m.mode = modeNormal
-		return m, nil
+		}}
 	}
-	m.yankChecklist = m.yankChecklist.Update(msg.String())
-	return m, nil
+	y.checklist = y.checklist.Update(k.String())
+	return y, nil, modalResult{}
 }
 
-// yankModalView renders the centered yank checklist modal.
-func (m Model) yankModalView() string {
-	if m.yankLoading {
+func (y yankModal) InputFocused() bool { return false }
+
+// View renders the centered yank checklist modal.
+func (y yankModal) View(width, height int) string {
+	if y.loading {
 		return ui.RenderModalFrame(ui.ModalFrameOptions{
 			Body:        "Loading files…",
 			BorderColor: ui.ColorBorder,
@@ -77,7 +89,7 @@ func (m Model) yankModalView() string {
 		})
 	}
 
-	modalW := m.width * 2 / 3
+	modalW := width * 2 / 3
 	if modalW < 44 {
 		modalW = 44
 	}
@@ -85,14 +97,14 @@ func (m Model) yankModalView() string {
 		modalW = 84
 	}
 	// overhead: border(2) + title(1) + blank(1) + blank(1) + hint(1) = 6
-	listH := m.height/2 - 6
+	listH := height/2 - 6
 	if listH < 3 {
 		listH = 3
 	}
 
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:       "Yank files from: " + m.yankSource.Name,
-		Body:        m.yankChecklist.View(modalW-4, listH),
+		Title:       "Yank files from: " + y.source.Name,
+		Body:        y.checklist.View(modalW-4, listH),
 		Hint:        ui.HintChecklistConfirm(),
 		Width:       modalW - 4,
 		BorderColor: ui.ColorBorder,

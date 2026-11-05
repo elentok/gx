@@ -10,8 +10,16 @@ import (
 // applies it.
 type modal interface {
 	Update(msg tea.Msg) (modal, tea.Cmd, modalResult)
+	// View renders the modal, centred over the page. An empty view draws
+	// nothing.
 	View(width, height int) string
 	InputFocused() bool
+}
+
+// bottomAnchored marks a modal drawn at the bottom of the page (where
+// settings.InputModalBottom puts it) instead of centred.
+type bottomAnchored interface {
+	bottomAnchored()
 }
 
 // modalResult is what a modal asks the root to do after an update.
@@ -25,13 +33,13 @@ type modalResult struct {
 	openLogs bool
 	// spinner, when set, starts the busy spinner with this label.
 	spinner string
+	// apply runs against the page after close, for what only the page can do
+	// (read the cursor worktree, move the table, open the next modal).
+	apply func(Model) (Model, tea.Cmd)
 }
 
-// openModal makes next the active modal. It also leaves any text-input mode,
-// as the mode enum and the modal field are one state until every mode is a
-// modal.
+// openModal makes next the active modal.
 func (m Model) openModal(next modal) Model {
-	m.mode = modeNormal
 	m.modal = next
 	return m
 }
@@ -54,6 +62,11 @@ func (m Model) updateModal(msg tea.Msg) (next Model, cmd tea.Cmd, ok bool) {
 		m.spinnerActive = true
 		m.spinnerLabel = res.spinner
 		cmd = tea.Batch(cmd, m.spinner.Tick)
+	}
+	if res.apply != nil {
+		var applyCmd tea.Cmd
+		m, applyCmd = res.apply(m)
+		cmd = tea.Batch(cmd, applyCmd)
 	}
 	return m, cmd, true
 }

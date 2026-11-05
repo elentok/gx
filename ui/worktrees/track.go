@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/confirm"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -25,5 +26,5 @@ func (m Model) enterTrackConfirm() Model {
 	remote := git.BranchRemote(m.repo, wt.Branch)
 	prompt := fmt.Sprintf("Track %s/%s?\n\nThis will run:\n  git branch --set-upstream-to=%s/%s %s",
 		remote, wt.Branch, remote, wt.Branch, wt.Branch)
-	return m.enterConfirm(prompt, cmdTrack(m.repo, *wt), "Tracking "+wt.Name+"…")
+	return m.enterConfirm(confirm.Options{Prompt: prompt, AcceptCmd: cmdTrack(m.repo, *wt), SpinnerLabel: "Tracking " + wt.Name + "…"})
 }

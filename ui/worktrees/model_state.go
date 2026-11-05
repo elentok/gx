@@ -3,7 +3,6 @@ package worktrees
 import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/pull"
@@ -13,23 +12,8 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/table"
-	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-)
-
-type mode int
-
-const (
-	modeNormal mode = iota
-	modeRename
-	modeClone
-	modeNew
-	modeNewAndOpen
-	modeYank
-	modePaste
-	modeSearch
-	modeDeleteProgress
 )
 
 type promptableJobKind int
@@ -73,10 +57,8 @@ type Model struct {
 	pull   pull.Model
 	pullWT *git.Worktree // worktree being pulled, set when pull.Open is called
 
-	mode      mode
-	modal     modal           // nil in normal mode
-	textInput textinput.Model // shared by rename and clone modes
-	helpModel help.Model      // closed template; each open copies it into a helpModal
+	modal     modal      // nil in normal mode
+	helpModel help.Model // closed template; each open copies it into a helpModal
 	jobs      jobs
 
 	lastJobLog   string
@@ -84,18 +66,8 @@ type Model struct {
 
 	confirm confirm.Model
 
-	deleteQueue    []git.Worktree    // worktrees pending deletion in the current batch
-	deleteInFlight int               // number of concurrent deletes in progress
-	deleteSteps    []components.Step // one per worktree in the batch, for the progress modal
-	deleteResults  []deleteResultMsg // accumulated results from the batch
-
-	yankLoading   bool
-	yankSource    git.Worktree
-	yankChecklist components.Checklist
-	clipboard     *clipboardState
-
 	keyManager keymgr.Manager
-	search     search.Model
+	search     search.Model // closed template; each open copies it into a searchModal
 
 	help help.Model
 

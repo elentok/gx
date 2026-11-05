@@ -2,11 +2,9 @@ package worktrees
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/elentok/gx/git"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
@@ -42,43 +40,24 @@ func newWorktreeInput() textinput.Model {
 }
 
 func (m Model) enterNewMode() Model {
-	m.mode = modeNew
-	m.textInput = newWorktreeInput()
-	return m
+	return m.openNewPrompt(cmdNewWorktree)
 }
 
 func (m Model) enterNewAndOpenMode() Model {
-	m.mode = modeNewAndOpen
-	m.textInput = newWorktreeInput()
-	return m
+	return m.openNewPrompt(cmdNewWorktreeAndOpen)
 }
 
-func (m Model) handleNewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	cancel := key.NewBinding(key.WithKeys("esc"))
-	submit := key.NewBinding(key.WithKeys("enter"))
-
-	switch {
-	case key.Matches(msg, cancel):
-		m.mode = modeNormal
-		return m, nil
-	case key.Matches(msg, submit):
-		newName := strings.TrimSpace(m.textInput.Value())
-		if newName == "" {
-			m.mode = modeNormal
-			return m, nil
-		}
-		prevMode := m.mode
-		m.mode = modeNormal
-		if m.repo.Trunk == "" {
-			return m.showError("cannot create worktree: " + m.trunkProblem()), nil
-		}
-		if prevMode == modeNewAndOpen {
-			return m, cmdNewWorktreeAndOpen(m.repo, newName)
-		}
-		return m, cmdNewWorktree(m.repo, newName)
-	}
-
-	var tiCmd tea.Cmd
-	m.textInput, tiCmd = m.textInput.Update(msg)
-	return m, tiCmd
+// openNewPrompt opens the new-worktree prompt; create builds the command for a
+// submitted name.
+func (m Model) openNewPrompt(create func(repo git.Repo, name string) tea.Cmd) Model {
+	return m.openModal(textPrompt{
+		title: "New Worktree",
+		input: newWorktreeInput(),
+		submit: func(m Model, name string) (Model, tea.Cmd) {
+			if m.repo.Trunk == "" {
+				return m.showError("cannot create worktree: " + m.trunkProblem()), nil
+			}
+			return m, create(m.repo, name)
+		},
+	})
 }

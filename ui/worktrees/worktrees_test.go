@@ -107,7 +107,7 @@ func TestDeleteWorktree(t *testing.T) {
 	waitForText(t, tm, "Delete", actionWait)
 	tm.Send(keyRune('y'))
 
-	// Wait until git has only 1 worktree AND the TUI has exited modeDeleteProgress,
+	// Wait until git has only 1 worktree AND the TUI has closed the delete progress modal,
 	// otherwise 'q' gets swallowed by the delete-progress key handler.
 	teatest.WaitFor(t, tm.Output(), func(_ []byte) bool {
 		wts, err := git.ListWorktrees(repo)

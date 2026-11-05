@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/git"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
@@ -60,41 +59,23 @@ func newCloneInput(sourceName string) textinput.Model {
 	return ti
 }
 
-// enterCloneMode transitions the model into clone mode.
+// enterCloneMode opens the clone prompt.
 func (m Model) enterCloneMode() Model {
 	wt := m.cursorWorktree()
 	if wt == nil {
 		return m
 	}
-	m.mode = modeClone
-	m.textInput = newCloneInput(wt.Name)
-	return m
-}
-
-// handleCloneKey handles key events while in clone-input mode.
-func (m Model) handleCloneKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	cancel := key.NewBinding(key.WithKeys("esc"))
-	submit := key.NewBinding(key.WithKeys("enter"))
-
-	switch {
-	case key.Matches(msg, cancel):
-		m.mode = modeNormal
-		return m, nil
-
-	case key.Matches(msg, submit):
-		newName := strings.TrimSpace(m.textInput.Value())
-		wt := m.cursorWorktree()
-		if newName == "" || wt == nil || newName == wt.Name {
-			m.mode = modeNormal
-			return m, nil
-		}
-		m.mode = modeNormal
-		return m, cmdClone(m.repo, *wt, newName)
-	}
-
-	var tiCmd tea.Cmd
-	m.textInput, tiCmd = m.textInput.Update(msg)
-	return m, tiCmd
+	return m.openModal(textPrompt{
+		title: "Clone Worktree",
+		input: newCloneInput(wt.Name),
+		submit: func(m Model, newName string) (Model, tea.Cmd) {
+			wt := m.cursorWorktree()
+			if wt == nil || newName == wt.Name {
+				return m, nil
+			}
+			return m, cmdClone(m.repo, *wt, newName)
+		},
+	})
 }
 
 // ── file copy helpers ─────────────────────────────────────────────────────────

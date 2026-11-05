@@ -33,45 +33,45 @@ func newUpdateTestModel(t *testing.T) Model {
 func TestInputFocused_TrueInRenameMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.mode = modeRename
+	m.modal = textPrompt{}
 	if !m.InputFocused() {
-		t.Error("expected InputFocused=true in modeRename")
+		t.Error("expected InputFocused=true with the rename prompt open")
 	}
 }
 
 func TestInputFocused_TrueInCloneMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.mode = modeClone
+	m.modal = textPrompt{}
 	if !m.InputFocused() {
-		t.Error("expected InputFocused=true in modeClone")
+		t.Error("expected InputFocused=true with the clone prompt open")
 	}
 }
 
 func TestInputFocused_TrueInNewMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.mode = modeNew
+	m.modal = textPrompt{}
 	if !m.InputFocused() {
-		t.Error("expected InputFocused=true in modeNew")
+		t.Error("expected InputFocused=true with the new prompt open")
 	}
 }
 
 func TestInputFocused_TrueInSearchMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.mode = modeSearch
+	m.modal = searchModal{}
 	if !m.InputFocused() {
-		t.Error("expected InputFocused=true in modeSearch")
+		t.Error("expected InputFocused=true with search open")
 	}
 }
 
 func TestInputFocused_FalseInNormalMode(t *testing.T) {
 	t.Parallel()
 	m := newUpdateTestModel(t)
-	m.mode = modeNormal
+	m.modal = nil
 	if m.InputFocused() {
-		t.Error("expected InputFocused=false in modeNormal")
+		t.Error("expected InputFocused=false with no modal")
 	}
 }
 

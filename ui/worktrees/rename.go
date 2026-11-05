@@ -2,11 +2,9 @@ package worktrees
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/elentok/gx/git"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
@@ -40,40 +38,21 @@ func newRenameInput(currentName string) textinput.Model {
 	return ti
 }
 
-// enterRenameMode transitions the model into rename mode.
+// enterRenameMode opens the rename prompt.
 func (m Model) enterRenameMode() Model {
 	wt := m.cursorWorktree()
 	if wt == nil {
 		return m
 	}
-	m.mode = modeRename
-	m.textInput = newRenameInput(wt.Name)
-	return m
-}
-
-// handleRenameKey handles key events while in rename-input mode.
-func (m Model) handleRenameKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	cancel := key.NewBinding(key.WithKeys("esc"))
-	submit := key.NewBinding(key.WithKeys("enter"))
-
-	switch {
-	case key.Matches(msg, cancel):
-		m.mode = modeNormal
-		return m, nil
-
-	case key.Matches(msg, submit):
-		newName := strings.TrimSpace(m.textInput.Value())
-		wt := m.cursorWorktree()
-		if newName == "" || wt == nil || newName == wt.Name {
-			m.mode = modeNormal
-			return m, nil
-		}
-		m.mode = modeNormal
-		return m, cmdRename(m.repo, *wt, newName)
-	}
-
-	// Pass other keys (typing, backspace, etc.) to the textinput
-	var tiCmd tea.Cmd
-	m.textInput, tiCmd = m.textInput.Update(msg)
-	return m, tiCmd
+	return m.openModal(textPrompt{
+		title: "Rename Worktree",
+		input: newRenameInput(wt.Name),
+		submit: func(m Model, newName string) (Model, tea.Cmd) {
+			wt := m.cursorWorktree()
+			if wt == nil || newName == wt.Name {
+				return m, nil
+			}
+			return m, cmdRename(m.repo, *wt, newName)
+		},
+	})
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 
 	"charm.land/bubbles/v2/textinput"
@@ -91,13 +92,11 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 	if !ok {
 		m.spinnerActive = false
 		m.modal = nil
-		m.mode = modeNormal
 		return m, nil
 	}
 
 	wt, kind, output, log := done.wt, done.kind, done.output, done.log
 	m.modal = nil
-	m.mode = modeNormal
 	m.spinnerActive = false
 	m.lastJobLog = log
 	m.lastJobLabel = promptableJobOutputTitle(kind)
@@ -118,7 +117,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 	case promptableJobPush:
 		if err != nil {
 			if git.IsNonFastForwardPushError(err) {
-				return m.enterConfirm(forcePushPrompt(wt), cmdStartPromptableJob(promptableJobForcePush, wt, log, false), "Force-pushing "+wt.Name+"…"), nil
+				return m.enterConfirm(confirm.Options{Prompt: forcePushPrompt(wt), AcceptCmd: cmdStartPromptableJob(promptableJobForcePush, wt, log, false), SpinnerLabel: "Force-pushing " + wt.Name + "…"}), nil
 			}
 			return m.showError(err.Error()), nil
 		}
@@ -129,7 +128,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 		prURL := git.ExtractPRURL(output)
 		if prURL != "" {
 			prompt := fmt.Sprintf("Open pull request page?\n\n%s", prURL)
-			m = m.enterConfirmDefaultYes(prompt, cmdOpenURL(prURL), "")
+			m = m.enterConfirm(confirm.Options{Prompt: prompt, AcceptCmd: cmdOpenURL(prURL), DefaultYes: true})
 			return m, tea.Batch(cmds...)
 		}
 		return m, tea.Batch(cmds...)

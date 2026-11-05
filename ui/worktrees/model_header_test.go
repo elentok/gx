@@ -31,8 +31,7 @@ func worktreesHeader(m Model) string {
 }
 
 func withPaste(m Model) Model {
-	m.mode = modePaste
-	m.clipboard = &clipboardState{srcName: "feat-x", files: []string{"a", "b", "c"}}
+	m.modal = pasteModal{clipboard: clipboardState{srcName: "feat-x", files: []string{"a", "b", "c"}}}
 	return m
 }
 
@@ -139,13 +138,16 @@ func TestWorktreesViewHasNoFooterRow(t *testing.T) {
 func TestEnteringPasteModeNotifiesTheKeys(t *testing.T) {
 	t.Parallel()
 	m := headerTestModel(120)
-	m.mode = modeYank
-	m.yankSource = git.Worktree{Name: "feat-x", Path: "/tmp/feat-x"}
-	m.yankChecklist = components.Checklist{Items: []components.Item{{Label: "a", Value: "a", Checked: true}}}
+	m.modal = yankModal{
+		source:    git.Worktree{Name: "feat-x", Path: "/tmp/feat-x"},
+		checklist: components.Checklist{Items: []components.Item{{Label: "a", Value: "a", Checked: true}}},
+	}
 
-	updated, cmd := m.handleYankKey(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if got := updated.(Model).mode; got != modePaste {
-		t.Fatalf("mode = %v, want modePaste", got)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if got := updated.(Model).modal; got == nil {
+		t.Fatal("modal = nil, want pasteModal")
+	} else if _, ok := got.(pasteModal); !ok {
+		t.Fatalf("modal = %T, want pasteModal", got)
 	}
 	if cmd == nil {
 		t.Fatal("expected a notification command")

@@ -178,7 +178,7 @@ func (m Model) buildRows() []table.Row {
 			selCell = styleSelected.Render(ic.checkmark)
 		}
 		nameCol := worktreeCell(wt.Name, wt.Branch, ic, isTrunk, isCursorRow)
-		if q := m.search.Query(); q != "" && !isCursorRow {
+		if q := m.searchQuery(); q != "" && !isCursorRow {
 			nameCol = highlightMatch(nameCol, q)
 		}
 		rows[i] = table.Row{

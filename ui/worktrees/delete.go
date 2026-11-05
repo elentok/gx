@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
@@ -83,21 +84,33 @@ func (m Model) enterDeleteConfirm() (tea.Model, tea.Cmd) {
 			items[i] = wt.Name
 		}
 	}
-	m = m.enterConfirmWithItems(prompt, items, cmdStartBatchDelete(batch), "")
+	m = m.enterConfirm(confirm.Options{Prompt: prompt, Items: items, AcceptCmd: cmdStartBatchDelete(batch)})
 	return m, nil
 }
 
-// enterDeleteProgress switches to modeDeleteProgress and starts up to 3
-// concurrent delete operations.
-func (m Model) enterDeleteProgress(worktrees []git.Worktree) (Model, tea.Cmd) {
-	m.mode = modeDeleteProgress
-	m.deleteQueue = nil
-	m.deleteResults = nil
-	m.deleteInFlight = 0
+// deleteProgress is the modal that tracks a batch of deletes, at most
+// maxConcurrentDeletes in flight at once.
+type deleteProgress struct {
+	queue    []git.Worktree    // worktrees pending deletion in the current batch
+	inFlight int               // number of concurrent deletes in progress
+	steps    []components.Step // one per worktree in the batch
+	results  []deleteResultMsg // accumulated results from the batch
+	// spinnerFrame is the page spinner's current frame; the root refreshes it
+	// on every tick because the modal does not own the spinner.
+	spinnerFrame string
+}
 
-	m.deleteSteps = make([]components.Step, len(worktrees))
+const maxConcurrentDeletes = 3
+
+// enterDeleteProgress opens the progress modal and starts up to
+// maxConcurrentDeletes concurrent delete operations.
+func (m Model) enterDeleteProgress(worktrees []git.Worktree) (Model, tea.Cmd) {
+	d := deleteProgress{
+		steps:        make([]components.Step, len(worktrees)),
+		spinnerFrame: m.spinner.View(),
+	}
 	for i, wt := range worktrees {
-		m.deleteSteps[i] = components.Step{
+		d.steps[i] = components.Step{
 			ID:           wt.Name,
 			TitleBefore:  wt.Name,
 			RunningTitle: wt.Name,
@@ -108,50 +121,83 @@ func (m Model) enterDeleteProgress(worktrees []git.Worktree) (Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	for i, wt := range worktrees {
-		if i < 3 {
-			m.deleteSteps[i].IsRunning = true
-			m.deleteInFlight++
+		if i < maxConcurrentDeletes {
+			d.steps[i].IsRunning = true
+			d.inFlight++
 			cmds = append(cmds, cmdDelete(m.repo, wt))
 		} else {
-			m.deleteQueue = append(m.deleteQueue, wt)
+			d.queue = append(d.queue, wt)
 		}
 	}
-	return m, tea.Batch(append(cmds, m.spinner.Tick)...)
+	return m.openModal(d), tea.Batch(append(cmds, m.spinner.Tick)...)
 }
 
-// handleDeleteProgressResult updates progress state and dispatches the next
-// queued delete. When all deletes finish it calls completeBatchDelete.
-func (m Model) handleDeleteProgressResult(msg deleteResultMsg) (tea.Model, tea.Cmd) {
-	for i, step := range m.deleteSteps {
+// Update swallows keys while the batch runs and leaves everything else to the
+// page.
+func (d deleteProgress) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	if _, ok := msg.(tea.KeyPressMsg); ok {
+		return d, nil, modalResult{}
+	}
+	return d, nil, modalResult{unhandled: true}
+}
+
+func (d deleteProgress) InputFocused() bool { return false }
+
+// View renders the progress modal.
+func (d deleteProgress) View(_, _ int) string {
+	title := "Deleting Worktrees"
+	if len(d.steps) == 1 {
+		title = "Deleting Worktree"
+	}
+	body := components.RenderSteps(d.steps, d.spinnerFrame)
+	return ui.RenderModalFrame(ui.ModalFrameOptions{
+		Title:         title,
+		Body:          body,
+		BorderColor:   ui.ColorBorder,
+		TitleColor:    ui.ColorBlue,
+		TitleInBorder: true,
+	})
+}
+
+// record stores msg's result and returns the command for the next queued
+// delete, if any. done is true once nothing is queued or in flight.
+func (d deleteProgress) record(repo git.Repo, msg deleteResultMsg) (next deleteProgress, cmds []tea.Cmd, done bool) {
+	for i, step := range d.steps {
 		if step.ID == msg.name {
-			m.deleteSteps[i].IsRunning = false
+			d.steps[i].IsRunning = false
 			if msg.err != nil {
-				m.deleteSteps[i].HasFailed = true
+				d.steps[i].HasFailed = true
 			} else {
-				m.deleteSteps[i].IsDone = true
+				d.steps[i].IsDone = true
 			}
 			break
 		}
 	}
-	m.deleteResults = append(m.deleteResults, msg)
-	m.deleteInFlight--
+	d.results = append(d.results, msg)
+	d.inFlight--
 
-	var cmds []tea.Cmd
-	if len(m.deleteQueue) > 0 {
-		next := m.deleteQueue[0]
-		m.deleteQueue = m.deleteQueue[1:]
-		for i, step := range m.deleteSteps {
+	if len(d.queue) > 0 {
+		next := d.queue[0]
+		d.queue = d.queue[1:]
+		for i, step := range d.steps {
 			if step.ID == next.Name {
-				m.deleteSteps[i].IsRunning = true
+				d.steps[i].IsRunning = true
 				break
 			}
 		}
-		m.deleteInFlight++
-		cmds = append(cmds, cmdDelete(m.repo, next))
+		d.inFlight++
+		cmds = append(cmds, cmdDelete(repo, next))
 	}
+	return d, cmds, d.inFlight == 0 && len(d.queue) == 0
+}
 
-	if m.deleteInFlight == 0 && len(m.deleteQueue) == 0 {
-		completedM, completionCmd := m.completeBatchDelete()
+// handleDeleteProgressResult updates progress state and dispatches the next
+// queued delete. When all deletes finish it calls completeBatchDelete.
+func (m Model) handleDeleteProgressResult(d deleteProgress, msg deleteResultMsg) (tea.Model, tea.Cmd) {
+	d, cmds, done := d.record(m.repo, msg)
+	m.modal = d
+	if done {
+		completedM, completionCmd := m.completeBatchDelete(d.results)
 		return completedM, tea.Batch(append(cmds, completionCmd)...)
 	}
 	return m, tea.Batch(cmds...)
@@ -159,12 +205,12 @@ func (m Model) handleDeleteProgressResult(msg deleteResultMsg) (tea.Model, tea.C
 
 // completeBatchDelete finalises the batch: shows a notification for single
 // deletes and a summary log for multi-deletes, then refreshes the worktree list.
-func (m Model) completeBatchDelete() (Model, tea.Cmd) {
+func (m Model) completeBatchDelete(results []deleteResultMsg) (Model, tea.Cmd) {
 	m.selectedWorktrees = make(map[string]bool)
-	m.mode = modeNormal
+	m.modal = nil
 
-	if len(m.deleteResults) == 1 {
-		result := m.deleteResults[0]
+	if len(results) == 1 {
+		result := results[0]
 		if result.err != nil {
 			m.lastJobLog = result.err.Error()
 			m.lastJobLabel = "Delete failed"
@@ -175,14 +221,14 @@ func (m Model) completeBatchDelete() (Model, tea.Cmd) {
 
 	// Multi-delete: build a summary log.
 	var successes, failures []string
-	for _, r := range m.deleteResults {
+	for _, r := range results {
 		if r.err != nil {
 			failures = append(failures, r.name)
 		} else {
 			successes = append(successes, r.name)
 		}
 	}
-	total := len(m.deleteResults)
+	total := len(results)
 
 	var sb strings.Builder
 	if len(failures) > 0 {
@@ -204,20 +250,4 @@ func (m Model) completeBatchDelete() (Model, tea.Cmd) {
 	m.lastJobLog = strings.TrimRight(sb.String(), "\n")
 	m.lastJobLabel = "Delete summary"
 	return m.enterLogsMode(), cmdLoadWorktrees(m.repo, m.settings.TicketStore)
-}
-
-// deleteProgressModalView renders the progress modal for modeDeleteProgress.
-func (m Model) deleteProgressModalView() string {
-	title := "Deleting Worktrees"
-	if len(m.deleteSteps) == 1 {
-		title = "Deleting Worktree"
-	}
-	body := components.RenderSteps(m.deleteSteps, m.spinner.View())
-	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:         title,
-		Body:          body,
-		BorderColor:   ui.ColorBorder,
-		TitleColor:    ui.ColorBlue,
-		TitleInBorder: true,
-	})
 }

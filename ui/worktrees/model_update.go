@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/cmdoutput"
 	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/worktrees/launch"
@@ -20,10 +21,7 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) InputFocused() bool {
-	return m.mode == modeRename || m.mode == modeClone || m.mode == modeNew ||
-		m.mode == modeNewAndOpen || m.mode == modeSearch ||
-		(m.modal != nil && m.modal.InputFocused()) ||
-		m.pull.InputFocused()
+	return (m.modal != nil && m.modal.InputFocused()) || m.pull.InputFocused()
 }
 
 func (m Model) ModalOpen() bool {
@@ -56,15 +54,6 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 				return next, cmd
 			}
 		}
-		switch m.mode {
-		case modeRename, modeClone, modeNew, modeNewAndOpen:
-			var cmd tea.Cmd
-			m.textInput, cmd = m.textInput.Update(msg)
-			return m, cmd
-		case modeSearch:
-			m.search.Start(msg.Content)
-			return m.updateSearchMatches()
-		}
 
 	case tea.MouseClickMsg:
 		if m.confirm.IsOpen {
@@ -88,22 +77,6 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			next, cmd, _ := m.updateModal(msg)
 			return next, cmd
 		}
-		switch m.mode {
-		case modeRename:
-			return m.handleRenameKey(msg)
-		case modeClone:
-			return m.handleCloneKey(msg)
-		case modeNew, modeNewAndOpen:
-			return m.handleNewKey(msg)
-		case modeYank:
-			return m.handleYankKey(msg)
-		case modePaste:
-			return m.handlePasteModeKey(msg)
-		case modeSearch:
-			return m.handleSearchKey(msg)
-		case modeDeleteProgress:
-			return m, nil
-		}
 		match, consumed := m.keyManager.Process(msg)
 		if match != nil {
 			return m.dispatchBinding(match.ID)
@@ -116,8 +89,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m.enterDeleteProgress(msg.worktrees)
 
 	case deleteResultMsg:
-		if m.mode == modeDeleteProgress {
-			return m.handleDeleteProgressResult(msg)
+		if d, ok := m.modal.(deleteProgress); ok {
+			return m.handleDeleteProgressResult(d, msg)
 		}
 		m.spinnerActive = false
 		if msg.err != nil {
@@ -159,14 +132,16 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m, nil
 
 	case yankDataMsg:
-		if m.mode != modeYank || msg.worktreePath != m.yankSource.Path {
+		y, ok := m.modal.(yankModal)
+		if !ok || msg.worktreePath != y.source.Path {
 			return m, nil
 		}
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.yankLoading = false
-		m.yankChecklist = components.NewChecklist(changesToChecklistItems(msg.changes))
+		y.loading = false
+		y.checklist = components.NewChecklist(changesToChecklistItems(msg.changes))
+		m.modal = y
 		return m, nil
 
 	case promptableJobStartMsg:
@@ -188,9 +163,14 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 				return m.finishPromptableJob(err)
 			}
 		}
-		if m.spinnerActive || m.previewLoading || m.mode == modeDeleteProgress {
+		d, deleting := m.modal.(deleteProgress)
+		if m.spinnerActive || m.previewLoading || deleting {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
+			if deleting {
+				d.spinnerFrame = m.spinner.View()
+				m.modal = d
+			}
 			if m.previewLoading {
 				m.viewport.SetContent(m.previewContent())
 			}
@@ -199,12 +179,12 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m, nil
 
 	case rebasePreflightMsg:
-		return m.enterConfirmWithCancel(
-			fmt.Sprintf("Stash changes before rebasing %s?", msg.wt.Branch),
-			cmdRebase(msg.repo, msg.wt, true),
-			"Rebasing "+msg.wt.Name+"…",
-			"rebase aborted (dirty worktree)",
-		), nil
+		return m.enterConfirm(confirm.Options{
+			Prompt:       fmt.Sprintf("Stash changes before rebasing %s?", msg.wt.Branch),
+			AcceptCmd:    cmdRebase(msg.repo, msg.wt, true),
+			SpinnerLabel: "Rebasing " + msg.wt.Name + "…",
+			CancelMsg:    "rebase aborted (dirty worktree)",
+		}), nil
 
 	case rebaseResultMsg:
 		m.spinnerActive = false
@@ -213,7 +193,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if msg.err != nil {
 			if msg.stashed {
 				prompt := fmt.Sprintf("Rebase failed: %s\n\nPop stash?", msg.err.Error())
-				m = m.enterConfirmDefaultYes(prompt, cmdStashPop(msg.wtPath, "rebase", msg.log), "Popping stash…")
+				m = m.enterConfirm(confirm.Options{Prompt: prompt, AcceptCmd: cmdStashPop(msg.wtPath, "rebase", msg.log), SpinnerLabel: "Popping stash…", DefaultYes: true})
 				return m, nil
 			}
 			return m.showError(msg.err.Error()), nil
@@ -280,7 +260,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if msg.err != nil {
 			wt := m.cursorWorktree()
 			if wt != nil && git.IsNonFastForwardPushError(msg.err) {
-				return m.enterConfirm(forcePushPrompt(*wt), cmdStartPromptableJob(promptableJobForcePush, *wt, msg.log, false), "Force-pushing "+wt.Name+"…"), nil
+				return m.enterConfirm(confirm.Options{Prompt: forcePushPrompt(*wt), AcceptCmd: cmdStartPromptableJob(promptableJobForcePush, *wt, msg.log, false), SpinnerLabel: "Force-pushing " + wt.Name + "…"}), nil
 			}
 			return m.showError(msg.err.Error()), nil
 		}
@@ -290,7 +270,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		if msg.prURL != "" {
 			prompt := fmt.Sprintf("Open pull request page?\n\n%s", msg.prURL)
-			m = m.enterConfirmDefaultYes(prompt, cmdOpenURL(msg.prURL), "")
+			m = m.enterConfirm(confirm.Options{Prompt: prompt, AcceptCmd: cmdOpenURL(msg.prURL), DefaultYes: true})
 			return m, tea.Batch(cmds...)
 		}
 		return m, tea.Batch(cmds...)
@@ -366,7 +346,6 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m.clipboard = nil
 		return m, tea.Batch(notify.Info(fmt.Sprintf("pasted %d file(s)", msg.n)), cmdLoadWorktrees(m.repo, m.settings.TicketStore))
 
 	case worktreesLoadedMsg:

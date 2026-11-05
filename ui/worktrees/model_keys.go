@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/confirm"
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -155,7 +156,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			return m.showError("cannot push: worktree is in detached HEAD state"), nil
 		}
 		prompt := fmt.Sprintf("Push %s?", wt.Branch)
-		return m.enterConfirm(prompt, cmdStartPromptableJob(promptableJobPushFetch, *wt, "", false), "Checking remote divergence…"), nil
+		return m.enterConfirm(confirm.Options{Prompt: prompt, AcceptCmd: cmdStartPromptableJob(promptableJobPushFetch, *wt, "", false), SpinnerLabel: "Checking remote divergence…"}), nil
 	case bindingRebase:
 		if len(m.worktrees) == 0 || m.spinnerActive {
 			return m, nil
@@ -176,9 +177,9 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		prompt := fmt.Sprintf("Rebase %s on %s?", wt.Branch, m.repo.Trunk)
 		dirty := m.dirties[wt.Path]
 		if dirty.hasModified || dirty.hasUntracked {
-			return m.enterConfirm(prompt, cmdRebasePreflight(m.repo, *wt), ""), nil
+			return m.enterConfirm(confirm.Options{Prompt: prompt, AcceptCmd: cmdRebasePreflight(m.repo, *wt)}), nil
 		}
-		return m.enterConfirm(prompt, cmdRebase(m.repo, *wt, false), "Rebasing "+wt.Name+"…"), nil
+		return m.enterConfirm(confirm.Options{Prompt: prompt, AcceptCmd: cmdRebase(m.repo, *wt, false), SpinnerLabel: "Rebasing " + wt.Name + "…"}), nil
 	case bindingRefresh:
 		if !m.spinnerActive {
 			m.loading = true

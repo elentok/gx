@@ -31,53 +31,62 @@ func pasteModeHelpSection() help.KeySection {
 	return help.NewKeySection("Paste mode", pasteModeBindings...)
 }
 
+// pasteModal holds the yanked files while the user picks the destination
+// worktree. It draws nothing itself: the page shows the PASTE chip.
+type pasteModal struct {
+	clipboard clipboardState
+}
+
 // enterPasteMode holds cb as the clipboard and announces the paste keys once.
 func (m Model) enterPasteMode(cb clipboardState) (Model, tea.Cmd) {
-	m.clipboard = &cb
-	m.mode = modePaste
 	hints := make([]string, len(pasteModeBindings))
 	for i, b := range pasteModeBindings {
 		hints[i] = b.Keys() + " " + b.Title
 	}
-	return m, notify.Info(strings.Join(hints, " · "))
+	return m.openModal(pasteModal{clipboard: cb}), notify.Info(strings.Join(hints, " · "))
 }
 
-// handlePasteModeKey handles key events in paste mode (clipboard active, waiting for destination).
-// Only navigation (j/k/arrows), paste (p), and cancel (esc) are active.
-func (m Model) handlePasteModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc", "q":
-		m.clipboard = nil
-		m.mode = modeNormal
-		return m, nil
-	case "p":
-		if m.clipboard != nil {
-			wt := m.cursorWorktree()
-			if wt != nil {
-				m.mode = modeNormal
-				return m, cmdPaste(*m.clipboard, *wt)
-			}
-		}
-		m.mode = modeNormal
-		return m, nil
-	case "up", "k", "down", "j":
-		prevCursor := m.table.Cursor()
-		var tableCmd tea.Cmd
-		m.table, tableCmd = m.table.Update(msg)
-		if m.table.Cursor() != prevCursor && len(m.worktrees) > 0 {
-			m.table.SetRows(m.buildRows())
-			m.previewLoading = true
-			m.previewUpstream = ""
-			m.previewAheadCommits = nil
-			m.previewBehindCommits = nil
-			m.previewChanges = nil
-			m.viewport.SetContent(m.previewContent())
-			return m, tea.Batch(tableCmd, cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]))
-		}
-		return m, tableCmd
+// Update handles keys while the clipboard waits for a destination. Only
+// navigation (j/k/arrows), paste (p), and cancel (esc) are active.
+func (p pasteModal) Update(msg tea.Msg) (modal, tea.Cmd, modalResult) {
+	k, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return p, nil, modalResult{unhandled: true}
 	}
-	return m, nil
+	switch k.String() {
+	case "esc", "q":
+		return p, nil, modalResult{close: true}
+	case "p":
+		return p, nil, modalResult{close: true, apply: func(m Model) (Model, tea.Cmd) {
+			if wt := m.cursorWorktree(); wt != nil {
+				return m, cmdPaste(p.clipboard, *wt)
+			}
+			return m, nil
+		}}
+	case "up", "k", "down", "j":
+		return p, nil, modalResult{apply: func(m Model) (Model, tea.Cmd) {
+			prevCursor := m.table.Cursor()
+			var tableCmd tea.Cmd
+			m.table, tableCmd = m.table.Update(k)
+			if m.table.Cursor() != prevCursor && len(m.worktrees) > 0 {
+				m.table.SetRows(m.buildRows())
+				m.previewLoading = true
+				m.previewUpstream = ""
+				m.previewAheadCommits = nil
+				m.previewBehindCommits = nil
+				m.previewChanges = nil
+				m.viewport.SetContent(m.previewContent())
+				return m, tea.Batch(tableCmd, cmdLoadPreviewData(m.repo, m.worktrees[m.table.Cursor()]))
+			}
+			return m, tableCmd
+		}}
+	}
+	return p, nil, modalResult{}
 }
+
+func (p pasteModal) InputFocused() bool { return false }
+
+func (p pasteModal) View(_, _ int) string { return "" }
 
 // cmdPaste copies clipboard files from their source into the destination worktree.
 func cmdPaste(cb clipboardState, dst git.Worktree) tea.Cmd {

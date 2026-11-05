@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/search"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -30,31 +29,13 @@ func (m Model) View() tea.View {
 		if m.confirm.IsOpen {
 			content = ui.OverlayCenter(bg, m.confirmModalView(), m.width, m.height)
 		} else if m.modal != nil {
-			content = ui.OverlayCenter(bg, m.modal.View(m.width, m.height), m.width, m.height)
+			content = m.modalOverlay(bg)
 		} else {
-			switch m.mode {
-			case modeDeleteProgress:
-				content = ui.OverlayCenter(bg, m.deleteProgressModalView(), m.width, m.height)
-			case modeYank:
-				content = ui.OverlayCenter(bg, m.yankModalView(), m.width, m.height)
-			case modeRename, modeClone, modeNew, modeNewAndOpen:
-				overlay := m.textInputOverlayView()
-				y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
-				content = ui.OverlayBottomCenter(bg, overlay, m.width, y)
-			default:
-				content = bg
-				if prefix := m.keyManager.Prefix(); len(prefix) > 0 {
-					hints := ui.ChordBindingsFromHints(m.keyManager.ChordHints())
-					if len(hints) > 0 {
-						content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
-					}
-				}
-				if m.search.Mode() == search.SearchModeInput {
-					overlayW := m.searchOverlayWidth()
-					m.search.SetWidth(overlayW)
-					overlay := m.search.View()
-					y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(overlay))
-					content = ui.OverlayBottomCenter(content, overlay, m.width, y)
+			content = bg
+			if prefix := m.keyManager.Prefix(); len(prefix) > 0 {
+				hints := ui.ChordBindingsFromHints(m.keyManager.ChordHints())
+				if len(hints) > 0 {
+					content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 				}
 			}
 		}
@@ -63,60 +44,19 @@ func (m Model) View() tea.View {
 	return ui.NewMainView(content)
 }
 
-func (m Model) searchOverlayWidth() int {
-	max := m.width * 80 / 100
-	if search.DESIRED_WIDTH < max {
-		return search.DESIRED_WIDTH
+// modalOverlay draws the open modal over bg: bottom-anchored for the text
+// prompts and search, centred for the rest, not at all for a modal with an
+// empty view.
+func (m Model) modalOverlay(bg string) string {
+	view := m.modal.View(m.width, m.height)
+	if view == "" {
+		return bg
 	}
-	return max
-}
-
-const textInputOverlayDesiredWidth = 50
-
-func (m Model) textInputOverlayWidth() int {
-	max := m.width * 80 / 100
-	if textInputOverlayDesiredWidth < max {
-		return textInputOverlayDesiredWidth
+	if _, ok := m.modal.(bottomAnchored); ok {
+		y := m.settings.InputModalBottom.ResolveY(m.height, lipgloss.Height(view))
+		return ui.OverlayBottomCenter(bg, view, m.width, y)
 	}
-	return max
-}
-
-// textInputOverlayView renders the framed input overlay for text-input modes.
-func (m Model) textInputOverlayView() string {
-	var title, rightTitle, body string
-	outerW := m.textInputOverlayWidth()
-	innerW := outerW - 2 - 2 // minus border and padding
-	ti := m.textInput
-	ti.SetWidth(innerW)
-	inputView := ti.View()
-
-	switch m.mode {
-	case modeRename:
-		title = "Rename Worktree"
-		body = inputView
-	case modeClone:
-		title = "Clone Worktree"
-		body = inputView
-	case modeNew:
-		title = "New Worktree"
-		body = inputView
-	case modeNewAndOpen:
-		title = "New Worktree"
-		body = inputView
-	case modeSearch:
-		title = "Search"
-		body = inputView
-	}
-
-	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:         title,
-		RightTitle:    rightTitle,
-		Body:          body,
-		Width:         outerW,
-		BorderColor:   ui.ColorBorder,
-		TitleColor:    ui.ColorBlue,
-		TitleInBorder: true,
-	})
+	return ui.OverlayCenter(bg, view, m.width, m.height)
 }
 
 // normalView renders the worktrees table, preview panel, and status bar.
@@ -166,10 +106,11 @@ func (m Model) renderWorktreesPanel(width, height int, title string, lines []str
 func (m Model) headerStatus(avail int, bg color.Color) string {
 	dim := ui.StyleDim.Background(bg)
 	var fixed, text string
+	paste, pasting := m.modal.(pasteModal)
 	switch {
-	case m.mode == modePaste && m.clipboard != nil:
+	case pasting:
 		fixed = ui.RenderChip("PASTE", ui.ColorBlue)
-		text = fmt.Sprintf("%d files from %s", len(m.clipboard.files), m.clipboard.srcName)
+		text = fmt.Sprintf("%d files from %s", len(paste.clipboard.files), paste.clipboard.srcName)
 	case m.spinnerActive:
 		fixed = dim.Render(strings.TrimSpace(m.spinner.View()))
 		text = m.spinnerLabel

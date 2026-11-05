@@ -44,8 +44,8 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 		t.Fatalf("expected no command when closing help")
 	}
 	m = updated.(Model)
-	if m.mode != modeNormal {
-		t.Fatalf("expected modeNormal after closing help, got %v", m.mode)
+	if m.modal != nil {
+		t.Fatalf("expected no modal after closing help, got %T", m.modal)
 	}
 }
 
