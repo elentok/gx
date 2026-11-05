@@ -21,8 +21,8 @@ func queueWithTicket(t *testing.T, m QueueModel, reason schema.PauseReason, mute
 	return m
 }
 
-// writeTicketFile writes a paused (answer) ticket file and returns its path.
-func writeTicketFile(t *testing.T) string {
+// writeMenuTicketFile writes a paused (answer) ticket file and returns its path.
+func writeMenuTicketFile(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "01-first.md")
 	body := "---\nid: \"01\"\ntitle: First\nstatus: paused\npause_reason: blocked-pane\n---\n\n# A\n\n" + tickets.LegacyAnswerHeading + "\n\nWhich approach?\n"

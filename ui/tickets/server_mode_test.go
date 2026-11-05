@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"context"
 	"slices"
 	"strings"
 	"testing"
@@ -16,172 +15,10 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
-
-type fakeServerAPI struct {
-	adds *[]wire.QueueItem
-	// addRes is what Queue.Add returns per address.
-	addRes map[string]wire.QueueResult
-	// calls records the ticket write verbs as "verb address" and the
-	// maintenance verbs by name.
-	calls *[]string
-	// replaced records the QueueReplace items; replaceRes is what it returns.
-	replaced   *[]wire.QueueItem
-	replaceRes wire.QueueResult
-	removeRes  wire.QueueResult
-	mergeRes   wire.QueueResult
-	// detail and detailErr are what Detail returns for any address.
-	detail     wire.TicketDetail
-	detailErr  error
-	budget     wire.BudgetStatus
-	iterations []wire.IterationInfo
-	// designWorktree is what DesignWorktree returns.
-	designWorktree    wire.DesignWorktreeResult
-	designWorktreeErr error
-	// fixAgent is what FixAgent returns.
-	fixAgent wire.FixAgentResult
-	// snap and queue are what Snapshot and QueueItems return.
-	snap  wire.Snapshot
-	queue []wire.QueueItem
-	// harness is what DefaultHarness returns; harnessSets records the
-	// SetDefaultHarness requests and harnessRes is what it returns.
-	harness     wire.DefaultHarnessStatus
-	harnessSets *[]wire.SetDefaultHarnessRequest
-	harnessRes  wire.SetDefaultHarnessResult
-}
-
-// fakeAdmin is the Admin sub-client over the same fakeServerAPI state.
-type fakeAdmin struct{ fakeServerAPI }
-
-func (f fakeAdmin) DefaultHarness(context.Context) (wire.DefaultHarnessStatus, error) {
-	return f.harness, nil
-}
-
-func (f fakeAdmin) SetDefaultHarness(_ context.Context, req wire.SetDefaultHarnessRequest) (wire.SetDefaultHarnessResult, error) {
-	if f.harnessSets != nil {
-		*f.harnessSets = append(*f.harnessSets, req)
-	}
-	return f.harnessRes, nil
-}
-
-// verb records the maintenance verbs ("pause", "resume", "override",
-// "remove <addr>") so a test can assert which one a key reached; removeRes and
-// budget are what QueueRemove and Budget return.
-func (f fakeServerAPI) verb(v string) {
-	if f.calls != nil {
-		*f.calls = append(*f.calls, v)
-	}
-}
-
-// fakeQueue and fakeReads are the Queue and Reads sub-clients over the same
-// fakeServerAPI state; Pause differs from the Tickets one, so they can't share a type.
-type fakeQueue struct{ fakeServerAPI }
-
-type fakeReads struct{ fakeServerAPI }
-
-func (f fakeQueue) Remove(_ context.Context, a string) (wire.QueueResult, error) {
-	f.verb("remove " + a)
-	return f.removeRes, nil
-}
-
-func (f fakeQueue) Pause(context.Context) (wire.QueueResult, error) {
-	f.verb("pause")
-	return wire.QueueResult{Mode: "paused"}, nil
-}
-
-func (f fakeQueue) Resume(context.Context) (wire.QueueResult, error) {
-	f.verb("resume")
-	return wire.QueueResult{Mode: "running"}, nil
-}
-
-func (f fakeReads) Budget(context.Context) (wire.BudgetStatus, error) { return f.budget, nil }
-
-func (f fakeAdmin) BudgetOverride(context.Context) (wire.BudgetResult, error) {
-	f.verb("override")
-	return wire.BudgetResult{}, nil
-}
-
-func (f fakeQueue) Replace(_ context.Context, _ string, items []wire.QueueItem) (wire.QueueResult, error) {
-	if f.replaced != nil {
-		*f.replaced = append(*f.replaced, items...)
-	}
-	return f.replaceRes, nil
-}
-
-func (f fakeQueue) Add(_ context.Context, address, agent string) (wire.QueueResult, error) {
-	if f.adds != nil {
-		*f.adds = append(*f.adds, wire.QueueItem{Address: address, Agent: agent})
-	}
-	return f.addRes[address], nil
-}
-
-func (f fakeServerAPI) Pause(_ context.Context, address, _ string) (wire.QueueResult, error) {
-	f.record("pause " + address)
-	return wire.QueueResult{}, nil
-}
-
-func (f fakeServerAPI) Cancel(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
-	f.record("cancel " + address)
-	return wire.QueueResult{}, nil
-}
-
-func (f fakeServerAPI) Relaunch(_ context.Context, address string, _ bool) (wire.QueueResult, error) {
-	f.record("relaunch " + address)
-	return wire.QueueResult{}, nil
-}
-
-func (f fakeServerAPI) Unmute(_ context.Context, address string) (wire.QueueResult, error) {
-	f.record("unmute " + address)
-	return wire.QueueResult{}, nil
-}
-
-func (f fakeServerAPI) Approve(_ context.Context, address string) (wire.QueueResult, error) {
-	f.record("approve " + address)
-	return wire.QueueResult{}, nil
-}
-
-func (f fakeServerAPI) EpicMerge(_ context.Context, address string) (wire.QueueResult, error) {
-	f.record("merge " + address)
-	return f.mergeRes, nil
-}
-
-func (f fakeServerAPI) EpicStashMerge(_ context.Context, address string) (wire.QueueResult, error) {
-	f.record("stash-merge " + address)
-	return wire.QueueResult{}, nil
-}
-
-func (f fakeReads) Detail(context.Context, string) (wire.TicketDetail, error) {
-	return f.detail, f.detailErr
-}
-
-func (f fakeAdmin) Repair(_ context.Context, verb string, req wire.RepairRequest) (wire.RepairResult, error) {
-	f.record(verb + " " + req.Address)
-	return wire.RepairResult{}, nil
-}
-
-func (f fakeServerAPI) DesignWorktree(_ context.Context, req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error) {
-	f.record("design-worktree " + req.Epic)
-	return f.designWorktree, f.designWorktreeErr
-}
-
-func (f fakeServerAPI) FixAgent(_ context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error) {
-	f.record("fix-agent " + req.Address)
-	return f.fixAgent, nil
-}
-
-func (f fakeServerAPI) record(call string) {
-	if f.calls != nil {
-		*f.calls = append(*f.calls, call)
-	}
-}
-
-func (f fakeServerAPI) Snapshot(context.Context) (wire.Snapshot, error) {
-	return f.snap, nil
-}
-func (fakeServerAPI) Events(context.Context, uint64) (<-chan wire.Event, error) { return nil, nil }
-func (f fakeQueue) Items(context.Context) ([]wire.QueueItem, error)             { return f.queue, nil }
 
 // withRenderedStatus makes snap look like one from a current server, which
 // always sends rendered_status: a ticket without one gets its raw status word.
@@ -215,7 +52,7 @@ func pausedRepairInfo(address, title string) wire.TicketInfo {
 
 func newServerModel(t *testing.T) Model {
 	t.Helper()
-	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithAdmin(fakeAdmin{fakeServerAPI{}}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
+	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(tickettest.FakeServerAPI{}).WithTickets(tickettest.FakeServerAPI{}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
 }
 
 // withState hands the tab the state the app shell would deliver for snap,
@@ -370,7 +207,7 @@ func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing
 // Seam D: "enter" on a paused row issues the detail's first verb (resume here).
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionResume)}})
+	m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}).WithTickets(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionResume)}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		// The wire carries no pause reason, so only the retired repair status
 		// tells the client this pause is a repair.
@@ -393,16 +230,16 @@ func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 // writes and the edit chords must reach the ticket's file instead.
 func serverModelWithTicketFile(t *testing.T) (Model, string) {
 	t.Helper()
-	return serverModelWithStoreTicket(t, fakeServerAPI{}, false)
+	return serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
 }
 
 // serverModelWithStoreTicket serves a draft gx:alpha/20 whose file lives in a
 // temp store, in a map epic when isMap is set.
-func serverModelWithStoreTicket(t *testing.T, api fakeServerAPI, isMap bool) (Model, string) {
+func serverModelWithStoreTicket(t *testing.T, api tickettest.FakeServerAPI, isMap bool) (Model, string) {
 	t.Helper()
 	store := t.TempDir()
-	file := writeStoreTicket(t, store, "20-a.md", "---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n")
-	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
+	file := tickettest.WriteStoreTicket(t, store, "20-a.md", "---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n")
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: api}).WithQueue(tickettest.FakeQueue{FakeServerAPI: api}).WithReads(tickettest.FakeReads{FakeServerAPI: api})
 	m.settings.TicketStore = store
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file, EpicIsMap: isMap},
@@ -420,23 +257,9 @@ func TestServerMode_EditTargetIsTheTicketFile(t *testing.T) {
 	}
 }
 
-func (f fakeReads) Iterations(context.Context) ([]wire.IterationInfo, error) {
-	return f.iterations, nil
-}
-
-type countingIterationsAPI struct {
-	fakeReads
-	calls *int
-}
-
-func (c countingIterationsAPI) Iterations(ctx context.Context) ([]wire.IterationInfo, error) {
-	*c.calls++
-	return c.fakeReads.Iterations(ctx)
-}
-
 func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
 	calls := 0
-	api := countingIterationsAPI{fakeReads: fakeReads{}, calls: &calls}
+	api := tickettest.CountingIterationsAPI{FakeReads: tickettest.FakeReads{}, Calls: &calls}
 	in := newTicketMenuInput(gxtickets.Epic{}, gxtickets.Ticket{Path: "gx:alpha/01", Title: "First"}, false, "")
 
 	cmdTicketMenu(api, config.Dirs{}, in)()
@@ -446,17 +269,12 @@ func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
 	}
 }
 
-func (f fakeServerAPI) Changed(_ context.Context, address string) error {
-	f.record("changed " + address)
-	return nil
-}
-
-func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
+func openAnswerMenu(t *testing.T, api tickettest.FakeServerAPI) Model {
 	t.Helper()
-	if len(api.detail.Actions) == 0 {
-		api.detail = detailWith(wire.ActionAnswer, wire.ActionResume)
+	if len(api.DetailRes.Actions) == 0 {
+		api.DetailRes = detailWith(wire.ActionAnswer, wire.ActionResume)
 	}
-	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: api}).WithQueue(tickettest.FakeQueue{FakeServerAPI: api}).WithReads(tickettest.FakeReads{FakeServerAPI: api})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
@@ -477,7 +295,7 @@ func pressMenuKey(t *testing.T, m Model) Model {
 
 func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "paused"} {
-		m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithAdmin(fakeAdmin{fakeServerAPI{}}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
+		m := newServerModel(t).WithServer(tickettest.FakeServerAPI{}).WithTickets(tickettest.FakeServerAPI{}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
 		m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: status},
 			// Keeps the epic open: a fully done epic starts collapsed.
@@ -503,7 +321,7 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 
 	var calls []string
-	api := fakeServerAPI{calls: &calls, iterations: []wire.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
+	api := tickettest.FakeServerAPI{Calls: &calls, IterationsRes: []wire.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
 	m, cmd := chooseTicketMenuItem(t, openAnswerMenu(t, api), "Go to pane")
 	cmd()
 	if !slices.Equal(*focused, []string{"t1"}) {
@@ -522,7 +340,7 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 // A paused (answer) ticket's menu has no Answer… action: answering is the web
 // UI's job, and the TUI only offers Resume.
 func TestServerMode_PausedAnswerMenuHasNoAnswerAction(t *testing.T) {
-	m := openAnswerMenu(t, fakeServerAPI{})
+	m := openAnswerMenu(t, tickettest.FakeServerAPI{})
 	view := m.ticketMenu.View()
 	if strings.Contains(view, "Answer…") {
 		t.Fatalf("menu offers Answer…:\n%s", view)

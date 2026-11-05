@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 // resumeLabel is the pause-to-verb table's label for resume.
@@ -82,7 +83,7 @@ func TestServerWrite_WebOnlyVerbsNeverResume(t *testing.T) {
 	for _, verb := range []string{wire.ActionAnswer, wire.ActionChooseBase, wire.ActionReopenAndRetry, "no-such-verb"} {
 		t.Run(verb, func(t *testing.T) {
 			var calls []string
-			cmd := cmdServerWrite(fakeAdmin{fakeServerAPI{calls: &calls}}, fakeServerAPI{calls: &calls}, verb, "gx:alpha/02")
+			cmd := cmdServerWrite(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}, tickettest.FakeServerAPI{Calls: &calls}, verb, "gx:alpha/02")
 			if cmd == nil {
 				t.Fatal("no toast for a web-only verb")
 			}
@@ -96,7 +97,7 @@ func TestServerWrite_WebOnlyVerbsNeverResume(t *testing.T) {
 
 func TestServerWrite_ResumeStillResumes(t *testing.T) {
 	var calls []string
-	cmdServerWrite(fakeAdmin{fakeServerAPI{calls: &calls}}, fakeServerAPI{calls: &calls}, wire.ActionResume, "gx:alpha/02")()
+	cmdServerWrite(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}, tickettest.FakeServerAPI{Calls: &calls}, wire.ActionResume, "gx:alpha/02")()
 	if want := []string{"resume gx:alpha/02"}; !slices.Equal(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
 	}
@@ -113,7 +114,7 @@ func TestServerMode_EnterSkipsWebOnlyActions(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
-			m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)}})
+			m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(tc.actions...)}).WithTickets(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(tc.actions...)}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(tc.actions...)}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(tc.actions...)}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(tc.actions...)}})
 			m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 				{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 			}})
@@ -142,9 +143,9 @@ func TestRecoveryItems_NoDetailOffersNone(t *testing.T) {
 // A failed detail read opens the menu without recovery items and reports the
 // error, instead of leaving the menu silently empty.
 func TestCmdTicketMenu_ReportsAFailedDetailRead(t *testing.T) {
-	api := fakeServerAPI{detailErr: errors.New("boom")}
+	api := tickettest.FakeServerAPI{DetailErr: errors.New("boom")}
 	ticket := tickets.Ticket{Path: "gx:alpha/02", Status: string(schema.StatusPaused), PauseReason: schema.PauseIterationError}
-	msg, ok := cmdTicketMenu(fakeReads{api}, config.Dirs{}, ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})().(ticketMenuReadyMsg)
+	msg, ok := cmdTicketMenu(tickettest.FakeReads{FakeServerAPI: api}, config.Dirs{}, ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})().(ticketMenuReadyMsg)
 	if !ok {
 		t.Fatal("no ticketMenuReadyMsg")
 	}
@@ -189,8 +190,8 @@ func TestRecoveryItems_MarkTheRecommendedVerb(t *testing.T) {
 // Seam D: "enter" on a repair pause runs the first verb of detail.actions.
 func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 	var calls []string
-	api := fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionRetry, wire.ActionStartOver)}
-	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
+	api := tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionRetry, wire.ActionStartOver)}
+	m := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: api}).WithQueue(tickettest.FakeQueue{FakeServerAPI: api}).WithReads(tickettest.FakeReads{FakeServerAPI: api})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})
@@ -209,7 +210,7 @@ func TestServerMode_EnterRunsTheFirstDetailAction(t *testing.T) {
 
 func TestServerMode_EnterWithNoActionsDoesNothing(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith()}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith()}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls, detail: detailWith()}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith()}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith()}})
+	m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith()}).WithTickets(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith()}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith()}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith()}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith()}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
 	}})

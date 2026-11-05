@@ -1,10 +1,7 @@
 package tickets
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -21,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
@@ -29,18 +27,18 @@ import (
 func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
-	writeTicket(t, root, "alpha", "03-independent.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "04-independent.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "03-independent.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "04-independent.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-foundation.md"):  true,
-		ticketPath(root, "alpha", "02-dependent.md"):   true,
-		ticketPath(root, "alpha", "03-independent.md"): true,
-		ticketPath(root, "alpha", "04-independent.md"): true,
-		ticketPath(root, "beta", "01-other.md"):        true,
+		tickettest.TicketPath(root, "alpha", "01-foundation.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-dependent.md"):   true,
+		tickettest.TicketPath(root, "alpha", "03-independent.md"): true,
+		tickettest.TicketPath(root, "alpha", "04-independent.md"): true,
+		tickettest.TicketPath(root, "beta", "01-other.md"):        true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := m.View().Content
@@ -71,16 +69,16 @@ func TestQueueModelRendersFlatDependencyOrderedEpicPlan(t *testing.T) {
 func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "20-dependent.md", "Status: open\nBlocked by: 50\n\nBody.\n")
-	writeTicket(t, root, "alpha", "50-blocker.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "60-unrelated.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "10-unrelated.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "20-dependent.md", "Status: open\nBlocked by: 50\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "50-blocker.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "60-unrelated.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "10-unrelated.md", "Status: open\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "20-dependent.md"): true,
-		ticketPath(root, "alpha", "50-blocker.md"):   true,
-		ticketPath(root, "alpha", "60-unrelated.md"): true,
-		ticketPath(root, "alpha", "10-unrelated.md"): true,
+		tickettest.TicketPath(root, "alpha", "20-dependent.md"): true,
+		tickettest.TicketPath(root, "alpha", "50-blocker.md"):   true,
+		tickettest.TicketPath(root, "alpha", "60-unrelated.md"): true,
+		tickettest.TicketPath(root, "alpha", "10-unrelated.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	rows := queueTicketEntries(m)
@@ -115,14 +113,14 @@ func TestQueueModelOrdersRowsByDependencyNotTicketNumber(t *testing.T) {
 func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
-	writeTicket(t, root, "alpha", "03-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "03-other.md", "Status: open\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-parent.md"): true,
-		ticketPath(root, "alpha", "02-child.md"):  true,
-		ticketPath(root, "alpha", "03-other.md"):  true,
+		tickettest.TicketPath(root, "alpha", "01-parent.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-child.md"):  true,
+		tickettest.TicketPath(root, "alpha", "03-other.md"):  true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -170,12 +168,12 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 func TestQueueModelNestsInvestigateChildUnderOneOff(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "fix-it", "01-prompt.md", "Status: paused\nPause reason: blocked-pane\n\nBody.\n")
-	writeRawQueueTicket(t, root, "fix-it", "02-investigate.md", "---\nid: \"02\"\nstatus: open\ntype: investigate\nparent: \"01\"\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "fix-it", "01-prompt.md", "Status: paused\nPause reason: blocked-pane\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "fix-it", "02-investigate.md", "---\nid: \"02\"\nstatus: open\ntype: investigate\nparent: \"01\"\n---\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "fix-it", "01-prompt.md"):      true,
-		ticketPath(root, "fix-it", "02-investigate.md"): true,
+		tickettest.TicketPath(root, "fix-it", "01-prompt.md"):      true,
+		tickettest.TicketPath(root, "fix-it", "02-investigate.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -216,15 +214,15 @@ func queueTicketEntries(m QueueModel) []tree.Entry[queueNode] {
 func TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
-	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
-	writeFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "02")
-	writeFrontmatterTicket(t, root, "alpha", "04-d.md", "04", "open", "")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "02")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "04-d.md", "04", "open", "")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-a.md"): true,
-		ticketPath(root, "alpha", "02-b.md"): true,
-		ticketPath(root, "alpha", "03-c.md"): true,
-		ticketPath(root, "alpha", "04-d.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-a.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-b.md"): true,
+		tickettest.TicketPath(root, "alpha", "03-c.md"): true,
+		tickettest.TicketPath(root, "alpha", "04-d.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -272,14 +270,14 @@ func TestQueueModelNestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T
 func TestQueueModelInjectsNonCandidateAncestorDimmedInsteadOfPromotingToRoot(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
-	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
-	writeFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "")
 	checked := map[string]bool{
 		// 01 (the parent) is deliberately left unchecked: not a scheduling
 		// candidate on its own.
-		ticketPath(root, "alpha", "02-b.md"): true,
-		ticketPath(root, "alpha", "03-c.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-b.md"): true,
+		tickettest.TicketPath(root, "alpha", "03-c.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -317,12 +315,12 @@ func TestQueueModelInjectsNonCandidateAncestorDimmedInsteadOfPromotingToRoot(t *
 func TestQueueModelSharedNonCandidateAncestorInjectedOnce(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
-	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
-	writeFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "01")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "open", "")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "03-c.md", "03", "open", "01")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "02-b.md"): true,
-		ticketPath(root, "alpha", "03-c.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-b.md"): true,
+		tickettest.TicketPath(root, "alpha", "03-c.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -351,11 +349,11 @@ func TestQueueModelSharedNonCandidateAncestorInjectedOnce(t *testing.T) {
 func TestQueueModelDoneParentWithOpenForkChildStaysVisible(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "done", "")
-	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "done", "")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-a.md"): true,
-		ticketPath(root, "alpha", "02-b.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-a.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-b.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -379,9 +377,9 @@ func TestQueueModelDoneParentWithOpenForkChildStaysVisible(t *testing.T) {
 func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
 
-	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-solo.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
@@ -407,12 +405,12 @@ func TestQueueModelLOnLeafRowFocusesPreview(t *testing.T) {
 func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-parent.md"): true,
-		ticketPath(root, "alpha", "02-child.md"):  true,
+		tickettest.TicketPath(root, "alpha", "01-parent.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-child.md"):  true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -437,8 +435,8 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-solo.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-solo.md"): true}
 
 	for _, key := range []tea.KeyPressMsg{
 		{Code: 'h', Text: "h"},
@@ -466,14 +464,14 @@ func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
 func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
 
 	// Only the dependent ticket is checked — its blocker never got selected,
 	// and it isn't done, so ralph-loop's own scheduler would never claim it
 	// either (schedule.RunScope.Frontier resolves blockers epic-wide).
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "02-dependent.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-dependent.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := m.View().Content
@@ -492,12 +490,12 @@ func TestQueueModelNeverShowsATicketRunnableWhenOutOfScopeBlockerIsUnmet(t *test
 func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nBlocked by: 02\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\nBlocked by: 02\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := m.View().Content
@@ -517,8 +515,8 @@ func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 	base := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	t.Run("not started", func(t *testing.T) {
@@ -601,8 +599,8 @@ func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	name := "01-first.md"
-	writeTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", name): true}
+	tickettest.WriteTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", name): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	content := m.View().Content
@@ -617,9 +615,9 @@ func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
 func TestQueueModelClearKeysWithoutServerDoNothing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
-	done := ticketPath(root, "alpha", "01-done.md")
+	tickettest.WriteTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
+	done := tickettest.TicketPath(root, "alpha", "01-done.md")
 	checked := map[string]bool{done: true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -642,11 +640,11 @@ func TestQueueModelClearKeysWithoutServerDoNothing(t *testing.T) {
 func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
-	first := ticketPath(root, "alpha", "01-first.md")
-	second := ticketPath(root, "alpha", "02-second.md")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
+	first := tickettest.TicketPath(root, "alpha", "01-first.md")
+	second := tickettest.TicketPath(root, "alpha", "02-second.md")
 	checked := map[string]bool{first: true, second: true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -692,11 +690,11 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
-	done := ticketPath(root, "alpha", "01-done.md")
-	open := ticketPath(root, "alpha", "02-open.md")
+	tickettest.WriteTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
+	done := tickettest.TicketPath(root, "alpha", "01-done.md")
+	open := tickettest.TicketPath(root, "alpha", "02-open.md")
 	checked := map[string]bool{done: true, open: true}
 	m := selectFirstQueueTicketRow(t, loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)))
 
@@ -737,8 +735,8 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	name := "01-later.md"
-	writeTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
-	path := ticketPath(root, "alpha", name)
+	tickettest.WriteTicket(t, root, "alpha", name, "Status: open\n\nBody.\n")
+	path := tickettest.TicketPath(root, "alpha", name)
 	checked := map[string]bool{}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -828,14 +826,14 @@ func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
 func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "03-done.md", "---\nid: \"03\"\nstatus: done\ntype: implement\nactual_context_window: 12000\nelapsed_time: 754\n---\n\nDone.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "03-done.md", "---\nid: \"03\"\nstatus: done\ntype: implement\nactual_context_window: 12000\nelapsed_time: 754\n---\n\nDone.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-foundation.md"): true,
-		ticketPath(root, "alpha", "02-dependent.md"):  true,
-		ticketPath(root, "alpha", "03-done.md"):       true,
+		tickettest.TicketPath(root, "alpha", "01-foundation.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-dependent.md"):  true,
+		tickettest.TicketPath(root, "alpha", "03-done.md"):       true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := m.View().Content
@@ -1003,11 +1001,11 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 40; i++ {
-		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+		tickettest.WriteTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
 	}
 	checked := map[string]bool{}
 	for i := 1; i <= 40; i++ {
-		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
+		checked[tickettest.TicketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
 	}
 
 	m := seedFromDisk(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
@@ -1067,12 +1065,12 @@ func queueModelForHoverScroll(t *testing.T) QueueModel {
 	for i := 1; i <= 100; i++ {
 		fmt.Fprintf(&longBody, "Line %d of a long body.\n", i)
 	}
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\n"+longBody.String())
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\n"+longBody.String())
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 	for i := 2; i <= 40; i++ {
 		filename := fmt.Sprintf("%02d-ticket.md", i)
-		writeTicket(t, root, "alpha", filename, "Status: open\n\nBody.\n")
-		checked[ticketPath(root, "alpha", filename)] = true
+		tickettest.WriteTicket(t, root, "alpha", filename, "Status: open\n\nBody.\n")
+		checked[tickettest.TicketPath(root, "alpha", filename)] = true
 	}
 
 	m := seedFromDisk(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
@@ -1139,8 +1137,8 @@ func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
 func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	m = selectFirstQueueTicketRow(t, m)
 
@@ -1169,11 +1167,11 @@ func TestQueueModelMouseWheelWhileHelpOpenScrollsHelpNotQueue(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 40; i++ {
-		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+		tickettest.WriteTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
 	}
 	checked := map[string]bool{}
 	for i := 1; i <= 40; i++ {
-		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
+		checked[tickettest.TicketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
 	}
 
 	m := seedFromDisk(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
@@ -1203,9 +1201,9 @@ func TestQueueModelMouseWheelWhileHelpOpenScrollsHelpNotQueue(t *testing.T) {
 func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nType: implement\n\nDistinctive queue-preview body.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\nType: implement\n\nDistinctive queue-preview body.\n")
 
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	m = selectFirstQueueTicketRow(t, m)
 
@@ -1227,14 +1225,14 @@ func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
 func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "03-third.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "03-third.md", "Status: open\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
-		ticketPath(root, "alpha", "03-third.md"):  true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "03-third.md"):  true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	if want := firstSelectableQueueIndex(t, m); m.queueTree.SelectedIndex() != want {
@@ -1283,11 +1281,11 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1322,7 +1320,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	if m.queueTree.SelectedIndex() != secondTicket {
 		t.Fatalf("expected right click to select row %d, got %d", secondTicket, m.queueTree.SelectedIndex())
 	}
-	if want := ticketPath(root, "alpha", "02-second.md"); m.ticketMenuPending != want || cmd == nil {
+	if want := tickettest.TicketPath(root, "alpha", "02-second.md"); m.ticketMenuPending != want || cmd == nil {
 		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.ticketMenuPending, cmd != nil)
 	}
 
@@ -1341,11 +1339,11 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1379,8 +1377,8 @@ func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.
 func TestQueueModelClickInsidePreviewBoundsFocusesIt(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	if m.focus != focusSidebar {
@@ -1405,8 +1403,8 @@ func TestQueueModelClickInsidePreviewBoundsFocusesIt(t *testing.T) {
 func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-ticket.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-ticket.md", "Status: open\n\nTOPMARKERXYZ\n\n"+strings.Repeat("Filler line of body text.\n\n", 80)+"BOTTOMMARKERXYZ\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-ticket.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	m = selectFirstQueueTicketRow(t, m)
@@ -1434,13 +1432,13 @@ func TestQueueModelPreviewScrollsPastTruncationPoint(t *testing.T) {
 func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "03-third.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "03-third.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
-		ticketPath(root, "alpha", "03-third.md"):  true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "03-third.md"):  true,
 	}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
@@ -1470,11 +1468,11 @@ func TestQueueModelGAndGGJumpSelectionToLastAndFirstRow(t *testing.T) {
 func TestQueueModelCursorSkipsFillerRowsBetweenEpics(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-second.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"): true,
-		ticketPath(root, "beta", "01-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"): true,
+		tickettest.TicketPath(root, "beta", "01-second.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1508,14 +1506,14 @@ func TestQueueModelPageDownLandsOnSelectableRow(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 4; i++ {
-		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+		tickettest.WriteTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
 	}
-	writeTicket(t, root, "beta", "01-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-ticket.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{}
 	for i := 1; i <= 4; i++ {
-		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
+		checked[tickettest.TicketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
 	}
-	checked[ticketPath(root, "beta", "01-ticket.md")] = true
+	checked[tickettest.TicketPath(root, "beta", "01-ticket.md")] = true
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -1547,14 +1545,14 @@ func TestQueueModelPageDownLandsOnSelectableRow(t *testing.T) {
 func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-open.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-open.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-done.md"): true,
-		ticketPath(root, "alpha", "02-open.md"): true,
-		ticketPath(root, "beta", "01-open.md"):  true,
+		tickettest.TicketPath(root, "alpha", "01-done.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-open.md"): true,
+		tickettest.TicketPath(root, "beta", "01-open.md"):  true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1581,41 +1579,11 @@ func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 	}
 }
 
-// addStoreProject registers repoRoot as a project in a temp ticket store,
-// returning the project dir and the store path for the model's settings.
-func addStoreProject(t *testing.T, repoRoot string) (project, store string) {
-	t.Helper()
-	store = t.TempDir()
-	project = filepath.Join(store, "p")
-	if err := os.MkdirAll(project, 0755); err != nil {
-		t.Fatal(err)
-	}
-	data, err := json.Marshal(map[string]string{"name": "p", "repo": repoRoot})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(project, "project.json"), data, 0644); err != nil {
-		t.Fatal(err)
-	}
-	return project, store
-}
-
-func ticketPath(root, epic, name string) string {
-	return filepath.Join(root, ".scratch", epic, "issues", name)
-}
-
-func writeRawQueueTicket(t *testing.T, root, epic, name, content string) {
-	t.Helper()
-	if err := os.WriteFile(ticketPath(root, epic, name), []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1630,11 +1598,11 @@ func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
 func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
 	}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
@@ -1673,11 +1641,11 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 func TestQueueSearch_MatchesEpicHeaderRows(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-alpha-tweak.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-alpha-tweak.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-alpha-tweak.md"): true,
-		ticketPath(root, "beta", "01-other.md"):        true,
+		tickettest.TicketPath(root, "alpha", "01-alpha-tweak.md"): true,
+		tickettest.TicketPath(root, "beta", "01-other.md"):        true,
 	}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
@@ -1704,8 +1672,8 @@ func TestQueueSearch_MatchesEpicHeaderRows(t *testing.T) {
 func TestQueueSearch_EscExitsSearchMode(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1728,8 +1696,8 @@ func TestQueueSearch_EscExitsSearchMode(t *testing.T) {
 func TestQueueSearch_EnterExitsInputButKeepsResults(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1756,8 +1724,8 @@ func TestQueueSearch_EnterExitsInputButKeepsResults(t *testing.T) {
 func TestQueueSearch_DigitsTypeIntoQueryNotBoundKeys(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1778,8 +1746,8 @@ func TestQueueEditChordLaunchesEditorOnSelectedTicket(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	chords := []struct {
 		name   string
@@ -1819,8 +1787,8 @@ func TestQueueEditChordCancelsOnEsc(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -1844,13 +1812,13 @@ func TestQueueEditChordCancelsOnEsc(t *testing.T) {
 func TestQueueSearch_MatchesTicketIDAndEpicName(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "27-second.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "27-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "27-second.md"): true,
-		ticketPath(root, "beta", "01-other.md"):   true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "27-second.md"): true,
+		tickettest.TicketPath(root, "beta", "01-other.md"):   true,
 	}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))

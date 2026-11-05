@@ -9,12 +9,13 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 func TestSearch_SlashEntersInputMode(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -32,8 +33,8 @@ func TestSearch_SlashEntersInputMode(t *testing.T) {
 func TestSearch_MatchesTitleAndStatusWordWithoutHidingRows(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -62,8 +63,8 @@ func TestSearch_MatchesTitleAndStatusWordWithoutHidingRows(t *testing.T) {
 func TestSearch_NonMatchesAreDimmed(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -92,7 +93,7 @@ func TestSearch_NonMatchesAreDimmed(t *testing.T) {
 func TestSearch_EnterDismissesInputButKeepsMatches(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -119,7 +120,7 @@ func TestSearch_EnterDismissesInputButKeepsMatches(t *testing.T) {
 func TestSearch_EscFullyClears(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -143,8 +144,8 @@ func TestSearch_EscFullyClears(t *testing.T) {
 func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -194,8 +195,8 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 // out of the rendered (and thus matchable) sidebar entries.
 func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -240,8 +241,8 @@ func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.
 func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "closed-epic", "01-hidden-gem.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -271,7 +272,7 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 func TestSearch_SidebarHighlightsMatchExactlyOnce(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -308,8 +309,8 @@ func TestSearch_SidebarHighlightsMatchExactlyOnce(t *testing.T) {
 func TestSearch_NAndShiftNCycleMatches(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-open-a.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-open-b.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-open-a.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-open-b.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -343,9 +344,9 @@ func TestSearch_NAndShiftNCycleMatches(t *testing.T) {
 func TestSearch_MatchesEpicRowsInRowOrderWithTickets(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "widget-queue", "01-widget-polish.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "widget-queue", "02-other.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "unrelated", "01-nothing.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "widget-queue", "01-widget-polish.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "widget-queue", "02-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "unrelated", "01-nothing.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -380,8 +381,8 @@ func TestSearch_MatchesEpicRowsInRowOrderWithTickets(t *testing.T) {
 func TestSearch_EpicMatchExpandsClosedSectionButNotTheEpic(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "closed-epic", "01-done.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "closed-epic", "01-done.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -409,9 +410,9 @@ func TestSearch_EpicMatchExpandsClosedSectionButNotTheEpic(t *testing.T) {
 func TestSearch_MatchesTicketIDAndEpicName(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "27-second.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "27-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)

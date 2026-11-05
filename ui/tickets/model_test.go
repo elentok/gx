@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -62,8 +62,8 @@ func deliverLoadDefaults(t *testing.T, m Model) Model {
 func TestNewModel_RendersEpicsAndTicketsFromDisk(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -82,7 +82,7 @@ func TestNewModel_RendersEpicsAndTicketsFromDisk(t *testing.T) {
 func TestNewModel_RendersAlphabeticallySuffixedTicketNumber(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "10a-split-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "10a-split-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -153,7 +153,7 @@ func TestModel_ArchivedEpicCountSuppressesEmptyState(t *testing.T) {
 func TestModel_CmdLoad_CarriesArchivedEpicCountAndRefreshesIt(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-open-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-open-ticket.md", "Status: open\n\nBody.\n")
 	archiveDir := filepath.Join(root, ".scratch", ".archive", "old-epic")
 	if err := os.MkdirAll(archiveDir, 0755); err != nil {
 		t.Fatal(err)
@@ -186,10 +186,10 @@ func TestModel_CmdLoad_CarriesArchivedEpicCountAndRefreshesIt(t *testing.T) {
 func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-done-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-open-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "03-paused-answer-ticket.md", "Status: paused\nPause reason: blocked-pane\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "04-blocked-ticket.md", "Status: open\nBlocked by: 02\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-done-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-open-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "03-paused-answer-ticket.md", "Status: paused\nPause reason: blocked-pane\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "04-blocked-ticket.md", "Status: open\nBlocked by: 02\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -216,8 +216,8 @@ func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 func TestNewModel_BlockedTicketShowsRawStatusWithoutServer(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -233,8 +233,8 @@ func TestNewModel_BlockedTicketShowsRawStatusWithoutServer(t *testing.T) {
 func TestNewModel_PausedAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-paused-answer-ticket.md", "Status: paused\nPause reason: blocked-pane\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-paused-answer-ticket.md", "Status: paused\nPause reason: blocked-pane\nBlocked by: 01\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -250,8 +250,8 @@ func TestNewModel_PausedAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 func TestNewModel_ResolvedBlockerDropsSuffixAndRegroups(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-formerly-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-formerly-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -267,7 +267,7 @@ func TestNewModel_ResolvedBlockerDropsSuffixAndRegroups(t *testing.T) {
 func TestNewModel_UnrecognizedStatusRendersAsError(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-bogus-status-ticket.md", "Status: bogus-value\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-bogus-status-ticket.md", "Status: bogus-value\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -283,9 +283,9 @@ func TestNewModel_UnrecognizedStatusRendersAsError(t *testing.T) {
 func TestNewModel_FullyDoneEpicStartsCollapsedAndDimmed(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "done-epic", "02-second-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "02-second-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -301,7 +301,7 @@ func TestNewModel_FullyDoneEpicStartsCollapsedAndDimmed(t *testing.T) {
 func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -317,7 +317,7 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 	// A new epic appears (simulating the auto-refresh poll picking up fresh
 	// disk state) — it should get its correct default while the manual
 	// toggle above survives.
-	writeTicket(t, root, "new-done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "new-done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 
 	msg := m.cmdLoad()()
 	updated, _ = m.Update(msg)
@@ -346,7 +346,7 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -383,17 +383,17 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 func TestNewModel_GroupsEpicsIntoSectionsInOrder(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 	testutil.Mkdir(t, filepath.Join(root, ".scratch", "empty-epic", "issues"))
 	testutil.EnsureEpicTicketMD(t, filepath.Join(root, ".scratch", "empty-epic"))
-	writeMap(t, root, "open-map", "")
-	writeTicket(t, root, "open-map", "01-only-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "complete-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteMap(t, root, "open-map", "")
+	tickettest.WriteTicket(t, root, "open-map", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "complete-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
 	writeMergedEpic(t, root, "merged-epic")
-	writeTicket(t, root, "merged-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
-	writeMap(t, root, "complete-map", "")
-	writeTicket(t, root, "complete-map", "01-only-ticket.md", "Status: done\n\nBody.\n")
-	writeArchivedTicket(t, root, "archived-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "merged-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteMap(t, root, "complete-map", "")
+	tickettest.WriteTicket(t, root, "complete-map", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "archived-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -466,8 +466,8 @@ func writeMergedEpic(t *testing.T, root, epic string) {
 func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -535,7 +535,7 @@ func prefixBefore(t *testing.T, content, needle string) string {
 func TestNewModel_HidesEmptySections(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -561,8 +561,8 @@ func TestNewModel_HidesEmptySections(t *testing.T) {
 func TestModel_NavigationCanSelectSectionHeaders(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -619,8 +619,8 @@ func TestModel_NavigationCanSelectSectionHeaders(t *testing.T) {
 func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -667,8 +667,8 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 func TestModel_RightClickOpensContextMenu(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -702,7 +702,7 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 	if m.sidebarTree.SelectedIndex() != 3 {
 		t.Fatalf("expected right click to select entry 3, got %d", m.sidebarTree.SelectedIndex())
 	}
-	if want := ticketPath(root, "my-epic", "02-second-ticket.md"); m.ticketMenuPending != want || cmd == nil {
+	if want := tickettest.TicketPath(root, "my-epic", "02-second-ticket.md"); m.ticketMenuPending != want || cmd == nil {
 		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.ticketMenuPending, cmd != nil)
 	}
 
@@ -721,7 +721,7 @@ func TestModel_RightClickOpensContextMenu(t *testing.T) {
 func TestModel_EnterOnExpandedEpicFocusesPreview(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -749,7 +749,7 @@ func TestModel_EnterOnExpandedEpicFocusesPreview(t *testing.T) {
 func TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -781,7 +781,7 @@ func TestModel_EnterOnCollapsedEpicExpandsThenFocusesPreview(t *testing.T) {
 func TestModel_HLCollapseAndExpandSelectedEpic(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -804,8 +804,8 @@ func TestModel_HLCollapseAndExpandSelectedEpic(t *testing.T) {
 func TestModel_NavigationSkipsCollapsedEpicTickets(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "epic-b", "01-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "epic-a", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "epic-b", "01-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -830,8 +830,8 @@ func TestModel_NavigationSkipsCollapsedEpicTickets(t *testing.T) {
 func TestModel_NoGlobalCollapseExpandAllBinding(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "epic-a", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "epic-b", "01-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "epic-a", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "epic-b", "01-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -850,8 +850,8 @@ func TestModel_NoGlobalCollapseExpandAllBinding(t *testing.T) {
 func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -881,8 +881,8 @@ func TestModel_DimmingTracksAllDoneNotCollapseState(t *testing.T) {
 func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -933,7 +933,7 @@ func TestModel_TCTogglesHideDoneTickets(t *testing.T) {
 func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -963,7 +963,7 @@ func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
 func TestModel_UnrelatedTAndCSequencesUnaffectedByHideDoneChord(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -999,7 +999,7 @@ func TestModel_UnrelatedTAndCSequencesUnaffectedByHideDoneChord(t *testing.T) {
 func TestModel_RRefreshesDataFromDisk(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -1012,7 +1012,7 @@ func TestModel_RRefreshesDataFromDisk(t *testing.T) {
 
 	// Simulate an edit made outside gx (e.g. in $EDITOR): a new ticket file
 	// appears on disk after the tab already loaded.
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	m = updated.(Model)
@@ -1106,91 +1106,6 @@ func visibleRows(m Model) []row {
 	return rows
 }
 
-func writeTicket(t *testing.T, root, epic, filename, content string) {
-	t.Helper()
-	path := filepath.Join(root, ".scratch", epic, "issues", filename)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.EnsureEpicTicketMD(t, filepath.Dir(filepath.Dir(path)))
-	if err := os.WriteFile(path, []byte(LegacyTicketToFrontmatter(filename, content)), 0644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// LegacyTicketToFrontmatter converts this package's many pre-existing test
-// fixtures (plain "Status: x\nBlocked by: y, z\n\nBody" lines, predating
-// ticket 04's retirement of old-format parsing) into a minimal valid
-// frontmatter ticket, deriving id from filename so blocked_by
-// cross-references between fixture tickets keep resolving. Exported (despite
-// living in a _test.go file, so it never ships in production builds) so the
-// tickets_test black-box package can share it instead of duplicating it.
-func LegacyTicketToFrontmatter(filename, content string) string {
-	id := filename
-	if idx := strings.Index(id, "-"); idx >= 0 {
-		id = id[:idx]
-	}
-
-	status, typ, pauseReason := "open", "implement", ""
-	var blockedBy []string
-	lines := strings.Split(content, "\n")
-	bodyStart := 0
-	for _, line := range lines {
-		matched := true
-		switch {
-		case strings.HasPrefix(line, "Status: "):
-			status = strings.TrimPrefix(line, "Status: ")
-		case strings.HasPrefix(line, "Pause reason: "):
-			pauseReason = strings.TrimPrefix(line, "Pause reason: ")
-		case strings.HasPrefix(line, "Blocked by: "):
-			blockedBy = strings.Split(strings.TrimPrefix(line, "Blocked by: "), ", ")
-		case strings.HasPrefix(line, "Type: "):
-			typ = strings.TrimPrefix(line, "Type: ")
-		default:
-			matched = false
-		}
-		if !matched {
-			break
-		}
-		bodyStart++
-	}
-	body := strings.TrimPrefix(strings.Join(lines[bodyStart:], "\n"), "\n")
-
-	var b strings.Builder
-	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: %s\n", id, status, typ)
-	if pauseReason != "" {
-		fmt.Fprintf(&b, "pause_reason: %s\n", pauseReason)
-	}
-	if len(blockedBy) > 0 {
-		fmt.Fprintf(&b, "blocked_by: [\"%s\"]\n", strings.Join(blockedBy, "\", \""))
-	}
-	b.WriteString("---\n")
-	b.WriteString(body)
-	return b.String()
-}
-
-func writeMap(t *testing.T, root, epic, content string) {
-	t.Helper()
-	epicDir := filepath.Join(root, ".scratch", epic)
-	testutil.Mkdir(t, epicDir)
-	testutil.WriteFile(t, epicDir, "ticket.md", "---\nkind: map\nstatus: open\n---\n"+content)
-}
-
-// writeArchivedTicket mirrors writeTicket but writes under `.scratch/
-// .archive/<epic>/issues/<filename>` (tickets.ArchiveDir's layout), so a test
-// can populate an archived epic ticket 04's lazy load will pick up.
-func writeArchivedTicket(t *testing.T, root, epic, filename, content string) {
-	t.Helper()
-	path := filepath.Join(root, ".scratch", ".archive", epic, "issues", filename)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.EnsureEpicTicketMD(t, filepath.Dir(filepath.Dir(path)))
-	if err := os.WriteFile(path, []byte(LegacyTicketToFrontmatter(filename, content)), 0644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // archivedSectionHeaderIndex returns the sidebar entry index of the Archived
 // section's own header row.
 func archivedSectionHeaderIndex(t *testing.T, m Model) int {
@@ -1212,8 +1127,8 @@ func archivedSectionHeaderIndex(t *testing.T, m Model) int {
 func TestModel_ArchivedSectionShowsCountWithoutLoading(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-open-ticket.md", "Status: open\n\nBody.\n")
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-open-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -1239,7 +1154,7 @@ func TestModel_ArchivedSectionShowsCountWithoutLoading(t *testing.T) {
 func TestModel_ExpandArchivedSectionLoadsAndPopulatesCollapsedByDefault(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -1280,7 +1195,7 @@ func TestModel_ExpandArchivedSectionLoadsAndPopulatesCollapsedByDefault(t *testi
 func TestModel_FailedArchivedLoadRendersInlineErrorAndStaysExpandedThenRetries(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
 	// Replace the archive directory with a file so tickets.LoadArchived's
 	// os.ReadDir call fails, forcing LazyResultMsg.Err on the load.
 	archiveDir := filepath.Join(root, ".scratch", ".archive")
@@ -1336,7 +1251,7 @@ func TestModel_FailedArchivedLoadRendersInlineErrorAndStaysExpandedThenRetries(t
 func TestModel_ArchivedCountChangeInvalidatesLazyCacheOnNextExpand(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -1351,7 +1266,7 @@ func TestModel_ArchivedCountChangeInvalidatesLazyCacheOnNextExpand(t *testing.T)
 		t.Fatalf("archivedLazy.State() = %v, want LazyLoaded before the count change", m.archivedLazy.State())
 	}
 
-	writeArchivedTicket(t, root, "another-old-epic", "01-ticket.md", "Status: done\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "another-old-epic", "01-ticket.md", "Status: done\n\nBody.\n")
 	updated, cmd = m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	m = updated.(Model)
 	m = deliverCmd(t, m, cmd)

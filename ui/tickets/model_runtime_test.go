@@ -8,13 +8,14 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 func TestModel_EditChordOpensSelectedTicketFile(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -38,7 +39,7 @@ func TestModel_EditChordSplitVariants(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	chords := []string{"s", "v", "t"}
 	for _, second := range chords {
@@ -65,7 +66,7 @@ func TestModel_EditChordOnEpicOpensTicketMD(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
-	writeMap(t, root, "my-epic", "# My epic\n")
+	tickettest.WriteMap(t, root, "my-epic", "# My epic\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)

@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -88,7 +89,7 @@ func withMutes(info wire.TicketInfo, mutes []schema.MuteRecord) wire.TicketInfo 
 
 func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}).WithTickets(fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}}).WithReads(fakeReads{fakeServerAPI{calls: &calls, detail: detailWith(wire.ActionAnswer, wire.ActionResume)}})
+	m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionAnswer, wire.ActionResume)}).WithTickets(tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionAnswer, wire.ActionResume)}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionAnswer, wire.ActionResume)}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionAnswer, wire.ActionResume)}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionAnswer, wire.ActionResume)}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
@@ -122,7 +123,7 @@ func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 
 func TestTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls}).WithTickets(fakeServerAPI{calls: &calls}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls}}).WithReads(fakeReads{fakeServerAPI{calls: &calls}})
+	m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls}).WithTickets(tickettest.FakeServerAPI{Calls: &calls}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}})
 	m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 		withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted),
 	}})
@@ -148,7 +149,7 @@ func TestTicketMenu_ServerTicketMutesDecideUnmute(t *testing.T) {
 		"unmuted": {nil, notMuted},
 	} {
 		t.Run(name, func(t *testing.T) {
-			m := newServerModel(t).WithServer(fakeServerAPI{}).WithTickets(fakeServerAPI{}).WithAdmin(fakeAdmin{fakeServerAPI{}}).WithQueue(fakeQueue{fakeServerAPI{}}).WithReads(fakeReads{fakeServerAPI{}})
+			m := newServerModel(t).WithServer(tickettest.FakeServerAPI{}).WithTickets(tickettest.FakeServerAPI{}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
 			m = withState(m, wire.Snapshot{Tickets: []wire.TicketInfo{
 				withMutes(pausedRepairInfo("gx:alpha/01", "First"), tt.mutes),
 			}})
@@ -172,7 +173,7 @@ func TestTicketMenu_SetStatusWritesTheFile(t *testing.T) {
 	} {
 		t.Run(tt.label, func(t *testing.T) {
 			var calls []string
-			m, file := serverModelWithStoreTicket(t, fakeServerAPI{calls: &calls}, true)
+			m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{Calls: &calls}, true)
 			_, cmd := chooseTicketMenuItem(t, pressMenuKey(t, m), tt.label)
 			if cmd == nil {
 				t.Fatalf("%s issued nothing", tt.label)
@@ -192,7 +193,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			var calls []string
-			m, file := serverModelWithStoreTicket(t, fakeServerAPI{calls: &calls}, false)
+			m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{Calls: &calls}, false)
 			r, _ := m.selectedRow()
 			m.epics[r.epicIdx].Tickets[r.ticketIdx].Mutes = muted
 			cut(&m)
@@ -239,7 +240,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 }
 
 func TestTicketMenu_ReadOnlyLinkDimsWithItsReason(t *testing.T) {
-	m, _ := serverModelWithStoreTicket(t, fakeServerAPI{}, false)
+	m, _ := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
 	m.link = tabapi.ServerLinkReadOnly
 	_, ready := requestTicketMenu(t, m)
 	if got, want := itemByLabel(t, ready.items, "Pause").Disabled, tabapi.ServerLinkReadOnly.DisabledReason(); got != want {
@@ -314,7 +315,7 @@ func stubTicketEditor(t *testing.T) *[]string {
 }
 
 func TestTicketMenu_AgentAndEditCopyGroups(t *testing.T) {
-	m, file := serverModelWithStoreTicket(t, fakeServerAPI{}, false)
+	m, file := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
 	m = pressMenuKey(t, m)
 	view := m.ticketMenu.View()
 	for _, want := range []string{"Agent", "Edit/copy", "Watch", "Transcript", "Investigate",
@@ -353,7 +354,7 @@ func TestTicketMenu_AgentAndEditCopyGroups(t *testing.T) {
 
 func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 	root := t.TempDir()
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: paused\nPause reason: spinning\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: paused\nPause reason: spinning\n\nBody.\n")
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -462,9 +463,9 @@ func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
 }
 
 func TestCmdTicketMenu_PTYIterationOffersTheAgentRow(t *testing.T) {
-	api := fakeServerAPI{iterations: []wire.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
+	api := tickettest.FakeServerAPI{IterationsRes: []wire.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
 	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01"}, true, "")
-	msg := cmdTicketMenu(fakeReads{api}, config.Dirs{}, in)().(ticketMenuReadyMsg)
+	msg := cmdTicketMenu(tickettest.FakeReads{FakeServerAPI: api}, config.Dirs{}, in)().(ticketMenuReadyMsg)
 	item := itemByLabel(t, msg.items, "Go to pane")
 	if item.Disabled != "" {
 		t.Fatalf("Go to pane dimmed %q with a live PTY holder and herdr down", item.Disabled)
@@ -476,7 +477,7 @@ func hasItem(items []contextmenu.Item[ticketTarget], label string) bool {
 }
 
 func TestTicketsTab_StatusKeyOpensNothing(t *testing.T) {
-	m, _ := serverModelWithStoreTicket(t, fakeServerAPI{}, false)
+	m, _ := serverModelWithStoreTicket(t, tickettest.FakeServerAPI{}, false)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if updated.(Model).ModalOpen() || cmd != nil {
 		t.Errorf("s opened a modal (%v) or issued a cmd (%v)", updated.(Model).ModalOpen(), cmd != nil)

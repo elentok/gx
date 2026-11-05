@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -20,7 +21,7 @@ import (
 func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueModel {
 	t.Helper()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).
-		WithServerLink(fakeServerAPI{}, start)
+		WithServerLink(tickettest.FakeServerAPI{}, start)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true

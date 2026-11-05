@@ -10,12 +10,13 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/list"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 func TestModel_SidebarScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -28,7 +29,7 @@ func TestModel_SidebarScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	}
 
 	for i := 2; i <= 60; i++ {
-		writeTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+		tickettest.WriteTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
 	}
 	m2 := NewModel(root, ui.Settings{}, keys.New(nil))
 	m2 = deliverLoad(t, m2)
@@ -45,7 +46,7 @@ func TestModel_MouseWheelScrollsSidebarWithoutMovingSelection(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 60; i++ {
-		writeTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+		tickettest.WriteTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
 	}
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -72,7 +73,7 @@ func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	for i := 1; i <= 40; i++ {
-		writeTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
+		tickettest.WriteTicket(t, root, "epic", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
 	}
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -110,8 +111,8 @@ func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
 func TestQueueModel_ScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "epic", "01-only-ticket.md"): true}
+	tickettest.WriteTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "epic", "01-only-ticket.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	shortContent := m.View().Content
@@ -122,8 +123,8 @@ func TestQueueModel_ScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	checked2 := map[string]bool{}
 	for i := 1; i <= 60; i++ {
 		name := fmt.Sprintf("%02d-ticket.md", i)
-		writeTicket(t, root, "epic2", name, "Status: open\n\nBody.\n")
-		checked2[ticketPath(root, "epic2", name)] = true
+		tickettest.WriteTicket(t, root, "epic2", name, "Status: open\n\nBody.\n")
+		checked2[tickettest.TicketPath(root, "epic2", name)] = true
 	}
 	m2 := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked2))
 	longContent := m2.View().Content

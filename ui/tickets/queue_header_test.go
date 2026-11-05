@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
@@ -131,14 +132,14 @@ func TestEpicContextMetricsSumsCompactions(t *testing.T) {
 func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 12000\nelapsed_time: 754\ncompactions: 2\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nactual_context_window: 8000\nelapsed_time: 100\ncompactions: 1\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 12000\nelapsed_time: 754\ncompactions: 2\n---\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nactual_context_window: 8000\nelapsed_time: 100\ncompactions: 1\n---\n\nBody.\n")
 
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := ansi.Strip(m.View().Content)
@@ -162,8 +163,8 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 	m := selectFirstQueueTicketRow(t, loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)))
 
 	var headerLine, rowLine string
@@ -214,8 +215,8 @@ func TestQueueHeaderCostSuffixFormats(t *testing.T) {
 // case: an incomplete local-mode epic gets nothing appended.
 func TestQueueEpicHeaderOmitsCostForNonRunningEpic(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	headerLine := epicHeaderLine(t, m, "alpha")
@@ -230,13 +231,13 @@ func TestQueueEpicHeaderOmitsCostForNonRunningEpic(t *testing.T) {
 // tickets.
 func TestQueueEpicHeaderAppendsSummedCostForCompletedEpic(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nelapsed_time: 60\nactual_cost: 30\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nelapsed_time: 60\nactual_cost: 13\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nelapsed_time: 60\nactual_cost: 30\n---\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nelapsed_time: 60\nactual_cost: 13\n---\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -281,11 +282,11 @@ func layoutBody(t *testing.T, width int, epicNames ...string) (QueueModel, []str
 	root := t.TempDir()
 	checked := map[string]bool{}
 	for _, name := range epicNames {
-		writeTicket(t, root, name, "01-first.md", "Status: open\n\nBody.\n")
-		writeTicket(t, root, name, "02-second.md", "Status: open\n\nBody.\n")
-		writeRawQueueTicket(t, root, name, "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\ncompactions: 1\n---\n\nBody.\n")
-		checked[ticketPath(root, name, "01-first.md")] = true
-		checked[ticketPath(root, name, "02-second.md")] = true
+		tickettest.WriteTicket(t, root, name, "01-first.md", "Status: open\n\nBody.\n")
+		tickettest.WriteTicket(t, root, name, "02-second.md", "Status: open\n\nBody.\n")
+		tickettest.WriteRawQueueTicket(t, root, name, "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\ncompactions: 1\n---\n\nBody.\n")
+		checked[tickettest.TicketPath(root, name, "01-first.md")] = true
+		checked[tickettest.TicketPath(root, name, "02-second.md")] = true
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 40})

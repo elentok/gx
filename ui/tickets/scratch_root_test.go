@@ -9,13 +9,14 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 // TestModel_ScratchDirResolvesThroughStore asserts scratchDir() is the repo's
 // project directory in the ticket store. Not parallel-safe (sets env).
 func TestModel_ScratchDirResolvesThroughStore(t *testing.T) {
 	root := testutil.TempRepo(t)
-	project, store := addStoreProject(t, root)
+	project, store := tickettest.AddStoreProject(t, root)
 	sub := filepath.Join(root, "sub")
 	if err := os.Mkdir(sub, 0755); err != nil {
 		t.Fatal(err)
@@ -39,7 +40,7 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IdentifyDir: %v", err)
 	}
-	wantScratchRoot, store := addStoreProject(t, info.Repo.Root)
+	wantScratchRoot, store := tickettest.AddStoreProject(t, info.Repo.Root)
 	settings := ui.Settings{TicketStore: store}
 
 	ticketPath := filepath.Join(wantScratchRoot, "alpha", "issues", "01-first.md")
@@ -47,7 +48,7 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 	testutil.EnsureEpicTicketMD(t, filepath.Join(wantScratchRoot, "alpha"))
-	if err := os.WriteFile(ticketPath, []byte(LegacyTicketToFrontmatter("01-first.md", "Status: open\n\nBody.\n")), 0644); err != nil {
+	if err := os.WriteFile(ticketPath, []byte(tickettest.LegacyTicketToFrontmatter("01-first.md", "Status: open\n\nBody.\n")), 0644); err != nil {
 		t.Fatal(err)
 	}
 

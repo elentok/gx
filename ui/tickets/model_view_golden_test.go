@@ -5,13 +5,14 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 func TestModelViewGolden_SidebarExpandedEpicAndDoneEpic(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "open-epic", "01-first-ticket.md", "Status: done\n\n# First ticket\n\nShipped.\n")
-	writeTicket(t, root, "open-epic", "02-second-ticket.md", "Status: open\n\n# Second ticket\n\nStill to do.\n")
-	writeTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\n# Only ticket\n\nDone.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "01-first-ticket.md", "Status: done\n\n# First ticket\n\nShipped.\n")
+	tickettest.WriteTicket(t, root, "open-epic", "02-second-ticket.md", "Status: open\n\n# Second ticket\n\nStill to do.\n")
+	tickettest.WriteTicket(t, root, "done-epic", "01-only-ticket.md", "Status: done\n\n# Only ticket\n\nDone.\n")
 
 	m := goldenModel(t, root)
 	expandOpenEpics(&m)
@@ -21,7 +22,7 @@ func TestModelViewGolden_SidebarExpandedEpicAndDoneEpic(t *testing.T) {
 
 func TestModelViewGolden_PausedRowWithRepairPreview(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-stuck-ticket.md",
+	tickettest.WriteTicket(t, root, "my-epic", "01-stuck-ticket.md",
 		"Status: paused\nPause reason: blocked-pane\n\n# Stuck ticket\n\nBody.\n\n"+tickets.LegacyRepairHeading+"\n\nThe agent pane blocked.\n")
 
 	m := goldenModel(t, root)

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 // runKey sends a key and feeds the command's message back once.
@@ -25,7 +26,7 @@ func runKey(t *testing.T, m QueueModel, k tea.KeyPressMsg) (QueueModel, tea.Msg)
 	return next.(QueueModel), msg
 }
 
-func harnessQueue(t *testing.T, api fakeServerAPI, project string) QueueModel {
+func harnessQueue(t *testing.T, api tickettest.FakeServerAPI, project string) QueueModel {
 	m := newMaintenanceQueue(t, api)
 	m.projectFilter = project
 	return m
@@ -33,10 +34,10 @@ func harnessQueue(t *testing.T, api fakeServerAPI, project string) QueueModel {
 
 func TestDefaultHarness_GlobalPickerSendsGlobalRequest(t *testing.T) {
 	sets := &[]wire.SetDefaultHarnessRequest{}
-	m := harnessQueue(t, fakeServerAPI{
-		harness:     wire.DefaultHarnessStatus{Default: "claude"},
-		harnessSets: sets,
-		harnessRes:  wire.SetDefaultHarnessResult{Notice: "switched"},
+	m := harnessQueue(t, tickettest.FakeServerAPI{
+		Harness:     wire.DefaultHarnessStatus{Default: "claude"},
+		HarnessSets: sets,
+		HarnessRes:  wire.SetDefaultHarnessResult{Notice: "switched"},
 	}, "")
 
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
@@ -63,12 +64,12 @@ func TestDefaultHarness_GlobalPickerSendsGlobalRequest(t *testing.T) {
 
 func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T) {
 	sets := &[]wire.SetDefaultHarnessRequest{}
-	m := harnessQueue(t, fakeServerAPI{
-		harness: wire.DefaultHarnessStatus{
+	m := harnessQueue(t, tickettest.FakeServerAPI{
+		Harness: wire.DefaultHarnessStatus{
 			Default:  "claude",
 			Projects: []wire.ProjectDefaultHarness{{Project: "gx", Harness: "codex"}},
 		},
-		harnessSets: sets,
+		HarnessSets: sets,
 	}, "gx")
 
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
@@ -92,10 +93,10 @@ func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T)
 }
 
 func TestDefaultHarness_RefusalShowsMessage(t *testing.T) {
-	m := harnessQueue(t, fakeServerAPI{
-		harness:     wire.DefaultHarnessStatus{Default: "claude"},
-		harnessSets: &[]wire.SetDefaultHarnessRequest{},
-		harnessRes:  wire.SetDefaultHarnessResult{Refused: true, Message: "codex is not on PATH"},
+	m := harnessQueue(t, tickettest.FakeServerAPI{
+		Harness:     wire.DefaultHarnessStatus{Default: "claude"},
+		HarnessSets: &[]wire.SetDefaultHarnessRequest{},
+		HarnessRes:  wire.SetDefaultHarnessResult{Refused: true, Message: "codex is not on PATH"},
 	}, "")
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyDown})
@@ -123,7 +124,7 @@ func TestDefaultHarness_NoServerWarnsAndOpensNothing(t *testing.T) {
 }
 
 func TestDefaultHarness_HelpListsTheBinding(t *testing.T) {
-	m := harnessQueue(t, fakeServerAPI{}, "")
+	m := harnessQueue(t, tickettest.FakeServerAPI{}, "")
 	m.help.Open(m.width, m.height)
 	if view := m.help.View(); !strings.Contains(view, "Default harness...") {
 		t.Fatalf("help lacks the binding:\n%s", view)

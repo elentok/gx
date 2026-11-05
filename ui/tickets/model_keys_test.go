@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 func TestFinishAndPauseKeyListedAsFinishAndPauseQueue(t *testing.T) {
@@ -56,7 +57,7 @@ func selectArchivedTicketRow(t *testing.T, m Model) Model {
 func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -91,7 +92,7 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 // yank, and hide-done toggle stay unaffected on an archived-sourced row.
 func TestModel_ReadOnlyKeysStillWorkOnArchivedRow(t *testing.T) {
 	root := t.TempDir()
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: open\n\nBody.\n")
 	t.Setenv("EDITOR", "true")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))

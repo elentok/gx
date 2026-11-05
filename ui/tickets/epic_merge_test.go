@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 // openEpicMenuOn selects the epic row name and presses "m".
@@ -26,8 +27,8 @@ func openEpicMenuOn(t *testing.T, m Model, name string) Model {
 
 func TestEpicMerge_TicketsTabMergesCompleteUnmergedEpicByAddress(t *testing.T) {
 	var calls []string
-	api := fakeServerAPI{calls: &calls, mergeRes: wire.QueueResult{MergeTicket: "gx:alpha/02"}}
-	m := withState(newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}), wire.Snapshot{Tickets: []wire.TicketInfo{
+	api := tickettest.FakeServerAPI{Calls: &calls, MergeRes: wire.QueueResult{MergeTicket: "gx:alpha/02"}}
+	m := withState(newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: api}).WithQueue(tickettest.FakeQueue{FakeServerAPI: api}).WithReads(tickettest.FakeReads{FakeServerAPI: api}), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Done", Status: "done"},
 		{Address: "gx:beta/01", Title: "Open", Status: "open"},
 	}})
@@ -57,7 +58,7 @@ func TestEpicMerge_TicketsTabMergesCompleteUnmergedEpicByAddress(t *testing.T) {
 }
 
 func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithMergeDim(t *testing.T) {
-	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}).WithTickets(fakeServerAPI{calls: &[]string{}}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &[]string{}}}).WithQueue(fakeQueue{fakeServerAPI{calls: &[]string{}}}).WithReads(fakeReads{fakeServerAPI{calls: &[]string{}}}), wire.Snapshot{Tickets: []wire.TicketInfo{
+	m := withState(newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &[]string{}}).WithTickets(tickettest.FakeServerAPI{Calls: &[]string{}}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &[]string{}}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &[]string{}}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &[]string{}}}), wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Done", Status: "done", EpicMergedAt: time.Now()},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

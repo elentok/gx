@@ -8,12 +8,13 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 func TestOpenHelp_TicketsOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -34,7 +35,7 @@ func TestOpenHelp_TicketsOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 func TestOpenHelp_TicketsEndsPreviewSearch(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -66,8 +67,8 @@ func TestOpenHelp_TicketsIgnoredWhileModalOpen(t *testing.T) {
 func TestOpenHelp_QueueOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})

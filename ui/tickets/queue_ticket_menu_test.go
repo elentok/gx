@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -75,7 +76,7 @@ func groupsOf(items []contextmenu.Item[ticketTarget]) []contextmenu.Group {
 func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) {
 	var calls []string
 	d := detailWith(wire.ActionResume, wire.ActionStartOver)
-	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls, detail: d}), schema.PauseManual, nil)
+	m := queueWithTicket(t, newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls, DetailRes: d}), schema.PauseManual, nil)
 	m, ready := requestQueueMenu(t, m)
 
 	in := newTicketMenuInput(m.epics[0], m.epics[0].Tickets[0], false, "")
@@ -108,7 +109,7 @@ func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) 
 
 func TestQueueTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
-	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), schema.PauseSpinning, muted)
+	m := queueWithTicket(t, newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls}), schema.PauseSpinning, muted)
 	_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Unmute")
 	cmd()
 	if !slices.Equal(calls, []string{"unmute gx:alpha/01"}) {
@@ -117,7 +118,7 @@ func TestQueueTicketMenu_UnmuteByAddress(t *testing.T) {
 }
 
 func TestQueueTicketMenu_ServerTicketMutesEnableUnmute(t *testing.T) {
-	m := newMaintenanceQueue(t, fakeServerAPI{})
+	m := newMaintenanceQueue(t, tickettest.FakeServerAPI{})
 	m, _ = m.applyServerState(&viewmodel.State{
 		Tickets: []wire.TicketInfo{withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted)},
 		Queue:   []string{"gx:alpha/01"},
@@ -133,7 +134,7 @@ func TestQueueTicketMenu_ServerTicketMutesEnableUnmute(t *testing.T) {
 func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 	const label = "Approve recovery proposal"
 	var calls []string
-	m := newMaintenanceQueue(t, fakeServerAPI{calls: &calls})
+	m := newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls})
 	m.epics[0].Tickets[0].Body = "## Proposed Remedy\n\nrun it"
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
@@ -148,7 +149,7 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 		t.Fatalf("calls = %v", calls)
 	}
 
-	m = newMaintenanceQueue(t, fakeServerAPI{})
+	m = newMaintenanceQueue(t, tickettest.FakeServerAPI{})
 	m.epics[0].Tickets[0].Body = "## Notes\n\nnothing"
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
@@ -159,7 +160,7 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 }
 
 func TestQueueTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
-	path := writeTicketFile(t)
+	path := writeMenuTicketFile(t)
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil))
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)

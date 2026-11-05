@@ -13,12 +13,13 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
-func newMaintenanceQueue(t *testing.T, api fakeServerAPI) QueueModel {
+func newMaintenanceQueue(t *testing.T, api tickettest.FakeServerAPI) QueueModel {
 	t.Helper()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).
-		WithServerLink(api, nil).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api})
+		WithServerLink(api, nil).WithTickets(api).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: api}).WithQueue(tickettest.FakeQueue{FakeServerAPI: api}).WithReads(tickettest.FakeReads{FakeServerAPI: api})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
@@ -90,7 +91,7 @@ func TestQueueServerKeys_PauseResumeOverrideReachVerbs(t *testing.T) {
 		{"override", wire.BudgetStatus{BudgetPaused: true}, false, "override"},
 	} {
 		var calls []string
-		m := newMaintenanceQueue(t, fakeServerAPI{calls: &calls, budget: tc.budget})
+		m := newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls, BudgetRes: tc.budget})
 		m.paused = tc.paused
 		m = accept(t, pressQueue(t, m, 'p'))
 		if !slices.Equal(calls, []string{tc.want}) {
@@ -112,7 +113,7 @@ func TestQueueServerKeys_ApproveNeedsPendingProposal(t *testing.T) {
 		{"approved", schema.DemoteSection("## Proposed Remedy\n\nrun it", "## Proposed Remedy", time.Now()), nil},
 	} {
 		var calls []string
-		m := newMaintenanceQueue(t, fakeServerAPI{calls: &calls})
+		m := newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls})
 		m.epics[0].Tickets[0].Body = tc.body
 		m.clampSelected()
 		m = pressQueue(t, m, 'A')
@@ -129,7 +130,7 @@ func TestQueueServerKeys_ApproveNeedsPendingProposal(t *testing.T) {
 
 func TestQueueServerKeys_DequeueAndDelete(t *testing.T) {
 	var calls []string
-	api := fakeServerAPI{calls: &calls}
+	api := tickettest.FakeServerAPI{Calls: &calls}
 	m := pressQueue(t, newMaintenanceQueue(t, api), 'C')
 	accept(t, m)
 	m = pressQueue(t, newMaintenanceQueue(t, api), 'x')
@@ -141,7 +142,7 @@ func TestQueueServerKeys_DequeueAndDelete(t *testing.T) {
 }
 
 func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
-	api := fakeServerAPI{removeRes: wire.QueueResult{Refused: true, Reason: wire.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}}
+	api := tickettest.FakeServerAPI{RemoveRes: wire.QueueResult{Refused: true, Reason: wire.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}}
 	m := newMaintenanceQueue(t, api)
 	msg := m.cmdServerRemove([]string{"gx:alpha/01"})()
 	got := msg.(serverRemovedMsg)
@@ -152,7 +153,7 @@ func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
 
 func TestServerMode_FinishAndPauseKeyIsFinishAndPause(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls}).WithTickets(fakeServerAPI{calls: &calls}).WithAdmin(fakeAdmin{fakeServerAPI{calls: &calls}}).WithQueue(fakeQueue{fakeServerAPI{calls: &calls}}).WithReads(fakeReads{fakeServerAPI{calls: &calls}})
+	m := newServerModel(t).WithServer(tickettest.FakeServerAPI{Calls: &calls}).WithTickets(tickettest.FakeServerAPI{Calls: &calls}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{Calls: &calls}})
 	next, _ := m.handleServerFinishAndPauseKey()
 	m = next.(Model)
 	if !m.confirm.IsOpen {

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -52,9 +53,9 @@ func writePausedFrontmatterTicket(t *testing.T, root, epic, filename, id, pauseR
 func TestQueueModel_DraftRowUnaffectedByPauseRendering(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md",
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md",
 		"Status: draft\n\n## Paused\n\nLeftover text that must not surface.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	lines := m.queueBody(80)
@@ -128,10 +129,10 @@ func TestQueueModel_PausedTicketWithChildren_ReasonRendersDirectlyUnderItself(t 
 	t.Parallel()
 	root := t.TempDir()
 	writePausedFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "blocked-pane", "", "Parent needs a decision.")
-	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
+	tickettest.WriteFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-a.md"): true,
-		ticketPath(root, "alpha", "02-b.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-a.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-b.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -168,7 +169,7 @@ func TestQueueModel_PausedLeafTicket_HasChildrenStaysFalse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writePausedFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "blocked-pane", "", "Leaf needs a decision.")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-a.md"): true}
+	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-a.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	entries := queueTicketEntries(m)

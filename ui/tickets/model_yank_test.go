@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 // stubClipboard swaps ticketsClipboardWrite for the test's duration, so these
@@ -33,7 +34,7 @@ func selectEpicRow(t *testing.T, m *Model, name string) {
 
 func TestYank_EpicRowSummaryIsEpicName(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
 	m := deliverLoad(t, NewModel(root, ui.Settings{}, keys.New(nil)))
 	selectEpicRow(t, &m, "my-epic")
 	got := stubClipboard(t)
@@ -47,7 +48,7 @@ func TestYank_EpicRowSummaryIsEpicName(t *testing.T) {
 
 func TestYank_EpicRowFilePathIsTicketMD(t *testing.T) {
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
 	m := deliverLoad(t, NewModel(root, ui.Settings{}, keys.New(nil)))
 	selectEpicRow(t, &m, "my-epic")
 	got := stubClipboard(t)
@@ -63,7 +64,7 @@ func TestYank_EpicRowFilePathIsTicketMD(t *testing.T) {
 func TestEpicTicketMDPath_ServerModeEpicFindsDirFromTicketFile(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
 	file := filepath.Join(root, ".scratch", "my-epic", "issues", "01-first.md")
 	epic := tickets.Epic{
 		Name:    "proj:my-epic",

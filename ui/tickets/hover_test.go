@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 // hoverFixture drives the Tickets and Queue tabs through the same hover cases.
@@ -26,8 +27,8 @@ type hoverFixture struct {
 func ticketsHoverFixture(t *testing.T) hoverFixture {
 	t.Helper()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "my-epic", "02-second.md", "Status: open\n\nBody.\n")
 	m := deliverLoad(t, NewModel(root, ui.Settings{}, keys.New(nil)))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
@@ -55,11 +56,11 @@ func ticketsHoverFixture(t *testing.T) hoverFixture {
 func queueHoverFixture(t *testing.T) hoverFixture {
 	t.Helper()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
+		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
+		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	other := -1

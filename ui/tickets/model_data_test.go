@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 // TestDeriveCollapsedSidebar_EveryEpicDefaultsCollapsed covers the default
@@ -35,8 +36,8 @@ func TestDeriveCollapsedSidebar_EveryEpicDefaultsCollapsed(t *testing.T) {
 func TestNewModel_StartsWithEveryEpicCollapsedAndCursorOnFirstEpic(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-alpha-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-beta-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "01-alpha-ticket.md", "Status: open\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "beta", "01-beta-ticket.md", "Status: open\n\nBody.\n")
 
 	m := deliverLoadDefaults(t, NewModel(root, ui.Settings{}, keys.New(nil)))
 

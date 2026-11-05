@@ -10,12 +10,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // queueOnEpicHeader is a server-mode Queue tab with gx:alpha's header
 // selected.
-func queueOnEpicHeader(t *testing.T, api fakeServerAPI) QueueModel {
+func queueOnEpicHeader(t *testing.T, api tickettest.FakeServerAPI) QueueModel {
 	t.Helper()
 	m := newMaintenanceQueue(t, api)
 	m.epics[0].Path = "gx:alpha"
@@ -38,7 +39,7 @@ func pressQueueMenuKey(t *testing.T, m QueueModel) QueueModel {
 }
 
 func TestQueueEpicMenu_HeaderOpensTheFullEpicMenu(t *testing.T) {
-	m := pressQueueMenuKey(t, queueOnEpicHeader(t, fakeServerAPI{calls: &[]string{}}))
+	m := pressQueueMenuKey(t, queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &[]string{}}))
 
 	view := m.ticketMenu.View()
 	items := epicMenuItems(epicMenuInput{epic: m.epics[0]})
@@ -59,7 +60,7 @@ func TestQueueEpicMenu_HeaderOpensTheFullEpicMenu(t *testing.T) {
 
 func TestQueueEpicMenu_MergeByAddress(t *testing.T) {
 	var calls []string
-	m := queueOnEpicHeader(t, fakeServerAPI{calls: &calls})
+	m := queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &calls})
 	m.epics[0].Tickets[0].Status = "done"
 	m.clampSelected()
 
@@ -83,7 +84,7 @@ func TestQueueEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T)
 		t.Fatal(err)
 	}
 	var calls []string
-	m := queueOnEpicHeader(t, fakeServerAPI{calls: &calls})
+	m := queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &calls})
 	m.settings.TicketStore = store
 
 	_, cmd := chooseQueueMenuItem(t, pressQueueMenuKey(t, m), "Set open")
@@ -103,7 +104,7 @@ func TestQueueEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T)
 
 func TestQueueEpicMenu_CheckedSetKeysIgnoreTheHeader(t *testing.T) {
 	var calls []string
-	m := queueOnEpicHeader(t, fakeServerAPI{calls: &calls})
+	m := queueOnEpicHeader(t, tickettest.FakeServerAPI{Calls: &calls})
 	m.epics[0].Tickets[0].Body = "## Proposed Remedy\n\nrun it"
 	for _, key := range []rune{'x', 'A', ' '} {
 		if got := pressQueue(t, m, key); got.confirm.IsOpen {
@@ -124,7 +125,7 @@ func TestQueueEpicMenu_EditTargetIsTheEpicFile(t *testing.T) {
 	if err := os.WriteFile(epicMD, []byte("---\nstatus: draft\n---\n\n# alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := queueOnEpicHeader(t, fakeServerAPI{})
+	m := queueOnEpicHeader(t, tickettest.FakeServerAPI{})
 	m.settings.TicketStore = store
 
 	if got, ok := m.selectedEditTarget(); !ok || got != epicMD {
@@ -133,7 +134,7 @@ func TestQueueEpicMenu_EditTargetIsTheEpicFile(t *testing.T) {
 }
 
 func TestQueueEpicMenu_SelectedHeaderRendersTheSelectionMark(t *testing.T) {
-	m := queueOnEpicHeader(t, fakeServerAPI{})
+	m := queueOnEpicHeader(t, tickettest.FakeServerAPI{})
 	for _, line := range m.queueBody(80) {
 		plain := ansi.Strip(line)
 		if strings.Contains(plain, "gx:alpha") {

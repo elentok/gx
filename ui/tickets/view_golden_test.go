@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -80,11 +81,11 @@ func goldenModelView(m Model) string { return m.View().Content }
 func goldenQueue(t *testing.T) QueueModel {
 	t.Helper()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).
-		WithServerLink(fakeServerAPI{}, nil).
-		WithTickets(fakeServerAPI{}).
-		WithAdmin(fakeAdmin{fakeServerAPI{}}).
-		WithQueue(fakeQueue{fakeServerAPI{}}).
-		WithReads(fakeReads{fakeServerAPI{}})
+		WithServerLink(tickettest.FakeServerAPI{}, nil).
+		WithTickets(tickettest.FakeServerAPI{}).
+		WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).
+		WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).
+		WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: goldenWidth, Height: goldenHeight})
 	return next.(QueueModel)
 }
