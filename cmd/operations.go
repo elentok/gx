@@ -572,7 +572,7 @@ func runNotifyStatus(d deps) error {
 	if err != nil {
 		return err
 	}
-	root, err := ticketRoot(d.dirs(), cwd)
+	root, err := tickets.RootForDirs(d.dirs(), cwd)
 	if err != nil {
 		return err
 	}

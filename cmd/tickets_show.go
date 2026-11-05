@@ -8,11 +8,10 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
-	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
@@ -28,17 +27,6 @@ type ticketShowJSON struct {
 	Body      string   `json:"body"`
 }
 
-// currentEpic is the epic cwd's worktree is working on, read from its
-// iteration branch name; "" on any other branch.
-func currentEpic(cwd string) string {
-	branch, err := git.CurrentBranch(cwd)
-	if err != nil {
-		return ""
-	}
-	epic, _, _ := ticketgit.ParseIterationBranch(branch)
-	return epic
-}
-
 // runTicketsShow resolves addr (full or short form) against the cwd project
 // and prints the ticket. Short forms are expanded before anything is
 // printed; an address that names nothing is refused with an
@@ -49,7 +37,7 @@ func currentEpic(cwd string) string {
 // A single ticket without the section is an error; --section and --json are
 // kept apart by the command's flag definitions.
 func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section string, w io.Writer) error {
-	a, t, err := findTicket(dirs, cwd, addr)
+	a, t, err := ticketref.FindTicket(dirs, cwd, addr)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
 		if project, epic, ok := parseEpicArg(addr); ok {
@@ -91,10 +79,10 @@ func printTicketSection(a tickets.Address, t tickets.Ticket, section string, w i
 // project may be empty (the cwd project), and checks the epic exists.
 func resolveEpic(dirs config.Dirs, cwd, project, name string) (root, resolved, path string, err error) {
 	if project == "" {
-		root, err = ticketRoot(dirs, cwd)
+		root, err = tickets.RootForDirs(dirs, cwd)
 		project = tickets.ProjectName(root)
 	} else {
-		root, err = projectRoot(dirs, cwd, project)
+		root, err = ticketref.ProjectRoot(dirs, cwd, project)
 	}
 	if err != nil {
 		return "", "", "", err

@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
@@ -25,7 +26,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	if err != nil {
 		return err
 	}
-	a, src, err := findTicket(d.dirs(), cwd, addr)
+	a, src, err := ticketref.FindTicket(d.dirs(), cwd, addr)
 	if err != nil {
 		return err
 	}
@@ -37,7 +38,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 		dstProject, dstEpic = m[1], m[2]
 	}
 	if dstProject != a.Project {
-		if _, err := projectRoot(d.dirs(), cwd, dstProject); err != nil {
+		if _, err := ticketref.ProjectRoot(d.dirs(), cwd, dstProject); err != nil {
 			return err
 		}
 		return ticketmove.MoveRefusal(tickets.CodeMoveCrossProject, "target epic %q is in project %q, not %q", dstEpic, dstProject, a.Project)

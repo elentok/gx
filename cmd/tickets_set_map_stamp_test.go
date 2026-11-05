@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets/schema"
@@ -33,7 +34,7 @@ func closeMapTicket(t *testing.T, createdAt time.Time, recs ...conversations.Rec
 	path := filepath.Join(epic, "issues", "04-pick.md")
 	writeTicketFile(t, path, "---\nid: \"04\"\nstatus: claimed\ntype: grilling\ncreated_at: "+createdAt.UTC().Format(time.RFC3339)+"\n---\nBody.\n")
 	for _, r := range recs {
-		r.Ticket = ticketLabel(path)
+		r.Ticket = ticketref.TicketLabel(path)
 		if err := conversations.Save(root, r); err != nil {
 			t.Fatal(err)
 		}

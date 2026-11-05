@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -17,10 +18,6 @@ import (
 	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/spf13/cobra"
 )
-
-// followUpsArchivedEpic receives every closed follow-up, so the live outbox
-// only holds what still needs a decision.
-const followUpsArchivedEpic = "follow-ups-archived"
 
 var closeReasons = []string{"fixed", "obsolete", "duplicate", "not-worth-it"}
 
@@ -39,12 +36,12 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	a, src, err := findTicket(d.dirs(), cwd, addr)
+	a, src, err := ticketref.FindTicket(d.dirs(), cwd, addr)
 	if err != nil {
 		return err
 	}
-	if a.Epic != followUpsEpic {
-		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: fmt.Sprintf("close works on tickets in a %s epic, not %q", followUpsEpic, a.Epic)}
+	if a.Epic != tickets.FollowUpsEpic {
+		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: fmt.Sprintf("close works on tickets in a %s epic, not %q", tickets.FollowUpsEpic, a.Epic)}
 	}
 	root := filepath.Dir(filepath.Dir(filepath.Dir(src.Path)))
 
@@ -68,14 +65,14 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	}
 	friction := ticketops.Friction(a.ID, runEvents, log)
 
-	created, err := ensureArchiveEpic(d.dirs(), root, filepath.Join(root, followUpsEpic))
+	created, err := ensureArchiveEpic(d.dirs(), root, filepath.Join(root, tickets.FollowUpsEpic))
 	if err != nil {
 		return err
 	}
 	p, err := archiveTicket(root, a, src, ticketmove.MoveOpts{Archive: true, Resolution: resolution, Friction: &friction})
 	if err != nil {
 		if created {
-			_ = os.RemoveAll(filepath.Join(root, followUpsArchivedEpic))
+			_ = os.RemoveAll(filepath.Join(root, tickets.ArchivedFollowUpsEpic))
 		}
 		return err
 	}
@@ -88,7 +85,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 // gets one naming its original address. An empty project argument means the
 // cwd project.
 func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
-	root, project, err := resolveProject(d, project)
+	root, project, err := ticketref.ResolveProject(d.base(), project)
 	if err != nil {
 		return err
 	}
@@ -98,7 +95,7 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 	}
 	var swept []tickets.Ticket
 	for _, e := range epics {
-		if e.Name != followUpsEpic {
+		if e.Name != tickets.FollowUpsEpic {
 			continue
 		}
 		for _, t := range e.Tickets {
@@ -110,11 +107,11 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 	if len(swept) == 0 {
 		return nil
 	}
-	if _, err := ensureArchiveEpic(d.dirs(), root, filepath.Join(root, followUpsEpic)); err != nil {
+	if _, err := ensureArchiveEpic(d.dirs(), root, filepath.Join(root, tickets.FollowUpsEpic)); err != nil {
 		return err
 	}
 	for _, t := range swept {
-		a := tickets.Address{Project: project, Epic: followUpsEpic, ID: t.Identifier}
+		a := tickets.Address{Project: project, Epic: tickets.FollowUpsEpic, ID: t.Identifier}
 		opts := ticketmove.MoveOpts{Archive: true, RecordOriginal: t.Status == string(schema.StatusCancelled)}
 		p, err := archiveTicket(root, a, t, opts)
 		if err != nil {
@@ -131,7 +128,7 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 // ensureArchiveEpic creates the archive epic draft when missing, of the same
 // kind as the follow-ups epic it archives. It reports whether it created it.
 func ensureArchiveEpic(dirs config.Dirs, root, followUpsPath string) (bool, error) {
-	if info, err := os.Stat(filepath.Join(root, followUpsArchivedEpic)); err == nil && info.IsDir() {
+	if info, err := os.Stat(filepath.Join(root, tickets.ArchivedFollowUpsEpic)); err == nil && info.IsDir() {
 		return false, nil
 	}
 	records, err := conversations.DirIn(dirs)
@@ -142,20 +139,20 @@ func ensureArchiveEpic(dirs config.Dirs, root, followUpsPath string) (bool, erro
 	if tickets.IsMapEpic(followUpsPath) {
 		kind = tickets.KindMap
 	}
-	_, err = tickets.CreateEpic(records, root, followUpsArchivedEpic, tickets.EpicFields{Kind: kind, Status: string(schema.StatusDraft)}, "")
+	_, err = tickets.CreateEpic(records, root, tickets.ArchivedFollowUpsEpic, tickets.EpicFields{Kind: kind, Status: string(schema.StatusDraft)}, "")
 	return err == nil, err
 }
 
 // archiveTicket moves src into the archive epic under both epic locks.
 func archiveTicket(root string, a tickets.Address, src tickets.Ticket, opts ticketmove.MoveOpts) (ticketmove.MovePlan, error) {
 	srcEpicPath := filepath.Join(root, a.Epic)
-	unlock, err := ticketmove.LockEpics(srcEpicPath, filepath.Join(root, followUpsArchivedEpic))
+	unlock, err := ticketmove.LockEpics(srcEpicPath, filepath.Join(root, tickets.ArchivedFollowUpsEpic))
 	if err != nil {
 		return ticketmove.MovePlan{}, err
 	}
 	defer unlock()
 
-	p, err := ticketmove.PlanMove(root, a, src, followUpsArchivedEpic, "", opts)
+	p, err := ticketmove.PlanMove(root, a, src, tickets.ArchivedFollowUpsEpic, "", opts)
 	if err != nil {
 		return ticketmove.MovePlan{}, err
 	}

@@ -18,8 +18,8 @@ import (
 // body asking for anything else is refused. Every check runs before anything
 // is written.
 func runTicketsFollowUpAdd(d deps, epicPath, body, category string, jsonOut bool, w io.Writer) error {
-	if filepath.Base(filepath.Clean(epicPath)) != followUpsEpic {
-		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: "follow-up add targets a " + followUpsEpic + " epic, not " + filepath.Base(epicPath)}
+	if filepath.Base(filepath.Clean(epicPath)) != tickets.FollowUpsEpic {
+		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: "follow-up add targets a " + tickets.FollowUpsEpic + " epic, not " + filepath.Base(epicPath)}
 	}
 	// Read before bodyFrontmatter, which would reject a bad status with an
 	// uncoded error.

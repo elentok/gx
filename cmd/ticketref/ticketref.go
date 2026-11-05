@@ -1,4 +1,6 @@
-package cmd
+// Package ticketref resolves the ticket, epic and project a command names:
+// addresses, file paths and bare epic names.
+package ticketref
 
 import (
 	"errors"
@@ -6,22 +8,25 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
 
-// findTicket resolves addr (full or short form) against the cwd project. An
+// FindTicket resolves addr (full or short form) against the cwd project. An
 // address that names nothing is refused with a tickets.AddressError carrying
 // a stable code.
-func findTicket(dirs config.Dirs, cwd, addr string) (tickets.Address, tickets.Ticket, error) {
+func FindTicket(dirs config.Dirs, cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 	a, t, err := lookupTicket(dirs, cwd, addr)
 	var ae *tickets.AddressError
 	if !errors.As(err, &ae) || (ae.Code != tickets.CodeUnknownTicket && ae.Code != tickets.CodeUnknownEpic) {
 		return a, t, err
 	}
 	// An archived one-off keeps answering to its old address.
-	root, rootErr := projectRoot(dirs, cwd, a.Project)
+	root, rootErr := ProjectRoot(dirs, cwd, a.Project)
 	if rootErr != nil {
 		return a, t, err
 	}
@@ -32,12 +37,12 @@ func findTicket(dirs config.Dirs, cwd, addr string) (tickets.Address, tickets.Ti
 }
 
 func lookupTicket(dirs config.Dirs, cwd, addr string) (tickets.Address, tickets.Ticket, error) {
-	cwdRoot, rootErr := ticketRoot(dirs, cwd)
+	cwdRoot, rootErr := tickets.RootForDirs(dirs, cwd)
 	ctxProject := ""
 	if rootErr == nil {
 		ctxProject = tickets.ProjectName(cwdRoot)
 	}
-	a, err := tickets.ParseAddress(addr, tickets.AddressContext{Project: ctxProject, Epic: currentEpic(cwd)})
+	a, err := tickets.ParseAddress(addr, tickets.AddressContext{Project: ctxProject, Epic: CurrentEpic(cwd)})
 	if err != nil {
 		return a, tickets.Ticket{}, err
 	}
@@ -45,7 +50,7 @@ func lookupTicket(dirs config.Dirs, cwd, addr string) (tickets.Address, tickets.
 		// A short form needs the cwd project, which cwd doesn't have.
 		return a, tickets.Ticket{}, rootErr
 	}
-	root, err := projectRoot(dirs, cwd, a.Project)
+	root, err := ProjectRoot(dirs, cwd, a.Project)
 	if err != nil {
 		return a, tickets.Ticket{}, err
 	}
@@ -73,13 +78,13 @@ func isUnknownTicket(err error) bool {
 	return errors.As(err, &ae) && ae.Code == tickets.CodeUnknownTicket
 }
 
-// projectRoot is the one resolver for a `project:` address prefix: the ticket
+// ProjectRoot is the one resolver for a `project:` address prefix: the ticket
 // store directory of the registered project called project, which may be the
 // cwd project or any other. An unregistered name is refused with
 // tickets.CodeUnknownProject. add, show, set and section use it; close and
 // move are meant to reuse it.
-func projectRoot(dirs config.Dirs, cwd, project string) (string, error) {
-	if root, err := ticketRoot(dirs, cwd); err == nil && tickets.ProjectName(root) == project {
+func ProjectRoot(dirs config.Dirs, cwd, project string) (string, error) {
+	if root, err := tickets.RootForDirs(dirs, cwd); err == nil && tickets.ProjectName(root) == project {
 		return root, nil
 	}
 	cfg, err := dirs.Load()
@@ -89,29 +94,29 @@ func projectRoot(dirs config.Dirs, cwd, project string) (string, error) {
 	return tickets.ProjectDirByName(cfg.TicketStore.Path, project)
 }
 
-// resolveProject is projectRoot for a command with an optional project
+// ResolveProject is ProjectRoot for a command with an optional project
 // argument: an empty one means the cwd's project. It returns the name too.
-func resolveProject(d deps, project string) (root, name string, err error) {
-	cwd, err := d.getwd()
+func ResolveProject(env cmdbase.Env, project string) (root, name string, err error) {
+	cwd, err := env.Getwd()
 	if err != nil {
 		return "", "", err
 	}
 	if project == "" {
-		cwdRoot, err := ticketRoot(d.dirs(), cwd)
+		cwdRoot, err := tickets.RootForDirs(env.Dirs(), cwd)
 		if err != nil {
 			return "", "", err
 		}
 		project = tickets.ProjectName(cwdRoot)
 	}
-	root, err = projectRoot(d.dirs(), cwd, project)
+	root, err = ProjectRoot(env.Dirs(), cwd, project)
 	return root, project, err
 }
 
-// resolveTicketRef turns a command's ticket argument — a file path or an
+// ResolveTicketRef turns a command's ticket argument — a file path or an
 // address — into the ticket file's path. An existing file always wins, so a
 // path never gets reinterpreted; anything that is not an address either is
 // passed through for the caller's own "no such file" error.
-func resolveTicketRef(dirs config.Dirs, getwd func() (string, error), arg string) (string, error) {
+func ResolveTicketRef(dirs config.Dirs, getwd func() (string, error), arg string) (string, error) {
 	if _, err := os.Stat(arg); err == nil || getwd == nil {
 		return arg, nil
 	}
@@ -120,13 +125,13 @@ func resolveTicketRef(dirs config.Dirs, getwd func() (string, error), arg string
 		return "", err
 	}
 	if project, epic, ok := tickets.ParseEpicAddress(arg); ok {
-		root, err := projectRoot(dirs, cwd, project)
+		root, err := ProjectRoot(dirs, cwd, project)
 		if err != nil {
 			return "", err
 		}
 		return tickets.EpicTicketMDPath(root, project, epic)
 	}
-	_, t, err := findTicket(dirs, cwd, arg)
+	_, t, err := FindTicket(dirs, cwd, arg)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
 		return arg, nil
@@ -137,22 +142,22 @@ func resolveTicketRef(dirs config.Dirs, getwd func() (string, error), arg string
 	return t.Path, nil
 }
 
-// isEpicTicketMD reports whether path is an epic's own ticket.md, the file a
+// IsEpicTicketMD reports whether path is an epic's own ticket.md, the file a
 // project:epic address resolves to.
-func isEpicTicketMD(path string) bool {
+func IsEpicTicketMD(path string) bool {
 	return filepath.Base(path) == "ticket.md"
 }
 
-// ticketLabel is how output names the ticket at path: its canonical address
+// TicketLabel is how output names the ticket at path: its canonical address
 // when path sits in the tracker's <project>/<epic>/issues/<file>.md layout,
 // the path itself for anything else (ad-hoc files have no address). An epic's
 // ticket.md is labelled by the epic's own address, project:epic.
-func ticketLabel(path string) string {
+func TicketLabel(path string) string {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return path
 	}
-	if isEpicTicketMD(abs) {
+	if IsEpicTicketMD(abs) {
 		epicDir := filepath.Dir(abs)
 		return tickets.ProjectName(filepath.Dir(epicDir)) + ":" + filepath.Base(epicDir)
 	}
@@ -165,4 +170,38 @@ func ticketLabel(path string) string {
 		return path
 	}
 	return a.String()
+}
+
+// CurrentEpic is the epic cwd's worktree is working on, read from its
+// iteration branch name; "" on any other branch.
+func CurrentEpic(cwd string) string {
+	branch, err := git.CurrentBranch(cwd)
+	if err != nil {
+		return ""
+	}
+	epic, _, _ := ticketgit.ParseIterationBranch(branch)
+	return epic
+}
+
+// ResolveEpicArg resolves a command's single epic argument to an epic path. A
+// `project:epic` address resolves against that project, as `gx tickets show`
+// does. Otherwise arg is tried as a bare epic name against the current repo's
+// ticket-store root (`gx tickets root`); if that directory doesn't exist, arg
+// is returned unchanged so a full path still works.
+func ResolveEpicArg(dirs config.Dirs, arg, cwd string) string {
+	if project, epic, ok := tickets.ParseEpicAddress(arg); ok {
+		if root, err := ProjectRoot(dirs, cwd, project); err == nil {
+			return filepath.Join(root, epic)
+		}
+		return arg
+	}
+	root, err := tickets.RootForDirs(dirs, cwd)
+	if err != nil {
+		return arg
+	}
+	candidate := filepath.Join(root, arg)
+	if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+		return candidate
+	}
+	return arg
 }

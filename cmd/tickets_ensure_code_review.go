@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
@@ -13,7 +11,7 @@ import (
 // completeEpicNames lists the current epic directory names under cwd's repo,
 // read live off disk, for the ensure-code-review command's shell completion.
 func completeEpicNames(dirs config.Dirs, cwd string) ([]string, error) {
-	root, err := ticketRoot(dirs, cwd)
+	root, err := tickets.RootForDirs(dirs, cwd)
 	if err != nil {
 		return nil, err
 	}
@@ -26,29 +24,6 @@ func completeEpicNames(dirs config.Dirs, cwd string) ([]string, error) {
 		names = append(names, epic.Name)
 	}
 	return names, nil
-}
-
-// resolveEpicArg resolves the ensure-code-review command's single argument to
-// an epic path. A `project:epic` address resolves against that project, as
-// `gx tickets show` does. Otherwise arg is tried as a bare epic name against
-// the current repo's ticket-store root (`gx tickets root`); if that directory
-// doesn't exist, arg is returned unchanged so a full path still works.
-func resolveEpicArg(dirs config.Dirs, arg, cwd string) string {
-	if project, epic, ok := tickets.ParseEpicAddress(arg); ok {
-		if root, err := projectRoot(dirs, cwd, project); err == nil {
-			return filepath.Join(root, epic)
-		}
-		return arg
-	}
-	root, err := ticketRoot(dirs, cwd)
-	if err != nil {
-		return arg
-	}
-	candidate := filepath.Join(root, arg)
-	if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-		return candidate
-	}
-	return arg
 }
 
 // runTicketsEnsureCodeReview checks whether epicPath already has a `type:

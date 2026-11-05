@@ -14,53 +14,6 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func TestResolveEpicArg_BareNameAndFullPathResolveToSameEpic(t *testing.T) {
-	store := isolateTicketStore(t)
-	repoDir := testutil.TempRepo(t)
-	project := addProject(t, store, "mine", repoDir)
-	epicDir := filepath.Join(project, "widget-epic")
-	testutil.Mkdir(t, epicDir)
-
-	bareResolved := resolveEpicArg(config.DirsFrom(envFor(t)), "widget-epic", repoDir)
-	fullResolved := resolveEpicArg(config.DirsFrom(envFor(t)), epicDir, repoDir)
-
-	if bareResolved != epicDir {
-		t.Errorf("resolveEpicArg(bare name) = %q, want %q", bareResolved, epicDir)
-	}
-	if fullResolved != epicDir {
-		t.Errorf("resolveEpicArg(full path) = %q, want it returned unchanged", fullResolved)
-	}
-}
-
-func TestResolveEpicArg_ProjectEpicAddressResolvesInCurrentAndOtherProject(t *testing.T) {
-	store := isolateTicketStore(t)
-	repoDir := testutil.TempRepo(t)
-	otherRepoDir := testutil.TempRepo(t)
-	mine := addProject(t, store, "mine", repoDir)
-	other := addProject(t, store, "other", otherRepoDir)
-	testutil.Mkdir(t, filepath.Join(mine, "widget-epic"))
-	testutil.Mkdir(t, filepath.Join(other, "gadget-epic"))
-
-	if got, want := resolveEpicArg(config.DirsFrom(envFor(t)), "mine:widget-epic", repoDir), filepath.Join(mine, "widget-epic"); got != want {
-		t.Errorf("resolveEpicArg(current project address) = %q, want %q", got, want)
-	}
-	if got, want := resolveEpicArg(config.DirsFrom(envFor(t)), "other:gadget-epic", repoDir), filepath.Join(other, "gadget-epic"); got != want {
-		t.Errorf("resolveEpicArg(other project address) = %q, want %q", got, want)
-	}
-}
-
-func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
-	store := isolateTicketStore(t)
-	repoDir := testutil.TempRepo(t)
-	addProject(t, store, "mine", repoDir)
-
-	resolved := resolveEpicArg(config.DirsFrom(envFor(t)), "no-such-epic", repoDir)
-
-	if resolved != "no-such-epic" {
-		t.Errorf("resolveEpicArg(unknown name) = %q, want it returned unchanged", resolved)
-	}
-}
-
 func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
 	store := isolateTicketStore(t)
 	repoDir := testutil.TempRepo(t)

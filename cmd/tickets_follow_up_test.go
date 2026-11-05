@@ -94,7 +94,7 @@ func TestExecute_TicketsFollowUpAdd_Refusals(t *testing.T) {
 		{"no problem", "mine:follow-ups", "---\ncategory: idea\n---\n\n## Source\n\ns\n\n## Suggested fix\n\nf\n", tickets.CodeSectionRequired, "## Problem"},
 		{"no fix", "mine:follow-ups", "---\ncategory: idea\n---\n\n## Source\n\ns\n\n## Problem\n\np\n", tickets.CodeSectionRequired, "## Suggested fix"},
 		{"bug without evidence", "mine:follow-ups", "---\ncategory: bug\n---\n\n" + followUpSections, tickets.CodeSectionRequired, "## Evidence"},
-		{"other epic", "mine:epic", "---\ncategory: idea\n---\n\n" + followUpSections, tickets.CodeNotFollowUpsEpic, followUpsEpic},
+		{"other epic", "mine:epic", "---\ncategory: idea\n---\n\n" + followUpSections, tickets.CodeNotFollowUpsEpic, tickets.FollowUpsEpic},
 		{"status", "mine:follow-ups", "---\ncategory: idea\nstatus: open\n---\n\n" + followUpSections, tickets.CodeStatusOverride, "open"},
 		{"type", "mine:follow-ups", "---\ncategory: idea\ntype: implement\n---\n\n" + followUpSections, tickets.CodeTypeOverride, "implement"},
 	} {
@@ -150,7 +150,7 @@ func TestExecute_TicketsFollowUpAdd_HelpListsRequiredSections(t *testing.T) {
 
 func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testing.T) {
 	f := setupCloseProject(t)
-	fu := filepath.Join(f.project, followUpsEpic, "issues")
+	fu := filepath.Join(f.project, tickets.FollowUpsEpic, "issues")
 	testutil.WriteFile(t, fu, "05-disk.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Cleanup\n\n## Problem\n\nThe Disk fills up.\n")
 	testutil.WriteFile(t, fu, "06-menu.md", "---\nid: \"06\"\nstatus: open\ntype: research\n---\n\n# 06 — Menu\n\n## Problem\n\nEscape misbehaves.\n\n## Suggested fix\n\nguard\n")
 	if _, err := runIn(t, f.repo, "tickets", "close", "follow-ups/06", "--reason", "obsolete"); err != nil {

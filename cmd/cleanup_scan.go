@@ -80,7 +80,7 @@ func runCleanupScan(dirs config.Dirs, cwd string, jsonOut bool, w io.Writer) err
 	}
 	repo := *openRepo
 
-	root, err := ticketRoot(dirs, cwd)
+	root, err := tickets.RootForDirs(dirs, cwd)
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,7 @@ import (
 // prints only the events matching ticketFilter/eventFilter as pretty-printed
 // JSON blocks, in file order. Both filters are optional and AND together;
 // with neither, every event is printed. epicPath must already be a resolved
-// epic directory (see resolveEpicArg) — a missing epic directory is an
+// epic directory (see ticketref.ResolveEpicArg) — a missing epic directory is an
 // error, but a missing run-log.jsonl (an epic that hasn't started yet) is
 // not: it prints a short message and returns nil so callers see exit 0.
 func runTicketsFilterRunLog(epicPath, ticketFilter string, eventFilter []string, w io.Writer) error {

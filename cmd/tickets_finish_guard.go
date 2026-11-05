@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/check"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
@@ -62,7 +63,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 
 	tree, err := history.TreeID(wt)
 	if err != nil {
-		return fmt.Errorf("%s: reading the tree of %s: %w", ticketLabel(path), wt, err)
+		return fmt.Errorf("%s: reading the tree of %s: %w", ticketref.TicketLabel(path), wt, err)
 	}
 	dataDir, err := dirs.DataDir()
 	if err != nil {
@@ -87,7 +88,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 			failing = &recs[i]
 		}
 	}
-	label := ticketLabel(path)
+	label := ticketref.TicketLabel(path)
 	if failing == nil {
 		return fmt.Errorf("%s: no passing `gx check` run for the current tree of %s; run `gx check` and fix it, or file follow-ups for flakes and pre-existing failures and finish with --check-failures <follow-up addrs>", label, branch)
 	}
@@ -108,7 +109,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		return err
 	}
 	for _, a := range addrs {
-		if _, _, err := findTicket(dirs, cwd, a); err != nil {
+		if _, _, err := ticketref.FindTicket(dirs, cwd, a); err != nil {
 			return fmt.Errorf("%s: --check-failures %s: %w", label, a, err)
 		}
 	}

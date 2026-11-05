@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/ticketref"
 )
 
 const pingTimeout = time.Second
@@ -14,7 +15,7 @@ const pingTimeout = time.Second
 // is the truth, so a down server (or any failure) is silent — the server's own
 // watch and poll pick the change up when it runs.
 func pingServer(d deps, path string) {
-	pingLabels(d.dial(), ticketLabel(path))
+	pingLabels(d.dial(), ticketref.TicketLabel(path))
 }
 
 // pingLabels is pingServer for callers that already hold the labels, such as a

@@ -122,6 +122,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `cmd/` — CLI commands (`gx tickets`, `gx agent`, ...)
   - `cmd/` (root) — the command tree and the commands not yet moved out
   - `cmd/cmdbase` — what every command package shares: `Env`, `ExitError`, provenance and JSON output, server-client helpers
+  - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
 - `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the

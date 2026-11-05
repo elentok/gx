@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -84,7 +85,7 @@ func archivedLookup(dirs config.Dirs, cwd string) movedLookup {
 		if err != nil || a.Project == "" {
 			return wire.TicketInfo{}, false
 		}
-		root, err := projectRoot(dirs, cwd, a.Project)
+		root, err := ticketref.ProjectRoot(dirs, cwd, a.Project)
 		if err != nil {
 			return wire.TicketInfo{}, false
 		}

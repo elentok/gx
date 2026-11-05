@@ -35,7 +35,7 @@ func outboxFollowUps(env evolveEnv) ([]followUpDraft, error) {
 	}
 	var out []followUpDraft
 	for _, e := range epics {
-		if e.Name != followUpsEpic {
+		if e.Name != tickets.FollowUpsEpic {
 			continue
 		}
 		for _, tk := range e.Tickets {

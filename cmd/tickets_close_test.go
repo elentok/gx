@@ -21,13 +21,13 @@ func setupCloseProject(t *testing.T) moveFixture {
 	store := isolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	project := addProject(t, store, "mine", repo)
-	for _, e := range []string{followUpsEpic, "work"} {
+	for _, e := range []string{tickets.FollowUpsEpic, "work"} {
 		testutil.EnsureEpicTicketMD(t, filepath.Join(project, e))
 		if err := os.MkdirAll(filepath.Join(project, e, "issues"), 0755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	fu := filepath.Join(project, followUpsEpic, "issues")
+	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
 	testutil.WriteFile(t, fu, "01-one.md", "---\nid: \"01\"\nstatus: open\ntype: research\n---\n\n# 01 — One\n\nbody\n")
 	testutil.WriteFile(t, fu, "02-two.md", "---\nid: \"02\"\nstatus: done\ntype: research\n---\n\n# 02 — Two\n")
 	testutil.WriteFile(t, fu, "03-run.md", "---\nid: \"03\"\nstatus: open\ntype: research\nsession_ids:\n  - abc\n---\n\n# 03 — Run\n")
@@ -56,10 +56,10 @@ func TestExecute_TicketsClose_EachReasonArchivesWithResolution(t *testing.T) {
 			if out != "mine:follow-ups-archived/01\n" {
 				t.Errorf("stdout = %q, want the archive address", out)
 			}
-			if _, err := os.Stat(filepath.Join(f.project, followUpsEpic, "issues", "01-one.md")); !os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(f.project, tickets.FollowUpsEpic, "issues", "01-one.md")); !os.IsNotExist(err) {
 				t.Errorf("old file still there: %v", err)
 			}
-			path := filepath.Join(f.project, followUpsArchivedEpic, "issues", "01-one.md")
+			path := filepath.Join(f.project, tickets.ArchivedFollowUpsEpic, "issues", "01-one.md")
 			got, err := schema.ParseTicket(path)
 			if err != nil {
 				t.Fatal(err)
@@ -86,7 +86,7 @@ func TestExecute_TicketsClose_StampsZeroFrictionOnANeverRunTicket(t *testing.T) 
 	if _, err := runIn(t, f.repo, "tickets", "close", "follow-ups/01", "--reason", "fixed"); err != nil {
 		t.Fatalf("close: %v", err)
 	}
-	got, err := schema.ParseTicket(filepath.Join(f.project, followUpsArchivedEpic, "issues", "01-one.md"))
+	got, err := schema.ParseTicket(filepath.Join(f.project, tickets.ArchivedFollowUpsEpic, "issues", "01-one.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestExecute_TicketsClose_CreatesArchiveDraftOnce(t *testing.T) {
 	if _, err := runIn(t, f.repo, "tickets", "close", "follow-ups/01", "--reason", "fixed"); err != nil {
 		t.Fatal(err)
 	}
-	md, err := os.ReadFile(filepath.Join(f.project, followUpsArchivedEpic, "ticket.md"))
+	md, err := os.ReadFile(filepath.Join(f.project, tickets.ArchivedFollowUpsEpic, "ticket.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
 			if after := moveTreeSnapshot(t, f.project); after != before {
 				t.Errorf("refusal wrote something:\nbefore %s\nafter  %s", before, after)
 			}
-			if _, err := os.Stat(filepath.Join(f.project, followUpsArchivedEpic)); !os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(f.project, tickets.ArchivedFollowUpsEpic)); !os.IsNotExist(err) {
 				t.Errorf("archive epic created: %v", err)
 			}
 			if len(*pings) != 0 {
@@ -182,14 +182,14 @@ func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
 
 func TestExecute_TicketsClose_SweepLeavesLogBesideArchivedTicket(t *testing.T) {
 	f := setupCloseProject(t)
-	fu := filepath.Join(f.project, followUpsEpic, "issues")
+	fu := filepath.Join(f.project, tickets.FollowUpsEpic, "issues")
 	testutil.WriteFile(t, fu, "05-kept.md", "---\nid: \"05\"\nstatus: cancelled\ntype: research\n---\n\n# 05 — Kept\n")
 	const log = "{\"a\":1}\n{\"b\":2}\n"
 	testutil.WriteFile(t, fu, "05-kept.jsonl", log)
 	if _, err := runIn(t, f.repo, "tickets", "close", "--sweep"); err != nil {
 		t.Fatalf("sweep: %v", err)
 	}
-	got, err := os.ReadFile(filepath.Join(f.project, followUpsArchivedEpic, "issues", "03-kept.jsonl"))
+	got, err := os.ReadFile(filepath.Join(f.project, tickets.ArchivedFollowUpsEpic, "issues", "03-kept.jsonl"))
 	if err != nil || string(got) != log {
 		t.Errorf("archived log = %q, %v; want %q", got, err, log)
 	}
@@ -202,7 +202,7 @@ func TestExecute_TicketsClose_SweepMovesDoneAndCancelled(t *testing.T) {
 	for _, flag := range []string{"--sweep", "--done"} {
 		t.Run(flag, func(t *testing.T) {
 			f := setupCloseProject(t)
-			fu := filepath.Join(f.project, followUpsEpic, "issues")
+			fu := filepath.Join(f.project, tickets.FollowUpsEpic, "issues")
 			testutil.WriteFile(t, fu, "05-kept.md", "---\nid: \"05\"\nstatus: cancelled\ntype: research\n---\n\n# 05 — Kept\n\n## Resolution\n\n- reason: fixed\n")
 			out, err := runIn(t, f.repo, "tickets", "close", flag)
 			if err != nil {
@@ -211,7 +211,7 @@ func TestExecute_TicketsClose_SweepMovesDoneAndCancelled(t *testing.T) {
 			if out != "mine:follow-ups-archived/01\nmine:follow-ups-archived/02\nmine:follow-ups-archived/03\n" {
 				t.Errorf("stdout = %q", out)
 			}
-			archived := filepath.Join(f.project, followUpsArchivedEpic, "issues")
+			archived := filepath.Join(f.project, tickets.ArchivedFollowUpsEpic, "issues")
 			for _, tc := range []struct {
 				name       string
 				status     schema.Status

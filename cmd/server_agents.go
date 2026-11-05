@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
 )
@@ -96,7 +97,7 @@ func newServerAgentsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a, _, err := findTicket(d.dirs(), cwd, args[0])
+			a, _, err := ticketref.FindTicket(d.dirs(), cwd, args[0])
 			if err != nil {
 				return err
 			}

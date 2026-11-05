@@ -38,7 +38,7 @@ func resolveEpicTarget(cfgDirs config.Dirs, cwd, arg string) (projectDir, projec
 	project, name, hasProject := strings.Cut(arg, ":")
 	if !hasProject {
 		name = arg
-		if projectDir, err = ticketRoot(cfgDirs, cwd); err != nil {
+		if projectDir, err = tickets.RootForDirs(cfgDirs, cwd); err != nil {
 			return "", "", "", err
 		}
 		return projectDir, tickets.ProjectName(projectDir), name, nil

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -19,7 +20,7 @@ func runTicketsFollowUpSearch(d deps, project string, words []string, w io.Write
 	if len(words) == 0 {
 		return fmt.Errorf("follow-up search needs at least one word")
 	}
-	root, project, err := resolveProject(d, project)
+	root, project, err := ticketref.ResolveProject(d.base(), project)
 	if err != nil {
 		return err
 	}
@@ -27,7 +28,7 @@ func runTicketsFollowUpSearch(d deps, project string, words []string, w io.Write
 	if err != nil {
 		return err
 	}
-	for _, name := range []string{followUpsEpic, followUpsArchivedEpic} {
+	for _, name := range []string{tickets.FollowUpsEpic, tickets.ArchivedFollowUpsEpic} {
 		for _, e := range epics {
 			if e.Name != name {
 				continue
@@ -39,7 +40,7 @@ func runTicketsFollowUpSearch(d deps, project string, words []string, w io.Write
 				}
 				a := tickets.Address{Project: project, Epic: name, ID: t.Identifier}
 				line := fmt.Sprintf("%s  %s  %s", a, t.Status, t.Title)
-				if name == followUpsArchivedEpic {
+				if name == tickets.ArchivedFollowUpsEpic {
 					if reason := closeReason(t.Body); reason != "" {
 						line += "  (" + reason + ")"
 					}

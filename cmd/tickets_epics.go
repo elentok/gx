@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// runTicketsEpics resolves the cwd repo's ticket root (see ticketRoot) and
+// runTicketsEpics resolves the cwd repo's ticket root (tickets.RootForDirs) and
 // prints its epic directory names, one per line,
 // alphabetically sorted (the order os.ReadDir already returns) with
 // `.archive` and other dot-prefixed directories excluded by tickets.Load —
@@ -17,7 +17,7 @@ import (
 // When mapsOnly is set, only epics with a ticket.md of kind: map (Epic.IsMap) are
 // printed.
 func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly bool) error {
-	root, err := ticketRoot(dirs, cwd)
+	root, err := tickets.RootForDirs(dirs, cwd)
 	if err != nil {
 		return err
 	}

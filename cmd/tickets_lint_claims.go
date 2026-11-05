@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -31,7 +32,7 @@ func newTicketsLintClaimsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			report, err := lintEpicClaims(d, cwd, commit, resolveEpicArg(d.dirs(), args[0], cwd), manifest, c.OutOrStdout())
+			report, err := lintEpicClaims(d, cwd, commit, ticketref.ResolveEpicArg(d.dirs(), args[0], cwd), manifest, c.OutOrStdout())
 			if err != nil {
 				return err
 			}

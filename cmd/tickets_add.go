@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
@@ -71,7 +72,7 @@ func runTicketsAddBody(d deps, epicPath, parent, slug, body string, flags addFro
 		return err
 	}
 	if fm.ID != "" && stderr != nil {
-		if got := ticketLabel(path); !strings.HasSuffix(got, "/"+fm.ID) {
+		if got := ticketref.TicketLabel(path); !strings.HasSuffix(got, "/"+fm.ID) {
 			fmt.Fprintf(stderr, "warning: body says id %q; the allocated id wins: %s\n", fm.ID, got)
 		}
 	}
@@ -230,8 +231,8 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 
 	epicPath = filepath.Clean(epicPath)
 	// Checked before anything is created, so a refusal leaves no epic behind.
-	if filepath.Base(epicPath) == followUpsEpic && fm.Category == "" {
-		return "", nil, &tickets.AddressError{Code: tickets.CodeCategoryRequired, Msg: "a ticket filed into " + followUpsEpic + " needs a category (bug or idea)"}
+	if filepath.Base(epicPath) == tickets.FollowUpsEpic && fm.Category == "" {
+		return "", nil, &tickets.AddressError{Code: tickets.CodeCategoryRequired, Msg: "a ticket filed into " + tickets.FollowUpsEpic + " needs a category (bug or idea)"}
 	}
 	// Also repairs an existing epic directory that has no ticket.md.
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
@@ -324,10 +325,6 @@ func printNotices(w io.Writer, notices []string) {
 // projectEpicRe matches `project:epic`, the cross-project spelling of an epic.
 var projectEpicRe = regexp.MustCompile(`^([^:/\s]+):([^:/\s]+)$`)
 
-// followUpsEpic is the epic every project's contributor outbox is filed in; its
-// tickets must say what kind of follow-up they are.
-const followUpsEpic = "follow-ups"
-
 // resolveAddTarget turns add's argument into the epic to allocate in and the
 // parent ticket id: an epic (name or path) as before, `project:epic` for an
 // epic of another registered project, or a ticket address, which names the
@@ -337,18 +334,18 @@ func resolveAddTarget(d deps, arg, parentFlag string) (epicPath, parent string, 
 	if err != nil {
 		return "", "", err
 	}
-	epicPath = resolveEpicArg(d.dirs(), arg, cwd)
+	epicPath = ticketref.ResolveEpicArg(d.dirs(), arg, cwd)
 	if info, statErr := os.Stat(epicPath); statErr == nil && info.IsDir() {
 		return epicPath, parentFlag, nil
 	}
 	if m := projectEpicRe.FindStringSubmatch(arg); m != nil {
-		root, err := projectRoot(d.dirs(), cwd, m[1])
+		root, err := ticketref.ProjectRoot(d.dirs(), cwd, m[1])
 		if err != nil {
 			return "", "", err
 		}
 		return filepath.Join(root, m[2]), parentFlag, nil
 	}
-	_, t, findErr := findTicket(d.dirs(), cwd, arg)
+	_, t, findErr := ticketref.FindTicket(d.dirs(), cwd, arg)
 	if findErr != nil {
 		// Not an address either: let the epic path's own error surface.
 		return epicPath, parentFlag, nil
@@ -362,7 +359,7 @@ func resolveAddTarget(d deps, arg, parentFlag string) (epicPath, parent string, 
 // printTicketRef prints the ticket at path by address, or as {address, path}
 // JSON.
 func printTicketRef(path string, jsonOut bool, w io.Writer) error {
-	label := ticketLabel(path)
+	label := ticketref.TicketLabel(path)
 	if !jsonOut {
 		_, err := fmt.Fprintln(w, label)
 		return err

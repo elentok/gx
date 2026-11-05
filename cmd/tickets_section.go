@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -17,7 +18,7 @@ func runTicketsSection(d deps, path, heading, content string, clear, jsonOut boo
 	if strings.TrimSpace(content) == "" && !clear {
 		return fmt.Errorf("refusing to blank section %q: content is empty (pass --clear to blank it on purpose)", heading)
 	}
-	if isEpicTicketMD(path) {
+	if ticketref.IsEpicTicketMD(path) {
 		// An epic's frontmatter is not a ticket's, so it is edited in place
 		// rather than parsed as a Ticket.
 		if err := tickets.SetEpicSection(path, heading, content); err != nil {

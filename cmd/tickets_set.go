@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/repair"
@@ -146,7 +147,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 		Short: "validated, sparse frontmatter writes to a ticket, by address or file path",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			path, err := resolveTicketRef(d.dirs(), d.getwd, args[0])
+			path, err := ticketref.ResolveTicketRef(d.dirs(), d.getwd, args[0])
 			if err != nil {
 				return err
 			}
@@ -201,7 +202,7 @@ func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 			continue
 		}
 		if c.Flags().Changed(strings.ReplaceAll(field, "_", "-")) {
-			return &tickets.AddressError{Code: tickets.CodeServerStamped, Msg: fmt.Sprintf("%s: %s is server-stamped and not settable via `tickets set`", ticketLabel(path), field)}
+			return &tickets.AddressError{Code: tickets.CodeServerStamped, Msg: fmt.Sprintf("%s: %s is server-stamped and not settable via `tickets set`", ticketref.TicketLabel(path), field)}
 		}
 	}
 
@@ -223,7 +224,7 @@ func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 		v, _ := c.Flags().GetString("destination-unconfirmed")
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			return fmt.Errorf("%s: --destination-unconfirmed %q: want true or false", ticketLabel(path), v)
+			return fmt.Errorf("%s: --destination-unconfirmed %q: want true or false", ticketref.TicketLabel(path), v)
 		}
 		update.DestinationUnconfirmed = &b
 		changed = append(changed, "destination_unconfirmed="+v)
@@ -240,7 +241,7 @@ func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 		if v != "now" {
 			var err error
 			if at, err = time.Parse(time.RFC3339, v); err != nil {
-				return fmt.Errorf("%s: --completed-at %q: want an RFC3339 timestamp or now", ticketLabel(path), v)
+				return fmt.Errorf("%s: --completed-at %q: want an RFC3339 timestamp or now", ticketref.TicketLabel(path), v)
 			}
 		}
 		update.CompletedAt = &at
@@ -260,18 +261,18 @@ func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 		}
 		var err error
 		if notices, err = tickets.CheckEpicBlockedByWrite(path, refs); err != nil {
-			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketLabel(path), v, err)
+			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketref.TicketLabel(path), v, err)
 		}
 		update.BlockedBy = &refs
 		changed = append(changed, "blocked_by="+v)
 	}
 	if len(changed) == 0 {
-		return fmt.Errorf("%s: an epic takes --kind, --status, --destination-unconfirmed and --blocked-by (a map also --design-step and --completed-at)", ticketLabel(path))
+		return fmt.Errorf("%s: an epic takes --kind, --status, --destination-unconfirmed and --blocked-by (a map also --design-step and --completed-at)", ticketref.TicketLabel(path))
 	}
 	if err := tickets.UpdateEpicFields(path, update); err != nil {
-		return fmt.Errorf("%s: %w", ticketLabel(path), err)
+		return fmt.Errorf("%s: %w", ticketref.TicketLabel(path), err)
 	}
-	pingLabels(dial, ticketLabel(path))
+	pingLabels(dial, ticketref.TicketLabel(path))
 	printNotices(c.ErrOrStderr(), notices)
 
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
@@ -279,9 +280,9 @@ func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 			Address string   `json:"address"`
 			Path    string   `json:"path"`
 			Updated []string `json:"updated"`
-		}{ticketLabel(path), path, changed}, cmdbase.ViaDirect, cmdbase.CallerActor(getwd))
+		}{ticketref.TicketLabel(path), path, changed}, cmdbase.ViaDirect, cmdbase.CallerActor(getwd))
 	}
-	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
+	fmt.Fprintf(w, "%s: updated (%s)\n", ticketref.TicketLabel(path), strings.Join(changed, ", "))
 	return nil
 }
 
@@ -383,7 +384,7 @@ func mapDoneStamp(dirs config.Dirs, c *cobra.Command, path string) (*conversatio
 	if err != nil {
 		return nil, err
 	}
-	sum, ok, err := conversations.SumTotals(root, ticketLabel(path), current.CreatedAt)
+	sum, ok, err := conversations.SumTotals(root, ticketref.TicketLabel(path), current.CreatedAt)
 	if err != nil || !ok {
 		return nil, err
 	}
@@ -394,7 +395,7 @@ func mapDoneStamp(dirs config.Dirs, c *cobra.Command, path string) (*conversatio
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
 func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
-	if isEpicTicketMD(path) {
+	if ticketref.IsEpicTicketMD(path) {
 		return runEpicSet(dirs, c, path, w, getwd, dial)
 	}
 	if c.Flags().Changed("exported-at") {
@@ -453,7 +454,7 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 		blockedBy, _ := c.Flags().GetString("blocked-by")
 		current.BlockedBy = parseCSVIDs(blockedBy)
 		if notices, err = tickets.CheckBlockedByWrite(path, current); err != nil {
-			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketLabel(path), blockedBy, err)
+			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketref.TicketLabel(path), blockedBy, err)
 		}
 	}
 
@@ -498,15 +499,15 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 	}
 	printNotices(stderr, notices)
 
-	pingLabels(dial, ticketLabel(path))
+	pingLabels(dial, ticketref.TicketLabel(path))
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
 		return cmdbase.WriteStamped(w, struct {
 			Address string   `json:"address"`
 			Path    string   `json:"path"`
 			Updated []string `json:"updated"`
-		}{ticketLabel(path), path, changed}, cmdbase.ViaDirect, cmdbase.CallerActor(getwd))
+		}{ticketref.TicketLabel(path), path, changed}, cmdbase.ViaDirect, cmdbase.CallerActor(getwd))
 	}
-	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
+	fmt.Fprintf(w, "%s: updated (%s)\n", ticketref.TicketLabel(path), strings.Join(changed, ", "))
 	return nil
 }
 
@@ -647,7 +648,7 @@ func checkOpenQuestionGuard(c *cobra.Command, path string) error {
 	if tickets.OpenQuestion(evs) != nil {
 		return nil
 	}
-	return fmt.Errorf("%s: the log has no open question; use `gx tickets %s` instead of `tickets set`", ticketLabel(path), verb)
+	return fmt.Errorf("%s: the log has no open question; use `gx tickets %s` instead of `tickets set`", ticketref.TicketLabel(path), verb)
 }
 
 // isRalphLoopBranch is the shared branch-detection logic behind

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/nav"
 
@@ -14,7 +15,7 @@ import (
 )
 
 // newEpicScopedCmd builds a cobra command that takes a single epic argument:
-// cwd resolution, resolveEpicArg, and shell-completion via completeEpicNames
+// cwd resolution, ticketref.ResolveEpicArg, and shell-completion via completeEpicNames
 // are wired once here so epic-scoped subcommands (ensure-code-review, add,
 // filter-run-log, ...) don't each hand-roll the same boilerplate. run
 // receives the resolved epic path, the raw args (for any extra positional
@@ -29,7 +30,7 @@ func newEpicScopedCmd(d deps, use, short string, run func(epicPath string, args 
 			if err != nil {
 				return err
 			}
-			return run(resolveEpicArg(d.dirs(), args[0], cwd), args, c.OutOrStdout())
+			return run(ticketref.ResolveEpicArg(d.dirs(), args[0], cwd), args, c.OutOrStdout())
 		},
 		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 			cwd, err := d.getwd()
@@ -231,7 +232,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 				}
 				return runTicketsValidateAll(cfg.TicketStore.Path, c.OutOrStdout(), c.ErrOrStderr())
 			}
-			path, err := resolveTicketRef(d.dirs(), d.getwd, args[0])
+			path, err := ticketref.ResolveTicketRef(d.dirs(), d.getwd, args[0])
 			if err != nil {
 				return err
 			}
@@ -448,7 +449,7 @@ second run changes nothing.`,
 				}
 				return runTicketsShow(d.dirs(), cwd, args[0], false, args[1], c.OutOrStdout())
 			}
-			path, err := resolveTicketRef(d.dirs(), d.getwd, args[0])
+			path, err := ticketref.ResolveTicketRef(d.dirs(), d.getwd, args[0])
 			if err != nil {
 				return err
 			}
