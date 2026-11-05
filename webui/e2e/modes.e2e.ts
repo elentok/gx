@@ -39,9 +39,9 @@ test.describe("61. Page modes at 760px", () => {
     expect(meta.y + meta.height).toBeGreaterThan(title.y);
     expect(meta.x).toBeGreaterThanOrEqual(title.x + title.width);
 
-    // The jump menu is a popover, not a full-screen sheet, and the heading shows the ⌘K hint.
+    // The jump menu is a popover, not a full-screen sheet, and the heading shows no ⌘K hint.
     const heading = page.getByRole("heading", { level: 1 });
-    await expect(heading.getByText("⌘K")).toBeVisible();
+    await expect(heading.getByText("⌘K")).toHaveCount(0);
     await heading.getByRole("button").click();
     const menu = page.getByRole("dialog", nav("Jump to epic"));
     await expect(menu).toBeVisible();

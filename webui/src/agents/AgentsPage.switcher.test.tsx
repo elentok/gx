@@ -25,6 +25,11 @@ test("the title button and Cmd-K open the switcher on the filter", () => {
   expect(document.activeElement).toBe(dialog().getByRole("combobox"));
 });
 
+test("the switcher title shows no ⌘K hint", () => {
+  render(switcherSessions(), "/agents/s-1");
+  expect(screen.getByRole("heading", { level: 1 }).textContent).not.toContain("⌘K");
+});
+
 test("Cmd-K and Ctrl-K open the switcher", () => {
   render(switcherSessions(), "/agents/s-1");
   fireEvent.keyDown(window, { key: "k", metaKey: true });

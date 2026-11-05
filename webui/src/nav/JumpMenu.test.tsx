@@ -119,7 +119,7 @@ test("the menu input has no expand button", async () => {
 
 test("the title shows no count", async () => {
   setup();
-  expect((await titleButton()).textContent).toBe("current▾⌘K");
+  expect((await titleButton()).textContent).toBe("current▾");
   expect(screen.queryByTestId("waiting-count")).toBeNull();
 });
 

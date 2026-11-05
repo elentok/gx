@@ -306,11 +306,6 @@ export function RowList({
           <Text as="span" aria-hidden fontSize="16px" color="text.dim">
             ▾
           </Text>
-          {!phone && hotkey && (
-            <Text as="span" aria-hidden fontSize="13px" color="text.dim" fontFamily="text" fontWeight="400">
-              ⌘K
-            </Text>
-          )}
         </chakra.button>
       </Heading>
       {open && <Menu sections={sections} label={label} placeholder={placeholder} footer={footer} phone={phone} onClose={() => setOpen(false)} />}
