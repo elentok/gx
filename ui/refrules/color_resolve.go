@@ -1,9 +1,11 @@
-package ui
+package refrules
 
 import (
 	"fmt"
 	"image/color"
 	"strings"
+
+	"github.com/elentok/gx/ui"
 )
 
 // ResolveColor parses a color string into a color.Color.
@@ -12,21 +14,21 @@ import (
 func ResolveColor(s string) (color.Color, error) {
 	switch strings.ToLower(s) {
 	case "blue":
-		return ColorBlue, nil
+		return ui.ColorBlue, nil
 	case "green":
-		return ColorGreen, nil
+		return ui.ColorGreen, nil
 	case "yellow":
-		return ColorYellow, nil
+		return ui.ColorYellow, nil
 	case "orange":
-		return ColorOrange, nil
+		return ui.ColorOrange, nil
 	case "mauve":
-		return ColorMauve, nil
+		return ui.ColorMauve, nil
 	case "teal":
-		return ColorTeal, nil
+		return ui.ColorTeal, nil
 	case "red":
-		return ColorRed, nil
+		return ui.ColorRed, nil
 	case "surface":
-		return ColorSurface, nil
+		return ui.ColorSurface, nil
 	}
 
 	if strings.HasPrefix(s, "#") {

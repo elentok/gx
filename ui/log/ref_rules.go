@@ -1,18 +1,18 @@
 package log
 
 import (
-	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/refrules"
 )
 
-// The important-refs/hide-refs matching logic lives in the ui package
+// The important-refs/hide-refs matching logic lives in the ui/refrules package
 // (shared with ui/commit so both views sort/filter decorations identically).
 // These aliases keep the existing unexported names in this package.
-type compiledRefRule = ui.CompiledRefRule
+type compiledRefRule = refrules.CompiledRefRule
 
 var (
-	compileHideRefs = ui.CompileHideRefs
-	isHiddenRef     = ui.IsHiddenRef
-	compileRefRules = ui.CompileRefRules
-	matchRefRule    = ui.MatchRefRule
-	sortDecorations = ui.SortDecorations
+	compileHideRefs = refrules.CompileHideRefs
+	isHiddenRef     = refrules.IsHiddenRef
+	compileRefRules = refrules.CompileRefRules
+	matchRefRule    = refrules.MatchRefRule
+	sortDecorations = refrules.SortDecorations
 )

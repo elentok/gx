@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/refrules"
 	"github.com/elentok/gx/ui/tree"
 
 	"github.com/elentok/gx/ui/commitops"
@@ -41,7 +42,7 @@ type Model struct {
 
 	// compiledRefRules/compiledHideRefs sort and filter decoration badges the
 	// same way ui/log does, so tags appear in the same order in both views.
-	compiledRefRules []ui.CompiledRefRule
+	compiledRefRules []refrules.CompiledRefRule
 	compiledHideRefs []*regexp.Regexp
 
 	commitDiffArea
@@ -84,8 +85,8 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 		settings:         settings,
 		filterPath:       strings.TrimSpace(filterPath),
 		bodyExpanded:     true,
-		compiledRefRules: ui.CompileRefRules(settings.LogConfig.ImportantRefs),
-		compiledHideRefs: ui.CompileHideRefs(settings.LogConfig.HideRefs),
+		compiledRefRules: refrules.CompileRefRules(settings.LogConfig.ImportantRefs),
+		compiledHideRefs: refrules.CompileHideRefs(settings.LogConfig.HideRefs),
 		commitDiffArea: commitDiffArea{
 			diffModel:        diffview.NewModel(settings.UseNerdFontIcons),
 			diffContextLines: settings.DiffContextLines,

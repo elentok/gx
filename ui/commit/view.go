@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
+	"github.com/elentok/gx/ui/refrules"
 	"github.com/elentok/gx/ui/tree"
 
 	tea "charm.land/bubbletea/v2"
@@ -387,17 +388,17 @@ func renderBadges(decorations []git.RefDecoration) string {
 // decorationBadgeParts filters out hidden refs and sorts decorations the same
 // way ui/log does (important-refs rules first, in rule order), so the tags
 // shown here appear in the same order as the log view's rows.
-func decorationBadgeParts(decorations []git.RefDecoration, hideRefs []*regexp.Regexp, rules []ui.CompiledRefRule, trunk string) []string {
+func decorationBadgeParts(decorations []git.RefDecoration, hideRefs []*regexp.Regexp, rules []refrules.CompiledRefRule, trunk string) []string {
 	if len(decorations) == 0 {
 		return nil
 	}
 	visible := make([]git.RefDecoration, 0, len(decorations))
 	for _, decoration := range decorations {
-		if !ui.IsHiddenRef(decoration.Name, hideRefs) {
+		if !refrules.IsHiddenRef(decoration.Name, hideRefs) {
 			visible = append(visible, decoration)
 		}
 	}
-	sorted := ui.SortDecorations(visible, rules)
+	sorted := refrules.SortDecorations(visible, rules)
 	parts := make([]string, 0, len(sorted))
 	for _, decoration := range sorted {
 		parts = append(parts, ui.RenderBadgeText(decoration.Name, badgeColorForDecoration(decoration, trunk)))

@@ -1,4 +1,4 @@
-package ui
+package refrules
 
 import (
 	"image/color"
