@@ -1,15 +1,15 @@
-package server
+package recovery
 
 import (
 	"fmt"
-	"github.com/elentok/gx/server/queue"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -29,8 +29,8 @@ func matchedEntryText(e recovery.Entry, matched bool) string {
 	return fmt.Sprintf("%s (%s)", e.ID, e.Signature())
 }
 
-// investigatePrompt is what the agent is told on top of the skill command.
-func investigatePrompt(t tickets.Ticket) string {
+// InvestigatePrompt is what the agent is told on top of the skill command.
+func InvestigatePrompt(t tickets.Ticket) string {
 	if t.Type != string(schema.TypeInvestigate) {
 		return ""
 	}
@@ -41,10 +41,10 @@ func investigatePrompt(t tickets.Ticket) string {
 	return "Matched catalog entry: " + strings.TrimSpace(schema.Section(schema.ParseBody(string(raw)), matchedEntryHeading))
 }
 
-// investigateRef is where an investigate ticket's detached worktree starts: the
+// InvestigateRef is where an investigate ticket's detached worktree starts: the
 // feature-branch tip, else the failed ticket's resolved base. ok is false when
 // neither exists, so the caller falls back to the ordinary commitless ref.
-func investigateRef(repo string, addr tickets.Address, t tickets.Ticket, epics []tickets.Epic) (ref string, ok bool) {
+func InvestigateRef(repo string, addr tickets.Address, t tickets.Ticket, epics []tickets.Epic) (ref string, ok bool) {
 	if _, err := git.RevParse(repo, "refs/heads/"+addr.Epic); err == nil {
 		return "refs/heads/" + addr.Epic, true
 	}
@@ -68,17 +68,17 @@ func investigateRef(repo string, addr tickets.Address, t tickets.Ticket, epics [
 // investigate forks a commitless investigate ticket off the failed ticket and
 // queues it at the front. The parent stays paused; it waits on the child through
 // the ordinary parent edge. It returns the child's address.
-func (s *Server) investigate(ref queue.TicketRef, f recovery.Failure, entry string) (string, error) {
+func (rec *Recovery) investigate(ref queue.TicketRef, f recovery.Failure, entry string) (string, error) {
 	path, id, err := writeInvestigateTicket(ref, f, entry)
 	if err != nil {
 		return "", err
 	}
 	child := tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: id}
 	// queueAdd checks the index, so it must see the new ticket first.
-	if err := s.idx.Refresh(); err != nil {
+	if err := rec.d.Index.Refresh(); err != nil {
 		return "", fmt.Errorf("refresh after writing %s: %w", path, err)
 	}
-	res, err := s.queue.Add(wire.QueueRequest{Address: child.String(), Front: true})
+	res, err := rec.d.Queue.Add(wire.QueueRequest{Address: child.String(), Front: true})
 	if err != nil {
 		return "", err
 	}
@@ -99,7 +99,7 @@ func writeInvestigateTicket(ref queue.TicketRef, f recovery.Failure, entry strin
 		p := schema.TicketID(ref.Addr.ID)
 		parent = &p
 	}
-	return writeNewTicket(filepath.Join(ref.ProjectDir, ref.Addr.Epic), ref.Addr.ID, "investigate", func(id string) (schema.Ticket, string) {
+	return ticketwrite.WriteNewTicket(filepath.Join(ref.ProjectDir, ref.Addr.Epic), ref.Addr.ID, "investigate", func(id string) (schema.Ticket, string) {
 		child := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeInvestigate, Parent: parent}
 		body := fmt.Sprintf(
 			"\n# %s — Investigate %s\n\n## What to build\n\n%s %s (%s): %s\n\nFind out why and fix it or report what a person must do. This ticket is commitless: put any code fix in a follow-up ticket (`gx tickets add --parent`) instead of committing here.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and %s, or the findings reported\n",
@@ -107,36 +107,4 @@ func writeInvestigateTicket(ref queue.TicketRef, f recovery.Failure, entry strin
 		)
 		return child, body
 	})
-}
-
-// writeNewTicket allocates the next id under the epic lock (a child of parent
-// when parent is set) and writes the ticket build returns for it.
-func writeNewTicket(epicPath, parent, slug string, build func(id string) (schema.Ticket, string)) (path, id string, err error) {
-	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
-	if err != nil {
-		return "", "", fmt.Errorf("load epic %s: %w", epicPath, err)
-	}
-	defer unlock()
-
-	id, err = tickets.NextTicketID(*epic, parent)
-	if err != nil {
-		return "", "", fmt.Errorf("allocate %s id: %w", slug, err)
-	}
-	tk, body := build(id)
-	tk.StampCreated(time.Now(), tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}.String())
-	out, err := schema.MarshalTicket(tk, body)
-	if err != nil {
-		return "", "", fmt.Errorf("marshal %s ticket %s: %w", slug, id, err)
-	}
-	path = filepath.Join(epicPath, "issues", fmt.Sprintf("%s-%s.md", id, slug))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", "", err
-	}
-	if err := os.WriteFile(path, out, 0o644); err != nil {
-		return "", "", fmt.Errorf("write %s: %w", path, err)
-	}
-	if _, err := schema.ParseTicket(path); err != nil {
-		return "", "", fmt.Errorf("%s ticket %s failed validation: %w", slug, path, err)
-	}
-	return path, id, nil
 }

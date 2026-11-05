@@ -1,4 +1,4 @@
-package server
+package recovery
 
 import (
 	"io"
@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -19,8 +22,8 @@ func investigateReport(class string) string {
 }
 
 // mergedInvestigation writes an investigate ticket carrying body into a fresh
-// store and returns the server, the store and the ticket's address and path.
-func mergedInvestigation(t *testing.T, body string, followUps string) (*Server, string, tickets.Address, string) {
+// store and returns the recovery, the store and the ticket's address and path.
+func mergedInvestigation(t *testing.T, body string, followUps string) (*Recovery, string, tickets.Address, string) {
 	t.Helper()
 	store := t.TempDir()
 	epicPath := filepath.Join(store, "proj", "epic-a")
@@ -40,8 +43,11 @@ func mergedInvestigation(t *testing.T, body string, followUps string) (*Server, 
 	if err := os.WriteFile(path, out, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := withProjects(&Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))})
-	s.settings.Store(&Settings{RecoverySettings: config.RecoveryConfig{FollowUps: followUps}})
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	env := projects.Env{TicketStore: store}
+	var set settings.Holder
+	set.Store(&settings.Settings{RecoverySettings: config.RecoveryConfig{FollowUps: followUps}})
+	s := New(Deps{Log: log, Settings: &set, Projects: projects.NewRegistry(func() projects.Env { return env }, log, nil, &set, nil, nil)})
 	return s, store, tickets.Address{Project: "proj", Epic: "epic-a", ID: "02"}, path
 }
 
@@ -50,7 +56,7 @@ func TestFileFollowUp_CatalogEntryFilesADraftResearchTicketAndCreatesTheEpicDraf
 	for _, class := range []string{proposalCatalogEntry, proposalOrchestratorFix} {
 		t.Run(class, func(t *testing.T) {
 			s, store, addr, path := mergedInvestigation(t, investigateReport(class), "proj:follow-ups")
-			s.fileFollowUp(addr, path)
+			s.FileFollowUp(addr, path)
 
 			epicPath := filepath.Join(store, "proj", "follow-ups")
 			epics, err := tickets.Load(filepath.Join(store, "proj"))
@@ -86,7 +92,7 @@ func TestEnsureDraftEpic_ExistingDirWithoutTicketMDBecomesValid(t *testing.T) {
 	epicPath := filepath.Join(projectDir, "follow-ups")
 	testutil.Mkdir(t, epicPath)
 
-	if err := ensureDraftEpic(epicPath); err != nil {
+	if err := EnsureDraftEpic(epicPath); err != nil {
 		t.Fatal(err)
 	}
 
@@ -116,8 +122,8 @@ func followUpTickets(t *testing.T, store string) []tickets.Ticket {
 func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
 	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
-	s.fileFollowUp(addr, path)
-	s.fileFollowUp(addr, path)
+	s.FileFollowUp(addr, path)
+	s.FileFollowUp(addr, path)
 
 	got := followUpTickets(t, store)
 	if len(got) != 1 {
@@ -147,7 +153,7 @@ func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
 func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
 	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
-	s.fileFollowUp(addr, path)
+	s.FileFollowUp(addr, path)
 	_, _, _, other := mergedInvestigation(t, investigateReport(proposalOrchestratorFix), "proj:follow-ups")
 	raw, err := os.ReadFile(other)
 	if err != nil {
@@ -156,7 +162,7 @@ func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s.fileFollowUp(addr, path)
+	s.FileFollowUp(addr, path)
 
 	if got := followUpTickets(t, store); len(got) != 2 {
 		t.Errorf("follow-ups has %d tickets, want 2", len(got))
@@ -166,7 +172,7 @@ func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
 func TestFileFollowUp_MissingProjectFilesNothingAndDoesNotFail(t *testing.T) {
 	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "nowhere:follow-ups")
-	s.fileFollowUp(addr, path)
+	s.FileFollowUp(addr, path)
 	if got := followUpTickets(t, store); got != nil {
 		t.Errorf("filed %d tickets with no follow-ups project", len(got))
 	}
@@ -175,7 +181,7 @@ func TestFileFollowUp_MissingProjectFilesNothingAndDoesNotFail(t *testing.T) {
 func TestFileFollowUp_HumanOnlyFilesNothing(t *testing.T) {
 	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalHumanOnly), "proj:follow-ups")
-	s.fileFollowUp(addr, path)
+	s.FileFollowUp(addr, path)
 	if _, err := os.Stat(filepath.Join(store, "proj", "follow-ups")); !os.IsNotExist(err) {
 		t.Errorf("follow-ups epic exists after a human-only report: %v", err)
 	}
@@ -186,9 +192,9 @@ func TestWriteFollowUp_GuardBodyAndDedupeKey(t *testing.T) {
 	s, store, _, _ := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
 	first := tickets.Address{Project: "proj", Epic: "epic-a", ID: "03"}
 	second := tickets.Address{Project: "proj", Epic: "epic-a", ID: "04"}
-	spec := followUp{Slug: "guard", Title: "Guard fired", Source: "Source text.", Problem: "Problem text.", SuggestedFix: "Fix text.", Key: "guard/a"}
+	spec := ticketwrite.FollowUp{Slug: "guard", Title: "Guard fired", Source: "Source text.", Problem: "Problem text.", SuggestedFix: "Fix text.", Key: "guard/a"}
 
-	if _, err := s.writeFollowUp(first, spec); err != nil {
+	if _, err := s.WriteFollowUp(first, spec); err != nil {
 		t.Fatal(err)
 	}
 	got := followUpTickets(t, store)
@@ -209,7 +215,7 @@ func TestWriteFollowUp_GuardBodyAndDedupeKey(t *testing.T) {
 		t.Errorf("Evidence has no dedupe key:\n%s", raw)
 	}
 
-	if _, err := s.writeFollowUp(second, spec); err != nil {
+	if _, err := s.WriteFollowUp(second, spec); err != nil {
 		t.Fatal(err)
 	}
 	if got = followUpTickets(t, store); len(got) != 1 {
@@ -221,7 +227,7 @@ func TestWriteFollowUp_GuardBodyAndDedupeKey(t *testing.T) {
 	}
 
 	spec.Key = "guard/b"
-	if _, err := s.writeFollowUp(second, spec); err != nil {
+	if _, err := s.WriteFollowUp(second, spec); err != nil {
 		t.Fatal(err)
 	}
 	if got = followUpTickets(t, store); len(got) != 2 {

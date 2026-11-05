@@ -62,11 +62,11 @@ func (s *Server) watchGates(now time.Time) {
 		if s.gatesRaised[hold] {
 			continue
 		}
-		if _, idle, err := s.agentState(addr); err != nil || !idle {
+		if _, idle, err := s.recovery.AgentState(addr); err != nil || !idle {
 			continue
 		}
 		s.gatesRaised[hold] = true
-		s.recoverAsync(recovery.Failure{Address: run.Address, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
+		s.recovery.RecoverAsync(recovery.Failure{Address: run.Address, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
 	}
 }
 

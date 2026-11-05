@@ -122,7 +122,7 @@ func (s *Server) detectDesignActionable(dir, id string, design chat.DesignRef) {
 	if !ok {
 		return
 	}
-	s.fileBadRoundBlocks(id, design, text)
+	s.recovery.FileBadRoundBlocks(id, design, text)
 	a, matched := designActionable(text, design.Ticket, meta.Harness, s.designFinal(design.Ticket))
 	outcome := actionableNone
 	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {

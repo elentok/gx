@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -107,7 +108,7 @@ func (s *Server) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration,
 	_ = ralphloop.AppendEvent(m.dir, root.Epic, ralphloop.Event{
 		Time: now, Type: string(events.TrunkConflictOpened), Reason: strings.Join(files, ", "), BackupRef: ref,
 	})
-	_, id, err := writeNewTicket(e.Path, "", "trunk-conflict", func(id string) (schema.Ticket, string) {
+	_, id, err := ticketwrite.WriteNewTicket(e.Path, "", "trunk-conflict", func(id string) (schema.Ticket, string) {
 		tk := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeTrunkConflict}
 		body := fmt.Sprintf("\n# %s — Resolve the conflicts on %s\n\n## What to build\n\n"+
 			"\"Stash, merge and restore\" fast-forwarded %s to %s and put your uncommitted changes back. These files hold conflict markers in the checkout of %s and nothing is committed:\n\n%s\n\n"+

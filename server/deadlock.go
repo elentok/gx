@@ -179,5 +179,5 @@ func (s *Server) checkDeadlock(root queue.RootRef, projectDir string, e tickets.
 	if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
 		s.log.Warn("cannot record deadlock", "root", root, "err", err)
 	}
-	s.recoverAsync(recovery.Failure{Address: root.String(), Type: events.Deadlocked, Kind: kind, Reason: reason})
+	s.recovery.RecoverAsync(recovery.Failure{Address: root.String(), Type: events.Deadlocked, Kind: kind, Reason: reason})
 }

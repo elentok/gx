@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/server/projects"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"slices"
@@ -16,28 +17,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// launchSkill is the skill an agent starts under: code-review tickets get their
-// own, since gx-implement would ask them for commits, prompt tickets (the
-// one-offs) get one that keeps the TDD rules out of the way, and investigate
-// and diagnose tickets run gx-investigate's unattended mode.
-func launchSkill(t tickets.Ticket) string {
-	switch {
-	case t.IsCodeReview():
-		return codeReviewSkill
-	case t.IsVerify():
-		return verifySkill
-	case t.Type == string(schema.TypePrompt), t.Type == string(schema.TypeTrunkConflict):
-		return oneOffSkill
-	case t.Type == string(schema.TypeEvolve):
-		return evolveSkill
-	case t.Type == string(schema.TypeInvestigate), t.Type == string(schema.TypeDiagnose):
-		return investigateSkill
-	case t.Type == string(schema.TypeMerge):
-		return mergeSkill
-	}
-	return implementSkill
-}
 
 // trunkConflictNote tells a trunk-conflict agent what the one-off skill does
 // not: it works in the target's own checkout, where a commit would be the
@@ -51,15 +30,7 @@ func launchNote(t tickets.Ticket) string {
 	if t.Type == string(schema.TypeTrunkConflict) {
 		return trunkConflictNote
 	}
-	return investigatePrompt(t)
-}
-
-func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string {
-	prompt := ralphloop.SkillPrompt(agent, skill, address)
-	if note != "" {
-		prompt += "\n\n" + note
-	}
-	return prompt
+	return srvrecovery.InvestigatePrompt(t)
 }
 
 // evolveDirs are the dirs a retro's `gx tickets` verbs write to outside the
@@ -67,7 +38,7 @@ func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string
 // A dir that does not resolve is left out; the verb then fails with its own error.
 func (s *Server) evolveDirs(ticket tickets.Address) []string {
 	var dirs []string
-	if d, err := s.followUpsEpicPath(ticket.Project); err == nil {
+	if d, err := s.recovery.FollowUpsEpicPath(ticket.Project); err == nil {
 		dirs = append(dirs, d)
 	}
 	if d, err := s.projects.Dir("gx"); err == nil {
@@ -114,7 +85,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 			Args:            ralphloop.AgentArgs(agent, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
 			Env:             agentEnv(s.settings.Load().TabEnv, t, ticket, agent),
 			ResumeSessionID: resumeID,
-		}, launchPrompt(agent, launchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
+		}, srvrecovery.LaunchPrompt(agent, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
 			s.logEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
 	}

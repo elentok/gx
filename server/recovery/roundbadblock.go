@@ -1,4 +1,4 @@
-package server
+package recovery
 
 import (
 	"crypto/sha256"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -41,43 +42,43 @@ func badRoundBlocks(text string) []badRoundBlock {
 	return bad
 }
 
-// fileBadRoundBlocks files the unreadable blocks of a round into the one open
+// FileBadRoundBlocks files the unreadable blocks of a round into the one open
 // follow-up that collects them. A round already filed adds nothing. A missing
 // follow-ups project or a failed write only logs a warning.
-func (s *Server) fileBadRoundBlocks(id string, design chat.DesignRef, text string) {
+func (rec *Recovery) FileBadRoundBlocks(id string, design chat.DesignRef, text string) {
 	bad := badRoundBlocks(text)
 	if len(bad) == 0 {
 		return
 	}
 	sum := sha256.Sum256([]byte(text))
 	round := "Round: " + hex.EncodeToString(sum[:6])
-	path, err := s.writeBadBlockFollowUp(id, design, round, bad)
+	path, err := rec.writeBadBlockFollowUp(id, design, round, bad)
 	switch {
 	case errors.Is(err, errNoFollowUpProject):
-		s.log.Warn("follow-ups project missing, unreadable gx-question block not filed", "session", id, "err", err)
+		rec.d.Log.Warn("follow-ups project missing, unreadable gx-question block not filed", "session", id, "err", err)
 	case err != nil:
-		s.log.Warn("file unreadable gx-question block", "session", id, "err", err)
+		rec.d.Log.Warn("file unreadable gx-question block", "session", id, "err", err)
 	case path != "":
-		s.log.Info("filed unreadable gx-question block", "session", id, "path", path)
+		rec.d.Log.Info("filed unreadable gx-question block", "session", id, "path", path)
 	}
 }
 
 // writeBadBlockFollowUp adds the round to the open draft carrying badBlockKey,
 // or files a new one. It returns "" when the round is already filed.
-func (s *Server) writeBadBlockFollowUp(id string, design chat.DesignRef, round string, bad []badRoundBlock) (string, error) {
-	epicPath, err := s.followUpsEpicPath("")
+func (rec *Recovery) writeBadBlockFollowUp(id string, design chat.DesignRef, round string, bad []badRoundBlock) (string, error) {
+	epicPath, err := rec.FollowUpsEpicPath("")
 	if err != nil {
 		return "", err
 	}
-	if err := ensureDraftEpic(epicPath); err != nil {
+	if err := EnsureDraftEpic(epicPath); err != nil {
 		return "", err
 	}
-	if _, ok := s.filedRounds.Load(round); ok {
+	if _, ok := rec.filedRounds.Load(round); ok {
 		return "", nil
 	}
 	if filed, err := roundFiled(epicPath, round); filed || err != nil {
 		if filed {
-			s.filedRounds.Store(round, struct{}{})
+			rec.filedRounds.Store(round, struct{}{})
 		}
 		return "", err
 	}
@@ -88,11 +89,11 @@ func (s *Server) writeBadBlockFollowUp(id string, design chat.DesignRef, round s
 	}
 	if path, found, err := noteOccurrence(epicPath, badBlockKey, "Seen again: "+ev.String()); found || err != nil {
 		if err == nil {
-			s.filedRounds.Store(round, struct{}{})
+			rec.filedRounds.Store(round, struct{}{})
 		}
 		return path, err
 	}
-	path, _, err := writeNewTicket(epicPath, "", badBlockSlug, func(tid string) (schema.Ticket, string) {
+	path, _, err := ticketwrite.WriteNewTicket(epicPath, "", badBlockSlug, func(tid string) (schema.Ticket, string) {
 		body := fmt.Sprintf(
 			"\n# %s — %s\n\n## Source\n\nThe transcript watcher, on a Design session that went Idle after a grilling round.\n\n## Problem\n\nA gx-question block in a grilling round does not parse, so its question shows without options.\n\n## Evidence\n\n%s\n\n%s\n## Suggested fix\n\nFix the gx-design skill's block format, or the parser if the block is valid.\n",
 			tid, badBlockTitle, dedupeLine(badBlockKey), ev.String(),
@@ -100,7 +101,7 @@ func (s *Server) writeBadBlockFollowUp(id string, design chat.DesignRef, round s
 		return schema.Ticket{ID: schema.TicketID(tid), Status: schema.StatusDraft, Type: schema.TypeResearch, Category: schema.CategoryBug}, body
 	})
 	if err == nil {
-		s.filedRounds.Store(round, struct{}{})
+		rec.filedRounds.Store(round, struct{}{})
 	}
 	return path, err
 }

@@ -218,7 +218,7 @@ func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
 func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 	t.Parallel()
 	h := startDeadlock(t, recovery.Catalog{Enabled: true})
-	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is paused"})
+	h.Server.Recovery().RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is paused"})
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.RecoveryApplied)) > 0 })
 
 	applied := runLogOf(t, h, events.RecoveryApplied)
@@ -239,7 +239,7 @@ func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 	}
 
 	// A second deadlock of the same kind hits the per-kind cap.
-	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "again"})
+	h.Server.Recovery().RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "again"})
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.RecoveryEscalated)) > 0 })
 	time.Sleep(100 * time.Millisecond) // negative wait: a second recovery would show by now
 	if got := runLogOf(t, h, events.RecoveryApplied); len(got) != 1 {

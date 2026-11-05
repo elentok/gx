@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
@@ -203,7 +204,7 @@ func TestRecoveryNotify_RecoveredPauseSendsNothingAndIsCounted(t *testing.T) {
 	if got := pauseMessages(sent()); len(got) != 0 {
 		t.Fatalf("a recovered pause sent %v", got)
 	}
-	if n := server.RecoveredCount(filepath.Join(h.TicketStore, "proj"), "epic-a"); n != 1 {
+	if n := srvrecovery.RecoveredCount(filepath.Join(h.TicketStore, "proj"), "epic-a"); n != 1 {
 		t.Errorf("recovered count = %d, want 1", n)
 	}
 }
@@ -275,7 +276,7 @@ func TestRecoveryNotify_RecognizedPauseStillNotifiesAndIsNotCounted(t *testing.T
 	if got := waitPauseMessages(t, sent, events.Spinning); len(got) != 1 {
 		t.Fatalf("sends = %v, want the spinning pause message", got)
 	}
-	if n := server.RecoveredCount(filepath.Join(h.TicketStore, "proj"), "epic-a"); n != 0 {
+	if n := srvrecovery.RecoveredCount(filepath.Join(h.TicketStore, "proj"), "epic-a"); n != 0 {
 		t.Errorf("recovered count = %d, want 0", n)
 	}
 }

@@ -11,14 +11,13 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/recovery"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
-var (
-	GuardRailStop = guardRailStop
-)
+// Recovery is the failure-recovery subsystem, for its test seams.
+func (s *Server) Recovery() *srvrecovery.Recovery { return s.recovery }
 
 // ServeAsset is serveAsset over a fake build, so a test can name hashed assets
 // the placeholder embed does not have.
@@ -66,7 +65,7 @@ func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairRes
 
 // AgentWaiting reports whether the run's agent is not working (idle or done).
 func (s *Server) AgentWaiting(project, epic, id string) bool {
-	_, idle, err := s.agentState(tickets.Address{Project: project, Epic: epic, ID: id})
+	_, idle, err := s.recovery.AgentState(tickets.Address{Project: project, Epic: epic, ID: id})
 	return err == nil && idle
 }
 
@@ -88,7 +87,7 @@ func (s *Server) SettleReleasedRun(address string) {
 	addr, _ := tickets.ParseAddress(address, tickets.AddressContext{})
 	dir := filepath.Join(s.cfg.TicketStore, addr.Project)
 	if run, ok := s.registry.RunOf(address); ok {
-		s.pauseReleasedGate(dir, addr, filepath.Join(dir, addr.Epic, "issues", addr.ID+"-first.md"), run)
+		s.recovery.PauseReleasedGate(dir, addr, filepath.Join(dir, addr.Epic, "issues", addr.ID+"-first.md"), run)
 	}
 	s.registry.Delete(address)
 }
@@ -96,20 +95,11 @@ func (s *Server) SettleReleasedRun(address string) {
 // ClaimNext runs one claim pass now.
 func (s *Server) ClaimNext() { s.claimNext() }
 
-// RecoverAsync is recoverAsync for a failure the test raises itself.
-func (s *Server) RecoverAsync(f recovery.Failure) { s.recoverAsync(f) }
-
-// RecoveryDo calls one server verb the way a remedy does.
-func (s *Server) RecoveryDo(c recovery.Call) (recovery.Result, error) { return recoveryVerbs{s}.Do(c) }
-
 // WatchGates runs one gate watchdog pass as of now.
 func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
 
 // PauseStuckFinishedClaims runs one finished-claim watchdog pass as of now.
 func (s *Server) PauseStuckFinishedClaims(now time.Time) { s.pauseStuckFinishedClaims(now) }
-
-// RecoveredCount is recoveredCount for tests.
-func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }
 
 // HoldTrunkLock takes the project's trunk lock the way a merge does, until
 // release runs.

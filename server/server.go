@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/queue"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
@@ -110,21 +111,18 @@ type Server struct {
 	sessionChat *chat.Chat
 	// autoAdvances holds the running auto-advance countdowns.
 	autoAdvances autoAdvances
-	// filedRounds holds the round markers already in the follow-ups epic, so an
-	// Idle detection never rescans its tickets.
-	filedRounds sync.Map
-	lock        *serverLock
-	ln          net.Listener
-	tcp         net.Listener // nil unless Config.TCPAddr is set
-	http        *http.Server
-	tcpHTTP     *http.Server // the socket's routes behind refuseBrowsers
-	web         net.Listener // nil unless Config.WebAddr is set and bound
-	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
-	webHTTP     *http.Server
-	webErr      string        // why the web bind failed
-	webListenIP net.IP        // nil when the listener binds every interface
-	webCerts    *webtls.Certs // nil unless the web listener is bound
-	clientErrs  ipLimiter
+	lock         *serverLock
+	ln           net.Listener
+	tcp          net.Listener // nil unless Config.TCPAddr is set
+	http         *http.Server
+	tcpHTTP      *http.Server // the socket's routes behind refuseBrowsers
+	web          net.Listener // nil unless Config.WebAddr is set and bound
+	webDev       http.Handler // nil unless Config.WebDevURL is set and valid
+	webHTTP      *http.Server
+	webErr       string        // why the web bind failed
+	webListenIP  net.IP        // nil when the listener binds every interface
+	webCerts     *webtls.Certs // nil unless the web listener is bound
+	clientErrs   ipLimiter
 	// webAuth is the web login store; nil unless the web listener is bound.
 	webAuth    *webauth.Gate
 	webStreams webStreams
@@ -148,6 +146,7 @@ type Server struct {
 	herdr        herdrWatch
 	writer       *ticketwrite.Writer
 	pauseHold    ticketwrite.RecoveryHold
+	recovery     *srvrecovery.Recovery
 	defectScan   sync.Mutex
 	lateFinishes inFlight
 	designSteps  sync.Map // map address -> design step at the last rescan
@@ -371,6 +370,7 @@ func New(cfg Config) (*Server, error) {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
 	s.writer = newTicketWriter(s)
+	s.recovery = newRecovery(s)
 	s.settings.Init(settings.Options{
 		ConfigPath: cfg.ConfigPath,
 		Startup: settings.Startup{
@@ -492,7 +492,6 @@ var routeTable = []struct {
 	{"POST /v1/tickets/recommend", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.HandlerCtx(s.ticketRecommend)(w, r) }},
 	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAnswer)(w, r) }},
 	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
-	{"POST /v1/tickets/approve", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketApprove)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
 	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicMerge)(w, r) }},
 	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicStashMerge)(w, r) }},

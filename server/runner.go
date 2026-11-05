@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/queue"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
@@ -23,17 +24,6 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
-)
-
-const (
-	implementSkill   = "gx-implement"
-	codeReviewSkill  = "gx-code-review"
-	verifySkill      = "gx-verify-epic"
-	oneOffSkill      = "gx-one-off"
-	evolveSkill      = "gx-evolve"
-	investigateSkill = "gx-investigate"
-	// mergeSkill carries its flag: the prompt appends the ticket address to it.
-	mergeSkill = "gx-merge --ticket"
 )
 
 // WaitSettled waits for every settle goroutine; see runs.Guards.WaitSettled.
@@ -517,7 +507,7 @@ func retargetIfMerged(ref, trunk string, isAncestor func(ancestor, descendant st
 // commitlessRef is the ref a commitless ticket's detached worktree starts at:
 // where its blockers resolve to.
 func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (string, error) {
-	if ref, ok := investigateRef(repo, addr, t, epics); ok && t.Type == string(schema.TypeInvestigate) {
+	if ref, ok := srvrecovery.InvestigateRef(repo, addr, t, epics); ok && t.Type == string(schema.TypeInvestigate) {
 		return ref, nil
 	}
 	ref, _, err := s.rootRefs(addr.Project, epics, addr.Epic, t, repo)
@@ -635,7 +625,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		return
 	}
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	if s.pauseReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {
+	if s.recovery.PauseReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {
 		return
 	}
 	var blocked *ralphloop.BlockedPausedError
@@ -698,7 +688,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	s.writer.StampFinished(addr, one.Ticket.Path, false)
 	s.oneOffs.NotifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)
-	s.fileFollowUp(addr, one.Ticket.Path)
+	s.recovery.FileFollowUp(addr, one.Ticket.Path)
 	if mode.afterDone != nil {
 		mode.afterDone()
 	}

@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/tickets"
@@ -52,7 +53,7 @@ func (s *Server) forkMergeTicket(root queue.RootRef, e tickets.Epic, target stri
 	if !manual && mergeTicketsThisRun(e) >= maxMergeTickets {
 		return ""
 	}
-	_, id, err := writeNewTicket(e.Path, "", "merge", func(id string) (schema.Ticket, string) {
+	_, id, err := ticketwrite.WriteNewTicket(e.Path, "", "merge", func(id string) (schema.Ticket, string) {
 		tk := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeMerge, Manual: manual}
 		body := fmt.Sprintf("\n# %s — Merge %s onto %s\n\n## What to build\n\nRebase %s onto %s so it can fast-forward. The server merges it once this ticket is done.\n",
 			id, root.Epic, target, root.Epic, target)

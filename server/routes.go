@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/settings"
@@ -46,6 +47,7 @@ var subsystemRoutes = func(s *Server) []wire.Route {
 		chat.Routes(func() *chat.Chat { return s.sessionChat }),
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),
 		ticketwrite.Routes(func() *ticketwrite.Writer { return s.writer }),
+		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
 	)
 }
 

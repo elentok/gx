@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -15,5 +16,5 @@ func (h budgetHost) PauseTicket(scratchDir string, addr tickets.Address, ticketP
 }
 
 func (h budgetHost) WriteFollowUp(from tickets.Address, f budget.FollowUp) (string, error) {
-	return h.s.writeFollowUp(from, followUp(f))
+	return h.s.recovery.WriteFollowUp(from, ticketwrite.FollowUp(f))
 }

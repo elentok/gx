@@ -157,6 +157,11 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/ticketwrite/` holds single-ticket writes (so far the leaf types: `RecoveryHold` and
   `RecoveryState`, `PauseFold`, `NudgeLimiter`, `PauseChatDetail`, `RetroSubmit`; the `Server`
   methods follow in later tickets);
+  `server/recovery/` holds failure recovery: planning, the rule/investigate/propose/escalate
+  actions, the recovery verbs, the investigate flow, follow-ups, the bad round block filing and
+  `LaunchSkill`/`LaunchPrompt`, with `Routes()` for `tickets/approve`. It imports `ticketwrite`; the
+  root implements its `Host` (`LiveIteration`) and passes it the pause hold. Import it as
+  `srvrecovery` (the name clashes with the top-level `recovery`);
   `server/settings/` holds the settings holder, config reload, config status and config file watch
   (imports `wire` only; the root registers its appliers); `server/runs/` holds the run registry
   (`Run`, `TrackedRun`, `Registry`; the reclaim methods stay in the root); `server/index/` holds

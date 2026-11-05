@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -306,7 +307,7 @@ func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 	}
 	elapsed, cost := ralphloop.EpicTotals(e)
 	counts := ralphloop.CountsOf(e)
-	counts.Recovered = recoveredCount(dir, one.Epic)
+	counts.Recovered = srvrecovery.RecoveredCount(dir, one.Epic)
 	s.chat.EpicComplete(project, s.projects.ChatOverride(project), one.Epic, counts, elapsed, cost, merged)
 }
 

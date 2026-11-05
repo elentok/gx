@@ -1,4 +1,4 @@
-package server
+package recovery
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/projects"
 )
 
 func TestLastLoggedAssistantText_Codex(t *testing.T) {
@@ -22,7 +23,9 @@ func TestLastLoggedAssistantText_Codex(t *testing.T) {
 		t.Fatal(err)
 	}
 	var logs bytes.Buffer
-	s := withProjects(&Server{log: slog.New(slog.NewTextHandler(&logs, nil)), cfg: Config{Env: []string{"CODEX_HOME=" + home}}})
+	log := slog.New(slog.NewTextHandler(&logs, nil))
+	env := projects.Env{Env: []string{"CODEX_HOME=" + home}}
+	s := New(Deps{Log: log, Projects: projects.NewRegistry(func() projects.Env { return env }, log, nil, nil, nil, nil)})
 
 	for _, tc := range []struct{ name, session, want string }{
 		{"rollout", "c1", "all done here"},

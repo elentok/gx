@@ -105,7 +105,7 @@ func TestRecoveryRunner_LiveCheckAgreesAcrossShapes(t *testing.T) {
 func TestRecoveryRunner_ClosePaneStopsAndCleansUpThroughTheRunner(t *testing.T) {
 	t.Parallel()
 	h, fake, _ := startOnRunner(t, "headless")
-	res, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbClosePane, Address: "proj:epic-a/01"})
+	res, err := h.Server.Recovery().Do(recovery.Call{Verb: recovery.VerbClosePane, Address: "proj:epic-a/01"})
 	if err != nil || res.Refused {
 		t.Fatalf("close-pane = %+v, %v", res, err)
 	}
@@ -123,7 +123,7 @@ func TestRecoveryRunner_WaitWaitsForTheRunnerToSettle(t *testing.T) {
 	fake.SetState(iterLabel, agentrunner.StateWorking, "")
 	done := make(chan error, 1)
 	go func() {
-		res, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbWait, Address: "proj:epic-a/01"})
+		res, err := h.Server.Recovery().Do(recovery.Call{Verb: recovery.VerbWait, Address: "proj:epic-a/01"})
 		if err == nil && res.Refused {
 			err = errors.New("refused: " + res.Reason)
 		}
@@ -144,7 +144,7 @@ func TestRecoveryRunner_WaitTimesOutAtTheConfiguredBound(t *testing.T) {
 	t.Parallel()
 	h, fake, _ := startOnRunner(t, "headless", func(c *server.Config) { c.CompactRewaitTimeout = 50 * time.Millisecond })
 	fake.SetState(iterLabel, agentrunner.StateWorking, "")
-	if _, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbWait, Address: "proj:epic-a/01"}); !strings.Contains(err.Error(), agentrunner.ErrTimeout.Error()) {
+	if _, err := h.Server.Recovery().Do(recovery.Call{Verb: recovery.VerbWait, Address: "proj:epic-a/01"}); !strings.Contains(err.Error(), agentrunner.ErrTimeout.Error()) {
 		t.Errorf("wait err = %v, want a timeout", err)
 	}
 }

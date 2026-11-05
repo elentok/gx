@@ -29,11 +29,11 @@ func newTicketWriter(s *Server) *ticketwrite.Writer {
 type ticketWriteHost struct{ s *Server }
 
 func (h ticketWriteHost) HoldPauseForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool {
-	return h.s.holdPauseForRecovery(addr, ticketPath, kind, reason)
+	return h.s.recovery.HoldPauseForRecovery(addr, ticketPath, kind, reason)
 }
 
 func (h ticketWriteHost) WriteFollowUp(from tickets.Address, f ticketwrite.FollowUp) (string, error) {
-	return h.s.writeFollowUp(from, followUp(f))
+	return h.s.recovery.WriteFollowUp(from, f)
 }
 
 func (h ticketWriteHost) HerdrUnavailable() bool { return h.s.herdr.isUnavailable() }
@@ -79,14 +79,11 @@ func (h ticketWriteHost) AdoptFirst(dir string, addr tickets.Address, path strin
 }
 
 func (h ticketWriteHost) InvestigateRetryFailure(qc queue.Ctx, ref queue.TicketRef) (recovery.Failure, wire.QueueResult, bool) {
-	return h.s.investigateRetryFailure(qc, ref)
+	return h.s.recovery.InvestigateRetryFailure(qc, ref)
 }
 
 func (h ticketWriteHost) AppendRecoveryApplied(ref queue.TicketRef, f recovery.Failure, investigator string) {
-	h.s.appendRecoveryEvent(ref, f, ralphloop.Event{
-		Type: string(events.RecoveryApplied), Ticket: ref.Addr.ID, Kind: string(f.Kind),
-		Reason: investigateRetryEntry, Outcome: "ok", Text: investigator,
-	})
+	h.s.recovery.AppendRecoveryApplied(ref, f, investigator)
 }
 
 func (h ticketWriteHost) LiveIteration(address string) (ticketwrite.LiveIter, bool) {

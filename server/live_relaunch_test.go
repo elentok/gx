@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
-	"github.com/elentok/gx/server"
+	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -62,7 +62,7 @@ func TestRelaunch_RecoveryEndsTheRoundWithSourceGx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbRelaunch, Address: "proj:epic-a/01"}); err != nil {
+	if _, err := h.Server.Recovery().Do(recovery.Call{Verb: recovery.VerbRelaunch, Address: "proj:epic-a/01"}); err != nil {
 		t.Fatal(err)
 	}
 	rounds := endedRounds(t, path)
@@ -77,7 +77,7 @@ func TestRelaunch_OnlyAHumanRelaunchIsLogged(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if _, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbRelaunch, Address: "proj:epic-a/01"}); err != nil {
+	if _, err := h.Server.Recovery().Do(recovery.Call{Verb: recovery.VerbRelaunch, Address: "proj:epic-a/01"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := ofType(runLog(t, h), events.HumanRelaunch); len(got) != 0 {
@@ -99,14 +99,14 @@ func TestGuardRail_AHumanRelaunchResetsTheBudget(t *testing.T) {
 	}
 	full := []ralphloop.Event{applied("a"), applied("b"), applied("c")}
 	f := recovery.Failure{Address: "proj:epic-a/01", Type: events.Paused, Kind: "d"}
-	if why := server.GuardRailStop(full, f); why == "" {
+	if why := srvrecovery.GuardRailStop(full, f); why == "" {
 		t.Fatal("three recoveries did not stop recovery")
 	}
 	human := append(full, ralphloop.Event{Type: string(events.HumanRelaunch), Ticket: "01"})
-	if why := server.GuardRailStop(human, f); why != "" {
+	if why := srvrecovery.GuardRailStop(human, f); why != "" {
 		t.Errorf("after a human relaunch: %q, want recovery allowed", why)
 	}
-	if why := server.GuardRailStop(append(human, applied("d")), f); why == "" {
+	if why := srvrecovery.GuardRailStop(append(human, applied("d")), f); why == "" {
 		t.Error("a recovery after the human relaunch was not counted")
 	}
 }

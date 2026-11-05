@@ -69,7 +69,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	if err := ralphloop.AppendEvent(dir, "epic-a", held); err != nil {
 		t.Fatal(err)
 	}
-	h.Server.RecoverAsync(recovery.Failure{Address: addr, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
+	h.Server.Recovery().RecoverAsync(recovery.Failure{Address: addr, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
 	var got gateRaise
 	waitFor(t, func() bool {
 		if h.Server.Registry().IsGateReleased(addr) {

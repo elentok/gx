@@ -1,4 +1,4 @@
-package server
+package recovery
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -48,16 +49,16 @@ func proposalClass(result string) string {
 	return found
 }
 
-// fileFollowUp files a draft research ticket in the follow-ups epic for a merged
+// FileFollowUp files a draft research ticket in the follow-ups epic for a merged
 // investigate ticket whose report proposes a catalog entry or an orchestrator fix.
-func (s *Server) fileFollowUp(addr tickets.Address, ticketPath string) {
+func (rec *Recovery) FileFollowUp(addr tickets.Address, ticketPath string) {
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil || tk.Type != schema.TypeInvestigate {
 		return
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
-		s.log.Warn("read investigate report", "ticket", addr.String(), "err", err)
+		rec.d.Log.Warn("read investigate report", "ticket", addr.String(), "err", err)
 		return
 	}
 	result := strings.TrimSpace(schema.Section(schema.ParseBody(string(raw)), "Result"))
@@ -66,23 +67,23 @@ func (s *Server) fileFollowUp(addr tickets.Address, ticketPath string) {
 		return
 	}
 	key := dedupeKey(string(raw), class)
-	path, err := s.writeFollowUp(addr, investigateFollowUp(addr, class, key, result))
+	path, err := rec.WriteFollowUp(addr, investigateFollowUp(addr, class, key, result))
 	if errors.Is(err, errNoFollowUpProject) {
 		// The proposal must not be lost with its filing place: the escalation
 		// message carries it instead (it already does when the submit asked for
 		// the result to be sent).
-		s.log.Warn("follow-ups project missing, proposal goes to the escalation only", "ticket", addr.String(), "err", err)
+		rec.d.Log.Warn("follow-ups project missing, proposal goes to the escalation only", "ticket", addr.String(), "err", err)
 		if !tk.Notify {
 			dir := filepath.Dir(filepath.Dir(filepath.Dir(ticketPath)))
-			s.chat.Result(addr.Project, s.projects.ChatOverride(addr.Project), dir, addr.Epic, addr.String(), result)
+			rec.d.Chat.Result(addr.Project, rec.d.Projects.ChatOverride(addr.Project), dir, addr.Epic, addr.String(), result)
 		}
 		return
 	}
 	if err != nil {
-		s.log.Warn("file follow-up", "ticket", addr.String(), "err", err)
+		rec.d.Log.Warn("file follow-up", "ticket", addr.String(), "err", err)
 		return
 	}
-	s.log.Info("filed follow-up", "ticket", addr.String(), "path", path)
+	rec.d.Log.Info("filed follow-up", "ticket", addr.String(), "path", path)
 }
 
 var errNoFollowUpProject = errors.New("no follow-ups project")
@@ -103,10 +104,10 @@ func dedupeKey(investigateRaw, class string) string {
 
 func dedupeLine(key string) string { return "Dedupe key: " + key }
 
-// followUpsEpicPath is the follow-ups epic dir that receives follow-ups from
+// FollowUpsEpicPath is the follow-ups epic dir that receives follow-ups from
 // fromProject's tickets.
-func (s *Server) followUpsEpicPath(fromProject string) (string, error) {
-	target := s.settings.Load().RecoverySettings.FollowUps
+func (rec *Recovery) FollowUpsEpicPath(fromProject string) (string, error) {
+	target := rec.d.Settings.Load().RecoverySettings.FollowUps
 	if target == "" {
 		target = DefaultFollowUps
 	}
@@ -114,22 +115,16 @@ func (s *Server) followUpsEpicPath(fromProject string) (string, error) {
 	if !ok {
 		project, epic = fromProject, target
 	}
-	dir, err := s.projects.Dir(project)
+	dir, err := rec.d.Projects.Dir(project)
 	if err != nil {
 		return "", fmt.Errorf("%w %s: %v", errNoFollowUpProject, project, err)
 	}
 	return filepath.Join(dir, epic), nil
 }
 
-// followUp is what a caller supplies to file a follow-up: the title and the
-// text of each section, plus the key that makes two filings the same problem.
-type followUp struct {
-	Slug, Title, Source, Problem, SuggestedFix, Key string
-}
-
 // investigateFollowUp is the follow-up for an investigate ticket's proposal.
-func investigateFollowUp(from tickets.Address, class, key, result string) followUp {
-	return followUp{
+func investigateFollowUp(from tickets.Address, class, key, result string) ticketwrite.FollowUp {
+	return ticketwrite.FollowUp{
 		Slug:         class,
 		Title:        fmt.Sprintf("Follow up on %s (%s)", from, class),
 		Source:       fmt.Sprintf("Investigate ticket %s, which proposed a %s.", from, class),
@@ -139,21 +134,21 @@ func investigateFollowUp(from tickets.Address, class, key, result string) follow
 	}
 }
 
-// writeFollowUp files the follow-up, or adds an occurrence line to the open
+// WriteFollowUp files the follow-up, or adds an occurrence line to the open
 // draft that already has the same key. from is the ticket the repeat is seen in.
-func (s *Server) writeFollowUp(from tickets.Address, f followUp) (string, error) {
-	epicPath, err := s.followUpsEpicPath(from.Project)
+func (rec *Recovery) WriteFollowUp(from tickets.Address, f ticketwrite.FollowUp) (string, error) {
+	epicPath, err := rec.FollowUpsEpicPath(from.Project)
 	if err != nil {
 		return "", err
 	}
-	if err := ensureDraftEpic(epicPath); err != nil {
+	if err := EnsureDraftEpic(epicPath); err != nil {
 		return "", err
 	}
 	line := fmt.Sprintf("Seen again in %s on %s.", from, time.Now().Format("2006-01-02"))
 	if path, found, err := noteOccurrence(epicPath, f.Key, line); found || err != nil {
 		return path, err
 	}
-	path, _, err := writeNewTicket(epicPath, "", f.Slug, func(id string) (schema.Ticket, string) {
+	path, _, err := ticketwrite.WriteNewTicket(epicPath, "", f.Slug, func(id string) (schema.Ticket, string) {
 		body := fmt.Sprintf(
 			// The dedupe line sits in Evidence, the section a repeat appends to.
 			"\n# %s — %s\n\n## Source\n\n%s\n\n## Problem\n\n%s\n\n## Evidence\n\n%s\n\n## Suggested fix\n\n%s\n",
@@ -188,15 +183,12 @@ func noteOccurrence(epicPath, key, line string) (path string, found bool, err er
 	return "", false, nil
 }
 
-// ensureDraftEpic creates a missing epic with status draft, so nothing in it is
+// EnsureDraftEpic creates a missing epic with status draft, so nothing in it is
 // scheduled until a person promotes it. An existing epic directory without a
 // ticket.md gets one too; one with a ticket.md keeps it.
-func ensureDraftEpic(epicPath string) error {
+func EnsureDraftEpic(epicPath string) error {
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0o755); err != nil {
 		return err
 	}
 	return tickets.WriteEpicTicketMD(epicPath, schema.StatusDraft)
 }
-
-// EnsureDraftEpic is ensureDraftEpic for the Host interface.
-func (s *Server) EnsureDraftEpic(epicPath string) error { return ensureDraftEpic(epicPath) }
