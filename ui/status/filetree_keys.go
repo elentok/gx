@@ -20,14 +20,14 @@ var (
 	discardBinding     = keys.Binding{ID: bindingDiscard, Seq: []string{"d"}, Categories: []string{filetreeCat}, Title: "discard"}
 )
 
-func (m Model) delegateToChild(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+func delegateToChild(m Model, msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.focus == focusFiletree {
-		return m.delegateToFiletree(msg)
+		return delegateToFiletree(m, msg)
 	}
 	return m.delegateToDiff(msg)
 }
 
-func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+func delegateToFiletree(m Model, msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var childCmd tea.Cmd
 	var result FiletreeResult
 	m.filetree, childCmd, result = m.filetree.Update(msg)
@@ -41,9 +41,9 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case result.PageMoved:
 		return m, m.diffLoader.scheduleDiffReload()
 	case result.ToggleStage:
-		return m, m.toggleStageStatusEntry()
+		return m, toggleStageStatusEntry(&m)
 	case result.Discard:
-		m.openDiscardStatusConfirm()
+		openDiscardStatusConfirm(&m)
 		return m, nil
 	}
 
@@ -52,15 +52,15 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		actionCmd = m.reloadDiffsForSelection()
 	}
 	if result.OpenSelected {
-		actionCmd = m.openSelectedFile()
+		actionCmd = openSelectedFile(&m)
 	}
 	selectionChanged := result.SelectionChanged
 	if selectionChanged {
 		m.filetree.syncListSelection()
-		m.onFiletreeSelectionChanged()
+		onFiletreeSelectionChanged(&m)
 	}
 	if childCmd != nil {
-		if handledModel, handledCmd, handled := m.handleFileTreeChildMsg(childCmd()); handled {
+		if handledModel, handledCmd, handled := handleFileTreeChildMsg(m, childCmd()); handled {
 			if selectionChanged {
 				return handledModel, tea.Batch(actionCmd, handledCmd, m.diffLoader.scheduleDiffReload())
 			}
@@ -77,13 +77,13 @@ func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, actionCmd
 }
 
-func (m Model) handleFileTreeChildMsg(msg tea.Msg) (Model, tea.Cmd, bool) {
+func handleFileTreeChildMsg(m Model, msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg.(type) {
 	case search.JumpToMatchMsg:
 		model, cmd := m.handleJumpToMatch(msg.(search.JumpToMatchMsg))
 		return model, cmd, true
 	case search.SearchQueryUpdatedMsg:
-		model, cmd := m.handleSearchQueryUpdated(msg.(search.SearchQueryUpdatedMsg))
+		model, cmd := handleSearchQueryUpdated(m, msg.(search.SearchQueryUpdatedMsg))
 		return model, cmd, true
 	default:
 		return m, nil, false

@@ -15,11 +15,11 @@ import (
 func TestUseStackedLayoutThreshold(t *testing.T) {
 	t.Parallel()
 	m := Model{width: 100}
-	if !m.useStackedLayout() {
+	if !useStackedLayout(m.width) {
 		t.Fatal("expected stacked layout at width 100")
 	}
 	m.width = 101
-	if m.useStackedLayout() {
+	if useStackedLayout(m.width) {
 		t.Fatal("expected side-by-side layout at width 101")
 	}
 }

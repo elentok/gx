@@ -17,12 +17,12 @@ const (
 
 func (m Model) splitWidth() (filetreeW, diffW int) {
 	seamW := 1
-	if m.useStackedLayout() {
+	if useStackedLayout(m.width) {
 		return m.width, m.width
 	}
 
 	width := m.width - seamW
-	filetreeW = m.requiredFiletreePaneWidth(m.mainContentHeight())
+	filetreeW = m.filetree.requiredPaneWidth(mainContentHeight(m.height), filetreeViewOf(m))
 	filetreeMax := minInt(maxFiletreePaneWidth, int(float64(width)*0.45))
 	if filetreeMax < minFiletreePaneWidth {
 		filetreeMax = minFiletreePaneWidth
@@ -47,8 +47,8 @@ func (m Model) splitWidth() (filetreeW, diffW int) {
 	return filetreeW, diffW
 }
 
-func (m Model) splitHeight(total int) (filetreeH, diffH int) {
-	if !m.useStackedLayout() {
+func splitHeight(width, total int) (filetreeH, diffH int) {
+	if !useStackedLayout(width) {
 		return total, total
 	}
 	total--
@@ -64,45 +64,42 @@ func (m Model) splitHeight(total int) (filetreeH, diffH int) {
 	return filetreeH, diffH
 }
 
-func (m Model) useStackedLayout() bool {
-	return m.width <= 100
+func useStackedLayout(width int) bool {
+	return width <= 100
 }
 
-func (m Model) mainContentHeight() int {
-	mainH := m.height
+func mainContentHeight(height int) int {
+	mainH := height
 	if mainH < 4 {
 		mainH = 4
 	}
 	return mainH
 }
 
-func (m Model) renderLeftPane(width, height int) string {
-	return m.renderFiletreePane(width, maxInt(minFiletreePaneHeight, height))
-}
-
-func (m Model) filetreePaneTitle(maxWidth int) string {
+func (p filetreePane) title(maxWidth int, v filetreeView) string {
 	prefix := "Changes in "
-	if summary := m.filetree.branchSummaryTitleSuffix(maxWidth-ansi.StringWidth(prefix), m.settings.UseNerdFontIcons); summary != "" {
+	if summary := p.branchSummaryTitleSuffix(maxWidth-ansi.StringWidth(prefix), v.nerdIcons); summary != "" {
 		return prefix + summary
 	}
 	return "Filetree"
 }
 
-func (m Model) filetreeView() filetreeView {
+func filetreeViewOf(m Model) filetreeView {
 	return filetreeView{
 		worktreeRoot: m.worktreeRoot,
+		isBareRepo:   m.isBareRepo,
 		nerdIcons:    m.settings.UseNerdFontIcons,
 		active:       m.focus == focusFiletree,
 	}
 }
 
 func (m Model) visibleStatusLines(width, height int) []string {
-	return m.filetree.renderLines(width, height, m.filetreeView())
+	return m.filetree.renderLines(width, height, filetreeViewOf(m))
 }
 
-func (m Model) requiredFiletreePaneWidth(height int) int {
-	required := ansi.StringWidth(" " + m.filetreePaneTitle(math.MaxInt32) + " ")
-	if w := m.filetree.requiredWidth(height, m.filetreeView()); w > required {
+func (p filetreePane) requiredPaneWidth(height int, v filetreeView) int {
+	required := ansi.StringWidth(" " + p.title(math.MaxInt32, v) + " ")
+	if w := p.requiredWidth(height, v); w > required {
 		required = w
 	}
 	return required + 2
@@ -111,24 +108,25 @@ func (m Model) requiredFiletreePaneWidth(height int) int {
 // renderFiletreePane puts the branch summary in the title and the worktree
 // name as a dim line at the top of the content, ahead of the file list.
 func (m Model) renderFiletreePane(width, height int) string {
-	info := m.filetreeInfoLines()
+	v := filetreeViewOf(m)
+	info := m.filetree.infoLines(v)
 	contentHeight := height - len(info)
 	if contentHeight < minFiletreePaneHeight {
 		contentHeight = height
 		info = nil
 	}
 	lines := append(info, m.visibleStatusLines(width, contentHeight)...)
-	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetreePaneTitle(width-2), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
+	return m.renderFiletreePanelWithBorderTitle(width, height, m.filetree.title(width-2, v), m.searchCounterForFiletreePane(), lines, m.focus == focusFiletree)
 }
 
-// filetreeInnerHeight returns the number of file rows actually rendered
+// innerHeight returns the number of file rows actually rendered
 // inside the filetree pane at the given outer height. It mirrors
-// renderFiletreePane's reservation of filetreeInfoLines() (e.g. the
+// renderFiletreePane's reservation of infoLines() (e.g. the
 // "worktree: X" line shown for bare-repo checkouts), so callers that clamp
 // scroll/selection via fileTreeModel.SetVisibleHeight never diverge from what
 // is actually rendered.
-func (m Model) filetreeInnerHeight(height int) int {
-	info := m.filetreeInfoLines()
+func (p filetreePane) innerHeight(height int, v filetreeView) int {
+	info := p.infoLines(v)
 	contentHeight := height - len(info)
 	if contentHeight < minFiletreePaneHeight {
 		contentHeight = height
@@ -136,19 +134,19 @@ func (m Model) filetreeInnerHeight(height int) int {
 	return maxInt(1, contentHeight-2)
 }
 
-// filetreeInfoLines shows which worktree is active, but only when the repo
+// infoLines shows which worktree is active, but only when the repo
 // actually uses multiple worktrees (the .bare technique) — for a plain
 // single-checkout clone the worktree name adds no information.
-func (m Model) filetreeInfoLines() []string {
-	if !m.isBareRepo {
+func (p filetreePane) infoLines(v filetreeView) []string {
+	if !v.isBareRepo {
 		return nil
 	}
-	name := ui.WorktreeName(m.worktreeRoot)
+	name := ui.WorktreeName(v.worktreeRoot)
 	if name == "" {
 		return nil
 	}
 	icon := ""
-	if m.settings.UseNerdFontIcons {
+	if v.nerdIcons {
 		icon = ui.Icons(true).Worktree + " "
 	}
 	return []string{ui.StyleMuted.Faint(true).Render(icon + "worktree: " + name)}

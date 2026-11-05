@@ -27,14 +27,14 @@ func (m Model) ModalOpen() bool {
 		m.git.IsOpen() || m.help.IsOpen
 }
 
-func (m *Model) computeSearchMatches(query string) []search.Match {
+func (p filetreePane) computeSearchMatches(query string) []search.Match {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
 		return []search.Match{}
 	}
 	var matches []search.Match
-	for i, entry := range m.filetree.model.Entries() {
-		text := strings.ToLower(m.filetreeEntrySearchText(entry))
+	for i, entry := range p.model.Entries() {
+		text := strings.ToLower(filetreeEntrySearchText(entry))
 		if strings.Contains(text, q) {
 			matches = append(matches, search.Match{DataIndex: i})
 		}
@@ -47,7 +47,7 @@ func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	if m.focus == focusFiletree {
 		if match.DataIndex >= 0 && match.DataIndex < len(m.filetree.model.Entries()) {
 			m.filetree.setSelection(match.DataIndex)
-			m.onFiletreeSelectionChanged()
+			onFiletreeSelectionChanged(&m)
 			return m, m.diffLoader.scheduleDiffReload()
 		}
 	}
@@ -62,7 +62,7 @@ func (m Model) searchCounterForFiletreePane() string {
 	return diffarea.SearchCounterText(m.settings.UseNerdFontIcons, search.Cursor(), search.MatchesCount())
 }
 
-func (m Model) filetreeEntrySearchText(entry tree.Entry[stage.StageFileStatus]) string {
+func filetreeEntrySearchText(entry tree.Entry[stage.StageFileStatus]) string {
 	name := entry.DisplayName
 	if !entry.HasChildren && entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
 		name = entry.Value.RenameFrom + " -> " + entry.ID

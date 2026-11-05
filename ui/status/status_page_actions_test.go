@@ -74,7 +74,7 @@ func TestHandleActionResultRecordsOutput(t *testing.T) {
 	m := newTestModelDefault(testutil.TempRepo(t))
 	m.ready = true
 
-	_ = m.handleActionResult(stagemodal.ActionResult{
+	_ = handleActionResult(&m, stagemodal.ActionResult{
 		Kind:   stagemodal.ActionAmend,
 		Output: "some action output",
 	})
@@ -89,7 +89,7 @@ func TestHandleActionResultWithErrorClosesRunning(t *testing.T) {
 	m.ready = true
 	showIdleRunning(&m)
 
-	_ = m.handleActionResult(stagemodal.ActionResult{
+	_ = handleActionResult(&m, stagemodal.ActionResult{
 		Kind: stagemodal.ActionAmend,
 		Err:  errors.New("git failed"),
 	})
@@ -104,7 +104,7 @@ func TestHandleActionResultPromptPopStashOpensConfirm(t *testing.T) {
 	m.ready = true
 	showIdleRunning(&m)
 
-	_ = m.handleActionResult(stagemodal.ActionResult{
+	_ = handleActionResult(&m, stagemodal.ActionResult{
 		Kind:           stagemodal.ActionRebase,
 		PromptPopStash: true,
 	})
@@ -123,7 +123,7 @@ func TestHandleActionResultSuccessReturnsCmd(t *testing.T) {
 	m.ready = true
 	showIdleRunning(&m)
 
-	cmd := m.handleActionResult(stagemodal.ActionResult{Kind: stagemodal.ActionRebase})
+	cmd := handleActionResult(&m, stagemodal.ActionResult{Kind: stagemodal.ActionRebase})
 
 	if m.modals.RunningOpen() {
 		t.Fatal("expected runningOpen=false after successful result")
@@ -139,7 +139,7 @@ func TestHandleActionResultAmendNotifyCmd(t *testing.T) {
 	m.ready = true
 	showIdleRunning(&m)
 
-	cmd := m.handleActionResult(stagemodal.ActionResult{Kind: stagemodal.ActionAmend})
+	cmd := handleActionResult(&m, stagemodal.ActionResult{Kind: stagemodal.ActionAmend})
 
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from successful amend result")
@@ -152,7 +152,7 @@ func TestHandleActionResultPopStashNotifyCmd(t *testing.T) {
 	m.ready = true
 	showIdleRunning(&m)
 
-	cmd := m.handleActionResult(stagemodal.ActionResult{Kind: stagemodal.ActionPopStashRebase})
+	cmd := handleActionResult(&m, stagemodal.ActionResult{Kind: stagemodal.ActionPopStashRebase})
 
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from successful pop stash rebase result")

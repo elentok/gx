@@ -71,7 +71,7 @@ func (m Model) PanelGeometry() (originCol, originRow, availCols, availRows int, 
 	if m.height < 1 {
 		return 0, 0, 0, 0, false
 	}
-	diffX, diffY, diffW, diffH, drOK := m.diffRect(m.mainContentHeight())
+	diffX, diffY, diffW, diffH, drOK := m.diffRect(mainContentHeight(m.height))
 	if !drOK || diffW <= 2 || diffH <= 2 {
 		return 0, 0, 0, 0, false
 	}

@@ -1,17 +1,17 @@
 package status
 
-func (m *Model) jumpFiletreeTop() {
+func jumpFiletreeTop(m *Model) {
 	if m.filetree.jumpTop() {
-		m.onFiletreeSelectionChanged()
+		onFiletreeSelectionChanged(m)
 	}
 }
 
-func (m *Model) jumpFiletreeBottom() {
+func jumpFiletreeBottom(m *Model) {
 	if m.filetree.jumpBottom() {
-		m.onFiletreeSelectionChanged()
+		onFiletreeSelectionChanged(m)
 	}
 }
 
-func (m *Model) onFiletreeSelectionChanged() {
+func onFiletreeSelectionChanged(m *Model) {
 	m.overlay.MarkDirty()
 }

@@ -58,7 +58,7 @@ func (m *Model) openDiscardDiffConfirm() tea.Cmd {
 		return notify.Error(err.Error())
 	}
 
-	m.openConfirmRequest(stagemodal.ConfirmRequest{
+	openConfirmRequest(m, stagemodal.ConfirmRequest{
 		Title:            title,
 		Lines:            lines,
 		Action:           stagemodal.ConfirmDiscardUnstaged,

@@ -12,15 +12,14 @@ type gotoPRMsg struct {
 	err error
 }
 
-func (m Model) cmdGotoPR() tea.Cmd {
-	worktreeRoot := m.worktreeRoot
+func cmdGotoPR(worktreeRoot string) tea.Cmd {
 	return func() tea.Msg {
 		url, err := pr.BranchPRURL(worktreeRoot)
 		return gotoPRMsg{url: url, err: err}
 	}
 }
 
-func (m Model) handleGotoPR(msg gotoPRMsg) (Model, tea.Cmd) {
+func handleGotoPR(m Model, msg gotoPRMsg) (Model, tea.Cmd) {
 	if msg.err != nil || msg.url == "" {
 		return m, notify.Warning("no PR found")
 	}

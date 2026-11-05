@@ -27,12 +27,12 @@ func (m *Model) renderDiffPane(width, height int) string {
 
 func (m *Model) syncDiffViewports() {
 	_, diffW := m.splitWidth()
-	filetreeH, diffH := m.splitHeight(m.mainContentHeight())
+	filetreeH, diffH := splitHeight(m.width, mainContentHeight(m.height))
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}
 	m.diffarea.SyncForSize(diffW, diffH)
-	m.filetree.model.SetVisibleHeight(m.filetreeInnerHeight(filetreeH))
+	m.filetree.model.SetVisibleHeight(m.filetree.innerHeight(filetreeH, filetreeViewOf(*m)))
 }
 
 func (m Model) binarySummaryLine() string {

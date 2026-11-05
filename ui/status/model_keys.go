@@ -115,14 +115,14 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 	case bindingLazygitLog:
 		return m, cmdLazygitLog(m.worktreeRoot)
 	case bindingGotoBottom:
-		m.jumpToBottom()
 		if m.focus == focusFiletree {
+			jumpFiletreeBottom(&m)
 			return m, m.diffLoader.scheduleDiffReload()
 		}
 		return m, nil
 	case bindingGotoTop:
-		m.jumpToTop()
 		if m.focus == focusFiletree {
+			jumpFiletreeTop(&m)
 			return m, m.diffLoader.scheduleDiffReload()
 		}
 		return m, nil
@@ -130,7 +130,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		if !m.git.HasOutput() {
 			return m, notify.Info(ui.MessageNoOutput())
 		}
-		m.openOutputModal()
+		openOutputModal(&m)
 		return m, nil
 	case bindingGitCommit:
 		return m, cmdGitCommit(m.worktreeRoot, m.settings.Terminal)
@@ -170,7 +170,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		}
 		return m, nil
 	case bindingRebase:
-		if err := m.prepareRebaseConfirm(); err != nil {
+		if err := prepareRebaseConfirm(&m); err != nil {
 			if errors.As(err, new(rebaseTargetError)) {
 				return m, notify.Warning(err.Error())
 			}
@@ -179,7 +179,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		}
 		return m, nil
 	case bindingAmend:
-		if err := m.openAmendConfirm(); err != nil {
+		if err := openAmendConfirm(&m); err != nil {
 			m.showGitError(err)
 		}
 		return m, nil
@@ -212,14 +212,14 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		if !m.settings.EnableNavigation {
 			return m, nil
 		}
-		return m, nav.Open(m.filterLogViewState())
+		return m, nav.Open(filterLogViewState(m))
 	case bindingGotoPR:
-		return m, m.cmdGotoPR()
+		return m, cmdGotoPR(m.worktreeRoot)
 	}
 	return m, nil
 }
 
-func (m Model) filterLogViewState() nav.ViewState {
+func filterLogViewState(m Model) nav.ViewState {
 	vs := nav.ViewState{Tab: nav.TabLog, WorktreeRoot: m.worktreeRoot}
 	file, ok := m.selectedStatusFile()
 	if !ok {
@@ -227,14 +227,14 @@ func (m Model) filterLogViewState() nav.ViewState {
 	}
 	vs.FilterPath = file.Path
 	if m.focus == focusDiff {
-		startLine, endLine := m.activeLogLineRange()
+		startLine, endLine := activeLogLineRange(m)
 		vs.FilterStartLine = startLine
 		vs.FilterEndLine = endLine
 	}
 	return vs
 }
 
-func (m Model) activeLogLineRange() (startLine, endLine int) {
+func activeLogLineRange(m Model) (startLine, endLine int) {
 	navMode := m.diffarea.NavMode()
 	data := m.diffarea.SectionModel(diffarea.SectionUnstaged).Data()
 

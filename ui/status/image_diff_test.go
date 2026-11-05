@@ -237,7 +237,7 @@ func TestImageDiffPanelGeometryUsesMainContentHeight(t *testing.T) {
 	repo := setupImageDiffRepo(t)
 	m, _ := newImageDiffTestModel(t, repo, DefaultSettings(), supportedCapability(), nil, nil)
 
-	_, _, _, diffH, ok := m.diffRect(m.mainContentHeight())
+	_, _, _, diffH, ok := m.diffRect(mainContentHeight(m.height))
 	if !ok {
 		t.Fatal("expected a diff rect")
 	}

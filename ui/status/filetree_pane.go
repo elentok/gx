@@ -45,6 +45,7 @@ type FiletreeResult struct {
 // filetreeView carries the Model state the pane needs to render.
 type filetreeView struct {
 	worktreeRoot string
+	isBareRepo   bool
 	nerdIcons    bool
 	active       bool
 }

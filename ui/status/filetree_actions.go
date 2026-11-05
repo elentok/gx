@@ -13,12 +13,12 @@ import (
 	"github.com/elentok/gx/ui/status/stagemodal"
 )
 
-func (m *Model) handleActionResult(res stagemodal.ActionResult) tea.Cmd {
+func handleActionResult(m *Model, res stagemodal.ActionResult) tea.Cmd {
 	if strings.TrimSpace(res.Output) != "" {
-		m.recordCommandOutput(stagemodal.OutputTitle(res.Kind), res.Output)
+		recordCommandOutput(m, stagemodal.OutputTitle(res.Kind), res.Output)
 	}
 	if res.PromptPopStash {
-		m.openConfirm("Pop stash after rebase failure?", []string{"The rebase failed after stashing changes.", "Pop the stash now?"}, stagemodal.ConfirmRebasePopStash, "", "")
+		openConfirm(m, "Pop stash after rebase failure?", []string{"The rebase failed after stashing changes.", "Pop the stash now?"}, stagemodal.ConfirmRebasePopStash, "", "")
 		m.modals.CloseRunning()
 		return nil
 	}
@@ -42,7 +42,7 @@ func (m *Model) handleActionResult(res stagemodal.ActionResult) tea.Cmd {
 
 // confirmAccept runs the action of a confirm request the modal closed with an
 // accepted answer.
-func (m Model) confirmAccept(req stagemodal.ConfirmRequest) (Model, tea.Cmd) {
+func confirmAccept(m Model, req stagemodal.ConfirmRequest) (Model, tea.Cmd) {
 	if !req.Yes {
 		return m, nil
 	}
@@ -58,15 +58,15 @@ func (m Model) confirmAccept(req stagemodal.ConfirmRequest) (Model, tea.Cmd) {
 		}
 		runner := stagemodal.NewRunner(stagemodal.ActionRebase, m.worktreeRoot, titleTarget, req.Branch)
 		runner.Store = m.settings.TicketStore
-		m.openRunning("Rebase on "+titleTarget, runner)
+		openRunning(&m, "Rebase on "+titleTarget, runner)
 		return m, stagemodal.PollCmd()
 	case stagemodal.ConfirmRebasePopStash:
 		runner := stagemodal.NewRunner(stagemodal.ActionPopStashRebase, m.worktreeRoot, "", "")
-		m.openRunning("Pop stash", runner)
+		openRunning(&m, "Pop stash", runner)
 		return m, stagemodal.PollCmd()
 	case stagemodal.ConfirmAmend:
 		runner := stagemodal.NewRunner(stagemodal.ActionAmend, m.worktreeRoot, "", "")
-		m.openRunning("Amend commit", runner)
+		openRunning(&m, "Amend commit", runner)
 		return m, stagemodal.PollCmd()
 	case stagemodal.ConfirmDiscardStatus:
 		if req.DiscardUntracked {
@@ -114,7 +114,7 @@ func (m Model) confirmAccept(req stagemodal.ConfirmRequest) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) prepareRebaseConfirm() error {
+func prepareRebaseConfirm(m *Model) error {
 	branch, err := git.CurrentBranch(m.worktreeRoot)
 	if err != nil {
 		return err
@@ -126,7 +126,8 @@ func (m *Model) prepareRebaseConfirm() error {
 	if err != nil {
 		return rebaseTargetError{err}
 	}
-	m.openConfirm(
+	openConfirm(
+		m,
 		fmt.Sprintf("Rebase branch %s on %s?", branch, target),
 		nil,
 		stagemodal.ConfirmRebase,
@@ -142,7 +143,7 @@ type rebaseTargetError struct{ error }
 
 func (e rebaseTargetError) Unwrap() error { return e.error }
 
-func (m *Model) openAmendConfirm() error {
+func openAmendConfirm(m *Model) error {
 	subject, files, err := amendPreview(m.worktreeRoot)
 	if err != nil {
 		return err
@@ -158,7 +159,7 @@ func (m *Model) openAmendConfirm() error {
 	if len(files) > limit {
 		lines = append(lines, "...")
 	}
-	m.openConfirm("Amend last commit?", lines, stagemodal.ConfirmAmend, "", "")
+	openConfirm(m, "Amend last commit?", lines, stagemodal.ConfirmAmend, "", "")
 	return nil
 }
 

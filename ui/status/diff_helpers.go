@@ -11,10 +11,6 @@ type statusDiffFileSelection struct {
 	stageFile  stage.StageFileStatus
 }
 
-type statusDiffSelection struct {
-	file statusDiffFileSelection
-}
-
 func (m Model) selectedStatusFile() (statusDiffFileSelection, bool) {
 	file, ok := m.filetree.selectedFile()
 	if !ok {
@@ -26,12 +22,4 @@ func (m Model) selectedStatusFile() (statusDiffFileSelection, bool) {
 		Untracked:  file.IsUntracked(),
 		stageFile:  file,
 	}, true
-}
-
-func (m Model) selectedStatusDiff() (statusDiffSelection, bool) {
-	file, ok := m.selectedStatusFile()
-	if !ok {
-		return statusDiffSelection{}, false
-	}
-	return statusDiffSelection{file: file}, true
 }

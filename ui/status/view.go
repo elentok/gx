@@ -19,18 +19,18 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Error: " + m.err.Error())
 	}
 
-	mainH := m.mainContentHeight()
+	mainH := mainContentHeight(m.height)
 
 	filetreeW, diffW := m.splitWidth()
-	filetreeH, diffH := m.splitHeight(mainH)
+	filetreeH, diffH := splitHeight(m.width, mainH)
 
 	var out string
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		out = m.renderDiffPane(m.width, mainH)
 	} else {
-		filetreePanel := m.renderLeftPane(filetreeW, filetreeH)
+		filetreePanel := m.renderFiletreePane(filetreeW, maxInt(minFiletreePaneHeight, filetreeH))
 		diffPanel := m.renderDiffPane(diffW, diffH)
-		if m.useStackedLayout() {
+		if useStackedLayout(m.width) {
 			seam := ui.RenderSeamRow(m.width, ui.SeamColor)
 			out = lipgloss.JoinVertical(lipgloss.Left, filetreePanel, seam, diffPanel)
 		} else {

@@ -73,9 +73,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case gotoPRMsg:
-		return m.handleGotoPR(msg)
+		return handleGotoPR(m, msg)
 	case tea.WindowSizeMsg:
-		return m.handleWindowSize(msg)
+		return handleWindowSize(m, msg)
 	case tea.FocusMsg:
 		m.overlay.MarkDirty()
 		return m, m.refreshPreserveScroll()
@@ -89,23 +89,23 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case renderTickMsg:
 		return m, renderTickCmd()
 	case statusStartupLoadMsg:
-		return m.handleStartupLoad()
+		return handleStartupLoad(m)
 	case stagemodal.PollMsg:
-		return m.handleActionPoll()
+		return handleActionPoll(m)
 	case diffReloadMsg:
-		return m.handleDiffReload(msg)
+		return handleDiffReload(m, msg)
 	case branchSyncLoadedMsg:
-		return m.handleBranchSyncLoaded(msg)
+		return handleBranchSyncLoaded(m, msg)
 	case tea.MouseWheelMsg:
-		return m.handleMouseWheelMsg(msg)
+		return handleMouseWheelMsg(m, msg)
 	case tea.KeyPressMsg:
-		return m.handleKeyPress(msg)
+		return handleKeyPress(m, msg)
 	case flashTickMsg:
-		return m.handleFlashTick()
+		return handleFlashTick(m)
 	case commitFinishedMsg:
-		return m.handleCommitFinished(msg)
+		return handleCommitFinished(m, msg)
 	case lazygitLogFinishedMsg:
-		return m.handleLazygitLogFinished(msg)
+		return handleLazygitLogFinished(m, msg)
 	case editFileFinishedMsg:
 		cmd := m.diffActions.handleEditFileFinished(msg, m.refresh)
 		return m, cmd
@@ -115,12 +115,12 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case search.JumpToMatchMsg:
 		return m.handleJumpToMatch(msg)
 	case search.SearchQueryUpdatedMsg:
-		return m.handleSearchQueryUpdated(msg)
+		return handleSearchQueryUpdated(m, msg)
 	}
 	return m, nil
 }
 
-func (m *Model) openSelectedFile() tea.Cmd {
+func openSelectedFile(m *Model) tea.Cmd {
 	entry, ok := m.filetree.selectedEntry()
 	if ok && entry.Kind == statusEntryFile {
 		return m.enterDiffFromStatus(false)
@@ -128,12 +128,12 @@ func (m *Model) openSelectedFile() tea.Cmd {
 	return nil
 }
 
-func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
-	matches := m.computeSearchMatches(msg.Query)
+func handleSearchQueryUpdated(m Model, msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
+	matches := m.filetree.computeSearchMatches(msg.Query)
 	return m, m.filetree.model.SetSearchMatchesAndJump(matches)
 }
 
-func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
+func handleWindowSize(m Model, msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.ready = true
@@ -149,13 +149,13 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 	return m, tea.Batch(reloadCmd, helpCmd)
 }
 
-func (m Model) handleStartupLoad() (Model, tea.Cmd) {
+func handleStartupLoad(m Model) (Model, tea.Cmd) {
 	m.filetree.reloadBranchState(m.worktreeRoot)
 	reloadCmd := m.reloadDiffsForSelection()
 	return m, tea.Batch(reloadCmd, m.filetree.cmdLoadBranchSync(m.worktreeRoot))
 }
 
-func (m Model) handleActionPoll() (Model, tea.Cmd) {
+func handleActionPoll(m Model) (Model, tea.Cmd) {
 	var pollCmd, actionCmd tea.Cmd
 	var res stagemodal.Result
 	m.modals, pollCmd, res = m.modals.Poll()
@@ -163,7 +163,7 @@ func (m Model) handleActionPoll() (Model, tea.Cmd) {
 		m.keys.Reset()
 	}
 	if res.Finished {
-		actionCmd = m.handleActionResult(res.Action)
+		actionCmd = handleActionResult(&m, res.Action)
 	}
 	if pollCmd != nil {
 		return m, tea.Batch(actionCmd, pollCmd)
@@ -171,19 +171,19 @@ func (m Model) handleActionPoll() (Model, tea.Cmd) {
 	return m, actionCmd
 }
 
-func (m Model) handleDiffReload(msg diffReloadMsg) (Model, tea.Cmd) {
+func handleDiffReload(m Model, msg diffReloadMsg) (Model, tea.Cmd) {
 	if m.diffLoader.isCurrentReload(msg.seq) && m.focus == focusFiletree {
 		return m, m.reloadDiffsForSelection()
 	}
 	return m, nil
 }
 
-func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (Model, tea.Cmd) {
+func handleBranchSyncLoaded(m Model, msg branchSyncLoadedMsg) (Model, tea.Cmd) {
 	m.filetree.applyBranchSync(msg.branchName, msg.sync)
 	return m, nil
 }
 
-func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
+func handleMouseWheelMsg(m Model, msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 	if next, cmd, handled := m.help.Forward(msg); handled {
 		m.help = next
 		return m, cmd
@@ -193,14 +193,14 @@ func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
 		m.git, cmd, _ = m.git.Update(msg)
 		return m, cmd
 	}
-	if m.handleMouseWheel(msg) {
+	if handleMouseWheel(&m, msg) {
 		m.overlay.MarkDirty()
 		return m, nil
 	}
 	return m, nil
 }
 
-func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+func handleKeyPress(m Model, msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		if m.modals.RunningOpen() && m.modals.Cancellable() {
 			m.modals.Cancel()
@@ -225,7 +225,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		var res stagemodal.Result
 		m.modals, cmd, res = m.modals.Update(msg)
 		if res.Accepted {
-			return m.confirmAccept(res.Confirm)
+			return confirmAccept(m, res.Confirm)
 		}
 		return m, cmd
 	}
@@ -242,7 +242,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 	// In search input mode the child model owns all keystrokes; bypass Manager.
 	if m.InputFocused() {
-		return m.delegateToChild(msg)
+		return delegateToChild(m, msg)
 	}
 
 	// When diff is focused, let diffview handle navigation keys before the
@@ -283,10 +283,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	return m.delegateToChild(msg)
+	return delegateToChild(m, msg)
 }
 
-func (m Model) handleFlashTick() (Model, tea.Cmd) {
+func handleFlashTick(m Model) (Model, tea.Cmd) {
 	if m.diffarea.Flash.Active {
 		m.diffarea.Flash.Frames--
 		if m.diffarea.Flash.Frames <= 0 {
@@ -298,7 +298,7 @@ func (m Model) handleFlashTick() (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleCommitFinished(msg commitFinishedMsg) (Model, tea.Cmd) {
+func handleCommitFinished(m Model, msg commitFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		m.showGitError(fmt.Errorf("commit failed: %w", msg.err))
 		return m, nil
@@ -309,7 +309,7 @@ func (m Model) handleCommitFinished(msg commitFinishedMsg) (Model, tea.Cmd) {
 	return m, tea.Batch(notify.Success("committed"), m.refreshPreserveScroll(), statusRepoMutatedCmd())
 }
 
-func (m Model) handleLazygitLogFinished(msg lazygitLogFinishedMsg) (Model, tea.Cmd) {
+func handleLazygitLogFinished(m Model, msg lazygitLogFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m, notify.Error("lazygit log failed: " + msg.err.Error())
 	}

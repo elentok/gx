@@ -52,11 +52,11 @@ func (m Model) delegateToDiff(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, m.openDiscardDiffConfirm()
 	case diffarea.BindingNextFile:
-		if ok, cmd := m.moveToAdjacentFile(1); ok {
+		if ok, cmd := moveToAdjacentFile(&m, 1); ok {
 			return m, cmd
 		}
 	case diffarea.BindingPrevFile:
-		if ok, cmd := m.moveToAdjacentFile(-1); ok {
+		if ok, cmd := moveToAdjacentFile(&m, -1); ok {
 			return m, cmd
 		}
 	}

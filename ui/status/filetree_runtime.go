@@ -25,7 +25,7 @@ func (m *Model) reloadFileList(preservePath string) {
 	m.err = nil
 	m.filetree.setFiles(files)
 	if m.filetree.model.Search().HasQuery() {
-		matches := m.computeSearchMatches(m.filetree.model.Search().Query())
+		matches := m.filetree.computeSearchMatches(m.filetree.model.Search().Query())
 		_ = m.filetree.model.SetSearchMatchesAndJump(matches)
 	}
 
@@ -54,11 +54,11 @@ func (m *Model) reloadFileList(preservePath string) {
 	m.filetree.setSelection(m.filetree.data.listState.Selected())
 }
 
-func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
+func moveToAdjacentFile(m *Model, delta int) (bool, tea.Cmd) {
 	if !m.filetree.moveToAdjacent(delta) {
 		return false, nil
 	}
-	m.onFiletreeSelectionChanged()
+	onFiletreeSelectionChanged(m)
 	cmd := m.reloadDiffsForSelection()
 	if m.focus == focusDiff {
 		m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
@@ -66,7 +66,7 @@ func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 	return true, cmd
 }
 
-func (m *Model) toggleStageStatusEntry() tea.Cmd {
+func toggleStageStatusEntry(m *Model) tea.Cmd {
 	entry, ok := m.filetree.selectedEntry()
 	if !ok {
 		return nil
@@ -89,7 +89,7 @@ func (m *Model) toggleStageStatusEntry() tea.Cmd {
 	return tea.Batch(m.reload(path), statusRepoMutatedCmd())
 }
 
-func (m *Model) openDiscardStatusConfirm() {
+func openDiscardStatusConfirm(m *Model) {
 	entry, ok := m.filetree.selectedEntry()
 	if !ok {
 		return
@@ -140,7 +140,7 @@ func (m *Model) openDiscardStatusConfirm() {
 		return
 	}
 
-	m.openConfirmRequest(stagemodal.ConfirmRequest{
+	openConfirmRequest(m, stagemodal.ConfirmRequest{
 		Title:            title,
 		Lines:            lines,
 		Action:           stagemodal.ConfirmDiscardStatus,

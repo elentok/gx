@@ -63,7 +63,7 @@ func TestFilterLogViewStateReturnsFilePathWhenFileSelected(t *testing.T) {
 	m := newTestModel(repo, ui.Settings{EnableNavigation: true}, "")
 	m.ready = true
 
-	vs := m.filterLogViewState()
+	vs := filterLogViewState(m)
 
 	if vs.Tab != nav.TabLog {
 		t.Fatalf("filterLogViewState tab = %q, want %q", vs.Tab, nav.TabLog)
@@ -90,7 +90,7 @@ func TestFilterLogViewStateIncludesLineRangeInDiffHunkMode(t *testing.T) {
 	data.ActiveHunk = 0
 	data.Parsed.Hunks = []diffcore.ParsedHunk{{NewStart: 5, NewCount: 3}}
 
-	vs := m.filterLogViewState()
+	vs := filterLogViewState(m)
 
 	if vs.Tab != nav.TabLog {
 		t.Fatalf("filterLogViewState tab = %q, want %q", vs.Tab, nav.TabLog)
@@ -112,7 +112,7 @@ func TestActiveLogLineRangeInHunkMode(t *testing.T) {
 	data.ActiveHunk = 0
 	data.Parsed.Hunks = []diffcore.ParsedHunk{{NewStart: 10, NewCount: 5}}
 
-	start, end := m.activeLogLineRange()
+	start, end := activeLogLineRange(m)
 	if start != 10 || end != 14 {
 		t.Fatalf("activeLogLineRange in hunk mode = (%d, %d), want (10, 14)", start, end)
 	}
@@ -127,7 +127,7 @@ func TestActiveLogLineRangeInLineModeWithNewLine(t *testing.T) {
 	data.ActiveLine = 0
 	data.Parsed.Changed = []diffcore.ChangedLine{{NewLine: 7}}
 
-	start, end := m.activeLogLineRange()
+	start, end := activeLogLineRange(m)
 	if start != 7 || end != 7 {
 		t.Fatalf("activeLogLineRange in line mode = (%d, %d), want (7, 7)", start, end)
 	}
@@ -139,7 +139,7 @@ func TestActiveLogLineRangeReturnsZeroWhenNoActiveHunk(t *testing.T) {
 	m.diffarea.SetNavMode(diffview.NavModeHunk)
 	m.diffarea.Unstaged.DataRef().ActiveHunk = -1
 
-	start, end := m.activeLogLineRange()
+	start, end := activeLogLineRange(m)
 	if start != 0 || end != 0 {
 		t.Fatalf("expected (0,0) with no active hunk, got (%d,%d)", start, end)
 	}
