@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmove"
 )
 
 // runTicketsMove moves one flat, never-run ticket of the cwd-resolved source
@@ -38,20 +39,20 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 		if _, err := projectRoot(d.dirs(), cwd, dstProject); err != nil {
 			return err
 		}
-		return tickets.MoveRefusal(tickets.CodeMoveCrossProject, "target epic %q is in project %q, not %q", dstEpic, dstProject, a.Project)
+		return ticketmove.MoveRefusal(tickets.CodeMoveCrossProject, "target epic %q is in project %q, not %q", dstEpic, dstProject, a.Project)
 	}
 	if dstEpic == a.Epic {
-		return tickets.MoveRefusal(tickets.CodeMoveSameEpic, "ticket %s is already in epic %q", a.ID, a.Epic)
+		return ticketmove.MoveRefusal(tickets.CodeMoveSameEpic, "ticket %s is already in epic %q", a.ID, a.Epic)
 	}
 	dstEpicPath := filepath.Join(root, dstEpic)
 	if info, err := os.Stat(dstEpicPath); err != nil || !info.IsDir() {
-		return tickets.MoveRefusal(tickets.CodeUnknownEpic, "no epic %q in project %q", dstEpic, a.Project)
+		return ticketmove.MoveRefusal(tickets.CodeUnknownEpic, "no epic %q in project %q", dstEpic, a.Project)
 	}
 	if tickets.IsMapEpic(srcEpicPath) {
-		return tickets.MoveRefusal(tickets.CodeMoveMapSource, "epic %q is a map; its tickets cannot be moved out", a.Epic)
+		return ticketmove.MoveRefusal(tickets.CodeMoveMapSource, "epic %q is a map; its tickets cannot be moved out", a.Epic)
 	}
 
-	unlock, err := tickets.LockEpics(srcEpicPath, dstEpicPath)
+	unlock, err := ticketmove.LockEpics(srcEpicPath, dstEpicPath)
 	if err != nil {
 		return err
 	}
@@ -61,7 +62,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 		return err
 	}
 
-	plan, err := tickets.PlanMove(root, a, src, dstEpic, slug, tickets.MoveOpts{})
+	plan, err := ticketmove.PlanMove(root, a, src, dstEpic, slug, ticketmove.MoveOpts{})
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 		return printMove(w, plan, jsonOut, "dry-run")
 	}
 
-	if err := tickets.ApplyMove(plan); err != nil {
+	if err := ticketmove.ApplyMove(plan); err != nil {
 		return err
 	}
 	// The old file is gone, so both sides are pinged by address, not by path.
@@ -83,10 +84,10 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 func refuseIfActive(dirs config.Dirs, dial func() (*apiclient.Client, error), a tickets.Address) error {
 	active, err := activeAddresses(dirs, dial)
 	if err != nil {
-		return tickets.MoveRefusal(tickets.CodeMoveActive, "cannot tell whether %s is queued or live: %v", a, err)
+		return ticketmove.MoveRefusal(tickets.CodeMoveActive, "cannot tell whether %s is queued or live: %v", a, err)
 	}
 	if slices.Contains(active, a.String()) {
-		return tickets.MoveRefusal(tickets.CodeMoveActive, "ticket %s is queued or live on the server", a)
+		return ticketmove.MoveRefusal(tickets.CodeMoveActive, "ticket %s is queued or live on the server", a)
 	}
 	return nil
 }
@@ -115,7 +116,7 @@ func activeAddresses(dirs config.Dirs, dial func() (*apiclient.Client, error)) (
 	return projects.PersistedActive(stateDir)
 }
 
-func printMove(w io.Writer, p tickets.MovePlan, jsonOut bool, mode string) error {
+func printMove(w io.Writer, p ticketmove.MovePlan, jsonOut bool, mode string) error {
 	if jsonOut {
 		rewritten := p.Rewritten
 		if rewritten == nil {

@@ -108,6 +108,28 @@ func resolveCrossEpic(project string, release EpicRelease, epics []Epic, archive
 	return out
 }
 
+// ValidateRefs is ValidateProject's cross-ticket half, run on epics already in
+// memory (all of project): every epic's and every live ticket's blocked_by
+// ref must resolve, and none may close a wait cycle. Done and
+// cancelled tickets are skipped, as in ValidateProject. archived is the
+// project's ArchivedEpicNames: a blocker in one of them is not dangling.
+func ValidateRefs(project string, epics []Epic, archived map[string]bool) []error {
+	g := newProjectGraph(project, epics, archived)
+	var errs []error
+	for _, e := range epics {
+		errs = append(errs, g.epicBlockedByErrors(e)...)
+		for _, t := range e.Tickets {
+			if t.IsTerminal() {
+				continue
+			}
+			for _, err := range append(g.checkBlockedBy(e.Name, t), g.cycleErrors(e.Name, t)...) {
+				errs = append(errs, fmt.Errorf("epic %s: %w", e.Name, err))
+			}
+		}
+	}
+	return errs
+}
+
 // EpicsWaitedOn is the set of epics (by name) that some non-terminal ticket is
 // blocked on as a whole: a whole-epic ref or one widened to its epic, its own
 // or its epic's. Whether the blocker still blocks is not asked.

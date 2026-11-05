@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/spf13/cobra"
 )
 
@@ -70,7 +71,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	p, err := archiveTicket(root, a, src, tickets.MoveOpts{Archive: true, Resolution: resolution, Friction: &friction})
+	p, err := archiveTicket(root, a, src, ticketmove.MoveOpts{Archive: true, Resolution: resolution, Friction: &friction})
 	if err != nil {
 		if created {
 			_ = os.RemoveAll(filepath.Join(root, followUpsArchivedEpic))
@@ -113,7 +114,7 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 	}
 	for _, t := range swept {
 		a := tickets.Address{Project: project, Epic: followUpsEpic, ID: t.Identifier}
-		opts := tickets.MoveOpts{Archive: true, RecordOriginal: t.Status == string(schema.StatusCancelled)}
+		opts := ticketmove.MoveOpts{Archive: true, RecordOriginal: t.Status == string(schema.StatusCancelled)}
 		p, err := archiveTicket(root, a, t, opts)
 		if err != nil {
 			return err
@@ -145,19 +146,19 @@ func ensureArchiveEpic(dirs config.Dirs, root, followUpsPath string) (bool, erro
 }
 
 // archiveTicket moves src into the archive epic under both epic locks.
-func archiveTicket(root string, a tickets.Address, src tickets.Ticket, opts tickets.MoveOpts) (tickets.MovePlan, error) {
+func archiveTicket(root string, a tickets.Address, src tickets.Ticket, opts ticketmove.MoveOpts) (ticketmove.MovePlan, error) {
 	srcEpicPath := filepath.Join(root, a.Epic)
-	unlock, err := tickets.LockEpics(srcEpicPath, filepath.Join(root, followUpsArchivedEpic))
+	unlock, err := ticketmove.LockEpics(srcEpicPath, filepath.Join(root, followUpsArchivedEpic))
 	if err != nil {
-		return tickets.MovePlan{}, err
+		return ticketmove.MovePlan{}, err
 	}
 	defer unlock()
 
-	p, err := tickets.PlanMove(root, a, src, followUpsArchivedEpic, "", opts)
+	p, err := ticketmove.PlanMove(root, a, src, followUpsArchivedEpic, "", opts)
 	if err != nil {
-		return tickets.MovePlan{}, err
+		return ticketmove.MovePlan{}, err
 	}
-	return p, tickets.ApplyMove(p)
+	return p, ticketmove.ApplyMove(p)
 }
 
 func newTicketsCloseCmd(d deps) *cobra.Command {

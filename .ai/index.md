@@ -192,7 +192,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `sessions/auto-advance` and `/cancel`; the root implements its `Host`; its tests share
   `servertest/promptsession.go`
 - `ralphloop/` — ralph-loop scheduler, landing and verification
-- `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail)
+- `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail); `tickets/ticketmove` — ticket move, id allocation and ref rewriting
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners
 - `harness/` — what runs inside an interactive agent session
 - `herdr/` — herdr CLI/socket client

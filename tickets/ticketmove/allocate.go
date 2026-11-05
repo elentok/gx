@@ -1,4 +1,4 @@
-package tickets
+package ticketmove
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/projectlock"
+	"github.com/elentok/gx/tickets"
 )
 
 // allocLockFileName is the per-epic ticket-ID allocation lock (see
@@ -68,7 +69,7 @@ func lockEpicFile(epicPath string) (unlock func(), err error) {
 // lock (if acquired) is released before returning, so the returned unlock is
 // always nil and safe to ignore in that case; callers should still defer
 // unlock() unconditionally when err is nil.
-func LoadLockedEpic(epicPath string) (epic *Epic, unlock func(), err error) {
+func LoadLockedEpic(epicPath string) (epic *tickets.Epic, unlock func(), err error) {
 	epicPath = filepath.Clean(epicPath)
 	scratchDir := filepath.Dir(epicPath)
 	epicName := filepath.Base(epicPath)
@@ -82,7 +83,7 @@ func LoadLockedEpic(epicPath string) (epic *Epic, unlock func(), err error) {
 		return nil, nil, err
 	}
 
-	epics, err := Load(scratchDir)
+	epics, err := tickets.Load(scratchDir)
 	if err != nil {
 		unlock()
 		return nil, nil, fmt.Errorf("loading epics under %s: %w", scratchDir, err)
@@ -112,7 +113,7 @@ var parentIDRe = regexp.MustCompile(`^(\d{2,})([a-z]?)(\d*)$`)
 // "12b". parent has a letter (e.g. "12b" or, past its own trailing digits,
 // "12b1"): the next number under that letter, "12b1" then "12b2" — both
 // spellings of the same lettered ancestor converge on the same next ID.
-func NextTicketID(epic Epic, parent string) (string, error) {
+func NextTicketID(epic tickets.Epic, parent string) (string, error) {
 	if parent == "" {
 		max := 0
 		for _, t := range epic.Tickets {
@@ -186,7 +187,7 @@ func ParentAllowed(id, parent string) bool {
 // nextLetter returns the next unused single-letter suffix after prefix
 // among existing (e.g. "b" when "12a" already exists under prefix "12"),
 // starting at "a" when none exist yet.
-func nextLetter(existing []Ticket, prefix string) byte {
+func nextLetter(existing []tickets.Ticket, prefix string) byte {
 	max := byte(0)
 	for _, t := range existing {
 		suffix, ok := strings.CutPrefix(t.Identifier, prefix)
@@ -206,7 +207,7 @@ func nextLetter(existing []Ticket, prefix string) byte {
 // nextNumber returns the next unused numeric suffix after prefix among
 // existing (e.g. 2 when "12b1" already exists under prefix "12b"), starting
 // at 1 when none exist yet.
-func nextNumber(existing []Ticket, prefix string) int {
+func nextNumber(existing []tickets.Ticket, prefix string) int {
 	max := 0
 	for _, t := range existing {
 		suffix, ok := strings.CutPrefix(t.Identifier, prefix)

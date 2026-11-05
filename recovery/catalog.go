@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -113,8 +113,8 @@ func Default() Catalog {
 // lettered ticket whose parent is missing or is not an ancestor its ID
 // allows. want is the ID-derived parent to backfill.
 func ParentDefect(id string, parent *string) (want string, defect bool) {
-	want, lettered := tickets.IDParent(id)
-	if !lettered || (parent != nil && tickets.ParentAllowed(id, *parent)) {
+	want, lettered := ticketmove.IDParent(id)
+	if !lettered || (parent != nil && ticketmove.ParentAllowed(id, *parent)) {
 		return "", false
 	}
 	return want, true

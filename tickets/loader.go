@@ -226,7 +226,7 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 // numeric sort key, full identifier, and a humanized title. The optional
 // suffix supports wayfinder's split tickets (for example 10a) and, one
 // level deeper, a numeric child of a lettered split (10b1) — see
-// tickets.NextTicketID.
+// ticketmove.NextTicketID.
 func parseTicketFilename(filename string) (number int, identifier, title string, ok bool) {
 	m := ticketFilenameRe.FindStringSubmatch(filename)
 	if m == nil {

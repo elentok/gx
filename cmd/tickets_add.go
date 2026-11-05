@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
@@ -20,7 +21,7 @@ import (
 // runTicketsAdd atomically allocates the next ticket ID for epicPath (a
 // flat sibling with no parent, a lettered child of parent, or the next
 // number under a lettered parent regardless of whether parent itself
-// already carries trailing digits — see tickets.NextTicketID) and writes a
+// already carries trailing digits — see ticketmove.NextTicketID) and writes a
 // minimal stub ticket file for the caller to fill in, printing the created
 // file's path to w. The stub is written status: draft — held-back work that
 // never enters an epic's frontier — so a freshly allocated, still-empty
@@ -239,13 +240,13 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 		return "", nil, err
 	}
 
-	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
+	epic, unlock, err := ticketmove.LoadLockedEpic(epicPath)
 	if err != nil {
 		return "", nil, err
 	}
 	defer unlock()
 
-	id, err := tickets.NextTicketID(*epic, parent)
+	id, err := ticketmove.NextTicketID(*epic, parent)
 	if err != nil {
 		return "", nil, err
 	}

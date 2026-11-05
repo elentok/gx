@@ -586,6 +586,12 @@ func siblingKey(number int, letters string) string {
 	return strconv.Itoa(number) + strings.ToLower(letters)
 }
 
+// SiblingKey normalises a ticket token ("03", "3", "04A") so two spellings of
+// the same sibling compare equal.
+func SiblingKey(token string) string {
+	return siblingKey(splitBlockedByToken(token))
+}
+
 // Word renders s as the status word shown in the ticket preview panel's
 // metadata line.
 func (s RenderedStatus) Word() string {

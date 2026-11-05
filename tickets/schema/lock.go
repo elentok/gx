@@ -17,7 +17,7 @@ func SetLockTimeoutForTest(d time.Duration) (restore func()) {
 }
 
 // LockTicket takes an exclusive per-ticket lock (a sidecar "<path>.lock" file,
-// same O_EXCL scheme as tickets.LockEpic) and returns its unlock func. Every
+// same O_EXCL scheme as ticketmove.LockEpic) and returns its unlock func. Every
 // read-modify-write of a ticket file must hold it, so a fork parent's
 // full-content write can't overwrite its child's concurrent `claimed`.
 func LockTicket(path string) (unlock func(), err error) {

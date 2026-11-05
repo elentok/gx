@@ -20,7 +20,7 @@ import (
 // TicketID is a validated ticket identifier, e.g. "04", "06b", or "06b1":
 // two or more digits, an optional single trailing lowercase letter, and —
 // only past that letter — optional trailing digits for one extra nesting
-// level (a numeric child of a lettered split, see tickets.NextTicketID).
+// level (a numeric child of a lettered split, see ticketmove.NextTicketID).
 // Real IDs are zero-padded (hence the 2-digit minimum, stricter than the
 // spec's literal \d+[a-z]?\d* — a bare "4" is not a real ID seen in
 // practice). "06ab" (two letters) and "06b1a" (a letter after a digit

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/spf13/cobra"
 )
 
@@ -554,7 +555,7 @@ func lockEpicForTicket(path string) (epic *tickets.Epic, target *tickets.Ticket,
 		return nil, nil, nil, nil
 	}
 
-	epic, unlock, err = tickets.LoadLockedEpic(filepath.Dir(issuesDir))
+	epic, unlock, err = ticketmove.LoadLockedEpic(filepath.Dir(issuesDir))
 	if err != nil {
 		return nil, nil, nil, err
 	}

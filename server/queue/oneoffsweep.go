@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 )
 
 // sweepOneOffs moves every done or cancelled ticket of a one-offs epic into
@@ -104,7 +105,7 @@ func (o *OneOffs) archiveOneOff(projectDir string, archived tickets.Epic, addr t
 	if err := o.Host.EnsureDraftEpic(archivePath); err != nil {
 		return err
 	}
-	unlock, err := tickets.LockEpics(filepath.Join(projectDir, OneOffsEpic), archivePath)
+	unlock, err := ticketmove.LockEpics(filepath.Join(projectDir, OneOffsEpic), archivePath)
 	if err != nil {
 		return err
 	}
@@ -118,16 +119,16 @@ func (o *OneOffs) archiveOneOff(projectDir string, archived tickets.Epic, addr t
 	for _, c := range archived.Tickets {
 		if tickets.IsOriginal(c, addr) {
 			to := tickets.Address{Project: addr.Project, Epic: OneOffsArchivedEpic, ID: c.Identifier}
-			return tickets.ResumeMove(projectDir, addr, to, t.Path, c.Path)
+			return ticketmove.ResumeMove(projectDir, addr, to, t.Path, c.Path)
 		}
 	}
 	completed := tk.IterationFinishedAt
 	if completed.IsZero() {
 		completed = now.UTC()
 	}
-	p, err := tickets.PlanMove(projectDir, addr, t, OneOffsArchivedEpic, "", tickets.MoveOpts{Archive: true, AppendOriginal: true, CompletedAt: completed})
+	p, err := ticketmove.PlanMove(projectDir, addr, t, OneOffsArchivedEpic, "", ticketmove.MoveOpts{Archive: true, AppendOriginal: true, CompletedAt: completed})
 	if err != nil {
 		return err
 	}
-	return tickets.ApplyMove(p)
+	return ticketmove.ApplyMove(p)
 }

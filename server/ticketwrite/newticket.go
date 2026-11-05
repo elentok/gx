@@ -8,18 +8,19 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 )
 
 // WriteNewTicket allocates the next id under the epic lock (a child of parent
 // when parent is set) and writes the ticket build returns for it.
 func WriteNewTicket(epicPath, parent, slug string, build func(id string) (schema.Ticket, string)) (path, id string, err error) {
-	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
+	epic, unlock, err := ticketmove.LoadLockedEpic(epicPath)
 	if err != nil {
 		return "", "", fmt.Errorf("load epic %s: %w", epicPath, err)
 	}
 	defer unlock()
 
-	id, err = tickets.NextTicketID(*epic, parent)
+	id, err = ticketmove.NextTicketID(*epic, parent)
 	if err != nil {
 		return "", "", fmt.Errorf("allocate %s id: %w", slug, err)
 	}

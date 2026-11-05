@@ -1,4 +1,4 @@
-package tickets
+package ticketmove
 
 import (
 	"os"
@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/tickettest"
 )
 
 func TestLoadLockedEpic_WaitsForProjectMigration(t *testing.T) {
-	requireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
-		project, epicDir := storeProjectWithEpic(t, root, "status: open\n")
+	tickettest.RequireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
+		project, epicDir := tickettest.StoreProjectWithEpic(t, root, "status: open\n")
 		return project, func() error {
 			_, unlock, err := LoadLockedEpic(epicDir)
 			if err == nil {
@@ -24,14 +26,14 @@ func TestLoadLockedEpic_WaitsForProjectMigration(t *testing.T) {
 
 func TestNextTicketID_FlatSibling(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-first.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "01-first.md"),
 		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\n")
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02-second.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "02-second.md"),
 		"---\nid: \"02\"\nstatus: done\ntype: implement\n---\n")
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "03-third.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "03-third.md"),
 		"---\nid: \"03\"\nstatus: done\ntype: implement\n---\n")
 
-	epics, err := Load(dir)
+	epics, err := tickets.Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -46,7 +48,7 @@ func TestNextTicketID_FlatSibling(t *testing.T) {
 }
 
 func TestNextTicketID_EmptyEpicStartsAt01(t *testing.T) {
-	id, err := NextTicketID(Epic{}, "")
+	id, err := NextTicketID(tickets.Epic{}, "")
 	if err != nil {
 		t.Fatalf("NextTicketID: %v", err)
 	}
@@ -57,9 +59,9 @@ func TestNextTicketID_EmptyEpicStartsAt01(t *testing.T) {
 
 func TestNextTicketID_LetteredChildOfBareParent(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12-parent.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "12-parent.md"),
 		"---\nid: \"12\"\nstatus: done\ntype: implement\n---\n")
-	epics, err := Load(dir)
+	epics, err := tickets.Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -75,11 +77,11 @@ func TestNextTicketID_LetteredChildOfBareParent(t *testing.T) {
 
 func TestNextTicketID_LetteredChildSkipsExisting(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12-parent.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "12-parent.md"),
 		"---\nid: \"12\"\nstatus: done\ntype: implement\n---\n")
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12a-child.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "12a-child.md"),
 		"---\nid: \"12a\"\nstatus: done\ntype: implement\n---\n")
-	epics, err := Load(dir)
+	epics, err := tickets.Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -95,9 +97,9 @@ func TestNextTicketID_LetteredChildSkipsExisting(t *testing.T) {
 
 func TestNextTicketID_NumericLevelPastLetteredParent(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12b-child.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "12b-child.md"),
 		"---\nid: \"12b\"\nstatus: done\ntype: implement\n---\n")
-	epics, err := Load(dir)
+	epics, err := tickets.Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -110,9 +112,9 @@ func TestNextTicketID_NumericLevelPastLetteredParent(t *testing.T) {
 		t.Errorf("NextTicketID(parent=12b) = %q, want %q", id, "12b1")
 	}
 
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12b1-grandchild.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "12b1-grandchild.md"),
 		"---\nid: \"12b1\"\nstatus: done\ntype: implement\n---\n")
-	epics, err = Load(dir)
+	epics, err = tickets.Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -127,13 +129,13 @@ func TestNextTicketID_NumericLevelPastLetteredParent(t *testing.T) {
 
 func TestNextTicketID_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e-parent.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "02e-parent.md"),
 		"---\nid: \"02e\"\nstatus: done\ntype: implement\n---\n")
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e1-child.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "02e1-child.md"),
 		"---\nid: \"02e1\"\nstatus: done\ntype: implement\n---\n")
-	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e2-child.md"),
+	tickettest.WriteFile(t, filepath.Join(dir, "my-epic", "issues", "02e2-child.md"),
 		"---\nid: \"02e2\"\nstatus: done\ntype: implement\n---\n")
-	epics, err := Load(dir)
+	epics, err := tickets.Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -158,7 +160,7 @@ func TestNextTicketID_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 func TestLoadLockedEpic_ValidPath(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "my-epic")
-	writeFile(t, filepath.Join(epicPath, "issues", "01-first.md"),
+	tickettest.WriteFile(t, filepath.Join(epicPath, "issues", "01-first.md"),
 		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\n")
 
 	epic, unlock, err := LoadLockedEpic(epicPath)
@@ -231,12 +233,12 @@ func TestLockEpic_SerializesConcurrentAllocation(t *testing.T) {
 			}
 			defer unlock()
 
-			epics, err := Load(dir)
+			epics, err := tickets.Load(dir)
 			if err != nil {
 				errs[i] = err
 				return
 			}
-			var epic Epic
+			var epic tickets.Epic
 			for _, e := range epics {
 				if e.Name == "my-epic" {
 					epic = e

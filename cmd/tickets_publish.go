@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/spf13/cobra"
 )
 
@@ -106,7 +107,7 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 	if err != nil {
 		return nil, err
 	}
-	first, err := tickets.NextTicketID(epic, "")
+	first, err := ticketmove.NextTicketID(epic, "")
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +230,7 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	var unlock func()
 	if epicExists {
 		var epic *tickets.Epic
-		if epic, unlock, err = tickets.LoadLockedEpic(epicPath); err != nil {
+		if epic, unlock, err = ticketmove.LoadLockedEpic(epicPath); err != nil {
 			return err
 		}
 		defer func() { unlock() }()
@@ -269,7 +270,7 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, al
 			}
 		}()
 		var epic *tickets.Epic
-		if epic, unlock, err = tickets.LoadLockedEpic(epicPath); err != nil {
+		if epic, unlock, err = ticketmove.LoadLockedEpic(epicPath); err != nil {
 			return err
 		}
 		defer func() { unlock() }()

@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 )
 
 // recoveryVerbs lets a remedy call the server's own verbs. Each call goes
@@ -195,7 +196,7 @@ func (rec *Recovery) recoveryFinish(req wire.QueueRequest, _ recovery.Call) (wir
 func (rec *Recovery) recoverySetParent(req wire.QueueRequest, c recovery.Call) (wire.QueueResult, error) {
 	address, parent := req.Address, c.Parent
 	return rec.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
-		epic, unlock, err := tickets.LoadLockedEpic(ref.Epic.Path)
+		epic, unlock, err := ticketmove.LoadLockedEpic(ref.Epic.Path)
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("lock epic of %s: %w", ref.Addr, err)
 		}

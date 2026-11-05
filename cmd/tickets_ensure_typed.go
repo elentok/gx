@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 )
 
 // typedTicketSpec is what differs between the epic's one-per-epic ticket
@@ -29,7 +30,7 @@ type typedTicketSpec struct {
 func ensureTypedTicket(epicPath string, w io.Writer, spec typedTicketSpec) error {
 	epicPath = filepath.Clean(epicPath)
 
-	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
+	epic, unlock, err := ticketmove.LoadLockedEpic(epicPath)
 	if err != nil {
 		return err
 	}
@@ -42,7 +43,7 @@ func ensureTypedTicket(epicPath string, w io.Writer, spec typedTicketSpec) error
 		}
 	}
 
-	id, err := tickets.NextTicketID(*epic, "")
+	id, err := ticketmove.NextTicketID(*epic, "")
 	if err != nil {
 		return err
 	}

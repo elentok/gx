@@ -1,4 +1,4 @@
-package tickets
+package ticketmove
 
 import (
 	"fmt"
@@ -12,12 +12,13 @@ import (
 	"unicode"
 
 	"github.com/elentok/gx/projectlock"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 // MoveRefusal is a refused move with a stable code.
 func MoveRefusal(code, format string, args ...any) error {
-	return &AddressError{Code: code, Msg: fmt.Sprintf(format, args...)}
+	return &tickets.AddressError{Code: code, Msg: fmt.Sprintf(format, args...)}
 }
 
 // LockEpics locks every epic in path order, so two moves in opposite
@@ -44,7 +45,7 @@ func LockEpics(paths ...string) (unlock func(), err error) {
 // MovePlan is a computed ticket move. PlanMove builds it without writing;
 // ApplyMove writes it.
 type MovePlan struct {
-	From, To  Address
+	From, To  tickets.Address
 	OldPath   string
 	NewPath   string
 	ticket    schema.Ticket
@@ -78,7 +79,7 @@ type MoveOpts struct {
 
 // PlanMove runs the refusals and computes the moved ticket, writing nothing.
 // Called with both epic locks held, so what it reads is what ApplyMove writes.
-func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts MoveOpts) (MovePlan, error) {
+func PlanMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug string, opts MoveOpts) (MovePlan, error) {
 	raw, err := os.ReadFile(src.Path)
 	if err != nil {
 		return MovePlan{}, err
@@ -88,22 +89,22 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 		return MovePlan{}, err
 	}
 	if opts.Resolution != "" && t.Status != schema.StatusDraft && t.Status != schema.StatusOpen {
-		return MovePlan{}, MoveRefusal(CodeCloseStatus, "ticket %s is %s; only draft or open follow-ups close", a.ID, t.Status)
+		return MovePlan{}, MoveRefusal(tickets.CodeCloseStatus, "ticket %s is %s; only draft or open follow-ups close", a.ID, t.Status)
 	}
 	if !opts.Archive {
 		if t.Status != schema.StatusDraft && t.Status != schema.StatusOpen {
-			return MovePlan{}, MoveRefusal(CodeMoveStatus, "ticket %s is %s; only draft or open tickets move", a.ID, t.Status)
+			return MovePlan{}, MoveRefusal(tickets.CodeMoveStatus, "ticket %s is %s; only draft or open tickets move", a.ID, t.Status)
 		}
 		if len(t.SessionIDs) > 0 || t.ResolvedBase != "" || t.IterationStatus != "" {
-			return MovePlan{}, MoveRefusal(CodeMoveRunHistory, "ticket %s has run history", a.ID)
+			return MovePlan{}, MoveRefusal(tickets.CodeMoveRunHistory, "ticket %s has run history", a.ID)
 		}
 	}
 
-	epics, err := Load(root)
+	epics, err := tickets.Load(root)
 	if err != nil {
 		return MovePlan{}, err
 	}
-	var dst, srcEpic *Epic
+	var dst, srcEpic *tickets.Epic
 	for i := range epics {
 		switch epics[i].Name {
 		case dstEpic:
@@ -113,14 +114,14 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 		}
 	}
 	if dst == nil || srcEpic == nil {
-		return MovePlan{}, MoveRefusal(CodeUnknownEpic, "no epic %q in project %q", dstEpic, a.Project)
+		return MovePlan{}, MoveRefusal(tickets.CodeUnknownEpic, "no epic %q in project %q", dstEpic, a.Project)
 	}
 	if t.Parent != nil {
-		return MovePlan{}, MoveRefusal(CodeMoveLineage, "ticket %s is a fork of %s", a.ID, *t.Parent)
+		return MovePlan{}, MoveRefusal(tickets.CodeMoveLineage, "ticket %s is a fork of %s", a.ID, *t.Parent)
 	}
 	for _, o := range srcEpic.Tickets {
 		if o.Parent != nil && *o.Parent == a.ID {
-			return MovePlan{}, MoveRefusal(CodeMoveLineage, "ticket %s has fork child %s", a.ID, o.Identifier)
+			return MovePlan{}, MoveRefusal(tickets.CodeMoveLineage, "ticket %s has fork child %s", a.ID, o.Identifier)
 		}
 	}
 
@@ -134,7 +135,7 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 
 	p := MovePlan{
 		From:    a,
-		To:      Address{Project: a.Project, Epic: dstEpic, ID: newID},
+		To:      tickets.Address{Project: a.Project, Epic: dstEpic, ID: newID},
 		OldPath: src.Path,
 		NewPath: filepath.Join(root, dstEpic, "issues", fmt.Sprintf("%s-%s.md", newID, slug)),
 		ticket:  t,
@@ -184,7 +185,7 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 		// which is no stale prose mention.
 		p.body = schema.SetSection(p.body, "Resolution", opts.Resolution)
 	} else if opts.RecordOriginal || opts.AppendOriginal {
-		original := OriginalLine(a) + "\n"
+		original := tickets.OriginalLine(a) + "\n"
 		if res := schema.Section(p.body, "Resolution"); res == "" {
 			p.body = schema.SetSection(p.body, "Resolution", original)
 		} else if opts.AppendOriginal && !strings.Contains(res, original) {
@@ -204,7 +205,7 @@ type inboundEdit struct {
 // respeller returns the function that re-spells a ref written in epic inEpic
 // when it names the moved ticket, matched by sibling key rather than spelling;
 // every other ref comes back unchanged.
-func respeller(project string, from, to Address, inEpic string) func(string) string {
+func respeller(project string, from, to tickets.Address, inEpic string) func(string) string {
 	return func(ref string) string {
 		rest := ref
 		if proj, r, ok := strings.Cut(ref, ":"); ok {
@@ -217,7 +218,7 @@ func respeller(project string, from, to Address, inEpic string) func(string) str
 		if e, i, ok := strings.Cut(rest, "/"); ok {
 			epic, id = e, i
 		}
-		if epic != from.Epic || !schema.TicketID(id).Valid() || SiblingKey(id) != SiblingKey(from.ID) {
+		if epic != from.Epic || !schema.TicketID(id).Valid() || tickets.SiblingKey(id) != tickets.SiblingKey(from.ID) {
 			return ref
 		}
 		if inEpic == to.Epic {
@@ -234,10 +235,10 @@ func respeller(project string, from, to Address, inEpic string) func(string) str
 //
 // Only errors the move introduces refuse it: a project that was already
 // broken elsewhere must not become unmovable.
-func (p *MovePlan) planInbound(root string, epics []Epic) error {
+func (p *MovePlan) planInbound(root string, epics []tickets.Epic) error {
 	project := p.From.Project
 	rewrittenFiles := map[string]string{} // path -> content after the rewrite
-	post := make([]Epic, len(epics))
+	post := make([]tickets.Epic, len(epics))
 
 	describe := func(path string, fn func(string) string, blockedBy []string, base string) {
 		for _, ref := range blockedBy {
@@ -307,12 +308,12 @@ func (p *MovePlan) planInbound(root string, epics []Epic) error {
 			post[i].Tickets = append(post[i].Tickets, t)
 		}
 		if e.Name == p.To.Epic {
-			moved := Ticket{
+			moved := tickets.Ticket{
 				Number:     leadingNumber(p.To.ID),
 				Identifier: p.To.ID,
 				Path:       p.NewPath,
 				Type:       string(p.ticket.Type),
-				BlockedBy:  idsToStrings(p.ticket.BlockedBy),
+				BlockedBy:  idStrings(p.ticket.BlockedBy),
 				Status:     string(p.ticket.Status),
 				Base:       p.ticket.Base,
 			}
@@ -320,22 +321,22 @@ func (p *MovePlan) planInbound(root string, epics []Epic) error {
 		}
 	}
 
-	archived, err := ArchivedEpicNames(root)
+	archived, err := tickets.ArchivedEpicNames(root)
 	if err != nil {
 		return err
 	}
 	before := map[string]bool{}
-	for _, err := range ValidateRefs(project, epics, archived) {
+	for _, err := range tickets.ValidateRefs(project, epics, archived) {
 		before[err.Error()] = true
 	}
 	var broken []string
-	for _, err := range ValidateRefs(project, post, archived) {
+	for _, err := range tickets.ValidateRefs(project, post, archived) {
 		if !before[err.Error()] {
 			broken = append(broken, err.Error())
 		}
 	}
 	if len(broken) > 0 {
-		return MoveRefusal(CodeMoveBrokenProj, "moving %s would break the project:\n  %s", p.From.ID, strings.Join(broken, "\n  "))
+		return MoveRefusal(tickets.CodeMoveBrokenProj, "moving %s would break the project:\n  %s", p.From.ID, strings.Join(broken, "\n  "))
 	}
 
 	p.Warnings = p.proseMentions(root, rewrittenFiles)
@@ -343,6 +344,14 @@ func (p *MovePlan) planInbound(root string, epics []Epic) error {
 }
 
 // leadingNumber is the numeric prefix of a ticket id ("12a" -> 12).
+func idStrings(ids []schema.TicketID) []string {
+	var out []string
+	for _, id := range ids {
+		out = append(out, string(id))
+	}
+	return out
+}
+
 func leadingNumber(id string) int {
 	n, _ := strconv.Atoi(strings.TrimRightFunc(id, unicode.IsLetter))
 	return n
@@ -416,7 +425,7 @@ func ApplyMove(p MovePlan) error {
 // ResumeMove finishes a move whose new file was written but whose old file is
 // still there (a crash between the two): it re-plans the inbound refs against
 // the existing new file, rewrites them and removes the old file.
-func ResumeMove(root string, from, to Address, oldPath, newPath string) error {
+func ResumeMove(root string, from, to tickets.Address, oldPath, newPath string) error {
 	unlockProject, err := projectlock.Shared(oldPath)
 	if err != nil {
 		return err
@@ -437,7 +446,7 @@ func ResumeMove(root string, from, to Address, oldPath, newPath string) error {
 		return err
 	}
 	p := MovePlan{From: from, To: to, OldPath: oldPath, NewPath: newPath, ticket: t, body: schema.ParseBody(string(raw))}
-	epics, err := Load(root)
+	epics, err := tickets.Load(root)
 	if err != nil {
 		return err
 	}
@@ -457,7 +466,7 @@ func (p MovePlan) finish() error {
 			return err
 		}
 	}
-	if err := os.Rename(LogPath(p.OldPath), LogPath(p.NewPath)); err != nil && !os.IsNotExist(err) {
+	if err := os.Rename(tickets.LogPath(p.OldPath), tickets.LogPath(p.NewPath)); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("moving log: %w", err)
 	}
 	return os.Remove(p.OldPath)

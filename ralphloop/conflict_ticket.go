@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 )
 
 // forkConflictResolutionTicket forks p.Ticket into a claimed conflict-resolution
@@ -17,14 +18,14 @@ import (
 // so no new blocking mechanism is needed (see ADR 0016).
 func forkConflictResolutionTicket(p iterationParams) (childPath, childID string, err error) {
 	epicPath := filepath.Join(p.ScratchDir, p.FeatureBranch)
-	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
+	epic, unlock, err := ticketmove.LoadLockedEpic(epicPath)
 	if err != nil {
 		return "", "", fmt.Errorf("loading epic %s to fork conflict-resolution ticket: %w", epicPath, err)
 	}
 	defer unlock()
 
 	parentID := schema.TicketID(p.Ticket.Identifier)
-	id, err := tickets.NextTicketID(*epic, p.Ticket.Identifier)
+	id, err := ticketmove.NextTicketID(*epic, p.Ticket.Identifier)
 	if err != nil {
 		return "", "", fmt.Errorf("allocating conflict-resolution ticket id: %w", err)
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"gopkg.in/yaml.v3"
 )
 
@@ -506,7 +507,7 @@ func IsOneOffEpic(e tickets.Epic) bool {
 // nextOneOffNumber is above the highest in the live epic and the archived one.
 func nextOneOffNumber(projectDir string, epic *tickets.Epic) (int, error) {
 	next := 1
-	if id, err := tickets.NextTicketID(*epic, ""); err != nil {
+	if id, err := ticketmove.NextTicketID(*epic, ""); err != nil {
 		return 0, err
 	} else if n, err := strconv.Atoi(id); err == nil {
 		next = n
@@ -529,7 +530,7 @@ func (o *OneOffs) writeOneOffTicket(projectDir, slug string, tk schema.Ticket, p
 	if err := o.Host.EnsureDraftEpic(epicDir); err != nil {
 		return "", "", err
 	}
-	epic, unlock, err := tickets.LoadLockedEpic(epicDir)
+	epic, unlock, err := ticketmove.LoadLockedEpic(epicDir)
 	if err != nil {
 		return "", "", err
 	}
