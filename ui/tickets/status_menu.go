@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // applyStatusChange writes status to the selected row's ticket through
@@ -31,7 +32,7 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 }
 
 // statusChangeCmd is applyStatusChange's guarded write for any tab's row.
-func statusChangeCmd(tix TicketsAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
+func statusChangeCmd(tix tabapi.TicketsAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
 	file, address := resolveTicketPath(store, ticket.Path)
 
 	if status == schema.StatusOpen {
@@ -81,7 +82,7 @@ type statusChangedMsg struct{}
 // applyStatusChange) so a filesystem error surfaces as a toast rather than a
 // panic on the Update goroutine. The write is local; a running server is then
 // pinged about address.
-func cmdApplyTicketStatus(tix TicketsAPI, file, address string, status schema.Status) tea.Cmd {
+func cmdApplyTicketStatus(tix tabapi.TicketsAPI, file, address string, status schema.Status) tea.Cmd {
 	return func() tea.Msg {
 		if err := schema.UpdateTicket(file, func(t *schema.Ticket) {
 			t.Status = status

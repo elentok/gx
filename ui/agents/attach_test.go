@@ -21,7 +21,7 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -163,7 +163,7 @@ func withStatusOfA(m Model, status wire.SessionStatus) (Model, tea.Cmd) {
 		{ID: "a", Name: "alpha", Project: "gx", Status: status},
 		{ID: "b", Name: "beta", Project: "gx", Status: idleStatus},
 	}}
-	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
+	next, cmd := m.WithServerState(st, tabapi.ServerLinkUp)
 	return next.(Model), cmd
 }
 
@@ -594,7 +594,7 @@ func TestAttach_QueueAgentDialsItsHolderDir(t *testing.T) {
 		ID: "queue-x-iter-01", Name: "x-iter-01", Project: "gx", Queue: true,
 		Holder: "/state/agents/gx/x-iter-01", Status: idleStatus,
 	}}}
-	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
+	next, cmd := m.WithServerState(st, tabapi.ServerLinkUp)
 	dialed(t, next.(Model), cmd)
 	if dialedDir != "/state/agents/gx/x-iter-01" {
 		t.Fatalf("dialed %q, want the Queue agent's holder dir", dialedDir)

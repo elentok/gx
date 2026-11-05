@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 type sessionActionMsg struct {
@@ -162,7 +162,7 @@ func queueActionCmd(c SessionClient, q Queue, epic string) tea.Cmd {
 		if err != nil {
 			return queueActionMsg{err: err}
 		}
-		queued, refusals := ticketsui.QueueEpic(ctx, snap, q.Add, epic)
+		queued, refusals := tabapi.QueueEpic(ctx, snap, q.Add, epic)
 		return queueActionMsg{epic: epic, queued: queued, refusals: refusals}
 	}
 }
@@ -176,9 +176,9 @@ func (m Model) updateQueueAction(msg queueActionMsg) (tea.Model, tea.Cmd) {
 	case msg.queued == 0 && len(msg.refusals) == 0:
 		return m, notify.Warning("nothing to queue in " + msg.epic)
 	case len(msg.refusals) > 0:
-		return m, ticketsui.QueuedToast(msg.queued, msg.refusals)
+		return m, tabapi.QueuedToast(msg.queued, msg.refusals)
 	}
-	return m, tea.Batch(ticketsui.QueuedToast(msg.queued, nil), nav.Switch(nav.ViewState{Tab: nav.TabQueue, InitialPath: msg.epic}))
+	return m, tea.Batch(tabapi.QueuedToast(msg.queued, nil), nav.Switch(nav.ViewState{Tab: nav.TabQueue, InitialPath: msg.epic}))
 }
 
 func (m Model) markReadSelected() (tea.Model, tea.Cmd) {

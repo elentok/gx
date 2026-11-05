@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // focusIterationTab is a package-level seam so tests can fake herdr.
@@ -23,7 +24,7 @@ var focusIterationTab = func(tabID string) error {
 // earlier fetch, so a caller that looks up several things in a row hits the
 // server once.
 type iterationsSnapshot struct {
-	ReadsAPI
+	tabapi.ReadsAPI
 	list []wire.IterationInfo
 	err  error
 }
@@ -33,7 +34,7 @@ func (s iterationsSnapshot) Iterations(context.Context) ([]wire.IterationInfo, e
 }
 
 // snapshotIterations fetches api's iterations once. Nil stays nil: no server.
-func snapshotIterations(api ReadsAPI) ReadsAPI {
+func snapshotIterations(api tabapi.ReadsAPI) tabapi.ReadsAPI {
 	if api == nil {
 		return nil
 	}
@@ -42,7 +43,7 @@ func snapshotIterations(api ReadsAPI) ReadsAPI {
 }
 
 // serverIteration is address's live iteration from the server's iterations read.
-func serverIteration(api ReadsAPI, address string) (wire.IterationInfo, bool) {
+func serverIteration(api tabapi.ReadsAPI, address string) (wire.IterationInfo, bool) {
 	if api == nil {
 		return wire.IterationInfo{}, false
 	}
@@ -82,7 +83,7 @@ func resolveTicketPath(store, path string) (file, address string) {
 
 // cmdServerFocusPane focuses the herdr tab the iterations read names for
 // address.
-func cmdServerFocusPane(api ReadsAPI, address string) tea.Cmd {
+func cmdServerFocusPane(api tabapi.ReadsAPI, address string) tea.Cmd {
 	return func() tea.Msg {
 		it, live := serverIteration(api, address)
 		if !live || it.Tab == "" {

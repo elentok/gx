@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // msgType names a message's type, for messages another package keeps private.
@@ -100,7 +100,7 @@ func TestDownMode_ReloadKeyReloadsTicketsAndProbesFromQueue(t *testing.T) {
 	if cmd == nil {
 		t.Fatal(`"R" on the Tickets tab did nothing`)
 	}
-	if got := runCmds(cmd); !slices.Contains(got, "tickets.epicsLoadedMsg") || slices.Contains(got, "tickets.ResnapshotRequestedMsg") {
+	if got := runCmds(cmd); !slices.Contains(got, "tickets.epicsLoadedMsg") || slices.Contains(got, "tabapi.ResnapshotRequestedMsg") {
 		t.Fatalf(`"R" on the Tickets tab produced %v, want a disk reload`, got)
 	}
 
@@ -110,7 +110,7 @@ func TestDownMode_ReloadKeyReloadsTicketsAndProbesFromQueue(t *testing.T) {
 	if cmd == nil {
 		t.Fatal(`"R" on the Queue tab did nothing`)
 	}
-	if got := runCmds(cmd); !slices.Contains(got, "tickets.ProbeRequestedMsg") {
+	if got := runCmds(cmd); !slices.Contains(got, "tabapi.ProbeRequestedMsg") {
 		t.Fatalf(`"R" on the Queue tab produced %v, want a probe request`, got)
 	}
 }
@@ -120,7 +120,7 @@ func TestDownMode_ReloadKeyReloadsTicketsAndProbesFromQueue(t *testing.T) {
 func TestDownMode_ProbeRequestIsOneShot(t *testing.T) {
 	h := newDownHarness(t)
 
-	next, cmd, ok := h.m.updateServerConn(ticketsui.ProbeRequestedMsg{})
+	next, cmd, ok := h.m.updateServerConn(tabapi.ProbeRequestedMsg{})
 	if !ok || cmd == nil {
 		t.Fatalf("probe request not handled (ok=%v)", ok)
 	}
@@ -141,7 +141,7 @@ func TestDownMode_NoClientIgnoresProbeRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := New(*repo, Settings{ActiveWorktreePath: repoDir})
-	if _, cmd, ok := m.updateServerConn(ticketsui.ProbeRequestedMsg{}); !ok || cmd != nil {
+	if _, cmd, ok := m.updateServerConn(tabapi.ProbeRequestedMsg{}); !ok || cmd != nil {
 		t.Fatalf("no-client probe request: ok=%v cmd=%v, want handled and no command", ok, cmd)
 	}
 }

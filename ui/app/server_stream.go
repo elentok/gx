@@ -11,7 +11,7 @@ import (
 	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -20,7 +20,7 @@ import (
 // how the shell currently reaches the server (a shell with no client is down).
 // The command runs while the page is on screen (the Queue tab's spinner loop).
 type serverStatePage interface {
-	WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (tea.Model, tea.Cmd)
+	WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea.Model, tea.Cmd)
 }
 
 // serverStream is the shell's one subscription to the server: the shared state
@@ -30,7 +30,7 @@ type serverStream struct {
 	loaded bool // a snapshot has been applied
 	// queue is vm's queue status, kept by setVM: working it out walks every
 	// epic, too slow to redo on each render.
-	queue   ticketsui.QueueStatus
+	queue   tabapi.QueueStatus
 	queueOK bool
 
 	// snapshotting coalesces re-snapshot requests; gen drops a snapshot reply
@@ -58,7 +58,7 @@ type serverStream struct {
 // setVM replaces the shared state and its queue status.
 func (s *serverStream) setVM(vm viewmodel.State) {
 	s.vm = vm
-	s.queue, s.queueOK = ticketsui.QueueStatusOf(vm)
+	s.queue, s.queueOK = tabapi.QueueStatusOf(vm)
 }
 
 type streamSnapshotMsg struct {
@@ -136,7 +136,7 @@ func (m Model) cancelStream() Model {
 // shell, not a page, watches it, so it runs whichever tab is on screen), the
 // stream only while not. prev is the link before the result; the active page is
 // told only when it changed, and hidden pages catch up when switched to.
-func (m Model) onLinkChange(prev ticketsui.ServerLink) (Model, tea.Cmd) {
+func (m Model) onLinkChange(prev tabapi.ServerLink) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	if m.serverConn().State == ServerDown {
 		var watch tea.Cmd
@@ -333,7 +333,7 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m, deliver := m.deliverServerState()
 		return m, tea.Batch(append(cmds, deliver)...), true
 
-	case ticketsui.ResnapshotRequestedMsg:
+	case tabapi.ResnapshotRequestedMsg:
 		// The queue is refetched when the snapshot lands. Down-mode "R" never
 		// reaches here: the tabs reload from disk.
 		if m.serverConn().State == ServerDown {
@@ -407,7 +407,7 @@ func (m Model) focusSession(id string) (Model, tea.Cmd) {
 
 // startSession switches to the Agents tab with its create form open,
 // pre-filled from a Tickets-tab "Start session…".
-func (m Model) startSession(req ticketsui.StartSessionMsg) (Model, tea.Cmd) {
+func (m Model) startSession(req tabapi.StartSessionMsg) (Model, tea.Cmd) {
 	m, cmd := m.switchTab(nav.ViewState{Tab: nav.TabAgents})
 	current := m.activePage()
 	agents, ok := current.model.(agentsui.Model)

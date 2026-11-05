@@ -4,7 +4,7 @@ import (
 	"image/color"
 
 	"github.com/elentok/gx/ui"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // ServerState is how this TUI sees the orchestrator server.
@@ -56,14 +56,14 @@ func (c ServerConn) badge(icons ui.IconSet) (b serverBadge, ok bool) {
 
 // link is the connection state as the Tickets tab gates its keys and live
 // columns on it.
-func (c ServerConn) link() ticketsui.ServerLink {
+func (c ServerConn) link() tabapi.ServerLink {
 	switch c.State {
 	case ServerDown:
-		return ticketsui.ServerLinkDown
+		return tabapi.ServerLinkDown
 	case ServerReadOnly:
-		return ticketsui.ServerLinkReadOnly
+		return tabapi.ServerLinkReadOnly
 	}
-	return ticketsui.ServerLinkUp
+	return tabapi.ServerLinkUp
 }
 
 // WithServerConn sets the connection state the server indicator renders.

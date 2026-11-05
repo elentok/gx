@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -125,14 +126,14 @@ type QueueModel struct {
 	// serverAPI/serverStart/link back the server-down banner (see
 	// queue_server_down.go). link is only ever set by WithServerState; a tab
 	// with no client is delivered ServerLinkDown, so it shows the banner too.
-	serverAPI   ServerAPI
-	admin       AdminAPI
-	sessions    SessionsAPI
-	tickets     TicketsAPI
-	queue       QueueAPI
-	reads       ReadsAPI
+	serverAPI   tabapi.ServerAPI
+	admin       tabapi.AdminAPI
+	sessions    tabapi.SessionsAPI
+	tickets     tabapi.TicketsAPI
+	queue       tabapi.QueueAPI
+	reads       tabapi.ReadsAPI
 	serverStart func(context.Context) error
-	link        ServerLink
+	link        tabapi.ServerLink
 	// olderServer: see Model.olderServer.
 	olderServer bool
 	// projectFilter narrows the server-mode rows to one project; "" shows all.
@@ -600,7 +601,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if m.serverDown() {
 				return m, cmdProbeRequested
 			}
-			return m, func() tea.Msg { return ResnapshotRequestedMsg{} }
+			return m, func() tea.Msg { return tabapi.ResnapshotRequestedMsg{} }
 		case bindingQueuePauseResume:
 			if m.serverAPI != nil {
 				return m.handleServerPauseKey()

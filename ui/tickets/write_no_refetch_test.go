@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // A finished write only toasts: the new state arrives on the event stream, so
@@ -41,7 +42,7 @@ func TestStatusChanged_UpModeMakesNoRefetch(t *testing.T) {
 }
 
 func TestStatusChanged_DownModeReloadsDisk(t *testing.T) {
-	down, _ := withLink(newServerModel(t), ServerLinkDown)
+	down, _ := withLink(newServerModel(t), tabapi.ServerLinkDown)
 	_, cmd := down.Update(statusChangedMsg{})
 	if cmd == nil {
 		t.Fatal("down mode did not reload")

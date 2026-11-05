@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	teatest "github.com/elentok/gx/testutil/teatestv2"
 	"github.com/elentok/gx/ui"
-	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -33,7 +33,7 @@ func waitForText(t *testing.T, tm *teatest.TestModel, text string) {
 func TestAgents_NoServerSaysAServerIsNeeded(t *testing.T) {
 	for name, m := range map[string]tea.Model{
 		"no client": NewModel(nil, nil, ui.Settings{}),
-		"link down": withState(t, newTestModel(&fakeSessionClient{}, ui.Settings{}), nil, ticketsui.ServerLinkDown),
+		"link down": withState(t, newTestModel(&fakeSessionClient{}, ui.Settings{}), nil, tabapi.ServerLinkDown),
 	} {
 		t.Run(name, func(t *testing.T) {
 			tm := startAgentsTUI(t, m)
@@ -43,14 +43,14 @@ func TestAgents_NoServerSaysAServerIsNeeded(t *testing.T) {
 }
 
 func TestAgents_NoSessionsHintsNewSession(t *testing.T) {
-	m := withState(t, newTestModel(&fakeSessionClient{}, ui.Settings{}), &viewmodel.State{}, ticketsui.ServerLinkUp)
+	m := withState(t, newTestModel(&fakeSessionClient{}, ui.Settings{}), &viewmodel.State{}, tabapi.ServerLinkUp)
 	tm := startAgentsTUI(t, m)
 	waitForText(t, tm, "c new session")
 }
 
 func TestAgents_SessionsReplaceTheEmptyState(t *testing.T) {
 	st := &viewmodel.State{Sessions: []wire.SessionInfo{{ID: "s1", Name: "fix login"}}}
-	m := withState(t, newTestModel(&fakeSessionClient{}, ui.Settings{}), st, ticketsui.ServerLinkUp)
+	m := withState(t, newTestModel(&fakeSessionClient{}, ui.Settings{}), st, tabapi.ServerLinkUp)
 	tm := startAgentsTUI(t, m)
 	waitForText(t, tm, "fix login")
 	if bytes.Contains(tm.CurrentFrame(), []byte("c new session")) {
@@ -69,7 +69,7 @@ func TestAgents_InputFocusedOnlyInTerminalFocus(t *testing.T) {
 	}
 }
 
-func withState(t *testing.T, m Model, st *viewmodel.State, link ticketsui.ServerLink) Model {
+func withState(t *testing.T, m Model, st *viewmodel.State, link tabapi.ServerLink) Model {
 	t.Helper()
 	next, _ := m.WithServerState(st, link)
 	return next.(Model)

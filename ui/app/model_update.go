@@ -6,7 +6,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -84,12 +84,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
-	if req, ok := msg.(ticketsui.StartSessionMsg); ok {
+	if req, ok := msg.(tabapi.StartSessionMsg); ok {
 		next, cmd := m.startSession(req)
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
-	if req, ok := msg.(ticketsui.GoToSessionMsg); ok {
+	if req, ok := msg.(tabapi.GoToSessionMsg); ok {
 		next, cmd := m.focusSession(req.ID)
 		return next, tea.Batch(notifyCmd, cmd)
 	}

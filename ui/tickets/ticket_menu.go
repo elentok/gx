@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // ticketTarget is the ticket row a Context menu was opened on. epicName is
@@ -156,7 +157,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		it := pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
 		if it.Disabled == "" {
 			id := in.queueAgent
-			it.Run = func(ticketTarget) tea.Cmd { return func() tea.Msg { return GoToSessionMsg{ID: id} } }
+			it.Run = func(ticketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } }
 		}
 		items = append(items, it)
 	case in.paneLive:
@@ -236,11 +237,11 @@ func firstReason(reasons ...string) string {
 
 // serverReason is why orchestration writes are off right now; empty when the
 // server takes them.
-func serverReason(api ServerAPI, link ServerLink) string {
-	if api == nil || link == ServerLinkDown {
+func serverReason(api tabapi.ServerAPI, link tabapi.ServerLink) string {
+	if api == nil || link == tabapi.ServerLinkDown {
 		return serverNotRunning
 	}
-	return link.disabledReason()
+	return link.DisabledReason()
 }
 
 // ticketMenuReadyMsg carries a ticket's Context menu whose agent liveness was
@@ -275,7 +276,7 @@ func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool
 
 // cmdTicketMenu resolves liveness in a Cmd (it shells out to ps), so the menu
 // opens once the result comes back.
-func cmdTicketMenu(api ReadsAPI, dirs config.Dirs, in ticketMenuInput) tea.Cmd {
+func cmdTicketMenu(api tabapi.ReadsAPI, dirs config.Dirs, in ticketMenuInput) tea.Cmd {
 	address := in.ticket.Path
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.

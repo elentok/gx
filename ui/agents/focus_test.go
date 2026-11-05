@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui"
-	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -46,7 +46,7 @@ func openedModel(t *testing.T, f *fakeSessionClient, lastViewed string, sessions
 	m.dial = (&fakeHolders{attaches: map[string]*fakeAttach{}}).dial
 	m.termProgram = "iTerm.app"
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
-	return withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)
+	return withState(t, m, &viewmodel.State{Sessions: sessions}, tabapi.ServerLinkUp)
 }
 
 func waitIdle(t *testing.T, r *focusReporter) {
@@ -115,7 +115,7 @@ func TestFocus_OpensOnTheSidebarHintWithNoSessions(t *testing.T) {
 
 func TestFocus_LaterSnapshotsKeepTheFocus(t *testing.T) {
 	m := openedModel(t, &fakeSessionClient{}, "", attentionSessions()[0])
-	m = withState(t, m, &viewmodel.State{Sessions: attentionSessions()}, ticketsui.ServerLinkUp)
+	m = withState(t, m, &viewmodel.State{Sessions: attentionSessions()}, tabapi.ServerLinkUp)
 	assertFocus(t, m, false, "a")
 }
 

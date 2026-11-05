@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
-	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -34,7 +34,7 @@ func terminalModel(t *testing.T, s wire.SessionInfo, sessionsDir string) Model {
 	m.sessionsDir = sessionsDir
 	m.hideSidebar = true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 8})
-	next, cmd := m.WithServerState(&viewmodel.State{Sessions: []wire.SessionInfo{s}}, ticketsui.ServerLinkUp)
+	next, cmd := m.WithServerState(&viewmodel.State{Sessions: []wire.SessionInfo{s}}, tabapi.ServerLinkUp)
 	m = next.(Model)
 	if cmd != nil {
 		m = runBatch(t, m, cmd)
@@ -138,7 +138,7 @@ func TestTerminal_ExitedScreenReloadsAfterALaterExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.StatusChangedAt = terminalNow
-	next, cmd := m.WithServerState(&viewmodel.State{Sessions: []wire.SessionInfo{s}}, ticketsui.ServerLinkUp)
+	next, cmd := m.WithServerState(&viewmodel.State{Sessions: []wire.SessionInfo{s}}, tabapi.ServerLinkUp)
 	m = runBatch(t, next.(Model), cmd)
 	if body := ansi.Strip(m.View().Content); !strings.Contains(body, "second") {
 		t.Fatalf("last screen not reloaded:\n%s", body)

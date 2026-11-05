@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -31,7 +32,7 @@ func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueM
 
 func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	m := newServerQueueModel(t, func(context.Context) error { return nil })
-	next, cmd := m.WithServerState(nil, ServerLinkDown)
+	next, cmd := m.WithServerState(nil, tabapi.ServerLinkDown)
 	m = next.(QueueModel)
 	if cmd != nil {
 		t.Fatal("the tab must not run a reconnect loop of its own")
@@ -48,7 +49,7 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}})
-	next, _ = m.WithServerState(&st, ServerLinkUp)
+	next, _ = m.WithServerState(&st, tabapi.ServerLinkUp)
 	if next.(QueueModel).serverDown() {
 		t.Fatal("still down after an up delivery")
 	}
@@ -65,13 +66,13 @@ func TestQueueServerDown_StateDeliveredDownShowsOnceUp(t *testing.T) {
 	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/09", Title: "Ninth", Status: "open"},
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/09"}})
-	next, _ := m.WithServerState(&st, ServerLinkDown)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkDown)
 	m = next.(QueueModel)
 	if len(m.epics) != 0 {
 		t.Fatalf("rows shown while down: %+v", m.epics)
 	}
 
-	next, _ = m.WithServerState(&st, ServerLinkUp)
+	next, _ = m.WithServerState(&st, tabapi.ServerLinkUp)
 	if view := ansi.Strip(next.(QueueModel).View().Content); !strings.Contains(view, "Ninth") {
 		t.Fatalf("delivered rows not shown after reconnect:\n%s", view)
 	}
@@ -87,7 +88,7 @@ func TestQueueServerDown_SOpensStartConfirm(t *testing.T) {
 		t.Fatal("confirm opened while server is up")
 	}
 
-	next, _ = m.WithServerState(nil, ServerLinkDown)
+	next, _ = m.WithServerState(nil, tabapi.ServerLinkDown)
 	next, _ = next.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = next.(QueueModel)
 	if !m.confirm.IsOpen || !strings.Contains(m.confirm.View(80), "server is down — start it now?") {
@@ -165,9 +166,9 @@ func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 	st := applySnapshot(viewmodel.State{}, wire.Snapshot{
 		Seq:     1,
 		Tickets: tickets,
-		Epics:   fixtureSummaries(epicsFromViewModel(viewmodel.State{Tickets: tickets}, viewmodel.Scope{}), nil),
+		Epics:   fixtureSummaries(tabapi.EpicsFromViewModel(viewmodel.State{Tickets: tickets}, viewmodel.Scope{}), nil),
 	}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:beta/01"}})
-	next, _ := m.WithServerState(&st, ServerLinkUp)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	m = next.(QueueModel)
 
 	entry := m.queueTree.Entries()[m.queueTree.SelectedIndex()].Value

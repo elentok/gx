@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 var (
@@ -178,7 +178,7 @@ func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSe
 
 // queueSegments draws the queue status: a mode icon, a progress bar when bar is
 // set and the done/total count, with a trailing space.
-func queueSegments(q ticketsui.QueueStatus, icons ui.IconSet, bar bool) []titleSegment {
+func queueSegments(q tabapi.QueueStatus, icons ui.IconSet, bar bool) []titleSegment {
 	icon, color := icons.QueueRunning, ui.ColorGreen
 	switch q.Mode {
 	case wire.QueueModePaused:

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // Seam D: the tab reads the store only while the server is down.
@@ -17,19 +18,19 @@ func TestRefresh_FollowsConnection(t *testing.T) {
 		t.Fatal("connected tab reads the store")
 	}
 
-	m, cmd := withLink(m, ServerLinkDown)
+	m, cmd := withLink(m, tabapi.ServerLinkDown)
 	if !m.readsDisk() {
 		t.Fatal("down tab does not read the store")
 	}
 	if cmd == nil {
 		t.Fatal("going down must load from disk")
 	}
-	if _, cmd = withLink(m, ServerLinkDown); cmd != nil {
+	if _, cmd = withLink(m, tabapi.ServerLinkDown); cmd != nil {
 		t.Fatal("a repeated down delivery must not reload")
 	}
 
 	// The shell re-snapshots on reconnect and delivers; the tab fetches nothing.
-	m, cmd = withLink(m, ServerLinkUp)
+	m, cmd = withLink(m, tabapi.ServerLinkUp)
 	if m.readsDisk() {
 		t.Fatal("reconnected tab reads the store")
 	}
@@ -41,7 +42,7 @@ func TestRefresh_FollowsConnection(t *testing.T) {
 // Seam B: with no client the tab starts, and stays, reading the store.
 func TestRefresh_NoClientStartsDown(t *testing.T) {
 	// The shell delivers the down link when it has no client (ServerConn.link).
-	m, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), ServerLinkDown)
+	m, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), tabapi.ServerLinkDown)
 	if m.Init() == nil {
 		t.Fatal("a tab with no client must load from disk on Init")
 	}
@@ -65,12 +66,12 @@ func TestRefresh_NoDiskPollWhileConnected(t *testing.T) {
 // down tab reloads. The tab keeps no loop of its own.
 func TestRefresh_StoreChangedReloadsOnlyWhenDown(t *testing.T) {
 	m := newServerModel(t)
-	if _, cmd := m.Update(StoreChangedMsg{}); cmd != nil {
+	if _, cmd := m.Update(tabapi.StoreChangedMsg{}); cmd != nil {
 		t.Fatal("a connected tab reloaded on a store change")
 	}
 
-	down, _ := withLink(m, ServerLinkDown)
-	_, cmd := down.Update(StoreChangedMsg{})
+	down, _ := withLink(m, tabapi.ServerLinkDown)
+	_, cmd := down.Update(tabapi.StoreChangedMsg{})
 	if cmd == nil {
 		t.Fatal("a down tab must reload on a store change")
 	}
@@ -84,7 +85,7 @@ func TestRefresh_ActivationReloadsOnlyWhenDown(t *testing.T) {
 	if m.OnPageActivated() != nil {
 		t.Fatal("a connected tab reloaded on activation")
 	}
-	down, _ := withLink(m, ServerLinkDown)
+	down, _ := withLink(m, tabapi.ServerLinkDown)
 	if down.OnPageActivated() == nil {
 		t.Fatal("a down tab must reload on activation")
 	}
@@ -92,7 +93,7 @@ func TestRefresh_ActivationReloadsOnlyWhenDown(t *testing.T) {
 
 func TestRefresh_WatchFiresOnStoreChange(t *testing.T) {
 	dir := t.TempDir()
-	events, stop, err := WatchStore(dir)
+	events, stop, err := tabapi.WatchStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

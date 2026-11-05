@@ -21,7 +21,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/nav"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -52,7 +52,7 @@ type Model struct {
 	// queue is nil exactly when client is.
 	queue    Queue
 	settings ui.Settings
-	link     ticketsui.ServerLink
+	link     tabapi.ServerLink
 	loaded   bool
 	// sessions is in sidebar order (see orderedSessions); cursor indexes it.
 	sessions    []wire.SessionInfo
@@ -141,7 +141,7 @@ func (m Model) WithQueue(q Queue) Model {
 
 // WithServerState hands the tab the app shell's shared state and the link it
 // was read over; nil st means no snapshot has arrived yet.
-func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (tea.Model, tea.Cmd) {
+func (m Model) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea.Model, tea.Cmd) {
 	m.link = link
 	if st != nil {
 		m.loaded = true
@@ -387,7 +387,7 @@ func (m Model) workingVisible() bool {
 }
 
 func (m Model) sidebarShown() bool {
-	return !m.hideSidebar && m.loaded && m.client != nil && m.link != ticketsui.ServerLinkDown
+	return !m.hideSidebar && m.loaded && m.client != nil && m.link != tabapi.ServerLinkDown
 }
 
 // followSelection is the cursor into next that keeps the session selected in
@@ -485,7 +485,7 @@ func (m Model) renderMain(width int, lines []string) string {
 
 func (m Model) lines() []string {
 	switch {
-	case m.client == nil || m.link == ticketsui.ServerLinkDown:
+	case m.client == nil || m.link == tabapi.ServerLinkDown:
 		return []string{ui.StyleMuted.Render("no server running — agent sessions need the gx server")}
 	case !m.loaded:
 		return []string{ui.StyleMuted.Render("loading…")}

@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 func goToSessionModel(t *testing.T, ticketStatus string, sessions ...wire.SessionInfo) Model {
@@ -125,7 +126,7 @@ func TestGoToSession_MostRecentlyChangedWins(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("choosing go to session issued no cmd")
 	}
-	if got := cmd(); got != (GoToSessionMsg{ID: "new"}) {
+	if got := cmd(); got != (tabapi.GoToSessionMsg{ID: "new"}) {
 		t.Errorf("msg = %+v, want session new", got)
 	}
 }

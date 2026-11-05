@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -25,7 +26,7 @@ func olderServerState() viewmodel.State {
 func TestOlderServer_TicketsTabShowsNoticeAndNoTickets(t *testing.T) {
 	m := newServerModel(t)
 	st := olderServerState()
-	next, _ := m.WithServerState(&st, ServerLinkUp)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	next, _ = next.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	view := ansi.Strip(next.View().Content)
 	if !strings.Contains(view, olderServerNotice) || strings.Contains(view, "First") {
@@ -39,7 +40,7 @@ func TestOlderServer_TicketsTabShowsNoticeAndNoTickets(t *testing.T) {
 func TestOlderServer_QueueTabShowsNoticeAndNoTickets(t *testing.T) {
 	m := newServerQueueModel(t, nil)
 	st := olderServerState()
-	next, _ := m.WithServerState(&st, ServerLinkUp)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	view := ansi.Strip(next.View().Content)
 	if !strings.Contains(view, olderServerNotice) || strings.Contains(view, "First") {
 		t.Fatalf("view = %s", view)
@@ -52,11 +53,11 @@ func TestOlderServer_QueueTabShowsNoticeAndNoTickets(t *testing.T) {
 func TestOlderServer_CurrentServerClearsNotice(t *testing.T) {
 	m := newServerModel(t)
 	st := olderServerState()
-	next, _ := m.WithServerState(&st, ServerLinkUp)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	current := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}})
-	next, _ = next.(Model).WithServerState(&current, ServerLinkUp)
+	next, _ = next.(Model).WithServerState(&current, tabapi.ServerLinkUp)
 	next, _ = next.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	if view := ansi.Strip(next.View().Content); strings.Contains(view, olderServerNotice) {
 		t.Fatalf("notice stays after a current server's snapshot:\n%s", view)
@@ -65,7 +66,7 @@ func TestOlderServer_CurrentServerClearsNotice(t *testing.T) {
 
 func TestNoServer_QueueSaysServerNotRunning(t *testing.T) {
 	m := newServerQueueModel(t, nil)
-	next, _ := m.WithServerState(nil, ServerLinkDown)
+	next, _ := m.WithServerState(nil, tabapi.ServerLinkDown)
 	if view := ansi.Strip(next.View().Content); !strings.Contains(view, "server not running") {
 		t.Fatalf("view = %s", view)
 	}
@@ -85,7 +86,7 @@ func TestNoServer_TicketsShowRawStatus(t *testing.T) {
 		t.Errorf("rowfmt.TicketStatus = %v, want open", got)
 	}
 
-	m, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), ServerLinkDown)
+	m, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), tabapi.ServerLinkDown)
 	if !m.readsDisk() || m.olderServer {
 		t.Fatal("a disk-reading tab must not show the older-server notice")
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 func menuHasStartSession(m Model) bool {
@@ -104,10 +105,10 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 	for _, tc := range []struct {
 		address string
 		epicRow bool
-		want    StartSessionMsg
+		want    tabapi.StartSessionMsg
 	}{
-		{"gx:map", true, StartSessionMsg{Project: "gx", Name: "map", Prompt: "/gx-design gx:map", Ticket: "gx:map"}},
-		{"gx:map/01", false, StartSessionMsg{Project: "gx", Name: "map/01", Prompt: "/gx-design gx:map/01", Ticket: "gx:map/01"}},
+		{"gx:map", true, tabapi.StartSessionMsg{Project: "gx", Name: "map", Prompt: "/gx-design gx:map", Ticket: "gx:map"}},
+		{"gx:map/01", false, tabapi.StartSessionMsg{Project: "gx", Name: "map/01", Prompt: "/gx-design gx:map/01", Ticket: "gx:map/01"}},
 	} {
 		var calls []string
 		api := fakeServerAPI{calls: &calls}
@@ -135,9 +136,9 @@ func TestStartSession_FillsDirWithTheDesignWorktree(t *testing.T) {
 	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Path: "/wt/design-map"}}
 	m := startSessionModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
-	msg, ok := cmd().(StartSessionMsg)
+	msg, ok := cmd().(tabapi.StartSessionMsg)
 	if !ok {
-		t.Fatalf("not a StartSessionMsg: %T", cmd())
+		t.Fatalf("not a tabapi.StartSessionMsg: %T", cmd())
 	}
 	if msg.Dir != "/wt/design-map" {
 		t.Errorf("Dir = %q, want the design worktree", msg.Dir)
@@ -148,9 +149,9 @@ func TestStartSession_CarriesTheRebaseNoteAndTrustFlag(t *testing.T) {
 	api := fakeServerAPI{designWorktree: wire.DesignWorktreeResult{Path: "/wt/design-map", Note: "not rebased: dirty"}}
 	m := startSessionModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
-	msg, ok := cmd().(StartSessionMsg)
+	msg, ok := cmd().(tabapi.StartSessionMsg)
 	if !ok {
-		t.Fatalf("not a StartSessionMsg: %T", cmd())
+		t.Fatalf("not a tabapi.StartSessionMsg: %T", cmd())
 	}
 	if msg.RebaseNote != "not rebased: dirty" || !msg.MadeWorktree {
 		t.Errorf("RebaseNote, MadeWorktree = %q, %v; want the note, true", msg.RebaseNote, msg.MadeWorktree)
@@ -162,7 +163,7 @@ func TestStartSession_ServerErrorIsShownAndOpensNoForm(t *testing.T) {
 	m := startSessionModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	got := cmd()
-	if _, form := got.(StartSessionMsg); form {
+	if _, form := got.(tabapi.StartSessionMsg); form {
 		t.Fatal("a server error opened the create form")
 	}
 	if _, ok := got.(notify.NotifyMsg); !ok {
@@ -174,9 +175,9 @@ func TestStartSession_NotRunningFallsBackToTrunk(t *testing.T) {
 	api := fakeServerAPI{designWorktreeErr: syscall.ECONNREFUSED}
 	m := startSessionModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
-	msg, ok := cmd().(StartSessionMsg)
+	msg, ok := cmd().(tabapi.StartSessionMsg)
 	if !ok {
-		t.Fatalf("not a StartSessionMsg: %T", cmd())
+		t.Fatalf("not a tabapi.StartSessionMsg: %T", cmd())
 	}
 	if msg.MadeWorktree || msg.RebaseNote != "" {
 		t.Errorf("trunk fallback = %+v, want no note and no trust flag", msg)
@@ -188,7 +189,7 @@ func TestStartSession_RefusalShowsMessageAndOpensNoForm(t *testing.T) {
 	m := startSessionModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithSessions(api)
 	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
 	got := cmd()
-	if _, form := got.(StartSessionMsg); form {
+	if _, form := got.(tabapi.StartSessionMsg); form {
 		t.Fatal("a refusal opened the create form")
 	}
 	n, ok := got.(notify.NotifyMsg)
@@ -217,9 +218,9 @@ func TestStartSession_CarriesTheTrunkCheckout(t *testing.T) {
 		if tc.name == "bare repo without one" {
 			testutil.MustGitExported(t, bare, "worktree", "remove", "--force", trunkWt)
 		}
-		msg, ok := startSessionCmd(nil, store, "gx:map")().(StartSessionMsg)
+		msg, ok := startSessionCmd(nil, store, "gx:map")().(tabapi.StartSessionMsg)
 		if !ok {
-			t.Fatalf("%s: not a StartSessionMsg", tc.name)
+			t.Fatalf("%s: not a tabapi.StartSessionMsg", tc.name)
 		}
 		want := tc.want
 		if resolved, err := filepath.EvalSymlinks(want); err == nil && want != "" {

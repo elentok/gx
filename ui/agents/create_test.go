@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -158,7 +158,7 @@ func TestCreate_SubmitSendsTheFieldsAndPanelSize(t *testing.T) {
 		t.Fatal("the form stayed open after a create")
 	}
 	st := &viewmodel.State{Sessions: append(createSessions(), wire.SessionInfo{ID: "new", Project: "gx", Dir: "/r/gx/wt1"})}
-	m = withState(t, m, st, ticketsui.ServerLinkUp)
+	m = withState(t, m, st, tabapi.ServerLinkUp)
 	assertFocus(t, m, true, "new")
 }
 

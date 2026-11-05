@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -221,7 +222,7 @@ func newServerModel(t *testing.T) Model {
 // then expands its open epics.
 func withState(m Model, snap wire.Snapshot) Model {
 	st := applySnapshot(viewmodel.State{}, snap)
-	next, _ := m.WithServerState(&st, ServerLinkUp)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	m = next.(Model)
 	expandOpenEpics(&m)
 	return m
@@ -243,7 +244,7 @@ func TestServerMode_NoStateKeepsLoading(t *testing.T) {
 	if cmd := m.Init(); cmd != nil {
 		t.Fatal("Init fetched; the shell's stream delivers the state")
 	}
-	pending, _ := m.WithServerState(nil, ServerLinkUp)
+	pending, _ := m.WithServerState(nil, tabapi.ServerLinkUp)
 	next, _ := pending.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if m := next.(Model); m.loaded || !strings.Contains(m.View().Content, "loading…") {
 		t.Fatalf("loaded=%v, want the loading… state", m.loaded)
@@ -252,8 +253,8 @@ func TestServerMode_NoStateKeepsLoading(t *testing.T) {
 
 func TestServerMode_ResnapshotRequestFromRefresh(t *testing.T) {
 	msg := newServerModel(t).cmdLoad()()
-	if _, ok := msg.(ResnapshotRequestedMsg); !ok {
-		t.Fatalf("refresh msg = %T, want ResnapshotRequestedMsg", msg)
+	if _, ok := msg.(tabapi.ResnapshotRequestedMsg); !ok {
+		t.Fatalf("refresh msg = %T, want tabapi.ResnapshotRequestedMsg", msg)
 	}
 }
 
@@ -298,7 +299,7 @@ func TestServerMode_OutsideProjectShowsAllWithoutToasting(t *testing.T) {
 func TestServerMode_StaleStateIsIgnoredWhileOnFallback(t *testing.T) {
 	m := newServerModel(t)
 	st := applySnapshot(viewmodel.State{}, scopeSnap)
-	next, _ := m.WithServerState(&st, ServerLinkDown)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkDown)
 	m = next.(Model)
 	if m.loaded || len(m.epics) != 0 {
 		t.Fatalf("fallback tab took the shell's stale state: loaded=%v epics=%d", m.loaded, len(m.epics))
@@ -535,7 +536,7 @@ func TestEpicsFromViewModel_KeepsTheDoneMetrics(t *testing.T) {
 	vm := applySnapshot(viewmodel.State{}, wire.Snapshot{Tickets: []wire.TicketInfo{
 		{Address: "proj:epic-a/01", Status: "done", ActualContextWindow: 66395, ElapsedTime: 316, Compactions: 2},
 	}})
-	epics := epicsFromViewModel(vm, viewmodel.Scope{})
+	epics := tabapi.EpicsFromViewModel(vm, viewmodel.Scope{})
 	if len(epics) != 1 || len(epics[0].Tickets) != 1 {
 		t.Fatalf("epics = %+v", epics)
 	}
@@ -552,7 +553,7 @@ func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
 		{Address: "proj:epic-a/27a1", Status: "done", Parent: "proj:epic-a/27a"},
 		{Address: "proj:epic-a/27a3", Status: "claimed", Parent: "proj:epic-a/27a1"},
 	}})
-	epics := epicsFromViewModel(vm, viewmodel.Scope{})
+	epics := tabapi.EpicsFromViewModel(vm, viewmodel.Scope{})
 	if len(epics) != 1 || len(epics[0].Tickets) != 4 {
 		t.Fatalf("epics = %+v", epics)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/sessions/fixagent"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 func TestInvestigate_PostsTheAddressAndLandsOnTheNewSession(t *testing.T) {
@@ -16,8 +17,8 @@ func TestInvestigate_PostsTheAddressAndLandsOnTheNewSession(t *testing.T) {
 
 	got := investigateCmd(api, api, "gx:map/01")()
 
-	if got != (GoToSessionMsg{ID: "fix-1"}) {
-		t.Fatalf("msg = %#v, want GoToSessionMsg{fix-1}", got)
+	if got != (tabapi.GoToSessionMsg{ID: "fix-1"}) {
+		t.Fatalf("msg = %#v, want tabapi.GoToSessionMsg{fix-1}", got)
 	}
 	if len(calls) != 1 || calls[0] != "fix-agent gx:map/01" {
 		t.Errorf("calls = %v, want one fix-agent post", calls)
@@ -35,8 +36,8 @@ func TestInvestigate_NameTakenSelectsTheExistingFixAgent(t *testing.T) {
 
 	got := investigateCmd(api, api, "gx:map/01")()
 
-	if got != (GoToSessionMsg{ID: "fix-1"}) {
-		t.Fatalf("msg = %#v, want GoToSessionMsg{fix-1}", got)
+	if got != (tabapi.GoToSessionMsg{ID: "fix-1"}) {
+		t.Fatalf("msg = %#v, want tabapi.GoToSessionMsg{fix-1}", got)
 	}
 }
 

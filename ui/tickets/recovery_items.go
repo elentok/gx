@@ -2,8 +2,10 @@ package tickets
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"strings"
+
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // recoverPrefix marks a menu pick that runs one of detail.actions; the rest of
@@ -41,7 +43,7 @@ func recoveryActions(d *wire.TicketDetail) []recoveryAction {
 // ticketDetail reads address's detail. With no server it returns nil and no
 // error; a failed read returns the error, and the menu opens without recovery
 // items.
-func ticketDetail(api ReadsAPI, address string) (*wire.TicketDetail, error) {
+func ticketDetail(api tabapi.ReadsAPI, address string) (*wire.TicketDetail, error) {
 	if api == nil {
 		return nil, nil
 	}

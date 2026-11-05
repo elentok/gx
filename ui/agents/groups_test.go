@@ -5,10 +5,9 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 
 	tea "charm.land/bubbletea/v2"
-
-	ticketsui "github.com/elentok/gx/ui/tickets"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui"
@@ -28,7 +27,7 @@ func groupsModel(t *testing.T, dirs config.Dirs) Model {
 	t.Helper()
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{Dirs: dirs})
 	m.opened = true
-	m = withState(t, m, &viewmodel.State{Sessions: groupSessions()}, ticketsui.ServerLinkUp)
+	m = withState(t, m, &viewmodel.State{Sessions: groupSessions()}, tabapi.ServerLinkUp)
 	return m
 }
 
@@ -98,7 +97,7 @@ func TestGroups_PendingSelectShowsTheAgent(t *testing.T) {
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
 	m.opened = true
 	m.pendingSelect = "d1"
-	m = withState(t, m, &viewmodel.State{Sessions: groupSessions()}, ticketsui.ServerLinkUp)
+	m = withState(t, m, &viewmodel.State{Sessions: groupSessions()}, tabapi.ServerLinkUp)
 	if got := m.selectedID(); got != "d1" || !strings.Contains(sidebarText(m), "design-one") {
 		t.Fatalf("selected %q; design-one listed: %v", got, strings.Contains(sidebarText(m), "design-one"))
 	}

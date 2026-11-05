@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -119,13 +120,13 @@ func (f *streamFake) stream(i int) *fakeStream {
 type stubPage struct {
 	calls int
 	last  *viewmodel.State
-	link  ticketsui.ServerLink
+	link  tabapi.ServerLink
 }
 
 func (p *stubPage) Init() tea.Cmd                       { return nil }
 func (p *stubPage) Update(tea.Msg) (tea.Model, tea.Cmd) { return p, nil }
 func (p *stubPage) View() tea.View                      { return tea.NewView("stub") }
-func (p *stubPage) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (tea.Model, tea.Cmd) {
+func (p *stubPage) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea.Model, tea.Cmd) {
 	p.calls++
 	p.last, p.link = st, link
 	return p, nil
@@ -329,7 +330,7 @@ func TestGoToSession_ShowsAQueueAgentOnTheAgentsTab(t *testing.T) {
 	f.mu.Unlock()
 	h.probeUp()
 
-	h.send(ticketsui.GoToSessionMsg{ID: "queue-q"})
+	h.send(tabapi.GoToSessionMsg{ID: "queue-q"})
 	h.pump()
 
 	if got := h.m.navState.ActiveTab(); got != nav.TabAgents {
@@ -345,7 +346,7 @@ func TestStartSession_OpensThePrefilledCreateFormOnTheAgentsTab(t *testing.T) {
 	h, _ := newStreamHarness(t)
 	h.probeUp()
 
-	h.send(ticketsui.StartSessionMsg{Project: "gx", Name: "map/01", Prompt: "/gx-design gx:map/01", Ticket: "gx:map/01"})
+	h.send(tabapi.StartSessionMsg{Project: "gx", Name: "map/01", Prompt: "/gx-design gx:map/01", Ticket: "gx:map/01"})
 	h.pump()
 
 	if got := h.m.navState.ActiveTab(); got != nav.TabAgents {
@@ -626,7 +627,7 @@ func TestServerStream_FailedResnapshotWithLiveStreamRetriesOncePerProbeTick(t *t
 	f.snapErr = context.DeadlineExceeded
 	f.mu.Unlock()
 	base := snapshots()
-	h.send(ticketsui.ResnapshotRequestedMsg{})
+	h.send(tabapi.ResnapshotRequestedMsg{})
 	h.pump()
 	if got := snapshots() - base; got != 1 {
 		t.Fatalf("snapshots after failed R = %d, want 1", got)
@@ -695,8 +696,8 @@ func TestServerStream_RefreshAsksForOneSnapshotPlusQueue(t *testing.T) {
 	h, f := newStreamHarness(t)
 	h.probeUp()
 	before, queueBefore := f.fetches()
-	h.send(ticketsui.ResnapshotRequestedMsg{})
-	h.send(ticketsui.ResnapshotRequestedMsg{}) // coalesces into the one in flight
+	h.send(tabapi.ResnapshotRequestedMsg{})
+	h.send(tabapi.ResnapshotRequestedMsg{}) // coalesces into the one in flight
 	h.pump()
 	after, queueAfter := f.fetches()
 	if after-before != 1 {

@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 func loadedModelWithTicket(t *testing.T) Model {
@@ -22,7 +23,7 @@ func loadedModelWithTicket(t *testing.T) Model {
 
 // withLink delivers link with no state, as the shell does on a link change
 // before any snapshot.
-func withLink(m Model, link ServerLink) (Model, tea.Cmd) {
+func withLink(m Model, link tabapi.ServerLink) (Model, tea.Cmd) {
 	next, cmd := m.WithServerState(nil, link)
 	return next.(Model), cmd
 }
@@ -30,11 +31,11 @@ func withLink(m Model, link ServerLink) (Model, tea.Cmd) {
 func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		link ServerLink
+		link tabapi.ServerLink
 		want string
 	}{
-		{ServerLinkDown, "server is down"},
-		{ServerLinkReadOnly, "read-only"},
+		{tabapi.ServerLinkDown, "server is down"},
+		{tabapi.ServerLinkReadOnly, "read-only"},
 	}
 	for _, tc := range cases {
 		m, _ := withLink(loadedModelWithTicket(t), tc.link)
@@ -53,7 +54,7 @@ func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 }
 
 func TestServerLink_DownKeepsMarkdownRow(t *testing.T) {
-	m, _ := withLink(loadedModelWithTicket(t), ServerLinkDown)
+	m, _ := withLink(loadedModelWithTicket(t), tabapi.ServerLinkDown)
 	content := m.View().Content
 	if !strings.Contains(content, "First ticket") {
 		t.Fatalf("markdown row should stay, got:\n%s", content)

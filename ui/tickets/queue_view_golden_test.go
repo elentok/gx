@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 var goldenNow = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -30,6 +31,6 @@ func TestQueueViewGolden_LiveTicketRow(t *testing.T) {
 
 func TestQueueViewGolden_ServerDown(t *testing.T) {
 	m := goldenQueue(t)
-	next, _ := m.WithServerState(nil, ServerLinkDown)
+	next, _ := m.WithServerState(nil, tabapi.ServerLinkDown)
 	assertGolden(t, "queue_server_down", next.View().Content)
 }

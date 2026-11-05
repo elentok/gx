@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui"
-	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -49,7 +49,7 @@ func sidebarModel(t *testing.T, nerd bool, sessions []wire.SessionInfo, width, h
 	// Start on the first session in the sidebar, past the opening focus.
 	m.opened = true
 	m.showQueue, m.showDesign = true, true
-	m = withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)
+	m = withState(t, m, &viewmodel.State{Sessions: sessions}, tabapi.ServerLinkUp)
 	return update1(t, m, tea.WindowSizeMsg{Width: width, Height: height})
 }
 
@@ -248,7 +248,7 @@ func TestSidebar_ClickIsIgnoredUnderAPopup(t *testing.T) {
 func TestSidebar_SelectionFollowsTheSessionAcrossUpdates(t *testing.T) {
 	m := press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "j")
 	sessions := append([]wire.SessionInfo{{ID: "s0", Project: "gx"}}, fixtureSessions()...)
-	m = withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)
+	m = withState(t, m, &viewmodel.State{Sessions: sessions}, tabapi.ServerLinkUp)
 	if got := m.selectedID(); got != "s3" {
 		t.Fatalf("selected %s after an update, want s3", got)
 	}
@@ -261,7 +261,7 @@ func TestSidebar_SelectionMovesUpWhenTheSelectedSessionGoes(t *testing.T) {
 
 	m := press(t, press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "j"), "j")
 	above, gone := m.sessions[1].ID, m.sessions[2].ID
-	m = withState(t, m, &viewmodel.State{Sessions: without(gone)}, ticketsui.ServerLinkUp)
+	m = withState(t, m, &viewmodel.State{Sessions: without(gone)}, tabapi.ServerLinkUp)
 	if got := m.selectedID(); got != above {
 		t.Fatalf("selected %s after %s went, want %s above it", got, gone, above)
 	}
@@ -269,7 +269,7 @@ func TestSidebar_SelectionMovesUpWhenTheSelectedSessionGoes(t *testing.T) {
 	// With nothing above, the selection goes to the first session.
 	top := sidebarModel(t, false, fixtureSessions(), 70, 14)
 	rest := without(top.sessions[0].ID)
-	top = withState(t, top, &viewmodel.State{Sessions: rest}, ticketsui.ServerLinkUp)
+	top = withState(t, top, &viewmodel.State{Sessions: rest}, tabapi.ServerLinkUp)
 	if got, want := top.selectedID(), orderedSessions(rest)[0].ID; got != want {
 		t.Fatalf("selected %s after the top session went, want the first, %s", got, want)
 	}
@@ -293,10 +293,10 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = "" // no attach, so a cmd can only be a tick
-	if _, cmd := m.WithServerState(&viewmodel.State{Sessions: idle}, ticketsui.ServerLinkUp); cmd != nil {
+	if _, cmd := m.WithServerState(&viewmodel.State{Sessions: idle}, tabapi.ServerLinkUp); cmd != nil {
 		t.Fatal("tick scheduled with no Working session")
 	}
-	next, cmd := m.WithServerState(&viewmodel.State{Sessions: working}, ticketsui.ServerLinkUp)
+	next, cmd := m.WithServerState(&viewmodel.State{Sessions: working}, tabapi.ServerLinkUp)
 	if cmd == nil {
 		t.Fatal("no tick scheduled with a Working session on screen")
 	}
@@ -316,7 +316,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 	fresh := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	fresh.sessionsDir = ""
 	sized := update1(t, fresh, tea.WindowSizeMsg{Width: 70, Height: 10})
-	if _, cmd := sized.WithServerState(&viewmodel.State{Sessions: offscreen}, ticketsui.ServerLinkUp); cmd != nil {
+	if _, cmd := sized.WithServerState(&viewmodel.State{Sessions: offscreen}, tabapi.ServerLinkUp); cmd != nil {
 		t.Fatal("tick scheduled for a Working session scrolled off screen")
 	}
 }
@@ -326,7 +326,7 @@ func TestJump_SpinnerTicksForAWorkingSessionWithTheSidebarHidden(t *testing.T) {
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
 	m.sessionsDir = ""
 	m.hideSidebar = true
-	m = withState(t, m, &viewmodel.State{Sessions: working}, ticketsui.ServerLinkUp)
+	m = withState(t, m, &viewmodel.State{Sessions: working}, tabapi.ServerLinkUp)
 	if m.ticking {
 		t.Fatal("ticking with the sidebar hidden and no popup")
 	}

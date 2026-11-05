@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -41,11 +42,11 @@ func deliverQueueTo(m QueueModel, snap wire.Snapshot, queue []wire.QueueItem) (Q
 				claimedAt[t.Address] = t.ClaimedAt
 			}
 		}
-		snap.Epics = fixtureSummaries(epicsFromViewModel(viewmodel.State{Tickets: snap.Tickets}, viewmodel.Scope{}), claimedAt)
+		snap.Epics = fixtureSummaries(tabapi.EpicsFromViewModel(viewmodel.State{Tickets: snap.Tickets}, viewmodel.Scope{}), claimedAt)
 	}
 	st := applySnapshot(viewmodel.State{}, snap)
 	st = st.SetQueue(queue)
-	next, cmd := m.WithServerState(&st, ServerLinkUp)
+	next, cmd := m.WithServerState(&st, tabapi.ServerLinkUp)
 	return next.(QueueModel), cmd
 }
 
@@ -279,7 +280,7 @@ func TestQueueServerMode_PausedFollowsDeliveredMode(t *testing.T) {
 	}
 
 	st := viewmodel.State{Seq: 1, Loaded: true, Mode: wire.QueueModePaused}
-	next, _ := m.WithServerState(&st, ServerLinkUp)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 
 	if !next.(QueueModel).paused {
 		t.Error("paused = false after a delivered paused mode")
@@ -294,8 +295,8 @@ func TestQueueServerMode_ReloadAsksShellForSnapshot(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("R returned no command")
 	}
-	if _, ok := cmd().(ResnapshotRequestedMsg); !ok {
-		t.Errorf("R produced %T, want ResnapshotRequestedMsg", cmd())
+	if _, ok := cmd().(tabapi.ResnapshotRequestedMsg); !ok {
+		t.Errorf("R produced %T, want tabapi.ResnapshotRequestedMsg", cmd())
 	}
 }
 
@@ -317,7 +318,7 @@ func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testi
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 	st, _ = st.Reduce(wire.Event{Seq: 2, Type: wire.EventTicketDone, Address: "gx:alpha/01"})
 
-	next, _ := m.WithServerState(&st, ServerLinkUp)
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	view := next.(QueueModel).View().Content
 	if !strings.Contains(view, "First") {
 		t.Fatalf("done ticket's row vanished:\n%s", view)

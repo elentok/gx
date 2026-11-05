@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // actionMerge triggers the server's manual epic merge, the TUI's
@@ -16,7 +17,7 @@ const actionMerge = "merge"
 
 // cmdEpicMerge asks the server to merge epic ("project:epic") and toasts the
 // outcome: a direct merge, the forked merge ticket, a pause, or the refusal.
-func cmdEpicMerge(tix TicketsAPI, epic string) tea.Cmd {
+func cmdEpicMerge(tix tabapi.TicketsAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
 		res, err := tix.EpicMerge(context.Background(), epic)
 		switch {
@@ -39,7 +40,7 @@ const actionStashMerge = "stash-merge-epic"
 
 // cmdEpicStashMerge asks the server to stash, merge epic ("project:epic") and
 // restore the stash, and toasts the outcome.
-func cmdEpicStashMerge(tix TicketsAPI, epic string) tea.Cmd {
+func cmdEpicStashMerge(tix tabapi.TicketsAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
 		res, err := tix.EpicStashMerge(context.Background(), epic)
 		switch {

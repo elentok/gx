@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // serverNotRunning is the toast for an orchestration write with no server.
@@ -13,7 +14,7 @@ const serverNotRunning = "server not running"
 // dispatchMenuAction runs an accepted "m" menu action for either tab, keyed by
 // the row's address (result.Path). Orchestration writes go only through the
 // server.
-func dispatchMenuAction(api ServerAPI, admin AdminAPI, reads ReadsAPI, sessions SessionsAPI, tix TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
+func dispatchMenuAction(api tabapi.ServerAPI, admin tabapi.AdminAPI, reads tabapi.ReadsAPI, sessions tabapi.SessionsAPI, tix tabapi.TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
 	if word, ok := recoveryWord(result.Action); ok {
 		return cmdServerWrite(admin, tix, word, result.Path)
 	}

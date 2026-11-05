@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server/wire"
 	agentsui "github.com/elentok/gx/ui/agents"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // serverProbeInterval spaces connection checks; a down daemon is polled, not spun on.
@@ -23,7 +23,7 @@ const serverProbeTimeout = 5 * time.Second
 // ServerClient is what the shell needs from the API client: everything the
 // tabs use, plus the handshake that tells up from down.
 type ServerClient interface {
-	ticketsui.ServerAPI
+	tabapi.ServerAPI
 	agentsui.SessionClient
 	Negotiate(ctx context.Context, build string) (apiclient.Negotiation, error)
 	// EventsAs subscribes under the Agents tab's focus client name, so its
@@ -35,7 +35,7 @@ type ServerClient interface {
 // Queue tabs each use of it, together.
 type ServerSessions interface {
 	agentsui.Sessions
-	ticketsui.SessionsAPI
+	tabapi.SessionsAPI
 }
 
 // ServerDeps is how the shell reaches the server. A nil Settings.Server (no
@@ -43,10 +43,10 @@ type ServerSessions interface {
 type ServerDeps struct {
 	Client   ServerClient
 	Sessions ServerSessions
-	Admin    ticketsui.AdminAPI
-	Tickets  ticketsui.TicketsAPI
-	Queue    ticketsui.QueueAPI
-	Reads    ticketsui.ReadsAPI
+	Admin    tabapi.AdminAPI
+	Tickets  tabapi.TicketsAPI
+	Queue    tabapi.QueueAPI
+	Reads    tabapi.ReadsAPI
 	// Build is this client's build id, compared with the server's.
 	Build string
 	// Start launches the server (the Queue tab's "s" when the server is down).
@@ -115,7 +115,7 @@ func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m, cmd := m.applyServerConn(msg)
 		return m, cmd, true
 
-	case ticketsui.ProbeRequestedMsg:
+	case tabapi.ProbeRequestedMsg:
 		if m.settings.Server == nil {
 			return m, nil, true // permanently down: nothing to ask
 		}

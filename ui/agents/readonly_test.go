@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -28,7 +28,7 @@ func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) 
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
 	info.ID, info.Name, info.Project, info.Status = "a", "alpha", "gx", idleStatus
 	st := &viewmodel.State{Sessions: []wire.SessionInfo{info, {ID: "b", Name: "beta", Project: "gx", Status: idleStatus}}}
-	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
+	next, cmd := m.WithServerState(st, tabapi.ServerLinkUp)
 	m = next.(Model)
 	if m.selectedID() != "a" {
 		// Regular sessions list before the Queue and Design groups.
@@ -53,7 +53,7 @@ func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 	for i := range st.Sessions {
 		st.Sessions[i].Status = idleStatus
 	}
-	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
+	next, cmd := m.WithServerState(st, tabapi.ServerLinkUp)
 	m = next.(Model)
 	m, _ = dialed(t, m, cmd)
 	if m.showQueue || m.selectedID() != "q2" {

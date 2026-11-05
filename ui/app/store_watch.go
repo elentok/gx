@@ -4,8 +4,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // storePollInterval is slow on purpose: the watch is the fast path and the
@@ -36,7 +35,7 @@ func (m Model) startStoreWatch() (Model, tea.Cmd) {
 	if m.store.running {
 		return m, nil
 	}
-	events, stop, err := ticketsui.WatchStore(ticketsui.ScratchDir(m.settings.TicketStore, m.settings.ActiveWorktreePath))
+	events, stop, err := tabapi.WatchStore(tabapi.ScratchDir(m.settings.TicketStore, m.settings.ActiveWorktreePath))
 	if err != nil {
 		// The poll alone still keeps the rows fresh.
 		events, stop = nil, nil
@@ -94,7 +93,7 @@ func (m Model) notifyStoreChanged() (Model, tea.Cmd) {
 		return m, nil
 	}
 	var cmd tea.Cmd
-	current.model, cmd = current.model.Update(ticketsui.StoreChangedMsg{})
+	current.model, cmd = current.model.Update(tabapi.StoreChangedMsg{})
 	m.setActivePage(current)
 	return m, cmd
 }

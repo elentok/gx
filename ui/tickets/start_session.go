@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // actionStartSession hands a map epic or one of its open tickets to the
@@ -23,22 +24,7 @@ const actionStartSession = "start-session"
 
 const startSessionLabel = "Start session…"
 
-// StartSessionMsg asks the app shell to open the Agents tab's create form
-// pre-filled for a map epic or ticket. The fields mirror agents.CreatePrefill,
-// which this package can't import.
-type StartSessionMsg struct {
-	Project, Dir, Name, Prompt, Ticket string
-	// RebaseNote and MadeWorktree come from the design-worktree route: the
-	// session shows the note and gx answers Claude's trust dialog in Dir.
-	RebaseNote   string
-	MadeWorktree bool
-}
-
 const goToSessionLabel = "Go to design session…"
-
-// GoToSessionMsg asks the app shell to switch to the Agents tab with session ID
-// selected.
-type GoToSessionMsg struct{ ID string }
 
 // latestSession is the ID of the most recently changed session whose Session
 // ticket matches; "" when none does. Exited and Stopped sessions count.
@@ -85,7 +71,7 @@ func queueAgentOf(sessions []wire.SessionInfo, address string) string {
 func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
 	return contextmenu.Item[ticketTarget]{
 		Label: goToSessionLabel, Group: contextmenu.Suggested,
-		Run: func(ticketTarget) tea.Cmd { return func() tea.Msg { return GoToSessionMsg{ID: id} } },
+		Run: func(ticketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } },
 	}
 }
 
@@ -94,7 +80,7 @@ func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
 // the map's design worktree when the server hands one out, else in the
 // project's trunk checkout, resolved from storePath off the UI thread. A
 // refusal opens no form.
-func startSessionCmd(sessions SessionsAPI, storePath, address string) tea.Cmd {
+func startSessionCmd(sessions tabapi.SessionsAPI, storePath, address string) tea.Cmd {
 	project, short, _ := strings.Cut(address, ":")
 	epic, _, _ := strings.Cut(address, "/")
 	return func() tea.Msg {
@@ -114,7 +100,7 @@ func startSessionCmd(sessions SessionsAPI, storePath, address string) tea.Cmd {
 		if dir == "" {
 			dir = ticketgit.TrunkCheckout(storePath, project)
 		}
-		return StartSessionMsg{
+		return tabapi.StartSessionMsg{
 			Project:      project,
 			Dir:          dir,
 			Name:         short,

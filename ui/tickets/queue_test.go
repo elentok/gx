@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -758,7 +759,7 @@ func withChecked(m QueueModel, checked map[string]bool) QueueModel {
 // state the app shell delivers.
 func seedFromDisk(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
-	epics, err := tickets.Load(scratchDirFor(m.settings.TicketStore, m.worktreeRoot))
+	epics, err := tickets.Load(tabapi.ScratchDir(m.settings.TicketStore, m.worktreeRoot))
 	if err != nil {
 		t.Fatal(err)
 	}

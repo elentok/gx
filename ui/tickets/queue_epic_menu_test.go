@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // queueOnEpicHeader is a server-mode Queue tab with gx:alpha's header
@@ -150,7 +151,7 @@ func TestQueueEpicMenu_SStillStartsTheServer(t *testing.T) {
 	if _, ok := m.selectedQueueEpic(); !ok {
 		t.Fatal("header not selected")
 	}
-	next, _ := m.WithServerState(nil, ServerLinkDown)
+	next, _ := m.WithServerState(nil, tabapi.ServerLinkDown)
 	next, _ = next.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if !next.(QueueModel).confirm.IsOpen {
 		t.Error("s on the header did not offer to start the server")

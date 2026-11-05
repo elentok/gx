@@ -2,14 +2,16 @@ package tickets
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"slices"
+
+	"github.com/elentok/gx/server/wire"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // Server-write verbs offered by the Context menu's Server group.
@@ -62,7 +64,7 @@ type serverWriteMsg struct {
 
 // cmdServerWrite issues verb for address through the server. With no server
 // it writes nothing: orchestration writes have no file fallback.
-func cmdServerWrite(admin AdminAPI, tix TicketsAPI, verb, address string) tea.Cmd {
+func cmdServerWrite(admin tabapi.AdminAPI, tix tabapi.TicketsAPI, verb, address string) tea.Cmd {
 	if admin == nil || tix == nil {
 		return notify.Warning(serverNotRunning)
 	}
@@ -137,7 +139,7 @@ func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
 
 // cmdRunFirstAction reads the ticket's detail and runs its first action; with
 // none it does nothing.
-func cmdRunFirstAction(admin AdminAPI, reads ReadsAPI, tix TicketsAPI, address string) tea.Cmd {
+func cmdRunFirstAction(admin tabapi.AdminAPI, reads tabapi.ReadsAPI, tix tabapi.TicketsAPI, address string) tea.Cmd {
 	return func() tea.Msg {
 		d, err := reads.Detail(context.Background(), address)
 		if err != nil {

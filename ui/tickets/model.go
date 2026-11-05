@@ -5,12 +5,10 @@ package tickets
 
 import (
 	"fmt"
-	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
@@ -21,6 +19,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -107,15 +106,15 @@ type Model struct {
 
 	// serverAPI feeds vm (server_mode.go); nil keeps the tab reading the
 	// store for good.
-	serverAPI ServerAPI
-	admin     AdminAPI
-	sessions  SessionsAPI
-	tickets   TicketsAPI
-	queue     QueueAPI
-	reads     ReadsAPI
+	serverAPI tabapi.ServerAPI
+	admin     tabapi.AdminAPI
+	sessions  tabapi.SessionsAPI
+	tickets   tabapi.TicketsAPI
+	queue     tabapi.QueueAPI
+	reads     tabapi.ReadsAPI
 	// link is the link half of the last WithServerState delivery; nothing else
 	// writes it (server_link.go).
-	link ServerLink
+	link tabapi.ServerLink
 	// olderServer: the last snapshot came from a server without rendered
 	// status; the tab shows olderServerNotice and no tickets.
 	olderServer bool
@@ -134,7 +133,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
 		return n.kind != nodeLoading && n.kind != nodeLoadError
 	})
-	scratchDir := scratchDirFor(settings.TicketStore, worktreeRoot)
+	scratchDir := tabapi.ScratchDir(settings.TicketStore, worktreeRoot)
 	archivedLazy := tree.NewLazySection(0, func() ([]tickets.Epic, error) {
 		return tickets.LoadArchived(scratchDir)
 	})
@@ -479,24 +478,7 @@ func (m Model) handleSidebarMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cm
 }
 
 func (m Model) scratchDir() string {
-	return scratchDirFor(m.settings.TicketStore, m.worktreeRoot)
-}
-
-// scratchDirFor resolves worktreeRoot's repo to its project directory in the
-// ticket store, so every linked worktree shares one tracker. Falls back to
-// the plain join when worktreeRoot isn't inside a git repo (e.g. test
-// fixtures that use a bare temp dir). A repo with no store project gets a
-// path that doesn't exist, which renders the empty state rather than reading
-// the legacy `.scratch`.
-func scratchDirFor(store, worktreeRoot string) string {
-	if _, err := git.FindRepo(worktreeRoot); err != nil {
-		return filepath.Join(worktreeRoot, ".scratch")
-	}
-	root, err := tickets.RootIn(store, worktreeRoot)
-	if err != nil {
-		return filepath.Join(worktreeRoot, ".gx-no-ticket-project")
-	}
-	return root
+	return tabapi.ScratchDir(m.settings.TicketStore, m.worktreeRoot)
 }
 
 func (m Model) View() tea.View {

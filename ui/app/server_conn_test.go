@@ -20,18 +20,18 @@ import (
 	"github.com/elentok/gx/ui"
 	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // fakeServerClient answers the handshake from fields; the tab calls the
 // embedded (nil) API are not reached by these tests' messages.
 type fakeServerClient struct {
-	ticketsui.ServerAPI
+	tabapi.ServerAPI
 	// QueueAPI and ReadsAPI stand in for the Queue and Reads sub-clients:
 	// newServerShellOn hands the same fake to ServerDeps, and a fake that
 	// needs one overrides the method (streamFake: Items, Budget).
-	ticketsui.QueueAPI
-	ticketsui.ReadsAPI
+	tabapi.QueueAPI
+	tabapi.ReadsAPI
 	agentsui.SessionClient
 	down     bool
 	readOnly bool
@@ -42,7 +42,7 @@ type fakeServerClient struct {
 // fakeSessions is the session sub-client; only ReportFocus is reached.
 type fakeSessions struct {
 	agentsui.Sessions
-	ticketsui.SessionsAPI
+	tabapi.SessionsAPI
 }
 
 var _ ServerSessions = fakeSessions{}
@@ -82,8 +82,8 @@ func newServerShellOn(t *testing.T, client ServerClient, tab nav.TabID) Model {
 	if err != nil {
 		t.Fatal(err)
 	}
-	queue, _ := client.(ticketsui.QueueAPI)
-	reads, _ := client.(ticketsui.ReadsAPI)
+	queue, _ := client.(tabapi.QueueAPI)
+	reads, _ := client.(tabapi.ReadsAPI)
 	m := New(*repo, Settings{
 		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,

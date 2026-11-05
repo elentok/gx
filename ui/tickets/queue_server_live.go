@@ -11,13 +11,14 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
 // WithServerState hands the tab the app shell's shared state and the link it
 // was read over; nil st means no snapshot has arrived yet. The returned command
 // starts the running spinner when the tab goes from idle to running.
-func (m QueueModel) WithServerState(st *viewmodel.State, link ServerLink) (tea.Model, tea.Cmd) {
+func (m QueueModel) WithServerState(st *viewmodel.State, link tabapi.ServerLink) (tea.Model, tea.Cmd) {
 	m.link = link
 	m.olderServer = st != nil && !m.serverDown() && st.OlderServer()
 	if m.serverDown() || m.olderServer {
@@ -64,7 +65,7 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 		m.checked[addr] = true
 		m.checkOrder[addr] = uint64(i + 1)
 	}
-	m.applyEpics(epicsFromViewModel(*st, viewmodel.Scope{}), true)
+	m.applyEpics(tabapi.EpicsFromViewModel(*st, viewmodel.Scope{}), true)
 	cmd := m.syncServerRunState()
 	if !hadFinished && len(m.finished) > 0 {
 		// The first finished entry has no chain yet; a delivery only reaches the

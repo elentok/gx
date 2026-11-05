@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -67,7 +67,7 @@ func attentionModel(t *testing.T) Model {
 		{ID: "b", Project: "gx", Status: idleStatus, Unread: wire.SessionUnread{Unread: true}},
 		{ID: "c", Project: "gx", Status: wire.SessionStatus{State: wire.SessionBlocked}},
 	}}
-	return withState(t, m, st, ticketsui.ServerLinkUp)
+	return withState(t, m, st, tabapi.ServerLinkUp)
 }
 
 func TestLeader_UGoesToActionableBeforeUnread(t *testing.T) {

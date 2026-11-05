@@ -1,12 +1,10 @@
 package tickets
 
 import (
-	"time"
-
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // The Tickets tab's rows come from the server's event stream while it is
@@ -14,22 +12,15 @@ import (
 // the store, reloading when the app shell (which runs the store watch) says the
 // store changed and when the tab is activated.
 
-// StoreChangedMsg tells the tab the ticket store changed on disk; the app shell
-// sends it while the server is down.
-type StoreChangedMsg struct{}
-
-// storeWatchDebounce turns a burst of writes into one signal.
-const storeWatchDebounce = 50 * time.Millisecond
-
 // readsDisk reports whether the tab reads the store itself: the server is down
 // or there is no client at all.
 func (m Model) readsDisk() bool {
-	return m.serverAPI == nil || m.link == ServerLinkDown
+	return m.serverAPI == nil || m.link == tabapi.ServerLinkDown
 }
 
 // updateStoreChanged handles StoreChangedMsg; ok is false for any other msg.
 func (m Model) updateStoreChanged(msg tea.Msg) (Model, tea.Cmd, bool) {
-	if _, isChange := msg.(StoreChangedMsg); !isChange {
+	if _, isChange := msg.(tabapi.StoreChangedMsg); !isChange {
 		return m, nil, false
 	}
 	if !m.readsDisk() {
@@ -57,40 +48,4 @@ func (m Model) cmdLoadDisk() tea.Cmd {
 		archivedEpicCount, _ := tickets.CountArchivedEpics(scratchDir)
 		return epicsLoadedMsg{epics: epics, err: err, archivedEpicCount: archivedEpicCount}
 	}
-}
-
-// ScratchDir is the ticket store directory for worktreeRoot's repo.
-func ScratchDir(store, worktreeRoot string) string { return scratchDirFor(store, worktreeRoot) }
-
-// WatchStore signals (debounced) on every change under dir. stop ends the
-// watch and closes the channel.
-func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
-	w, err := index.NewStoreWatch(dir)
-	if err != nil {
-		return nil, nil, err
-	}
-	out := make(chan struct{}, 1)
-	go func() {
-		defer close(out)
-		var debounce <-chan time.Time
-		for {
-			select {
-			case _, ok := <-w.Events:
-				if !ok {
-					return
-				}
-				if debounce == nil {
-					debounce = time.After(storeWatchDebounce)
-				}
-			case <-debounce:
-				debounce = nil
-				w.Rewatch() // pick up directories created since
-				select {
-				case out <- struct{}{}:
-				default: // a signal is already pending
-				}
-			}
-		}
-	}()
-	return out, w.Close, nil
 }

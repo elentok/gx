@@ -3,10 +3,11 @@ package tickets
 import (
 	"context"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/server/wire"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // epicMenuPickMsg carries an epic Context menu pick back to Update. status is
@@ -232,24 +234,14 @@ type epicQueuedMsg struct {
 }
 
 func (msg epicQueuedMsg) toast() tea.Cmd {
-	return QueuedToast(msg.queued, msg.refusals)
-}
-
-// QueuedToast is the toast for a finished queue run: a warning listing the
-// refusals, else a success.
-func QueuedToast(queued int, refusals []string) tea.Cmd {
-	text := fmt.Sprintf("queued %d, refused %d", queued, len(refusals))
-	if len(refusals) == 0 {
-		return notify.Success(text)
-	}
-	return notify.Warning(text + " (" + strings.Join(refusals, "; ") + ")")
+	return tabapi.QueuedToast(msg.queued, msg.refusals)
 }
 
 // cmdQueueEpic queues the epic as one entry and reports the outcome as an
 // epicQueuedMsg.
-func cmdQueueEpic(q QueueAPI, epicAddress string) tea.Cmd {
+func cmdQueueEpic(q tabapi.QueueAPI, epicAddress string) tea.Cmd {
 	return func() tea.Msg {
-		queued, refusals := QueueAddresses(context.Background(), q.Add, []string{epicAddress})
+		queued, refusals := tabapi.QueueAddresses(context.Background(), q.Add, []string{epicAddress})
 		return epicQueuedMsg{queued: queued, refusals: refusals}
 	}
 }
@@ -268,7 +260,7 @@ func epicFile(store string, epic tickets.Epic) (string, error) {
 
 // cmdApplyEpicStatus is an Author write to the epic's own file, then a ping to
 // a running server, like cmdApplyTicketStatus.
-func cmdApplyEpicStatus(tix TicketsAPI, store string, epic tickets.Epic, status schema.Status) tea.Cmd {
+func cmdApplyEpicStatus(tix tabapi.TicketsAPI, store string, epic tickets.Epic, status schema.Status) tea.Cmd {
 	return func() tea.Msg {
 		file, err := epicFile(store, epic)
 		if err == nil {

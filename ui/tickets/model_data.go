@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -279,7 +280,7 @@ func (m Model) cmdLoad() tea.Cmd {
 	if m.readsDisk() {
 		return m.cmdLoadDisk()
 	}
-	return func() tea.Msg { return ResnapshotRequestedMsg{} }
+	return func() tea.Msg { return tabapi.ResnapshotRequestedMsg{} }
 }
 
 // cmdRefresh reloads .scratch/ from disk, matching every other tab's manual

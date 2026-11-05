@@ -9,12 +9,13 @@ import (
 
 	"github.com/elentok/gx/server/sessions/fixagent"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // investigateCmd starts the server's Fix agent for address and lands on its
 // Agents-tab row. A second start finds the existing session by its name; any
 // other refusal is a toast.
-func investigateCmd(api ServerAPI, sessions SessionsAPI, address string) tea.Cmd {
+func investigateCmd(api tabapi.ServerAPI, sessions tabapi.SessionsAPI, address string) tea.Cmd {
 	if api == nil || sessions == nil {
 		return notify.Warning(serverNotRunning)
 	}
@@ -26,7 +27,7 @@ func investigateCmd(api ServerAPI, sessions SessionsAPI, address string) tea.Cmd
 			return notify.Error("investigate: " + err.Error())()
 		case res.Refused && res.Reason == wire.ReasonSessionNameTaken:
 			if id := fixAgentSession(ctx, api, address); id != "" {
-				return GoToSessionMsg{ID: id}
+				return tabapi.GoToSessionMsg{ID: id}
 			}
 			return notify.Error("investigate: " + res.Message)()
 		case res.Refused:
@@ -34,12 +35,12 @@ func investigateCmd(api ServerAPI, sessions SessionsAPI, address string) tea.Cmd
 		case res.Session == nil:
 			return nil
 		}
-		return GoToSessionMsg{ID: res.Session.ID}
+		return tabapi.GoToSessionMsg{ID: res.Session.ID}
 	}
 }
 
 // fixAgentSession is the live session fixing address, "" when none is found.
-func fixAgentSession(ctx context.Context, api ServerAPI, address string) string {
+func fixAgentSession(ctx context.Context, api tabapi.ServerAPI, address string) string {
 	snap, err := api.Snapshot(ctx)
 	if err != nil {
 		return ""

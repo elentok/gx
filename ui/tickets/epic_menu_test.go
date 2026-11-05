@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -38,7 +39,7 @@ func epicMenuModel(t *testing.T, api fakeServerAPI) (Model, string) {
 
 func TestEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T) {
 	var calls []string
-	for name, api := range map[string]TicketsAPI{"server": fakeServerAPI{calls: &calls}, "no server": nil} {
+	for name, api := range map[string]tabapi.TicketsAPI{"server": fakeServerAPI{calls: &calls}, "no server": nil} {
 		t.Run(name, func(t *testing.T) {
 			calls = nil
 			m, epicMD := epicMenuModel(t, fakeServerAPI{calls: &[]string{}})
@@ -107,7 +108,7 @@ func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 		{Address: "gx:alpha/06", Title: "Queued", Status: "open"},
 		{Address: "gx:alpha/07", Title: "Blocked", Status: "open", BlockedBy: []string{"gx:alpha/02"}},
 	}})
-	next, _ := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithServerState(&st, ServerLinkUp)
+	next, _ := newServerModel(t).WithServer(api).WithTickets(api).WithAdmin(fakeAdmin{api}).WithQueue(fakeQueue{api}).WithReads(fakeReads{api}).WithServerState(&st, tabapi.ServerLinkUp)
 	m := next.(Model)
 	expandOpenEpics(&m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})

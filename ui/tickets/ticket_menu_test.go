@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // requestTicketMenu presses "m" and returns the ready message its cmd
@@ -187,7 +188,7 @@ func TestTicketMenu_SetStatusWritesTheFile(t *testing.T) {
 func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 	for name, cut := range map[string]func(*Model){
 		"no server api": func(m *Model) { m.serverAPI = nil },
-		"link down":     func(m *Model) { m.link = ServerLinkDown },
+		"link down":     func(m *Model) { m.link = tabapi.ServerLinkDown },
 	} {
 		t.Run(name, func(t *testing.T) {
 			var calls []string
@@ -239,9 +240,9 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 
 func TestTicketMenu_ReadOnlyLinkDimsWithItsReason(t *testing.T) {
 	m, _ := serverModelWithStoreTicket(t, fakeServerAPI{}, false)
-	m.link = ServerLinkReadOnly
+	m.link = tabapi.ServerLinkReadOnly
 	_, ready := requestTicketMenu(t, m)
-	if got, want := itemByLabel(t, ready.items, "Pause").Disabled, ServerLinkReadOnly.disabledReason(); got != want {
+	if got, want := itemByLabel(t, ready.items, "Pause").Disabled, tabapi.ServerLinkReadOnly.DisabledReason(); got != want {
 		t.Errorf("pause disabled =%q, want %q", got, want)
 	}
 }
@@ -455,8 +456,8 @@ func TestTicketMenuItems_GoToPane(t *testing.T) {
 
 func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
 	item := itemByLabel(t, ticketMenuItems(ticketMenuInput{queueAgent: "queue-a", ptyLive: true}), "Go to pane")
-	if got := item.Run(ticketTarget{})(); got != (GoToSessionMsg{ID: "queue-a"}) {
-		t.Fatalf("Go to pane sent %v, want GoToSessionMsg{queue-a}", got)
+	if got := item.Run(ticketTarget{})(); got != (tabapi.GoToSessionMsg{ID: "queue-a"}) {
+		t.Fatalf("Go to pane sent %v, want tabapi.GoToSessionMsg{queue-a}", got)
 	}
 }
 

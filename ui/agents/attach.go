@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // AttachStream is the slice of nativerunner.HolderAttach the terminal panel
@@ -140,7 +140,7 @@ type attachStreamMsg struct {
 
 // attachTarget is the session the panel shows live, or "" for none.
 func (m Model) attachTarget() string {
-	if m.client == nil || m.link == ticketsui.ServerLinkDown || !m.loaded || m.sessionsDir == "" || m.cursor >= len(m.sessions) {
+	if m.client == nil || m.link == tabapi.ServerLinkDown || !m.loaded || m.sessionsDir == "" || m.cursor >= len(m.sessions) {
 		return ""
 	}
 	if s := m.sessions[m.cursor]; s.Status.State != wire.SessionExited {
