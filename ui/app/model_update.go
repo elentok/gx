@@ -39,17 +39,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Same pass-through rule as the notify history above.
 		switch v := msg.(type) {
 		case tea.KeyPressMsg:
-			next, cmd := m.updateSwitcherKey(v)
+			s, cmd, res := m.switcher.updateKey(v, m.switcherEnv())
+			next, cmd := m.applySwitcher(s, cmd, res)
 			return next, tea.Batch(notifyCmd, cmd)
 		case tea.MouseMsg:
-			next, cmd := m.updateSwitcherMouse(v)
+			s, res := m.switcher.updateMouse(v, m.switcherEnv())
+			next, cmd := m.applySwitcher(s, nil, res)
 			return next, tea.Batch(notifyCmd, cmd)
 		}
 	}
 
 	if mouse, ok := msg.(tea.MouseMsg); ok {
 		if click, ok := mouse.(tea.MouseClickMsg); ok && click.Button == tea.MouseLeft && click.Y == 0 {
-			row := m.renderTitleRow(m.width)
+			row := m.titleBar().render(m.width)
 			if row.left.contains(click.X) {
 				next, cmd := m.openSwitcher()
 				return next, tea.Batch(notifyCmd, cmd)

@@ -104,19 +104,43 @@ var titleDropOrder = []titleShape{
 	{shortHelp: true, words: serverWordsNone},
 }
 
-// renderTitleRow builds the title row for width (<= 0 means unbounded).
-func (m Model) renderTitleRow(width int) titleRow {
-	name := m.activeViewLabel()
+// titleBar is the shell's title row, view only. It holds what the row shows:
+// the active page's label, the stream's queue status and agents count, and the
+// server connection.
+type titleBar struct {
+	label      string
+	queue      tabapi.QueueStatus
+	queueOK    bool
+	actionable int
+	conn       ServerConn
+	nerdFont   bool
+}
+
+// titleBar gathers the title row's inputs from the shell.
+func (m Model) titleBar() titleBar {
+	return titleBar{
+		label:      m.activeViewLabel(),
+		queue:      m.stream.queue,
+		queueOK:    m.stream.queueOK,
+		actionable: m.stream.vm.ActionableCount(),
+		conn:       m.serverConn(),
+		nerdFont:   m.settings.UseNerdFontIcons,
+	}
+}
+
+// render builds the title row for width (<= 0 means unbounded).
+func (t titleBar) render(width int) titleRow {
+	name := t.label
 	shape := titleDropOrder[0]
 	for _, shape = range titleDropOrder {
-		if width <= 0 || m.titleWidth(shape, name) <= width {
+		if width <= 0 || t.titleWidth(shape, name) <= width {
 			break
 		}
 	}
-	if over := m.titleWidth(shape, name) - width; width > 0 && over > 0 {
+	if over := t.titleWidth(shape, name) - width; width > 0 && over > 0 {
 		name = ansi.Truncate(name, max(ansi.StringWidth(name)-over, 1), "…")
 	}
-	left, right, helpW := m.titleGroups(shape, name)
+	left, right, helpW := t.titleGroups(shape, name)
 	leftW := segmentsWidth(left)
 	rightW := segmentsWidth(right)
 	gap := max(width-leftW-rightW, 1)
@@ -136,14 +160,14 @@ func (m Model) renderTitleRow(width int) titleRow {
 }
 
 // titleWidth is the row's width in shape with the minimum one-column gap.
-func (m Model) titleWidth(shape titleShape, name string) int {
-	left, right, _ := m.titleGroups(shape, name)
+func (t titleBar) titleWidth(shape titleShape, name string) int {
+	left, right, _ := t.titleGroups(shape, name)
 	return segmentsWidth(left) + 1 + segmentsWidth(right)
 }
 
 // titleGroups returns the left group, the right group (attention items then
 // help, with a trailing margin) and the width of the help item.
-func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSegment, helpW int) {
+func (t titleBar) titleGroups(shape titleShape, name string) (left, right []titleSegment, helpW int) {
 	sp := titleSegment{" ", titleBgStyle}
 	left = []titleSegment{sp}
 	if shape.brand {
@@ -154,14 +178,14 @@ func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSe
 		left = append(left, sp, titleSegment{"▾", titleCaretStyle})
 	}
 
-	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	if m.stream.queueOK {
-		right = append(right, queueSegments(m.stream.queue, icons, shape.queueBar)...)
+	icons := ui.Icons(t.nerdFont)
+	if t.queueOK {
+		right = append(right, queueSegments(t.queue, icons, shape.queueBar)...)
 	}
-	if n := m.stream.vm.ActionableCount(); n > 0 {
+	if n := t.actionable; n > 0 {
 		right = append(right, titleSegment{icons.Agents, titleAgentsWord}, sp, titleSegment{strconv.Itoa(n), titleAgentsCount}, sp)
 	}
-	if b, ok := m.serverConn().badge(icons); ok {
+	if b, ok := t.conn.badge(icons); ok {
 		style := titleBgStyle.Foreground(b.color)
 		right = append(right, titleSegment{b.icon, style}, sp)
 		if words := b.words(shape.words); words != "" {
@@ -218,6 +242,6 @@ func (m Model) activeViewLabel() string {
 	return string(tab)
 }
 
-func (m Model) blankChromeRow(width int) string {
+func (titleBar) blankRow(width int) string {
 	return titleBgStyle.Render(strings.Repeat(" ", max(width, 0)))
 }

@@ -89,7 +89,7 @@ func TestTitleRowSpansCoverLeftGroupAndHelp(t *testing.T) {
 	t.Parallel()
 	m := newAppForMouseTest(t)
 
-	row := m.renderTitleRow(m.width)
+	row := m.titleBar().render(m.width)
 	plain := ansi.Strip(row.line)
 	if got := ansi.Cut(plain, row.left.start, row.left.end); got != "gx › worktrees ▾" {
 		t.Errorf("left span = %q", got)
@@ -209,7 +209,7 @@ func TestHelpClickSendsOpenHelpToPage(t *testing.T) {
 			}
 			updated, _ := m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 30})
 			m = updated.(Model)
-			row := m.renderTitleRow(m.width)
+			row := m.titleBar().render(m.width)
 			if got := ansi.Cut(ansi.Strip(row.line), row.help.start, row.help.end); got != tc.help {
 				t.Fatalf("help span = %q, want %q", got, tc.help)
 			}
@@ -227,7 +227,7 @@ func TestHelpClickSendsOpenHelpToPage(t *testing.T) {
 func TestClickOffHelpSendsNoOpenHelp(t *testing.T) {
 	t.Parallel()
 	m, stub := withStubPage(newAppForMouseTest(t))
-	row := m.renderTitleRow(m.width)
+	row := m.titleBar().render(m.width)
 
 	for _, x := range []int{0, row.left.end, row.help.start - 1, row.help.end} {
 		updated, cmd := m.Update(tea.MouseClickMsg{X: x, Y: 0, Button: tea.MouseLeft})

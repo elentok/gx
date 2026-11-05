@@ -31,58 +31,72 @@ type (
 	storeChangedMsg    struct{ gen int }
 )
 
-func (m Model) startStoreWatch() (Model, tea.Cmd) {
-	if m.store.running {
-		return m, nil
+// start watches dir (the ticket scratch directory); a no-op while running.
+func (w *storeWatch) start(dir string) tea.Cmd {
+	if w.running {
+		return nil
 	}
-	events, stop, err := tabapi.WatchStore(tabapi.ScratchDir(m.settings.TicketStore, m.settings.ActiveWorktreePath))
+	events, stop, err := tabapi.WatchStore(dir)
 	if err != nil {
 		// The poll alone still keeps the rows fresh.
 		events, stop = nil, nil
 	}
-	m.store.gen++
-	m.store.running, m.store.stop, m.store.events = true, stop, events
-	cmds := []tea.Cmd{cmdStorePoll(m.store.gen)}
+	w.gen++
+	w.running, w.stop, w.events = true, stop, events
+	cmds := []tea.Cmd{cmdStorePoll(w.gen)}
 	if events != nil {
-		cmds = append(cmds, cmdStoreWait(m.store.gen, events))
+		cmds = append(cmds, cmdStoreWait(w.gen, events))
 	}
-	return m, tea.Batch(cmds...)
+	return tea.Batch(cmds...)
 }
 
-func (m Model) stopStoreWatch() Model {
-	if !m.store.running {
-		return m
+func (w *storeWatch) halt() {
+	if !w.running {
+		return
 	}
-	if m.store.stop != nil {
-		m.store.stop()
+	if w.stop != nil {
+		w.stop()
 	}
-	m.store.running, m.store.stop, m.store.events = false, nil, nil
-	m.store.gen++ // orphans any tick still in flight
-	return m
+	w.running, w.stop, w.events = false, nil, nil
+	w.gen++ // orphans any tick still in flight
 }
 
-// updateStoreWatch handles the watch's messages; ok is false for any other msg.
-func (m Model) updateStoreWatch(msg tea.Msg) (Model, tea.Cmd, bool) {
+// update handles the watch's messages; ok is false for any other msg. changed
+// is true when the store may have changed, so the caller must tell the active
+// page; next is the command that keeps the watch going.
+func (w *storeWatch) update(msg tea.Msg, dir string) (next tea.Cmd, changed, ok bool) {
 	switch msg := msg.(type) {
 	case storeWatchStartMsg:
-		m, cmd := m.startStoreWatch()
-		return m, cmd, true
+		return w.start(dir), false, true
 
 	case storePollMsg:
-		if msg.gen != m.store.gen || !m.store.running {
-			return m, nil, true
+		if msg.gen != w.gen || !w.running {
+			return nil, false, true
 		}
-		m, notify := m.notifyStoreChanged()
-		return m, tea.Batch(notify, cmdStorePoll(msg.gen)), true
+		return cmdStorePoll(msg.gen), true, true
 
 	case storeChangedMsg:
-		if msg.gen != m.store.gen || !m.store.running {
-			return m, nil, true
+		if msg.gen != w.gen || !w.running {
+			return nil, false, true
 		}
-		m, notify := m.notifyStoreChanged()
-		return m, tea.Batch(notify, cmdStoreWait(msg.gen, m.store.events)), true
+		return cmdStoreWait(msg.gen, w.events), true, true
 	}
-	return m, nil, false
+	return nil, false, false
+}
+
+func (m Model) storeDir() string {
+	return tabapi.ScratchDir(m.settings.TicketStore, m.settings.ActiveWorktreePath)
+}
+
+// updateStoreWatch routes the watch's messages and tells the active page when
+// the store changed.
+func (m Model) updateStoreWatch(msg tea.Msg) (Model, tea.Cmd, bool) {
+	next, changed, ok := m.store.update(msg, m.storeDir())
+	if !changed {
+		return m, next, ok
+	}
+	m, notify := m.notifyStoreChanged()
+	return m, tea.Batch(notify, next), true
 }
 
 // notifyStoreChanged tells the active page the store changed; hidden pages

@@ -50,7 +50,7 @@ func openedSwitcher(t *testing.T) (Model, *mouseRecorderStub) {
 
 func switcherLabels(m Model) []string {
 	var out []string
-	for _, match := range m.switcherPicker().Matches() {
+	for _, match := range m.switcher.sized(m.switcherEnv()).Matches() {
 		out = append(out, match.Item.Label)
 	}
 	return out
@@ -259,7 +259,7 @@ func TestSwitcher_ClickOnTitleLeftGroupOpens(t *testing.T) {
 	for _, width := range []int{120, 12} {
 		m, _ := switcherApp(t)
 		m, _ = step(m, tea.WindowSizeMsg{Width: width, Height: 40})
-		left := m.renderTitleRow(m.width).left
+		left := m.titleBar().render(m.width).left
 		m, _ = step(m, tea.MouseClickMsg{X: left.end - 1, Y: 0, Button: tea.MouseLeft})
 		if !m.switcher.isOpen {
 			t.Fatalf("width %d: click on %q did not open the switcher", width, titleOf(m))
@@ -295,7 +295,7 @@ func TestSwitcher_Placement(t *testing.T) {
 	t.Parallel()
 	m, _ := openedSwitcher(t)
 
-	frame := m.renderSwitcher()
+	frame := m.switcher.render(m.switcherEnv())
 	if w := lipgloss.Width(frame); w != switcherWidth {
 		t.Fatalf("frame width = %d, want %d", w, switcherWidth)
 	}
@@ -309,7 +309,7 @@ func TestSwitcher_Placement(t *testing.T) {
 	}
 
 	m, _ = step(m, tea.WindowSizeMsg{Width: 20, Height: 10})
-	frame = m.renderSwitcher()
+	frame = m.switcher.render(m.switcherEnv())
 	if w := lipgloss.Width(frame); w != 16 {
 		t.Fatalf("narrow frame width = %d, want 16", w)
 	}
@@ -349,7 +349,7 @@ func TestSwitcher_Golden(t *testing.T) {
 		m.stream.vm.Sessions = []wire.SessionInfo{{ID: "a", Actionable: wire.SessionActionable{Reason: "blocked"}}}
 		m, _ = step(m, ctrlO)
 		m = typeText(m, tc.query)
-		assertGolden(t, tc.name, m.renderSwitcher()+"\n")
+		assertGolden(t, tc.name, m.switcher.render(m.switcherEnv())+"\n")
 	}
 }
 

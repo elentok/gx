@@ -23,7 +23,7 @@ var update = flag.Bool("update", false, "rewrite golden files")
 
 // titleText is the title row as drawn at the model's width, without styles.
 func titleText(m Model) string {
-	return ansi.Strip(m.renderTitleRow(m.width).line)
+	return ansi.Strip(m.titleBar().render(m.width).line)
 }
 
 // titleModel is a shell on the worktrees view with no server deps, so the
@@ -129,7 +129,7 @@ func TestTitleRow_DropOrder(t *testing.T) {
 	}
 	for _, tc := range cases {
 		m := titleModel(t, false, tc.width, connDown, 3)
-		row := m.renderTitleRow(m.width)
+		row := m.titleBar().render(m.width)
 		plain := ansi.Strip(row.line)
 		if got := strings.Join(strings.Fields(plain), " "); got != tc.want {
 			t.Errorf("width %d: title = %q, want %q", tc.width, got, tc.want)
@@ -177,7 +177,7 @@ func TestTitleRow_Golden(t *testing.T) {
 			for _, st := range states {
 				for _, actionable := range []int{0, 3} {
 					m := titleModel(t, nerd, width, st.conn, actionable)
-					fmt.Fprintf(&b, "%d %s agents=%d\n%s\n", width, st.name, actionable, m.renderTitleRow(width).line)
+					fmt.Fprintf(&b, "%d %s agents=%d\n%s\n", width, st.name, actionable, m.titleBar().render(width).line)
 				}
 			}
 		}

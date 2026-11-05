@@ -140,15 +140,13 @@ func (m Model) cancelStream() Model {
 func (m Model) onLinkChange(prev tabapi.ServerLink) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	if m.serverConn().State == ServerDown {
-		var watch tea.Cmd
-		m, watch = m.startStoreWatch()
-		cmds = append(cmds, watch)
+		cmds = append(cmds, m.store.start(m.storeDir()))
 		m = m.cancelStream()
 		m.stream.snapshotting = false
 		m.stream.resnapshotPending, m.stream.resnapshotDue = false, false
 		m.stream.gen++ // outdate an in-flight snapshot
 	} else {
-		m = m.stopStoreWatch()
+		m.store.halt()
 		// Startup goes unknown → up without crossing the down line, so the
 		// stream is started from "no stream yet", not from a transition.
 		if m.streamWanted() {

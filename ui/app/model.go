@@ -167,7 +167,7 @@ func (m Model) View() tea.View {
 		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, ui.ChromeRows)
 	}
 	if m.switcher.isOpen {
-		content = ui.PlaceOverlay(content, m.renderSwitcher(), switcherX, ui.ChromeRows)
+		content = ui.PlaceOverlay(content, m.switcher.render(m.switcherEnv()), switcherX, ui.ChromeRows)
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
@@ -191,7 +191,8 @@ func (m Model) withChrome(page string) string {
 		pageHeight = m.childWindowSizeMsg().Height
 	}
 	page = normalizeFrameContent(page, m.width, pageHeight)
-	lines := append([]string{m.renderTitleRow(m.width).line, m.blankChromeRow(m.width)}, strings.Split(page, "\n")...)
+	bar := m.titleBar()
+	lines := append([]string{bar.render(m.width).line, bar.blankRow(m.width)}, strings.Split(page, "\n")...)
 	if m.height > 0 && len(lines) > m.height {
 		lines = lines[:m.height]
 	}

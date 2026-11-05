@@ -32,44 +32,49 @@ type switcher struct {
 	picker components.PickerState
 }
 
-// openSwitcher opens the "go to" list, under the same modal guard as switchTab.
-func (m Model) openSwitcher() (Model, tea.Cmd) {
-	type modalOpener interface{ ModalOpen() bool }
-	if mo, ok := m.activePage().model.(modalOpener); ok && mo.ModalOpen() {
-		return m, notify.Info("close the modal first")
-	}
-	m.keyPrefix = ""
-	m.switcher = switcher{isOpen: true, picker: components.PickerState{Items: m.switcherItems()}}
-	return m, nil
+// switcherEnv is what the switcher reads from the shell: the tabs, the current
+// one, the agents badge count and the screen size.
+type switcherEnv struct {
+	specs      []tabSpec
+	current    nav.TabID
+	actionable int
+	width      int
+	height     int
 }
 
-func (m Model) switcherItems() []components.PickerItem {
-	current := m.activePage().viewState.Tab
+// switcherResult reports a pick; Picked is empty when nothing was picked.
+type switcherResult struct{ Picked nav.TabID }
+
+// openSwitcher builds the open "go to" list.
+func openSwitcher(env switcherEnv) switcher {
+	return switcher{isOpen: true, picker: components.PickerState{Items: env.items()}}
+}
+
+func (e switcherEnv) items() []components.PickerItem {
 	var items []components.PickerItem
-	for _, spec := range m.tabSpecs() {
-		item := components.PickerItem{Label: spec.label, Value: string(spec.id), Group: spec.group, Current: spec.id == current}
-		if spec.id == nav.TabAgents {
-			if n := m.stream.vm.ActionableCount(); n > 0 {
-				item.Badge = strconv.Itoa(n)
-			}
+	for _, spec := range e.specs {
+		item := components.PickerItem{Label: spec.label, Value: string(spec.id), Group: spec.group, Current: spec.id == e.current}
+		if spec.id == nav.TabAgents && e.actionable > 0 {
+			item.Badge = strconv.Itoa(e.actionable)
 		}
 		items = append(items, item)
 	}
 	return items
 }
 
-func (m Model) switcherPicker() components.PickerState {
-	p, _ := m.switcherLayout()
+// sized is the picker sized to the rows left under the frame.
+func (s switcher) sized(env switcherEnv) components.PickerState {
+	p, _ := s.layout(env)
 	return p
 }
 
-// switcherLayout sizes the picker to the rows left under the frame's top and
-// wraps the hint to the frame. The hint, with the blank row the frame puts
-// above it, is dropped when it would leave the list no row.
-func (m Model) switcherLayout() (components.PickerState, string) {
-	p := m.switcher.picker
-	rows := m.height - ui.ChromeRows - switcherChrome
-	hint := lipgloss.NewStyle().Width(m.switcherInnerWidth()).Render(components.PickerHint)
+// layout sizes the picker to the rows left under the frame's top and wraps the
+// hint to the frame. The hint, with the blank row the frame puts above it, is
+// dropped when it would leave the list no row.
+func (s switcher) layout(env switcherEnv) (components.PickerState, string) {
+	p := s.picker
+	rows := env.height - ui.ChromeRows - switcherChrome
+	hint := lipgloss.NewStyle().Width(env.innerWidth()).Render(components.PickerHint)
 	if hintRows := lipgloss.Height(hint) + 1; rows-hintRows >= 1 {
 		rows -= hintRows
 	} else {
@@ -79,76 +84,101 @@ func (m Model) switcherLayout() (components.PickerState, string) {
 	return p, hint
 }
 
-func (m Model) updateSwitcherKey(key tea.KeyPressMsg) (Model, tea.Cmd) {
+func (s switcher) updateKey(key tea.KeyPressMsg, env switcherEnv) (switcher, tea.Cmd, switcherResult) {
 	switch key.String() {
 	case "ctrl+o":
-		m.switcher = switcher{}
-		return m, nil
+		return switcher{}, nil, switcherResult{}
 	case "ctrl+c":
-		m.switcher = switcher{}
-		return m, nav.ForceQuit()
+		return switcher{}, nav.ForceQuit(), switcherResult{}
 	}
-	picker, decided, accepted, _ := components.UpdatePicker(key, m.switcherPicker())
-	m.switcher.picker = picker
+	picker, decided, accepted, _ := components.UpdatePicker(key, s.sized(env))
+	s.picker = picker
 	if !decided {
-		return m, nil
+		return s, nil, switcherResult{}
 	}
 	item, _ := picker.Selected()
-	m.switcher = switcher{}
 	if !accepted {
-		return m, nil
+		return switcher{}, nil, switcherResult{}
 	}
-	return m.switchTab(nav.ViewState{Tab: nav.TabID(item.Value)})
+	return switcher{}, nil, switcherResult{Picked: nav.TabID(item.Value)}
 }
 
-// updateSwitcherMouse swallows every mouse message: a left click on a row
-// switches to it, a click outside the frame closes.
-func (m Model) updateSwitcherMouse(msg tea.MouseMsg) (Model, tea.Cmd) {
+// updateMouse swallows every mouse message: a left click on a row picks it, a
+// click outside the frame closes.
+func (s switcher) updateMouse(msg tea.MouseMsg, env switcherEnv) (switcher, switcherResult) {
 	click, ok := msg.(tea.MouseClickMsg)
 	if !ok || click.Button != tea.MouseLeft {
-		return m, nil
+		return s, switcherResult{}
 	}
-	frame := m.renderSwitcher()
+	frame := s.render(env)
 	w, h := lipgloss.Width(frame), lipgloss.Height(frame)
 	x, y := click.X-switcherX, click.Y-ui.ChromeRows
 	if x < 0 || x >= w || y < 0 || y >= h {
-		m.switcher = switcher{}
-		return m, nil
+		return switcher{}, switcherResult{}
 	}
-	picker := m.switcherPicker()
+	picker := s.sized(env)
 	i, ok := picker.HitRow(y - switcherListTop)
 	if !ok {
-		return m, nil
+		return s, switcherResult{}
 	}
 	item := picker.Matches()[i].Item
-	m.switcher = switcher{}
-	return m.switchTab(nav.ViewState{Tab: nav.TabID(item.Value)})
+	return switcher{}, switcherResult{Picked: nav.TabID(item.Value)}
 }
 
-func (m Model) switcherOuterWidth() int {
-	if m.width > 0 {
-		return min(switcherWidth, m.width-4)
+func (e switcherEnv) outerWidth() int {
+	if e.width > 0 {
+		return min(switcherWidth, e.width-4)
 	}
 	return switcherWidth
 }
 
-// switcherInnerWidth leaves out two border columns and one padding column
-// each side.
-func (m Model) switcherInnerWidth() int {
-	return max(m.switcherOuterWidth()-4, 1)
+// innerWidth leaves out two border columns and one padding column each side.
+func (e switcherEnv) innerWidth() int {
+	return max(e.outerWidth()-4, 1)
 }
 
-func (m Model) renderSwitcher() string {
-	picker, hint := m.switcherLayout()
+func (s switcher) render(env switcherEnv) string {
+	picker, hint := s.layout(env)
 	query := switcherPromptStyle.Render("›") + " " + picker.Filter
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:         "go to",
-		Body:          query + "\n" + components.RenderPickerList(picker, m.switcherInnerWidth()),
+		Body:          query + "\n" + components.RenderPickerList(picker, env.innerWidth()),
 		Hint:          hint,
-		Width:         m.switcherOuterWidth(),
+		Width:         env.outerWidth(),
 		BorderColor:   ui.ColorBorder,
 		TitleColor:    ui.ColorBlue,
 		HintColor:     ui.ColorSubtle,
 		TitleInBorder: true,
 	})
+}
+
+// openSwitcher opens the "go to" list, under the same modal guard as switchTab.
+func (m Model) openSwitcher() (Model, tea.Cmd) {
+	type modalOpener interface{ ModalOpen() bool }
+	if mo, ok := m.activePage().model.(modalOpener); ok && mo.ModalOpen() {
+		return m, notify.Info("close the modal first")
+	}
+	m.keyPrefix = ""
+	m.switcher = openSwitcher(m.switcherEnv())
+	return m, nil
+}
+
+// applySwitcher stores the switcher's new state and switches to what it picked.
+func (m Model) applySwitcher(s switcher, cmd tea.Cmd, res switcherResult) (Model, tea.Cmd) {
+	m.switcher = s
+	if res.Picked == "" {
+		return m, cmd
+	}
+	return m.switchTab(nav.ViewState{Tab: res.Picked})
+}
+
+// switcherEnv gathers the switcher's inputs from the shell.
+func (m Model) switcherEnv() switcherEnv {
+	return switcherEnv{
+		specs:      m.tabSpecs(),
+		current:    m.activePage().viewState.Tab,
+		actionable: m.stream.vm.ActionableCount(),
+		width:      m.width,
+		height:     m.height,
+	}
 }
