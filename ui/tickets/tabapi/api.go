@@ -104,7 +104,7 @@ type ResnapshotRequestedMsg struct{}
 type StoreChangedMsg struct{}
 
 // StartSessionMsg asks the app shell to open the Agents tab's create form
-// pre-filled for a map epic or ticket. The fields mirror agents.CreatePrefill,
+// pre-filled for a map epic or ticket. The fields mirror create.Prefill,
 // which this package can't import.
 type StartSessionMsg struct {
 	Project, Dir, Name, Prompt, Ticket string

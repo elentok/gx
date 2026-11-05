@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/create"
 	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -311,7 +312,7 @@ func TestModalOpen_EachPopup(t *testing.T) {
 	}
 	for name, open := range map[string]func(*Model){
 		"jump":    func(m *Model) { m.jump = &jumpPopup{} },
-		"create":  func(m *Model) { m.create = &createForm{} },
+		"create":  func(m *Model) { m.create = &create.Form{} },
 		"confirm": func(m *Model) { m.confirm.IsOpen = true },
 		"menu":    func(m *Model) { m.menu.IsOpen = true },
 		"help":    func(m *Model) { m.help.IsOpen = true },

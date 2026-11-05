@@ -101,7 +101,7 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateJumpKey(msg)
 	case m.create != nil:
 		var cmd tea.Cmd
-		m.create, cmd, _ = m.create.Update(msg, createCtx{m.height, m.mainWidth(), m.sessionAPI})
+		m.create, cmd, _ = m.create.Update(msg, m.createCtx())
 		return m, cmd
 	case m.confirm.IsOpen:
 		return m.updateConfirmKey(msg)

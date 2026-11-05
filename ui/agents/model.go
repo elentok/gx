@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/create"
 	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/confirm"
@@ -74,8 +75,8 @@ type Model struct {
 	// jump is nil while the jump popup is closed.
 	jump *jumpPopup
 	// create is nil while the create form is closed.
-	create       *createForm
-	listProjects func() ([]formProject, error)
+	create       *create.Form
+	listProjects func() ([]create.Project, error)
 	// cwdProject is the cwd repo's project; empty outside a registered one.
 	cwdProject string
 	// pendingSelect is a just-created or banner-clicked session to select and
@@ -120,7 +121,7 @@ type Model struct {
 func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]formProject, error) { return listFormProjects(settings.TicketStore) },
+	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]create.Project, error) { return create.ListProjects(settings.TicketStore) },
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{sessions: sessions}
@@ -252,21 +253,21 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd = tea.Batch(terminal.WriteCopied(m.clipWrite, *res.Copied), cmd)
 		}
 		return m, cmd
-	case formProjectsMsg:
+	case create.ProjectsMsg:
 		if m.create != nil {
-			m.create = m.create.updateProjects(msg, createCtx{m.height, m.mainWidth(), m.sessionAPI})
+			m.create = m.create.UpdateProjects(msg, m.createCtx())
 		}
 		return m, nil
-	case sessionCreatedMsg:
+	case create.CreatedMsg:
 		if m.create == nil {
 			return m, nil
 		}
-		var res createResult
-		m.create, res = m.create.updateCreated(msg)
-		if res.createdID == "" {
+		var res create.Result
+		m.create, res = m.create.UpdateCreated(msg)
+		if res.CreatedID == "" {
 			return m, nil
 		}
-		m.pendingSelect = res.createdID
+		m.pendingSelect = res.CreatedID
 		return m.selectPending()
 	case sessionActionMsg:
 		return m.updateSessionAction(msg)
@@ -495,7 +496,7 @@ func (m Model) render() string {
 		out = ui.OverlayCenter(out, m.renderJump(), m.width, m.height)
 	}
 	if m.create != nil {
-		out = ui.OverlayCenter(out, m.create.view(m.width, m.height, m.sessions), m.width, m.height)
+		out = ui.OverlayCenter(out, m.create.View(m.width, m.height, m.sessions), m.width, m.height)
 	}
 	if m.menu.IsOpen {
 		out = m.menu.Overlay(out, m.menuAnchor(), m.width, m.height)

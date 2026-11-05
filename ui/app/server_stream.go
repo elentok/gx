@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	agentsui "github.com/elentok/gx/ui/agents"
+	"github.com/elentok/gx/ui/agents/create"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -414,7 +415,7 @@ func (m Model) startSession(req tabapi.StartSessionMsg) (Model, tea.Cmd) {
 	if !ok {
 		return m, cmd
 	}
-	agents, open := agents.OpenCreateForm(agentsui.CreatePrefill{Project: req.Project, Dir: req.Dir, Name: req.Name, Prompt: req.Prompt, Ticket: req.Ticket, RebaseNote: req.RebaseNote, MadeWorktree: req.MadeWorktree})
+	agents, open := agents.OpenCreateForm(create.Prefill{Project: req.Project, Dir: req.Dir, Name: req.Name, Prompt: req.Prompt, Ticket: req.Ticket, RebaseNote: req.RebaseNote, MadeWorktree: req.MadeWorktree})
 	current.model = agents
 	m.setActivePage(current)
 	return m, tea.Batch(cmd, open)
