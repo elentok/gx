@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -40,7 +41,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	d.Runner = runnerfake.NewRunner()
 	lp := mergeQueueParams{
 		RepoDir: repo, FeatureWorktree: repo, FeatureBranch: "epic", ScratchDir: scratchDir,
-		Gate: NewGate(), Sink: runlog.NoopEventSink{},
+		Gate: supervise.NewGate(), Sink: runlog.NoopEventSink{},
 	}
 	r := mergeOne(d, lp, mergeJob{ticket: tickets.Ticket{Identifier: "01", Path: path}, base: base, branch: "iter", path: repo})
 	if r.err != nil || r.mergeDeferred || r.pausedOnChild {

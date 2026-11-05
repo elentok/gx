@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"slices"
@@ -214,7 +215,7 @@ func FinishIteration(d deps.Deps, o OneIteration, w IterationWorktree, pane stri
 		Ticket:          o.Ticket,
 		ScratchDir:      o.ScratchDir,
 		SmartZone:       o.smartZone(),
-		Gate:            NewGate(),
+		Gate:            supervise.NewGate(),
 		Sink:            o.sink(),
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
@@ -304,21 +305,21 @@ const mergeDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.M
 // keeps holding. Without this a long test run in the background reads as a
 // finish, and the ticket is paused zero-commit before the agent commits.
 func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
-	until := runnerFinishStates
+	until := supervise.RunnerFinishStates
 	waitStates := append(slices.Clone(until), agentrunner.StateBlocked)
-	p := launchAndPromptParams{
+	p := supervise.LaunchParams{
 		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
-		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: new(verifyCapState), Model: o.Model,
+		TicketData: o.Ticket, SmartZone: o.smartZone(), VerifyCap: new(supervise.VerifyCapState), Model: o.Model,
 		LongTicketTurns: o.LongTicketTurns, OnLongTicket: o.OnLongTicket,
 	}
-	in := watchPersonInput(d.Runner, s)
-	defer in.close()
-	p.input = in
+	in := supervise.WatchPersonInput(d.Runner, s)
+	defer in.Close()
+	p.Input = in
 	vcap := newVerifyCap(p, p.SmartZone)
-	now := clockOf(d)
-	mguard := newModelGuard(d, p, now)
-	lguard := newLongTicketGuard(d, p, now)
+	now := supervise.ClockOf(d)
+	mguard := supervise.NewModelGuard(d, p, now)
+	lguard := supervise.NewLongTicketGuard(d, p, now)
 	elapsedMs := 0
 	nudged := false
 	for {
@@ -329,10 +330,10 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 				if status, err := d.Runner.Status(s); err == nil {
 					sessionID = status.SessionID
 				}
-				if err := mguard.tick(d, p, sessionID); err != nil {
+				if err := mguard.Tick(d, p, sessionID); err != nil {
 					return err
 				}
-				lguard.tick(d, p, sessionID)
+				lguard.Tick(d, p, sessionID)
 				if _, err := vcap.tick(d, p, sessionID); err != nil {
 					return err
 				}
@@ -393,11 +394,11 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 // agent that is still idle with no open question and no finished report.
 // again tells the caller to wait for the agent to settle once more: after the
 // nudge, or because the agent went back to work during the delay.
-func nudgeIfStalled(d deps.Deps, in *personInput, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
+func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
 	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
 		return false, false, err
 	}
-	in.sleep(d, o.StallNudgeDelay)
+	in.Sleep(d, o.StallNudgeDelay)
 	// The agent may have asked or finished during the delay.
 	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
 		return false, false, err

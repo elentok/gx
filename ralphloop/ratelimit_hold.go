@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 )
 
 // rateLimitPollInterval is how often holdRateLimit re-checks a pane when the
@@ -21,8 +22,8 @@ const rateLimitPollInterval = 5 * time.Minute
 // loop wakes just after the quota actually rolls over, not right at it.
 const rateLimitResetBuffer = 60 * time.Second
 
-func codexBlocked(d deps.Deps, p launchAndPromptParams) bool {
-	st, err := d.Runner.Status(p.session())
+func codexBlocked(d deps.Deps, p supervise.LaunchParams) bool {
+	st, err := d.Runner.Status(p.SessionOrDefault())
 	return err == nil && st.State == agentrunner.StateBlocked
 }
 
@@ -32,17 +33,17 @@ func codexBlocked(d deps.Deps, p launchAndPromptParams) bool {
 // returns when a turn ends without the runner reporting a limit. It asks the
 // runner after each turn, not the transcript alone: on PTY an idle agent's
 // transcript keeps the old error as its newest entry.
-func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time), p launchAndPromptParams, waitStates []agentrunner.State, resetAt time.Time) error {
+func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time), p supervise.LaunchParams, waitStates []agentrunner.State, resetAt time.Time) error {
 	sessionID := ""
-	if status, err := d.Runner.Status(p.session()); err == nil {
+	if status, err := d.Runner.Status(p.SessionOrDefault()); err == nil {
 		sessionID = status.SessionID
 	}
 	reason := "rate limit detected"
 	if !resetAt.IsZero() {
 		reason = fmt.Sprintf("rate limit detected, resets %s", resetAt.UTC().Format(time.RFC3339))
 	}
-	p.sink().IterationPaused(p.Ticket, p.Label, runlog.PauseRateLimit, reason)
-	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
+	p.EventSink().IterationPaused(p.Ticket, p.Label, runlog.PauseRateLimit, reason)
+	p.LogAgentEvent(string(events.PausedRateLimit), sessionID, reason)
 	for {
 		if onRateLimit != nil {
 			onRateLimit(true, resetAt)
@@ -58,12 +59,12 @@ func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 		if !(p.Agent == agent.AgentCodex && codexBlocked(d, p)) {
 			// A refused prompt means the agent is already working (claude's own
 			// auto-continue) or blocked; the wait below and the caller handle both.
-			if err := d.Runner.Prompt(p.session(), "continue"); err != nil && !errors.Is(err, agentrunner.ErrNotReady) {
+			if err := d.Runner.Prompt(p.SessionOrDefault(), "continue"); err != nil && !errors.Is(err, agentrunner.ErrNotReady) {
 				return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
 			}
 		}
 		for {
-			_, err := d.Runner.Wait(p.session(), waitStates, smartZonePollMs*time.Millisecond)
+			_, err := d.Runner.Wait(p.SessionOrDefault(), waitStates, smartZonePollMs*time.Millisecond)
 			if err == nil {
 				break
 			}
@@ -80,7 +81,7 @@ func holdRateLimit(d deps.Deps, onRateLimit func(limited bool, resetAt time.Time
 	if onRateLimit != nil {
 		onRateLimit(false, time.Time{})
 	}
-	p.sink().IterationResumed(p.Ticket, p.Label, runlog.PauseRateLimit)
-	p.logLifecycleEvent(string(events.Resumed), sessionID)
+	p.EventSink().IterationResumed(p.Ticket, p.Label, runlog.PauseRateLimit)
+	p.LogLifecycleEvent(string(events.Resumed), sessionID)
 	return nil
 }

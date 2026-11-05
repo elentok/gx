@@ -13,12 +13,13 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 )
 
 func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	t.Parallel()
 	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
-	gate := NewGate()
+	gate := supervise.NewGate()
 	var observedCwd, observedSession string
 	r := &blipRunner{Runner: idlePromptRunner("iter-01", "codex-session-1"), timeoutOn: 1}
 	d := deps.Deps{
@@ -30,7 +31,7 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label:      "iter-01",
 		Agent:      agent.AgentCodex,
 		Pane:       "pane-1",
@@ -59,7 +60,7 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	if fakes.RawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket status = %s, a recovered breach must not become paused", raw)
 	}
-	if gate.isPaused() {
+	if gate.IsPaused() {
 		t.Error("gate.isPaused() = true, want smart-zone recovery to never pause the Gate")
 	}
 }

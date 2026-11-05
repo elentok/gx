@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -192,13 +193,13 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, launchAndPromptParams{
+	err := waitForFinish(deps, supervise.LaunchParams{
 		Label:      "iter-07",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       NewGate(),
+		Gate:       supervise.NewGate(),
 		Ticket:     "07",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
@@ -387,13 +388,13 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, launchAndPromptParams{
+	err := waitForFinish(deps, supervise.LaunchParams{
 		Label:      "iter-08",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       NewGate(),
+		Gate:       supervise.NewGate(),
 		Ticket:     "08",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",

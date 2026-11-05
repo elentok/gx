@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -44,7 +45,7 @@ func runVerifyCapWait(t *testing.T, ticketType string, agent agent.AgentKind, sm
 	p.Agent = agent
 	p.SmartZone = smartZone
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: ticketType}
-	p.verifyCap = new(verifyCapState)
+	p.VerifyCap = new(supervise.VerifyCapState)
 	p.ScratchDir = scratchDir
 	p.EpicName = "epic"
 	err := waitForFinish(d, p, "sess-19")
@@ -106,7 +107,7 @@ func TestWaitForFinish_VerifyCap_FiredStateSurvivesASecondWait(t *testing.T) {
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: "verify"}
 	p.ScratchDir = fixture.EpicScratchDir(t, "epic")
 	p.EpicName = "epic"
-	p.verifyCap = new(verifyCapState)
+	p.VerifyCap = new(supervise.VerifyCapState)
 	for i := range 2 {
 		if err := waitForFinish(d, p, "sess-19"); err != nil {
 			t.Fatalf("wait %d: %v", i, err)
@@ -238,7 +239,7 @@ func TestVerifyCap_OptInOnly(t *testing.T) {
 	if newVerifyCap(p, verifyCapTestZone) != nil {
 		t.Error("a pane that did not opt in got a cap")
 	}
-	p.verifyCap = new(verifyCapState)
+	p.VerifyCap = new(supervise.VerifyCapState)
 	if newVerifyCap(p, verifyCapTestZone) == nil {
 		t.Error("an opted-in verify pane got no cap")
 	}

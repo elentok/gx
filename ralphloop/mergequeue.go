@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"time"
@@ -80,7 +81,7 @@ type mergeQueueParams struct {
 	Skill      string
 	ScratchDir string
 	SmartZone  int
-	Gate       *Gate
+	Gate       *supervise.Gate
 	Sink       runlog.EventSink
 }
 

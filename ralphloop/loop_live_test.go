@@ -3,13 +3,15 @@ package ralphloop
 import (
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/ralphloop/supervise"
 )
 
 // TestGate_WakePaused_ShortensPauseWait: WakePaused cuts a pause wait short
 // instead of it running out a long pause-poll-interval wait.
 func TestGate_WakePaused_ShortensPauseWait(t *testing.T) {
 	t.Parallel()
-	gate := NewGate()
+	gate := supervise.NewGate()
 	waiting := make(chan struct{})
 	woke := make(chan struct{})
 

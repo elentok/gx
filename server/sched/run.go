@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/schedule"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/merge"
@@ -259,7 +260,7 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 		go l.Writer.WatchUnblock(deps.Runner, run.Session, ticketAddr)
 		return
 	}
-	var mismatch *ralphloop.ModelMismatchError
+	var mismatch *supervise.ModelMismatchError
 	if errors.As(err, &mismatch) {
 		l.Writer.PauseModelMismatch(rc.one.ScratchDir, rc.one.Ticket.Path, addr, rc.run, mismatch)
 		return

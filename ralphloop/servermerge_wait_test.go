@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -426,7 +427,7 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 			_ = merge.ReleaseMergeLock(lockDir)
 		}
 	}
-	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, Gate: NewGate(), Sink: runlog.NoopEventSink{}}
+	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, Gate: supervise.NewGate(), Sink: runlog.NoopEventSink{}}
 	built := &builtAwaitingMergeError{job: mergeJob{ticket: tickets.Ticket{Identifier: "01"}}}
 
 	err := mergeBuilt(d, p, built)

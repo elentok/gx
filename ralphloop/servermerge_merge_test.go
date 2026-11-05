@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -38,7 +39,7 @@ func serverMergeFixture(t *testing.T) (deps.Deps, iterationParams, *builtAwaitin
 	p := iterationParams{
 		WorkspaceID: "ws1", RepoDir: "/fake/repo", WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature",
 		FeatureBranch: "epic", Agent: agent.AgentClaude, Skill: "implement", Ticket: tk, ScratchDir: scratchDir,
-		SmartZone: agent.DefaultSmartZone, Gate: NewGate(), Sink: runlog.NoopEventSink{},
+		SmartZone: agent.DefaultSmartZone, Gate: supervise.NewGate(), Sink: runlog.NoopEventSink{},
 	}
 	built := &builtAwaitingMergeError{job: mergeJob{
 		ticket: tk, base: "base", branch: worktree.IterationBranch("epic", "01"), path: worktree.IterationWorktreePath("/fake/worktrees", "epic", "01"),

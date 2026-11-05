@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -337,9 +338,9 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label: "iter-01", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "01",
-		SessionCwd: "/repo/iter-01", SmartZone: 1_000_000, Gate: NewGate(), Sink: sink,
+		SessionCwd: "/repo/iter-01", SmartZone: 1_000_000, Gate: supervise.NewGate(), Sink: sink,
 	}, "sess-1")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -397,9 +398,9 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label: "iter-01", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-		SmartZone: 1_000_000, Gate: NewGate(),
+		SmartZone: 1_000_000, Gate: supervise.NewGate(),
 	}, "sess-1")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -420,8 +421,8 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	r.SetRateLimitErr("iter-01", errors.New("rollout unreadable"))
 	d := deps.Deps{Runner: r}
 
-	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: agent.AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
+	err := waitForFinish(d, supervise.LaunchParams{
+		Label: "iter-01", Agent: agent.AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: supervise.NewGate(),
 	}, "session-1")
 	if err == nil || !strings.Contains(err.Error(), "rollout unreadable") {
 		t.Fatalf("waitForFinish error = %v, want rollout read failure", err)

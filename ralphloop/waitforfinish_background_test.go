@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -27,10 +28,10 @@ func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (tra
 	}
 }
 
-func backgroundTaskGateParams(scratchDir string) launchAndPromptParams {
-	return launchAndPromptParams{
+func backgroundTaskGateParams(scratchDir string) supervise.LaunchParams {
+	return supervise.LaunchParams{
 		Label: "iter-30", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "30",
-		SessionCwd: "/repo/iter-30", Gate: NewGate(),
+		SessionCwd: "/repo/iter-30", Gate: supervise.NewGate(),
 		ScratchDir: scratchDir, EpicName: "epic",
 	}
 }

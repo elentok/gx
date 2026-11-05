@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"strings"
 	"time"
@@ -246,13 +247,13 @@ func retryUnexecutedToolCallOnce(d deps.Deps, p iterationParams, path, pane, bas
 	if err != nil {
 		return false, 0, "", fmt.Errorf("reading live agent state for %s before corrective retry: %w", label, err)
 	}
-	if !alreadyFinished(string(status.State)) {
+	if !supervise.AlreadyFinished(string(status.State)) {
 		return false, 0, "", nil
 	}
 
 	retrySessionID := cmp.Or(status.SessionID, sessionID)
 	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
-	launchParams.verifyCap = p.verifyCap
+	launchParams.VerifyCap = p.verifyCap
 	launchParams.Session = s
 	if err := promptIdle(d, launchParams, unexecutedToolCallCorrection); err != nil {
 		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
@@ -733,7 +734,7 @@ func reattachLiveConflictResolver(d deps.Deps, p iterationParams, live agentrunn
 
 	launchParams := p.launchAndPromptParams(label, live.ID, "", p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
-	if !alreadyFinished(string(agent.State)) {
+	if !supervise.AlreadyFinished(string(agent.State)) {
 		if err := waitForFinish(d, launchParams, sessionID); err != nil {
 			return "", fmt.Errorf("waiting for reattached conflict-resolution agent %s to finish: %w", label, err)
 		}

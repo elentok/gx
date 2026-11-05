@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
 	"go.uber.org/goleak"
@@ -204,13 +205,13 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, launchAndPromptParams{
+	err := waitForFinish(deps, supervise.LaunchParams{
 		Label:      "iter-05",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       NewGate(),
+		Gate:       supervise.NewGate(),
 		Ticket:     "05",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
@@ -310,13 +311,13 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	recovered, err := recoverSmartZoneBreach(deps, launchAndPromptParams{
+	recovered, err := recoverSmartZoneBreach(deps, supervise.LaunchParams{
 		Label:      "iter-09",
 		Agent:      agent.AgentCodex,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       NewGate(),
+		Gate:       supervise.NewGate(),
 		Ticket:     "09",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",
@@ -532,13 +533,13 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
-	err := waitForFinish(deps, launchAndPromptParams{
+	err := waitForFinish(deps, supervise.LaunchParams{
 		Label:      "iter-06",
 		Agent:      agent.AgentClaude,
 		Pane:       pane,
 		SessionCwd: cwd,
 		SmartZone:  smartZone,
-		Gate:       NewGate(),
+		Gate:       supervise.NewGate(),
 		Ticket:     "06",
 		ScratchDir: scratchDir,
 		EpicName:   "epic",

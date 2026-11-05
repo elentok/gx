@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 )
 
 func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t *testing.T) {
@@ -29,10 +30,10 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label: "iter-20", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "20",
 		SessionCwd: "/repo/iter-20", SmartZone: 150_000, ScratchDir: scratchDir,
-		EpicName: "epic", Gate: NewGate(),
+		EpicName: "epic", Gate: supervise.NewGate(),
 	}, "codex-session-20")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -60,9 +61,9 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 	}
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label: "iter-20", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "20",
-		SmartZone: 150_000, Gate: NewGate(),
+		SmartZone: 150_000, Gate: supervise.NewGate(),
 	}, "codex-session-20")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -79,9 +80,9 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 	r.FailNextPrompts("iter-21", 1, errors.New("compact never merged"))
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label: "iter-21", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "21",
-		SmartZone: 150_000, Gate: NewGate(),
+		SmartZone: 150_000, Gate: supervise.NewGate(),
 	}, "codex-session-21")
 	if err == nil {
 		t.Fatal("waitForFinish: want durable error after failed recovery, got nil")
@@ -104,9 +105,9 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	r.FailNextPrompts("iter-21", 1, errors.New("compact never merged"))
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label: "iter-21", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "21",
-		SmartZone: 150_000, Gate: NewGate(),
+		SmartZone: 150_000, Gate: supervise.NewGate(),
 	}, "codex-session-21")
 	if err == nil || !strings.Contains(err.Error(), "recovery failed") {
 		t.Fatalf("waitForFinish() = %v, want a durable recovery-failed error without any ReadCodexContext dependency", err)
@@ -123,9 +124,9 @@ func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfPausing
 	r.SetState("iter-22", agentrunner.StateBlocked, "")
 	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(d, supervise.LaunchParams{
 		Label: "iter-22", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "22", TicketPath: ticketPath,
-		SmartZone: 150_000, Gate: NewGate(),
+		SmartZone: 150_000, Gate: supervise.NewGate(),
 	}, "codex-session-22")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -198,9 +199,9 @@ func TestWaitForFinish_InterruptNotReadyRetriesNextPoll(t *testing.T) {
 				d.ReadCodexContext = func(string, string) (int, bool, error) { return 150001, true, nil }
 			}
 
-			err := waitForFinish(d, launchAndPromptParams{
+			err := waitForFinish(d, supervise.LaunchParams{
 				Label: "iter-30", Agent: tc.agent, Pane: "pane-1", Ticket: "30", TicketPath: ticketPath,
-				SmartZone: 150_000, Gate: NewGate(),
+				SmartZone: 150_000, Gate: supervise.NewGate(),
 			}, "codex-session-30")
 			if err != nil {
 				t.Fatalf("waitForFinish: %v", err)
@@ -223,8 +224,8 @@ func TestWaitForFinish_InterruptOtherErrorStillFails(t *testing.T) {
 		ReadCodexContext: func(string, string) (int, bool, error) { return 150001, true, nil },
 		Sleep:            func(time.Duration) {},
 	}
-	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-31", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "31", SmartZone: 150_000, Gate: NewGate(),
+	err := waitForFinish(d, supervise.LaunchParams{
+		Label: "iter-31", Agent: agent.AgentCodex, Pane: "pane-1", Ticket: "31", SmartZone: 150_000, Gate: supervise.NewGate(),
 	}, "codex-session-31")
 	if err == nil || !strings.Contains(err.Error(), "pane gone") {
 		t.Fatalf("waitForFinish() = %v, want the interrupt error", err)

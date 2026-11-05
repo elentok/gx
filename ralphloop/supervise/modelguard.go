@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"fmt"
@@ -39,36 +39,36 @@ func ModelMatches(ran, expected string) bool {
 	return strings.Contains(ran, expected) || strings.Contains(expected, ran)
 }
 
-// modelGuard checks the model of one launch's first assistant turn, once.
-type modelGuard struct {
+// ModelGuard checks the model of one launch's first assistant turn, once.
+type ModelGuard struct {
 	expected string
 	since    time.Time
 	done     bool
 }
 
-// newModelGuard returns nil when the launch gets no check: a ticket that is not
+// NewModelGuard returns nil when the launch gets no check: a ticket that is not
 // an implement ticket, or a reader the wiring lacks. An empty expected model
 // (the tier resolved to none) is logged once and skipped.
-func newModelGuard(d deps.Deps, p launchAndPromptParams, since time.Time) *modelGuard {
-	if d.ReadTurns == nil || !isImplementTicket(p) {
+func NewModelGuard(d deps.Deps, p LaunchParams, since time.Time) *ModelGuard {
+	if d.ReadTurns == nil || !IsImplementTicket(p) {
 		return nil
 	}
 	if p.Model == "" {
-		p.logAgentEvent(string(events.ModelMismatch), "", "model check skipped: the tier resolves to no model")
+		p.LogAgentEvent(string(events.ModelMismatch), "", "model check skipped: the tier resolves to no model")
 		return nil
 	}
-	return &modelGuard{expected: p.Model, since: since}
+	return &ModelGuard{expected: p.Model, since: since}
 }
 
-// clockOf is d's clock, the wall clock when the wiring has none.
-func clockOf(d deps.Deps) time.Time {
+// ClockOf is d's clock, the wall clock when the wiring has none.
+func ClockOf(d deps.Deps) time.Time {
 	if d.Now != nil {
 		return d.Now()
 	}
 	return time.Now()
 }
 
-func isImplementTicket(p launchAndPromptParams) bool {
+func IsImplementTicket(p LaunchParams) bool {
 	return IsImplementType(p.TicketData.Type)
 }
 
@@ -78,11 +78,11 @@ func IsImplementType(ticketType string) bool {
 	return ticketType == "" || ticketType == string(schema.TypeImplement)
 }
 
-// tick compares the launch's first assistant turn with the expected model. It
+// Tick compares the launch's first assistant turn with the expected model. It
 // returns a *ModelMismatchError the first time they differ; once a turn has
 // been read, whatever the verdict, it never reads again. A nil receiver checks
-// nothing, and a read that fails or finds no turn yet tries again next tick.
-func (g *modelGuard) tick(d deps.Deps, p launchAndPromptParams, sessionID string) error {
+// nothing, and a read that fails or finds no turn yet tries again next Tick.
+func (g *ModelGuard) Tick(d deps.Deps, p LaunchParams, sessionID string) error {
 	if g == nil || g.done || sessionID == "" {
 		return nil
 	}
@@ -94,6 +94,6 @@ func (g *modelGuard) tick(d deps.Deps, p launchAndPromptParams, sessionID string
 	if ModelMatches(turns.Model, g.expected) {
 		return nil
 	}
-	p.logAgentEvent(string(events.ModelMismatch), sessionID, fmt.Sprintf("ran %s, expected %s", turns.Model, g.expected))
+	p.LogAgentEvent(string(events.ModelMismatch), sessionID, fmt.Sprintf("ran %s, expected %s", turns.Model, g.expected))
 	return &ModelMismatchError{Ran: turns.Model, Expected: g.expected}
 }

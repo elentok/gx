@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -21,7 +22,7 @@ const smartZonePollMs = 30_000
 
 // waitForFinishStates are the states that end one waitForFinish poll. Blocked
 // is among them because it needs its own quota/pause handling.
-var waitForFinishStates = append(append([]agentrunner.State{}, runnerFinishStates...), agentrunner.StateBlocked)
+var waitForFinishStates = append(append([]agentrunner.State{}, supervise.RunnerFinishStates...), agentrunner.StateBlocked)
 
 // finishDebounceMs is how long waitForFinish and finishIteration each pause
 // before re-checking a just-reached "finished" signal, and finishConfirmMs is
@@ -44,7 +45,7 @@ const (
 // (compact + finish-up re-prompt) and falls back into normal polling —
 // unlike rate-limit/paused (repair) pauses, this never blocks the
 // scheduler via Gate.pause.
-func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error {
+func waitForFinish(d deps.Deps, p supervise.LaunchParams, sessionID string) error {
 	smartZone := p.SmartZone
 	if smartZone <= 0 {
 		smartZone = agent.DefaultSmartZone
@@ -57,9 +58,9 @@ func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error
 	// own doc comment.
 	recovery := newSmartZoneRecovery(smartZone)
 	vcap := newVerifyCap(p, smartZone)
-	now := clockOf(d)
-	mguard := newModelGuard(d, p, now)
-	lguard := newLongTicketGuard(d, p, now)
+	now := supervise.ClockOf(d)
+	mguard := supervise.NewModelGuard(d, p, now)
+	lguard := supervise.NewLongTicketGuard(d, p, now)
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -72,7 +73,7 @@ func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error
 			}
 		}
 
-		status, err := d.Runner.Wait(p.session(), waitForFinishStates, time.Duration(pollMs)*time.Millisecond)
+		status, err := d.Runner.Wait(p.SessionOrDefault(), waitForFinishStates, time.Duration(pollMs)*time.Millisecond)
 		if err == nil {
 			if status.State == agentrunner.StateBlocked {
 				if recovery.consumeJustRecovered() {
@@ -111,7 +112,7 @@ func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error
 				continue
 			}
 
-			confirmed, err := confirmFinished(d, nil, p.session(), waitForFinishStates)
+			confirmed, err := confirmFinished(d, nil, p.SessionOrDefault(), waitForFinishStates)
 			if err != nil {
 				return fmt.Errorf("confirming %s finished: %w", p.Label, err)
 			}
@@ -134,7 +135,7 @@ func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error
 					elapsedMs = 0
 					continue
 				}
-				p.logLifecycleEvent(p.FinishEvent, sessionID)
+				p.LogLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
 			}
 			// The last recovery gave up gated and the transcript still records no
@@ -158,7 +159,7 @@ func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error
 					elapsedMs = 0
 					continue
 				}
-				p.logLifecycleEvent(p.FinishEvent, sessionID)
+				p.LogLifecycleEvent(p.FinishEvent, sessionID)
 				return nil
 			}
 			if recovery.recordGatedGiveUp() {
@@ -201,11 +202,11 @@ func waitForFinish(d deps.Deps, p launchAndPromptParams, sessionID string) error
 // reports that either of the first two interrupted the pane. The cap stop goes
 // first and takes the whole tick: if occupancy is also past the smart zone, the
 // next poll runs its recovery.
-func guardTick(d deps.Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *modelGuard, lguard *longTicketGuard) (acted bool, err error) {
-	if err := mguard.tick(d, p, sessionID); err != nil {
+func guardTick(d deps.Deps, p supervise.LaunchParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *supervise.ModelGuard, lguard *supervise.LongTicketGuard) (acted bool, err error) {
+	if err := mguard.Tick(d, p, sessionID); err != nil {
 		return false, err
 	}
-	lguard.tick(d, p, sessionID)
+	lguard.Tick(d, p, sessionID)
 	if stopped, err := vcap.tick(d, p, sessionID); err != nil || stopped {
 		return stopped, err
 	}
@@ -303,20 +304,20 @@ func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 // confirmed successful from the transcript's compaction-boundary signal
 // instead of being misreported as a failure — see waitForCompactionSignal's
 // doc comment.
-func recoverSmartZoneBreach(d deps.Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
-	p.sink().SmartZoneCompactStarted(p.Ticket)
-	p.logAgentEvent(string(events.PausedSmartZone), sessionID, reason)
+func recoverSmartZoneBreach(d deps.Deps, p supervise.LaunchParams, sessionID, reason string, smartZone int) (bool, error) {
+	p.EventSink().SmartZoneCompactStarted(p.Ticket)
+	p.LogAgentEvent(string(events.PausedSmartZone), sessionID, reason)
 
 	baseline := newStickyBaseline(d, p, sessionID)
 
-	err := d.Runner.Prompt(p.session(), "/compact")
+	err := d.Runner.Prompt(p.SessionOrDefault(), "/compact")
 	completion := compactPaneConfirmed
 	if err == nil {
-		completion, err = waitForCompactionSignal(d, p, sessionID, runnerFinishStates, baseline)
+		completion, err = waitForCompactionSignal(d, p, sessionID, supervise.RunnerFinishStates, baseline)
 	}
 	if err != nil {
-		p.sink().SmartZoneRecovered(p.Ticket)
-		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
+		p.EventSink().SmartZoneRecovered(p.Ticket)
+		p.LogAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
 		if errors.Is(err, errCompactNeverConfirmed) {
 			return false, err
 		}
@@ -324,12 +325,12 @@ func recoverSmartZoneBreach(d deps.Deps, p launchAndPromptParams, sessionID, rea
 	}
 	switch completion {
 	case compactTimeoutConfirmed:
-		p.logAgentEvent(string(events.SmartZoneWaitExpired), sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
+		p.LogAgentEvent(string(events.SmartZoneWaitExpired), sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
 	case compactGateConfirmed:
-		p.logAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary merged", p.Label))
+		p.LogAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary merged", p.Label))
 	}
 
-	p.sink().SmartZoneFinishingUp(p.Ticket)
+	p.EventSink().SmartZoneFinishingUp(p.Ticket)
 
 	finishText := fmt.Sprintf(
 		"I stopped you because you exceeded %d tokens in the context window, I compacted the "+
@@ -337,14 +338,14 @@ func recoverSmartZoneBreach(d deps.Deps, p launchAndPromptParams, sessionID, rea
 			"`gx-implement` skill and create follow up tickets",
 		smartZone,
 	)
-	if err := d.Runner.Prompt(p.session(), finishText); err != nil {
-		p.sink().SmartZoneRecovered(p.Ticket)
-		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
+	if err := d.Runner.Prompt(p.SessionOrDefault(), finishText); err != nil {
+		p.EventSink().SmartZoneRecovered(p.Ticket)
+		p.LogAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
 		return false, nil
 	}
 
-	p.sink().SmartZoneRecovered(p.Ticket)
-	p.logLifecycleEvent(string(events.Resumed), sessionID)
+	p.EventSink().SmartZoneRecovered(p.Ticket)
+	p.LogLifecycleEvent(string(events.Resumed), sessionID)
 	return true, nil
 }
 
@@ -421,14 +422,14 @@ func (s compactBoundarySnapshot) gates() bool {
 // the transcript to show for it. An agent with no boundary signal at all is
 // never unresolved: there is no evidence to wait for, so nothing to withhold
 // trust for.
-func (s compactBoundarySnapshot) unresolved(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
+func (s compactBoundarySnapshot) unresolved(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
 	return s.gates() && !s.advancedPast(d, p, sessionID)
 }
 
 // advancedPast reports whether a fresh read proves a compaction boundary
 // merged since s was taken. Anything short of a confirmed, higher count —
 // including a read that fails now — is "not yet", never "close enough".
-func (s compactBoundarySnapshot) advancedPast(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
+func (s compactBoundarySnapshot) advancedPast(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
 	if s.state != compactBoundaryConfirmed {
 		return false
 	}
@@ -462,7 +463,7 @@ type stickyBaseline struct {
 // newStickyBaseline snapshots the boundary count and stamps since. Both must
 // happen before "/compact" is submitted, so that any boundary this recovery
 // causes is strictly newer than both.
-func newStickyBaseline(d deps.Deps, p launchAndPromptParams, sessionID string) *stickyBaseline {
+func newStickyBaseline(d deps.Deps, p supervise.LaunchParams, sessionID string) *stickyBaseline {
 	now := time.Now()
 	if d.Now != nil {
 		now = d.Now()
@@ -479,7 +480,7 @@ func (b *stickyBaseline) gates() bool {
 
 // advancedPast reports whether the transcript now proves this recovery's
 // compaction merged.
-func (b *stickyBaseline) advancedPast(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
+func (b *stickyBaseline) advancedPast(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
 	switch b.snapshot.state {
 	case compactBoundaryConfirmed:
 		return b.snapshot.advancedPast(d, p, sessionID)
@@ -494,7 +495,7 @@ func (b *stickyBaseline) advancedPast(d deps.Deps, p launchAndPromptParams, sess
 // completion is decided by failing the gate open, never by this read. A read
 // that fails proves nothing and holds the gate closed, like every other
 // unconfirmed observation.
-func (b *stickyBaseline) boundaryMergedSince(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
+func (b *stickyBaseline) boundaryMergedSince(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
 	read := compactionAfterReader(d, p.Agent)
 	if read == nil || sessionID == "" {
 		return false
@@ -552,13 +553,13 @@ const (
 // pane's nil error in that second case would let recovery walk straight into
 // the finish-up prompt and reintroduce the bug ten minutes later.
 func waitForCompactionSignal(
-	d deps.Deps, p launchAndPromptParams, sessionID string,
+	d deps.Deps, p supervise.LaunchParams, sessionID string,
 	until []agentrunner.State, baseline *stickyBaseline,
 ) (compactCompletion, error) {
 	gateHeld := false
 	elapsedMs := 0
 	for {
-		_, err := d.Runner.Wait(p.session(), until, smartZonePollMs*time.Millisecond)
+		_, err := d.Runner.Wait(p.SessionOrDefault(), until, smartZonePollMs*time.Millisecond)
 		if err != nil && !errors.Is(err, agentrunner.ErrTimeout) {
 			return compactPaneConfirmed, err
 		}
@@ -603,8 +604,8 @@ func waitForCompactionSignal(
 // whether the agent is still in one of until's finish states. A poll timeout
 // (the agent went back to "working" in the meantime) means the original
 // signal was a transient blip, not a real finish.
-func confirmFinished(d deps.Deps, in *personInput, s agentrunner.Session, until []agentrunner.State) (bool, error) {
-	in.sleep(d, finishDebounceMs*time.Millisecond)
+func confirmFinished(d deps.Deps, in *supervise.PersonInput, s agentrunner.Session, until []agentrunner.State) (bool, error) {
+	in.Sleep(d, finishDebounceMs*time.Millisecond)
 	_, err := d.Runner.Wait(s, until, finishConfirmMs*time.Millisecond)
 	if err == nil {
 		return true, nil
@@ -640,7 +641,7 @@ func confirmFinished(d deps.Deps, in *personInput, s agentrunner.Session, until 
 // FinishTimeoutMs instead of resetting it, and it paces re-reads at
 // smartZonePollMs instead of spinning — same reasoning as
 // waitForCompactionSignal's own pacing.
-func waitForBackgroundTasks(d deps.Deps, p launchAndPromptParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
+func waitForBackgroundTasks(d deps.Deps, p supervise.LaunchParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
 	if p.Agent != agent.AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
 		return true, nil
 	}
@@ -664,23 +665,23 @@ func waitForBackgroundTasks(d deps.Deps, p launchAndPromptParams, sessionID stri
 				if !held[m.TaskID] {
 					held[m.TaskID] = true
 					gated = true
-					p.logGateEvent(events.BackgroundTaskGateHeld, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
+					p.LogGateEvent(events.BackgroundTaskGateHeld, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			case transcript.BackgroundTaskResolved:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.logGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
+					p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			case transcript.BackgroundTaskOutstandingAgedOut:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.logGateEvent(events.BackgroundTaskGateExpired, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
+					p.LogGateEvent(events.BackgroundTaskGateExpired, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			}
 		}
 		if outstanding && d.GateReleased != nil && d.GateReleased() {
 			for id := range held {
-				p.logGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id))
+				p.LogGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id))
 			}
 			clear(held)
 			outstanding = false
@@ -689,7 +690,7 @@ func waitForBackgroundTasks(d deps.Deps, p launchAndPromptParams, sessionID stri
 			if !gated {
 				return true, nil
 			}
-			confirmed, err := confirmFinished(d, p.input, p.session(), until)
+			confirmed, err := confirmFinished(d, p.Input, p.SessionOrDefault(), until)
 			if err != nil {
 				return false, fmt.Errorf("confirming %s still finished after background task gate: %w", p.Label, err)
 			}
@@ -781,8 +782,8 @@ func sessionCompactions(d deps.Deps, agentKind agent.AgentKind, cwd, sessionID s
 // runnerRateLimit asks the runner whether p's agent is rate limited.
 // ErrContextExhausted is not a failure: it is returned as the evidence the
 // adapter found, with limited false and a nil err.
-func runnerRateLimit(d deps.Deps, p launchAndPromptParams) (resetAt time.Time, limited bool, evidence string, err error) {
-	resetAt, limited, err = d.Runner.RateLimit(p.session())
+func runnerRateLimit(d deps.Deps, p supervise.LaunchParams) (resetAt time.Time, limited bool, evidence string, err error) {
+	resetAt, limited, err = d.Runner.RateLimit(p.SessionOrDefault())
 	if errors.Is(err, agentrunner.ErrContextExhausted) {
 		return time.Time{}, false, strings.TrimPrefix(err.Error(), agentrunner.ErrContextExhausted.Error()+": "), nil
 	}
@@ -802,7 +803,7 @@ func runnerRateLimit(d deps.Deps, p launchAndPromptParams) (resetAt time.Time, l
 // path every other iteration-level failure takes (see Run's per-result
 // handling in loop.go), which marks the ticket paused (repair) with this
 // specific reason and leaves its worktree/tab for inspection.
-func recoverOrFailCodexContextExhaustion(d deps.Deps, p launchAndPromptParams, sessionID, evidence string, smartZone int) error {
+func recoverOrFailCodexContextExhaustion(d deps.Deps, p supervise.LaunchParams, sessionID, evidence string, smartZone int) error {
 	reason := fmt.Sprintf("Codex context exhaustion detected: %s", evidence)
 	recovered, err := recoverSmartZoneBreach(d, p, sessionID, reason, smartZone)
 	if err != nil {

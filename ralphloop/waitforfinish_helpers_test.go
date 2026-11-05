@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -24,8 +25,8 @@ func idlePromptRunner(label, sessionID string) *runnerfake.Runner {
 
 // gatedBreachParams is the launchAndPromptParams shape the compaction-gate
 // tests below share: a Claude iteration whose events merge in scratchDir.
-func gatedBreachParams(scratchDir string) launchAndPromptParams {
-	return launchAndPromptParams{
+func gatedBreachParams(scratchDir string) supervise.LaunchParams {
+	return supervise.LaunchParams{
 		Label:      "iter-19",
 		Agent:      agent.AgentClaude,
 		Pane:       "pane-1",
@@ -45,10 +46,10 @@ func breachRunner(timeoutIf func(wait int) bool) *blipRunner {
 // boundGiveUpParams is the iteration shape the give-up-bound tests share: a
 // Claude iteration whose occupancy stays over the smart zone, so every poll
 // tick that times out drives one full recovery attempt.
-func boundGiveUpParams() launchAndPromptParams {
-	return launchAndPromptParams{
+func boundGiveUpParams() supervise.LaunchParams {
+	return supervise.LaunchParams{
 		Label: "iter-19", Agent: agent.AgentClaude, Pane: "pane-1", Ticket: "19",
-		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
+		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: supervise.NewGate(),
 	}
 }
 

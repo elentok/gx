@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -50,9 +51,9 @@ func serverGuardsWait(t *testing.T, ticketType, expected, ranModel string, thres
 func TestWaitIterationFinished_ModelMismatch_WrongModelReturnsTypedError(t *testing.T) {
 	t.Parallel()
 	f := serverGuardsWait(t, "implement", "sonnet", "claude-opus-5-5", 0, []int{1})
-	var mm *ModelMismatchError
+	var mm *supervise.ModelMismatchError
 	if !errors.As(f.err, &mm) {
-		t.Fatalf("err = %v, want *ModelMismatchError", f.err)
+		t.Fatalf("err = %v, want *supervise.ModelMismatchError", f.err)
 	}
 	if mm.Ran != "claude-opus-5-5" || mm.Expected != "sonnet" {
 		t.Errorf("error = %+v, want ran claude-opus-5-5 expected sonnet", mm)

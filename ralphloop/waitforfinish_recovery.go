@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 // (a blocked or idle pane: Wait does not block there), in which case a retry
 // sleeps one poll interval and counts it. A timed-out Wait already spent its
 // interval, so it passes false.
-func recoverCodexContextExhaustionPoll(d deps.Deps, p launchAndPromptParams, sessionID, evidence string, smartZone, elapsedMs int, paceRetry bool) (int, error) {
+func recoverCodexContextExhaustionPoll(d deps.Deps, p supervise.LaunchParams, sessionID, evidence string, smartZone, elapsedMs int, paceRetry bool) (int, error) {
 	retry, err := interruptOrRetry(d, p, "Codex context exhaustion")
 	if err != nil {
 		return elapsedMs, err
@@ -43,12 +44,12 @@ func recoverCodexContextExhaustionPoll(d deps.Deps, p launchAndPromptParams, ses
 // re-read: busy (the agent is already working) skips the prompt, since the
 // caller goes on to wait for the iteration to finish anyway. Any other state
 // returns the original error.
-func promptIdle(d deps.Deps, p launchAndPromptParams, text string) error {
-	err := d.Runner.Prompt(p.session(), text)
+func promptIdle(d deps.Deps, p supervise.LaunchParams, text string) error {
+	err := d.Runner.Prompt(p.SessionOrDefault(), text)
 	if !errors.Is(err, agentrunner.ErrNotReady) {
 		return err
 	}
-	st, statusErr := d.Runner.Status(p.session())
+	st, statusErr := d.Runner.Status(p.SessionOrDefault())
 	if statusErr != nil {
 		return fmt.Errorf("re-reading %s after refused prompt: %w", p.Label, statusErr)
 	}
@@ -94,10 +95,10 @@ var errBlockedPanePaused = errors.New("iteration paused: pane blocked on an unan
 // this repo and can silently regress on a Claude Code or herdr upgrade. See
 // docs/runbooks/blocked-form-regression-check.md for the (necessarily
 // interactive, via `gx doctor --check-blocked-form`) way to check it.
-func dwellThenPauseBlocked(d deps.Deps, p launchAndPromptParams, runner, sessionID string) (reason string, paused bool, err error) {
+func dwellThenPauseBlocked(d deps.Deps, p supervise.LaunchParams, runner, sessionID string) (reason string, paused bool, err error) {
 	d.Sleep(blockedDwellMs * time.Millisecond)
 
-	st, err := d.Runner.Status(p.session())
+	st, err := d.Runner.Status(p.SessionOrDefault())
 	if err != nil {
 		return "", false, fmt.Errorf("rechecking %s for pause: %w", p.Label, err)
 	}
@@ -107,7 +108,7 @@ func dwellThenPauseBlocked(d deps.Deps, p launchAndPromptParams, runner, session
 
 	if st.Error != "" {
 		reason = errorPauseReason(p.Label, st.Error)
-		p.pauseBlockedPane(sessionID, reason)
+		pauseBlockedPane(p, sessionID, reason)
 		return reason, true, nil
 	}
 
@@ -122,7 +123,7 @@ func dwellThenPauseBlocked(d deps.Deps, p launchAndPromptParams, runner, session
 	if st.BlockedReason != "" {
 		reason = fmt.Sprintf("%s is blocked on a prompt gx did not send (%s); %s", p.Label, st.BlockedReason, how)
 	}
-	p.pauseBlockedPane(sessionID, reason)
+	pauseBlockedPane(p, sessionID, reason)
 	return reason, true, nil
 }
 
@@ -136,7 +137,7 @@ func errorPauseReason(label, text string) string {
 // agent whose block st the tracker reported. The reason names the tool and its
 // input, with the verb that exits that block: a permission request is answered,
 // a bare requires_action (no request to answer) is interrupted.
-func pauseBlockedAtOnce(d deps.Deps, p launchAndPromptParams, ticketPath string, st agentrunner.Status) error {
+func pauseBlockedAtOnce(d deps.Deps, p supervise.LaunchParams, ticketPath string, st agentrunner.Status) error {
 	hint := "interrupt with `gx server agents interrupt`"
 	if st.Pending != nil {
 		hint = "answer with `gx server agents answer`"
@@ -145,14 +146,14 @@ func pauseBlockedAtOnce(d deps.Deps, p launchAndPromptParams, ticketPath string,
 	if st.Error != "" {
 		reason = errorPauseReason(p.Label, st.Error)
 	}
-	p.pauseBlockedPane(recordLiveSession(d, p.Label, ticketPath), reason)
+	pauseBlockedPane(p, recordLiveSession(d, p.Label, ticketPath), reason)
 	return &BlockedPausedError{Reason: reason}
 }
 
 // pauseBlockedPane routes a blocked-pane pause through the single pause path,
 // keeping the agent context on the event.
-func (p launchAndPromptParams) pauseBlockedPane(sessionID, reason string) {
-	ticketops.PauseTicket(p.sink(), ticketops.PauseRequest{
+func pauseBlockedPane(p supervise.LaunchParams, sessionID, reason string) {
+	ticketops.PauseTicket(p.EventSink(), ticketops.PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
 		Type: events.Paused, Kind: events.BlockedPane, Reason: reason,
 		Event: runlog.Event{Agent: p.Agent, Pane: p.Pane, AgentSession: sessionID, Cwd: p.SessionCwd},

@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/supervise"
 )
 
 // smartZoneRecovery holds the smart-zone-breach sub-state that waitForFinish's
@@ -61,7 +62,7 @@ func (r *smartZoneRecovery) consumeJustRecovered() bool {
 // pendingUnresolved reports whether a prior gated give-up's compaction still
 // has nothing in the transcript to show for it, i.e. a "finished" poll result
 // right now would be that same uncorroborated claim rather than a real finish.
-func (r *smartZoneRecovery) pendingUnresolved(d deps.Deps, p launchAndPromptParams, sessionID string) bool {
+func (r *smartZoneRecovery) pendingUnresolved(d deps.Deps, p supervise.LaunchParams, sessionID string) bool {
 	return r.pending != nil && r.pending.unresolved(d, p, sessionID)
 }
 
@@ -77,8 +78,8 @@ func (r *smartZoneRecovery) recordGatedGiveUp() (exceeded bool) {
 // with ErrNotReady when the pane is in a state it can't safely interrupt; that
 // is not a failure, so retry reports true and the caller skips this poll and
 // tries again on the next one. Any other error aborts waitForFinish.
-func interruptOrRetry(d deps.Deps, p launchAndPromptParams, why string) (retry bool, err error) {
-	err = d.Runner.Interrupt(p.session())
+func interruptOrRetry(d deps.Deps, p supervise.LaunchParams, why string) (retry bool, err error) {
+	err = d.Runner.Interrupt(p.SessionOrDefault())
 	switch {
 	case err == nil:
 		return false, nil
@@ -96,10 +97,10 @@ func interruptOrRetry(d deps.Deps, p launchAndPromptParams, why string) (retry b
 // caller resets its own elapsed-poll-time counter only when breached is true.
 // A non-nil err means the caller must abort waitForFinish entirely, same as
 // every other hard failure in the main loop.
-func (r *smartZoneRecovery) checkAndRecover(d deps.Deps, p launchAndPromptParams, sessionID string) (breached bool, err error) {
+func (r *smartZoneRecovery) checkAndRecover(d deps.Deps, p supervise.LaunchParams, sessionID string) (breached bool, err error) {
 	occupancy, found, decidable, occErr := smartZoneOccupancy(d, p.Agent, p.SessionCwd, sessionID)
 	if occErr == nil && found {
-		p.sink().ContextOccupancy(p.Ticket, occupancy)
+		p.EventSink().ContextOccupancy(p.Ticket, occupancy)
 	}
 	if occErr != nil || !decidable || occupancy <= r.zone {
 		return false, nil

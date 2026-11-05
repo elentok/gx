@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -212,7 +213,7 @@ func conflictParams(t *testing.T, dir string) iterationParams {
 		Ticket:          tickets.Ticket{Identifier: "03"},
 		ScratchDir:      scratchDir,
 		SmartZone:       1_000_000,
-		Gate:            NewGate(),
+		Gate:            supervise.NewGate(),
 		Sink:            runlog.NoopEventSink{},
 	}
 }

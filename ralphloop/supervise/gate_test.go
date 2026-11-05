@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 func TestPauseGate_NotPausedInitially(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
-	if g.isPaused() {
+	if g.IsPaused() {
 		t.Error("isPaused() = true for a fresh gate, want false")
 	}
 }
@@ -18,12 +18,12 @@ func TestPauseGate_NotPausedInitially(t *testing.T) {
 func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
-	g.pause("iter-01", "context occupancy breach")
+	g.Pause("iter-01", "context occupancy breach")
 
-	if !g.isPaused() {
+	if !g.IsPaused() {
 		t.Error("isPaused() = false after pause(), want true")
 	}
-	if got := g.snapshot()["iter-01"]; got != "context occupancy breach" {
+	if got := g.Snapshot()["iter-01"]; got != "context occupancy breach" {
 		t.Errorf(`snapshot()["iter-01"] = %q, want "context occupancy breach"`, got)
 	}
 }
@@ -34,7 +34,7 @@ func TestPauseGate_Pause_RefusesFutureClaimsWithoutRunningTheClaimFunc(t *testin
 	g.Pause("queue", "finish and pause")
 
 	ran := false
-	admitted, err := g.claimIfRunning(func() error {
+	admitted, err := g.ClaimIfRunning(func() error {
 		ran = true
 		return nil
 	})
@@ -52,17 +52,17 @@ func TestPauseGate_Pause_RefusesFutureClaimsWithoutRunningTheClaimFunc(t *testin
 func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsLast(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
-	g.pause("iter-01", "breach one")
-	g.pause("iter-02", "breach two")
+	g.Pause("iter-01", "breach one")
+	g.Pause("iter-02", "breach two")
 
-	if got := g.snapshot(); len(got) != 2 {
+	if got := g.Snapshot(); len(got) != 2 {
 		t.Fatalf("snapshot() = %v, want both iterations recorded as paused", got)
 	}
 
 	var wg sync.WaitGroup
 	for range 2 {
 		wg.Go(func() {
-			g.waitForResume(context.Background())
+			g.WaitForResume(context.Background())
 		})
 	}
 
@@ -92,7 +92,7 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsL
 		t.Fatal("waitForResume() never returned for both waiters")
 	}
 
-	if g.isPaused() {
+	if g.IsPaused() {
 		t.Error("isPaused() = true after resume, want false")
 	}
 }
@@ -100,11 +100,11 @@ func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsL
 func TestPauseGate_ForceResume_WakesWaiterImmediately(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
-	g.pause("iter-01", "breach")
+	g.Pause("iter-01", "breach")
 
 	returned := make(chan struct{})
 	go func() {
-		g.waitForResume(context.Background())
+		g.WaitForResume(context.Background())
 		close(returned)
 	}()
 
@@ -124,7 +124,7 @@ func TestPauseGate_ForceResume_WakesWaiterImmediately(t *testing.T) {
 		t.Fatal("waitForResume() did not return after ForceResume")
 	}
 
-	if g.isPaused() {
+	if g.IsPaused() {
 		t.Error("isPaused() = true after ForceResume, want false")
 	}
 }
@@ -132,12 +132,12 @@ func TestPauseGate_ForceResume_WakesWaiterImmediately(t *testing.T) {
 func TestPauseGate_ForceResume_UnknownLabelReturnsFalse(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
-	g.pause("iter-01", "breach")
+	g.Pause("iter-01", "breach")
 
 	if g.ForceResume("iter-02") {
 		t.Error("ForceResume(unpaused label) = true, want false")
 	}
-	if !g.isPaused() {
+	if !g.IsPaused() {
 		t.Error("isPaused() = false after ForceResume of an unrelated label, want true: iter-01 is still paused")
 	}
 }
@@ -152,7 +152,7 @@ func TestPauseGate_ForceResume_UnknownLabelReturnsFalse(t *testing.T) {
 func TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
-	g.pause("iter-01", "breach")
+	g.Pause("iter-01", "breach")
 
 	if !g.ForceResume("iter-01") {
 		t.Fatal("ForceResume(iter-01) = false, want true")
@@ -160,7 +160,7 @@ func TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately(t *tes
 
 	returned := make(chan struct{})
 	go func() {
-		g.waitForResume(context.Background())
+		g.WaitForResume(context.Background())
 		close(returned)
 	}()
 

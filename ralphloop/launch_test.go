@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -40,7 +41,7 @@ func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccup
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := promptedLaunch(d, launchAndPromptParams{
+	sessionID, err := promptedLaunch(d, supervise.LaunchParams{
 		Label:      "iter-01",
 		Agent:      agent.AgentClaude,
 		Session:    agentrunner.Session{Label: "iter-01", ID: "pane-1"},
@@ -90,7 +91,7 @@ func TestPromptedLaunch_CodexAdoptsSessionIDFromStatusAfterPrompt(t *testing.T) 
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := promptedLaunch(d, launchAndPromptParams{
+	sessionID, err := promptedLaunch(d, supervise.LaunchParams{
 		Label:      "iter-09",
 		Agent:      agent.AgentCodex,
 		Session:    agentrunner.Session{Label: "iter-09", ID: "pane-9"},
