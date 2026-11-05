@@ -17,7 +17,7 @@ func (p *Pty) codexPending(ss *ptySession) (*agentrunner.Pending, error) {
 	if ok {
 		return &agentrunner.Pending{ID: req.ID, Tool: req.Tool, Input: req.Input, Description: req.Description}, nil
 	}
-	d, err := p.answerer(ss).codexScreenDialog()
+	d, err := p.answerer(ss).CodexScreenDialog()
 	if err != nil || !d.Approvable {
 		return nil, err
 	}
@@ -28,8 +28,8 @@ func (p *Pty) agentDir(ss *ptySession) string { return filepath.Join(p.Root, ss.
 
 // answerer is the shared answer logic over ss's holder, with the queue's
 // timings and its died mapping.
-func (p *Pty) answerer(ss *ptySession) holderAnswerer {
-	return holderAnswerer{
+func (p *Pty) answerer(ss *ptySession) HolderAnswerer {
+	return HolderAnswerer{
 		Holder:    ss.holder,
 		Dir:       p.agentDir(ss),
 		Poll:      p.pollInterval(),

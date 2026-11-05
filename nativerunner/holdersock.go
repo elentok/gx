@@ -22,6 +22,10 @@ import (
 	"github.com/elentok/gx/harness"
 )
 
+// claudeTyping is the holder child's typing rules; it reads the env the
+// parent gave that child.
+var claudeTyping = harness.ClaudeTyping()
+
 // HolderSocketFile is the holder's unix socket in a pty agent directory.
 const HolderSocketFile = "holder.sock"
 
@@ -81,9 +85,9 @@ var pasteSettle = 300 * time.Millisecond
 
 const (
 	holderIOTimeout = 5 * time.Second
-	// holderStopGrace is how long stop waits for the child to exit on
+	// HolderStopGrace is how long stop waits for the child to exit on
 	// SIGTERM before it kills it.
-	holderStopGrace = 5 * time.Second
+	HolderStopGrace = 5 * time.Second
 )
 
 // holderDenyTimeout bounds each wait in deny-reason: for idle after Esc, and
@@ -114,8 +118,8 @@ type holderResponse struct {
 	Screen      []string `json:"screen,omitempty"`
 	Scrollback  []string `json:"scrollback,omitempty"`
 	// Claude is nil until claude's pid status file first appears.
-	Claude *PidStatus `json:"claude,omitempty"`
-	Turn   int        `json:"turn,omitempty"`
+	Claude *harness.PidStatus `json:"claude,omitempty"`
+	Turn   int                `json:"turn,omitempty"`
 	// Program is claude's last session-wide OSC 7501 state, empty before one
 	// and after clear.
 	Program string `json:"program,omitempty"`
@@ -329,7 +333,7 @@ func (h *holderServer) denyReason(reason string) error {
 	if _, err := h.ptmx.Write([]byte("\x1b")); err != nil {
 		return err
 	}
-	typedAt, ok := h.pid.WaitLive(holderDenyTimeout, func(s PidStatus, _ int) bool { return s.Status == ClaudeIdle })
+	typedAt, ok := h.pid.WaitLive(holderDenyTimeout, func(s harness.PidStatus, _ int) bool { return s.Status == harness.ClaudeIdle })
 	if !ok {
 		return errors.New("claude did not go idle after Esc")
 	}
@@ -356,7 +360,7 @@ func (h *holderServer) denyReason(reason string) error {
 	if _, err := h.ptmx.Write([]byte("\r")); err != nil {
 		return err
 	}
-	if _, ok := h.pid.WaitLive(holderDenyTimeout, func(_ PidStatus, turn int) bool { return turn > typedAt }); !ok {
+	if _, ok := h.pid.WaitLive(holderDenyTimeout, func(_ harness.PidStatus, turn int) bool { return turn > typedAt }); !ok {
 		return errors.New("claude did not take the reason")
 	}
 	return nil
@@ -487,7 +491,7 @@ func (h *holderServer) stop() {
 	_ = syscall.Kill(pgid, syscall.SIGTERM)
 	select {
 	case <-h.exited:
-	case <-time.After(holderStopGrace):
+	case <-time.After(HolderStopGrace):
 		_ = syscall.Kill(pgid, syscall.SIGKILL)
 	}
 }
@@ -539,19 +543,19 @@ func (c *HolderClient) Supports(op string) bool { return slices.Contains(c.ops, 
 
 // Status returns claude's last pid file status, nil before the file first
 // appears, and the number of status changes the holder has seen.
-func (c *HolderClient) Status() (*PidStatus, int, error) {
-	claude, turn, _, err := c.statusWithProgram()
+func (c *HolderClient) Status() (*harness.PidStatus, int, error) {
+	claude, turn, _, err := c.StatusWithProgram()
 	return claude, turn, err
 }
 
-// statusWithProgram is Status plus the OSC state from the same reply, so the
+// StatusWithProgram is Status plus the OSC state from the same reply, so the
 // two never come from different moments.
-func (c *HolderClient) statusWithProgram() (*PidStatus, int, string, error) {
-	resp, err := c.statusReply()
+func (c *HolderClient) StatusWithProgram() (*harness.PidStatus, int, string, error) {
+	resp, err := c.StatusReply()
 	return resp.Claude, resp.Turn, resp.Program, err
 }
 
-func (c *HolderClient) statusReply() (holderResponse, error) {
+func (c *HolderClient) StatusReply() (holderResponse, error) {
 	resp, err := c.call(holderRequest{Op: opStatus})
 	if resp.Exited != nil {
 		return holderResponse{}, &ClaudeExitedError{Code: *resp.Exited}
@@ -570,11 +574,11 @@ type WatchedStatus struct {
 // Watched is the watcher's status, nil from a holder that serves a pid status
 // file instead.
 func (c *HolderClient) Watched() (*WatchedStatus, error) {
-	resp, err := c.statusReply()
-	return resp.watched(), err
+	resp, err := c.StatusReply()
+	return resp.WatchedView(), err
 }
 
-func (r holderResponse) watched() *WatchedStatus {
+func (r holderResponse) WatchedView() *WatchedStatus {
 	if r.Watched == nil {
 		return nil
 	}

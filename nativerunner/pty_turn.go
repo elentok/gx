@@ -30,7 +30,7 @@ func (t ptyTurn) promptSlash(pr *ptyPrompter, text string) error {
 	if err != nil || started {
 		return err
 	}
-	claude, _, program, err := pr.ss.holder.statusWithProgram()
+	claude, _, program, err := pr.ss.holder.StatusWithProgram()
 	if err != nil {
 		return t.p.died(pr.ss, err)
 	}
@@ -48,14 +48,14 @@ func (t ptyTurn) awaitNotBusy(ss *ptySession) (int, error) {
 	p := t.p
 	deadline := time.Now().Add(p.WaitN())
 	for {
-		resp, err := ss.holder.statusReply()
+		resp, err := ss.holder.StatusReply()
 		if err != nil {
 			return 0, p.died(ss, err)
 		}
 		claude, turn, program := resp.Claude, resp.Turn, resp.Program
 		// A watched harness (Codex) reports Background itself: working with a
 		// background terminal takes a prompt, a running turn does not.
-		if w := resp.watched(); w != nil {
+		if w := resp.WatchedView(); w != nil {
 			switch {
 			// After an error the input is ready: a prompt starts the next turn.
 			case w.Status.State == harness.Blocked && w.Status.Blocked != harness.BlockedError:
@@ -90,12 +90,12 @@ func (t ptyTurn) awaitIdle(ss *ptySession) error {
 	p := t.p
 	deadline := time.Now().Add(p.WaitN())
 	for {
-		resp, err := ss.holder.statusReply()
+		resp, err := ss.holder.StatusReply()
 		if err != nil {
 			return p.died(ss, err)
 		}
 		claude, program := resp.Claude, resp.Program
-		if w := resp.watched(); w != nil {
+		if w := resp.WatchedView(); w != nil {
 			program = watchedProgram(w.Status)
 		}
 		busy := program == "working" || program == "blocked" ||

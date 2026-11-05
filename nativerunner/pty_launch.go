@@ -239,7 +239,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 	}
 	var nextTrustKey time.Time
 	for {
-		resp, err := ss.holder.statusReply()
+		resp, err := ss.holder.StatusReply()
 		if err != nil {
 			return err
 		}
@@ -260,7 +260,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 			// The trust dialog shows before claude writes its pid file, so
 			// no holder rule can see it. Claude drops a key typed before it
 			// reads input, so keys repeat while the dialog stays up.
-			rows, scrolled, err := ss.holder.Screen(startupScrollback)
+			rows, scrolled, err := ss.holder.Screen(StartupScrollback)
 			if err != nil {
 				return err
 			}
@@ -268,7 +268,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 				if err := ss.holder.SendKeys(startup.Key); err != nil {
 					return err
 				}
-				nextTrustKey = time.Now().Add(trustKeyRepeat)
+				nextTrustKey = time.Now().Add(TrustKeyRepeat)
 			}
 		}
 		select {
@@ -284,10 +284,6 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 		}
 	}
 }
-
-// trustKeyRepeat spaces trust dialog keys so claude redraws the cursor
-// before the next key is chosen from the screen.
-const trustKeyRepeat = 500 * time.Millisecond
 
 // holderExitedErr reports a holder gone before claude turned idle, with
 // claude's exit code when the holder saved one.
@@ -315,12 +311,8 @@ func (l ptyLauncher) watchExit(ss *ptySession, meta Meta) {
 	}
 }
 
-// startupScrollback is how many scrolled-off rows a startup screen rule
-// reads besides the visible screen.
-const startupScrollback = 50
-
 func (l ptyLauncher) startupScreen(ss *ptySession) (string, error) {
-	rows, scrolled, err := ss.holder.Screen(startupScrollback)
+	rows, scrolled, err := ss.holder.Screen(StartupScrollback)
 	if err != nil {
 		return "", err
 	}
@@ -344,7 +336,7 @@ func (l ptyLauncher) noPidFileErr(ss *ptySession) error {
 func (l ptyLauncher) launchTick(ss *ptySession, dir string, deadline time.Time, what string) error {
 	select {
 	case <-ss.exited:
-		if text := holderErrText(dir); text != "" {
+		if text := HolderErrText(dir); text != "" {
 			return fmt.Errorf("pty start: holder exited: %s", text)
 		}
 		return fmt.Errorf("pty start: holder exited: %s", what)
@@ -379,7 +371,7 @@ func (l ptyLauncher) spawn(opts agentrunner.StartOptions, dir, sessionID string)
 	cmd := exec.Command(holder[0], args...)
 	cmd.Dir = opts.Cwd
 	cmd.Env = launch.Env
-	errFile, err := createHolderErr(dir)
+	errFile, err := CreateHolderErr(dir)
 	if err != nil {
 		return nil, err
 	}

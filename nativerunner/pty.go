@@ -279,13 +279,13 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	if err != nil {
 		return agentrunner.Status{}, err
 	}
-	resp, err := ss.holder.statusReply()
+	resp, err := ss.holder.StatusReply()
 	if err != nil {
 		return agentrunner.Status{}, p.died(ss, err)
 	}
 	claude := resp.Claude
 	st := agentrunner.Status{State: agentrunner.StateWorking, Turn: resp.Turn, SessionID: ss.session.SessionID}
-	if w := resp.watched(); w != nil {
+	if w := resp.WatchedView(); w != nil {
 		st = watchedStatus(st, *w)
 		if st.State == agentrunner.StateBlocked && w.Status.Blocked == harness.BlockedPermission {
 			if st.Pending, err = p.codexPending(ss); err != nil {
@@ -306,7 +306,7 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	case ClaudeWaiting:
 		st.State, st.BlockedReason = agentrunner.StateBlocked, claude.WaitingFor
 		// Only here, on demand: the screen is never read on a timer for it.
-		if claude.WaitingFor == permissionPrompt {
+		if claude.WaitingFor == PermissionPrompt {
 			d, err := p.screenDialog(ss)
 			if err != nil {
 				return agentrunner.Status{}, err
@@ -375,7 +375,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 	grace := p.StopGrace
 	if grace <= 0 {
 		// Longer than the holder's own grace for claude, plus its final flush.
-		grace = 2 * holderStopGrace
+		grace = 2 * HolderStopGrace
 	}
 	if ss.holder == nil {
 		// A silent holder can't be asked; its exited is already closed, so
@@ -490,12 +490,12 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	if err != nil {
 		return err
 	}
-	resp, err := ss.holder.statusReply()
+	resp, err := ss.holder.StatusReply()
 	if err != nil {
 		return p.died(ss, err)
 	}
 	claude, program := resp.Claude, resp.Program
-	w := resp.watched()
+	w := resp.WatchedView()
 	if w != nil {
 		program = watchedProgram(w.Status)
 	}
@@ -532,10 +532,6 @@ func watchedProgram(st harness.Status) string {
 	}
 	return "idle"
 }
-
-// permissionPrompt is the waitingFor of both tool permission and plan
-// approval. Their first option is "Yes", so Enter allows.
-const permissionPrompt = "permission prompt"
 
 // Answer answers the session's dialog; see holderAnswerer.AnswerClaude and
 // AnswerCodex.

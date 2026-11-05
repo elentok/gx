@@ -230,10 +230,6 @@ func HolderTypingIO(h *HolderClient) harness.TypingIO {
 	}
 }
 
-// claudeTyping is the holder child's typing rules; it reads the env the
-// parent gave that child.
-var claudeTyping = harness.ClaudeTyping()
-
 // typing is the typing rules of ss's harness. Claude reads its config from
 // p.Env; a nil Env becomes an empty one, which harness would read as the
 // process env.
@@ -267,7 +263,7 @@ func (pr *ptyPrompter) SendEnter() error {
 }
 
 func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
-	return pr.p.answerer(pr.ss).waitTurn(pr.turn, timeout, pr.cancelled)
+	return pr.p.answerer(pr.ss).WaitTurn(pr.turn, timeout, pr.cancelled)
 }
 
 func (pr *ptyPrompter) Screen() (string, error) {

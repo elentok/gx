@@ -38,6 +38,14 @@ const (
 	ExitCodeFile   = "exit-code"
 )
 
+// TrustKeyRepeat spaces trust dialog keys so claude redraws the cursor
+// before the next key is chosen from the screen.
+const TrustKeyRepeat = 500 * time.Millisecond
+
+// StartupScrollback is how many scrolled-off rows a startup screen rule
+// reads besides the visible screen.
+const StartupScrollback = 50
+
 // AgentSessionEnv carries the gx session id into the child's env.
 const AgentSessionEnv = "GX_AGENT_SESSION"
 
@@ -283,11 +291,11 @@ func answerTrust(h harness.Harness, scr *screen.Screen, keys io.Writer, watcher 
 			return
 		}
 		if !time.Now().Before(next) {
-			if startup := h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()); startup.Dialog != harness.NoDialog {
+			if startup := h.StartupScreen(scr.ScrollbackTail(StartupScrollback), scr.Rows()); startup.Dialog != harness.NoDialog {
 				if _, err := io.WriteString(keys, startup.Key); err != nil {
 					return
 				}
-				next = time.Now().Add(trustKeyRepeat)
+				next = time.Now().Add(TrustKeyRepeat)
 			}
 		}
 		select {

@@ -15,10 +15,14 @@ import (
 // cancels it, but nothing says which option approves.
 var ErrNotApprovable = errors.New("dialog is not approvable")
 
-// holderAnswerer answers an agent's permission dialog over a holder. The queue
+// PermissionPrompt is the waitingFor of both tool permission and plan
+// approval. Their first option is "Yes", so Enter allows.
+const PermissionPrompt = "permission prompt"
+
+// HolderAnswerer answers an agent's permission dialog over a holder. The queue
 // (Pty.Answer) and the keys route share it, so both need only a holder, the
 // agent dir and the timing parameters.
-type holderAnswerer struct {
+type HolderAnswerer struct {
 	Holder *HolderClient
 	// Dir is the agent dir the Codex hook writes its request and decision in.
 	Dir  string
@@ -49,17 +53,17 @@ type holderAnswerer struct {
 	AwaitIdle func() error
 }
 
-func (h holderAnswerer) died(err error) error {
+func (h HolderAnswerer) died(err error) error {
 	if h.Died == nil {
 		return err
 	}
 	return h.Died(err)
 }
 
-func (h holderAnswerer) exitedErr() error { return h.died(errors.New("holder exited")) }
+func (h HolderAnswerer) exitedErr() error { return h.died(errors.New("holder exited")) }
 
 // sleep waits one poll, failing once the holder is gone.
-func (h holderAnswerer) sleep() error {
+func (h HolderAnswerer) sleep() error {
 	select {
 	case <-h.Exited:
 		return h.exitedErr()
@@ -68,9 +72,9 @@ func (h holderAnswerer) sleep() error {
 	}
 }
 
-// waitTurn waits up to timeout for the holder's Turn to pass turn. cancelled,
+// WaitTurn waits up to timeout for the holder's Turn to pass turn. cancelled,
 // when set, is checked before every look.
-func (h holderAnswerer) waitTurn(turn int, timeout time.Duration, cancelled func() error) (bool, error) {
+func (h HolderAnswerer) WaitTurn(turn int, timeout time.Duration, cancelled func() error) (bool, error) {
 	deadline := time.Now().Add(timeout)
 	for {
 		if cancelled != nil {
@@ -100,7 +104,7 @@ func (h holderAnswerer) waitTurn(turn int, timeout time.Duration, cancelled func
 // Deny with a reason also sends the reason as claude's next prompt. With a
 // RequestID, the screen is re-read first and anything but that approvable
 // dialog is ErrRequestMismatch, before any key is sent.
-func (h holderAnswerer) AnswerClaude(a agentrunner.Answer) error {
+func (h HolderAnswerer) AnswerClaude(a agentrunner.Answer) error {
 	if h.StrictAllow {
 		return h.answerClaudeStrict(a)
 	}
@@ -108,7 +112,7 @@ func (h holderAnswerer) AnswerClaude(a agentrunner.Answer) error {
 	if err != nil {
 		return h.died(err)
 	}
-	if claude == nil || claude.Status != ClaudeWaiting {
+	if claude == nil || claude.Status != harness.ClaudeWaiting {
 		return fmt.Errorf("%w: answer on a session that is not blocked", agentrunner.ErrNotReady)
 	}
 	if a.RequestID != "" {
@@ -123,7 +127,7 @@ func (h holderAnswerer) AnswerClaude(a agentrunner.Answer) error {
 	var key string
 	switch a.Decision {
 	case agentrunner.DecisionAllow:
-		if claude.WaitingFor != permissionPrompt {
+		if claude.WaitingFor != PermissionPrompt {
 			return fmt.Errorf("%w: %q is not a permission prompt; deny cancels it",
 				agentrunner.ErrInvalidDecision, claude.WaitingFor)
 		}
@@ -139,7 +143,7 @@ func (h holderAnswerer) AnswerClaude(a agentrunner.Answer) error {
 	if err := h.died(h.Holder.SendKeys(key)); err != nil {
 		return err
 	}
-	moved, err := h.waitTurn(turn, h.Grace, nil)
+	moved, err := h.WaitTurn(turn, h.Grace, nil)
 	if err != nil {
 		return err
 	}
@@ -154,16 +158,16 @@ func (h holderAnswerer) AnswerClaude(a agentrunner.Answer) error {
 // its watcher. The screen is the authority: a RequestID that is not the dialog
 // on it is ErrRequestMismatch for either decision, and Allow needs the cursor
 // on a plain "Yes" first option. Deny is Esc whatever the screen shows.
-func (h holderAnswerer) answerClaudeStrict(a agentrunner.Answer) error {
+func (h HolderAnswerer) answerClaudeStrict(a agentrunner.Answer) error {
 	if a.Decision != agentrunner.DecisionAllow && a.Decision != agentrunner.DecisionDeny {
 		return fmt.Errorf("%w: %q", agentrunner.ErrInvalidDecision, a.Decision)
 	}
-	resp, err := h.Holder.statusReply()
+	resp, err := h.Holder.StatusReply()
 	if err != nil {
 		return h.died(err)
 	}
-	w := resp.watched()
-	blocked := resp.Claude != nil && resp.Claude.Status == ClaudeWaiting
+	w := resp.WatchedView()
+	blocked := resp.Claude != nil && resp.Claude.Status == harness.ClaudeWaiting
 	if w != nil {
 		blocked = w.Status.State == harness.Blocked && w.Status.Blocked == harness.BlockedPermission
 	}
@@ -191,7 +195,7 @@ func (h holderAnswerer) answerClaudeStrict(a agentrunner.Answer) error {
 	if w != nil {
 		return h.awaitNotBlocked(a.Decision)
 	}
-	moved, err := h.waitTurn(resp.Turn, h.Grace, nil)
+	moved, err := h.WaitTurn(resp.Turn, h.Grace, nil)
 	if err != nil {
 		return err
 	}
@@ -205,7 +209,7 @@ func (h holderAnswerer) answerClaudeStrict(a agentrunner.Answer) error {
 // the keys route: the shared answer logic with the strict Claude Allow and the
 // Codex policy for an unreadable screen.
 func AnswerSessionPermission(c *HolderClient, dir string, kind agentrunner.Kind, a agentrunner.Answer, poll, grace time.Duration) error {
-	h := holderAnswerer{Holder: c, Dir: dir, Poll: poll, Grace: grace, UnreadableDeny: true, StrictAllow: true}
+	h := HolderAnswerer{Holder: c, Dir: dir, Poll: poll, Grace: grace, UnreadableDeny: true, StrictAllow: true}
 	if kind == harness.Codex {
 		return h.AnswerCodex(a)
 	}
@@ -216,7 +220,7 @@ func AnswerSessionPermission(c *HolderClient, dir string, kind agentrunner.Kind,
 // blocked until claude takes the reason; between a bare Esc and the reason,
 // a waiter would see idle and end the turn. A failed step leaves claude
 // somewhere between the dialog and the reason, so the session is marked died.
-func (h holderAnswerer) denyWithReason(reason string) error {
+func (h HolderAnswerer) denyWithReason(reason string) error {
 	var err error
 	if h.Holder.Supports(OpDenyReason) {
 		err = h.died(h.Holder.DenyWithReason(reason))
@@ -231,7 +235,7 @@ func (h holderAnswerer) denyWithReason(reason string) error {
 
 // escThenPrompt is deny-reason over core ops, for a holder that predates the
 // op: Esc, then the reason as a normal prompt once claude is idle.
-func (h holderAnswerer) escThenPrompt(reason string) error {
+func (h HolderAnswerer) escThenPrompt(reason string) error {
 	if err := h.died(h.Holder.SendKeys("\x1b")); err != nil {
 		return err
 	}
@@ -241,7 +245,7 @@ func (h holderAnswerer) escThenPrompt(reason string) error {
 		if err != nil {
 			return h.died(err)
 		}
-		if claude != nil && claude.Status == ClaudeIdle {
+		if claude != nil && claude.Status == harness.ClaudeIdle {
 			return h.prompt(reason)
 		}
 		if time.Now().After(deadline) {
@@ -251,7 +255,7 @@ func (h holderAnswerer) escThenPrompt(reason string) error {
 	}
 }
 
-func (h holderAnswerer) prompt(text string) error {
+func (h HolderAnswerer) prompt(text string) error {
 	if h.Prompt == nil {
 		return nil
 	}
@@ -259,16 +263,16 @@ func (h holderAnswerer) prompt(text string) error {
 }
 
 // codexBlockedOnPermission reports whether Codex is blocked on an approval.
-func (h holderAnswerer) codexBlockedOnPermission() (bool, error) {
-	resp, err := h.Holder.statusReply()
+func (h HolderAnswerer) codexBlockedOnPermission() (bool, error) {
+	resp, err := h.Holder.StatusReply()
 	if err != nil {
 		return false, h.died(err)
 	}
-	w := resp.watched()
+	w := resp.WatchedView()
 	return w != nil && w.Status.State == harness.Blocked && w.Status.Blocked == harness.BlockedPermission, nil
 }
 
-func (h holderAnswerer) codexScreenDialog() (claudeui.Dialog, error) {
+func (h HolderAnswerer) CodexScreenDialog() (claudeui.Dialog, error) {
 	rows, _, err := h.Holder.Screen(0)
 	if err != nil {
 		return claudeui.Dialog{}, h.died(err)
@@ -280,7 +284,7 @@ func (h holderAnswerer) codexScreenDialog() (claudeui.Dialog, error) {
 // dir the answer is a decision file; without one it is keys on the dialog the
 // screen shows, and only a dialog the parser recognises. A RequestID that is
 // not the current request is ErrRequestMismatch, before anything is sent.
-func (h holderAnswerer) AnswerCodex(a agentrunner.Answer) error {
+func (h HolderAnswerer) AnswerCodex(a agentrunner.Answer) error {
 	blocked, err := h.codexBlockedOnPermission()
 	if err != nil {
 		return err
@@ -309,8 +313,8 @@ func (h holderAnswerer) AnswerCodex(a agentrunner.Answer) error {
 	return h.awaitNotBlocked(a.Decision)
 }
 
-func (h holderAnswerer) answerCodexByKeys(a agentrunner.Answer) error {
-	d, err := h.codexScreenDialog()
+func (h HolderAnswerer) answerCodexByKeys(a agentrunner.Answer) error {
+	d, err := h.CodexScreenDialog()
 	if err != nil {
 		return err
 	}
@@ -342,7 +346,7 @@ func (h holderAnswerer) answerCodexByKeys(a agentrunner.Answer) error {
 }
 
 // awaitNotBlocked returns once Codex left the approval.
-func (h holderAnswerer) awaitNotBlocked(decision agentrunner.Decision) error {
+func (h HolderAnswerer) awaitNotBlocked(decision agentrunner.Decision) error {
 	deadline := time.Now().Add(h.Grace)
 	for {
 		blocked, err := h.codexBlockedOnPermission()

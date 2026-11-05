@@ -16,11 +16,11 @@ func Died(p *Pty, label string, err error) error {
 
 // AnswerClaude and AnswerCodex run the shared answer logic over a holder alone.
 func AnswerClaude(c *HolderClient, dir string, a agentrunner.Answer) error {
-	return holderAnswerer{Holder: c, Dir: dir, Poll: 20 * time.Millisecond, Grace: time.Second}.AnswerClaude(a)
+	return HolderAnswerer{Holder: c, Dir: dir, Poll: 20 * time.Millisecond, Grace: time.Second}.AnswerClaude(a)
 }
 
 func AnswerCodex(c *HolderClient, dir string, a agentrunner.Answer, unreadableDeny bool) error {
-	return holderAnswerer{Holder: c, Dir: dir, Poll: 20 * time.Millisecond, Grace: time.Second, UnreadableDeny: unreadableDeny}.AnswerCodex(a)
+	return HolderAnswerer{Holder: c, Dir: dir, Poll: 20 * time.Millisecond, Grace: time.Second, UnreadableDeny: unreadableDeny}.AnswerCodex(a)
 }
 
 // LaunchCommand is the command p runs the agent for opts with.

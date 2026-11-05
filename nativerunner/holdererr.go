@@ -10,13 +10,13 @@ import (
 // the launch error and a person can read why the holder never listened.
 const HolderErrFile = "holder.err"
 
-// createHolderErr opens a fresh holder.err in dir for the holder's stderr.
-func createHolderErr(dir string) (*os.File, error) {
+// CreateHolderErr opens a fresh holder.err in dir for the holder's stderr.
+func CreateHolderErr(dir string) (*os.File, error) {
 	return os.Create(filepath.Join(dir, HolderErrFile))
 }
 
-// holderErrText is what the holder wrote to stderr, empty when nothing.
-func holderErrText(dir string) string {
+// HolderErrText is what the holder wrote to stderr, empty when nothing.
+func HolderErrText(dir string) string {
 	b, err := os.ReadFile(filepath.Join(dir, HolderErrFile))
 	if err != nil {
 		return ""
