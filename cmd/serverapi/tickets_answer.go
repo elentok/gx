@@ -1,4 +1,4 @@
-package cmdbase
+package serverapi
 
 import (
 	"context"
@@ -7,14 +7,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 )
 
-// NewTicketsAnswerCmd is `gx tickets answer`: a person's reply to a paused
-// agent's question. The server mirror also takes the state token of the
-// question being answered. It never starts the server. Root and serverapi
-// both register it, so it lives here.
-func NewTicketsAnswerCmd(env Env, withState bool) *cobra.Command {
+// NewAnswerCmd is `gx tickets answer`: a person's reply to a paused
+// agent's question. The server mirror (serverTree) also takes the state token
+// of the question being answered. It never starts the server. Root and
+// serverapi both register it.
+func NewAnswerCmd(d Deps, serverTree bool) *cobra.Command {
+	env, withState := d.Env, serverTree
 	var req wire.QueueRequest
 	var body string
 	var jsonOut bool
@@ -25,13 +27,13 @@ func NewTicketsAnswerCmd(env Env, withState bool) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			req.Address, req.Source = args[0], "cli"
 			if body != "" {
-				text, err := ReadBodyArg(env.Stdin, body)
+				text, err := cmdbase.ReadBodyArg(env.Stdin, body)
 				if err != nil {
 					return err
 				}
 				req.Text = text
 			}
-			return ServerQueueWrite(env.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(env.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				res, err := cl.Tickets.Answer(ctx, req)
 				if err == nil && res.Refused && res.Reason == wire.ReasonStale && !jsonOut {
 					res.Message = staleMessage(res)

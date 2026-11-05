@@ -1,4 +1,4 @@
-package cmd
+package serverapi
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// newTicketsAskCmd is `gx tickets ask`: an agent's question, sent to the server
+// NewAskCmd is `gx tickets ask`: an agent's question, sent to the server
 // as a "## Question" + "## Handoff" body. It never starts the server.
-func newTicketsAskCmd(d deps) *cobra.Command {
+func NewAskCmd(d Deps) *cobra.Command {
 	var body string
 	var jsonOut bool
 	cmd := &cobra.Command{
@@ -20,11 +20,11 @@ func newTicketsAskCmd(d deps) *cobra.Command {
 		Short: "record a question on a ticket and pause it as asking",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			text, err := cmdbase.ReadBodyArg(d.stdin, body)
+			text, err := cmdbase.ReadBodyArg(d.Stdin, body)
 			if err != nil {
 				return err
 			}
-			return cmdbase.ServerQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
+			return cmdbase.ServerQueueWrite(d.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 				return cl.Tickets.Ask(ctx, args[0], text)
 			})
 		},

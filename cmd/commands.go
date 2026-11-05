@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/cmd/ticketsmigrate"
 	"github.com/elentok/gx/git/stage"
@@ -398,8 +399,8 @@ func newTicketsCmd(d deps) *cobra.Command {
 	followUpCmd.AddCommand(followUpSearchCmd)
 	cmd.AddCommand(followUpCmd)
 	cmd.AddCommand(newTicketsEpicCmd(d))
-	cmd.AddCommand(newTicketsAskCmd(d))
-	cmd.AddCommand(cmdbase.NewTicketsAnswerCmd(d.base(), false))
+	cmd.AddCommand(serverapi.NewAskCmd(d.serverapiDeps()))
+	cmd.AddCommand(serverapi.NewAnswerCmd(d.serverapiDeps(), false))
 	var sectionJSON, sectionClear bool
 	sectionCmd := &cobra.Command{
 		Use:   "section <addr|path> <heading> [<content|->]",

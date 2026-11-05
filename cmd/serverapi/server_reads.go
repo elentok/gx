@@ -377,7 +377,7 @@ func newServerTicketsCmd(d Deps) *cobra.Command {
 	recommend.Flags().String("diagnosis", "", "the diagnosis, or - to read it from stdin")
 	recommend.Flags().BoolVar(&recJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(recommend)
-	cmd.AddCommand(cmdbase.NewTicketsAnswerCmd(d.Env, true))
+	cmd.AddCommand(NewAnswerCmd(d, true))
 
 	var followJSON bool
 	follow := &cobra.Command{
