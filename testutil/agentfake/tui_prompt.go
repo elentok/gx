@@ -15,6 +15,11 @@ func (t *tui) submit() error {
 	}
 	text := t.typed.String()
 	t.typed.Reset()
+	images := t.images
+	t.images = nil
+	if len(images) > 0 {
+		text = strings.TrimSpace(text)
+	}
 	if text == "" && t.pid.Status != StatusWaiting {
 		return nil
 	}
@@ -92,7 +97,7 @@ func (t *tui) submit() error {
 			return t.fastTurn()
 		}
 		if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil && cfg.Chat {
-			return t.chatTurn(text)
+			return t.chatTurn(text, images)
 		}
 		return t.setStatus(StatusBusy, "")
 	case StatusWaiting:

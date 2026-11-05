@@ -227,6 +227,82 @@ func TestTUIClaude_ChatKnobMakesAPlainPromptAChatTurn(t *testing.T) {
 	}
 }
 
+func (f *tuiFake) paste(s string) {
+	f.t.Helper()
+	if _, err := io.WriteString(f.stdin, "\x1b[200~"+s+"\x1b[201~"); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func TestTUIClaude_PastedImagePathsBecomeChipsAndTranscriptLines(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	path := f.transcriptPath()
+	f.writeWorkerConfig(WorkerConfig{Chat: true})
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a.png"), filepath.Join(dir, "b.JPG")
+	for _, p := range []string{a, b} {
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	f.paste(a)
+	f.waitScreen("[Image #1] ")
+	f.paste(b)
+	f.waitScreen("[Image #1] [Image #2] ")
+	f.typeLine("look")
+	f.waitStatus(StatusBusy, "")
+	f.waitStatus(StatusIdle, "")
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("transcript = %q", raw)
+	}
+	var user, meta struct {
+		IsMeta  bool `json:"isMeta"`
+		Message struct {
+			Content []struct {
+				Type   string `json:"type"`
+				Text   string `json:"text"`
+				Source struct {
+					MediaType string `json:"media_type"`
+				} `json:"source"`
+			} `json:"content"`
+		} `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(lines[0]), &user); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &meta); err != nil {
+		t.Fatal(err)
+	}
+	u := user.Message.Content
+	if user.IsMeta || len(u) != 3 || u[0].Text != "[Image #1] [Image #2] look" ||
+		u[1].Type != "image" || u[1].Source.MediaType != "image/png" ||
+		u[2].Type != "image" || u[2].Source.MediaType != "image/jpeg" {
+		t.Errorf("user line = %s", lines[0])
+	}
+	m := meta.Message.Content
+	if !meta.IsMeta || len(m) != 2 || m[0].Text != "[Image: source: "+a+"]" || m[1].Text != "[Image: source: "+b+"]" {
+		t.Errorf("meta line = %s", lines[1])
+	}
+}
+
+func TestTUIClaude_PastedNonImageTextStaysPlain(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.transcriptPath()
+	f.paste("a whole sentence")
+	f.paste(filepath.Join(t.TempDir(), "missing.png"))
+	f.waitScreen("missing.png")
+	if s := f.screen.String(); strings.Contains(s, "[Image #") || !strings.Contains(s, "a whole sentence") {
+		t.Fatalf("screen = %q", s)
+	}
+}
+
 func TestTUIClaude_LogsItsArgv(t *testing.T) {
 	args := append([]string{"--model", "opus", "--effort", "max"}, tuiLaunchArgs...)
 	f := startTUIFake(t, args)

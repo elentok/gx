@@ -196,7 +196,7 @@ const chatReply = "Sure, here is a short answer."
 
 // chatTurn plays a plain prompt as a chat turn: the person message and a
 // scripted reply land in the transcript, and the turn ends shortly after.
-func (t *tui) chatTurn(text string) error {
+func (t *tui) chatTurn(text string, images []string) error {
 	t.prompt = text
 	if err := t.setStatus(StatusBusy, ""); err != nil {
 		return err
@@ -205,7 +205,12 @@ func (t *tui) chatTurn(text string) error {
 	if err != nil {
 		return err
 	}
-	if err := appendMessage(path, "user", text); err != nil {
+	if len(images) > 0 {
+		err = writeImagePrompt(path, text, images)
+	} else {
+		err = appendMessage(path, "user", text)
+	}
+	if err != nil {
 		return err
 	}
 	if strings.Contains(text, ChatSlowMarker) {

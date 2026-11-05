@@ -62,6 +62,9 @@ type tui struct {
 	// resume is the ticket a ratelimit or question-menu worker finishes on the
 	// next prompt, whatever that prompt says.
 	resume *PendingWork
+	// images are the paths behind the [Image #N] chips in the input.
+	images []string
+	paste  pasteState
 }
 
 type PendingWork struct {
@@ -93,6 +96,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	if t.opts.mouse {
 		fmt.Fprint(t.out, "\x1b[?1049h\x1b[?1000h\x1b[?1006h")
 	}
+	fmt.Fprint(t.out, bracketedPasteOn)
 	if t.opts.trust {
 		t.draw()
 	} else if err := t.startSession(); err != nil {
@@ -122,6 +126,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if quit, err := t.trustKey(ev.Key); quit || err != nil {
 				return 1, err
 			}
+		case t.pasteKey(ev.Key):
 		case t.opts.mouse && (ev.Key == EscKey || len(t.seq) > 0):
 			if err := t.mouseSeqKey(ev.Key); err != nil {
 				return 0, err
