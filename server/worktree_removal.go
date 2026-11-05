@@ -53,7 +53,7 @@ func (s *Reconciler) removeMergedWorktree(root queue.RootRef) {
 // waitOutStamping blocks until the stamping path releases the epic's trunk lock.
 func (s *Reconciler) waitOutStamping(root queue.RootRef, project, dir, repoDir string) {
 	if epics, err := tickets.LoadResolved(project, dir); err == nil {
-		_, _, target, refsErr := s.epicRefs(project, epics, root.Epic, repoDir)
+		_, _, target, refsErr := s.merger.epicRefs(project, epics, root.Epic, repoDir)
 		s.guards.Trunks.Lock(repoDir, mergeLockKey(root, target, refsErr))()
 	}
 }

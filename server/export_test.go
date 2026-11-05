@@ -35,12 +35,12 @@ func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string 
 
 // SetMergeInto swaps the merge core a root merge calls.
 func (s *Server) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error)) {
-	s.mergeInto = f
+	s.merger.mergeInto = f
 }
 
 // SetMergedProbe swaps the poll-time ancestry check.
 func (s *Server) SetMergedProbe(f func(repo, ancestor, descendant string) (bool, error)) {
-	s.mergedProbe = f
+	s.rec.mergedProbe = f
 }
 
 // ResumeAsWeb is the resume the web mux serves: it needs a state token.
@@ -97,7 +97,7 @@ func (s *Server) CompleteRootIfDone(address string) error {
 	if !ok {
 		return errors.New("no ticket " + address)
 	}
-	s.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
+	s.merger.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	return nil
 }
 

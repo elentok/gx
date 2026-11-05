@@ -69,7 +69,7 @@ func (s *Server) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.Epi
 			Pill: PillDeadlocked, Reason: cycleReason(root, e), Since: fallback,
 			Action: wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: root.String()},
 		}, true
-	case state == wire.EpicListAwaitingMerge && !s.autoFFMerge(root.Project):
+	case state == wire.EpicListAwaitingMerge && !s.merger.autoFFMerge(root.Project):
 		return needsYou{
 			Pill: PillAwaitingMerge, Reason: "Auto-merge is off for " + root.Project, Since: fallback,
 			Action: wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: root.String()},

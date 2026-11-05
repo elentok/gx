@@ -22,7 +22,7 @@ import (
 // epic's branch when it already fast-forwards, and forks a manual merge ticket
 // otherwise. A manual ticket resets the merge-ticket cap and merges the epic
 // whatever auto-ff-merge says.
-func (s *Server) epicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
+func (s *Merger) epicMerge(req wire.QueueRequest) (wire.QueueResult, error) {
 	m, err := s.loadMergeEpic(req)
 	if err != nil {
 		return mergeVerbError(err)
@@ -82,7 +82,7 @@ func shownEpicState(shown wire.EpicState, e tickets.Epic) wire.EpicState {
 // loadMergeEpic resolves req's epic address for a manual merge verb. A
 // mergeRefused error means the verb stops there; req's state token, when it has
 // one, must match the epic's current state.
-func (s *Server) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
+func (s *Merger) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 	project, epic, ok := tickets.ParseEpicAddress(req.Address)
 	if !ok {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
@@ -119,7 +119,7 @@ func (s *Server) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 
 // epicMergeLocked is epicMerge's work under the trunk lock; the caller acts on
 // the decision after unlock.
-func (s *Server) epicMergeLocked(root queue.RootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string) (mergeDecision, error) {
+func (s *Merger) epicMergeLocked(root queue.RootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string) (mergeDecision, error) {
 	if r := epicMergeRefusal(root, e, repo); r != nil {
 		return mergeDecision{result: *r}, nil
 	}
@@ -158,7 +158,7 @@ func lowestTicket(e tickets.Epic) tickets.Ticket {
 
 // fillEpicMergeTargets sets each ticket's EpicMergeTarget to the branch
 // epicMerge would merge its epic on. rootRefs runs git, so once per epic.
-func (s *Server) fillEpicMergeTargets(list []wire.TicketInfo) {
+func (s *Merger) fillEpicMergeTargets(list []wire.TicketInfo) {
 	targets := map[tickets.Address]string{}
 	for i, info := range list {
 		a, err := tickets.ParseAddress(info.Address, tickets.AddressContext{})
@@ -179,7 +179,7 @@ func (s *Server) fillEpicMergeTargets(list []wire.TicketInfo) {
 // just says "Merge". It is also "" for an epic whose Merge is dimmed (tickets
 // not done, already merged): every snapshot runs this per epic, and only a
 // mergeable epic is worth its git calls.
-func (s *Server) epicMergeTarget(a tickets.Address) string {
+func (s *Merger) epicMergeTarget(a tickets.Address) string {
 	// The cheap epic checks come from the index and run before projectOf, which
 	// reads project.json: most epics are not mergeable.
 	dir, epics, ok := s.idx.ProjectEpics(a.Project)
@@ -321,7 +321,7 @@ func pendingMerge(e tickets.Epic, t tickets.Ticket) bool {
 // ensureFeatureWorktree recreates the epic's feature worktree from its branch
 // when a person removed it. The post-merge removal (removeMergedWorktree) is the
 // one place the server removes it again.
-func (s *Server) ensureFeatureWorktree(project, epic, repo string) error {
+func (s *Merger) ensureFeatureWorktree(project, epic, repo string) error {
 	path := filepath.Join(s.projects.WorktreeDir(project), epic)
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -334,7 +334,7 @@ func (s *Server) ensureFeatureWorktree(project, epic, repo string) error {
 }
 
 // ensureRootQueued queues the root's first ticket unless the root is queued.
-func (s *Server) ensureRootQueued(root queue.RootRef, first tickets.Ticket) error {
+func (s *Merger) ensureRootQueued(root queue.RootRef, first tickets.Ticket) error {
 	addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: first.Identifier}.String()
 	_, err := s.queue.Write(addr, func(items []wire.QueueItem) ([]wire.QueueItem, *wire.QueueResult) {
 		for _, it := range items {

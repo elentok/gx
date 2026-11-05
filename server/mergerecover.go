@@ -15,7 +15,7 @@ import (
 // recoverMerges runs before anything is scheduled. A merge lock whose owner is
 // dead and that has no conflict marker means a merge was in flight when a
 // process died: clear the lock, then let verify say whether the ticket merged.
-func (s *Server) recoverMerges() {
+func (s *Merger) recoverMerges() {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		s.log.Warn("recover merges", "err", err)
@@ -35,7 +35,7 @@ func (s *Server) recoverMerges() {
 	}
 }
 
-func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
+func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 	lockDir, err := s.projects.MergeLockDir(epicPath)
 	if err != nil {
 		return err
@@ -103,7 +103,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 }
 
 // abortHalfPick drops a cherry-pick the crashed merge left in progress.
-func (s *Server) abortHalfPick(featureWorktree string) error {
+func (s *Merger) abortHalfPick(featureWorktree string) error {
 	d := s.projects.DefaultDeps()
 	inProgress, err := d.CherryPickInProgress(featureWorktree)
 	if err != nil || !inProgress {

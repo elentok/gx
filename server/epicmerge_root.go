@@ -29,7 +29,7 @@ import (
 // completed_at marks the epic's final outcome: with auto-ff-merge on that is
 // the merge or the pause, not all-done. An epic with nothing to merge is merged
 // as it stands, whatever auto-ff-merge says.
-func (s *Server) completeRootIfDone(root queue.RootRef, one ralphloop.OneIteration) {
+func (s *Merger) completeRootIfDone(root queue.RootRef, one ralphloop.OneIteration) {
 	// The one-offs epic is a standing inbox: it never merges, merges or retros.
 	if root.Epic == queue.OneOffsEpic {
 		return
@@ -59,7 +59,7 @@ func (s *Server) completeRootIfDone(root queue.RootRef, one ralphloop.OneIterati
 //
 // Without refs there is no target, so the merge locks the epic itself: mergeEpic
 // pauses it the way mergeRoot does, and two finishes still can't both stamp.
-func (s *Server) completeEpic(root queue.RootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
+func (s *Merger) completeEpic(root queue.RootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
 	_, _, target, err := s.epicRefs(root.Project, epics, one.Epic, repo)
 	lockKey := mergeLockKey(root, target, err)
 	if err == nil {
@@ -88,7 +88,7 @@ func mergeLockKey(root queue.RootRef, target string, refsErr error) string {
 // trunkConflictHolder is the epic, other than self, whose open trunk-conflict
 // ticket has an agent editing target's checkout; "" when there is none. A land
 // into target would change files under that agent, so it waits.
-func (s *Server) trunkConflictHolder(project string, epics []tickets.Epic, repo, target, self string) string {
+func (s *Merger) trunkConflictHolder(project string, epics []tickets.Epic, repo, target, self string) string {
 	for _, e := range epics {
 		if e.Name == self || !slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool {
 			return t.Type == string(schema.TypeTrunkConflict) && !e.RenderedStatus(t).Terminal()
@@ -104,7 +104,7 @@ func (s *Server) trunkConflictHolder(project string, epics []tickets.Epic, repo,
 
 // retryHeldMerge merges root again once the trunk-conflict ticket that held its
 // merge is gone. The hold lives in memory only: a server restart forgets it.
-func (s *Server) retryHeldMerge(root queue.RootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
+func (s *Merger) retryHeldMerge(root queue.RootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
 	if !s.guards.HeldMerges.Has(root.String()) {
 		return
 	}
@@ -184,7 +184,7 @@ func pauseDecision(first bool, reason string, kind events.Kind) mergeDecision {
 // mergeEpic is completeEpic's work under target's trunk lock: stamps, git and
 // the dequeue. force merges with auto-ff-merge off: the manual trigger's direct
 // merge.
-func (s *Server) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string, force bool) mergeDecision {
+func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string, force bool) mergeDecision {
 	project := root.Project
 	// A stored block is the last merge's; this merge decides afresh, and a new
 	// pause writes it again.
@@ -253,7 +253,7 @@ func (s *Server) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 // cancelled tickets of the merged epic left behind. Only that epic's: another
 // epic's iteration worktree may hold a running agent. A failure is logged: the
 // merge already happened.
-func (s *Server) removeLeftoverWorktrees(repo string, e tickets.Epic) {
+func (s *Merger) removeLeftoverWorktrees(repo string, e tickets.Epic) {
 	d := s.projects.DefaultDeps()
 	for _, t := range e.Tickets {
 		if err := ralphloop.RemoveIterationWorktree(d, repo, e.Name, t.Identifier); err != nil {
@@ -264,7 +264,7 @@ func (s *Server) removeLeftoverWorktrees(repo string, e tickets.Epic) {
 
 // actOnMerge sends d's notices and retro. It runs after the trunk lock is
 // released, and returns d's result.
-func (s *Server) actOnMerge(root queue.RootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) wire.QueueResult {
+func (s *Merger) actOnMerge(root queue.RootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) wire.QueueResult {
 	if d.result.Paused {
 		s.pauseRoot(root, one, dir, e, d)
 	} else if d.sendNotice() {
@@ -281,7 +281,7 @@ func (s *Server) actOnMerge(root queue.RootRef, one ralphloop.OneIteration, dir 
 }
 
 // pauseRoot reports the pause of e's all-done root.
-func (s *Server) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) {
+func (s *Merger) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) {
 	project := root.Project
 	reason, kind := d.result.Message, d.result.PauseKind
 	s.events.PublishEvent(wire.Event{Type: wire.EventRootPaused, Address: root.String(), Kind: kind, Level: wire.EventLevelWarning, Message: reason})
@@ -300,7 +300,7 @@ func (s *Server) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir s
 }
 
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
-func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIteration, e tickets.Epic, merged bool) {
+func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIteration, e tickets.Epic, merged bool) {
 	// The epic, not one: a one-off's merge ticket is not its one-off file.
 	if !s.chat.Enabled() || queue.IsOneOffEpic(e) {
 		return
@@ -315,7 +315,7 @@ func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 // the epic's final outcome, where completed_at is stamped: the merge, a root
 // pause, or all-done with auto-ff-merge off. A refused submit is logged, never an error:
 // the dedupe key refuses a second live retro of the same epic.
-func (s *Server) submitRetro(root queue.RootRef, projectDir string, e tickets.Epic) {
+func (s *Merger) submitRetro(root queue.RootRef, projectDir string, e tickets.Epic) {
 	if e.IsMap || queue.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
 		return
 	}
@@ -350,7 +350,7 @@ func (s *Server) submitRetro(root queue.RootRef, projectDir string, e tickets.Ep
 
 // StampEpic stamps each of keys with now on the epic. A failed stamp is
 // logged, never fatal: the merge it records has already happened.
-func (s *Server) StampEpic(root queue.RootRef, epicPath string, keys ...string) {
+func (s *Merger) StampEpic(root queue.RootRef, epicPath string, keys ...string) {
 	now := time.Now().UTC()
 	fields := make(map[string]any, len(keys))
 	for _, k := range keys {
@@ -370,7 +370,7 @@ func (s *Server) StampEpic(root queue.RootRef, epicPath string, keys ...string) 
 
 // stampTotals records the epic's summed tokens, cost, Codex marker and friction.
 // A failed stamp is logged, never fatal, like stampEpic's.
-func (s *Server) stampTotals(root queue.RootRef, e tickets.Epic) {
+func (s *Merger) stampTotals(root queue.RootRef, e tickets.Epic) {
 	if err := tickets.StampEpicFields(e.Path, tickets.SumEpicStats(e.Tickets).Fields()); err != nil {
 		s.log.Warn("stamp epic totals", "root", root, "err", err)
 	}
@@ -378,7 +378,7 @@ func (s *Server) stampTotals(root queue.RootRef, e tickets.Epic) {
 
 // stampMergedEpic records a merged epic's line counts and totals. A failed
 // count (countErr) skips the line stamps; the totals are stamped regardless.
-func (s *Server) stampMergedEpic(root queue.RootRef, e tickets.Epic, added, removed int, countErr error) {
+func (s *Merger) stampMergedEpic(root queue.RootRef, e tickets.Epic, added, removed int, countErr error) {
 	if countErr != nil {
 		s.log.Warn("count merged lines", "root", root, "err", countErr)
 	} else {
@@ -389,7 +389,7 @@ func (s *Server) stampMergedEpic(root queue.RootRef, e tickets.Epic, added, remo
 
 // stampLines records the lines the merge added to and removed from trunk. A
 // failed stamp is logged, never fatal, like stampEpic's.
-func (s *Server) stampLines(root queue.RootRef, epicPath string, added, removed int) {
+func (s *Merger) stampLines(root queue.RootRef, epicPath string, added, removed int) {
 	err := tickets.StampEpicFields(epicPath, map[string]any{"lines_added": added, "lines_removed": removed})
 	if err != nil {
 		s.log.Warn("stamp epic lines", "root", root, "err", err)
@@ -410,7 +410,7 @@ type mergePause struct {
 	files  []string
 }
 
-func (s *Server) clearMergeBlock(root queue.RootRef, epicPath string) {
+func (s *Merger) clearMergeBlock(root queue.RootRef, epicPath string) {
 	if err := tickets.ClearEpicFields(epicPath, mergeBlockKindKey, mergeBlockReasonKey, mergeBlockFilesKey); err != nil {
 		s.log.Warn("clear merge block", "root", root, "err", err)
 	}
@@ -418,7 +418,7 @@ func (s *Server) clearMergeBlock(root queue.RootRef, epicPath string) {
 
 // storeMergeBlock records a pause's kind, reason and files on the epic, so the
 // epic's state outlives the event and a server restart.
-func (s *Server) storeMergeBlock(root queue.RootRef, epicPath string, p mergePause) {
+func (s *Merger) storeMergeBlock(root queue.RootRef, epicPath string, p mergePause) {
 	fields := map[string]any{mergeBlockReasonKey: p.reason, mergeBlockKindKey: string(p.kind)}
 	if len(p.files) > 0 {
 		fields[mergeBlockFilesKey] = p.files
@@ -431,7 +431,7 @@ func (s *Server) storeMergeBlock(root queue.RootRef, epicPath string, p mergePau
 // nothingToMerge reports whether the root's feature branch is missing or has no
 // commits ahead of its target. An error reading either means there may be
 // something to merge: never call an epic merged on a guess.
-func (s *Server) nothingToMerge(project string, epics []tickets.Epic, one ralphloop.OneIteration, repo string) bool {
+func (s *Merger) nothingToMerge(project string, epics []tickets.Epic, one ralphloop.OneIteration, repo string) bool {
 	branch := "refs/heads/" + one.Epic
 	if _, err := git.RevParse(repo, branch); err != nil {
 		return errors.Is(err, git.ErrRefNotFound)
@@ -448,7 +448,7 @@ func (s *Server) nothingToMerge(project string, epics []tickets.Epic, one ralphl
 // merge core. A non-empty reason means the root must pause, not merge; kind
 // names the pause's cause. Every error pauses the
 // root: one left all-done in the queue looks stuck.
-func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) mergePause {
+func (s *Merger) mergeRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) mergePause {
 	_, _, target, err := s.epicRefs(project, epics, one.Epic, repoDir)
 	if err != nil {
 		return s.refsFailed(project, one.Epic, err)
@@ -497,7 +497,7 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 }
 
 // refsFailed is the pause for an epic whose refs can't be worked out.
-func (s *Server) refsFailed(project, epic string, err error) mergePause {
+func (s *Merger) refsFailed(project, epic string, err error) mergePause {
 	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing merges; the project stops claiming until a person fixes trunk.
 		s.rec.enterTrunkMissing(project, err.Error())

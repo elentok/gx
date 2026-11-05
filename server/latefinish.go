@@ -250,7 +250,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 	s.cancelUnstartedInvestigations(lf.dir, addr)
 	unlock()
 	// The adopted ticket may be the epic's last; settleRun would have completed it.
-	s.completeRootIfDone(queue.RootOf(addr), one)
+	s.merger.completeRootIfDone(queue.RootOf(addr), one)
 	s.guards.Kick()
 	return true
 }

@@ -45,7 +45,7 @@ func (s *Landing) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, a
 	s.dropTrunkConflictBackup(addr)
 	if _, fresh, ok := s.FreshTicket(addr); ok && s.guards.Merges.Begin() {
 		defer s.guards.Merges.End()
-		s.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: fresh})
+		s.merger.completeRootIfDone(queue.RootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: fresh})
 	}
 	return repairOK(repair.StartOverResult{Ticket: addr.ID, Status: string(schema.StatusDone)})
 }

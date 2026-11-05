@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -201,7 +200,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 		s.checkDeadlock(root, projectDir, e)
 		t, ok := s.nextUntracked(addr.Project, e)
 		if !ok {
-			s.retryHeldMerge(root, e, loaded, repo)
+			s.merger.retryHeldMerge(root, e, loaded, repo)
 			return false, nil
 		}
 		if s.parentAwaitsAdoption(projectDir, addr, e, t) {
@@ -371,7 +370,7 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
 		return "", "", "", err
 	}
-	_, ref, _, err = s.epicRefs(addr.Project, epics, addr.Epic, repo)
+	_, ref, _, err = s.merger.epicRefs(addr.Project, epics, addr.Epic, repo)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -401,17 +400,6 @@ func (s *Server) mergingOnMerged(project string) bool {
 	}
 	pf, _ := config.ReadProjectFile(dir)
 	return pf.LandingPolicy() == config.LandingOnLanded
-}
-
-// autoFFMerge reports whether the project opted in to automatic ff-only merges,
-// read live. An unreadable project file means off: never merge on a guess.
-func (s *Server) autoFFMerge(project string) bool {
-	dir, err := s.projects.Dir(project)
-	if err != nil {
-		return false
-	}
-	pf, _ := config.ReadProjectFile(dir)
-	return pf.AutoFFMergeEnabled()
 }
 
 // rootRefs is where a root's feature branch starts (base: the claim base and
@@ -446,17 +434,6 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 	return ref, ref, nil
 }
 
-// epicRefs is rootRefs for epic's Root ticket, the one ticket every caller
-// that means "the epic's refs" agrees on, so they all lock the same key. A
-// non-root ticket's base: never moves where the epic starts or merges.
-func (s *Server) epicRefs(project string, epics []tickets.Epic, epic, repo string) (root tickets.Ticket, base, target string, err error) {
-	if i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic }); i >= 0 && len(epics[i].Tickets) > 0 {
-		root = lowestTicket(epics[i])
-	}
-	base, target, err = s.rootRefs(project, epics, epic, root, repo)
-	return root, base, target, err
-}
-
 // mergeTarget is the target of the root epic addr belongs to.
 func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
 	dir, repo, err := s.projects.Of(addr.Project)
@@ -467,7 +444,7 @@ func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, _, target, err := s.epicRefs(addr.Project, epics, addr.Epic, repo)
+	_, _, target, err := s.merger.epicRefs(addr.Project, epics, addr.Epic, repo)
 	return target, err
 }
 
@@ -692,7 +669,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	if mode.afterDone != nil {
 		mode.afterDone()
 	}
-	s.completeRootIfDone(root, one)
+	s.merger.completeRootIfDone(root, one)
 }
 
 // keepsAskedAgent reports whether run's agent stays alive after it asks: a

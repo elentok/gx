@@ -58,7 +58,7 @@ func (s *Reconciler) stampIfMerged(root queue.RootRef, epics []tickets.Epic, e t
 	if err != nil {
 		return
 	}
-	t, _, target, err := s.epicRefs(root.Project, epics, e.Name, repo)
+	t, _, target, err := s.merger.epicRefs(root.Project, epics, e.Name, repo)
 	if err != nil {
 		return
 	}
@@ -69,7 +69,7 @@ func (s *Reconciler) stampIfMerged(root queue.RootRef, epics []tickets.Epic, e t
 	removed := s.stampMerged(root, e, repo, target)
 	unlock()
 	if removed {
-		s.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: t}, e, true)
+		s.merger.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: t}, e, true)
 	}
 }
 
@@ -85,8 +85,8 @@ func (s *Reconciler) stampMerged(root queue.RootRef, e tickets.Epic, repo, targe
 		return false
 	}
 	added, deleted, err := ralphloop.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
-	s.stampMergedEpic(root, e, added, deleted, err)
-	s.StampEpic(root, e.Path, "merged_at")
+	s.merger.stampMergedEpic(root, e, added, deleted, err)
+	s.merger.StampEpic(root, e.Path, "merged_at")
 	s.log.Info("epic merged outside the server", "root", root, "target", target)
 	removed, err = s.queue.RemoveRoot(root)
 	if err != nil {

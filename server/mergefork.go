@@ -49,7 +49,7 @@ func hasManualMergeTicket(e tickets.Epic) bool {
 // forkMergeTicket forks a merge ticket into e for its non-ff onto target and
 // returns its id. At the cap, or when the write fails, it forks none and the
 // caller pauses the root. A manual ticket, the manual trigger's, skips the cap.
-func (s *Server) forkMergeTicket(root queue.RootRef, e tickets.Epic, target string, manual bool) string {
+func (s *Merger) forkMergeTicket(root queue.RootRef, e tickets.Epic, target string, manual bool) string {
 	if !manual && mergeTicketsThisRun(e) >= maxMergeTickets {
 		return ""
 	}

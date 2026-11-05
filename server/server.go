@@ -29,7 +29,6 @@ import (
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
@@ -150,20 +149,18 @@ type Server struct {
 	// rec repairs merge state at startup and on each rescan.
 	rec *Reconciler
 	// landing lands over a dirty trunk and handles trunk conflicts.
-	landing     *Landing
+	landing *Landing
+	// merger merges epics and recovers merges a crash cut short.
+	merger      *Merger
 	designSteps sync.Map // map address -> design step at the last rescan
 	deadlocks   deadlocks
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 
-	chat         *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
-	registry     *runs.Registry
-	savedRuns    []runs.TrackedRun // handles the previous server left; consumed by reclaimRuns
-	guards       *runs.Guards
-	mergeTargets mergeTargetCache
-	projectRepos projectRepoCache
-	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
-	mergedProbe  func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
-	verdicts     verdictLog
+	chat      *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
+	registry  *runs.Registry
+	savedRuns []runs.TrackedRun // handles the previous server left; consumed by reclaimRuns
+	guards    *runs.Guards
+	verdicts  verdictLog
 	// sessions creates, stops and watches the sessions; resumer brings them back.
 	sessions    *sessions.Manager
 	resumer     *sessions.Resumer
@@ -324,19 +321,18 @@ func New(cfg Config) (*Server, error) {
 
 		instanceID: newInstanceID(),
 
-		queue:       q,
-		afk:         afk,
-		viMode:      viMode,
-		tokens:      tokens,
-		mergeInto:   git.MergeBranchInto,
-		mergedProbe: git.IsAncestor,
-		events:      events,
-		guards:      runs.NewGuards(),
+		queue:  q,
+		afk:    afk,
+		viMode: viMode,
+		tokens: tokens,
+		events: events,
+		guards: runs.NewGuards(),
 
 		focus: sessions.NewFocusReports(),
 	}
 	s.rec = newReconciler(s)
 	s.landing = newLanding(s)
+	s.merger = newMerger(s)
 	s.initProjects()
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
@@ -496,7 +492,7 @@ var routeTable = []struct {
 	{"POST /v1/tickets/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAnswer)(w, r) }},
 	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/retry", func(s *Server, w http.ResponseWriter, r *http.Request) { s.retryWrite(false)(w, r) }},
-	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.epicMerge)(w, r) }},
+	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.merger.epicMerge)(w, r) }},
 	{"POST /v1/epics/stash-merge", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.landing.epicStashMerge)(w, r) }},
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentPrompt)(w, r) }},
 	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { queue.Handler(s.agentInterrupt)(w, r) }},
@@ -567,7 +563,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 			snap.Tickets[i].Recovery = ticketwrite.RecoveryState(s.pauseHold.State(t.Address), t.Address, snap.Tickets)
 		}
 	}
-	s.fillEpicMergeTargets(snap.Tickets)
+	s.merger.fillEpicMergeTargets(snap.Tickets)
 	snap.Build = s.cfg.Build
 	snap.Instance = s.instanceID
 	snap.MigrationFailures = s.MigrationFailures()

@@ -1,6 +1,10 @@
 package server
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/elentok/gx/git"
+)
 
 // Reconciler is the server's startup and rescan repair of merge state: late
 // finishes, hand-merged epics, parent defects, missing trunks and the removal
@@ -11,6 +15,9 @@ type Reconciler struct {
 	defectScan   sync.Mutex
 	lateFinishes inFlight
 	trunkMissing missingTrunks
+	mergedProbe  func(repo, ancestor, descendant string) (bool, error) // the poll-time ancestry check; swapped in tests
 }
 
-func newReconciler(s *Server) *Reconciler { return &Reconciler{Server: s} }
+func newReconciler(s *Server) *Reconciler {
+	return &Reconciler{Server: s, mergedProbe: git.IsAncestor}
+}

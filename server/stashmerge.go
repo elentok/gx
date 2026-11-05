@@ -21,14 +21,14 @@ import (
 // trunk-conflict ticket carries the resolution; until it is done the epic is
 // not merged.
 func (s *Landing) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error) {
-	m, err := s.loadMergeEpic(req)
+	m, err := s.merger.loadMergeEpic(req)
 	if err != nil {
 		return mergeVerbError(err)
 	}
 	if m.epic.MergeBlockKind != string(events.DirtyTrunk) {
 		return queue.Refusal(wire.ReasonNotDirtyTrunk, m.root.String()+" is not paused on a dirty trunk"), nil
 	}
-	first, _, target, err := s.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
+	first, _, target, err := s.merger.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
 		return wire.QueueResult{}, err
 	}
@@ -41,7 +41,7 @@ func (s *Landing) epicStashMerge(req wire.QueueRequest) (wire.QueueResult, error
 	}
 	// The files restored cleanly: this was an ordinary merge after all.
 	if d != nil {
-		return s.actOnMerge(m.root, one, m.dir, m.epic, *d), nil
+		return s.merger.actOnMerge(m.root, one, m.dir, m.epic, *d), nil
 	}
 	return res, nil
 }
@@ -77,7 +77,7 @@ func (s *Landing) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, t
 		return wire.QueueResult{}, nil, err
 	}
 	if clean {
-		d, err := s.epicMergeLocked(root, one, m.repo, m.epics, e, target)
+		d, err := s.merger.epicMergeLocked(root, one, m.repo, m.epics, e, target)
 		return wire.QueueResult{}, &d, err
 	}
 	ref, now, _, err := s.landWithRestore(repo.Root, dir, epic, target, snapshot, tree, clashing,
@@ -101,7 +101,7 @@ func (s *Landing) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration
 	if err != nil {
 		return wire.QueueResult{}, nil, fmt.Errorf("stamp %s: %w", root, err)
 	}
-	s.clearMergeBlock(root, e.Path)
+	s.merger.clearMergeBlock(root, e.Path)
 	if err := tickets.ClearEpicFields(e.Path, "completed_at"); err != nil {
 		return wire.QueueResult{}, nil, fmt.Errorf("clear completed_at of %s: %w", root, err)
 	}
@@ -122,7 +122,7 @@ func (s *Landing) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration
 	// The poller must not read the old index: it still shows the epic completed
 	// and, with main now at its tip, merged by hand.
 	s.idx.Rescan()
-	if err := s.ensureRootQueued(root, one.Ticket); err != nil {
+	if err := s.merger.ensureRootQueued(root, one.Ticket); err != nil {
 		s.log.Warn("queue root after stash-merge", "root", root, "err", err)
 	}
 	s.log.Info("stash-merge left conflicts", "root", root, "ticket", id, "backup", ref)

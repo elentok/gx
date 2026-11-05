@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/server/budget"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/limits"
+	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/tickets"
@@ -21,6 +22,11 @@ type queueHost struct {
 
 // CheckExtraUsage forwards to the budget, which owns the daily notice latch.
 func (h queueHost) CheckExtraUsage(now time.Time) bool { return h.budget.CheckExtraUsage(now) }
+
+// StampEpic forwards to the merger, which owns the epic stamps.
+func (h queueHost) StampEpic(root queue.RootRef, epicPath string, keys ...string) {
+	h.merger.StampEpic(root, epicPath, keys...)
+}
 
 // Harness is the server's harness choice. Tests outside the package read it
 // through here.
