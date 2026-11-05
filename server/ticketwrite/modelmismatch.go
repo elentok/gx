@@ -1,13 +1,13 @@
-package server
+package ticketwrite
 
 import (
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -22,12 +22,12 @@ const (
 	emptyModelExpected = "a model from its tier"
 )
 
-func modelMismatchFollowUp(from tickets.Address, m *ralphloop.ModelMismatchError) followUp {
+func modelMismatchFollowUp(from tickets.Address, m *ralphloop.ModelMismatchError) FollowUp {
 	source := fmt.Sprintf("Ticket %s ran on %s but its tier resolved to %s, and was paused.", from, m.Ran, m.Expected)
 	if m.Ran == emptyModelRan {
 		source = fmt.Sprintf("Ticket %s was paused before launch: its tier resolved to no model.", from)
 	}
-	return followUp{
+	return FollowUp{
 		Slug:    modelMismatchKey,
 		Title:   "Implement sessions run on the wrong model",
 		Source:  source,
@@ -38,30 +38,24 @@ func modelMismatchFollowUp(from tickets.Address, m *ralphloop.ModelMismatchError
 	}
 }
 
-// pauseModelMismatch settles a run whose session ran on the wrong model: it
+// PauseModelMismatch settles a run whose session ran on the wrong model: it
 // stops the session, keeps the branch and commits, pauses the ticket with both
 // model names recorded, and files or updates the follow-up.
-func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralphloop.ModelMismatchError) {
-	var stopErr error
-	if r, err := s.harness.RunnerOf(rc.run); err != nil {
-		stopErr = err
-	} else {
-		stopErr = r.Stop(rc.run.Session)
-	}
-	s.recordModelMismatch(rc.one.ScratchDir, rc.one.Ticket.Path, addr, rc.run, m, stopErr)
+func (w *Writer) PauseModelMismatch(scratchDir, ticketPath string, addr tickets.Address, run runs.Run, m *ralphloop.ModelMismatchError) {
+	w.recordModelMismatch(scratchDir, ticketPath, addr, run, m, w.d.Host.StopRun(run))
 }
 
-// launchModel resolves the model and effort a launch runs on, honouring a
+// LaunchModel resolves the model and effort a launch runs on, honouring a
 // one-shot tier override. ok is false when an implement launch resolved to no
 // model: it is refused and paused, and no agent may start.
-func (s *Server) launchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) (model, effort string, ok bool) {
+func (w *Writer) LaunchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) (model, effort string, ok bool) {
 	var tierRun runs.Run
-	if tier := takeTierOverride(t.Path); tier != "" {
-		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.projects.AgentsConfig(addr.Project), agent, tier)
+	if tier := w.d.Host.TakeTierOverride(t.Path); tier != "" {
+		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(w.d.Projects.AgentsConfig(addr.Project), agent, tier)
 	}
-	model, effort = s.projects.RunAgentConfig(addr.Project, agent, tierRun)
+	model, effort = w.d.Projects.RunAgentConfig(addr.Project, agent, tierRun)
 	if model == "" && ralphloop.IsImplementType(t.Type) {
-		s.refuseEmptyModel(scratchDir, t.Path, addr)
+		w.refuseEmptyModel(scratchDir, t.Path, addr)
 		return "", "", false
 	}
 	return model, effort, true
@@ -70,15 +64,15 @@ func (s *Server) launchModel(scratchDir string, t tickets.Ticket, addr tickets.A
 // refuseEmptyModel refuses an implement launch whose tier resolved to no model:
 // the CLI would pick a default gx does not know. No session started, so there
 // is nothing to stop.
-func (s *Server) refuseEmptyModel(scratchDir, path string, addr tickets.Address) {
+func (w *Writer) refuseEmptyModel(scratchDir, path string, addr tickets.Address) {
 	m := &ralphloop.ModelMismatchError{Ran: emptyModelRan, Expected: emptyModelExpected}
-	s.recordModelMismatch(scratchDir, path, addr, runs.Run{}, m, nil)
+	w.recordModelMismatch(scratchDir, path, addr, runs.Run{}, m, nil)
 }
 
 // recordModelMismatch pauses the ticket with both model names recorded, notifies
 // and files or updates the follow-up. stopErr is any error from stopping the
 // session, logged with the rest.
-func (s *Server) recordModelMismatch(scratchDir, path string, addr tickets.Address, run runs.Run, m *ralphloop.ModelMismatchError, stopErr error) {
+func (w *Writer) recordModelMismatch(scratchDir, path string, addr tickets.Address, run runs.Run, m *ralphloop.ModelMismatchError, stopErr error) {
 	ticketAddr := addr.String()
 	if err := tickets.EndOpenRound(path, tickets.SourceGx, tickets.HowAuto, ralphloop.CloseModelMismatch); err != nil {
 		stopErr = errors.Join(stopErr, err)
@@ -89,13 +83,13 @@ func (s *Server) recordModelMismatch(scratchDir, path string, addr tickets.Addre
 		stopErr = errors.Join(stopErr, err)
 	}
 	if stopErr != nil {
-		s.log.Warn("model mismatch stop", "ticket", ticketAddr, "err", stopErr)
+		w.d.Log.Warn("model mismatch stop", "ticket", ticketAddr, "err", stopErr)
 	}
-	if err := s.pauseTicket(scratchDir, addr, path, events.ModelMismatch, m.Error(), run); err != nil {
-		s.log.Warn("pause model mismatch", "ticket", ticketAddr, "err", err)
+	if err := w.Pause(scratchDir, addr, path, events.ModelMismatch, m.Error(), run); err != nil {
+		w.d.Log.Warn("pause model mismatch", "ticket", ticketAddr, "err", err)
 	}
-	s.events.Publish(wire.EventIterationPaused, ticketAddr)
-	if _, err := s.writeFollowUp(addr, modelMismatchFollowUp(addr, m)); err != nil {
-		s.log.Warn("file model-mismatch follow-up", "ticket", ticketAddr, "err", err)
+	w.d.Events.Publish(wire.EventIterationPaused, ticketAddr)
+	if _, err := w.d.Host.WriteFollowUp(addr, modelMismatchFollowUp(addr, m)); err != nil {
+		w.d.Log.Warn("file model-mismatch follow-up", "ticket", ticketAddr, "err", err)
 	}
 }

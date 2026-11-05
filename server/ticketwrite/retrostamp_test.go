@@ -1,4 +1,4 @@
-package server
+package ticketwrite
 
 import (
 	"io"
@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -58,10 +60,12 @@ func retroFixture(t *testing.T, epicFM string) (store string, addr tickets.Addre
 	return store, tickets.Address{Project: "proj", Epic: "evolve-epic-a-20261010-1405", ID: "01"}, ticketPath, epicTicket
 }
 
-func retroServer(store string) *Server {
-	s := withProjects(&Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))})
-	s.settings.Store(&Settings{})
-	return s
+func retroServer(store string) *Writer {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	set := &settings.Holder{}
+	set.Store(&settings.Settings{})
+	reg := projects.NewRegistry(func() projects.Env { return projects.Env{TicketStore: store} }, log, nil, set, nil, nil)
+	return New(Deps{Log: log, Projects: reg})
 }
 
 func TestStampRetro_DoneStampsEvolvedAtAndTicketKeepingOtherKeys(t *testing.T) {

@@ -139,7 +139,7 @@ func (s *Server) checkHerdr() {
 	}
 	s.syncHerdrBanner()
 	if changed && !s.herdr.isUnavailable() {
-		s.flushPauseFold()
+		s.writer.FlushPauseFold()
 	}
 }
 

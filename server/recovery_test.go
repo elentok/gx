@@ -677,34 +677,6 @@ func startR3(t *testing.T, opts ...func(*server.Config)) *servertest.Harness {
 	return h
 }
 
-// runToZeroCommitPause queues 01 under an agent whose every turn ends with
-// last as its final assistant text and no commit, so the loop pauses it
-// zero-commit the way a real iteration does.
-func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
-	t.Helper()
-	h.OnTurn(func(turn *servertest.Turn) { turn.Transcript(last) })
-	queueToZeroCommitPause(t, h)
-}
-
-func queueToZeroCommitPause(t *testing.T, h *servertest.Harness) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	snap, err := h.Client.Snapshot(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	evs, err := h.Client.Events(ctx, snap.Seq)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
-		t.Fatalf("add: %+v, %v", res, err)
-	}
-	// The loop's own finish debounce outlasts waitFor.
-	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationPaused, "proj:epic-a/01")
-}
-
 // R2 and R3 read the transcript the pause's session left: the matcher sees the
 // agent's last words with no test injecting them.
 func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
@@ -715,7 +687,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := startR3(t)
-			runToZeroCommitPause(t, h, tc.last)
+			servertest.RunToZeroCommitPause(t, h, tc.last)
 			waitFor(t, func() bool {
 				for _, tk := range epicTickets(t, h).Tickets {
 					if tk.Identifier == "01a" && tk.Type == "investigate" {
@@ -732,7 +704,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
 	t.Parallel()
 	h := startR3(t)
-	runToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
+	servertest.RunToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")

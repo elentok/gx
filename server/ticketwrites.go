@@ -117,7 +117,7 @@ func (s *Server) ticketPause(req wire.QueueRequest) (wire.QueueResult, error) {
 			return queue.Refusal(wire.ReasonMapEpic, ref.Addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
 		}
 		run, _ := s.registry.Tracked(ref.Addr.String())
-		if err := s.pauseTicket(ref.ProjectDir, ref.Addr, ref.Ticket.Path, events.Manual, reason, run.Run); err != nil {
+		if err := s.writer.Pause(ref.ProjectDir, ref.Addr, ref.Ticket.Path, events.Manual, reason, run.Run); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("pause %s: %w", ref.Addr, err)
 		}
 		return wire.QueueResult{}, nil
@@ -320,7 +320,7 @@ func (s *Server) markCancelled(ref queue.TicketRef, t tickets.Ticket, source str
 	if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
 		return fmt.Errorf("cancel %s: %w", ref.Address(t), err)
 	}
-	s.stampFinished(tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}, t.Path, true)
+	s.writer.StampFinished(tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}, t.Path, true)
 	// The branch stays: it holds the commits.
 	if ref.Repo != "" && s.awaitRunSettled(ref.Address(t)) {
 		// The epic merge removes leftovers later, so a failed removal must not stop the cancel.

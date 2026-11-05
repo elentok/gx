@@ -52,7 +52,7 @@ func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterat
 		m := iterationMode{commitless: true, scratchDir: dir, err: err, afterDone: func() { s.dropTrunkConflictBackup(addr) }}
 		// An epic with no recorded files still gets the scan.
 		var files []string
-		if e, ok := s.freshEpic(addr.Project, addr.Epic); ok {
+		if e, ok := s.writer.FreshEpic(addr.Project, addr.Epic); ok {
 			files = e.TrunkConflictFiles
 		}
 		m.finishCheck = func(o ralphloop.OneIteration) (ralphloop.FinishOutcome, bool, error) {

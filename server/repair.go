@@ -174,17 +174,9 @@ func (s *Server) mergeInQueue(req wire.RepairRequest, rc repairCtx) (wire.Repair
 }
 
 // FreshTicket loads addr's ticket, and its epic, straight from disk.
+// It is the root's harness.Host method.
 func (s *Server) FreshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
-	e, ok := s.freshEpic(addr.Project, addr.Epic)
-	if !ok {
-		return tickets.Epic{}, tickets.Ticket{}, false
-	}
-	for _, t := range e.Tickets {
-		if t.Identifier == addr.ID {
-			return e, t, true
-		}
-	}
-	return tickets.Epic{}, tickets.Ticket{}, false
+	return s.writer.FreshTicket(addr)
 }
 
 // startOverInQueue is the server's start-over: a person's, so it also cancels

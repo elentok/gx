@@ -24,7 +24,7 @@ func (s *Server) startOverTrunkConflict(req wire.RepairRequest, rc repairCtx, ad
 	if st := schema.Status(t.Status); st != schema.StatusClaimed && st != schema.StatusPaused {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %v; start-over accepts only claimed or paused", addr.ID, st)}), nil
 	}
-	e, ok := s.freshEpic(addr.Project, addr.Epic)
+	e, ok := s.writer.FreshEpic(addr.Project, addr.Epic)
 	if !ok || e.TrunkConflictBackup == "" {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonStatusRefused, Message: "no trunk-conflict backup is recorded for " + addr.Epic}), nil
 	}

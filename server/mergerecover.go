@@ -95,7 +95,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 		s.events.Publish(wire.EventMergeRolledBack, addr)
 	default:
 		reason := fmt.Sprintf("merge interrupted by a crash (lock owner %s) and verify cannot tell whether it merged: %s", owner.Describe(), v.Merging)
-		if err := s.pauseTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, runs.Run{}); err != nil {
+		if err := s.writer.Pause(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, runs.Run{}); err != nil {
 			return fmt.Errorf("pausing %s: %w", addr, err)
 		}
 	}

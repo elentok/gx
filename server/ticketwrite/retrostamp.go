@@ -1,9 +1,13 @@
 package ticketwrite
 
 import (
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -21,5 +25,58 @@ func RetroSubmit(project, epic string, now time.Time) wire.OneOffRequest {
 		Type:    string(schema.TypeEvolve),
 		Unique:  RetroKeyPrefix + project + "/" + epic,
 		Notify:  true,
+	}
+}
+
+// StampFinished is the one hook every done and cancel path calls once the
+// ticket's status is written.
+func (w *Writer) StampFinished(addr tickets.Address, ticketPath string, cancelled bool) {
+	w.stampFriction(addr, ticketPath)
+	w.stampRetro(addr, ticketPath, cancelled)
+}
+
+func (w *Writer) stampFriction(addr tickets.Address, ticketPath string) {
+	dir, err := w.d.Projects.Dir(addr.Project)
+	if err == nil {
+		err = ralphloop.StampFriction(dir, addr.Epic, addr.ID, ticketPath)
+	}
+	if err != nil {
+		w.d.Log.Warn("stamp friction", "ticket", addr.String(), "err", err)
+	}
+}
+
+// stampRetro records on the retro'd epic what became of its evolve one-off: the
+// server stamps, never the skill. A done retro (zero findings included) sets
+// evolve_ticket, overwriting a --force re-run's predecessor; a cancelled one
+// sets evolve_skipped so `gx evolve all` stops offering the epic. Both set
+// evolved_at. Tickets that are not retros are ignored.
+func (w *Writer) stampRetro(addr tickets.Address, ticketPath string, cancelled bool) {
+	tk, err := schema.ParseTicket(ticketPath)
+	if err != nil || tk.Type != schema.TypeEvolve {
+		return
+	}
+	target, ok := strings.CutPrefix(tk.Unique, RetroKeyPrefix)
+	if !ok {
+		return
+	}
+	project, epic, ok := strings.Cut(target, "/")
+	if !ok {
+		return
+	}
+	dir, err := w.d.Projects.Dir(project)
+	if err != nil {
+		w.d.Log.Warn("stamp retro", "ticket", addr.String(), "err", err)
+		return
+	}
+	epicPath := filepath.Join(dir, epic)
+	now := time.Now().UTC()
+	if cancelled {
+		// A cancel after a finished retro keeps the stamp that retro wrote.
+		err = tickets.StampEpicFields(epicPath, map[string]any{"evolved_at": now, "evolve_skipped": true})
+	} else {
+		err = tickets.OverwriteEpicFields(epicPath, map[string]any{"evolved_at": now, "evolve_ticket": addr.String()})
+	}
+	if err != nil {
+		w.d.Log.Warn("stamp retro", "ticket", addr.String(), "err", err)
 	}
 }

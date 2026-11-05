@@ -18,7 +18,7 @@ func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
 		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 		servertest.SetProjectRepo(t, store, "proj", repo)
 		h := servertest.StartWithStore(t, store)
-		runToZeroCommitPause(t, h, "done")
+		servertest.RunToZeroCommitPause(t, h, "done")
 		// The PTY agent's session id is generated, so any non-empty one will do.
 		assertPauseRecordsRun(t, store, events.Paused, "pty", agentrunner.Session{Label: "epic-a-iter-01"})
 	})

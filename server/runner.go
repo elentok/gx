@@ -287,7 +287,7 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		if perr := s.pauseTicket(dir, ticket, t.Path, events.AmbiguousBase, reason, runs.Run{}); perr != nil {
+		if perr := s.writer.Pause(dir, ticket, t.Path, events.AmbiguousBase, reason, runs.Run{}); perr != nil {
 			return false, fmt.Errorf("pause %s: %w", ticketAddr, perr)
 		}
 		return false, nil
@@ -305,13 +305,13 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 	if err := budget.ClearLongTicketMark(t.Path); err != nil {
 		s.log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
 	}
-	model, effort, ok := s.launchModel(dir, t, ticket, agent)
+	model, effort, ok := s.writer.LaunchModel(dir, t, ticket, agent)
 	if !ok {
 		return false, nil
 	}
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
-		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),
+		Model: model, Effort: effort, Sink: s.writer.FinishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),
 	}
 	deps := s.projects.DepsWith(s.harness.LaunchRunner(ticket.Project, agent))
 	deps.GateReleased = s.registry.GateReleased(ticketAddr)
@@ -355,7 +355,7 @@ func (s *Server) claimAndLaunch(root queue.RootRef, queued tickets.Address, t ti
 		} else if k, ok := ralphloop.LaunchFailureKind(err); ok {
 			kind = k
 		}
-		if perr := s.pauseTicket(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
+		if perr := s.writer.Pause(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
 			err = errors.Join(err, fmt.Errorf("pause: %w", perr))
 		}
 		s.events.Publish(wire.EventIterationLaunchFailed, ticketAddr)
@@ -645,13 +645,13 @@ func (s *Server) settleRun(rc runContext, err error) {
 		keepRun = true
 		s.registry.MarkWaiting(ticketAddr, time.Now())
 		s.events.Publish(wire.EventIterationPaused, ticketAddr)
-		s.announcePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
+		s.writer.AnnouncePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
 		go s.watchUnblock(deps.Runner, run.Session, ticketAddr)
 		return
 	}
 	var mismatch *ralphloop.ModelMismatchError
 	if errors.As(err, &mismatch) {
-		s.pauseModelMismatch(rc, addr, mismatch)
+		s.writer.PauseModelMismatch(rc.one.ScratchDir, rc.one.Ticket.Path, addr, rc.run, mismatch)
 		return
 	}
 	var out ralphloop.FinishOutcome
@@ -672,7 +672,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
 		// Pause it: a claimed ticket nobody is working on is stuck, not failed.
-		if perr := s.pauseTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
+		if perr := s.writer.Pause(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
 			s.log.Warn("pause failed finish", "ticket", ticketAddr, "err", perr)
 		}
 		s.events.Publish(wire.EventIterationFailed, ticketAddr)
@@ -686,7 +686,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			s.registry.MarkWaiting(ticketAddr, time.Now())
 		}
 		s.events.Publish(wire.EventIterationPaused, ticketAddr)
-		s.announcePause(addr, one.Ticket.Path, out.Kind, out.Reason)
+		s.writer.AnnouncePause(addr, one.Ticket.Path, out.Kind, out.Reason)
 		return
 	}
 	// Stop already cleans an adopted session; a run found finished at reattach
@@ -695,7 +695,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		s.log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
 	}
 	s.events.Publish(wire.EventTicketDone, ticketAddr)
-	s.stampFinished(addr, one.Ticket.Path, false)
+	s.writer.StampFinished(addr, one.Ticket.Path, false)
 	s.oneOffs.NotifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)
 	s.fileFollowUp(addr, one.Ticket.Path)

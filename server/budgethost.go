@@ -11,7 +11,7 @@ import (
 type budgetHost struct{ s *Server }
 
 func (h budgetHost) PauseTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run runs.Run) error {
-	return h.s.pauseTicket(scratchDir, addr, ticketPath, kind, reason, run)
+	return h.s.writer.Pause(scratchDir, addr, ticketPath, kind, reason, run)
 }
 
 func (h budgetHost) WriteFollowUp(from tickets.Address, f budget.FollowUp) (string, error) {

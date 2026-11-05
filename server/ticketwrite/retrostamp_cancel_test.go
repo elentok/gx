@@ -1,4 +1,4 @@
-package server_test
+package ticketwrite_test
 
 import (
 	"context"

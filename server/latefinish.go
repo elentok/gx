@@ -222,7 +222,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	}
 	out, err := mode.finish(deps, one, wt, pane)
 	if err != nil {
-		if perr := s.pauseTicket(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {
+		if perr := s.writer.Pause(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {
 			s.log.Warn("late finish: pause failed finish", "ticket", addr, "err", perr)
 		}
 		s.events.Publish(wire.EventIterationFailed, addr.String())
@@ -246,7 +246,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 			lf.pause.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),
 	})
 	s.events.Publish(wire.EventTicketDone, addr.String())
-	s.stampFinished(addr, lf.path, false)
+	s.writer.StampFinished(addr, lf.path, false)
 	s.cancelUnstartedInvestigations(lf.dir, addr)
 	unlock()
 	// The adopted ticket may be the epic's last; settleRun would have completed it.
@@ -278,7 +278,7 @@ func (s *Server) cancelUnstartedInvestigations(dir string, addr tickets.Address)
 				continue
 			}
 			child := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
-			s.stampFinished(child, t.Path, true)
+			s.writer.StampFinished(child, t.Path, true)
 			s.events.Publish(wire.EventTicketCancelled, child.String())
 		}
 	}

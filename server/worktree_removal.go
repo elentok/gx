@@ -82,7 +82,7 @@ func (s *Server) removeUnlessKept(root queue.RootRef, path string, repo *git.Rep
 	if s.queue.RootQueued(root) {
 		return "the root is queued"
 	}
-	e, ok := s.freshEpic(root.Project, root.Epic)
+	e, ok := s.writer.FreshEpic(root.Project, root.Epic)
 	if !ok {
 		return "the epic could not be loaded"
 	}

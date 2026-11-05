@@ -248,8 +248,8 @@ func TestNotifyPause_ShowsRealStatusKindAndReason(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	addr := tickets.Address{Project: "p", Epic: "epic", ID: "01"}
 
-	s.notifyPause(addr, "", events.BudgetKilled, "daily budget hard limit reached")
-	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "", events.AmbiguousBase, "choose a base")
+	s.writer.NotifyPause(addr, "", events.BudgetKilled, "daily budget hard limit reached")
+	s.writer.NotifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "", events.AmbiguousBase, "choose a base")
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
@@ -277,7 +277,7 @@ func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, path, events.SelfReported, "agent reported asking via iteration_status")
+	s.writer.NotifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, path, events.SelfReported, "agent reported asking via iteration_status")
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
@@ -294,7 +294,7 @@ func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	s.herdr.unavailable = true
 	pause := func(project, id string, kind events.Kind) {
-		s.notifyPause(tickets.Address{Project: project, Epic: "epic", ID: id}, "", kind, "why-"+project)
+		s.writer.NotifyPause(tickets.Address{Project: project, Epic: "epic", ID: id}, "", kind, "why-"+project)
 	}
 
 	pause("p1", "01", events.AgentNameTaken)
@@ -302,7 +302,7 @@ func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 	pause("p3", "03", events.AgentPaneBusy)
 	pause("p4", "04", events.ZeroCommit) // not herdr-caused: at once
 	s.herdr.unavailable = false
-	s.flushPauseFold()
+	s.writer.FlushPauseFold()
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n") // the batcher may merge both into one send
@@ -490,7 +490,7 @@ func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, "", events.BudgetKilled, "why")
+	s.writer.NotifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, "", events.BudgetKilled, "why")
 	s.chat.Close()
 
 	if _, err := os.Stat(ralphloop.NotificationStatePath(stateDir)); err != nil {

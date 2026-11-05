@@ -50,7 +50,7 @@ func (s *Server) pauseStuckFinishedClaims(now time.Time) {
 				}
 				run, _ := s.registry.RunOf(addr.String())
 				reason := fmt.Sprintf("agent reported finished at %s but the ticket was never processed", t.IterationFinishedAt.UTC().Format(time.RFC3339))
-				if err := s.pauseTicket(dir, addr, it.Path, events.IterationError, reason, run); err != nil {
+				if err := s.writer.Pause(dir, addr, it.Path, events.IterationError, reason, run); err != nil {
 					s.log.Warn("pause finished claim", "ticket", addr, "err", err)
 				}
 			}

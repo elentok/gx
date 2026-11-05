@@ -242,7 +242,7 @@ func (s *Server) holdPauseForRecovery(addr tickets.Address, ticketPath string, k
 	}
 	s.pauseHold.Hold(f.Address, s.settings.Load().RecoverySettings.NotifyHold, func() {
 		s.events.Publish(wire.EventTicketChanged, f.Address)
-		s.notifyPause(addr, ticketPath, kind, reason)
+		s.writer.NotifyPause(addr, ticketPath, kind, reason)
 	})
 	s.guards.GoSettle(func() { s.recoverFrom(plan, f) })
 	return true
@@ -672,7 +672,7 @@ func (s *Server) pauseReleasedGate(scratchDir string, addr tickets.Address, tick
 	if reason == "" {
 		return false
 	}
-	if err := s.pauseTicket(scratchDir, addr, ticketPath, events.BackgroundTaskGate, reason, run); err != nil {
+	if err := s.writer.Pause(scratchDir, addr, ticketPath, events.BackgroundTaskGate, reason, run); err != nil {
 		s.log.Error("pause released gate", "ticket", addr.String(), "err", err)
 	}
 	return true
@@ -750,7 +750,7 @@ func (s *Server) ticketCommitlessDone(req wire.QueueRequest) (wire.QueueResult, 
 		if err != nil {
 			return wire.QueueResult{}, fmt.Errorf("commitless-done %s: %w", ref.Addr, err)
 		}
-		s.stampFinished(ref.Addr, ref.Ticket.Path, false)
+		s.writer.StampFinished(ref.Addr, ref.Ticket.Path, false)
 		s.events.Publish(wire.EventTicketDone, ref.Addr.String())
 		return wire.QueueResult{}, nil
 	})

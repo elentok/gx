@@ -95,7 +95,7 @@ func (s *Server) AgentWaiting(project, epic, id string) bool {
 func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason string) error {
 	dir := filepath.Join(s.cfg.TicketStore, project)
 	path := filepath.Join(dir, epic, "issues", id+"-first.md")
-	return s.pauseTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, runs.Run{})
+	return s.writer.Pause(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, runs.Run{})
 }
 
 // PruneBackups runs the backup-ref prune as of now.

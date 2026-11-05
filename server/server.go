@@ -146,7 +146,7 @@ type Server struct {
 	stats        *stats.Stats
 	events       *broker.Broker
 	herdr        herdrWatch
-	pauseFold    ticketwrite.PauseFold
+	writer       *ticketwrite.Writer
 	pauseHold    ticketwrite.RecoveryHold
 	defectScan   sync.Mutex
 	lateFinishes inFlight
@@ -372,7 +372,7 @@ func New(cfg Config) (*Server, error) {
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
-	s.pauseFold.OnCap = s.flushPauseFold
+	s.writer = newTicketWriter(s)
 	s.settings.Init(settings.Options{
 		ConfigPath: cfg.ConfigPath,
 		Startup: settings.Startup{

@@ -32,7 +32,7 @@ func filesWithMarkers(dir string, files []string) []string {
 // dropTrunkConflictBackup deletes the backup ref of a trunk-conflict ticket
 // that just went done: the resolution replaced what the ref kept safe.
 func (s *Server) dropTrunkConflictBackup(addr tickets.Address) {
-	e, ok := s.freshEpic(addr.Project, addr.Epic)
+	e, ok := s.writer.FreshEpic(addr.Project, addr.Epic)
 	if !ok || e.TrunkConflictBackup == "" {
 		return
 	}

@@ -75,7 +75,7 @@ func (s *Server) pauseUnreclaimed(t runs.TrackedRun, cause error) {
 	if err == nil {
 		var dir string
 		if dir, _, err = s.projects.Of(addr.Project); err == nil {
-			err = s.pauseTicket(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error(), t.Run)
+			err = s.writer.Pause(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error(), t.Run)
 		}
 	}
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *Server) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) e
 		if err != nil {
 			return err
 		}
-		return s.pauseTicket(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied, t.Run)
+		return s.writer.Pause(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied, t.Run)
 	}
 	one, wt, mode, err := s.resume(t)
 	if err != nil {
@@ -345,7 +345,7 @@ func (s *Server) resolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloo
 	if one.Ticket.Path == "" {
 		return one, ralphloop.IterationWorktree{}, iterationMode{}, errors.New("ticket gone")
 	}
-	one.Sink = s.finishSink(addr, one.Ticket.Path)
+	one.Sink = s.writer.FinishSink(addr, one.Ticket.Path)
 	mode := s.iterationModeFor(addr, one.Ticket)
 	wt, err := mode.resume(s.projects.DefaultDeps(), one, t.Base)
 	return one, wt, mode, err
