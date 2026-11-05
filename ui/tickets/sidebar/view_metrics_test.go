@@ -1,4 +1,4 @@
-package tickets
+package sidebar
 
 import (
 	"strings"
@@ -11,14 +11,28 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
-	"github.com/elentok/gx/ui/tickets/sidebar"
 )
 
-func newModelForTicketRowTests(epic tickets.Epic) Model {
-	m := NewModel("", ui.Settings{}, keys.New(nil))
-	m.loaded = true
+// rowTestModel is a loaded sidebar with the default (non-nerd-font) icons and
+// the sidebar focused, the env the tab hands in for these cases.
+type rowTestModel struct{ sidebar Model }
+
+func (rowTestModel) icons() ui.IconSet { return ui.Icons(false) }
+
+func sidebarEnvFor(m rowTestModel) Env {
+	return Env{
+		Icons:               m.icons(),
+		Active:              true,
+		Loaded:              true,
+		SessionMarker:       func(string) string { return "" },
+		HasSuggestedActions: func(tickets.Epic, tickets.Ticket, bool) bool { return false },
+		PendingText:         func(string) (string, bool) { return "", false },
+	}
+}
+
+func newModelForTicketRowTests(epic tickets.Epic) rowTestModel {
+	m := rowTestModel{sidebar: New("")}
 	m.sidebar.Epics = []tickets.Epic{epic}
 	m.sidebar.Tree.SetEntries(m.sidebar.BuildSidebarEntries(sidebarEnvFor(m)))
 	return m
@@ -29,7 +43,7 @@ func TestRenderTicketRow_NeverRunIsSingleLine(t *testing.T) {
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Open ticket", Status: "open"}}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if len(lines) != 1 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
@@ -42,7 +56,7 @@ func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if len(lines) != 1 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
@@ -59,7 +73,7 @@ func TestRenderTicketRow_CancelledRendersAsTerminal(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if len(lines) != 1 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
@@ -83,7 +97,7 @@ func TestRenderTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if len(lines) != 1 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
@@ -102,7 +116,7 @@ func TestRenderTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if len(lines) != 1 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
@@ -157,7 +171,7 @@ func TestRenderTicketRow_CommitlessSuffix(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if !strings.Contains(lines[0], "Open ticket (commitless)") {
 		t.Fatalf("title line = %q, want title followed by \" (commitless)\"", lines[0])
 	}
@@ -170,7 +184,7 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	wantSuffix := " " + rowfmt.StatusDoneStyle.Italic(true).Render(rowfmt.FormatMetricsLine(5, 100, 0, false))
 	if !strings.HasSuffix(lines[0], wantSuffix) {
 		t.Fatalf("row line = %q, want it to end with %q", lines[0], wantSuffix)
@@ -244,7 +258,7 @@ func TestRenderTicketRow_CostOnlyStillShowsSubtitle(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if !strings.Contains(lines[0], "$0.42") {
 		t.Fatalf("row line = %q, want it to contain the cost-only subtitle %q", lines[0], "$0.42")
 	}
@@ -261,7 +275,7 @@ func TestRenderTicketRow_DoneWithNoMetricsOmitsSubtitle(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0}, 1)
+	lines := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0}, 1)
 	if len(lines) != 1 {
 		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
 	}
@@ -282,8 +296,8 @@ func TestRenderTicketRow_IconColumnAlignsRegardlessOfChildren(t *testing.T) {
 	}}
 	m := newModelForTicketRowTests(epic)
 
-	withChildren := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 0, HasChildren: true, Expanded: true}, 1)[0]
-	childless := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, sidebar.Row{TicketIdx: 1}, 2)[0]
+	withChildren := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 0, HasChildren: true, Expanded: true}, 1)[0]
+	childless := m.sidebar.RenderTicketRow(sidebarEnvFor(m), epic, Row{TicketIdx: 1}, 2)[0]
 
 	iconOffset := func(line string) int {
 		stripped := ansi.Strip(line)
