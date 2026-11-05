@@ -1,4 +1,5 @@
-package main
+// Package websignin finishes gxfixture's web setup through the server's real routes.
+package websignin
 
 import (
 	"bytes"
@@ -17,30 +18,30 @@ import (
 	"github.com/elentok/gx/server/webauth"
 )
 
-// fixturePassword is the password every fixture's web login is set up with.
-const fixturePassword = "gxfixture-password"
+// Password is the password every fixture's web login is set up with.
+const Password = "gxfixture-password"
 
-// signIn is the web sign-in gxfixture finished: the login cookie, and, when the
+// SignIn is the web sign-in gxfixture finished: the login cookie, and, when the
 // server asks for a code, the TOTP secret and the step of the last code used.
-type signIn struct {
-	cookieName, cookie, totpSecret string
-	totpStep                       int64
+type SignIn struct {
+	CookieName, Cookie, TOTPSecret string
+	TOTPStep                       int64
 }
 
-// webSetup finishes the web setup through the real routes, with the Setup code
+// Setup finishes the web setup through the real routes, with the Setup code
 // from `gx server status --json`, as a person's first visit would.
-func webSetup(stateDir, webURL, setupCode string) (signIn, error) {
+func Setup(stateDir, webURL, setupCode string) (SignIn, error) {
 	root, err := os.ReadFile(filepath.Join(stateDir, "web-tls", "root.pem"))
 	if err != nil {
-		return signIn{}, err
+		return SignIn{}, err
 	}
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(root) {
-		return signIn{}, fmt.Errorf("%s has no certificate", filepath.Join(stateDir, "web-tls", "root.pem"))
+		return SignIn{}, fmt.Errorf("%s has no certificate", filepath.Join(stateDir, "web-tls", "root.pem"))
 	}
 	u, err := url.Parse(webURL)
 	if err != nil {
-		return signIn{}, err
+		return SignIn{}, err
 	}
 	origin := u.Scheme + "://" + u.Host
 	client := &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}}
@@ -75,7 +76,7 @@ func webSetup(stateDir, webURL, setupCode string) (signIn, error) {
 	// The fixture follows what the server does, not what it asked the config for.
 	resp, err := client.Get(origin + "/v1/web/auth")
 	if err != nil {
-		return signIn{}, err
+		return SignIn{}, err
 	}
 	var state struct {
 		TOTPOn bool `json:"totp_on"`
@@ -83,44 +84,44 @@ func webSetup(stateDir, webURL, setupCode string) (signIn, error) {
 	err = json.NewDecoder(resp.Body).Decode(&state)
 	resp.Body.Close()
 	if err != nil {
-		return signIn{}, fmt.Errorf("GET /v1/web/auth: %w", err)
+		return SignIn{}, fmt.Errorf("GET /v1/web/auth: %w", err)
 	}
 
-	var in signIn
+	var in SignIn
 	var started struct {
 		Secret string `json:"secret"`
 	}
 	if _, err := post("/v1/web/auth/setup-start", map[string]string{"code": setupCode}, &started); err != nil {
-		return signIn{}, err
+		return SignIn{}, err
 	}
-	finish := map[string]string{"code": setupCode, "password": fixturePassword}
+	finish := map[string]string{"code": setupCode, "password": Password}
 	if state.TOTPOn {
 		if started.Secret == "" {
-			return signIn{}, fmt.Errorf("setup step 1 returned no TOTP secret")
+			return SignIn{}, fmt.Errorf("setup step 1 returned no TOTP secret")
 		}
 		// The server accepts the step before its own, so the setup code uses it and leaves two
 		// steps for the flows to use without waiting. Near the end of a step the server's clock
 		// could already be on the next one, which no longer accepts the previous.
 		now := time.Now()
-		in.totpSecret, in.totpStep = started.Secret, webauth.TOTPStepAt(now)
+		in.TOTPSecret, in.TOTPStep = started.Secret, webauth.TOTPStepAt(now)
 		if now.Unix()%30 < 25 {
-			in.totpStep--
+			in.TOTPStep--
 		}
-		if finish["totp_code"], err = webauth.TOTPCode(in.totpSecret, in.totpStep); err != nil {
-			return signIn{}, err
+		if finish["totp_code"], err = webauth.TOTPCode(in.TOTPSecret, in.TOTPStep); err != nil {
+			return SignIn{}, err
 		}
 	}
 	resp, err = post("/v1/web/auth/setup-finish", finish, &struct{}{})
 	if err != nil {
-		return signIn{}, err
+		return SignIn{}, err
 	}
 	for _, c := range resp.Cookies() {
 		if strings.HasPrefix(c.Name, "__Host-gx_login") {
-			in.cookieName, in.cookie = c.Name, c.Value
+			in.CookieName, in.Cookie = c.Name, c.Value
 		}
 	}
-	if in.cookie == "" {
-		return signIn{}, fmt.Errorf("setup finished without a login cookie")
+	if in.Cookie == "" {
+		return SignIn{}, fmt.Errorf("setup finished without a login cookie")
 	}
 	return in, nil
 }

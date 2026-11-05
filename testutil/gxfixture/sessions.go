@@ -72,9 +72,15 @@ type commandStep struct {
 
 const sessionWaitTimeout = 20 * time.Second
 
+// sessionSeeder holds the fixture's session-driving methods, so fixture stays under the
+// per-type method limit. It reaches the fixture's fields and methods by embedding.
+type sessionSeeder struct{ *fixture }
+
+func sessionsOf(f *fixture) sessionSeeder { return sessionSeeder{f} }
+
 // seedSessions creates the scenario's sessions one at a time, each settled
 // before the next so the list keeps creation order.
-func (f *fixture) seedSessions(sc scenario) error {
+func (f sessionSeeder) seedSessions(sc scenario) error {
 	for _, s := range sc.sessions {
 		// A Codex session cannot start while codex is off PATH, which is the
 		// state the missing-harness flows need.
@@ -88,7 +94,7 @@ func (f *fixture) seedSessions(sc scenario) error {
 	return nil
 }
 
-func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
+func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	before, codexBefore := f.controlFiles(), f.codexIDs()
 	id, err := f.createSession(s.project, f.repoDir(sc, s.project), s.prompt, s.harness)
 	if err != nil {
@@ -197,7 +203,7 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 // prompt sends text to the session. The server's status lags the fake's turn,
 // so under load it can still report "working" after the reply landed; a
 // session-not-idle refusal is retried until the session settles.
-func (f *fixture) prompt(id, text string) error {
+func (f sessionSeeder) prompt(id, text string) error {
 	deadline := time.Now().Add(sessionWaitTimeout)
 	for {
 		out, err := f.cli("agents", "prompt", id, text)
@@ -212,7 +218,7 @@ func (f *fixture) prompt(id, text string) error {
 }
 
 // promptAgain sends text as another chat turn and waits for its reply.
-func (f *fixture) promptAgain(id, text string) error {
+func (f sessionSeeder) promptAgain(id, text string) error {
 	agentMessages := func(chat wire.SessionChatResponse) int {
 		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m wire.SessionChatMessage) bool {
 			return m.Role != transcript.ChatRoleAgent
@@ -234,7 +240,7 @@ func (f *fixture) promptAgain(id, text string) error {
 
 // runCommandStep sends one "/" command and waits until the chat shows it (and
 // its output entry, when the step has output).
-func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(agentfake.Control) error) error {
+func (f sessionSeeder) runCommandStep(id string, st commandStep, sendControl func(agentfake.Control) error) error {
 	if st.turn {
 		return f.promptAgain(id, st.prompt)
 	}
@@ -275,7 +281,7 @@ func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(age
 }
 
 // controlFiles lists the control FIFOs of the TUI fakes started so far.
-func (f *fixture) controlFiles() []string {
+func (f sessionSeeder) controlFiles() []string {
 	paths, _ := filepath.Glob(agentfake.TUIControlPath(filepath.Join(f.root, "home"), "*"))
 	names := make([]string, len(paths))
 	for i, p := range paths {
@@ -285,7 +291,7 @@ func (f *fixture) controlFiles() []string {
 }
 
 // codexIDs lists the ids of the Codex fakes started so far.
-func (f *fixture) codexIDs() []string {
+func (f sessionSeeder) codexIDs() []string {
 	paths, _ := filepath.Glob(codex.CodexArgsPath(filepath.Join(f.root, "home", ".codex"), "*"))
 	ids := make([]string, len(paths))
 	for i, p := range paths {
@@ -295,7 +301,7 @@ func (f *fixture) codexIDs() []string {
 }
 
 // repoDir is the repo root the project's sessions run in.
-func (f *fixture) repoDir(sc scenario, project string) string {
+func (f sessionSeeder) repoDir(sc scenario, project string) string {
 	if slices.Contains(sc.ownRepos, project) {
 		return filepath.Join(f.root, project+"-repo")
 	}
@@ -303,7 +309,7 @@ func (f *fixture) repoDir(sc scenario, project string) string {
 }
 
 // waitFor polls the session until ok accepts its list row and chat.
-func (f *fixture) waitFor(id, what string, ok func(wire.SessionInfo, wire.SessionChatResponse) bool) error {
+func (f sessionSeeder) waitFor(id, what string, ok func(wire.SessionInfo, wire.SessionChatResponse) bool) error {
 	// In-process calls: this loop runs for every seeded session, and a spawned
 	// gx per poll dominated the scenario's start-up.
 	cl := apiclient.New(server.SocketPath(f.stateD))
@@ -327,7 +333,7 @@ func (f *fixture) waitFor(id, what string, ok func(wire.SessionInfo, wire.Sessio
 
 // createSession starts a session in dir and returns its id. The harness is
 // Claude when empty.
-func (f *fixture) createSession(project, dir, prompt, harness string) (string, error) {
+func (f sessionSeeder) createSession(project, dir, prompt, harness string) (string, error) {
 	args := []string{"agents", "create", "--project", project, "--dir", dir, "--json"}
 	if prompt != "" {
 		args = append(args, "--prompt", prompt)
@@ -446,7 +452,7 @@ func codexQueueScenario() scenario {
 // iteration-started event in the epic's run log and a transcript for its session
 // in the fixture home, which is all server.earlierRunHarness reads. A live
 // worker would race the server's adoption of its question and hold a slot.
-func (f *fixture) seedRanOnClaude(addr string) error {
+func (f sessionSeeder) seedRanOnClaude(addr string) error {
 	project, rest, _ := strings.Cut(addr, ":")
 	epicName, id, _ := strings.Cut(rest, "/")
 	const session = "00000000-0000-4000-8000-0000000000c1"

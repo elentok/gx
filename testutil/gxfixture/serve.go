@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil/gxfixture/websignin"
 )
 
 // runningServer is the started gx server and what the web login gave the caller.
@@ -24,7 +25,7 @@ type runningServer struct {
 	logPath  string
 	logFile  *os.File
 	webURL   string
-	in       signIn
+	in       websignin.SignIn
 	password string
 }
 
@@ -75,13 +76,13 @@ func (f *fixture) loginWeb(ctx context.Context, sc scenario, rs *runningServer) 
 	}
 	rs.webURL = webURL
 	if sc.web != webSetupPending {
-		if rs.in, err = webSetup(f.stateD, webURL, setupCode); err != nil {
+		if rs.in, err = websignin.Setup(f.stateD, webURL, setupCode); err != nil {
 			return fmt.Errorf("web setup: %w\n%s", err, f.serverOutput())
 		}
-		rs.password = fixturePassword
+		rs.password = websignin.Password
 	}
 	if sc.web == webSignedOut {
-		rs.in.cookieName, rs.in.cookie = "", ""
+		rs.in.CookieName, rs.in.Cookie = "", ""
 	}
 	return nil
 }
@@ -147,7 +148,7 @@ func (f *fixture) queueAfterUsage(sc scenario) error {
 func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s seeded, err error) {
 	// The earlier run goes first so no held worker holds its slot.
 	for _, addr := range sc.ranOnClaude {
-		if err := f.seedRanOnClaude(addr); err != nil {
+		if err := sessionsOf(f).seedRanOnClaude(addr); err != nil {
 			return s, err
 		}
 	}
@@ -182,7 +183,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 			return s, err
 		}
 	}
-	if err := f.seedSessions(sc); err != nil {
+	if err := sessionsOf(f).seedSessions(sc); err != nil {
 		return s, err
 	}
 	if sc.queueAfterSessions {
@@ -208,7 +209,7 @@ func (f *fixture) seedDesigns(ctx context.Context, sc scenario) error {
 	// open` return that one instead of starting another.
 	plain := make(map[string]string)
 	for _, addr := range sc.linkedDesigns {
-		id, err := f.createSession(project, filepath.Join(f.root, "repo"), "hello", "")
+		id, err := sessionsOf(f).createSession(project, filepath.Join(f.root, "repo"), "hello", "")
 		if err != nil {
 			return err
 		}
@@ -245,7 +246,7 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 	}
 	// The opening prompt is still running when `designs open` returns. A control the test sends
 	// meanwhile (Block) is overwritten when that turn ends.
-	if err := f.waitFor(res.Session.ID, "past its opening turn", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
+	if err := sessionsOf(f).waitFor(res.Session.ID, "past its opening turn", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
 		return si.Status.State != wire.SessionStarting && si.Status.State != wire.SessionWorking
 	}); err != nil {
 		return fmt.Errorf("open design %s: %w", addr, err)
@@ -261,7 +262,7 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 
 // buildOutput assembles what the fixture prints.
 func (f *fixture) buildOutput(sc scenario, rs *runningServer, s seeded) Output {
-	res := Output{WebURL: rs.webURL, CookieName: rs.in.cookieName, Cookie: rs.in.cookie, Password: rs.password, TOTPSecret: rs.in.totpSecret, TOTPStep: rs.in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: f.gx, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: rs.logPath, AgentTranscript: s.agentTranscript, CheckWaitingFile: s.checkWaitingFile}
+	res := Output{WebURL: rs.webURL, CookieName: rs.in.CookieName, Cookie: rs.in.Cookie, Password: rs.password, TOTPSecret: rs.in.TOTPSecret, TOTPStep: rs.in.TOTPStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: f.gx, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: rs.logPath, AgentTranscript: s.agentTranscript, CheckWaitingFile: s.checkWaitingFile}
 	f.addScenarioOutput(&res, sc, s.transcripts)
 	return res
 }
