@@ -1,4 +1,4 @@
-package git
+package history
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 func IsCommitPushed(root, hash string) (bool, error) {
 	out, _, err := run.Exec(root, []string{"branch", "-r", "--contains", hash})
 	if err != nil {
-		if _, ok := err.(*RunError); ok {
+		if _, ok := err.(*run.RunError); ok {
 			return false, nil
 		}
 		return false, err
@@ -51,7 +51,7 @@ func RebaseAutosquash(root, hash string) (string, error) {
 func HasUnstagedChanges(root string) (bool, error) {
 	_, _, err := run.Exec(root, []string{"diff", "--quiet"})
 	if err != nil {
-		if runErr, ok := err.(*RunError); ok && runErr.Code == 1 {
+		if runErr, ok := err.(*run.RunError); ok && runErr.Code == 1 {
 			return true, nil
 		}
 		return false, err
@@ -66,6 +66,6 @@ func StashPushAuto(root string) (string, error) {
 }
 
 func runWithExtraEnv(dir string, args []string, extraEnv []string) (string, error) {
-	stdout, stderr, err := Run(dir, append(NonInteractiveEnv(), extraEnv...), args...)
+	stdout, stderr, err := run.Run(dir, append(run.NonInteractiveEnv(), extraEnv...), args...)
 	return run.JoinOutput(stdout, stderr), err
 }

@@ -10,6 +10,7 @@ import (
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -196,7 +197,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 
 	d, _, _ := fakeDeps()
 	d.SessionHomes = SessionHomes{Claude: home}
-	d.AppendTrailers = git.AppendTrailers
+	d.AppendTrailers = history.AppendTrailers
 	d.RevParse = git.RevParse
 
 	p := iterationParams{
@@ -224,17 +225,17 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 
 	wantTokens := strconv.Itoa(ticket.ActualContextWindow)
 	wantElapsed := strconv.Itoa(ticket.ElapsedTime) + "s"
-	if found, err := git.TrailerCommitExists(repoDir, "HEAD", tokensTrailerKey, wantTokens); err != nil {
+	if found, err := history.TrailerCommitExists(repoDir, "HEAD", tokensTrailerKey, wantTokens); err != nil {
 		t.Fatalf("TrailerCommitExists(%s): %v", tokensTrailerKey, err)
 	} else if !found {
 		t.Errorf("merged commit missing %s: %s trailer", tokensTrailerKey, wantTokens)
 	}
-	if found, err := git.TrailerCommitExists(repoDir, "HEAD", elapsedTrailerKey, wantElapsed); err != nil {
+	if found, err := history.TrailerCommitExists(repoDir, "HEAD", elapsedTrailerKey, wantElapsed); err != nil {
 		t.Fatalf("TrailerCommitExists(%s): %v", elapsedTrailerKey, err)
 	} else if !found {
 		t.Errorf("merged commit missing %s: %s trailer", elapsedTrailerKey, wantElapsed)
 	}
-	if found, err := git.TrailerCommitExists(repoDir, "HEAD", ticketTrailerKey, addressTrailerValue(scratchDir, "epic", "01")); err != nil {
+	if found, err := history.TrailerCommitExists(repoDir, "HEAD", ticketTrailerKey, addressTrailerValue(scratchDir, "epic", "01")); err != nil {
 		t.Fatalf("TrailerCommitExists(%s): %v", ticketTrailerKey, err)
 	} else if !found {
 		t.Errorf("merged commit missing %s trailer", ticketTrailerKey)

@@ -125,12 +125,13 @@ func DiffLines(dir, refA, refB string) (added, removed int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	added, removed = sumNumstat(out)
+	added, removed = SumNumstat(out)
 	return added, removed, nil
 }
 
-// sumNumstat is shared with TrailerLines, so it stays in core.
-func sumNumstat(out string) (added, removed int) {
+// SumNumstat totals the added and removed columns of `git diff --numstat` output.
+// git/history uses it too.
+func SumNumstat(out string) (added, removed int) {
 	for _, line := range strings.Split(out, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 3 {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -45,7 +45,7 @@ type MergeDeps struct {
 	PatchesApplied       func(dir, upstream, base, branch string) (bool, error)
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
-	AppendTrailers       func(dir string, trailers ...git.Trailer) error
+	AppendTrailers       func(dir string, trailers ...history.Trailer) error
 	MergedTickets        func(dir, featureBranch string) (map[string]bool, error)
 	// SessionHomes are where the merging session's transcripts are read from.
 	SessionHomes SessionHomes
@@ -259,14 +259,14 @@ func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	}
 
 	trailerValue := mergeTrailerValue(lp)
-	trailers := []git.Trailer{{Key: ticketTrailerKey, Value: trailerValue}}
+	trailers := []history.Trailer{{Key: ticketTrailerKey, Value: trailerValue}}
 	if hasMetrics {
 		trailers = append(trailers,
-			git.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(m.contextWindow)},
-			git.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(m.elapsedSeconds) + "s"},
+			history.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(m.contextWindow)},
+			history.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(m.elapsedSeconds) + "s"},
 		)
 		if m.costStamped {
-			trailers = append(trailers, git.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(m.cost)})
+			trailers = append(trailers, history.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(m.cost)})
 		}
 	}
 	if err := d.AppendTrailers(lp.FeatureWorktree, trailers...); err != nil {

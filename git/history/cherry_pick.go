@@ -1,6 +1,7 @@
-package git
+package history
 
 import (
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
 	"os"
 	"path/filepath"
@@ -23,7 +24,7 @@ func TrailerLines(dir, ref, key string, match func(value string) bool) (added, r
 		if err != nil {
 			return 0, 0, err
 		}
-		a, r := sumNumstat(out)
+		a, r := git.SumNumstat(out)
 		added += a
 		removed += r
 	}
@@ -32,7 +33,7 @@ func TrailerLines(dir, ref, key string, match func(value string) bool) (added, r
 
 // CherryPickRange cherry-picks the commit range fromExclusive..toInclusive
 // (in order) onto dir's current branch via `git cherry-pick`. On a conflict,
-// the returned error is a *RunError and dir is left mid-cherry-pick with
+// the returned error is a *run.RunError and dir is left mid-cherry-pick with
 // conflict markers in place, same as running the command by hand.
 func CherryPickRange(dir, fromExclusive, toInclusive string) error {
 	_, _, err := run.Exec(dir, []string{"cherry-pick", fromExclusive + ".." + toInclusive})
@@ -75,7 +76,7 @@ func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
 	if total > 0 {
 		return true, nil
 	}
-	ahead, err := CommitsAhead(dir, base, branch)
+	ahead, err := git.CommitsAhead(dir, base, branch)
 	return ahead > 0, err
 }
 
@@ -166,7 +167,7 @@ func CherryPickInProgress(dir string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	if _, ok := err.(*RunError); !ok {
+	if _, ok := err.(*run.RunError); !ok {
 		return false, err
 	}
 

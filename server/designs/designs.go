@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -142,7 +143,7 @@ func (s *Designs) tryCleanupDesign(project, epic string) error {
 			return fmt.Errorf("the worktree has uncommitted edits")
 		}
 	}
-	missing, err := git.UnappliedPatches(c.repo.Root, epic+tickets.ImplEpicSuffix, c.branch)
+	missing, err := history.UnappliedPatches(c.repo.Root, epic+tickets.ImplEpicSuffix, c.branch)
 	if err != nil {
 		return err
 	}
@@ -269,8 +270,8 @@ func (s *Designs) tryRebase(project, epic, worktree, excludeID string) error {
 	if err == nil {
 		return nil
 	}
-	if inProgress, _ := git.RebaseInProgress(worktree); inProgress {
-		if abortErr := git.AbortRebase(worktree); abortErr != nil {
+	if inProgress, _ := history.RebaseInProgress(worktree); inProgress {
+		if abortErr := history.AbortRebase(worktree); abortErr != nil {
 			return fmt.Errorf("the rebase conflicted and could not be aborted: %w", abortErr)
 		}
 		return errors.New("the rebase conflicted and was aborted")

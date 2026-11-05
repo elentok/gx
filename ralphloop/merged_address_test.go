@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -26,7 +26,7 @@ func TestMergeTicket_TicketInTrackerLayout_StampsCanonicalAddress(t *testing.T) 
 	if want := "proj:main/03"; res.TrailerValue != want {
 		t.Errorf("TrailerValue = %q, want %q", res.TrailerValue, want)
 	}
-	if found, err := git.TrailerCommitExists(dir, "HEAD", ticketTrailerKey, "proj:main/03"); err != nil || !found {
+	if found, err := history.TrailerCommitExists(dir, "HEAD", ticketTrailerKey, "proj:main/03"); err != nil || !found {
 		t.Errorf("merged commit missing address trailer (found=%v err=%v)", found, err)
 	}
 }
@@ -42,7 +42,7 @@ func TestMergedTickets_ReadsOldAndNewTrailerForms(t *testing.T) {
 	} {
 		testutil.WriteFile(t, dir, "f.txt", value)
 		testutil.CommitAll(t, dir, "c"+string(rune('a'+i)))
-		if err := git.AppendTrailer(dir, ticketTrailerKey, value); err != nil {
+		if err := history.AppendTrailer(dir, ticketTrailerKey, value); err != nil {
 			t.Fatalf("AppendTrailer: %v", err)
 		}
 	}

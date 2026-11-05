@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -38,7 +39,7 @@ func TestCherryPickCore_Conflict_LeavesSequencerInProgress(t *testing.T) {
 	if err != nil || !conflicted {
 		t.Fatalf("cherryPickCore = (%v, %v), want (true, nil)", conflicted, err)
 	}
-	if inProgress, _ := git.CherryPickInProgress(dir); !inProgress {
+	if inProgress, _ := history.CherryPickInProgress(dir); !inProgress {
 		t.Error("sequencer not in progress after conflict, want it left intact")
 	}
 }

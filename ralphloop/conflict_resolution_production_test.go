@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -69,7 +70,7 @@ func (r *conflictResolver) onPrompt(s agentrunner.Session, text string) error {
 		return fmt.Errorf("conflict resolver launched in wrong cwd %q, want %q", cwd, r.expectedCwd)
 	}
 
-	inProgress, err := git.CherryPickInProgress(cwd)
+	inProgress, err := history.CherryPickInProgress(cwd)
 	if err != nil {
 		return fmt.Errorf("checking cherry-pick state in %s: %w", cwd, err)
 	}
@@ -246,7 +247,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Errorf("resolution session = %q, want %q", gotResolutionSessionID, resolutionSessionID)
 	}
 
-	inProgress, err := git.CherryPickInProgress(dir)
+	inProgress, err := history.CherryPickInProgress(dir)
 	if err != nil {
 		t.Fatalf("CherryPickInProgress: %v", err)
 	}

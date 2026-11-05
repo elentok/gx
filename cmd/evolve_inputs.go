@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -362,7 +363,7 @@ func defaultMerged(storePath string) func(project, epic string) (map[string]bool
 		if err != nil {
 			return nil, err
 		}
-		trailers, err := git.TrailerMap(repo.Root, epic, ralphloop.TicketTrailerKey)
+		trailers, err := history.TrailerMap(repo.Root, epic, ralphloop.TicketTrailerKey)
 		if err != nil {
 			return nil, err
 		}

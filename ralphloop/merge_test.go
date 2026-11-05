@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -178,7 +179,7 @@ func TestMergeTicket_Conflict_IsAResultNotAnError(t *testing.T) {
 	if res.Outcome != Conflicted {
 		t.Fatalf("outcome = %q, want %q", res.Outcome, Conflicted)
 	}
-	if inProgress, _ := git.CherryPickInProgress(dir); !inProgress {
+	if inProgress, _ := history.CherryPickInProgress(dir); !inProgress {
 		t.Error("sequencer not left in progress after conflict")
 	}
 }

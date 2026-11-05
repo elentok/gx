@@ -1,7 +1,7 @@
 package ralphloop
 
 import (
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -9,7 +9,7 @@ import (
 // from ref whose Ralph-Loop-Ticket trailer names epic. It stamps an epic that
 // merged outside the server, where no trunk before/after pair exists.
 func EpicTrailerLines(dir, ref, epic string) (added, removed int, err error) {
-	return git.TrailerLines(dir, ref, ticketTrailerKey, func(value string) bool {
+	return history.TrailerLines(dir, ref, ticketTrailerKey, func(value string) bool {
 		e, _, ok := tickets.SplitTrailerValue(value)
 		return ok && e == epic
 	})
@@ -17,14 +17,14 @@ func EpicTrailerLines(dir, ref, epic string) (added, removed int, err error) {
 
 // mergedTickets reports which tickets have a commit reachable from
 // featureBranch stamped with their Ralph-Loop-Ticket trailer (see
-// ticketTrailerValue), keyed by ticket identifier — a single git.TrailerMap
+// ticketTrailerValue), keyed by ticket identifier — a single history.TrailerMap
 // call replacing what would otherwise be one TrailerCommitExists shell-out
 // per ticket. It is VerifyEpic's trailer rung. A returned error means the
 // check itself couldn't run (e.g. dir isn't a git repo, or featureBranch
 // doesn't exist) — callers must keep that "unknown" outcome distinct from a
 // ticket simply being absent from a successfully-computed map ("not merged").
 func mergedTickets(dir, featureBranch string) (map[string]bool, error) {
-	trailers, err := git.TrailerMap(dir, featureBranch, ticketTrailerKey)
+	trailers, err := history.TrailerMap(dir, featureBranch, ticketTrailerKey)
 	if err != nil {
 		return nil, err
 	}

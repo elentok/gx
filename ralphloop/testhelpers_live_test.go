@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 )
 
 // readyTimer is a Deps.PauseTimer that has already fired: a pause test polls at
@@ -27,8 +28,8 @@ func realGitDeps() Deps {
 	d.RevParse = git.RevParse
 	d.WorktreeExists = worktreeExists
 	d.MergeBase = git.MergeBase
-	d.PatchesApplied = git.PatchesApplied
-	d.AppendTrailers = git.AppendTrailers
+	d.PatchesApplied = history.PatchesApplied
+	d.AppendTrailers = history.AppendTrailers
 	return d
 }
 

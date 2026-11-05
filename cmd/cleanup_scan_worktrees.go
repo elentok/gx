@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
 )
@@ -173,7 +174,7 @@ func iterationMerged(repo git.Repo, branch, epicName string) (bool, error) {
 		}
 
 		if base, err := git.MergeBase(repo.Root, branch, epicName); err == nil {
-			applied, err := git.PatchesApplied(repo.Root, epicName, base, branch)
+			applied, err := history.PatchesApplied(repo.Root, epicName, base, branch)
 			if err != nil {
 				return false, err
 			}

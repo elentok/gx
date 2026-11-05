@@ -2,7 +2,7 @@ package commit
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -11,7 +11,7 @@ func (m *Model) openRewordEditor() tea.Cmd {
 	if m.details.FullHash == "" {
 		return notify.Warning("no commit loaded")
 	}
-	pushed, _ := git.IsCommitPushed(m.worktreeRoot, m.details.FullHash)
+	pushed, _ := history.IsCommitPushed(m.worktreeRoot, m.details.FullHash)
 	cmd, err := m.reword.CmdOpenEditor(
 		m.worktreeRoot, m.details.FullHash,
 		m.details.Subject, m.details.Body, pushed,

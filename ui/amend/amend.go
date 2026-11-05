@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -68,7 +69,7 @@ func (m *Model) Open(root, hash, subject string) error {
 	if len(staged) == 0 {
 		return fmt.Errorf("no staged changes to amend")
 	}
-	pushed, _ := git.IsCommitPushed(root, hash)
+	pushed, _ := history.IsCommitPushed(root, hash)
 
 	m.root = root
 	m.Hash = hash
@@ -89,7 +90,7 @@ func (m *Model) Open(root, hash, subject string) error {
 }
 
 func buildSteps(root, hash string) ([]execStep, error) {
-	isHead, err := git.IsHEAD(root, hash)
+	isHead, err := history.IsHEAD(root, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +103,7 @@ func buildSteps(root, hash string) ([]execStep, error) {
 					TitleAfter:   "amended HEAD",
 					TitleFailed:  "amend failed",
 				},
-				run: func() (string, error) { return git.AmendHead(root) },
+				run: func() (string, error) { return history.AmendHead(root) },
 			},
 		}, nil
 	}
@@ -110,7 +111,7 @@ func buildSteps(root, hash string) ([]execStep, error) {
 	// Check for unstaged working-tree changes BEFORE the fixup commit is created.
 	// These need to be stashed so the rebase can run on a clean working tree.
 	// Staged changes are consumed by the fixup commit (step 1) and don't need stashing.
-	needStash, err := git.HasUnstagedChanges(root)
+	needStash, err := history.HasUnstagedChanges(root)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func buildSteps(root, hash string) ([]execStep, error) {
 				TitleAfter:   "created fixup commit",
 				TitleFailed:  "fixup commit failed",
 			},
-			run: func() (string, error) { return git.CommitFixup(root, hash) },
+			run: func() (string, error) { return history.CommitFixup(root, hash) },
 		},
 	}
 	if needStash {
@@ -136,7 +137,7 @@ func buildSteps(root, hash string) ([]execStep, error) {
 				TitleAfter:   "stashed",
 				TitleFailed:  "stash failed",
 			},
-			run: func() (string, error) { return git.StashPushAuto(root) },
+			run: func() (string, error) { return history.StashPushAuto(root) },
 		})
 	}
 	steps = append(steps,
@@ -147,7 +148,7 @@ func buildSteps(root, hash string) ([]execStep, error) {
 				TitleAfter:   "rebased",
 				TitleFailed:  "rebase failed",
 			},
-			run: func() (string, error) { return git.RebaseAutosquash(root, hash) },
+			run: func() (string, error) { return history.RebaseAutosquash(root, hash) },
 		},
 	)
 	if needStash {

@@ -3,6 +3,7 @@ package log
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -32,7 +33,7 @@ func (m Model) cmdFetchRewordDetails() tea.Cmd {
 		if err != nil {
 			return rewordDetailsMsg{err: err}
 		}
-		pushed, _ := git.IsCommitPushed(root, hash)
+		pushed, _ := history.IsCommitPushed(root, hash)
 		return rewordDetailsMsg{
 			hash:    hash,
 			subject: details.Subject,

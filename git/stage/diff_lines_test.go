@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -41,7 +42,7 @@ func TestTrailerLines_SumsOnlyCommitsWhoseTrailerMatches(t *testing.T) {
 	testutil.WriteFile(t, dir, "c.txt", "q\n")
 	testutil.CommitAll(t, dir, "no trailer")
 
-	added, removed, err := git.TrailerLines(dir, "HEAD", "Ralph-Loop-Ticket", func(v string) bool {
+	added, removed, err := history.TrailerLines(dir, "HEAD", "Ralph-Loop-Ticket", func(v string) bool {
 		return strings.HasPrefix(v, "mine/")
 	})
 	if err != nil {

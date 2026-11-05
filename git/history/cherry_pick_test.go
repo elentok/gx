@@ -1,4 +1,4 @@
-package git_test
+package history_test
 
 import (
 	"os"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -32,7 +33,7 @@ func TestCherryPickRange_AppliesCommitsInOrder(t *testing.T) {
 
 	testutil.MustGitExported(t, dir, "checkout", "-b", "feature", base)
 
-	if err := git.CherryPickRange(dir, base, tip); err != nil {
+	if err := history.CherryPickRange(dir, base, tip); err != nil {
 		t.Fatalf("CherryPickRange: %v", err)
 	}
 
@@ -63,11 +64,11 @@ func TestCherryPickRange_ConflictReturnsError(t *testing.T) {
 	testutil.WriteFile(t, dir, "a.txt", "line from feature\n")
 	testutil.CommitAll(t, dir, "feature change")
 
-	if err := git.CherryPickRange(dir, base, tip); err == nil {
+	if err := history.CherryPickRange(dir, base, tip); err == nil {
 		t.Fatal("CherryPickRange() error = nil, want conflict error")
 	}
 
-	inProgress, err := git.CherryPickInProgress(dir)
+	inProgress, err := history.CherryPickInProgress(dir)
 	if err != nil {
 		t.Fatalf("CherryPickInProgress: %v", err)
 	}
@@ -96,13 +97,13 @@ func TestAbortCherryPick_ClearsConflictAndRestoresHead(t *testing.T) {
 		t.Fatalf("RevParse feature: %v", err)
 	}
 
-	if err := git.CherryPickRange(dir, base, tip); err == nil {
+	if err := history.CherryPickRange(dir, base, tip); err == nil {
 		t.Fatal("CherryPickRange() error = nil, want conflict error")
 	}
-	if err := git.AbortCherryPick(dir); err != nil {
+	if err := history.AbortCherryPick(dir); err != nil {
 		t.Fatalf("AbortCherryPick: %v", err)
 	}
-	inProgress, err := git.CherryPickInProgress(dir)
+	inProgress, err := history.CherryPickInProgress(dir)
 	if err != nil {
 		t.Fatalf("CherryPickInProgress: %v", err)
 	}
@@ -141,13 +142,13 @@ func TestAbortRebase_ClearsConflictAndRestoresHead(t *testing.T) {
 	if _, err := git.Rebase(dir, trunk); err == nil {
 		t.Fatal("Rebase() error = nil, want conflict error")
 	}
-	if inProgress, _ := git.RebaseInProgress(dir); !inProgress {
+	if inProgress, _ := history.RebaseInProgress(dir); !inProgress {
 		t.Fatal("RebaseInProgress() = false, want true mid-conflict")
 	}
-	if err := git.AbortRebase(dir); err != nil {
+	if err := history.AbortRebase(dir); err != nil {
 		t.Fatalf("AbortRebase: %v", err)
 	}
-	if inProgress, _ := git.RebaseInProgress(dir); inProgress {
+	if inProgress, _ := history.RebaseInProgress(dir); inProgress {
 		t.Error("RebaseInProgress() = true after abort")
 	}
 	if gotHead, _ := git.RevParse(dir, "HEAD"); gotHead != featureHead {
@@ -163,7 +164,7 @@ func TestPatchesApplied_RangeAlreadyOnUpstream_IsApplied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RevParse: %v", err)
 	}
-	if applied, err := git.PatchesApplied(dir, "HEAD", base, base); err != nil || applied {
+	if applied, err := history.PatchesApplied(dir, "HEAD", base, base); err != nil || applied {
 		t.Fatalf("PatchesApplied(empty range) = %v, %v; want false, nil", applied, err)
 	}
 
@@ -174,7 +175,7 @@ func TestPatchesApplied_RangeAlreadyOnUpstream_IsApplied(t *testing.T) {
 		t.Fatalf("RevParse: %v", err)
 	}
 
-	applied, err := git.PatchesApplied(dir, "HEAD", base, tip)
+	applied, err := history.PatchesApplied(dir, "HEAD", base, tip)
 	if err != nil {
 		t.Fatalf("PatchesApplied: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestTrailerMap_ParsesValueToSHA(t *testing.T) {
 
 	testutil.WriteFile(t, dir, "a.txt", "a\n")
 	testutil.CommitAll(t, dir, "add a")
-	if err := git.AppendTrailer(dir, "Ralph-Loop-Ticket", "epic/01"); err != nil {
+	if err := history.AppendTrailer(dir, "Ralph-Loop-Ticket", "epic/01"); err != nil {
 		t.Fatalf("AppendTrailer: %v", err)
 	}
 	stamped, err := git.RevParse(dir, "HEAD")
@@ -200,7 +201,7 @@ func TestTrailerMap_ParsesValueToSHA(t *testing.T) {
 	testutil.WriteFile(t, dir, "b.txt", "b\n")
 	testutil.CommitAll(t, dir, "add b (no trailer)")
 
-	got, err := git.TrailerMap(dir, "HEAD", "Ralph-Loop-Ticket")
+	got, err := history.TrailerMap(dir, "HEAD", "Ralph-Loop-Ticket")
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
 	}
@@ -214,7 +215,7 @@ func TestTrailerMap_NoMatchingTrailers_EmptyMap(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 
-	got, err := git.TrailerMap(dir, "HEAD", "Ralph-Loop-Ticket")
+	got, err := history.TrailerMap(dir, "HEAD", "Ralph-Loop-Ticket")
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
 	}
@@ -245,7 +246,7 @@ func TestCherryPickInProgress_TrueWithSequencerLeftoverButNoHead(t *testing.T) {
 	testutil.WriteFile(t, dir, "a.txt", "line from feature\n")
 	testutil.CommitAll(t, dir, "feature change")
 
-	if err := git.CherryPickRange(dir, base, tip); err == nil {
+	if err := history.CherryPickRange(dir, base, tip); err == nil {
 		t.Fatal("CherryPickRange() error = nil, want conflict error")
 	}
 
@@ -258,7 +259,7 @@ func TestCherryPickInProgress_TrueWithSequencerLeftoverButNoHead(t *testing.T) {
 		t.Fatalf("sequencer/todo missing before test even begins: %v", err)
 	}
 
-	inProgress, err := git.CherryPickInProgress(dir)
+	inProgress, err := history.CherryPickInProgress(dir)
 	if err != nil {
 		t.Fatalf("CherryPickInProgress: %v", err)
 	}
@@ -266,7 +267,7 @@ func TestCherryPickInProgress_TrueWithSequencerLeftoverButNoHead(t *testing.T) {
 		t.Error("CherryPickInProgress() = false, want true when sequencer/todo survives without CHERRY_PICK_HEAD")
 	}
 
-	if err := git.AbortCherryPick(dir); err != nil {
+	if err := history.AbortCherryPick(dir); err != nil {
 		t.Fatalf("AbortCherryPick: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".git", "sequencer")); !os.IsNotExist(err) {
@@ -278,7 +279,7 @@ func TestCherryPickInProgress_FalseOutsideCherryPick(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 
-	inProgress, err := git.CherryPickInProgress(dir)
+	inProgress, err := history.CherryPickInProgress(dir)
 	if err != nil {
 		t.Fatalf("CherryPickInProgress: %v", err)
 	}

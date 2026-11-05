@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -197,7 +197,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		PatchesApplied: func(dir, upstream, base, branch string) (bool, error) {
 			return false, nil
 		},
-		AppendTrailers: func(dir string, trailers ...git.Trailer) error {
+		AppendTrailers: func(dir string, trailers ...history.Trailer) error {
 			return nil
 		},
 		WorktreeExists: func(path string) (bool, error) {

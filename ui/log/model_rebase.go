@@ -3,6 +3,7 @@ package log
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/nav"
@@ -52,7 +53,7 @@ func (m Model) startRebaseInteractive() (tea.Model, tea.Cmd) {
 
 	hash := rows[next].commit.FullHash
 
-	dirty, err := git.HasUnstagedChanges(m.worktreeRoot)
+	dirty, err := history.HasUnstagedChanges(m.worktreeRoot)
 	if err != nil {
 		return m, notify.Error("rebase -i: " + err.Error())
 	}
@@ -89,7 +90,7 @@ func (m Model) handleRebaseConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(
 			notify.Progress("rebase-stash", "stashing..."),
 			func() tea.Msg {
-				_, err := git.StashPushAuto(root)
+				_, err := history.StashPushAuto(root)
 				return rebaseStashMsg{hash: hash, err: err}
 			},
 		)

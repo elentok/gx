@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/transcript"
 )
@@ -103,7 +104,7 @@ type Deps struct {
 	// every merged cherry-pick so classifyDoneTicket can still find the
 	// ticket trailer later even if a subsequent rebase-plus-manual-conflict-
 	// resolution changes the commit's hash and patch-id both.
-	AppendTrailers func(dir string, trailers ...git.Trailer) error
+	AppendTrailers func(dir string, trailers ...history.Trailer) error
 	// TrailerMap maps each value of trailer key on the commits of ref (any
 	// rev or range) to its commit; `merge --continue` reads it to tell its own
 	// unstamped pick from other tickets' merges.
@@ -280,14 +281,14 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		UncommittedChanges:   git.UncommittedChanges,
 		CommitSubjects:       git.CommitSubjects,
 		UnreachableCommits:   git.UnreachableCommits,
-		CherryPickRange:      git.CherryPickRange,
-		CherryPickInProgress: git.CherryPickInProgress,
-		AbortCherryPick:      git.AbortCherryPick,
+		CherryPickRange:      history.CherryPickRange,
+		CherryPickInProgress: history.CherryPickInProgress,
+		AbortCherryPick:      history.AbortCherryPick,
 		IsAncestor:           git.IsAncestor,
-		RebaseInProgress:     git.RebaseInProgress,
-		PatchesApplied:       git.PatchesApplied,
-		AppendTrailers:       git.AppendTrailers,
-		TrailerMap:           git.TrailerMap,
+		RebaseInProgress:     history.RebaseInProgress,
+		PatchesApplied:       history.PatchesApplied,
+		AppendTrailers:       history.AppendTrailers,
+		TrailerMap:           history.TrailerMap,
 		RebaseOntoOrAbort:    rebaseOntoOrAbort,
 		WorktreeExists:       worktreeExists,
 		InstallDeps: func(path, logDir string) ([]string, error) {
@@ -644,8 +645,8 @@ func rebaseOntoOrAbort(dir, onto string) error {
 	if err == nil {
 		return nil
 	}
-	if inProgress, _ := git.RebaseInProgress(dir); inProgress {
-		if abortErr := git.AbortRebase(dir); abortErr != nil {
+	if inProgress, _ := history.RebaseInProgress(dir); inProgress {
+		if abortErr := history.AbortRebase(dir); abortErr != nil {
 			return fmt.Errorf("the rebase conflicted and could not be aborted: %w", abortErr)
 		}
 		return errors.New("the rebase conflicted and was aborted")

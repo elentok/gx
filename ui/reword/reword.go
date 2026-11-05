@@ -9,7 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 )
@@ -133,7 +133,7 @@ func (m *Model) ReadEditorResult() (changed bool, newMsg string, err error) {
 // StartRunning sets up the running steps and returns the first cmd.
 // Hash and Subject must already be set (via CmdOpenEditor or directly).
 func (m *Model) StartRunning(root, newMsg string) (tea.Cmd, error) {
-	isHead, err := git.IsHEAD(root, m.Hash)
+	isHead, err := history.IsHEAD(root, m.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (m *Model) StartRunning(root, newMsg string) (tea.Cmd, error) {
 				TitleAfter:   "rewrote HEAD",
 				TitleFailed:  "reword failed",
 			},
-			run: func() (string, error) { return git.RewordHead(root, newMsg) },
+			run: func() (string, error) { return history.RewordHead(root, newMsg) },
 		}}
 	} else {
 		steps = []execStep{{
@@ -158,7 +158,7 @@ func (m *Model) StartRunning(root, newMsg string) (tea.Cmd, error) {
 				TitleAfter:   "rewrote commit",
 				TitleFailed:  "reword failed",
 			},
-			run: func() (string, error) { return git.RewordCommit(root, hash, newMsg) },
+			run: func() (string, error) { return history.RewordCommit(root, hash, newMsg) },
 		}}
 	}
 
