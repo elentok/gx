@@ -238,6 +238,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `git/history` — fast-forward merge (`MergeBranchInto`, `MergeFastForward`), `TreeID`, cherry-pick, trailers, reword and amend; imports `git`, never the reverse
   - `git/pr` — GitHub pull requests via `gh` (list open/closed, comments, facets, PR URLs); imports `git`, never the reverse
 - `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
+  - `ui/tickets` — the Tickets tab root (`Model`); children never import it: `ui/tickets/rowfmt` (leaf: metrics, pause labels, live row), `ui/tickets/tabapi` (names `ui/app` and `ui/agents` use: `ServerAPI`, `ServerLink*`, messages), `ui/tickets/preview` (preview pane), `ui/tickets/rowactions` (row menus, row editor, watch modal), `ui/tickets/queue` (`QueueModel` and children), `ui/tickets/sidebar` (sidebar tree), `ui/tickets/internal/tickettest` (shared test helpers)
+  - `ui/gitops` — shared bump, push and pull handling for `ui/status` and `ui/log`
+  - `ui/commitops` — shared commit handling for `ui/commit` and `ui/log`
 - `e2e/` — end-to-end tests (slow, CI only)
 - `testutil/` — fakes and helpers: `testutil/agentfake` (fake Claude, shared core),
   `testutil/agentfake/codex` (fake Codex, imports `agentfake`), `testutil/herdrfake`,
