@@ -89,14 +89,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handlePreviewKey(msg)
 	}
 
-	if nextSearch, cmd, result := m.search.Update(msg); result.Handled {
-		m.search = nextSearch
-		if result.QueryChanged {
-			m.recomputeSearchMatches()
-		}
-		if result.QueryChanged || result.CursorChanged {
-			m.jumpToCurrentMatch()
-		}
+	if cmd, handled := m.sidebar.UpdateSearch(sidebarEnvFor(m), msg); handled {
 		return m, cmd
 	}
 
@@ -137,9 +130,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsToggleHideDone:
 			// Hiding done tickets can shrink the tree out from under the cursor.
 			m.sidebar.HideDone = !m.sidebar.HideDone
-			if m.search.HasQuery() {
-				m.recomputeSearchMatches()
-			}
+			m.refreshSearchMatches()
 			m.clampSelected()
 		case bindingTicketsToggleProjectScope:
 			return m.toggleProjectScope()

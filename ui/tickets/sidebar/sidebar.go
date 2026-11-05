@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -45,14 +46,15 @@ type Model struct {
 	// Epic done/total header counts read epic.Tickets directly
 	// (renderEpicRow), so they're unaffected by this filter.
 	HideDone bool
+	// Search is the sidebar's own "/" search; matches are indices into Tree's
+	// entries (see RecomputeSearchMatches).
+	Search search.Model
 }
 
 // Env is what the sidebar needs from the rest of the tab, handed in per
 // call (see sidebarEnvFor).
 type Env struct {
-	Query    string // the sidebar search's raw query
-	HasQuery bool
-	Icons    ui.IconSet
+	Icons ui.IconSet
 	// Active: the sidebar holds keyboard focus.
 	Active      bool
 	Loaded      bool
@@ -72,6 +74,7 @@ func New(scratchDir string) Model {
 	return Model{
 		Tree:              t,
 		ExplicitCollapsed: map[string]bool{},
+		Search:            search.NewModel(),
 		ArchivedLazy: tree.NewLazySection(0, func() ([]tickets.Epic, error) {
 			return tickets.LoadArchived(scratchDir)
 		}),
@@ -80,7 +83,7 @@ func New(scratchDir string) Model {
 
 // Rebuild re-derives the collapse map and rebuilds the tree's entries.
 func (s *Model) Rebuild(env Env) {
-	s.refreshCollapse(env.Query)
+	s.refreshCollapse(s.Search.Query())
 	s.Tree.SetEntries(s.BuildSidebarEntries(env))
 }
 

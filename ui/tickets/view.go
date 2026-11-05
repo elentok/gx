@@ -16,8 +16,6 @@ var sessionMarkerStyle = lipgloss.NewStyle().Foreground(ui.ColorTeal)
 // sidebarEnvFor snapshots what the sidebar reads from the rest of the tab.
 func sidebarEnvFor(m Model) sidebar.Env {
 	return sidebar.Env{
-		Query:       m.search.Query(),
-		HasQuery:    m.search.HasQuery(),
 		Icons:       m.icons(),
 		Active:      m.preview.Focus == preview.FocusSidebar,
 		Loaded:      m.loaded,

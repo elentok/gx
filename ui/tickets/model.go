@@ -42,7 +42,6 @@ type Model struct {
 	loaded bool
 	// sidebar owns the epic rows and the sidebar tree's state (sidebar.go).
 	sidebar sidebar.Model
-	search  search.Model
 
 	// preview backs the preview panel's own focus/scroll/search state
 	// (see preview_focus.go and model_preview_focus.go).
@@ -78,7 +77,6 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		keys:         km,
 		sidebar:      sb,
 		help:         help.NewModel(help.BuildSections(km, *sb.Tree.Keys(), extraKeys), settings.About),
-		search:       search.NewModel(),
 		preview:      preview.NewPane(),
 		confirm:      confirm.New(),
 	}
@@ -160,9 +158,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.Epics = msg.epics
 		m.sidebar.ArchivedEpicCount = msg.archivedEpicCount
 		m.sidebar.ArchivedLazy.SetCount(msg.archivedEpicCount)
-		if m.search.HasQuery() {
-			m.recomputeSearchMatches()
-		}
+		m.refreshSearchMatches()
 		m.clampSelected()
 		if firstLoad {
 			m.sidebar.SelectFirstEpic()
@@ -269,13 +265,19 @@ func (m *Model) clampSelected() {
 	m.sidebar.ClampSelected(sidebarEnvFor(*m))
 }
 
+// refreshSearchMatches re-runs the sidebar search when a query is active, so
+// its matches follow rows that changed under it.
+func (m *Model) refreshSearchMatches() {
+	if m.sidebar.Search.HasQuery() {
+		m.sidebar.RecomputeSearchMatches(sidebarEnvFor(*m))
+	}
+}
+
 // afterSidebarToggle runs the sidebar's post-toggle bookkeeping, then re-runs
 // the search so its matches follow the new collapse state.
 func (m *Model) afterSidebarToggle(toggledID string, cmd tea.Cmd) tea.Cmd {
 	cmd = m.sidebar.AfterToggle(sidebarEnvFor(*m), toggledID, cmd)
-	if m.search.HasQuery() {
-		m.recomputeSearchMatches()
-	}
+	m.refreshSearchMatches()
 	return cmd
 }
 
@@ -385,8 +387,8 @@ func (m Model) View() tea.View {
 // models is mid-input, since only one can be at a time (focus gates which
 // one a "/" keypress reaches).
 func (m Model) activeInputSearch() (search.Model, bool) {
-	if m.search.Mode() == search.SearchModeInput {
-		return m.search, true
+	if m.sidebar.Search.Mode() == search.SearchModeInput {
+		return m.sidebar.Search, true
 	}
 	if m.preview.Search.Mode() == search.SearchModeInput {
 		return m.preview.Search, true
@@ -414,8 +416,8 @@ func renderPanel(width, height int, title, rightTitle string, lines []string, ac
 }
 
 func (m Model) searchMatchStatus() string {
-	if m.search.HasQuery() && m.search.MatchesCount() > 0 {
-		return fmt.Sprintf("%d/%d matches", m.search.Cursor()+1, m.search.MatchesCount())
+	if s := m.sidebar.Search; s.HasQuery() && s.MatchesCount() > 0 {
+		return fmt.Sprintf("%d/%d matches", s.Cursor()+1, s.MatchesCount())
 	}
 	return ""
 }

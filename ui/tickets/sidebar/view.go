@@ -163,7 +163,7 @@ func (s Model) RenderTicketRow(env Env, epic tickets.Epic, r Row, rowIdx int) []
 	icon, style := rowfmt.StatusIconAndStyle(icons, status)
 
 	matched, _ := s.Tree.SearchMatch(rowIdx)
-	searchDim := env.HasQuery && !matched
+	searchDim := s.Search.HasQuery() && !matched
 	doneDim := status.Terminal()
 
 	title := rowfmt.RowTitle(icons, t)

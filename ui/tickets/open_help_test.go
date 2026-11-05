@@ -29,8 +29,8 @@ func TestOpenHelp_TicketsOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 	if !m.help.IsOpen {
 		t.Fatal("OpenHelp did not open help")
 	}
-	if m.search.Mode() != search.SearchModeNone || m.search.Query() != "" {
-		t.Fatalf("search not ended: mode %v query %q", m.search.Mode(), m.search.Query())
+	if s := m.sidebar.Search; s.Mode() != search.SearchModeNone || s.Query() != "" {
+		t.Fatalf("search not ended: mode %v query %q", s.Mode(), s.Query())
 	}
 }
 
