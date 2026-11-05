@@ -15,14 +15,7 @@ import (
 
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
-)
-
-var (
-	styleReason     = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	styleAction     = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	styleDetail     = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	styleLastScreen = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
-	styleHarness    = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
+	"github.com/elentok/gx/ui/agents/agentstyle"
 )
 
 // lastScreen is an Exited session's saved last screen; changedAt tells a
@@ -60,10 +53,10 @@ func (m Model) loadLastScreen() tea.Cmd {
 // status label and Session ticket.
 func (m Model) terminalTitle(s wire.SessionInfo, titleStyle lipgloss.Style) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	title := m.statusIcon(s, icons) + " " + titleStyle.Render(displayName(s)) + " " + statusLabel(s)
+	title := agentstyle.StatusIcon(s, icons, m.spinner.View()) + " " + titleStyle.Render(displayName(s)) + " " + agentstyle.StatusLabel(s)
 	rest := ""
 	if s.Ticket != "" {
-		rest += " " + styleTicket.Render(s.Ticket)
+		rest += " " + agentstyle.Ticket.Render(s.Ticket)
 	}
 	title += m.harnessLabelText(s, ansi.StringWidth(title)+ansi.StringWidth(rest)) + rest
 	if a := m.attach; a != nil && a.id == s.ID && a.offset > 0 {
@@ -71,10 +64,10 @@ func (m Model) terminalTitle(s wire.SessionInfo, titleStyle lipgloss.Style) stri
 		if a.newLines > 0 {
 			badge += fmt.Sprintf("  +%d new", a.newLines)
 		}
-		title += " " + styleDetail.Render(badge)
+		title += " " + agentstyle.Detail.Render(badge)
 	}
 	if m.copy != nil && m.copy.a.id == s.ID {
-		title += " " + styleDetail.Render("copy")
+		title += " " + agentstyle.Detail.Render("copy")
 	}
 	return title
 }
@@ -92,7 +85,7 @@ func (m Model) harnessLabelText(s wire.SessionInfo, used int) string {
 		return ""
 	}
 	label := ui.HarnessLabel(s.Harness, string(s.Tier), s.Model, s.Effort, s.ModelSwitched)
-	return " " + styleHarness.Render(ansi.Truncate(label, room-1, "…"))
+	return " " + agentstyle.Harness.Render(ansi.Truncate(label, room-1, "…"))
 }
 
 // terminalRightTitle is the AFK mark, project, dir and the time since the
@@ -104,7 +97,7 @@ func (m Model) terminalRightTitle(s wire.SessionInfo, width int) string {
 		afk = " AFK ·"
 	}
 	// The leading space keeps a gap once the title is truncated against it.
-	right := " " + s.Project + "  " + shortDir(m.settings.Home(), s.Dir)
+	right := " " + s.Project + "  " + agentstyle.ShortDir(m.settings.Home(), s.Dir)
 	if !s.StatusChangedAt.IsZero() {
 		right += "  for " + ui.DurationCompact(m.now().Sub(s.StatusChangedAt))
 	}
@@ -112,30 +105,6 @@ func (m Model) terminalRightTitle(s wire.SessionInfo, width int) string {
 		right = ansi.TruncateLeft(right, w-limit+1, "…")
 	}
 	return afk + right
-}
-
-func statusLabel(s wire.SessionInfo) string {
-	switch s.Status.State {
-	case wire.SessionStarting:
-		return styleStarting.Render("starting")
-	case wire.SessionWorking:
-		if s.Status.Background {
-			return styleWorking.Render("working") + styleBackground.Render(" +bg")
-		}
-		return styleWorking.Render("working")
-	case wire.SessionIdle:
-		return styleIdle.Render("idle")
-	case wire.SessionBlocked:
-		return styleBlocked.Render("blocked")
-	case wire.SessionRateLimited:
-		return styleRateLimited.Render("rate-limited")
-	case wire.SessionExited:
-		if s.Exit == wire.SessionExitCrashed {
-			return styleCrashed.Render("crashed")
-		}
-		return styleExited.Render("exited")
-	}
-	return s.Status.State
 }
 
 // terminalLines is the terminal panel body: the info row (then a blank row)
@@ -149,7 +118,7 @@ func (m Model) terminalLines(s wire.SessionInfo) []string {
 	if s.Status.State != wire.SessionExited && (live == nil || !live.exited) {
 		switch {
 		case live != nil && live.err != nil && !live.retrying:
-			return append(lines, styleReason.Render("attach failed: "+live.err.Error()))
+			return append(lines, agentstyle.Reason.Render("attach failed: "+live.err.Error()))
 		case live == nil || live.rows == nil:
 			return append(lines, ui.StyleMuted.Render("live screen not attached yet"))
 		}
@@ -163,7 +132,7 @@ func (m Model) terminalLines(s wire.SessionInfo) []string {
 		return lines
 	}
 	for _, row := range m.lastScreen.rows {
-		lines = append(lines, styleLastScreen.Render(ansi.Strip(row)))
+		lines = append(lines, agentstyle.LastScreen.Render(ansi.Strip(row)))
 	}
 	return lines
 }
@@ -226,42 +195,19 @@ func (m Model) screenSize() (cols, rows int) {
 // way to cancel.
 func infoRow(s wire.SessionInfo, now time.Time) string {
 	if s.Actionable.Reason != "" {
-		row := styleReason.Render(s.Actionable.Reason)
+		row := agentstyle.Reason.Render(s.Actionable.Reason)
 		if len(s.Actionable.Action) > 0 {
-			row += styleAction.Render("  <leader> a: " + strings.Join(s.Actionable.Action, " → "))
+			row += agentstyle.Action.Render("  <leader> a: " + strings.Join(s.Actionable.Action, " → "))
 		}
 		if s.AutoAdvanceAt != nil {
 			left := max(s.AutoAdvanceAt.Sub(now), 0)
-			row += styleDetail.Render(fmt.Sprintf("  Continuing in %ds", int((left+time.Second-1)/time.Second)))
-			row += styleAction.Render("  Cancel: session menu (m)")
+			row += agentstyle.Detail.Render(fmt.Sprintf("  Continuing in %ds", int((left+time.Second-1)/time.Second)))
+			row += agentstyle.Action.Render("  Cancel: session menu (m)")
 		}
 		return row
 	}
-	if d := statusDetail(s); d != "" {
-		return styleDetail.Render(d)
+	if d := agentstyle.StatusDetail(s); d != "" {
+		return agentstyle.Detail.Render(d)
 	}
 	return ""
-}
-
-func statusDetail(s wire.SessionInfo) string {
-	var parts []string
-	for _, p := range []string{s.Status.Kind, s.Status.Message} {
-		if p != "" {
-			parts = append(parts, p)
-		}
-	}
-	return strings.Join(parts, ": ")
-}
-
-func shortDir(home, dir string) string {
-	if home == "" {
-		return dir
-	}
-	if dir == home {
-		return "~"
-	}
-	if rest, ok := strings.CutPrefix(dir, home+string(filepath.Separator)); ok {
-		return "~/" + rest
-	}
-	return dir
 }

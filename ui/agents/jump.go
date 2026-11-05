@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/agentstyle"
 	"github.com/elentok/gx/ui/fuzzy"
 )
 
@@ -146,25 +147,25 @@ func (m Model) renderJump() string {
 // status change, status label and the Actionable reason or status detail.
 func (m Model) jumpRow(s wire.SessionInfo, w int) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	style := styleNameRead
+	style := agentstyle.NameRead
 	if s.Unread.Unread {
-		style = styleNameUnread
+		style = agentstyle.NameUnread
 	}
 	since := ""
 	if !s.StatusChangedAt.IsZero() {
 		since = ui.DurationCompact(m.now().Sub(s.StatusChangedAt))
 	}
 	// Some status glyphs render 2 cells wide; a fixed slot keeps columns aligned.
-	row := fit(m.statusIcon(s, icons), 2) + " " + marks(s, icons) +
-		fit(style.Render(displayName(s)), 18) + " " +
-		fit(styleProjectHeader.Render(s.Project), 12) + " " +
-		fit(ui.StyleMuted.Render(shortDir(m.settings.Home(), s.Dir)), 20) + " " +
-		fit(ui.StyleMuted.Render(since), 5) + " " +
-		statusLabel(s)
+	row := agentstyle.Fit(agentstyle.StatusIcon(s, icons, m.spinner.View()), 2) + " " + marks(s, icons) +
+		agentstyle.Fit(style.Render(displayName(s)), 18) + " " +
+		agentstyle.Fit(agentstyle.ProjectHeader.Render(s.Project), 12) + " " +
+		agentstyle.Fit(ui.StyleMuted.Render(agentstyle.ShortDir(m.settings.Home(), s.Dir)), 20) + " " +
+		agentstyle.Fit(ui.StyleMuted.Render(since), 5) + " " +
+		agentstyle.StatusLabel(s)
 	if s.Actionable.Reason != "" {
-		row += " " + styleReason.Render(s.Actionable.Reason)
-	} else if d := statusDetail(s); d != "" {
-		row += " " + styleDetail.Render(d)
+		row += " " + agentstyle.Reason.Render(s.Actionable.Reason)
+	} else if d := agentstyle.StatusDetail(s); d != "" {
+		row += " " + agentstyle.Detail.Render(d)
 	}
-	return fit(row, w)
+	return agentstyle.Fit(row, w)
 }

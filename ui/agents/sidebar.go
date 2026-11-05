@@ -3,15 +3,14 @@ package agents
 import (
 	"image/color"
 	"strconv"
-	"strings"
 
 	"github.com/elentok/gx/server/wire"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/agentstyle"
 )
 
 const sidebarWidth = 30
@@ -20,25 +19,6 @@ const sidebarWidth = 30
 // Actionable slots, 2 cells each, so a wide-rendering glyph never squeezes
 // its neighbour and names stay aligned.
 const markSlotsWidth = 5
-
-var (
-	styleProjectHeader = lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
-	styleNameRead      = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	styleNameUnread    = lipgloss.NewStyle().Foreground(ui.ColorText).Bold(true)
-	styleTicket        = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
-	styleBackground    = lipgloss.NewStyle().Foreground(ui.ColorTeal)
-	styleUnreadMark    = lipgloss.NewStyle().Foreground(ui.ColorMauve)
-	styleActionable    = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	styleDesign        = lipgloss.NewStyle().Foreground(ui.ColorMauve)
-
-	styleStarting    = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-	styleWorking     = lipgloss.NewStyle().Foreground(ui.ColorBlue)
-	styleIdle        = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	styleBlocked     = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	styleRateLimited = lipgloss.NewStyle().Foreground(ui.ColorMauve)
-	styleCrashed     = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
-	styleExited      = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
-)
 
 // sidebarRow is one rendered sidebar line; session is -1 for project headers
 // and group gaps.
@@ -88,7 +68,7 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 		if len(rows) > 0 {
 			rows = append(rows, sidebarRow{session: -1})
 		}
-		rows = append(rows, sidebarRow{text: styleProjectHeader.Render(icons.FolderClosed + " " + text), session: -1})
+		rows = append(rows, sidebarRow{text: agentstyle.ProjectHeader.Render(icons.FolderClosed + " " + text), session: -1})
 	}
 	// prev is the last session listed, to know when a header starts.
 	var prev *wire.SessionInfo
@@ -107,7 +87,7 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 			header(s.Project)
 		}
 		prev = &m.sessions[i]
-		row := fit(" "+m.statusIcon(s, icons)+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + marks(s, icons)
+		row := agentstyle.Fit(" "+agentstyle.StatusIcon(s, icons, m.spinner.View())+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + marks(s, icons)
 		if i == m.cursor {
 			row = ui.RenderRowHighlight(row)
 		}
@@ -239,43 +219,22 @@ func headerColors(active bool) (title, bg color.Color) {
 	return ui.ColorMauve, ui.ColorSurface
 }
 
-func (m Model) statusIcon(s wire.SessionInfo, icons ui.IconSet) string {
-	switch s.Status.State {
-	case wire.SessionStarting:
-		return styleStarting.Render(icons.AgentStarting)
-	case wire.SessionWorking:
-		return styleWorking.Render(m.spinner.View())
-	case wire.SessionIdle:
-		return styleIdle.Render(icons.TicketOpen)
-	case wire.SessionBlocked:
-		return styleBlocked.Render(icons.TicketPausedAnswer)
-	case wire.SessionRateLimited:
-		return styleRateLimited.Render(icons.TicketPaused)
-	case wire.SessionExited:
-		if s.Exit == wire.SessionExitCrashed {
-			return styleCrashed.Render(icons.TicketError)
-		}
-		return styleExited.Render(icons.AgentExited)
-	}
-	return " "
-}
-
 // sessionLabel is the Design mark, the name (bold when Unread), the teal +bg
 // while a background task runs, and the Session ticket.
 func sessionLabel(s wire.SessionInfo, icons ui.IconSet) string {
-	style := styleNameRead
+	style := agentstyle.NameRead
 	if s.Unread.Unread {
-		style = styleNameUnread
+		style = agentstyle.NameUnread
 	}
 	label := style.Render(displayName(s))
 	if s.Design {
-		label = styleDesign.Render(icons.DesignSession) + " " + label
+		label = agentstyle.Design.Render(icons.DesignSession) + " " + label
 	}
 	if s.Status.State == wire.SessionWorking && s.Status.Background {
-		label += styleBackground.Render(" +bg")
+		label += agentstyle.Background.Render(" +bg")
 	}
 	if s.Ticket != "" {
-		label += " " + styleTicket.Render(s.Ticket)
+		label += " " + agentstyle.Ticket.Render(s.Ticket)
 	}
 	return label
 }
@@ -288,10 +247,10 @@ func marks(s wire.SessionInfo, icons ui.IconSet) string {
 		return unread + " " + actionable + " "
 	}
 	if s.Unread.Unread {
-		unread = styleUnreadMark.Render(icons.Unread)
+		unread = agentstyle.UnreadMark.Render(icons.Unread)
 	}
 	if isActionable(s) {
-		actionable = styleActionable.Render(icons.SuggestedAction)
+		actionable = agentstyle.Actionable.Render(icons.SuggestedAction)
 	}
 	return unread + " " + actionable + " "
 }
@@ -300,16 +259,4 @@ func marks(s wire.SessionInfo, icons ui.IconSet) string {
 // without a recorded reason.
 func isActionable(s wire.SessionInfo) bool {
 	return s.Actionable.Reason != "" || s.Status.State == wire.SessionBlocked
-}
-
-// fit truncates or pads s to exactly w cells.
-func fit(s string, w int) string {
-	if w <= 0 {
-		return ""
-	}
-	s = ansi.Truncate(s, w, "…")
-	if pad := w - ansi.StringWidth(s); pad > 0 {
-		s += strings.Repeat(" ", pad)
-	}
-	return s
 }

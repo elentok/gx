@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/agentstyle"
 	"github.com/elentok/gx/ui/fuzzy"
 )
 
@@ -285,7 +286,7 @@ func entryLabel(home string, e formEntry) string {
 	if e.newWorktree() {
 		return newWorktreeLabel
 	}
-	return shortDir(home, e.dir)
+	return agentstyle.ShortDir(home, e.dir)
 }
 
 // selected is the chosen entry; false when nothing matches.
@@ -522,12 +523,12 @@ func (m Model) renderCreate() string {
 		if f.field == fl {
 			cursor = "▏"
 		}
-		return fit(fit(label(fl, name), 12)+value+cursor, w)
+		return agentstyle.Fit(agentstyle.Fit(label(fl, name), 12)+value+cursor, w)
 	}
 	var lines []string
 	switch {
 	case f.loadErr != "":
-		lines = append(lines, styleCrashed.Render(f.loadErr))
+		lines = append(lines, agentstyle.Crashed.Render(f.loadErr))
 	case f.projects == nil:
 		lines = append(lines, ui.StyleMuted.Render("loading projects…"))
 	case len(f.projects) == 0:
@@ -542,13 +543,13 @@ func (m Model) renderCreate() string {
 		}
 		lines = append(lines, textLine(fieldName, "Name", f.name, innerW), textLine(fieldPrompt, "Prompt", f.prompt, innerW))
 		if f.prefill.Ticket != "" {
-			lines = append(lines, fit(ui.StyleMuted.Render("  Ticket")+"    "+styleTicket.Render(f.prefill.Ticket), innerW))
+			lines = append(lines, agentstyle.Fit(ui.StyleMuted.Render("  Ticket")+"    "+agentstyle.Ticket.Render(f.prefill.Ticket), innerW))
 		}
 	}
 	hint := createHint
 	switch {
 	case f.err != "":
-		hint = styleCrashed.Render(f.err)
+		hint = agentstyle.Crashed.Render(f.err)
 	case f.sending:
 		hint = ui.StyleMuted.Render("creating…")
 	}
@@ -576,7 +577,7 @@ func (m Model) renderPicker(innerW int) []string {
 	var lines []string
 	for _, r := range rows[f.offset:end] {
 		if r.entry < 0 {
-			lines = append(lines, fit("  "+styleProjectHeader.Render(f.projects[r.project].Name), innerW))
+			lines = append(lines, agentstyle.Fit("  "+agentstyle.ProjectHeader.Render(f.projects[r.project].Name), innerW))
 			continue
 		}
 		e := f.matches[r.entry]
@@ -586,7 +587,7 @@ func (m Model) renderPicker(innerW int) []string {
 				text += ui.StyleMuted.Render("  " + plural(n, "session"))
 			}
 		}
-		row := fit(text, innerW)
+		row := agentstyle.Fit(text, innerW)
 		if r.entry == f.sel {
 			row = ui.RenderRowHighlight(row)
 		}
