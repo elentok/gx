@@ -10,8 +10,7 @@ import (
 )
 
 func TestServerStats_HasJSONRangeAndProjectFlags(t *testing.T) {
-	root := newRootCmd(deps{})
-	c, _, err := root.Find([]string{"server", "stats"})
+	c, _, err := serverParent(Deps{}).Find([]string{"stats"})
 	if err != nil || c.RunE == nil {
 		t.Fatalf("server stats = %v, err %v; want a runnable verb", c, err)
 	}

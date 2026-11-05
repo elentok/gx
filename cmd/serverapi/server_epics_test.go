@@ -3,14 +3,15 @@ package serverapi
 import (
 	"bytes"
 	"context"
-	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestPrintEpicDetail_ShowsQueueable(t *testing.T) {
@@ -100,8 +101,7 @@ func TestPrintEpicList_FinishedIsCappedUnlessAllFinished(t *testing.T) {
 }
 
 func TestServerEpicsList_HasJSONFlag(t *testing.T) {
-	root := newRootCmd(deps{})
-	c, _, err := root.Find([]string{"server", "epics"})
+	c, _, err := serverParent(Deps{}).Find([]string{"epics"})
 	if err != nil || c.Flags().Lookup("json") == nil || c.RunE == nil {
 		t.Errorf("server epics = %v, err %v; want a runnable verb with --json", c, err)
 	}
@@ -109,11 +109,7 @@ func TestServerEpicsList_HasJSONFlag(t *testing.T) {
 
 func TestServerEpicsMerge_RejectsNonEpicAddresses(t *testing.T) {
 	for _, args := range [][]string{{}, {"proj:epic/01"}, {"epic"}, {"proj:a", "proj:b"}} {
-		root := newRootCmd(deps{})
-		root.SetArgs(append([]string{"server", "epics", "merge"}, args...))
-		root.SetOut(&bytes.Buffer{})
-		root.SetErr(&bytes.Buffer{})
-		if err := root.Execute(); err == nil {
+		if err := execute(t, append([]string{"server", "epics", "merge"}, args...), Deps{}); err == nil {
 			t.Errorf("args %q: want an error", args)
 		}
 	}
@@ -156,7 +152,7 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 }
 
 func TestServerEpicsMerge_RefusesWhenNoServerRunning(t *testing.T) {
-	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
+	cl := apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock"))
 	err := cmdbase.RunServerQueueWrite(context.Background(), cl, &bytes.Buffer{}, false,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.Tickets.EpicMerge(ctx, "proj:epic")

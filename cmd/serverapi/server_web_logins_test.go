@@ -23,7 +23,7 @@ func TestWebLogins_JSONListsEveryLoginWithItsFiveFields(t *testing.T) {
 	finishWebSetup(t, h)
 
 	var out bytes.Buffer
-	if err := execute([]string{"server", "web-logins", "--json"}, webResetDeps(t, h, "", false, &out)); err != nil {
+	if err := execute(t, []string{"server", "web-logins", "--json"}, webResetDeps(t, h, "", false, &out)); err != nil {
 		t.Fatal(err)
 	}
 	var raw struct {
@@ -62,7 +62,7 @@ func TestWebRevoke_EndsTheOpenEventStreamAndLogsLikeAWebRevoke(t *testing.T) {
 	go func() { _, _ = io.Copy(io.Discard, stream.Body); close(ended) }()
 
 	var out bytes.Buffer
-	if err := execute([]string{"server", "web-revoke", id}, webResetDeps(t, h, "", false, &out)); err != nil {
+	if err := execute(t, []string{"server", "web-revoke", id}, webResetDeps(t, h, "", false, &out)); err != nil {
 		t.Fatal(err)
 	}
 	select {

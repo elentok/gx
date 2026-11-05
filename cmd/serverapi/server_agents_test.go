@@ -9,12 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentlog"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/nativerunner/holder"
 )
 
@@ -31,7 +32,7 @@ func readLines(t *testing.T, path string) []string {
 // run, and returns a Log whose Offset skips that line.
 func agentLogFixture(t *testing.T) agentlog.Log {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "agentlog", "testdata", "out.jsonl"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "agentlog", "testdata", "out.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,23 +61,23 @@ func assertLines(t *testing.T, got, want []string) {
 }
 
 func TestAgentsWatch_Dump(t *testing.T) {
-	golden := readLines(t, filepath.Join("..", "agentlog", "testdata", "out.golden"))
+	golden := readLines(t, filepath.Join("..", "..", "agentlog", "testdata", "out.golden"))
 	assertLines(t, watchOutput(t, agentLogFixture(t), agentsWatchOpts{}), golden)
 }
 
 func TestAgentsWatch_Tail(t *testing.T) {
-	golden := readLines(t, filepath.Join("..", "agentlog", "testdata", "out.golden"))
+	golden := readLines(t, filepath.Join("..", "..", "agentlog", "testdata", "out.golden"))
 	assertLines(t, watchOutput(t, agentLogFixture(t), agentsWatchOpts{Tail: 3}), golden[len(golden)-3:])
 }
 
 func TestAgentsWatch_JSON(t *testing.T) {
-	raw := readLines(t, filepath.Join("..", "agentlog", "testdata", "out.jsonl"))
+	raw := readLines(t, filepath.Join("..", "..", "agentlog", "testdata", "out.jsonl"))
 	assertLines(t, watchOutput(t, agentLogFixture(t), agentsWatchOpts{JSON: true}), raw)
 	assertLines(t, watchOutput(t, agentLogFixture(t), agentsWatchOpts{JSON: true, Tail: 2}), raw[len(raw)-2:])
 }
 
 func TestAgentsWatch_FollowExitsWhenAgentEnded(t *testing.T) {
-	golden := readLines(t, filepath.Join("..", "agentlog", "testdata", "out.golden"))
+	golden := readLines(t, filepath.Join("..", "..", "agentlog", "testdata", "out.golden"))
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var out bytes.Buffer
@@ -89,34 +90,17 @@ func TestAgentsWatch_FollowExitsWhenAgentEnded(t *testing.T) {
 	assertLines(t, strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n"), golden)
 }
 
-type syncBuffer struct {
-	mu sync.Mutex
-	b  bytes.Buffer
-}
-
-func (s *syncBuffer) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.b.Write(p)
-}
-
-func (s *syncBuffer) String() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.b.String()
-}
-
 func TestAgentsWatch_FollowStreamsUntilEnd(t *testing.T) {
 	log := agentLogFixture(t)
 	var ended atomic.Bool
 	log.Ended = ended.Load
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	var out syncBuffer
+	var out cmdtest.SyncBuffer
 	done := make(chan error, 1)
 	go func() { done <- runAgentsWatch(ctx, log, agentsWatchOpts{Follow: true, Tail: 1}, &out) }()
 
-	waitFor(t, ctx, func() bool { return strings.Contains(out.String(), "[result] error") })
+	cmdtest.WaitFor(t, ctx, func() bool { return strings.Contains(out.String(), "[result] error") })
 	f, err := os.OpenFile(log.Path, os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +110,7 @@ func TestAgentsWatch_FollowStreamsUntilEnd(t *testing.T) {
 	time.Sleep(2 * cmdbase.LogFollowInterval)
 	_, _ = f.WriteString(`"result":"late"}` + "\n")
 	f.Close()
-	waitFor(t, ctx, func() bool { return strings.Contains(out.String(), "late") })
+	cmdtest.WaitFor(t, ctx, func() bool { return strings.Contains(out.String(), "late") })
 	ended.Store(true)
 
 	if err := <-done; err != nil {

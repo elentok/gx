@@ -121,7 +121,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 
 - `cmd/` — CLI commands (`gx tickets`, `gx agent`, ...)
   - `cmd/` (root) — the command tree and the commands not yet moved out
-  - `cmd/cmdbase` — what every command package shares: `Env`, `ExitError`, provenance and JSON output, server-client helpers
+  - `cmd/cmdbase` — what every command package shares: `Env`, `ExitError`, provenance and JSON output, server-client helpers, `NewTicketsAnswerCmd` (root and `server tickets answer`), `LogFollowInterval`, `WriteConfigBlock` and `SetupCodeLine` (shared with `gx server status`)
   - `cmd/cmdtest` — test plumbing for the cmd packages (imports `testing`): `EnvFor`/`TempEnv`, `Main`/`MainWithGx` for TestMain, `Run` (mini root), `SetWaitHook`, ticket-store/git/server fixtures (`fixtures.go`: `IsolateTicketStore`, `AddProject`, `WriteTicketFile`, `MergeTestRepo`, `ShortTempDir`, ...)
   - `cmd/brief` — `gx brief` (`New`, `Deps` with the `go-clean-cache` gate hooks)
   - `cmd/check` — `gx check` (`New`, `Deps` with the `LoadAvg` hook)
@@ -133,6 +133,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/term` — `gx term` (`New`, `Deps` with the `GOOS` field)
   - `cmd/limits` — `gx budget`, `gx usage`, `gx afk`, `gx vimode` (`New`, `NewUsage`, `NewAFK`, `NewViMode`, `Deps` with no hooks of its own; `BudgetLine` is called by `gx server status`)
   - `cmd/project` — `gx project` (`New`, `Deps` with the `RunEditor` and `StdinIsTerminal` hooks, `DefaultDeps`)
+  - `cmd/serverapi` — the `gx server` verbs that only call the server API (`Commands`, `Deps` with the `StdinIsTerminal` hook for the web password prompt; `DecideOneOff` is called by `gx evolve`)
   - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
 - `server/` — the gx server; `server/servertest/` holds its test helpers; `server/wire/` holds the

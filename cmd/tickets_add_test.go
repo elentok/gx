@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/testutil"
@@ -29,7 +30,7 @@ func TestRunTicketsAdd_WaitsForProjectMigrationAndSaysSo(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer projectlock.SetWaitHookDelayForTest(50 * time.Millisecond)()
-	var notice syncBuffer
+	var notice cmdtest.SyncBuffer
 	defer cmdbase.RegisterMigrationWaitNotice(&notice)()
 
 	unlock, err := projectlock.Exclusive(project)
@@ -43,7 +44,7 @@ func TestRunTicketsAdd_WaitsForProjectMigrationAndSaysSo(t *testing.T) {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	waitFor(t, ctx, func() bool { return notice.String() != "" })
+	cmdtest.WaitFor(t, ctx, func() bool { return notice.String() != "" })
 	select {
 	case err := <-done:
 		t.Fatalf("add returned while the project migrated: %v", err)

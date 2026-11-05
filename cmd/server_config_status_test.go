@@ -1,4 +1,4 @@
-package serverapi
+package cmd
 
 import (
 	"bytes"
@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -38,7 +40,8 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	}
 
 	out.Reset()
-	if err := runConfigStatus(ctx, h.Client, &out, true); err != nil {
+	d := deps{stdout: &out, stderr: &bytes.Buffer{}, env: cmdtest.EnvFor(t), serverClient: func() (*apiclient.Client, error) { return h.Client, nil }}
+	if err := execute([]string{"server", "config-status", "--json"}, d); err != nil {
 		t.Fatal(err)
 	}
 	var st wire.ConfigStatus
@@ -161,7 +164,7 @@ func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing
 func TestServerStatus_NoSetupCodeAfterSetup(t *testing.T) {
 	dirs := config.DirsFrom(tempEnv(t))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	finishWebSetup(t, h)
+	cmdtest.FinishWebSetup(t, h)
 
 	var out, js bytes.Buffer
 	if err := runServerStatusWith(context.Background(), dirs, h.Client, false, &out); err != nil {
@@ -172,5 +175,44 @@ func TestServerStatus_NoSetupCodeAfterSetup(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "setup code") || strings.Contains(js.String(), "web_setup_code") {
 		t.Errorf("status holds a setup code after setup:\n%s\n%s", out.String(), js.String())
+	}
+}
+
+// Story 113: gx server status prints no TOTP secret or otpauth:// URI.
+func TestServerStatus_NeverPrintsATOTPSecret(t *testing.T) {
+	secretLeak := regexp.MustCompile(`otpauth://|\b[A-Z2-7]{32}\b`)
+	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	check := func(stage string) {
+		for _, jsonOut := range []bool{false, true} {
+			var out bytes.Buffer
+			if err := runServerStatusWith(context.Background(), config.DirsFrom(tempEnv(t)), h.Client, jsonOut, &out); err != nil {
+				t.Fatalf("%s: %v", stage, err)
+			}
+			if secretLeak.MatchString(out.String()) {
+				t.Errorf("%s: json=%v printed a secret:\n%s", stage, jsonOut, out.String())
+			}
+		}
+	}
+	check("setup pending")
+	cmdtest.FinishWebSetup(t, h)
+	check("after setup")
+}
+
+func TestServerStatus_NotRunningFromATempEnv(t *testing.T) {
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: tempEnv(t)}
+	if err := execute([]string{"server", "status"}, d); err != nil {
+		t.Fatalf("server status: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "not running") {
+		t.Errorf("status = %q, want it to say not running", stdout.String())
+	}
+}
+
+func TestWebToken_CommandIsGone(t *testing.T) {
+	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, env: tempEnv(t)}
+	err := execute([]string{"server", "web-token"}, d)
+	if err == nil || !strings.Contains(err.Error(), "unknown command") {
+		t.Errorf("err = %v, want unknown command", err)
 	}
 }

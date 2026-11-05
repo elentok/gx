@@ -14,13 +14,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -29,82 +28,12 @@ func startWebServer(t *testing.T) *servertest.Harness {
 	return servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 }
 
-func TestServerStatus_NotRunningFromATempEnv(t *testing.T) {
-	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: tempEnv(t)}
-	if err := execute([]string{"server", "status"}, d); err != nil {
-		t.Fatalf("server status: %v", err)
-	}
-	if !strings.Contains(stdout.String(), "not running") {
-		t.Errorf("status = %q, want it to say not running", stdout.String())
-	}
-}
-
 func TestServerWebURL_NoHomeInEnvIsAnError(t *testing.T) {
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}
-	err := execute([]string{"server", "web-url"}, d)
+	d := Deps{Env: cmdbase.Env{Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}}}
+	err := execute(t, []string{"server", "web-url"}, d)
 	if err == nil || !strings.Contains(err.Error(), "no HOME in env") {
 		t.Errorf("err = %v, want it to mention no HOME in env", err)
 	}
-}
-
-func TestWebToken_CommandIsGone(t *testing.T) {
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, env: tempEnv(t)}
-	err := execute([]string{"server", "web-token"}, d)
-	if err == nil || !strings.Contains(err.Error(), "unknown command") {
-		t.Errorf("err = %v, want unknown command", err)
-	}
-}
-
-// finishWebSetup sets the web account up through the real routes, so the server
-// stops showing a Setup code.
-// It returns the first web login's cookie.
-func finishWebSetup(t *testing.T, h *servertest.Harness) *http.Cookie {
-	t.Helper()
-	cookie, _ := finishWebSetupWithSecret(t, h)
-	return cookie
-}
-
-// finishWebSetupWithSecret is finishWebSetup that also returns the authenticator secret.
-func finishWebSetupWithSecret(t *testing.T, h *servertest.Harness) (*http.Cookie, string) {
-	t.Helper()
-	var login *http.Cookie
-	info, err := h.Client.Web.Info(context.Background())
-	if err != nil || !info.SetupPending {
-		t.Fatalf("web info %+v, %v; want setup pending", info, err)
-	}
-	client := &http.Client{Transport: servertest.WebTransport()}
-	post := func(path, body string) []byte {
-		req, err := http.NewRequest(http.MethodPost, info.BaseURL+path, strings.NewReader(body))
-		if err != nil {
-			t.Fatal(err)
-		}
-		req.Header.Set("Origin", info.BaseURL)
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
-		if cs := resp.Cookies(); len(cs) > 0 {
-			login = cs[0]
-		}
-		b, _ := io.ReadAll(resp.Body)
-		return b
-	}
-	var start struct{ Secret string }
-	if err := json.Unmarshal(post("/v1/web/auth/setup-start", `{"code":"`+info.SetupCode+`"}`), &start); err != nil || start.Secret == "" {
-		t.Fatalf("setup-start: %v, secret %q", err, start.Secret)
-	}
-	totp, err := webauth.TOTPCode(start.Secret, time.Now().Unix()/30)
-	if err != nil {
-		t.Fatal(err)
-	}
-	post("/v1/web/auth/setup-finish", `{"code":"`+info.SetupCode+`","password":"correct horse battery","totp_code":"`+totp+`"}`)
-	if after, _ := h.Client.Web.Info(context.Background()); after.SetupPending {
-		t.Fatalf("setup still pending after setup-finish: %+v", after)
-	}
-	return login, start.Secret
 }
 
 // webLoginsStatus is the status the web logins list answers an old or new cookie with.
@@ -125,14 +54,16 @@ func webLoginsStatus(t *testing.T, baseURL string, cookie *http.Cookie) int {
 	return resp.StatusCode
 }
 
-func webResetDeps(t *testing.T, h *servertest.Harness, stdin string, tty bool, out *bytes.Buffer) deps {
-	return deps{
-		env:             tempEnv(t),
-		stdout:          out,
-		stderr:          &bytes.Buffer{},
-		stdin:           strings.NewReader(stdin),
-		stdinIsTerminal: func() bool { return tty },
-		serverClient:    func() (*apiclient.Client, error) { return h.Client, nil },
+func webResetDeps(t *testing.T, h *servertest.Harness, stdin string, tty bool, out *bytes.Buffer) Deps {
+	return Deps{
+		Env: cmdbase.Env{
+			Env:       cmdtest.TempEnv(t),
+			Stdout:    out,
+			Stderr:    &bytes.Buffer{},
+			Stdin:     strings.NewReader(stdin),
+			NewClient: func() (*apiclient.Client, error) { return h.Client, nil },
+		},
+		StdinIsTerminal: func() bool { return tty },
 	}
 }
 
@@ -144,7 +75,7 @@ func TestWebReset_YesClearsEverythingAndPrintsANewCode(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := execute([]string{"server", "web-reset", "--yes", "--json"}, webResetDeps(t, h, "", false, &out)); err != nil {
+	if err := execute(t, []string{"server", "web-reset", "--yes", "--json"}, webResetDeps(t, h, "", false, &out)); err != nil {
 		t.Fatal(err)
 	}
 	var got wire.WebInfo
@@ -155,13 +86,8 @@ func TestWebReset_YesClearsEverythingAndPrintsANewCode(t *testing.T) {
 		t.Errorf("result = %+v, want a pending setup with a new code", got)
 	}
 
-	var status bytes.Buffer
-	if err := runServerStatusWith(context.Background(), config.DirsFrom(tempEnv(t)), h.Client, true, &status); err != nil {
-		t.Fatal(err)
-	}
-	var st StatusInfo
-	if err := json.Unmarshal(status.Bytes(), &st); err != nil || st.WebSetupCode != got.SetupCode {
-		t.Errorf("status --json web_setup_code = %q (err %v), want %q", st.WebSetupCode, err, got.SetupCode)
+	if code := mustWebInfo(t, h).SetupCode; code != got.SetupCode {
+		t.Errorf("web info setup code = %q, want %q", code, got.SetupCode)
 	}
 	if got := webLoginsStatus(t, mustWebInfo(t, h).BaseURL, old); got != http.StatusUnauthorized {
 		t.Errorf("old cookie after reset = %d, want 401", got)
@@ -185,7 +111,7 @@ func TestWebReset_WithoutATerminalOrYesRefusesAndChangesNothing(t *testing.T) {
 	h := startWebServer(t)
 	old := finishWebSetup(t, h)
 	var out bytes.Buffer
-	err := execute([]string{"server", "web-reset"}, webResetDeps(t, h, "y\n", false, &out))
+	err := execute(t, []string{"server", "web-reset"}, webResetDeps(t, h, "y\n", false, &out))
 	if err == nil || !strings.Contains(err.Error(), "--yes") {
 		t.Errorf("err = %v, want a refusal naming --yes", err)
 	}
@@ -203,7 +129,7 @@ func TestWebReset_AsksOnATerminal(t *testing.T) {
 			h := startWebServer(t)
 			old := finishWebSetup(t, h)
 			var out bytes.Buffer
-			if err := execute([]string{"server", "web-reset"}, webResetDeps(t, h, tc.answer, true, &out)); err != nil {
+			if err := execute(t, []string{"server", "web-reset"}, webResetDeps(t, h, tc.answer, true, &out)); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.Contains(out.String(), "[y/N]") {

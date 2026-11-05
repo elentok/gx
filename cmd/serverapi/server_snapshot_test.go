@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/events"
 )
 
@@ -48,11 +49,8 @@ func TestServerEventsKinds_JSONCarriesHerdrCause(t *testing.T) {
 }
 
 func TestServerEventsKinds_ViaRootCommand(t *testing.T) {
-	root := newRootCmd(deps{})
 	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetArgs([]string{"server", "events", "kinds", "--json"})
-	if err := root.Execute(); err != nil {
+	if err := execute(t, []string{"server", "events", "kinds", "--json"}, Deps{Env: cmdbase.Env{Stdout: &out}}); err != nil {
 		t.Fatal(err)
 	}
 	if !json.Valid(out.Bytes()) {

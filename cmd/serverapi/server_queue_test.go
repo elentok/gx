@@ -6,18 +6,18 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/wire"
 )
 
 func TestServerQueueAdd_RefusesWhenNoServerRunning(t *testing.T) {
-	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
+	cl := apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock"))
 	var out bytes.Buffer
 	err := cmdbase.RunServerQueueWrite(context.Background(), cl, &out, false,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
@@ -30,7 +30,7 @@ func TestServerQueueAdd_RefusesWhenNoServerRunning(t *testing.T) {
 
 // Story 18: --agent overrides for one launch; no flag sends an empty agent.
 func TestServerQueueAdd_AgentFlagReachesTheServerRequest(t *testing.T) {
-	sock := filepath.Join(shortTempDir(t), "a.sock")
+	sock := filepath.Join(cmdtest.ShortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func TestServerQueueAdd_AgentFlagReachesTheServerRequest(t *testing.T) {
 		want string
 	}{{[]string{"add", "proj:epic/01", "--agent", "codex"}, "codex"}, {[]string{"add", "proj:epic/01"}, ""}} {
 		got = wire.QueueRequest{}
-		c := newServerQueueCmd(deps{env: envFor(t), serverClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }})
+		c := newServerQueueCmd(Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t), NewClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }}})
 		c.SetArgs(tc.args)
 		c.SetOut(&bytes.Buffer{})
 		if err := c.Execute(); err != nil {
@@ -60,16 +60,4 @@ func TestServerQueueAdd_AgentFlagReachesTheServerRequest(t *testing.T) {
 			t.Errorf("%v sent agent %q, want %q", tc.args, got.Agent, tc.want)
 		}
 	}
-}
-
-// shortTempDir keeps the socket path under the unix sun_path limit, which
-// t.TempDir() exceeds on macOS.
-func shortTempDir(t *testing.T) string {
-	t.Helper()
-	dir, err := os.MkdirTemp("/tmp", "gx")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
 }

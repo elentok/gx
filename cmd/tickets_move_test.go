@@ -10,6 +10,7 @@ import (
 
 	"errors"
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
@@ -409,7 +410,7 @@ func moveWithServer(t *testing.T, f moveFixture, cl func() (*apiclient.Client, e
 
 func fakeMoveServer(t *testing.T, queue []wire.QueueItem, live []wire.IterationInfo) (func() (*apiclient.Client, error), *[]string) {
 	t.Helper()
-	sock := filepath.Join(shortTempDir(t), "a.sock")
+	sock := filepath.Join(cmdtest.ShortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -478,7 +479,7 @@ func TestTicketsMove_ServerDownReadsPersistedQueueAndRuns(t *testing.T) {
 			}
 			testutil.WriteFile(t, filepath.Join(stateDir, "gx"), file, `[{"address":"mine:src/01"}]`)
 			down := func() (*apiclient.Client, error) {
-				return apiclient.New(filepath.Join(shortTempDir(t), "none.sock")), nil
+				return apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "none.sock")), nil
 			}
 			requireMoveActive(t, moveWithServer(t, f, down))
 		})

@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/ticketops"
@@ -21,7 +23,7 @@ import (
 
 func TestServerRepair_IgnoreLiveTabHelpNamesTheAgentSession(t *testing.T) {
 	parent := &cobra.Command{Use: "repair"}
-	addServerRepairCmds(parent, defaultDeps())
+	addServerRepairCmds(parent, Deps{})
 	merge, _, err := parent.Find([]string{"merge"})
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +38,7 @@ func TestServerRepair_IgnoreLiveTabHelpNamesTheAgentSession(t *testing.T) {
 }
 
 func TestServerRepair_ResumeTierFlagReachesTheRequest(t *testing.T) {
-	sock := filepath.Join(shortTempDir(t), "a.sock")
+	sock := filepath.Join(cmdtest.ShortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +54,7 @@ func TestServerRepair_ResumeTierFlagReachesTheRequest(t *testing.T) {
 	t.Cleanup(func() { _ = srv.Close() })
 
 	parent := &cobra.Command{Use: "tickets"}
-	addServerRepairCmds(parent, deps{env: envFor(t), serverClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }})
+	addServerRepairCmds(parent, Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t), NewClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }}})
 	parent.SetArgs([]string{"resume", "proj:epic-a/01", "--tier", "worker"})
 	parent.SetOut(&bytes.Buffer{})
 	if err := parent.Execute(); err != nil {
@@ -63,10 +65,23 @@ func TestServerRepair_ResumeTierFlagReachesTheRequest(t *testing.T) {
 	}
 }
 
+func TestServerRepairJSON_ReportsServerVia(t *testing.T) {
+	cl := apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock"))
+	var out bytes.Buffer
+	if err := runServerRepair(context.Background(), cl, &out, true, "resume", wire.RepairRequest{Address: "p:e/01"},
+		func(string, wire.RepairRequest) (wire.RepairResult, error) { return wire.RepairResult{}, nil }); err != nil {
+		t.Fatalf("runServerRepair: %v", err)
+	}
+	got := cmdtest.DecodeJSON(t, out.Bytes())
+	if got["via"] != "server" || got["actor"] != "recovery" {
+		t.Errorf("via/actor = %v/%v; want server/recovery", got["via"], got["actor"])
+	}
+}
+
 func TestServerRepair_RunsDirectlyWhenNoServerRunning(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
+	cl := apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock"))
 	direct := func(verb string, req wire.RepairRequest) (wire.RepairResult, error) {
 		return ticketops.RunRepairDirect(store, verb, req)
 	}

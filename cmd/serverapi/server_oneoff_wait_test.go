@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -87,7 +88,7 @@ func runWaitTimeout(t *testing.T, f *fakeSource, timeout time.Duration) (stdout 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	err := runOneOffWait(ctx, f, f.moved, &out, &errOut, "gx:p/1", timeout)
-	var exitErr *ExitError
+	var exitErr *cmdbase.ExitError
 	if errors.As(err, &exitErr) {
 		return out.String(), exitErr.Code
 	}

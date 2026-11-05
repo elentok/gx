@@ -59,7 +59,7 @@ func TestWebPassword_StdinSignsEveryLoginOutAndTheNewPasswordLogsIn(t *testing.T
 
 	var out bytes.Buffer
 	args := []string{"server", "web-password", "--password-stdin", "--json"}
-	if err := execute(args, webResetDeps(t, h, newWebPassword+"\n", false, &out)); err != nil {
+	if err := execute(t, args, webResetDeps(t, h, newWebPassword+"\n", false, &out)); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
 	if list, _ := h.Client.Web.Logins(context.Background()); len(list.Logins) != 0 {
@@ -93,7 +93,7 @@ func TestWebPassword_StdinEndsTheOpenEventStream(t *testing.T) {
 	ended := make(chan struct{})
 	go func() { _, _ = io.Copy(io.Discard, stream.Body); close(ended) }()
 
-	if err := execute([]string{"server", "web-password", "--password-stdin"}, webResetDeps(t, h, newWebPassword+"\n", false, &bytes.Buffer{})); err != nil {
+	if err := execute(t, []string{"server", "web-password", "--password-stdin"}, webResetDeps(t, h, newWebPassword+"\n", false, &bytes.Buffer{})); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -107,7 +107,7 @@ func TestWebPassword_ShortPasswordIsRefusedWithItsReason(t *testing.T) {
 	h := startWebServer(t)
 	old := finishWebSetup(t, h)
 	var out bytes.Buffer
-	err := execute([]string{"server", "web-password", "--password-stdin", "--json"}, webResetDeps(t, h, "short\n", false, &out))
+	err := execute(t, []string{"server", "web-password", "--password-stdin", "--json"}, webResetDeps(t, h, "short\n", false, &out))
 	if err == nil || !strings.Contains(err.Error(), wire.ReasonPasswordTooShort) {
 		t.Errorf("err = %v, want %s", err, wire.ReasonPasswordTooShort)
 	}
@@ -122,7 +122,7 @@ func TestWebPassword_ShortPasswordIsRefusedWithItsReason(t *testing.T) {
 func TestWebPassword_NoTerminalAndNoStdinFlagRefuses(t *testing.T) {
 	h := startWebServer(t)
 	finishWebSetup(t, h)
-	err := execute([]string{"server", "web-password"}, webResetDeps(t, h, newWebPassword+"\n", false, &bytes.Buffer{}))
+	err := execute(t, []string{"server", "web-password"}, webResetDeps(t, h, newWebPassword+"\n", false, &bytes.Buffer{}))
 	if err == nil || !strings.Contains(err.Error(), "--password-stdin") {
 		t.Errorf("err = %v, want a refusal naming --password-stdin", err)
 	}
@@ -164,10 +164,10 @@ func runOnPty(t *testing.T, h *servertest.Harness, answers ...string) (string, e
 	defer master.Close()
 	defer tty.Close()
 	d := webResetDeps(t, h, "", true, &bytes.Buffer{})
-	d.stdin, d.stdout = tty, tty
+	d.Stdin, d.Stdout = tty, tty
 
 	done := make(chan error, 1)
-	go func() { done <- execute([]string{"server", "web-password"}, d) }()
+	go func() { done <- execute(t, []string{"server", "web-password"}, d) }()
 	var screen strings.Builder
 	for i, answer := range answers {
 		prompt := "New web password: "

@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -53,21 +54,8 @@ func TestTicketsSetJSON_IterationStatusFromAgent(t *testing.T) {
 	}
 }
 
-func TestServerRepairJSON_ReportsServerVia(t *testing.T) {
-	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
-	var out bytes.Buffer
-	if err := runServerRepair(context.Background(), cl, &out, true, "resume", wire.RepairRequest{Address: "p:e/01"},
-		func(string, wire.RepairRequest) (wire.RepairResult, error) { return wire.RepairResult{}, nil }); err != nil {
-		t.Fatalf("runServerRepair: %v", err)
-	}
-	got := decodeJSON(t, out.Bytes())
-	if got["via"] != "server" || got["actor"] != "recovery" {
-		t.Errorf("via/actor = %v/%v; want server/recovery", got["via"], got["actor"])
-	}
-}
-
 func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
-	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
+	cl := apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock"))
 	var out bytes.Buffer
 	err := cmdbase.RunServerQueueWrite(context.Background(), cl, &out, true,
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {

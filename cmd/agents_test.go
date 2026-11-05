@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -99,7 +100,7 @@ func TestAgentsScreen_JSON(t *testing.T) {
 }
 
 func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
-	sock := filepath.Join(shortTempDir(t), "a.sock")
+	sock := filepath.Join(cmdtest.ShortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +136,7 @@ func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
 }
 
 func TestAgentsCreateCmd_Tier(t *testing.T) {
-	sock := filepath.Join(shortTempDir(t), "a.sock")
+	sock := filepath.Join(cmdtest.ShortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -180,7 +181,7 @@ func TestAgentsCreateCmd_Tier(t *testing.T) {
 }
 
 func TestAgentsCreateCmd_HarnessIsEmptyUnlessGiven(t *testing.T) {
-	sock := filepath.Join(shortTempDir(t), "a.sock")
+	sock := filepath.Join(cmdtest.ShortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)
@@ -245,7 +246,9 @@ func TestAgentActionable(t *testing.T) {
 }
 
 func TestAgentActionable_NoServerInSession(t *testing.T) {
-	client := func() (*apiclient.Client, error) { return apiclient.New(filepath.Join(shortTempDir(t), "a.sock")), nil }
+	client := func() (*apiclient.Client, error) {
+		return apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock")), nil
+	}
 	var out bytes.Buffer
 	req := wire.MarkActionableRequest{ID: "s1", Reason: "x"}
 	if err := runAgentActionable(context.Background(), client, &out, false, req); err != nil {

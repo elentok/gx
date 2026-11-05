@@ -3,7 +3,6 @@ package serverapi
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"github.com/elentok/gx/server/wire"
 	"io"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/webauth"
 )
@@ -51,7 +49,7 @@ func TestWebResetAuthenticator_PrintsASetupCodeAndNoSecret(t *testing.T) {
 			args = append(args, "--json")
 		}
 		var out bytes.Buffer
-		if err := execute(args, webResetDeps(t, h, "", false, &out)); err != nil {
+		if err := execute(t, args, webResetDeps(t, h, "", false, &out)); err != nil {
 			t.Fatal(err)
 		}
 		if secretLeak.MatchString(out.String()) || strings.Contains(out.String(), secret) {
@@ -62,14 +60,6 @@ func TestWebResetAuthenticator_PrintsASetupCodeAndNoSecret(t *testing.T) {
 			t.Fatalf("output %q does not hold the Setup code %q", out.String(), code)
 		}
 
-		var status bytes.Buffer
-		if err := runServerStatusWith(context.Background(), config.DirsFrom(tempEnv(t)), h.Client, true, &status); err != nil {
-			t.Fatal(err)
-		}
-		var st StatusInfo
-		if err := json.Unmarshal(status.Bytes(), &st); err != nil || st.WebSetupCode != code {
-			t.Errorf("status --json web_setup_code = %q (err %v), want %q", st.WebSetupCode, err, code)
-		}
 		var url bytes.Buffer
 		if err := runWebURL(context.Background(), h.Client, false, false, &url); err != nil || !strings.Contains(url.String(), code) {
 			t.Errorf("web-url = %q (err %v), want the Setup code %q", url.String(), err, code)
@@ -119,13 +109,12 @@ func TestWebCommands_NeverPrintATOTPSecret(t *testing.T) {
 	commands := [][]string{
 		{"server", "web-url"}, {"server", "web-url", "--json"},
 		{"server", "web-logins"}, {"server", "web-logins", "--json"},
-		{"server", "status"}, {"server", "status", "--json"},
 	}
 	check := func(t *testing.T, h *servertest.Harness, stage string) {
 		for _, args := range commands {
 			var out bytes.Buffer
 			d := webResetDeps(t, h, "", false, &out)
-			if err := execute(args, d); err != nil {
+			if err := execute(t, args, d); err != nil {
 				t.Fatalf("%s: %v: %v", stage, args, err)
 			}
 			if secretLeak.MatchString(out.String()) {
@@ -138,7 +127,7 @@ func TestWebCommands_NeverPrintATOTPSecret(t *testing.T) {
 	finishWebSetup(t, h)
 	check(t, h, "after setup")
 	var out bytes.Buffer
-	if err := execute([]string{"server", "web-reset-authenticator", "--json"}, webResetDeps(t, h, "", false, &out)); err != nil {
+	if err := execute(t, []string{"server", "web-reset-authenticator", "--json"}, webResetDeps(t, h, "", false, &out)); err != nil {
 		t.Fatal(err)
 	}
 	check(t, h, "after authenticator reset")
