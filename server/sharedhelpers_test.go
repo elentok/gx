@@ -14,16 +14,24 @@ const (
 	runEndText           = servertest.RunEndText
 	repairToken          = servertest.RepairToken
 	holderLabel          = servertest.HolderLabel
+	investigateAddr      = servertest.InvestigateAddr
 )
 
 type (
-	slackHook  = servertest.SlackHook
-	herdrNamed = servertest.HerdrNamed
-	codexNamed = servertest.CodexNamed
-	ptyNamed   = servertest.PtyNamed
+	headlessFake = servertest.HeadlessFake
+	renamedFake  = servertest.RenamedFake
+	slackHook    = servertest.SlackHook
+	herdrNamed   = servertest.HerdrNamed
+	codexNamed   = servertest.CodexNamed
+	ptyNamed     = servertest.PtyNamed
 )
 
 var (
+	newRenamedFake         = servertest.NewRenamedFake
+	startInvestigateEnv    = servertest.StartInvestigateEnv
+	gitIn                  = servertest.GitIn
+	retryAs                = servertest.RetryAs
+	epicTickets            = servertest.EpicTickets
 	report                 = servertest.Report
 	readMeta               = servertest.ReadMeta
 	waitForHolder          = servertest.WaitForHolder

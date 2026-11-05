@@ -1,4 +1,4 @@
-package server_test
+package recovery_test
 
 import (
 	"context"

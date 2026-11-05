@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 // Seam: once a restarted server sees the agent waited past the grace period it
@@ -24,7 +23,7 @@ func TestSlotRelease_QueuedRootClaimsAfterGrace(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictLive}
+	fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetPollInterval = time.Hour
 		c.MaxAgents = 1

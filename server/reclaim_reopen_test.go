@@ -15,7 +15,6 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
-	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -31,7 +30,7 @@ func restartDead(t *testing.T, headless bool, work func(t *testing.T, wtPath str
 	var h *servertest.Harness
 	var wtPath, ticketPath string
 	if headless {
-		fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictDied}
+		fake := servertest.NewHeadlessFake(nativerunner.VerdictDied)
 		h = servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 		wtPath, ticketPath = leaveIterationWith(t, h, store, repo, runnerOf(headless), func(p string) { work(t, p) })
 		stampRun(t, h, runnerOf(headless), deadSession(headless))

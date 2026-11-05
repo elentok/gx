@@ -18,21 +18,8 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// renamedFake is a headlessFake answering to name, so two of them are two runners.
-type renamedFake struct {
-	*headlessFake
-	name string
-}
-
-func (r renamedFake) Name() string { return r.name }
-
-func newRenamedFake(name string, verdict nativerunner.Verdict) renamedFake {
-	return renamedFake{&headlessFake{Runner: runnerfake.NewRunner(), verdict: verdict}, name}
-}
 
 // findErrFake fails every label lookup, which runnerfake cannot inject.
 type findErrFake struct {
@@ -89,22 +76,16 @@ func setSavedRunner(t *testing.T, h *servertest.Harness, name string) {
 
 var waitStatus = servertest.WaitStatus
 
-func cleanedBy(f renamedFake) []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return slices.Clone(f.cleaned)
-}
-
 func TestReclaim_FinishesThroughTheRunsOwnRunner(t *testing.T) {
 	t.Parallel()
 	own, configured := newRenamedFake("a", nativerunner.VerdictFinished), newRenamedFake("b", nativerunner.VerdictFinished)
 	_, ticketPath := restartUnder(t, "a", configured, map[string]agentrunner.Runner{"a": own})
 	waitStatus(t, ticketPath, schema.StatusDone)
-	servertest.Poll(10*time.Second, func() bool { return len(cleanedBy(own)) > 0 })
-	if got := cleanedBy(own); !slices.Equal(got, []string{"epic-a-iter-01"}) {
+	servertest.Poll(10*time.Second, func() bool { return len(own.Cleaned()) > 0 })
+	if got := own.Cleaned(); !slices.Equal(got, []string{"epic-a-iter-01"}) {
 		t.Errorf("run's runner cleaned %v, want epic-a-iter-01", got)
 	}
-	if got := cleanedBy(configured); len(got) != 0 {
+	if got := configured.Cleaned(); len(got) != 0 {
 		t.Errorf("configured runner cleaned %v, want nothing", got)
 	}
 }

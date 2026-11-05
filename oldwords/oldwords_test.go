@@ -140,7 +140,7 @@ var allowed = map[string]allowance{
 	"server/repair_test.go":                    allow("tests the hidden unpark verb alias", "park"),
 	"server/epicsummary_test.go":               allow("summary reads only the legacy Needs headings", "needsanswer", "needsrepair"),
 	"server/ticketwrites_test.go":              allow("unmute demotes only the legacy Needs Repair heading", "needsrepair"),
-	"server/recovery_notify_test.go":           allow("snapshot status is the legacy wire word", "needsanswer", "needsrepair"),
+	"server/recovery/recovery_notify_test.go":  allow("snapshot status is the legacy wire word", "needsanswer", "needsrepair"),
 	"server/reads_test.go":                     allow("persisted lock kind \"land\"", "land"),
 	"server/web_test.go":                       allow("tests the hidden unpark route", "park"),
 	"server/web_allowlist_test.go":             allow("tests the hidden unpark route", "park"),

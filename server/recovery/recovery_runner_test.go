@@ -1,4 +1,4 @@
-package server_test
+package recovery_test
 
 import (
 	"context"
@@ -112,7 +112,7 @@ func TestRecoveryRunner_ClosePaneStopsAndCleansUpThroughTheRunner(t *testing.T) 
 	if _, found, _ := fake.Find(iterLabel); found {
 		t.Error("session still live after close-pane")
 	}
-	if got := cleanedBy(fake); !slices.Equal(got, []string{iterLabel}) {
+	if got := fake.Cleaned(); !slices.Equal(got, []string{iterLabel}) {
 		t.Errorf("cleaned %v, want %s", got, iterLabel)
 	}
 }

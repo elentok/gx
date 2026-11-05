@@ -1,4 +1,4 @@
-package server_test
+package recovery_test
 
 import (
 	"context"
@@ -26,15 +26,6 @@ func startUnmatched(t *testing.T) *servertest.Harness {
 	return servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = recovery.Catalog{Enabled: true}
 	})
-}
-
-func epicTickets(t *testing.T, h *servertest.Harness) tickets.Epic {
-	t.Helper()
-	epics, err := tickets.Load(filepath.Join(h.TicketStore, "proj"))
-	if err != nil || len(epics) != 1 {
-		t.Fatalf("load = %v, %v", epics, err)
-	}
-	return epics[0]
 }
 
 func TestRecovery_UnmatchedPauseForksAQueuedInvestigateChildAndNeverRecurses(t *testing.T) {

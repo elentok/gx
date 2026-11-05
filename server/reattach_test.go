@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -17,57 +15,8 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// headlessFake is a fake runner with the headless runner's reattach, cleanup
-// and prune hooks.
-type headlessFake struct {
-	*runnerfake.Runner
-	verdict nativerunner.Verdict
-
-	mu        sync.Mutex
-	cleaned   []string
-	stopped   []string
-	retention time.Duration
-	paused    map[string]bool
-}
-
-func (h *headlessFake) Stop(s agentrunner.Session) error {
-	h.mu.Lock()
-	h.stopped = append(h.stopped, s.ID)
-	h.mu.Unlock()
-	return h.Runner.Stop(s)
-}
-
-func (h *headlessFake) Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error) {
-	if s, ok, _ := h.Find(label); ok {
-		return s, h.verdict, nil
-	}
-	return agentrunner.Session{Label: label, ID: "p1"}, h.verdict, nil
-}
-
-func (h *headlessFake) Cleanup(label string) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.cleaned = append(h.cleaned, label)
-	return nil
-}
-
-func (h *headlessFake) Prune(maxAge time.Duration, _ time.Time, paused func(string) bool) ([]string, error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.retention = maxAge
-	// Called once per project; only the proj call sees these labels.
-	if h.paused == nil {
-		h.paused = map[string]bool{}
-	}
-	for _, l := range []string{"epic-a-iter-01", "epic-a-iter-02"} {
-		h.paused[l] = h.paused[l] || paused(l)
-	}
-	return nil, nil
-}
 
 // asHeadlessRun rewrites the staged handle as a headless run on the fake runner.
 func asHeadlessRun(t *testing.T, h *servertest.Harness) {
@@ -110,7 +59,7 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: verdict}
+	fake := servertest.NewHeadlessFake(verdict)
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.LogRetention = retention
 	})
@@ -134,10 +83,8 @@ func TestReattach_DiedPausesStuckAndKeepsTheDir(t *testing.T) {
 	if !strings.Contains(string(body), nativerunner.ReasonAgentDied) {
 		t.Errorf("ticket lacks %q:\n%s", nativerunner.ReasonAgentDied, body)
 	}
-	fake.mu.Lock()
-	defer fake.mu.Unlock()
-	if len(fake.cleaned) != 0 {
-		t.Errorf("cleaned %v, want the dir kept", fake.cleaned)
+	if cleaned := fake.Cleaned(); len(cleaned) != 0 {
+		t.Errorf("cleaned %v, want the dir kept", cleaned)
 	}
 }
 
@@ -153,9 +100,7 @@ func TestReattach_FinishedMergesAndCleansUp(t *testing.T) {
 	})
 	var cleaned []string
 	servertest.WaitFor(t, 30*time.Second, "the agent to be cleaned up", func() bool {
-		fake.mu.Lock()
-		defer fake.mu.Unlock()
-		cleaned = slices.Clone(fake.cleaned)
+		cleaned = fake.Cleaned()
 		return len(cleaned) > 0
 	})
 	if cleaned[0] != "epic-a-iter-01" {
@@ -176,16 +121,14 @@ func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsPaused(t *testing.T) {
 	if err := ralphloop.Pause(filepath.Join(store, "proj"), "epic-a", "01", ticket, events.IterationError, "stuck", ralphloop.Event{}); err != nil {
 		t.Fatal(err)
 	}
-	fake := &headlessFake{Runner: runnerfake.NewRunner()}
+	fake := servertest.NewHeadlessFake(0)
 	servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.LogRetention = 36 * time.Hour
 	})
 	var paused map[string]bool
 	var retention time.Duration
 	servertest.WaitFor(t, 10*time.Second, "Prune to run", func() bool {
-		fake.mu.Lock()
-		defer fake.mu.Unlock()
-		paused, retention = fake.paused, fake.retention
+		paused, retention = fake.PruneSeen()
 		return paused != nil
 	})
 	if retention != 36*time.Hour {

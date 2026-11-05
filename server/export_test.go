@@ -4,20 +4,15 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/server/queue"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
-	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
-
-// Recovery is the failure-recovery subsystem, for its test seams.
-func (s *Server) Recovery() *srvrecovery.Recovery { return s.recovery }
 
 // ServeAsset is serveAsset over a fake build, so a test can name hashed assets
 // the placeholder embed does not have.
@@ -63,12 +58,6 @@ func (s *Server) ResumeAs(req wire.RepairRequest, origin string) (wire.RepairRes
 	return s.repairResume(req, repairCtx{origin: origin})
 }
 
-// AgentWaiting reports whether the run's agent is not working (idle or done).
-func (s *Server) AgentWaiting(project, epic, id string) bool {
-	_, idle, err := s.recovery.AgentState(tickets.Address{Project: project, Epic: epic, ID: id})
-	return err == nil && idle
-}
-
 // PruneBackups runs the backup-ref prune as of now.
 func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.pruneBackups(repoRoot, now) }
 
@@ -81,22 +70,8 @@ func SetShutdownRecorder(rec func(step string)) {
 	shutdownRecorder.Store(&rec)
 }
 
-// SettleReleasedRun stands in for the finish of a run whose gate was released:
-// the pause release-gate left, if any, then the run is dropped.
-func (s *Server) SettleReleasedRun(address string) {
-	addr, _ := tickets.ParseAddress(address, tickets.AddressContext{})
-	dir := filepath.Join(s.cfg.TicketStore, addr.Project)
-	if run, ok := s.registry.RunOf(address); ok {
-		s.recovery.PauseReleasedGate(dir, addr, filepath.Join(dir, addr.Epic, "issues", addr.ID+"-first.md"), run)
-	}
-	s.registry.Delete(address)
-}
-
 // ClaimNext runs one claim pass now.
 func (s *Server) ClaimNext() { s.claimNext() }
-
-// WatchGates runs one gate watchdog pass as of now.
-func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
 
 // PauseStuckFinishedClaims runs one finished-claim watchdog pass as of now.
 func (s *Server) PauseStuckFinishedClaims(now time.Time) { s.pauseStuckFinishedClaims(now) }

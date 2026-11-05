@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 // Seam 1: a run waiting for its answer explains as waiting inside the grace
@@ -34,7 +33,7 @@ func TestExplain_WaitingRunVerdicts(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictLive}
+			fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
 			h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 				c.BudgetPollInterval = time.Hour
 				c.MaxAgents = 1

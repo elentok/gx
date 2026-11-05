@@ -35,11 +35,11 @@ func liveUnder(t *testing.T, own renamedFake, opts ...func(*server.Config)) (*se
 		t.Fatal(err)
 	}
 	own.SetState(routedLabel, agentrunner.StateWorking, "")
-	h, ticketPath := restartUnder(t, own.name, newRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.name: own}, opts...)
+	h, ticketPath := restartUnder(t, own.Name(), newRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.Name(): own}, opts...)
 	if !servertest.Poll(10*time.Second, func() bool {
-		return slices.ContainsFunc(h.Server.Runs(), func(r runs.Run) bool { return r.Runner == own.name })
+		return slices.ContainsFunc(h.Server.Runs(), func(r runs.Run) bool { return r.Runner == own.Name() })
 	}) {
-		t.Fatalf("run not reclaimed under %s: %+v", own.name, h.Server.Runs())
+		t.Fatalf("run not reclaimed under %s: %+v", own.Name(), h.Server.Runs())
 	}
 	return h, own, ticketPath
 }

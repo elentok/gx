@@ -76,7 +76,7 @@ func TestRateLimitHold_RestartHoldsBeforeTheFirstClaim(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictLive}
+	fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
 	session, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01"})
 	if err != nil {
 		t.Fatal(err)

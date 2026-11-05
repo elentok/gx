@@ -171,7 +171,7 @@ func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
 	runnerShapes(t, func(t *testing.T, headless bool) {
 		var ticketPath string
 		if headless {
-			fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictDied}
+			fake := servertest.NewHeadlessFake(nativerunner.VerdictDied)
 			_, ticketPath = restartLaunching(t, fake, nil, noWork)
 		} else {
 			_, ticketPath = restartLaunchingPty(t, false, nil)
@@ -204,13 +204,11 @@ func TestReclaim_HerdrLaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
 func TestReclaim_LaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
 	t.Parallel()
 	t.Run("headless", func(t *testing.T) {
-		fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictFinished}
+		fake := servertest.NewHeadlessFake(nativerunner.VerdictFinished)
 		_, ticketPath := restartLaunching(t, fake, nil, noWork)
 		waitStatus(t, ticketPath, schema.StatusOpen)
-		fake.mu.Lock()
-		defer fake.mu.Unlock()
-		if !slices.Equal(fake.stopped, []string{"p1"}) {
-			t.Errorf("stopped %v, want p1", fake.stopped)
+		if stopped := fake.Stopped(); !slices.Equal(stopped, []string{"p1"}) {
+			t.Errorf("stopped %v, want p1", stopped)
 		}
 	})
 }
@@ -223,7 +221,7 @@ func TestReclaim_LaunchingWorkingAgentIsALiveRun(t *testing.T) {
 		waitStatus(t, ticketPath, schema.StatusDone)
 	})
 	t.Run("headless", func(t *testing.T) {
-		fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictLive}
+		fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
 		fake.IDs = func(string) (string, string) { return "p1", "s1" }
 		if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01"}); err != nil {
 			t.Fatal(err)

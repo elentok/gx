@@ -1,4 +1,4 @@
-package server_test
+package recovery_test
 
 import (
 	"path/filepath"
@@ -6,29 +6,11 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil"
 )
 
 const investigateAddr = servertest.InvestigateAddr
-
-// startInvestigateEnv starts a server whose ticket 01 is paused with kind and
-// whose ticket 02 is the investigate ticket forked off it.
-func startInvestigateEnv(t *testing.T, kind events.Kind) *servertest.Harness {
-	t.Helper()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "probe", servertest.TicketOpts{Type: "investigate", Parent: "01"})
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(*server.Config) {})
-	servertest.RegisterTurn(h)
-	if err := h.Server.PauseAs("proj:epic-a/01", kind, "boom"); err != nil {
-		t.Fatal(err)
-	}
-	return h
-}
 
 var retryAs = servertest.RetryAs
 

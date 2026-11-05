@@ -1,10 +1,9 @@
-package server_test
+package recovery_test
 
 import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,15 +20,6 @@ const (
 	recoveryAddr   = "proj:epic-a/01"
 	recoveryBranch = "ralph-loop/epic-a-item-01"
 )
-
-func gitIn(t *testing.T, repo string, args ...string) string {
-	t.Helper()
-	out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimSpace(string(out))
-}
 
 // startRecoveryWeb serves a repair-paused ticket 01 over the web mux and returns
 // the repo, the session cookie and the web base URL.
