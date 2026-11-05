@@ -147,34 +147,36 @@ func claimTargetTip(o OneIteration) string {
 }
 
 // addFeatureWorktree creates the epic's feature worktree (see Deps.AddWorktree).
-// When it attaches a missing worktree to a branch that already exists, as for
-// a design's <map>-impl branch cut when the design ended, and the branch lacks
-// the base's newer commits, it rebases the branch onto the base first, so the
-// epic does not start from a stale tree. Callers hold the worktree lock.
-// A conflicting or failing rebase is skipped: the branch keeps its old tip and
-// the merge step rebases it later.
+// When the branch lacks the base's newer commits, as for a design's <map>-impl
+// branch cut when the design ended, it rebases the branch onto the base, so the
+// epic does not start from a stale tree. This holds whether the worktree was
+// just attached or already existed. A worktree with uncommitted changes or a
+// rebase in progress is left alone. Callers hold the worktree lock.
+// A conflicting or failing rebase is aborted and returned as an error: the
+// branch keeps its old tip, and the launch fails so the ticket pauses with the
+// reason instead of starting on a stale tree.
 func addFeatureWorktree(d deps.Deps, o OneIteration, path string) error {
-	exists, err := d.WorktreeExists(path)
-	if err != nil {
-		return err
-	}
-	preexisting := !exists && worktree.BranchExists(d, o.RepoDir, o.Epic)
 	if err := d.AddWorktree(o.RepoDir, path, o.Epic, o.RootBase); err != nil {
 		return err
 	}
-	if !preexisting || d.RebaseOntoOrAbort == nil {
+	if d.RebaseOntoOrAbort == nil {
 		return nil
 	}
 	base, err := d.RevParse(o.RepoDir, cmp.Or(o.RootBase, "HEAD"))
 	if err != nil {
 		return nil
 	}
-	if behind, err := d.IsAncestor(path, base, o.Epic); err != nil || behind {
+	if upToDate, err := d.IsAncestor(path, base, o.Epic); err != nil || upToDate {
+		return nil
+	}
+	if rebasing, err := d.RebaseInProgress(path); err != nil || rebasing {
 		return nil
 	}
 	if changes, err := d.UncommittedChanges(path); err != nil || len(changes) > 0 {
 		return nil
 	}
-	_ = d.RebaseOntoOrAbort(path, base)
+	if err := d.RebaseOntoOrAbort(path, base); err != nil {
+		return fmt.Errorf("rebasing %s onto %s before its first run: %w", o.Epic, cmp.Or(o.RootBase, "HEAD"), err)
+	}
 	return nil
 }

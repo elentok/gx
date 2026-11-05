@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/deps"
@@ -166,13 +167,30 @@ func TestPrepare_RebasesAnExistingEpicBranchOntoTheBaseOnFirstAttach(t *testing.
 	}
 }
 
-func TestPrepareFeature_KeepsTheBranchWhenTheRebaseFails(t *testing.T) {
+func TestPrepareFeature_FailsWhenTheRebaseConflicts(t *testing.T) {
 	d, _, o := prepareDepsFixture(t)
 	gitIn(t, o.RepoDir, "branch", o.Epic)
 	gitIn(t, o.RepoDir, "commit", "--allow-empty", "-m", "newer trunk commit")
 	d.RebaseOntoOrAbort = func(string, string) error { return errors.New("conflict") }
 
+	_, err := PrepareFeature(d, o)
+	if err == nil || !strings.Contains(err.Error(), "conflict") {
+		t.Fatalf("PrepareFeature err = %v, want the rebase conflict", err)
+	}
+}
+
+func TestPrepareFeature_RebasesWhenTheWorktreeAlreadyExists(t *testing.T) {
+	d, _, o := prepareDepsFixture(t)
+	gitIn(t, o.RepoDir, "branch", o.Epic)
 	if _, err := PrepareFeature(d, o); err != nil {
-		t.Fatalf("a failed rebase must not fail the prepare: %v", err)
+		t.Fatal(err)
+	}
+	gitIn(t, o.RepoDir, "commit", "--allow-empty", "-m", "newer trunk commit")
+
+	if _, err := PrepareFeature(d, o); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := d.IsAncestor(o.RepoDir, "main", o.Epic); err != nil || !ok {
+		t.Errorf("main is not an ancestor of %s after a second attach (err %v)", o.Epic, err)
 	}
 }
