@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"github.com/elentok/gx/server/wire"
@@ -16,7 +16,7 @@ import (
 // new state cannot slip past the guard below.
 func epicStateValues(t *testing.T) []wire.EpicState {
 	t.Helper()
-	f, err := parser.ParseFile(token.NewFileSet(), "wire/epicsummary.go", nil, 0)
+	f, err := parser.ParseFile(token.NewFileSet(), "../wire/epicsummary.go", nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

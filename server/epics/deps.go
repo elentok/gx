@@ -88,3 +88,11 @@ type Deps struct {
 	AmbiguousBlockers func(addr tickets.Address) []string
 	DesignUncharted   func(epicAddr string, e tickets.Epic) (bool, error)
 }
+
+// Epics serves the epic and ticket read models.
+type Epics struct {
+	Deps
+}
+
+// New builds the read models over d.
+func New(d Deps) *Epics { return &Epics{Deps: d} }

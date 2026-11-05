@@ -27,29 +27,6 @@ type answerRefused struct{ res wire.QueueResult }
 
 func (e answerRefused) Error() string { return e.res.Message }
 
-// storedStatus is t's status in the old stored spelling: a paused ticket is
-// asking or stuck by class. The web API and pause events keep
-// those labels until the events are renamed.
-func storedStatus(t schema.Ticket) schema.Status {
-	if t.Status == schema.StatusPaused {
-		return t.PausedClass().LegacyStatus()
-	}
-	return t.Status
-}
-
-// detailState is the token the detail page carries. A paused ticket's token
-// names its latest round of any kind, so repair and manual pauses have one.
-func detailState(evs []tickets.LogEvent, t schema.Ticket) string {
-	rounds := tickets.Rounds(evs)
-	if t.PausedClass() != "" {
-		rounds = tickets.AllRounds(evs)
-	}
-	if len(rounds) == 0 {
-		return ""
-	}
-	return queue.AnswerState(rounds[len(rounds)-1].Question, t.PausedClass())
-}
-
 // answerFrame is the prompt the live agent receives: the choice first, the note
 // under it. A free-text answer prints the text and no note.
 func answerFrame(seq int, answer, note string) string {

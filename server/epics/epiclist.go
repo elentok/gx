@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"cmp"
@@ -34,7 +34,7 @@ func epicListState(e tickets.Epic, queued, queueable bool, loopState wire.EpicSt
 		return wire.EpicListFinished
 	case e.Status == string(schema.StatusDraft):
 		return wire.EpicListDraft
-	case loopState == wire.EpicStatePaused && epicMergeBlocked(e):
+	case loopState == wire.EpicStatePaused && EpicMergeBlocked(e):
 		return wire.EpicListMergeBlocked
 	case loopState != wire.EpicStateWaiting && loopState != wire.EpicStateFinished:
 		return wire.EpicListState(loopState)
@@ -60,8 +60,9 @@ func mapListState(e tickets.Epic) wire.EpicListState {
 	return wire.EpicListWaitingToDesign
 }
 
-func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
-	dirs, err := tickets.ProjectDirs(s.epics.TicketStore)
+// EpicList serves the Epics page.
+func (s *Epics) EpicList(w http.ResponseWriter, _ *http.Request) {
+	dirs, err := tickets.ProjectDirs(s.TicketStore)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -72,7 +73,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		list.Projects = append(list.Projects, project)
-		epics, err := s.epics.Projects.Epics(project)
+		epics, err := s.Projects.Epics(project)
 		if err != nil {
 			continue
 		}
@@ -85,16 +86,16 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		}
 		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, qidx)...)
 	}
-	list.RecentlyFinished = s.epics.Settings.Load().RecentlyFinished
+	list.RecentlyFinished = s.Settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
 	sortCards(list.Epics, func(r wire.EpicListRow) int { return r.QueueSlot })
-	writeJSON(w, list)
+	wire.WriteJSON(w, list)
 }
 
 // projectCards builds one project's cards: follow-ups, one-offs, loop and map
 // epics, then pending Design cards. A listed map's card shows its -impl epic,
 // so that epic gets no row of its own.
-func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, qidx queueIndex) []wire.EpicListRow {
+func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, qidx queueIndex) []wire.EpicListRow {
 	merged := map[string]bool{}
 	byName := map[string]tickets.Epic{}
 	for _, e := range epics {
@@ -183,9 +184,9 @@ func lastActivity(e tickets.Epic) time.Time {
 	return newest
 }
 
-func (s *Server) epicListRow(project string, e tickets.Epic, qidx queueIndex) wire.EpicListRow {
+func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wire.EpicListRow {
 	root := queue.RootRef{Project: project, Epic: e.Name}
-	queued := s.epics.Queue.RootQueued(root)
+	queued := s.Queue.RootQueued(root)
 	queueable := queue.EpicQueueable(e, queued)
 	row := wire.EpicListRow{
 		Address: root.String(), Project: project, Name: e.Name, Kind: wire.EpicKindLoop,
@@ -198,7 +199,7 @@ func (s *Server) epicListRow(project string, e tickets.Epic, qidx queueIndex) wi
 	if e.IsMap {
 		row.Kind = wire.EpicKindMap
 	}
-	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.epics.Runs.StartedAtOf))
+	row.State = epicListState(e, queued, queueable, EpicStateFor(root, e, s.Runs.StartedAtOf))
 	if row.State == wire.EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}

@@ -37,7 +37,7 @@ func (s *Server) ticketRecommend(req wire.QueueRequest, qc queue.Ctx) (wire.Queu
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
-		actions, err := s.detailFor(ref.Addr.String(), t, tickets.Rounds(evs), nil)
+		actions, err := s.epics.DetailFor(ref.Addr.String(), t, tickets.Rounds(evs), nil)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}

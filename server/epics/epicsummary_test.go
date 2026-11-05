@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"slices"
@@ -8,7 +8,6 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -327,8 +326,8 @@ func TestSummarizeEpic_MergingState(t *testing.T) {
 	}
 }
 
-// The Deadlocked state is deadlockKind's blocked cycle, nothing more.
-func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
+// The Deadlocked state is StateOf's cycle, nothing more.
+func TestSummarizeEpic_DeadlockedAgreesWithStateOf(t *testing.T) {
 	t.Parallel()
 	root := queue.RootRef{Project: "proj", Epic: "epic"}
 	none := func(string) (time.Time, bool) { return time.Time{}, false }
@@ -342,29 +341,30 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 		}
 		// A last ticket blocked on itself keeps blocked-only shapes honest.
 		epic := tickets.Epic{Name: "epic", Tickets: ts}
-		kind, stuck := deadlockKind(epic)
+		state := StateOf(epic)
+		stuck := state == StatePaused || state == StateCycle
 		got := summarizeEpic(root, epic, none, noRecovery, noLog)
 		if (got.State == wire.EpicStatePaused) != stuck {
-			t.Errorf("%v: state %q, deadlockKind %q/%v", statuses, got.State, kind, stuck)
+			t.Errorf("%v: state %q, StateOf %v", statuses, got.State, state)
 		}
-		if want := stuck && kind == events.BlockedCycle; (got.Reason == wire.EpicReasonDeadlock) != want {
-			t.Errorf("%v: reason %q, deadlockKind %q/%v", statuses, got.Reason, kind, stuck)
+		if want := state == StateCycle; (got.Reason == wire.EpicReasonDeadlock) != want {
+			t.Errorf("%v: reason %q, StateOf %v", statuses, got.Reason, state)
 		}
 	}
 }
 
-func TestDeadlockReason_PausedAndCycle(t *testing.T) {
+func TestPausedAndCycleReason(t *testing.T) {
 	t.Parallel()
 	root := queue.RootRef{Project: "proj", Epic: "epic"}
 	paused := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{answerPausedTicket("01"), summaryTicket("02", "draft")}}
-	if got, want := deadlockReason(root, paused, events.AllPaused), "every remaining ticket is paused: proj:epic/01, proj:epic/02"; got != want {
+	if got, want := PausedReason(root, paused), "every remaining ticket is paused: proj:epic/01, proj:epic/02"; got != want {
 		t.Errorf("paused reason = %q, want %q", got, want)
 	}
 	first := summaryTicket("01", "open", "02")
 	first.ExternalBlockers = []string{"other:epic2/07"}
 	cycle := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{first, summaryTicket("02", "open", "01")}}
 	want := "proj:epic/01 waits on other:epic2/07, proj:epic/02; proj:epic/02 waits on proj:epic/01"
-	if got := deadlockReason(root, cycle, events.BlockedCycle); got != want {
+	if got := CycleReason(root, cycle); got != want {
 		t.Errorf("cycle reason = %q, want %q", got, want)
 	}
 }

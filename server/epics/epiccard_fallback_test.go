@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"github.com/elentok/gx/server/wire"

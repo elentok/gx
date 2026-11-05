@@ -141,11 +141,11 @@ func (s *Server) webHandler() http.Handler {
 		case r.URL.Path == "/v1/snapshot":
 			s.snapshot(w, r)
 		case r.URL.Path == "/v1/tickets/detail":
-			s.detail(w, r)
+			s.epics.Detail(w, r)
 		case r.URL.Path == "/v1/epics":
-			s.epicList(w, r)
+			s.epics.EpicList(w, r)
 		case r.URL.Path == "/v1/epics/detail":
-			s.epicDetail(w, r)
+			s.epics.EpicDetail(w, r)
 		case r.URL.Path == "/v1/restart/check":
 			s.restartCheckRead(w, r)
 		case r.URL.Path == "/v1/events":

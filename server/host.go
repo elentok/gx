@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
@@ -29,7 +30,7 @@ func (s *Server) Landing() *merge.Landing { return s.landing }
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recovery.RecoverAsync(f) }
 
 func (s *Server) EpicState(root queue.RootRef, e tickets.Epic) wire.EpicState {
-	return epicStateFor(root, e, s.registry.StartedAtOf)
+	return epics.EpicStateFor(root, e, s.registry.StartedAtOf)
 }
 
-func (s *Server) EpicMergeBlocked(e tickets.Epic) bool { return epicMergeBlocked(e) }
+func (s *Server) EpicMergeBlocked(e tickets.Epic) bool { return epics.EpicMergeBlocked(e) }

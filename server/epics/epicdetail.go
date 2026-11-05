@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"errors"
@@ -25,14 +25,15 @@ func mergeBlockActions(kind string) []string {
 	return actions
 }
 
-func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
+// EpicDetail serves one epic's detail.
+func (s *Epics) EpicDetail(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	root, err := queue.ParseRootRef(address)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	epics, err := s.epics.Projects.Epics(root.Project)
+	epics, err := s.Projects.Epics(root.Project)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) {
 		http.Error(w, "no epic "+address, http.StatusNotFound)
@@ -47,29 +48,29 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no epic "+address, http.StatusNotFound)
 		return
 	}
-	writeJSON(w, s.buildEpicDetail(root, epics, epics[i], time.Now()))
+	wire.WriteJSON(w, s.buildEpicDetail(root, epics, epics[i], time.Now()))
 }
 
-func (s *Server) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
+func (s *Epics) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
 	if e.IsMap {
 		return s.buildMapDetail(root, epics, e, now)
 	}
 	return s.buildLoopDetail(root, e, now)
 }
 
-func (s *Server) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
+func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) wire.EpicDetail {
 	byName := map[string]tickets.Epic{}
 	for _, other := range epics {
 		byName[other.Name] = other
 	}
-	queued := s.epics.Queue.RootQueued(root)
+	queued := s.Queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
 	}
-	if deletable, err := s.epics.DesignUncharted(root.String(), e); err != nil {
-		s.epics.Log.Warn("design deletable check", "epic", root.String(), "err", err)
+	if deletable, err := s.DesignUncharted(root.String(), e); err != nil {
+		s.Log.Warn("design deletable check", "epic", root.String(), "err", err)
 	} else {
 		d.Deletable = deletable
 	}
@@ -98,16 +99,16 @@ func (s *Server) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e tick
 	return d
 }
 
-func (s *Server) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
-	queued := s.epics.Queue.RootQueued(root)
+func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
+	queued := s.Queue.RootQueued(root)
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
-		State: epicStateFor(root, e, s.epics.Runs.StartedAtOf),
+		State: EpicStateFor(root, e, s.Runs.StartedAtOf),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 		Queueable: queue.EpicQueueable(e, queued), Queued: queued,
 		Draft: e.Status == string(schema.StatusDraft),
 	}
-	if epicMergeBlocked(e) {
+	if EpicMergeBlocked(e) {
 		d.MergeBlockKind, d.MergeBlockReason, d.MergeBlockFiles = e.MergeBlockKind, e.MergeBlockReason, e.MergeBlockFiles
 		d.Actions = mergeBlockActions(e.MergeBlockKind)
 		d.ActionInfo = actionInfo(d.Actions)
@@ -170,18 +171,18 @@ func baseRow(root queue.RootRef, e tickets.Epic, t tickets.Ticket, status ticket
 }
 
 // rowFor builds a loop epic's full row for t.
-func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
+func (s *Epics) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wire.EpicDetailRow {
 	status := e.RenderedStatus(t)
 	row := baseRow(root, e, t, status)
 	row.Elapsed, row.Cost = t.ElapsedTime, t.ActualCost
 	if t.LongTicketTurns > 0 {
-		row.LongTicketTurns, row.LongTicketThreshold = t.LongTicketTurns, s.epics.Settings.Load().LongTicketTurns
+		row.LongTicketTurns, row.LongTicketThreshold = t.LongTicketTurns, s.Settings.Load().LongTicketTurns
 	}
-	row.HarnessLabel = s.epics.Harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
+	row.HarnessLabel = s.Harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if t.Parent != nil {
 		row.Parent = root.TicketAddress(*t.Parent)
 	}
-	if at, ok := s.epics.Runs.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
+	if at, ok := s.Runs.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
 	}
 	evs := queue.ReadLogLenient(t)
@@ -190,7 +191,7 @@ func (s *Server) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wi
 	}
 	if status == tickets.StatusPausedRepair {
 		row.State = sessions.RepairState(evs, t.PausedClass())
-		row.FixPrompt = sessions.FixAgentPrompt(s.epics.Projects.LaunchHarness(root.Project), row.Address, t)
+		row.FixPrompt = sessions.FixAgentPrompt(s.Projects.LaunchHarness(root.Project), row.Address, t)
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()

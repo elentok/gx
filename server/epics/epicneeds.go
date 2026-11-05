@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"cmp"
@@ -6,7 +6,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 
@@ -45,7 +44,7 @@ type ticketWait struct {
 // waiting ticket comes first, oldest wait first, since it can hold a running epic
 // too. An epic without one waits on its deadlock, its blocked merge, or an
 // unmerged finish in a project with auto-merge off.
-func (s *Server) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.EpicListState) (needsYou, bool) {
+func (s *Epics) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.EpicListState) (needsYou, bool) {
 	if e.IsMap || !e.MergedAt.IsZero() {
 		return needsYou{}, false
 	}
@@ -65,12 +64,12 @@ func (s *Server) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.Epi
 			n.More = []wire.CardAction{{Kind: wire.CardActionMerge, Label: schema.VerbMergeAgain.Label(), Target: root.String()}}
 		}
 		return n, true
-	case state == wire.EpicListPaused && epics.StateOf(e) == epics.StateCycle:
+	case state == wire.EpicListPaused && StateOf(e) == StateCycle:
 		return needsYou{
-			Pill: PillDeadlocked, Reason: epics.CycleReason(root, e), Since: fallback,
+			Pill: PillDeadlocked, Reason: CycleReason(root, e), Since: fallback,
 			Action: wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: root.String()},
 		}, true
-	case state == wire.EpicListAwaitingMerge && !s.epics.AutoFFMerge(root.Project):
+	case state == wire.EpicListAwaitingMerge && !s.AutoFFMerge(root.Project):
 		return needsYou{
 			Pill: PillAwaitingMerge, Reason: "Auto-merge is off for " + root.Project, Since: fallback,
 			Action: wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: root.String()},
@@ -81,7 +80,7 @@ func (s *Server) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.Epi
 
 // ticketNeedsYou picks the oldest wait among e's asking, permission-blocked and
 // paused tickets. A wait with no time of its own starts at fallback.
-func (s *Server) ticketNeedsYou(root queue.RootRef, e tickets.Epic, fallback time.Time) (needsYou, bool) {
+func (s *Epics) ticketNeedsYou(root queue.RootRef, e tickets.Epic, fallback time.Time) (needsYou, bool) {
 	var waits []ticketWait
 	for _, t := range e.Tickets {
 		if n, ok := s.ticketWaitOf(root, e, t); ok {
@@ -106,12 +105,12 @@ func (s *Server) ticketNeedsYou(root queue.RootRef, e tickets.Epic, fallback tim
 
 // ticketWaitOf says whether t is paused, asking or blocked on a permission. The
 // wait's Since is zero when the log holds no time for it.
-func (s *Server) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Ticket) (needsYou, bool) {
+func (s *Epics) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Ticket) (needsYou, bool) {
 	addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}
 	status := e.RenderedStatus(t)
 	label := t.DisplayNumber() + " " + t.Title
 	switch {
-	case epics.IsPaused(e, t) && status != tickets.StatusDraft:
+	case IsPaused(e, t) && status != tickets.StatusDraft:
 		evs := queue.ReadLogLenient(t)
 		n := needsYou{
 			Pill: PillPaused, Reason: label + ": " + tickets.PauseDetail(e, t),
@@ -126,7 +125,7 @@ func (s *Server) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Tick
 		}
 		return n, true
 	case status == tickets.StatusClaimed:
-		card, err := s.permissionCard(addr)
+		card, err := s.PermissionCard(addr)
 		if err != nil || card == nil {
 			return needsYou{}, false
 		}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -94,7 +94,7 @@ func TestEpicList_DesignCards(t *testing.T) {
 	}{
 		{"d-idle", wire.SectionReadyToDesign, "Not started", "", []wire.CardActionKind{wire.CardActionDesign}},
 		{"d-live", wire.SectionDesigning, "Designing", "", []wire.CardActionKind{wire.CardActionOpen}},
-		{"d-wait", wire.SectionNeedsYou, "Designing", server.PillQuestion, []wire.CardActionKind{wire.CardActionAnswer}},
+		{"d-wait", wire.SectionNeedsYou, "Designing", epics.PillQuestion, []wire.CardActionKind{wire.CardActionAnswer}},
 		{"d-stopped", wire.SectionDesigning, "Designing", "", []wire.CardActionKind{wire.CardActionContinue}},
 		{"d-done", wire.SectionFinished, "Designed", "", nil},
 	} {
@@ -167,7 +167,7 @@ func TestEpicList_NewDesignLifecycle(t *testing.T) {
 	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
-	if r := epicRows(t, f.h, f)["fresh-idea"]; r.Section != wire.SectionNeedsYou || r.StatePill != server.PillQuestion {
+	if r := epicRows(t, f.h, f)["fresh-idea"]; r.Section != wire.SectionNeedsYou || r.StatePill != epics.PillQuestion {
 		t.Errorf("waiting row = section %q pill %q, want Needs you / Question", r.Section, r.StatePill)
 	}
 

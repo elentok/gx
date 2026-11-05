@@ -168,8 +168,7 @@ type Server struct {
 	resumer     *sessions.Resumer
 	designOpens sync.Map // epic address -> *sync.Mutex, serializing designs open
 	focus       *sessions.FocusReports
-	// epics is everything the epic read models reach for; the one field they use.
-	epics epics.Deps
+	epics       *epics.Epics
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -438,7 +437,7 @@ func New(cfg Config) (*Server, error) {
 	s.sessions = newManager(s)
 	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
-	s.epics = s.epicsDeps()
+	s.epics = epics.New(s.epicsDeps())
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished
 	}
@@ -481,9 +480,9 @@ var routeTable = []struct {
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
 	{"POST /v1/restart", (*Server).restartWrite},
 	{"GET /v1/tickets/explain", (*Server).explain},
-	{"GET /v1/tickets/detail", (*Server).detail},
-	{"GET /v1/epics", (*Server).epicList},
-	{"GET /v1/epics/detail", (*Server).epicDetail},
+	{"GET /v1/tickets/detail", func(s *Server, w http.ResponseWriter, r *http.Request) { s.epics.Detail(w, r) }},
+	{"GET /v1/epics", func(s *Server, w http.ResponseWriter, r *http.Request) { s.epics.EpicList(w, r) }},
+	{"GET /v1/epics/detail", func(s *Server, w http.ResponseWriter, r *http.Request) { s.epics.EpicDetail(w, r) }},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"GET /v1/queue", (*Server).queueView},
 	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.mergeInQueue)(w, r) }},
@@ -576,8 +575,8 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Disks = s.disks.Listed()
 	snap.Health = s.health.Current()
 	snap.Pending = s.pendingRows()
-	snap.Epics = s.epicSummaries(snap.Tickets)
-	snap.RecentlyFinished = recentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
+	snap.Epics = s.epics.EpicSummaries(snap.Tickets)
+	snap.RecentlyFinished = epics.RecentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
 	snap.Mode = s.queue.Mode()
 	snap.AFK = s.afk.IsOn()
 	snap.ViMode = s.viMode.IsOn()

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -149,7 +150,7 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	waitForSession(ctx, t, h, evs, res.Session.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 
 	r := row()
-	if r.Section != wire.SectionNeedsYou || r.StatePill != server.PillQuestion {
+	if r.Section != wire.SectionNeedsYou || r.StatePill != epics.PillQuestion {
 		t.Errorf("section %q pill %q, want needs-you Question", r.Section, r.StatePill)
 	}
 	if want := []string{"proj:m", "proj:m-impl"}; !slices.Equal(r.Addresses, want) {

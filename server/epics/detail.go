@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"net/http"
@@ -25,14 +25,15 @@ func actionInfo(actions []string) map[string]wire.ActionInfo {
 
 const permissionHint = "Approve it in the TUI"
 
-func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
+// Detail serves one ticket's detail.
+func (s *Epics) Detail(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	// A malformed address is a ticket nobody has, the same as an unknown one.
 	if _, err := tickets.ParseAddress(address, tickets.AddressContext{}); err != nil {
 		http.Error(w, "no ticket "+address, http.StatusNotFound)
 		return
 	}
-	ref, ok, err := s.epics.Writer.FindTicket(address)
+	ref, ok, err := s.Writer.FindTicket(address)
 	switch {
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -41,15 +42,16 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no ticket "+r.URL.Query().Get("address"), http.StatusNotFound)
 		return
 	}
-	d, err := s.ticketDetail(ref)
+	d, err := s.TicketDetail(ref)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, d)
+	wire.WriteJSON(w, d)
 }
 
-func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
+// TicketDetail builds ref's detail payload.
+func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	t, err := schema.ParseTicket(ref.Ticket.Path)
 	if err != nil {
 		return brokenDetail(ref, err), nil
@@ -61,14 +63,14 @@ func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	d := newTicketDetail(ref)
 	fillHeader(&d, ref, t)
 	if t.Status == schema.StatusClaimed {
-		d.WaitingLabel = s.epics.CheckWaitingLabel(ref.Addr.String())
+		d.WaitingLabel = s.CheckWaitingLabel(ref.Addr.String())
 	}
 	if t.LongTicketTurns > 0 {
-		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.epics.Settings.Load().LongTicketTurns
+		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.Settings.Load().LongTicketTurns
 	}
 	if !ref.Epic.IsMap {
 		d.Stats = s.detailStats(ref)
-		_, d.HasScreen = s.epics.Chat.TicketPtyDir(ref.Addr)
+		_, d.HasScreen = s.Chat.TicketPtyDir(ref.Addr)
 		var writtenAt time.Time
 		if t.Status == schema.StatusCancelled {
 			writtenAt = ticketWrittenAt(ref.Ticket.Path)
@@ -77,14 +79,14 @@ func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 			return wire.TicketDetail{}, err
 		}
 	}
-	epics, err := s.epics.Projects.Epics(ref.Addr.Project)
+	epics, err := s.Projects.Epics(ref.Addr.Project)
 	if err != nil {
 		return wire.TicketDetail{}, err
 	}
 	d.Related = relatedTickets(ref, epics)
 	// A blocked-pane pause keeps its agent's prompt, and Approve ends that pause.
 	if t.Status == schema.StatusClaimed || t.PauseReason == schema.PauseBlockedPane {
-		if d.Permission, err = s.permissionCard(ref.Addr); err != nil {
+		if d.Permission, err = s.PermissionCard(ref.Addr); err != nil {
 			return wire.TicketDetail{}, err
 		}
 	}
@@ -93,7 +95,7 @@ func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 		d.Recommendation = &wire.DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
 	}
 	rounds := tickets.Rounds(evs)
-	if d.Actions, err = s.detailFor(ref.Addr.String(), t, rounds, d.Permission); err != nil {
+	if d.Actions, err = s.DetailFor(ref.Addr.String(), t, rounds, d.Permission); err != nil {
 		return wire.TicketDetail{}, err
 	}
 	d.ActionInfo = actionInfo(d.Actions)
@@ -113,14 +115,14 @@ func (s *Server) ticketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == wire.RoundAnswered
 	d.Chat = roundChat(latest)
 	if t.PausedClass() == schema.PauseClassAnswer && t.PauseReason == schema.PauseAmbiguousBase {
-		d.Bases = s.epics.AmbiguousBlockers(ref.Addr)
+		d.Bases = s.AmbiguousBlockers(ref.Addr)
 	}
 	return d, nil
 }
 
-// detailFor is what a person may do with a parsed ticket now, given its pause
+// DetailFor is what a person may do with a parsed ticket now, given its pause
 // rounds. The ticket detail and ticketRecommend both read their actions from here.
-func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseRound, card *wire.PermissionCard) ([]string, error) {
+func (s *Epics) DetailFor(addr string, t schema.Ticket, rounds []tickets.PauseRound, card *wire.PermissionCard) ([]string, error) {
 	var last *tickets.PauseRound
 	if len(rounds) > 0 {
 		last = &rounds[len(rounds)-1]
@@ -128,7 +130,7 @@ func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseR
 	gone := false
 	if t.PausedClass() != "" {
 		var err error
-		if gone, err = s.epics.AgentGone(addr); err != nil {
+		if gone, err = s.AgentGone(addr); err != nil {
 			return nil, err
 		}
 	}
@@ -155,6 +157,29 @@ func newTicketDetail(ref queue.TicketRef) wire.TicketDetail {
 	}
 }
 
+// storedStatus is t's status in the old stored spelling: a paused ticket is
+// asking or stuck by class. The web API and pause events keep
+// those labels until the events are renamed.
+func storedStatus(t schema.Ticket) schema.Status {
+	if t.Status == schema.StatusPaused {
+		return t.PausedClass().LegacyStatus()
+	}
+	return t.Status
+}
+
+// detailState is the token the detail page carries. A paused ticket's token
+// names its latest round of any kind, so repair and manual pauses have one.
+func detailState(evs []tickets.LogEvent, t schema.Ticket) string {
+	rounds := tickets.Rounds(evs)
+	if t.PausedClass() != "" {
+		rounds = tickets.AllRounds(evs)
+	}
+	if len(rounds) == 0 {
+		return ""
+	}
+	return queue.AnswerState(rounds[len(rounds)-1].Question, t.PausedClass())
+}
+
 // fillHeader sets the fields of a ticket that parsed: its status, pause, body
 // and, for an Error ticket, the reason.
 func fillHeader(d *wire.TicketDetail, ref queue.TicketRef, t schema.Ticket) {
@@ -176,12 +201,12 @@ func fillHeader(d *wire.TicketDetail, ref queue.TicketRef, t schema.Ticket) {
 	}
 }
 
-// permissionCard is the pending prompt of addr's live agent, or nil. It reads
+// PermissionCard is the pending prompt of addr's live agent, or nil. It reads
 // the runner's status, so it runs only when a detail or a snapshot is built.
 // A prompt the web cannot approve (a herdr-hosted agent, an unnamed dialog, a
 // tool that needs a real answer) gets a card with a hint and no request ID.
-func (s *Server) permissionCard(addr tickets.Address) (*wire.PermissionCard, error) {
-	runner, sess, ok, err := s.epics.Harness.LiveSession(addr)
+func (s *Epics) PermissionCard(addr tickets.Address) (*wire.PermissionCard, error) {
+	runner, sess, ok, err := s.Harness.LiveSession(addr)
 	if err != nil || !ok {
 		return nil, err
 	}

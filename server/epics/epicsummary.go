@@ -1,10 +1,9 @@
-package server
+package epics
 
 import (
 	"slices"
 	"time"
 
-	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
@@ -12,13 +11,13 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// epicSummaries summarizes every epic with a queue item, in queue order. A
+// EpicSummaries summarizes every epic with a queue item, in queue order. A
 // Merged epic and a map epic have no card.
-func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
+func (s *Epics) EpicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 	out := []wire.EpicSummary{}
 	seen := map[queue.RootRef]bool{}
-	recoveryOf := func(addr string) string { return ticketwrite.RecoveryState(s.epics.Pauses.State(addr), addr, all) }
-	for _, item := range s.epics.Queue.List() {
+	recoveryOf := func(addr string) string { return ticketwrite.RecoveryState(s.Pauses.State(addr), addr, all) }
+	for _, item := range s.Queue.List() {
 		addr, err := tickets.ParseQueuedAddress(item.Address)
 		if err != nil {
 			continue
@@ -28,7 +27,7 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 			continue
 		}
 		seen[root] = true
-		projEpics, err := s.epics.Projects.Epics(root.Project)
+		projEpics, err := s.Projects.Epics(root.Project)
 		if err != nil {
 			continue
 		}
@@ -36,7 +35,7 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 		if i < 0 || projEpics[i].IsMap || !projEpics[i].MergedAt.IsZero() {
 			continue
 		}
-		sum := summarizeEpic(root, projEpics[i], s.epics.Runs.StartedAtOf, recoveryOf, queue.ReadLogLenient)
+		sum := summarizeEpic(root, projEpics[i], s.Runs.StartedAtOf, recoveryOf, queue.ReadLogLenient)
 		for j := range sum.Active {
 			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
 		}
@@ -48,12 +47,12 @@ func (s *Server) epicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 // needsApproval reports whether the live agent of address waits on a
 // permission prompt. It reads the runner's status, so it runs only when a
 // snapshot or a detail is built.
-func (s *Server) needsApproval(address string) bool {
+func (s *Epics) needsApproval(address string) bool {
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return false
 	}
-	card, err := s.permissionCard(addr)
+	card, err := s.PermissionCard(addr)
 	return err == nil && card != nil
 }
 
@@ -79,7 +78,7 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (t
 		addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
 		info := wire.SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
 		switch {
-		case epics.IsPaused(e, t):
+		case IsPaused(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.PauseDetail(e, t)
 			info.ReasonLabel = t.PauseReason.Label()
 			open := tickets.OpenQuestion(logOf(t))
@@ -107,16 +106,16 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, claimedAt func(string) (t
 	if oneOffs {
 		sum.Done, sum.Total = 0, 0
 	}
-	sum.State = epicStateFor(root, e, claimedAt)
+	sum.State = EpicStateFor(root, e, claimedAt)
 	if sum.State == wire.EpicStatePaused {
 		sum.Reason, sum.More = pausedEpicReason(e)
 		switch {
-		case root.Mergeable() && epicMergeBlocked(e):
+		case root.Mergeable() && EpicMergeBlocked(e):
 			sum.Reason, sum.Detail = wire.EpicReasonMergeBlocked, e.MergeBlockReason
 			sum.MergeBlocked, sum.MergeBlockKind = true, e.MergeBlockKind
 			sum.Actions = mergeBlockActions(e.MergeBlockKind)
-		case epics.StateOf(e) == epics.StateCycle:
-			sum.Reason, sum.Detail = wire.EpicReasonDeadlock, epics.CycleReason(root, e)
+		case StateOf(e) == StateCycle:
+			sum.Reason, sum.Detail = wire.EpicReasonDeadlock, CycleReason(root, e)
 		}
 	}
 	if !showsActive(sum.State) {
@@ -136,7 +135,7 @@ func showsActive(state wire.EpicState) bool {
 func pausedEpicReason(e tickets.Epic) (reason string, more int) {
 	n := 0
 	for _, t := range e.Tickets {
-		if !epics.IsPaused(e, t) || e.RenderedStatus(t) == tickets.StatusDraft {
+		if !IsPaused(e, t) || e.RenderedStatus(t) == tickets.StatusDraft {
 			continue
 		}
 		if n == 0 {
@@ -147,9 +146,9 @@ func pausedEpicReason(e tickets.Epic) (reason string, more int) {
 	return reason, max(n-1, 0)
 }
 
-// epicMergeBlocked reports whether e is done and unmerged, with its last merge blocked.
-func epicMergeBlocked(e tickets.Epic) bool {
-	return epics.StateOf(e) == epics.StateDone && e.MergedAt.IsZero() && e.MergeBlockReason != ""
+// EpicMergeBlocked reports whether e is done and unmerged, with its last merge blocked.
+func EpicMergeBlocked(e tickets.Epic) bool {
+	return StateOf(e) == StateDone && e.MergedAt.IsZero() && e.MergeBlockReason != ""
 }
 
 // onlyMergeTicketsRemain reports whether every ticket is done or cancelled
@@ -161,7 +160,7 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 		switch e.RenderedStatus(t) {
 		case tickets.StatusDone, tickets.StatusCancelled:
 		case tickets.StatusOpen, tickets.StatusClaimed:
-			if t.Type != string(schema.TypeMerge) || epics.IsPaused(e, t) {
+			if t.Type != string(schema.TypeMerge) || IsPaused(e, t) {
 				return false
 			}
 			merging = true
@@ -172,27 +171,27 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 	return merging
 }
 
-// epicStateFor is the one place that decides an epic's state. Running needs a
+// EpicStateFor is the one place that decides an epic's state. Running needs a
 // claimed, non-paused ticket that has a server claim time.
-func epicStateFor(root queue.RootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) wire.EpicState {
-	switch epics.StateOf(e) {
-	case epics.StateDone:
+func EpicStateFor(root queue.RootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) wire.EpicState {
+	switch StateOf(e) {
+	case StateDone:
 		if !root.Mergeable() {
 			return wire.EpicStateWaiting
 		}
 		if e.MergedAt.IsZero() {
-			if epicMergeBlocked(e) {
+			if EpicMergeBlocked(e) {
 				return wire.EpicStatePaused
 			}
 			return wire.EpicStateAwaitingMerge
 		}
 		return wire.EpicStateFinished
-	case epics.StateRunnable:
+	case StateRunnable:
 		if root.Mergeable() && onlyMergeTicketsRemain(e) {
 			return wire.EpicStateMerging
 		}
 		for _, t := range e.Tickets {
-			if epics.IsPaused(e, t) || e.RenderedStatus(t) != tickets.StatusClaimed {
+			if IsPaused(e, t) || e.RenderedStatus(t) != tickets.StatusClaimed {
 				continue
 			}
 			addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()

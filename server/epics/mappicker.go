@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"github.com/elentok/gx/server/queue"
@@ -25,11 +25,11 @@ type designActivity struct {
 // designActivities folds the sessions into one designActivity per map address.
 // A session counts for a map when its Session ticket is the map or one of its
 // tickets; live means not Exited.
-func (s *Server) designActivities() map[string]designActivity {
+func (s *Epics) designActivities() map[string]designActivity {
 	out := map[string]designActivity{}
-	sessions, err := s.epics.Sessions.ListSessions()
+	sessions, err := s.Sessions.ListSessions()
 	if err != nil {
-		s.epics.Log.Warn("design picker: list sessions", "err", err)
+		s.Log.Warn("design picker: list sessions", "err", err)
 		return out
 	}
 	for _, info := range sessions {

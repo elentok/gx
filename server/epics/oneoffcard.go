@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"cmp"
@@ -16,7 +16,7 @@ import (
 
 // oneOffCards lists the cards of e's one-off tickets, none when e holds none. A
 // done or archived one-off gets a Finished card; capFinishedOneOffs trims those.
-func (s *Server) oneOffCards(project string, e tickets.Epic, qidx queueIndex) []wire.EpicListRow {
+func (s *Epics) oneOffCards(project string, e tickets.Epic, qidx queueIndex) []wire.EpicListRow {
 	if !queue.IsOneOffEpic(e) {
 		return nil
 	}

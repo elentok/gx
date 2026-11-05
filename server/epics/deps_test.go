@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"encoding/json"
@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
@@ -86,8 +85,8 @@ type fakeChat struct{}
 
 func (fakeChat) TicketPtyDir(tickets.Address) (string, bool) { return "", false }
 
-func fakeEpics() epics.Deps {
-	return epics.Deps{
+func fakeEpics() Deps {
+	return Deps{
 		Log:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Harness:     fakeHarness{},
 		Projects:    &fakeProjects{},
@@ -106,7 +105,7 @@ func fakeEpics() epics.Deps {
 func TestEpicsDeps_DesignActivitiesReadsTheSessionsFake(t *testing.T) {
 	d := fakeEpics()
 	d.Sessions = fakeSessions{list: []wire.SessionInfo{{Design: true, Ticket: "p:map/01"}}}
-	s := &Server{epics: d}
+	s := New(d)
 	got := s.designActivities()
 	if a := got[queue.EpicAddress("p:map/01")]; !a.running {
 		t.Fatalf("activities = %+v, want the map running", got)
@@ -116,7 +115,7 @@ func TestEpicsDeps_DesignActivitiesReadsTheSessionsFake(t *testing.T) {
 func TestEpicsDeps_DesignActivitiesIsEmptyWhenSessionsFail(t *testing.T) {
 	d := fakeEpics()
 	d.Sessions = fakeSessions{err: errors.New("boom")}
-	s := &Server{epics: d}
+	s := New(d)
 	if got := s.designActivities(); len(got) != 0 {
 		t.Fatalf("activities = %+v, want none", got)
 	}
@@ -125,7 +124,7 @@ func TestEpicsDeps_DesignActivitiesIsEmptyWhenSessionsFail(t *testing.T) {
 func TestEpicsDeps_QueueIndexReadsTheQueueFake(t *testing.T) {
 	d := fakeEpics()
 	d.Queue = fakeQueue{items: []wire.QueueItem{{Address: "p:e/01"}, {Address: "p:f/01"}}}
-	s := &Server{epics: d}
+	s := New(d)
 	q := s.newQueueIndex()
 	if got := q.slot(queueKey(tickets.Address{Project: "p", Epic: "f", ID: "1"})); got != 2 {
 		t.Fatalf("slot of the second queued epic = %d, want 2", got)
@@ -136,24 +135,24 @@ func TestEpicsDeps_TicketRunsReturnsTheHistoryError(t *testing.T) {
 	d := fakeEpics()
 	want := errors.New("history unreadable")
 	d.History = fakeHistory{err: want}
-	s := &Server{epics: d}
+	s := New(d)
 	if _, err := s.ticketRuns(queue.TicketRef{}, schema.Ticket{}, nil, time.Time{}); !errors.Is(err, want) {
 		t.Fatalf("err = %v, want %v", err, want)
 	}
 }
 
 func TestEpicsDeps_DetailAnswers404WhenTheWriterFindsNothing(t *testing.T) {
-	s := &Server{epics: fakeEpics()}
+	s := New(fakeEpics())
 	rec := httptest.NewRecorder()
-	s.detail(rec, httptest.NewRequest(http.MethodGet, "/v1/detail?address=p:e/01", nil))
+	s.Detail(rec, httptest.NewRequest(http.MethodGet, "/v1/detail?address=p:e/01", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rec.Code)
 	}
 }
 
 func TestEpicsDeps_PermissionCardIsNilWithoutALiveSession(t *testing.T) {
-	s := &Server{epics: fakeEpics()}
-	card, err := s.permissionCard(tickets.Address{Project: "p", Epic: "e", ID: "1"})
+	s := New(fakeEpics())
+	card, err := s.PermissionCard(tickets.Address{Project: "p", Epic: "e", ID: "1"})
 	if card != nil || err != nil {
 		t.Fatalf("card, err = %v, %v, want nil, nil", card, err)
 	}
@@ -165,7 +164,7 @@ func TestEpicsDeps_PermissionCardIsNilWithoutALiveSession(t *testing.T) {
 func TestEpicsDeps_RowForUsesTheHarnessFake(t *testing.T) {
 	d := fakeEpics()
 	d.Harness = fakeHarness{label: wire.HarnessLabel{Harness: "codex"}}
-	s := &Server{epics: d}
+	s := New(d)
 	e := tickets.Epic{Name: "e"}
 	row := s.rowFor(queue.RootRef{Project: "p", Epic: "e"}, e, tickets.Ticket{Number: 1, Identifier: "t1"})
 	if row.HarnessLabel.Harness != "codex" {
@@ -178,8 +177,8 @@ func TestEpicsDeps_EpicSummariesAskTheProjectsFake(t *testing.T) {
 	proj := &fakeProjects{epics: map[string][]tickets.Epic{"p": {{Name: "e"}}}}
 	d.Projects = proj
 	d.Queue = fakeQueue{items: []wire.QueueItem{{Address: "p:e/01"}}}
-	s := &Server{epics: d}
-	out := s.epicSummaries(nil)
+	s := New(d)
+	out := s.EpicSummaries(nil)
 	if len(out) != 1 || len(proj.asked) != 1 || proj.asked[0] != "p" {
 		t.Fatalf("summaries = %d, asked = %v, want one summary from project p", len(out), proj.asked)
 	}
@@ -189,9 +188,9 @@ func TestEpicsDeps_EpicListReadsTheSettingsFake(t *testing.T) {
 	d := fakeEpics()
 	d.TicketStore = t.TempDir()
 	d.Settings = fakeSettings{recentlyFinished: 7}
-	s := &Server{epics: d}
+	s := New(d)
 	rec := httptest.NewRecorder()
-	s.epicList(rec, httptest.NewRequest(http.MethodGet, "/v1/epics", nil))
+	s.EpicList(rec, httptest.NewRequest(http.MethodGet, "/v1/epics", nil))
 	var list wire.EpicList
 	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatal(err)

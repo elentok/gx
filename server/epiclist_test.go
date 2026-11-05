@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -290,7 +291,7 @@ func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
 	if q := bySection[wire.SectionImplementing]; len(q) != 1 || q[0].Address != "proj:one-offs/01" || q[0].CardKind != wire.CardKindOneOff || q[0].State != wire.EpicListQueued {
 		t.Errorf("Implementing = %+v, want the queued one-off", q)
 	}
-	if n := bySection[wire.SectionNeedsYou]; len(n) != 1 || n[0].Address != "proj:one-offs/02" || n[0].StatePill != server.PillPaused || len(n[0].Actions) != 1 || n[0].Actions[0].Kind != wire.CardActionOpenTicket {
+	if n := bySection[wire.SectionNeedsYou]; len(n) != 1 || n[0].Address != "proj:one-offs/02" || n[0].StatePill != epics.PillPaused || len(n[0].Actions) != 1 || n[0].Actions[0].Kind != wire.CardActionOpenTicket {
 		t.Errorf("Needs you = %+v, want the paused one-off with its pill and action", n)
 	}
 	var got []string

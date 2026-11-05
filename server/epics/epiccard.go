@@ -1,4 +1,4 @@
-package server
+package epics
 
 import (
 	"cmp"
@@ -88,9 +88,9 @@ type queueIndex struct {
 // newQueueIndex indexes the queue. A slot is 1-based, in queue order; an epic's
 // tickets share one slot and each one-off ticket has its own. A key whose items
 // have no enqueue time has no entry in enqueued.
-func (s *Server) newQueueIndex() queueIndex {
+func (s *Epics) newQueueIndex() queueIndex {
 	idx := queueIndex{slots: map[string]int{}, enqueued: map[string]time.Time{}}
-	for _, it := range s.epics.Queue.List() {
+	for _, it := range s.Queue.List() {
 		a, err := tickets.ParseQueuedAddress(it.Address)
 		if err != nil {
 			continue
