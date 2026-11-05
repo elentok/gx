@@ -150,6 +150,19 @@ func (s *Sessions) AddImage(ctx context.Context, id string, data []byte) (wire.S
 	return res, err
 }
 
+// Image reads one saved Prompt image: its bytes and detected Content-Type.
+func (s *Sessions) Image(ctx context.Context, session, image string) ([]byte, string, error) {
+	return s.t.getBytes(ctx, "/v1/sessions/images?session="+url.QueryEscape(session)+"&id="+url.QueryEscape(image))
+}
+
+// RemoveImage deletes one saved Prompt image that has not been sent. A refusal
+// is a result (Refused set), not an error.
+func (s *Sessions) RemoveImage(ctx context.Context, req wire.SessionImageRequest) (wire.SessionImageResult, error) {
+	var res wire.SessionImageResult
+	err := s.t.post(ctx, "/v1/sessions/images/delete", req, &res)
+	return res, err
+}
+
 // Keys sends a named key or literal text to a live session. A refusal is a
 // result (Refused set), not an error.
 func (s *Sessions) Keys(ctx context.Context, req wire.SessionKeysRequest) (wire.SessionResult, error) {

@@ -3,12 +3,15 @@ package prompt
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
@@ -58,18 +61,9 @@ func (p *Prompt) imageUploadHandler(w http.ResponseWriter, r *http.Request) {
 // folder as img-<n>-<id><ext>. The name is gx's: plain ASCII, never from the
 // upload, with the extension from the type the bytes show.
 func (p *Prompt) saveSessionImage(sessionID string, data []byte) (wire.SessionImageResult, error) {
-	dir, meta, res, err := p.sessions.SessionDir(sessionID)
-	if res.Refused || err != nil {
-		return imageRefusalOf(res), err
-	}
-	if !p.settings.Load().HasChatReader(meta.Harness) {
-		return imageRefusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", sessionID)), nil
-	}
-	// An upload must work while the session is Working, which the prompt route
-	// refuses with ReasonSessionNotIdle, so an Exited (or still starting)
-	// session answers ReasonSessionNotLive instead.
-	if st := meta.Info().Status.State; st != wire.SessionIdle && st != wire.SessionWorking {
-		return imageRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", sessionID, st)), nil
+	dir, refusal, err := p.imageSessionDir(sessionID)
+	if refusal != nil || err != nil {
+		return orZero(refusal), err
 	}
 	if len(data) > maxImageBytes {
 		return imageRefusal(wire.ReasonImageTooLarge, fmt.Sprintf("image is over %d MB", maxImageBytes>>20)), nil
@@ -79,6 +73,113 @@ func (p *Prompt) saveSessionImage(sessionID string, data []byte) (wire.SessionIm
 		return imageRefusal(wire.ReasonImageTypeNotAllowed, "only PNG, JPEG, GIF and WebP images are accepted"), nil
 	}
 	return p.writeImage(filepath.Join(dir, imagesDir), ext, data)
+}
+
+// imageSessionDir is the session gate of the upload and delete routes: the
+// session's state dir, or the refusal that stops the write.
+func (p *Prompt) imageSessionDir(sessionID string) (string, *wire.SessionImageResult, error) {
+	dir, meta, res, err := p.sessions.SessionDir(sessionID)
+	if res.Refused || err != nil {
+		r := imageRefusalOf(res)
+		return "", &r, err
+	}
+	if !p.settings.Load().HasChatReader(meta.Harness) {
+		r := imageRefusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", sessionID))
+		return "", &r, nil
+	}
+	// A write must work while the session is Working, which the prompt route
+	// refuses with ReasonSessionNotIdle, so an Exited (or still starting)
+	// session answers ReasonSessionNotLive instead.
+	if st := meta.Info().Status.State; st != wire.SessionIdle && st != wire.SessionWorking {
+		r := imageRefusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is %s", sessionID, st))
+		return "", &r, nil
+	}
+	return dir, nil, nil
+}
+
+func orZero(r *wire.SessionImageResult) wire.SessionImageResult {
+	if r == nil {
+		return wire.SessionImageResult{}
+	}
+	return *r
+}
+
+// imageFileName matches a saved image's file name and captures its id.
+var imageFileName = regexp.MustCompile(`^img-\d+-([0-9a-f]{8})\.[a-z]+$`)
+
+// findImage is the path of the saved image id in the session's images folder.
+// The id is matched against the names gx itself wrote, so no part of a request
+// ever becomes a path: `..`, a slash or an unknown id finds nothing.
+func findImage(sessionDir, id string) (string, bool) {
+	entries, err := os.ReadDir(filepath.Join(sessionDir, imagesDir))
+	if err != nil {
+		return "", false
+	}
+	for _, e := range entries {
+		if m := imageFileName.FindStringSubmatch(e.Name()); m != nil && m[1] == id && e.Type().IsRegular() {
+			return filepath.Join(sessionDir, imagesDir, e.Name()), true
+		}
+	}
+	return "", false
+}
+
+// imageServeHandler serves GET /v1/sessions/images?session=<id>&id=<image>.
+// Any miss, in the session or the image, is a 404.
+func (p *Prompt) imageServeHandler(w http.ResponseWriter, r *http.Request) {
+	dir, _, res, err := p.sessions.SessionDir(r.URL.Query().Get("session"))
+	if res.Refused || err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	path, ok := findImage(dir, r.URL.Query().Get("id"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", detectType(data))
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	_, _ = w.Write(data)
+}
+
+// imageDeleteHandler serves POST /v1/sessions/images/delete.
+func (p *Prompt) imageDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	var req wire.SessionImageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := p.deleteSessionImage(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
+}
+
+// deleteSessionImage removes a saved image under the upload's session gates.
+// A refusal of an already-sent image goes here, after the lookup.
+func (p *Prompt) deleteSessionImage(req wire.SessionImageRequest) (wire.SessionImageResult, error) {
+	dir, refusal, err := p.imageSessionDir(req.ID)
+	if refusal != nil || err != nil {
+		return orZero(refusal), err
+	}
+	p.imageMu.Lock()
+	defer p.imageMu.Unlock()
+	path, ok := findImage(dir, req.Image)
+	if !ok {
+		return imageRefusal(wire.ReasonImageNotFound, fmt.Sprintf("no image %s in session %s", req.Image, req.ID)), nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return wire.SessionImageResult{}, err
+	}
+	return wire.SessionImageResult{ID: req.Image, Name: filepath.Base(path)}, nil
 }
 
 // detectType is the media type the bytes show, without any parameters.

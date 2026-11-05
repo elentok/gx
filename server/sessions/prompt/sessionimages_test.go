@@ -2,11 +2,15 @@ package prompt_test
 
 import (
 	"bytes"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -130,5 +134,143 @@ func TestSessionImage_WorksWhileWorking(t *testing.T) {
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	if res := f.addImage(t, f.id, imageBytes(pngHead, 16)); res.Refused {
 		t.Errorf("upload while working = %+v", res)
+	}
+}
+
+// serveImage is a signed-in GET of the serve route.
+func (f promptFixture) serveImage(t *testing.T, session, image string) (*http.Response, []byte) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, f.base+"/v1/sessions/images?session="+url.QueryEscape(session)+"&id="+url.QueryEscape(image), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(f.ck)
+	resp, err := servertest.WebClient().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return resp, body
+}
+
+func TestSessionImage_ServeReturnsBytesWithHeaders(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	data := imageBytes(pngHead, 64)
+	saved := f.addImage(t, f.id, data)
+	resp, body := f.serveImage(t, f.id, saved.ID)
+	if resp.StatusCode != http.StatusOK || !bytes.Equal(body, data) {
+		t.Fatalf("serve = %d, %d bytes", resp.StatusCode, len(body))
+	}
+	for k, want := range map[string]string{
+		"Content-Type":           "image/png",
+		"X-Content-Type-Options": "nosniff",
+		"Cache-Control":          "private, max-age=31536000, immutable",
+	} {
+		if got := resp.Header.Get(k); got != want {
+			t.Errorf("%s = %q, want %q", k, got, want)
+		}
+	}
+}
+
+func TestSessionImage_ServeRefusesWhatIsNotInTheSessionFolder(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	saved := f.addImage(t, f.id, imageBytes(pngHead, 16))
+	// A file next to the images folder must stay out of reach by any id.
+	if err := os.WriteFile(filepath.Join(f.h.SessionsDir, f.id, "secret.txt"), []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	other, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || other.Session == nil {
+		t.Fatalf("create = %+v, %v", other, err)
+	}
+	for name, tc := range map[string]struct{ session, image string }{
+		"dot dot":         {f.id, "../secret.txt"},
+		"dot dot to meta": {f.id, ".."},
+		"absolute":        {f.id, filepath.Join(f.h.SessionsDir, f.id, "secret.txt")},
+		"file name":       {f.id, saved.Name},
+		"unknown id":      {f.id, "00000000"},
+		"empty id":        {f.id, ""},
+		"another session": {other.Session.ID, saved.ID},
+		"unknown session": {"nope", saved.ID},
+		"session dot dot": {"../" + f.id, saved.ID},
+	} {
+		if resp, _ := f.serveImage(t, tc.session, tc.image); resp.StatusCode != http.StatusNotFound {
+			t.Errorf("%s: serve = %d, want 404", name, resp.StatusCode)
+		}
+	}
+}
+
+func TestSessionImage_ServeNeedsSignIn(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	saved := f.addImage(t, f.id, imageBytes(pngHead, 16))
+	if code, _ := servertest.WebDoCookie(t, http.MethodGet, f.base+"/v1/sessions/images?session="+f.id+"&id="+saved.ID, nil); code != http.StatusUnauthorized {
+		t.Errorf("signed-out serve = %d, want %d", code, http.StatusUnauthorized)
+	}
+}
+
+func TestSessionImage_DeleteRemovesAnUnsentFile(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	saved := f.addImage(t, f.id, imageBytes(pngHead, 16))
+	path := filepath.Join(f.h.SessionsDir, f.id, "images", saved.Name)
+	req := wire.SessionImageRequest{ID: f.id, Image: saved.ID}
+	if res, err := f.h.Client.Sessions.RemoveImage(f.ctx, req); err != nil || res.Refused {
+		t.Fatalf("delete = %+v, %v", res, err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("file still there (err %v)", err)
+	}
+	if res, err := f.h.Client.Sessions.RemoveImage(f.ctx, req); err != nil || !res.Refused || res.Reason != wire.ReasonImageNotFound {
+		t.Errorf("second delete = %+v, %v, want %s", res, err, wire.ReasonImageNotFound)
+	}
+	if resp, _ := f.serveImage(t, f.id, saved.ID); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("serve after delete = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestSessionImage_DeleteSessionGates(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	saved := f.addImage(t, f.id, imageBytes(pngHead, 16))
+	noChat, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind), Ticket: "proj:map"})
+	if err != nil || noChat.Session == nil {
+		t.Fatalf("create = %+v, %v", noChat, err)
+	}
+	if res, err := f.h.Client.Sessions.Stop(f.ctx, f.id); err != nil || res.Refused {
+		t.Fatalf("stop = %+v, %v", res, err)
+	}
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+	for name, tc := range map[string]struct{ id, want string }{
+		"unknown":        {"nope", wire.ReasonSessionUnknown},
+		"exited":         {f.id, wire.ReasonSessionNotLive},
+		"no chat reader": {noChat.Session.ID, wire.ReasonPromptHarnessNotSupported},
+	} {
+		res, err := f.h.Client.Sessions.RemoveImage(f.ctx, wire.SessionImageRequest{ID: tc.id, Image: saved.ID})
+		if err != nil || !res.Refused || res.Reason != tc.want {
+			t.Errorf("%s: delete = %+v, %v, want %s", name, res, err, tc.want)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(f.h.SessionsDir, f.id, "images", saved.Name)); err != nil {
+		t.Errorf("a refused delete removed the file: %v", err)
+	}
+}
+
+func TestSessionImage_RemovingAnExitedSessionRemovesItsImages(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	f.addImage(t, f.id, imageBytes(pngHead, 16))
+	if res, err := f.h.Client.Sessions.Stop(f.ctx, f.id); err != nil || res.Refused {
+		t.Fatalf("stop = %+v, %v", res, err)
+	}
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+	if res, err := f.h.Client.Sessions.Remove(f.ctx, f.id); err != nil || res.Refused {
+		t.Fatalf("remove = %+v, %v", res, err)
+	}
+	if _, err := os.Stat(filepath.Join(f.h.SessionsDir, f.id)); !os.IsNotExist(err) {
+		t.Errorf("session folder still there (err %v)", err)
 	}
 }

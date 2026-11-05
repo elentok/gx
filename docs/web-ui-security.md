@@ -80,6 +80,27 @@ The same flow has command-line verbs:
 - `gx tickets answer <project:epic/NN>` answers the question a paused ticket is waiting on.
 - `gx tickets log <addr>` prints the ticket's raw log events, one JSON object per line.
 
+## Prompt images
+
+Three routes carry the images pasted into a session's Prompt box. All three need a signed-in web login.
+
+- **Upload** (`POST /v1/sessions/images?id=<session>`). The body is the image's raw bytes, so this is
+  the one web write that skips the JSON `Content-Type` rule. It keeps the `Origin` check, which a
+  cross-site page cannot forge. It accepts PNG, JPEG, GIF and WebP up to 20 MB, decided from the
+  bytes and never from the upload's name or type. gx picks the saved file name. An unknown session,
+  an Exited session and a session with no chat reader are refused.
+- **Serve** (`GET /v1/sessions/images?session=<id>&id=<image>`). The image id is matched against the
+  file names gx wrote in that session's `images` folder. No part of the request becomes a path, so
+  `..`, an absolute path, another session's id and an unknown id all return 404. The response has
+  `Content-Type` detected from the file bytes, `X-Content-Type-Options: nosniff` and a long
+  `private` cache header.
+- **Delete** (`POST /v1/sessions/images/delete`, JSON `{id, image}`). It removes an image that has
+  not been sent, under the upload's session rules. A second delete answers `image-not-found`.
+
+Removing an Exited session deletes its state folder, images included.
+
+CLI: `gx agents image add|get|rm`.
+
 ## Upgrade note: run migrate
 
 The person who runs the gx server runs `gx tickets migrate <path>` once after you upgrade. Pass the

@@ -166,6 +166,25 @@ func (c *transport) postBody(ctx context.Context, path, contentType string, body
 	return json.NewDecoder(resp.Body).Decode(res)
 }
 
+// getBytes reads a non-JSON body and the Content-Type the server sent with it.
+func (c *transport) getBytes(ctx context.Context, path string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, "", fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
+	}
+	data, err := io.ReadAll(resp.Body)
+	return data, resp.Header.Get("Content-Type"), err
+}
+
 func (c *transport) get(ctx context.Context, path string, out any) error {
 	// The host is ignored by the unix dialer; it only has to parse.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)

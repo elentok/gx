@@ -1967,9 +1967,22 @@ export type ReasonPrompt = typeof ReasonPromptHarnessNotSupported | typeof Reaso
 export const ReasonImageTypeNotAllowed = "image-type-not-allowed";
 export const ReasonImageTooLarge = "image-too-large";
 /**
+ * ReasonImageNotFound is the delete of an image that is not in the
+ * session's folder (never saved, or already deleted).
+ */
+export const ReasonImageNotFound = "image-not-found";
+/**
  * Refusal reasons of POST /v1/sessions/images.
  */
-export type ReasonImageT = typeof ReasonImageTypeNotAllowed | typeof ReasonImageTooLarge;
+export type ReasonImage = typeof ReasonImageTypeNotAllowed | typeof ReasonImageTooLarge | typeof ReasonImageNotFound;
+/**
+ * SessionImageRequest is the body of POST /v1/sessions/images/delete: Image is
+ * the id an upload returned.
+ */
+export interface SessionImageRequest {
+  id: string;
+  image: string;
+}
 /**
  * SessionImageResult is the answer of POST /v1/sessions/images. ID names the
  * saved Prompt image; Name is its file name in the session's images folder.
