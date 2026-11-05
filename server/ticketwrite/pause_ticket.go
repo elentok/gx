@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -18,7 +19,7 @@ import (
 // lost a race with a merge) is not an error to the caller: nothing is left to pause.
 // run is the paused run, zero when none launched.
 func (w *Writer) Pause(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run runs.Run) error {
-	if err := ralphloop.Pause(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.PauseEvent()); errors.Is(err, ralphloop.ErrPauseDone) {
+	if err := ticketops.Pause(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.PauseEvent()); errors.Is(err, ticketops.ErrPauseDone) {
 		w.d.Log.Warn("pause refused: ticket is done", "ticket", addr.String(), "kind", kind, "reason", reason)
 		return nil
 	} else if err != nil {
@@ -55,7 +56,7 @@ func (w *Writer) AnnouncePause(addr tickets.Address, ticketPath string, kind eve
 	switch {
 	case w.d.Host.HoldPauseForRecovery(addr, ticketPath, kind, reason):
 	case kind.CauseHerdr() && w.d.Host.HerdrUnavailable():
-		w.holdPause(addr, ralphloop.PauseStatus(kind), kind, reason)
+		w.holdPause(addr, ticketops.PauseStatus(kind), kind, reason)
 	default:
 		w.sendPause(addr, ticketPath, kind, reason)
 	}
@@ -65,7 +66,7 @@ func (w *Writer) AnnouncePause(addr tickets.Address, ticketPath string, kind eve
 // checked, the recovery hold is not.
 func (w *Writer) NotifyPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
 	if kind.CauseHerdr() && w.d.Host.HerdrUnavailable() {
-		w.holdPause(addr, ralphloop.PauseStatus(kind), kind, reason)
+		w.holdPause(addr, ticketops.PauseStatus(kind), kind, reason)
 		return
 	}
 	w.sendPause(addr, ticketPath, kind, reason)
@@ -73,7 +74,7 @@ func (w *Writer) NotifyPause(addr tickets.Address, ticketPath string, kind event
 
 // sendPause sends the one chat message for a pause.
 func (w *Writer) sendPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
-	status := ralphloop.PauseStatus(kind)
+	status := ticketops.PauseStatus(kind)
 	w.d.Chat.Pause(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, PauseChatDetail(ticketPath, kind, reason), w.epicCounts(addr.Project, addr.Epic))
 }
 

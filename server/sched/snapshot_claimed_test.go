@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -15,7 +15,7 @@ import (
 func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
 	t.Parallel()
 	h, path := startTicketWrites(t)
-	if err := ralphloop.Claim(path); err != nil {
+	if err := ticketops.Claim(path); err != nil {
 		t.Fatal(err)
 	}
 	launched := time.Now().Add(-90 * time.Second).Truncate(time.Second)

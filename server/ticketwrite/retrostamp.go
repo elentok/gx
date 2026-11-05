@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -38,7 +38,7 @@ func (w *Writer) StampFinished(addr tickets.Address, ticketPath string, cancelle
 func (w *Writer) stampFriction(addr tickets.Address, ticketPath string) {
 	dir, err := w.d.Projects.Dir(addr.Project)
 	if err == nil {
-		err = ralphloop.StampFriction(dir, addr.Epic, addr.ID, ticketPath)
+		err = ticketops.StampFriction(dir, addr.Epic, addr.ID, ticketPath)
 	}
 	if err != nil {
 		w.d.Log.Warn("stamp friction", "ticket", addr.String(), "err", err)

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -280,7 +281,7 @@ func (s *Reconciler) cancelUnstartedInvestigations(dir string, addr tickets.Addr
 			if !ok || parent.Identifier != addr.ID || t.Type != string(schema.TypeInvestigate) || t.Status != string(schema.StatusOpen) {
 				continue
 			}
-			if err := ralphloop.CancelWithResolution(t.Path, "late finish adopted"); err != nil {
+			if err := ticketops.CancelWithResolution(t.Path, "late finish adopted"); err != nil {
 				s.log.Warn("late finish: cancel investigation", "ticket", t.Identifier, "err", err)
 				continue
 			}

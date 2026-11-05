@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -313,7 +314,7 @@ func recordLiveSession(d Deps, label, ticketPath string) string {
 		return ""
 	}
 	if t, err := schema.ParseTicket(ticketPath); err == nil && !slices.Contains(t.SessionIDs, status.SessionID) {
-		_ = AppendSessionID(ticketPath, status.SessionID)
+		_ = ticketops.AppendSessionID(ticketPath, status.SessionID)
 	}
 	return status.SessionID
 }
@@ -518,7 +519,7 @@ func mergeBuilt(d Deps, p iterationParams, built *builtAwaitingMergeError) error
 		reason := "merge conflict not resolved: " + r.childReason +
 			"\nThe cherry-pick was rolled back; the iteration branch " + built.job.branch +
 			" is intact. Merge it again with `gx server tickets merge`."
-		_, err := PauseTicket(p.Sink, PauseRequest{
+		_, err := ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 			Type: events.Paused, Kind: events.MergeConflict, Reason: reason,
 			Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},

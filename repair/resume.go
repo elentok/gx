@@ -3,7 +3,7 @@ package repair
 import (
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -43,5 +43,5 @@ func Resume(epicPath, id string, now time.Time, base string) (ResumeResult, erro
 	if status := epic.RenderedStatus(t); status != tickets.StatusPausedAnswer {
 		return res, &RefusalError{Reason: ReasonNotPaused, Message: statusRefusal(id, t.Path, status.Word(), ", not asking")}
 	}
-	return res, ralphloop.ResumeTicketWithBase(t.Path, now, base)
+	return res, ticketops.ResumeTicketWithBase(t.Path, now, base)
 }

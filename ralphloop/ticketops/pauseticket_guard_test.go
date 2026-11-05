@@ -1,4 +1,4 @@
-package ralphloop
+package ticketops
 
 import (
 	"go/ast"
@@ -25,7 +25,7 @@ var pauseWriters = map[string]bool{
 // writers, or calls those writers from anywhere but pauseticket.go — so a future
 // catch-all cannot pause a ticket without the pause path's event and notification.
 func TestPausePath_NoStatusWriteBypasses(t *testing.T) {
-	root := filepath.Join("..")
+	root := filepath.Join("..", "..")
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -47,10 +47,10 @@ func TestPausePath_NoStatusWriteBypasses(t *testing.T) {
 		// The one-off ticket migration rewrites legacy statuses to paused; it is
 		// not a runtime pause, so it owes no event or notification.
 		// servertest/pausedrun.go seeds a legacy-status ticket for tests.
-		if p := filepath.ToSlash(filepath.Clean(path)); p == "../tickets/ticketmigrate/migrate_pause.go" || p == "../server/servertest/pausedrun.go" {
+		if p := filepath.ToSlash(filepath.Clean(path)); p == "../../tickets/ticketmigrate/migrate_pause.go" || p == "../../server/servertest/pausedrun.go" {
 			return nil
 		}
-		inRalphloop := filepath.Clean(filepath.Dir(path)) == filepath.Join("..", "ralphloop")
+		inRalphloop := filepath.Clean(filepath.Dir(path)) == filepath.Join("..", "..", "ralphloop", "ticketops")
 		base := filepath.Base(path)
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch n := n.(type) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
@@ -40,7 +41,7 @@ func (s *Landing) StartOverTrunkConflict(req wire.RepairRequest, origin string, 
 	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowStartOver, "start-over"); err != nil {
 		return repair.StartOverResult{}, err
 	}
-	if err := ralphloop.MarkDone(t.Path); err != nil {
+	if err := ticketops.MarkDone(t.Path); err != nil {
 		return repair.StartOverResult{}, fmt.Errorf("marking trunk-conflict ticket %s done: %w", addr.ID, err)
 	}
 	s.dropTrunkConflictBackup(addr)

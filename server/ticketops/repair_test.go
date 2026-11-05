@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -208,7 +208,7 @@ func TestRepair_MergeWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	if err := ralphloop.Claim(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")); err != nil {
+	if err := ticketops.Claim(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")); err != nil {
 		t.Fatal(err)
 	}
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))

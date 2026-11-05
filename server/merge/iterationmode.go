@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
@@ -169,10 +170,10 @@ func pauseOnMarkers(o ralphloop.OneIteration, dir string, files []string) (out r
 	}
 	reason := "conflict markers are still in " + listFiles(left)
 	kind := events.ConflictMarkers
-	if err := ralphloop.Pause(o.ScratchDir, o.Epic, o.Ticket.Identifier, o.Ticket.Path, kind, reason, runlog.Event{}); err != nil {
+	if err := ticketops.Pause(o.ScratchDir, o.Epic, o.Ticket.Identifier, o.Ticket.Path, kind, reason, runlog.Event{}); err != nil {
 		return ralphloop.FinishOutcome{}, false, fmt.Errorf("pausing on conflict markers: %w", err)
 	}
-	return ralphloop.FinishOutcome{Status: schema.Status(ralphloop.PauseStatus(kind)), Kind: kind, Reason: reason}, true, nil
+	return ralphloop.FinishOutcome{Status: schema.Status(ticketops.PauseStatus(kind)), Kind: kind, Reason: reason}, true, nil
 }
 
 // Resume rebuilds the worktree; base is the persisted base of a feature-branch run.

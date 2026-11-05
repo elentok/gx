@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -49,7 +49,7 @@ func (w *Writer) LeaveBlocked(address string) error {
 	if !w.WaitsOnBlockedPause(tk, address) || !tk.PausedAsking() {
 		return nil
 	}
-	if err := ralphloop.Claim(t.Path); err != nil {
+	if err := ticketops.Claim(t.Path); err != nil {
 		return fmt.Errorf("claim %s: %w", address, err)
 	}
 	if err := w.d.Host.ResettleWaiting(run); err != nil {

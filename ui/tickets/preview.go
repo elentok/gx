@@ -184,7 +184,7 @@ func renderPauseRoundsBlock(events []tickets.LogEvent, width int) (block string,
 }
 
 // highlightPauseSection finds the paused (repair) heading ("## Needs Repair", the
-// literal text markRepairWithReason appends — see ralphloop/claim.go)
+// literal text markRepairWithReason appends — see ralphloop/ticketops/claim.go)
 // within rendered
 // (glamour output, so headings survive verbatim as their own line — see
 // ticketGlamourStyle's H2 prefix in glamour.go) and re-styles that line

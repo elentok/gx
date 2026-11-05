@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
@@ -45,7 +46,7 @@ func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t 
 		return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 	}
 	answered := AnsweredSession(t)
-	if err := ralphloop.ClaimWithBase(t.Path, resolvedBase); err != nil {
+	if err := ticketops.ClaimWithBase(t.Path, resolvedBase); err != nil {
 		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
 	l.Index.Rescan() // the claim must show now, not when the backstop poll comes

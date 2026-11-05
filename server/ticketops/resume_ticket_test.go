@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -69,8 +69,8 @@ func TestResume_GoneAgentClosesTheQuestionAndReopens(t *testing.T) {
 		t.Fatalf("resume = %+v, %v; want reopened", res, err)
 	}
 	closed, answers := resumeEvents(t, ticketPath)
-	if len(closed) != 1 || closed[0].Reason != ralphloop.CloseResumed || answers != 0 {
-		t.Errorf("closed=%+v answers=%d; want one pause.closed(%s) and no pause.answer", closed, answers, ralphloop.CloseResumed)
+	if len(closed) != 1 || closed[0].Reason != ticketops.CloseResumed || answers != 0 {
+		t.Errorf("closed=%+v answers=%d; want one pause.closed(%s) and no pause.answer", closed, answers, ticketops.CloseResumed)
 	}
 	if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusOpen {
 		t.Errorf("ticket = %+v, %v; want open", tk, err)

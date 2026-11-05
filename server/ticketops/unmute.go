@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -16,10 +16,10 @@ func (o *Ops) Unmute(req wire.QueueRequest) (wire.QueueResult, error) {
 		if len(ref.Ticket.Mutes) == 0 {
 			return queue.Refusal(wire.ReasonNotMuted, ref.Addr.String()+" is not muted"), nil
 		}
-		if err := ralphloop.UnmuteTicket(ref.Ticket.Path, time.Now()); err != nil {
+		if err := ticketops.UnmuteTicket(ref.Ticket.Path, time.Now()); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("unmute %s: %w", ref.Addr, err)
 		}
-		if err := tickets.EndOpenRound(ref.Ticket.Path, req.Source, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+		if err := tickets.EndOpenRound(ref.Ticket.Path, req.Source, tickets.HowResume, ticketops.CloseResumed); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
 		}
 		o.d.Index.Rescan()

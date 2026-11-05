@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 )
@@ -85,7 +86,7 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 		if err := tickets.EndOpenRound(t.Path, tickets.SourceGx, tickets.HowManualMerge, "manual-merge"); err != nil {
 			return fmt.Errorf("end pause round of %s: %w", addr, err)
 		}
-		if err := ralphloop.RecordManualMerge(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
+		if err := ticketops.RecordManualMerge(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
 			return fmt.Errorf("finishing merge of %s: %w", addr, err)
 		}
 		s.events.Publish(wire.EventTicketDone, addr)

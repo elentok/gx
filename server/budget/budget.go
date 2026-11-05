@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
@@ -341,7 +342,7 @@ func (b *Budget) PauseKilled(t runs.TrackedRun) error {
 	if closeErr == nil {
 		closeErr = r.Stop(t.Session)
 	}
-	if err := tickets.EndOpenRound(t.TicketPath, tickets.SourceGx, tickets.HowAuto, ralphloop.CloseBudgetKilled); err != nil {
+	if err := tickets.EndOpenRound(t.TicketPath, tickets.SourceGx, tickets.HowAuto, ticketops.CloseBudgetKilled); err != nil {
 		closeErr = errors.Join(closeErr, err)
 	}
 	pauseErr := b.host.PauseTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached", t.Run)

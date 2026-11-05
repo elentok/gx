@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"cmp"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 
 	"github.com/elentok/gx/events"
@@ -64,7 +65,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 			return FinishOutcome{}, err
 		}
 		if fault != "" {
-			reason, err := PauseTicket(p.Sink, PauseRequest{
+			reason, err := ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 				Type: events.Paused, Kind: kind, Reason: fault,
 				Event: p.agentEvent(pane, sessionID, w.Path),

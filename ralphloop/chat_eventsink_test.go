@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
 	"strings"
@@ -223,7 +224,7 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 		{"IterationResumed", func(s *chatEventSink) { s.IterationResumed("04", "iter-04", runlog.PauseRateLimit) }},
 		{"IterationFinished", func(s *chatEventSink) { s.IterationFinished(ticket, "epic", stats) }},
 		{"TicketNeedsHuman", func(s *chatEventSink) {
-			s.TicketNeedsHuman("04", "epic", PauseStatus(events.ZeroCommit), "zero-commit", "no commits merged")
+			s.TicketNeedsHuman("04", "epic", ticketops.PauseStatus(events.ZeroCommit), "zero-commit", "no commits merged")
 		}},
 		{"EpicPaused", func(s *chatEventSink) { s.EpicPaused("epic", []runlog.StalledTicket{{Identifier: "04"}}) }},
 		{"EpicComplete", func(s *chatEventSink) { s.EpicComplete("epic", 5, 300) }},
@@ -278,7 +279,7 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 	sink.IterationPaused("01", "iter-01", runlog.PauseRateLimit, "rate limited")
 	sink.IterationResumed("01", "iter-01", runlog.PauseRateLimit)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", runlog.IterationStats{})
-	sink.TicketNeedsHuman("01", "epic", PauseStatus(events.ZeroCommit), "zero-commit", "no commits merged")
+	sink.TicketNeedsHuman("01", "epic", ticketops.PauseStatus(events.ZeroCommit), "zero-commit", "no commits merged")
 	sink.EpicPaused("epic", []runlog.StalledTicket{{Identifier: "01"}})
 	sink.EpicComplete("epic", 1, 0)
 
@@ -306,14 +307,14 @@ func TestChatEventSink_Pause_ProducesExactlyOneChatMessage(t *testing.T) {
 	sink, transport := newFakeChatSink(t, &recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", runlog.PauseRepair, "agent blocked on permission prompt")
-	sink.TicketNeedsHuman("04", "epic", PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt")
+	sink.TicketNeedsHuman("04", "epic", ticketops.PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt")
 	sink.flush()
 
 	got := waitForSentCount(transport, 1)
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 message for the pause", got)
 	}
-	want := slackStyle.ticketNeedsHumanText("04", "epic", PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt", EpicCounts{}).String()
+	want := slackStyle.ticketNeedsHumanText("04", "epic", ticketops.PauseStatus(events.Spinning), "blocked-pane", "agent blocked on permission prompt", EpicCounts{}).String()
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}

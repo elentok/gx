@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -370,7 +371,7 @@ func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairRes
 			clearTierOverride(t.Path, req.Tier)
 			return repairRefusal(err), nil
 		}
-		if err := tickets.EndOpenRound(t.Path, rc.origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+		if err := tickets.EndOpenRound(t.Path, rc.origin, tickets.HowResume, ticketops.CloseResumed); err != nil {
 			return wire.RepairResult{}, fmt.Errorf("end pause round of %s: %w", addr, err)
 		}
 	}
@@ -449,7 +450,7 @@ func resumeAnswered(ticketPath, id string, req wire.RepairRequest, origin string
 		if !t.PausedAsking() || open == nil || queue.AnswerState(*open, t.PausedClass()) != req.State {
 			return tickets.LogEvent{}, resumeRefused{staleResumeRefusal()}
 		}
-		if err := ralphloop.ResumeTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
+		if err := ticketops.ResumeTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
 			return tickets.LogEvent{}, resumeRefused{repairRefusal(err)}
 		}
 		return tickets.LogEvent{
@@ -612,7 +613,7 @@ func (o *Ops) resumeSelfReported(epicPath, id, origin string) (wire.RepairResult
 	if !selfReported {
 		return wire.RepairResult{}, false, nil
 	}
-	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowResume, ticketops.CloseResumed); err != nil {
 		return wire.RepairResult{}, false, fmt.Errorf("close question of %s: %w", address, err)
 	}
 	return wire.RepairResult{}, false, nil

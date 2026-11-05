@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"strings"
 	"sync"
 	"time"
@@ -158,7 +159,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 	// Status stays claimed. builtAwaitingMergeError carries everything the
 	// worker needs that only exists as live-process state — pane/tab/
 	// sessionID/path aren't available once this build goroutine returns.
-	if err := MarkBuiltAwaitingMerge(p.Ticket.Path); err != nil {
+	if err := ticketops.MarkBuiltAwaitingMerge(p.Ticket.Path); err != nil {
 		return fmt.Errorf("marking ticket %s built awaiting merge: %w", p.Ticket.Identifier, err)
 	}
 	return &builtAwaitingMergeError{job: mergeJob{
@@ -285,7 +286,7 @@ func adoptCommitlessFinish(d Deps, p iterationParams, path, pane, sessionID stri
 		return false, nil
 	}
 	stampCommitlessMetrics(d.SessionHomes, p, path, sessionID)
-	if err := MarkDone(p.Ticket.Path); err != nil {
+	if err := ticketops.MarkDone(p.Ticket.Path); err != nil {
 		return false, fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
 	}
 	p.logTicketEvent(string(events.Commitless), pane, sessionID, path)
@@ -321,7 +322,7 @@ func adoptAskingReport(p iterationParams, path, pane, sessionID string) (adopted
 // pauseAsking routes a finish-time paused (answer) pause through the single
 // pause path, carrying the iteration's pane/tab/session on the event.
 func (p iterationParams) pauseAsking(kind events.Kind, reason, pane, sessionID, cwd string) (string, error) {
-	return PauseTicket(p.Sink, PauseRequest{
+	return ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 		Type: events.Paused, Kind: kind, Reason: reason,
 		Event: p.agentEvent(pane, sessionID, cwd),
@@ -351,7 +352,7 @@ func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID str
 func backfillDoneMetadata(d Deps, p iterationParams) error {
 	sessionID, sessionCwd, agent, ok := recoverIterationSession(p)
 	if !ok {
-		return MarkDone(p.Ticket.Path)
+		return ticketops.MarkDone(p.Ticket.Path)
 	}
 	if _, _, err := writeMergedMetrics(d.SessionHomes, agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
 		return fmt.Errorf("writing merged metrics for ticket %s: %w", p.Ticket.Identifier, err)
@@ -362,9 +363,9 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 func markDoneWithCompactions(d Deps, agent agent.AgentKind, path, cwd, sessionID string) error {
 	compactions, ok, err := sessionCompactions(d, agent, cwd, sessionID)
 	if err != nil || !ok {
-		return MarkDone(path)
+		return ticketops.MarkDone(path)
 	}
-	return MarkDoneWithMetadata(path, compactions, sessionID)
+	return ticketops.MarkDoneWithMetadata(path, compactions, sessionID)
 }
 
 // recoverIterationSession finds the session of p.Ticket's last
@@ -740,7 +741,7 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, live agentrunner.Se
 		return "", fmt.Errorf("closing reattached conflict-resolution session: %w", err)
 	}
 
-	if err := MarkChildDone(childPath, sessionID); err != nil {
+	if err := ticketops.MarkChildDone(childPath, sessionID); err != nil {
 		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
 
@@ -824,7 +825,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		return "", pauseConflictResolutionChildRepair(p, childPath, childID, label, reason)
 	}
 
-	if err := MarkChildDone(childPath, sessionID); err != nil {
+	if err := ticketops.MarkChildDone(childPath, sessionID); err != nil {
 		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
 
@@ -842,7 +843,7 @@ func pauseConflictResolutionChildRepair(p iterationParams, childPath, childID, l
 		Branch:   p.FeatureBranch,
 		Worktree: p.FeatureWorktree,
 	}
-	PauseTicket(p.Sink, PauseRequest{
+	ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: childID, Path: childPath,
 		Type: events.Paused, Kind: events.IterationError, Reason: reason, Repair: state,
 	})

@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,7 +33,7 @@ func TestPause_CommitsStoreWithAddressAndStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := PauseTicket(runlog.NoopEventSink{}, PauseRequest{
+	if _, err := ticketops.PauseTicket(runlog.NoopEventSink{}, ticketops.PauseRequest{
 		ScratchDir: store, EpicName: "myepic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.Kind("ticket-answered"), Reason: "q",
 	}); err != nil {

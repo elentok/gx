@@ -7,8 +7,8 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/queue"
@@ -97,7 +97,7 @@ func (w *Writer) Relaunch(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult
 		if qc.Actor != "" {
 			source = tickets.SourceGx
 		}
-		if err := tickets.EndOpenRound(ref.Ticket.Path, source, tickets.HowRelaunch, ralphloop.CloseRelaunch); err != nil {
+		if err := tickets.EndOpenRound(ref.Ticket.Path, source, tickets.HowRelaunch, ticketops.CloseRelaunch); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
 		}
 		if qc.Actor == "" {

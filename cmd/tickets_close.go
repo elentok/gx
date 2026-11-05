@@ -10,8 +10,8 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
@@ -66,7 +66,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	friction := ralphloop.Friction(a.ID, runEvents, log)
+	friction := ticketops.Friction(a.ID, runEvents, log)
 
 	created, err := ensureArchiveEpic(d.dirs(), root, filepath.Join(root, followUpsEpic))
 	if err != nil {

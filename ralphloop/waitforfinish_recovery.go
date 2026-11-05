@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -150,7 +151,7 @@ func pauseBlockedAtOnce(d Deps, p launchAndPromptParams, ticketPath string, st a
 // pauseBlockedPane routes a blocked-pane pause through the single pause path,
 // keeping the agent context on the event.
 func (p launchAndPromptParams) pauseBlockedPane(sessionID, reason string) {
-	PauseTicket(p.sink(), PauseRequest{
+	ticketops.PauseTicket(p.sink(), ticketops.PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
 		Type: events.Paused, Kind: events.BlockedPane, Reason: reason,
 		Event: runlog.Event{Agent: p.Agent, Pane: p.Pane, AgentSession: sessionID, Cwd: p.SessionCwd},

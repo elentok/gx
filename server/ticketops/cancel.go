@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -53,7 +54,7 @@ func (o *Ops) markCancelled(ref queue.TicketRef, t tickets.Ticket, source string
 	if err := tickets.EndOpenRound(t.Path, source, tickets.HowCancel, "cancelled"); err != nil {
 		return fmt.Errorf("end pause round of %s: %w", ref.Address(t), err)
 	}
-	if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
+	if err := ticketops.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
 		return fmt.Errorf("cancel %s: %w", ref.Address(t), err)
 	}
 	o.d.Writer.StampFinished(tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}, t.Path, true)

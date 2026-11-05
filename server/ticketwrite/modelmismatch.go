@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -75,7 +76,7 @@ func (w *Writer) refuseEmptyModel(scratchDir, path string, addr tickets.Address)
 // session, logged with the rest.
 func (w *Writer) recordModelMismatch(scratchDir, path string, addr tickets.Address, run runs.Run, m *ralphloop.ModelMismatchError, stopErr error) {
 	ticketAddr := addr.String()
-	if err := tickets.EndOpenRound(path, tickets.SourceGx, tickets.HowAuto, ralphloop.CloseModelMismatch); err != nil {
+	if err := tickets.EndOpenRound(path, tickets.SourceGx, tickets.HowAuto, ticketops.CloseModelMismatch); err != nil {
 		stopErr = errors.Join(stopErr, err)
 	}
 	if err := schema.UpdateTicketWithBody(path, func(t *schema.Ticket, _ *string) {

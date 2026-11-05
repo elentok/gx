@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -163,13 +163,13 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if queued {
 			// Open again for gx to claim; the dead run has nothing to settle.
 			o.d.Registry.Delete(address)
-			if err := ralphloop.ResumeTicket(ref.Ticket.Path, time.Now()); err != nil {
+			if err := ticketops.ResumeTicket(ref.Ticket.Path, time.Now()); err != nil {
 				return wire.QueueResult{}, fmt.Errorf("reopen %s: %w", ref.Addr, err)
 			}
 			o.d.Index.Rescan()
 			return wire.QueueResult{Outcome: wire.OutcomeQueued}, nil
 		}
-		if err := ralphloop.Claim(ref.Ticket.Path); err != nil {
+		if err := ticketops.Claim(ref.Ticket.Path); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("claim %s: %w", ref.Addr, err)
 		}
 		if err := o.d.Launch.ResettleWaiting(run); err != nil {

@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func retryTurnSelfReport(t *testing.T, d Deps, path string, mutate func(*schema.
 	t.Helper()
 	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
 		if strings.Contains(text, unexecutedToolCallCorrection) {
-			if err := UpdateTicket(path, mutate); err != nil {
+			if err := ticketops.UpdateTicket(path, mutate); err != nil {
 				t.Errorf("seeding retry-turn self-report on %s: %v", path, err)
 			}
 		}

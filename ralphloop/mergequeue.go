@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"sync"
 	"time"
@@ -155,7 +156,7 @@ func mergeOne(d Deps, lp mergeQueueParams, job mergeJob) outcome {
 		var amb *ambiguousMergeError
 		if errors.As(err, &amb) {
 			// Paused, not failed: callers then see it via the pause check / the ticket.
-			if _, perr := PauseTicket(p.Sink, PauseRequest{
+			if _, perr := ticketops.PauseTicket(p.Sink, ticketops.PauseRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 				Type: events.Paused, Kind: events.AmbiguousMerge, Reason: amb.Error(),
 				Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},

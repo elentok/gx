@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
@@ -170,7 +171,7 @@ func ticketFrictionUnder(root string) func(epicName string, t tickets.Ticket) (s
 		if err != nil {
 			return schema.FrictionSummary{}, err
 		}
-		return ralphloop.Friction(t.Identifier, runEvents, log), nil
+		return ticketops.Friction(t.Identifier, runEvents, log), nil
 	}
 }
 

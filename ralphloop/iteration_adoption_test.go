@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"strings"
 	"testing"
@@ -19,7 +20,7 @@ func reportIterationStatus(t *testing.T, d Deps, path, label, value string) {
 		if s.Label != label {
 			return
 		}
-		if err := UpdateTicket(path, func(tk *schema.Ticket) {
+		if err := ticketops.UpdateTicket(path, func(tk *schema.Ticket) {
 			tk.IterationStatus = schema.IterationStatus(value)
 		}); err != nil {
 			t.Errorf("seeding iteration_status on %s: %v", path, err)

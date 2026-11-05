@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
 	"time"
@@ -58,7 +59,7 @@ func forkConflictResolutionTicket(p iterationParams) (childPath, childID string,
 		return "", "", fmt.Errorf("conflict-resolution ticket %s failed validation: %w", stubPath, err)
 	}
 
-	if err := Claim(stubPath); err != nil {
+	if err := ticketops.Claim(stubPath); err != nil {
 		return "", "", fmt.Errorf("claiming conflict-resolution ticket %s: %w", stubPath, err)
 	}
 

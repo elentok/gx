@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -513,7 +514,7 @@ func (s *chatEventSink) pauseTicket(source, reason string) error {
 	if t, err := schema.ParseTicket(source); err == nil {
 		identifier = string(t.ID)
 	}
-	_, err := PauseTicket(s.EventSink, PauseRequest{
+	_, err := ticketops.PauseTicket(s.EventSink, ticketops.PauseRequest{
 		ScratchDir: s.scratchDir,
 		EpicName:   s.epicName,
 		Ticket:     identifier,

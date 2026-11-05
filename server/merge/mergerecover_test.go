@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -121,7 +122,7 @@ func TestMergeRecovery_OrphanLockWithNoEvidencePausesAmbiguousMerge(t *testing.T
 	t.Parallel()
 	h, store, _, lockDir := startCrashedMerge(t)
 	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	if err := ralphloop.Claim(ticketPath); err != nil {
+	if err := ticketops.Claim(ticketPath); err != nil {
 		t.Fatal(err)
 	}
 

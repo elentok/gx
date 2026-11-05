@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"errors"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
 	"strings"
@@ -170,7 +171,7 @@ func TestFinishIteration_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPau
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
 	onRunnerPrompt(d, func(agentrunner.Session, string) error {
-		return UpdateTicket(ticketPath, func(tk *schema.Ticket) {
+		return ticketops.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
 			tk.IterationStatus = schema.IterationStatusFinished
 			tk.Commitless = true
 			tk.Base = ""

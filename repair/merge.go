@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -190,7 +191,7 @@ func recordLanded(epicPath, epic, source string, t tickets.Ticket, status schema
 	if session.ID == "" {
 		ev.Reason = "no recoverable agent session; metrics not stamped"
 	}
-	if err := ralphloop.RecordManualMerge(filepath.Dir(filepath.Clean(epicPath)), epic, t.Identifier, t.Path, status == schema.StatusDone, ev); err != nil {
+	if err := ticketops.RecordManualMerge(filepath.Dir(filepath.Clean(epicPath)), epic, t.Identifier, t.Path, status == schema.StatusDone, ev); err != nil {
 		return fmt.Errorf("marking ticket %s done: %w", t.Identifier, err)
 	}
 	return nil

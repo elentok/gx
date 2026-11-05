@@ -12,7 +12,7 @@ import (
 const pauseReasonMaxRunes = 60
 
 // pausedRepairHeading is the literal heading markRepairWithReason
-// (ralphloop/claim.go) appends to a paused ticket's body.
+// (ralphloop/ticketops/claim.go) appends to a paused ticket's body.
 const pausedRepairHeading = tickets.LegacyRepairHeading
 
 // pausedAnswerHint is rendered under the preview's "Pause rounds" heading.
