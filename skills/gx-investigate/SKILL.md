@@ -85,7 +85,7 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
    `~/.config/gx/notifications-state.json` and the affected ticket's own `Mutes` frontmatter field.
    A muted event can look identical to a stuck ticket or a scheduler that silently skipped it.
 6. Once you have a concrete hypothesis, verify it against the source it actually lives in
-   (`ralphloop/loop.go`, `scope.go`, `schedule.go`, `tickets/status.go`) — this file is a map, not
+   (`ralphloop/lifecycle.go`, `ralphloop/schedule/scope.go`, `ralphloop/schedule/schedule.go`, `tickets/status.go`) — this file is a map, not
    a substitute for reading the code the bug is in.
 
 ## CPU spikes

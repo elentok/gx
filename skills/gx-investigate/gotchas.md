@@ -24,9 +24,9 @@ archived and renumbered, and the tracker isn't on every machine.
   closed — nothing so far has enumerated every way an agent can learn a background task ended.
 - **`background-task-gate-released` is treated as full-turn completion, pausing the ticket
   with reason `zero-commit` even though the agent kept working afterward.**
-  `waitForBackgroundTasks` (`ralphloop/waitforfinish.go:774-824`) only tracks whether one specific
+  `WaitForBackgroundTasks` (`ralphloop/supervise/waitforfinish.go`) only tracks whether one specific
   backgrounded shell command's own completion notification appeared in the transcript — not pane
-  status. Its callers (`waitforfinish.go:143-166`, `iteration.go:240-243`) log the finish event and
+  status. Its callers (`supervise/waitforfinish.go`, `lifecycle.go`) log the finish event and
   fall straight into `finishIteration`'s commit count with no re-check that the pane is still idle;
   if the agent resumes real work once it sees the background task's result (the normal case), the
   pause fires anyway. Found live on two tickets, both paused right after a gate release; one
@@ -37,10 +37,9 @@ archived and renumbered, and the tracker isn't on every machine.
   `confirmFinished` once a gate it actually held releases, and both call sites loop again instead
   of finishing if that recheck finds the pane busy.
 - **A paused (no commits) outcome also fires a spurious "done"
-  notification with `0s · 0 tok · $0.00`.** `ralphloop/loop.go`'s main scheduling loop (~line
-  759-817) only early-exits on the built and paused-on-child flags; a plain pause falls through to
+  notification with `0s · 0 tok · $0.00`.** The former `ralphloop/loop.go` main scheduling loop (since removed) only early-exits on the built and paused-on-child flags; a plain pause falls through to
   `completed++`/`sink.IterationFinished` anyway, alongside the correct `TicketNeedsHuman` message
-  fired earlier in `iteration.go`/`waitforfinish.go`. Reads as "ticket X needed an answer, then
+  fired earlier in `lifecycle.go`/`supervise/waitforfinish.go`. Reads as "ticket X needed an answer, then
   completed anyway" in the same notification batch. Not fixed as of this entry.
 - **Finishing and pausing a paused epic run hangs silently — indistinguishable from a finish-and-pause
   still waiting on a long in-flight ticket.** The gate's finish-and-pause call doesn't wake a run
@@ -50,16 +49,16 @@ archived and renumbered, and the tracker isn't on every machine.
   on. Recovery: resume the epic and it exits immediately. Not fixed as of this entry; drop it once
   the fix is merged.
 - **Telegram ticket-completion notifications silently drop almost every time (unescaped `.` in
-  cost).** `formatCost` (`ralphloop/notification_text.go`) renders `"$1.23"` and
+  cost).** `formatCost` (`ralphloop/notify/notification_text.go`) renders `"$1.23"` and
   `iterationFinishedText` splices it unescaped into the counts line `message()` sends — `.` is a
   reserved MarkdownV2 char, so any non-integer cost 400s the whole send; since almost every real
   iteration has a fractional cost, `✅` ticket-done messages drop nearly always. Explains a report
   of "got epic-start and every iteration-started, never a single completion" (those carry no
   cost, so they go through fine). Fixed by escaping the assembled counts/detail strings in
   `iterationFinishedText`/`epicCompleteText`; regression covered by
-  `ralphloop/full_epic_notifications_e2e_test.go`.
+  the notify package tests (`ralphloop/notify/`).
 - **Telegram batch notifications silently drop whenever ≥2 messages coalesce into one flush.**
-  `renderBatch` (`ralphloop/chat_eventsink.go:244-253`) joins each already-escaped queued
+  `renderBatch` (`ralphloop/notify/chat_eventsink.go`) joins each already-escaped queued
   message with a raw `"\n---\n"` separator — `-` is a reserved MarkdownV2 char
   (`telegramMarkdownV2SpecialChars`), so any batch with 2+ distinct messages 400s on send;
   single-message batches (no separator) go through fine, so the drop is intermittent, not total.
@@ -68,11 +67,11 @@ archived and renumbered, and the tracker isn't on every machine.
   matched exactly the 7 notifications the user reported receiving. Not fixed as of this entry.
 - **Nudge-retry exhaustion on the initial `herdr agent wait --until working` launch step leaves a
   ticket Paused (repair) with a live, never-prompted pane leaked.** `promptWithNudge`
-  (`ralphloop/deps.go:483-568`) only resends bare Enter, never the actual prompt text, across its
-  3 nudges (`promptMaxNudges`, `deps.go:454`, 45s each, `deps.go:453`); if the agent never
+  (`ralphloop/deps/deps.go`) only resends bare Enter, never the actual prompt text, across its
+  3 nudges (`promptMaxNudges`, 45s each); if the agent never
   reaches `working` before all 3 exhaust, no prompt content was ever delivered, and the created
-  pane/tab is left alive with an empty prompt box — `loop.go`'s generic `r.err != nil` catch-all
-  (`ralphloop/loop.go:732-752`) pauses the ticket (repair) with no `iteration-started`
+  pane/tab is left alive with an empty prompt box — the former `loop.go`'s generic `r.err != nil` catch-all
+  (since removed) paused the ticket (repair) with no `iteration-started`
   logged and no cleanup of the orphaned pane. Found live: the pane sat idle at Claude Code's
   fresh welcome screen ~2min after launch. Fixed:
   `promptWithNudge` now diffs a pane-text snapshot per attempt and retypes the full prompt (capped
@@ -81,10 +80,10 @@ archived and renumbered, and the tracker isn't on every machine.
   closes whichever pane it finally gives up on.
 - **Reclaiming an already-live pane via `reattachIteration` logs no `iteration-started`, so the
   Queue spinner and the epic's "N paused" count both go stale.** `resumeReattachable`
-  (`ralphloop/loop.go:409-411`) routes a reclaim of a ticket with a still-live tab/pane through
-  `reattachIteration`, which deliberately sets `StartEvent=""` (`ralphloop/iteration.go:189-191`);
+  (formerly `ralphloop/loop.go`) routes a reclaim of a ticket with a still-live tab/pane through
+  `reattachIteration`, which deliberately sets `StartEvent=""` (`ralphloop/lifecycle.go`);
   that gates off both the run-log event and `sink().IterationStarted`
-  (`launch.go:260-262,291-293`). The UI spinner (`ui/tickets/live_row.go`) and the epic-paused
+  (`ralphloop/supervise/startandprompt.go`). The UI spinner (`ui/tickets/live_row.go`) and the epic-paused
   count (in the since-deleted `ui/tickets/loop_registry.go`) both only updated on
   `IterationStarted`/`TicketReattached`/`IterationPaused` events, never recomputing from ticket
   status directly — so a ticket can sit `claimed` with `gx` genuinely still polling it (confirmed
@@ -95,7 +94,7 @@ archived and renumbered, and the tracker isn't on every machine.
 - **`attachToLiveAgent` treats a permanently-stalled idle pane as "already finished," pausing a
   second ticket zero-commit with no real work attempted.** A ticket that already leaked a pane/tab
   from a failed launch (the `agent_prompt_stalled` gotcha below) can, on reclaim, collide (`agent_name_taken`) with
-  that same leaked agent name; `attachToLiveAgent` (`ralphloop/launch.go:283-301`) reattaches to it
+  that same leaked agent name; `attachToLiveAgent` (`ralphloop/launch.go`) reattaches to it
   and, since its status is `idle`, logs `iteration-started`/`-finished` back-to-back with no
   `AgentPrompt`/`waitForFinish` ever run — `promptWithNudge`'s stall-retry never gets a chance.
   `finishIteration` then pauses the ticket with `pause_reason: zero-commit` against the
@@ -104,30 +103,30 @@ archived and renumbered, and the tracker isn't on every machine.
   *original* stalled session (`state_change_seq` unchanged since). Not fixed as of this entry.
 - **A `herdr agent prompt agent_prompt_stalled` error leaves a ticket Paused (repair) with no
   `iteration-started` ever logged, and the retry code that exists doesn't cover it.**
-  `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/launch.go:242-263`);
+  `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/supervise/startandprompt.go`);
   a failed prompt-send returns before that line ever runs. There's a nudge-retry
-  (`promptWithNudge`, `ralphloop/deps.go:457-568`) but it only fires when the error text contains
-  "timed out" (`isPollTimeout`, `ralphloop/waitforfinish.go:1127-1129`) — herdr's stalled-prompt
+  (`promptWithNudge`, `ralphloop/deps/deps.go`) but it only fires when the error text contains
+  "timed out" (`isPollTimeout`, `ralphloop/supervise/waitforfinish.go`) — herdr's stalled-prompt
   message ("produced no observed state change within 5000 ms") doesn't match, so it's one-shot.
   Ends up in the same generic `r.err != nil` catch-all as `agent_pane_busy` below
-  (`ralphloop/loop.go:691-711`); clear the ticket back to `open` to reclaim, same as that entry —
+  (formerly `ralphloop/loop.go`); clear the ticket back to `open` to reclaim, same as that entry —
   but reclaim leaks a second herdr tab (`TabCreate` has no collision detection) since the failed
   launch never cleaned up its own pane. Fixed by widening `isPollTimeout` to also match
-  `agent_prompt_stalled`/"no observed state change" (`ralphloop/waitforfinish.go:1127-1136`); the
+  `agent_prompt_stalled`/"no observed state change" (`ralphloop/supervise/waitforfinish.go`); the
   pane/tab-leak-on-reclaim part is still open.
 - **`type: code-review` tickets always stall as Paused (`pause_reason: zero-commit`)
   under ralph-loop.** `gx-implement/SKILL.md` told the agent to "follow the gx-code-review
   skill instead," which the agent read as invoking a skill by name (Skill tool) — but `gx-code-review` sets
   `disable-model-invocation: true`, so the call is refused and the iteration ends with zero
   commits every time. Fixed at the scheduler, not in-session: `runIteration`
-  (`ralphloop/iteration.go`) now launches a `type: code-review` frontier ticket with
-  `/gx-code-review` directly (`codeReviewSkill` const, `ralphloop/loop.go`) instead of handing
+  (`ralphloop/lifecycle.go`) now launches a `type: code-review` frontier ticket with
+  `/gx-code-review` directly (`codeReviewSkill` const, `ralphloop/agent/agent.go`) instead of handing
   off from inside a `gx-implement` session, since the harness starting a session with the
   command already resolved isn't blocked by `disable-model-invocation` the way an in-session
   Skill-tool call is. `gx-implement/SKILL.md` keeps a short note for the manual-invocation edge
   case only.
 - **Every ticket in an epic ends up Paused (repair) on first claim, so the whole epic pauses.**
-  `ralphloop/labels.go`'s `iterLabel` (`epicName + "-iter-" + identifier`, no length cap) is used
+  `ralphloop/worktree/labels.go`'s `IterationLabel` (`epicName + "-iter-" + identifier`, no length cap) is used
   verbatim as the herdr agent name; epic slugs of 25+ chars push double-digit-ticket labels past
   herdr's 32-char `invalid_agent_name` limit, and herdr's error isn't special-cased the way
   `agent_name_taken` is, so it falls into the generic non-fatal repair-pause path and every
@@ -142,7 +141,7 @@ archived and renumbered, and the tracker isn't on every machine.
   the explore/implement split.
 
 - **A smart-zone `/compact` gets cancelled by gx's own finish-up prompt when herdr reports the pane
-  idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/waitforfinish.go`) returns
+  idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/supervise/waitforfinish.go`) returns
   success on *any* non-error `AgentWait`, consulting the transcript's compaction-boundary count only
   on a wait *timeout* past `smartZoneCompactTimeoutMs` (5 min) — so a prematurely-idle pane bypasses
   the very signal `compactSignalUnconfirmed` had just used to prove compaction hadn't finished, and
@@ -153,7 +152,7 @@ archived and renumbered, and the tracker isn't on every machine.
 
 - **`agent_pane_busy` on `herdr agent start` pauses a ticket (repair) with no
   `iteration-started` logged at all.** `--pane` is herdr's own `RootPaneID` from `tab create`, not
-  allocated/pooled by gx (`ralphloop/iteration.go:56-66` → `herdr/tab.go:30-52` →
+  allocated/pooled by gx (`ralphloop/lifecycle.go` → `herdr/tab.go` →
   `launch.go:76,220-225`); two tickets launching concurrently under `MaxParallel` can race inside
   herdr's own pane allocator (external binary, no gx-side mutex around the herdr CLI calls). Not a
   gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim.
@@ -206,7 +205,7 @@ kept as history of what the code did at the time, not as a description of today'
   follow-on work; `visiting` now unwinds via `defer delete` so it guards only the active recursion
   path. Also added: `gx tickets set --status done` now refuses a ticket with unresolved
   `blocked_by` unless `--force` is passed (with a stderr warning when forced) — closing the actual
-  write-time gap, since claim-time enforcement in `ralphloop/loop.go`'s `claimNext` was confirmed
+  write-time gap, since claim-time enforcement in the former `ralphloop/loop.go`'s `claimNext` was confirmed
   already sound. Regression tests: `TestEpic_UnresolvedBlockers_MisparentedGrandchildStillEnforced`,
   `TestEpic_UnresolvedBlockers_MisparentedSelfDoesNotDeadlockOnOwnBlocker`,
   `TestEpic_UnresolvedBlockers_SharedOpenDescendantCheckedIndependently` (`tickets/status_test.go`);
@@ -242,7 +241,7 @@ kept as history of what the code did at the time, not as a description of today'
   affected ticket via `gx tickets set --parent <id>`.
 
 - **Telegram epic-complete notifications always fail with HTTP 400; ticket-finished ones work
-  fine.** `ralphloop/notification_text.go`'s `epicCompleteText` hardcodes a literal `(s)` (from "N
+  fine.** `ralphloop/notify/notification_text.go`'s `epicCompleteText` hardcodes a literal `(s)` (from "N
   ticket(s) merged in...") straight into the MarkdownV2 text without routing it through
   `s.escape`, unlike every other template in that file. `(`/`)` are reserved MarkdownV2 chars
   (`telegramMarkdownV2SpecialChars`), so Telegram's `sendMessage` rejects the whole message with
@@ -280,8 +279,8 @@ kept as history of what the code did at the time, not as a description of today'
   requested. Fixed in `35c0d2e` (`ralphloop: log scheduler scans; fix review-ticket scoping`),
   `skills/gx-code-review/SKILL.md` "Close out" step.
 - **Telegram notifications silently drop on any transient network blip, including epic-complete.**
-  `ralphloop/telegram_eventsink.go`'s `send` is one-shot, 10s timeout, zero retries
-  (`ralphloop/eventlog_notify.go`) — a ~3min DNS/network stall reaching `api.telegram.org`
+  `ralphloop/notify/telegram_transport.go`'s `send` is one-shot, 10s timeout, zero retries
+  (`ralphloop/notify/eventlog_notify.go`) — a ~3min DNS/network stall reaching `api.telegram.org`
   dropped 4 consecutive notifications (3 `iteration-finished` + the final `epic-complete`) in one
   `gx-merge` run, confirmed via `notification-failed` "context deadline exceeded" entries in
   `run-log.jsonl` with the send goroutine running to completion (ruling out the process-exit race
@@ -296,7 +295,7 @@ kept as history of what the code did at the time, not as a description of today'
   overwrite of `06b.md` clobbers the `status: claimed` the scheduler had just set, reverting it to
   `open`; the next `scheduler-scan` sees it unclaimed and re-launches a second iteration under the
   *same* deterministic herdr agent name, which collides with the still-alive original
-  (`agent_name_taken`). `ralphloop/loop.go`'s `r.err != nil` path (~line 402) treats the failed
+  (`agent_name_taken`). the former `ralphloop/loop.go`'s `r.err != nil` path treats the failed
   launch as non-fatal: pauses that ticket (repair) and fires `IterationPaused`
   (`"{label} paused"` notification quoting the herdr error) but keeps scheduling. Harmless when
   the original iteration finishes normally afterward (its `done` write overwrites the spurious
