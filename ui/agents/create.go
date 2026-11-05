@@ -169,24 +169,41 @@ func (m Model) OpenCreateForm(p CreatePrefill) (Model, tea.Cmd) {
 		field = fieldName
 	}
 	m.create = &createForm{home: m.settings.Home(), prefill: p, name: p.Name, prompt: p.Prompt, field: field}
-	list := m.listProjects
-	return m, func() tea.Msg {
+	return m, m.create.load(m.listProjects)
+}
+
+// createCtx is what the form reads from the Model: screen sizes and the
+// session API that creates sessions.
+type createCtx struct {
+	height, mainWidth int
+	sessions          Sessions
+}
+
+func (c createCtx) pickerRows() int {
+	return max(3, min(maxPickerRows, c.height-createChrome))
+}
+
+// createResult tells the Model what a form update decided.
+type createResult struct {
+	closed    bool   // the form is done and the Model drops it
+	createdID string // the new session to select once a snapshot lists it
+}
+
+// load is the command that lists the projects the form offers.
+func (*createForm) load(list func() ([]formProject, error)) tea.Cmd {
+	return func() tea.Msg {
 		projects, err := list()
 		return formProjectsMsg{projects: projects, err: err}
 	}
 }
 
-// updateFormProjects moves the pre-filled project first, adding it when the
+// updateProjects moves the pre-filled project first, adding it when the
 // store lacks it, and selects the pre-filled dir, adding it when absent.
-func (m Model) updateFormProjects(msg formProjectsMsg) (tea.Model, tea.Cmd) {
-	if m.create == nil {
-		return m, nil
-	}
-	f := *m.create
-	m.create = &f
+func (c *createForm) updateProjects(msg formProjectsMsg, ctx createCtx) *createForm {
+	f := *c
 	if msg.err != nil {
 		f.loadErr = msg.err.Error()
-		return m, nil
+		return &f
 	}
 	f.projects = slices.Clone(msg.projects)
 	if f.projects == nil {
@@ -211,8 +228,8 @@ func (m Model) updateFormProjects(msg formProjectsMsg) (tea.Model, tea.Cmd) {
 			return e.project == 0 && filepath.Clean(e.dir) == filepath.Clean(dir)
 		}))
 	}
-	f.scroll(m.pickerRows())
-	return m, nil
+	f.scroll(ctx.pickerRows())
+	return &f
 }
 
 // filter keeps the entries matching query and selects the first. Projects
@@ -345,11 +362,6 @@ func (f *createForm) scroll(n int) {
 	f.offset = max(0, min(f.offset, len(rows)-n))
 }
 
-// pickerRows is how many picker rows fit the screen.
-func (m Model) pickerRows() int {
-	return max(3, min(maxPickerRows, m.height-createChrome))
-}
-
 // fields is the form's fields in tab order; the worktree name only shows
 // for a new worktree.
 func (f *createForm) fields() []createField {
@@ -379,14 +391,14 @@ func (f *createForm) text() *string {
 	return nil
 }
 
-func (m Model) updateCreateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	f := *m.create
-	m.create = &f
+// Update handles a key press.
+func (c *createForm) Update(msg tea.KeyPressMsg, ctx createCtx) (*createForm, tea.Cmd, createResult) {
+	cp := *c
+	f := &cp
 	query := f.query
 	switch msg.String() {
 	case "esc":
-		m.create = nil
-		return m, nil
+		return nil, nil, createResult{closed: true}
 	case "tab":
 		f.moveField(1)
 	case "shift+tab":
@@ -396,7 +408,7 @@ func (m Model) updateCreateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "up", "ctrl+p":
 		f.choose(-1)
 	case "enter":
-		return m.submitCreate()
+		return f, f.submit(ctx), createResult{}
 	case "backspace":
 		if t := f.text(); t != nil {
 			if r := []rune(*t); len(r) > 0 {
@@ -411,8 +423,8 @@ func (m Model) updateCreateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if f.query != query && f.projects != nil {
 		f.filter()
 	}
-	f.scroll(m.pickerRows())
-	return m, nil
+	f.scroll(ctx.pickerRows())
+	return f, nil, createResult{}
 }
 
 // choose steps the Where choice, wrapping.
@@ -422,15 +434,14 @@ func (f *createForm) choose(step int) {
 	}
 }
 
-func (m Model) submitCreate() (tea.Model, tea.Cmd) {
-	f := m.create
+func (f *createForm) submit(ctx createCtx) tea.Cmd {
 	if f.sending || len(f.projects) == 0 {
-		return m, nil
+		return nil
 	}
 	e, ok := f.selected()
 	if !ok {
 		f.err = "nothing matches " + strconv.Quote(f.query)
-		return m, nil
+		return nil
 	}
 	req := wire.CreateSessionRequest{
 		Project: f.projects[e.project].Name,
@@ -442,7 +453,7 @@ func (m Model) submitCreate() (tea.Model, tea.Cmd) {
 		req.Worktree = strings.TrimSpace(f.worktree)
 		if req.Worktree == "" {
 			f.err = "a new worktree needs a name"
-			return m, nil
+			return nil
 		}
 	} else {
 		req.Dir = e.dir
@@ -452,38 +463,32 @@ func (m Model) submitCreate() (tea.Model, tea.Cmd) {
 		}
 	}
 	// The new session has no info lines yet, so it gets the whole panel.
-	req.Cols, req.Rows = max(m.mainWidth()-2, 1), max(m.height-1, 1)
+	req.Cols, req.Rows = max(ctx.mainWidth-2, 1), max(ctx.height-1, 1)
 	f.sending, f.err = true, ""
-	sessions := m.sessionAPI
-	return m, func() tea.Msg {
+	sessions := ctx.sessions
+	return func() tea.Msg {
 		res, err := sessions.Create(context.Background(), req)
 		return sessionCreatedMsg{result: res, err: err}
 	}
 }
 
-// updateSessionCreated closes the form and selects the new session once a
-// snapshot lists it; a failure stays in the form's footer.
-func (m Model) updateSessionCreated(msg sessionCreatedMsg) (tea.Model, tea.Cmd) {
-	if m.create == nil {
-		return m, nil
-	}
-	f := *m.create
-	m.create = &f
+// updateCreated closes the form once the session exists; a failure stays in
+// the form's footer.
+func (c *createForm) updateCreated(msg sessionCreatedMsg) (*createForm, createResult) {
+	f := *c
 	f.sending = false
 	switch {
 	case msg.err != nil:
 		f.err = msg.err.Error()
-		return m, nil
+		return &f, createResult{}
 	case msg.result.Refused || msg.result.Session == nil:
 		f.err = msg.result.Message
 		if f.err == "" {
 			f.err = "create refused: " + msg.result.Reason
 		}
-		return m, nil
+		return &f, createResult{}
 	}
-	m.create = nil
-	m.pendingSelect = msg.result.Session.ID
-	return m.selectPending()
+	return nil, createResult{closed: true, createdID: msg.result.Session.ID}
 }
 
 // selectPending refreshes, first selecting and focusing the just-created
@@ -498,9 +503,9 @@ func (m Model) selectPending() (tea.Model, tea.Cmd) {
 }
 
 // dirSessions is how many live sessions run in dir.
-func (m Model) dirSessions(dir string) int {
+func dirSessions(sessions []wire.SessionInfo, dir string) int {
 	n := 0
-	for _, s := range m.sessions {
+	for _, s := range sessions {
 		if s.Status.State != wire.SessionExited && filepath.Clean(s.Dir) == filepath.Clean(dir) {
 			n++
 		}
@@ -508,9 +513,10 @@ func (m Model) dirSessions(dir string) int {
 	return n
 }
 
-func (m Model) renderCreate() string {
-	f := m.create
-	width := min(createMaxWidth, m.width-4)
+// view renders the form over a screen of the given size; sessions feed the
+// per-dir session counts.
+func (f *createForm) view(screenW, screenH int, sessions []wire.SessionInfo) string {
+	width := min(createMaxWidth, screenW-4)
 	innerW := width - 4
 	label := func(fl createField, name string) string {
 		if f.field == fl {
@@ -536,7 +542,7 @@ func (m Model) renderCreate() string {
 	default:
 		count := ui.StyleMuted.Render(strconv.Itoa(len(f.matches)))
 		lines = append(lines, textLine(fieldWhere, "Where", f.query, innerW-6)+fitLeft(count, 6), "")
-		lines = append(lines, m.renderPicker(innerW)...)
+		lines = append(lines, f.renderPicker(innerW, createCtx{height: screenH}.pickerRows(), sessions)...)
 		lines = append(lines, "")
 		if f.newWorktree() {
 			lines = append(lines, textLine(fieldWorktree, "Worktree", f.worktree, innerW))
@@ -567,13 +573,12 @@ func (m Model) renderCreate() string {
 
 // renderPicker is the visible picker rows: project headers, then their dirs
 // and a new-worktree entry.
-func (m Model) renderPicker(innerW int) []string {
-	f := m.create
+func (f *createForm) renderPicker(innerW, pickerRows int, sessions []wire.SessionInfo) []string {
 	rows := f.rows()
 	if len(rows) == 0 {
 		return []string{ui.StyleMuted.Render("    no matches")}
 	}
-	end := min(len(rows), f.offset+m.pickerRows())
+	end := min(len(rows), f.offset+pickerRows)
 	var lines []string
 	for _, r := range rows[f.offset:end] {
 		if r.entry < 0 {
@@ -583,7 +588,7 @@ func (m Model) renderPicker(innerW int) []string {
 		e := f.matches[r.entry]
 		text := "    " + fuzzy.HighlightMatches(entryLabel(f.home, e), e.pos)
 		if !e.newWorktree() {
-			if n := m.dirSessions(e.dir); n > 0 {
+			if n := dirSessions(sessions, e.dir); n > 0 {
 				text += ui.StyleMuted.Render("  " + plural(n, "session"))
 			}
 		}

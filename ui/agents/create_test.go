@@ -124,7 +124,7 @@ func TestCreate_SelectedSessionBeatsTheCwdProject(t *testing.T) {
 
 func TestCreate_DirPickerCountsSessionsPerDir(t *testing.T) {
 	m := step(t, createModel(t, &fakeSessionClient{}), letter("c"))
-	lines := strings.Split(ansi.Strip(m.renderCreate()), "\n")
+	lines := strings.Split(ansi.Strip(m.create.view(m.width, m.height, m.sessions)), "\n")
 	row := func(dir string) string {
 		for _, l := range lines {
 			if strings.Contains(l, "│     "+dir+" ") {
@@ -225,7 +225,7 @@ func TestCreate_PrefillWithDirStartsOnName(t *testing.T) {
 
 func TestCreate_PickerGroupsEveryProjectFocusedFirst(t *testing.T) {
 	m := step(t, createModel(t, &fakeSessionClient{}), letter("c"))
-	view := ansi.Strip(m.renderCreate())
+	view := ansi.Strip(m.create.view(m.width, m.height, m.sessions))
 	gx, web := strings.Index(view, "\n│   gx "), strings.Index(view, "\n│   web ")
 	if gx < 0 || web < 0 || gx > web {
 		t.Fatalf("want a gx header before a web header:\n%s", view)
@@ -239,7 +239,7 @@ func TestCreate_TypingFuzzyFiltersAcrossProjects(t *testing.T) {
 	f := &fakeSessionClient{result: wire.SessionResult{Session: &wire.SessionInfo{ID: "new"}}}
 	m := step(t, createModel(t, f), letter("c"))
 	m = typeKeys(t, m, letter("W"), letter("b"))
-	view := ansi.Strip(m.renderCreate())
+	view := ansi.Strip(m.create.view(m.width, m.height, m.sessions))
 	if strings.Contains(view, "/r/gx") || !strings.Contains(view, "/r/web") {
 		t.Fatalf("query wb should keep only web:\n%s", view)
 	}
@@ -262,7 +262,7 @@ func TestCreate_NoMatchRefusesToSubmit(t *testing.T) {
 	m := step(t, createModel(t, f), letter("c"))
 	m = typeKeys(t, m, letter("z"), letter("z"))
 	m = step(t, m, keyEnterMsg)
-	view := ansi.Strip(m.renderCreate())
+	view := ansi.Strip(m.create.view(m.width, m.height, m.sessions))
 	if !strings.Contains(view, "no matches") || !strings.Contains(view, `nothing matches "zz"`) {
 		t.Fatalf("want no matches and a refusal:\n%s", view)
 	}
@@ -281,11 +281,11 @@ func TestCreate_PickerScrollsToKeepTheSelectionVisible(t *testing.T) {
 		return []formProject{{Name: "gx", Root: "/r/gx", Worktrees: wts}}, nil
 	}
 	m = step(t, m, letter("c"))
-	if strings.Contains(ansi.Strip(m.renderCreate()), "/r/gx/wt29 ") {
+	if strings.Contains(ansi.Strip(m.create.view(m.width, m.height, m.sessions)), "/r/gx/wt29 ") {
 		t.Fatal("the last worktree should start off-screen")
 	}
 	m = typeKeys(t, m, keyUpMsg, keyUpMsg)
-	view := ansi.Strip(m.renderCreate())
+	view := ansi.Strip(m.create.view(m.width, m.height, m.sessions))
 	if !strings.Contains(view, "/r/gx/wt29 ") || strings.Contains(view, "/r/gx/wt0 ") {
 		t.Fatalf("up from the top should scroll to the end:\n%s", view)
 	}

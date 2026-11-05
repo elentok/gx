@@ -253,9 +253,21 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	case formProjectsMsg:
-		return m.updateFormProjects(msg)
+		if m.create != nil {
+			m.create = m.create.updateProjects(msg, createCtx{m.height, m.mainWidth(), m.sessionAPI})
+		}
+		return m, nil
 	case sessionCreatedMsg:
-		return m.updateSessionCreated(msg)
+		if m.create == nil {
+			return m, nil
+		}
+		var res createResult
+		m.create, res = m.create.updateCreated(msg)
+		if res.createdID == "" {
+			return m, nil
+		}
+		m.pendingSelect = res.createdID
+		return m.selectPending()
 	case sessionActionMsg:
 		return m.updateSessionAction(msg)
 	case queueActionMsg:
@@ -483,7 +495,7 @@ func (m Model) render() string {
 		out = ui.OverlayCenter(out, m.renderJump(), m.width, m.height)
 	}
 	if m.create != nil {
-		out = ui.OverlayCenter(out, m.renderCreate(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.create.view(m.width, m.height, m.sessions), m.width, m.height)
 	}
 	if m.menu.IsOpen {
 		out = m.menu.Overlay(out, m.menuAnchor(), m.width, m.height)
