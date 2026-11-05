@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -77,7 +77,7 @@ func (p *Registry) Check() {
 		}
 		if p.unavailable.mark(name) {
 			p.log.Warn("project unavailable", "project", name, "path", path)
-			p.chat.Notice(ralphloop.ServerNotice{Kind: NoticeProjectUnavailable, Emoji: "📁", Title: "project " + name + " unavailable",
+			p.chat.Notice(notify.ServerNotice{Kind: NoticeProjectUnavailable, Emoji: "📁", Title: "project " + name + " unavailable",
 				Detail: path + " does not exist; its tickets will not run. Fix it with gx project set-path " + name + " <path>"})
 		}
 	}

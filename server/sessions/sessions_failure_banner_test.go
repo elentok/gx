@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -166,7 +166,7 @@ func TestFailureBanner_AFKChatCarriesTheLink(t *testing.T) {
 	t.Parallel()
 	chat := newSlackHook(t)
 	f := startFailureBannerSession(t, true, func(c *server.Config) {
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 	started := chat.WaitStarted(t)
 	afk := true

@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -23,7 +23,7 @@ func startAFKSession(t *testing.T, afk bool) (*servertest.Harness, *slackHook, i
 	chat := newSlackHook(t)
 	gate := filepath.Join(t.TempDir(), "gate.json")
 	h, ctx, evs, id, conv := startBannerSession(t, func(c *server.Config) {
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: testFlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: testFlushInterval}
 	})
 	started := chat.WaitStarted(t)
 	if _, err := h.Client.Sessions.SetAFK(ctx, &afk); err != nil {
@@ -66,7 +66,7 @@ func TestSessionAFK_OffSendsNoChat(t *testing.T) {
 func TestSessionAFK_NotificationsDisabledSuppressesChat(t *testing.T) {
 	t.Parallel()
 	h, chat, started, gate, _, step := startAFKSession(t, true)
-	muted, _ := json.Marshal(ralphloop.NotificationState{Transports: map[string]ralphloop.TransportState{"slack": {Muted: true, Reason: "manual-disable"}}})
+	muted, _ := json.Marshal(notify.NotificationState{Transports: map[string]notify.TransportState{"slack": {Muted: true, Reason: "manual-disable"}}})
 	if err := os.WriteFile(gate, muted, 0o600); err != nil {
 		t.Fatal(err)
 	}

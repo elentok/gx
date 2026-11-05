@@ -14,8 +14,8 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/metrics"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
@@ -69,7 +69,7 @@ type Deps struct {
 	Harness  *harnesschoice.Harness
 	Events   *broker.Broker
 	Guards   *runs.Guards
-	Chat     *ralphloop.ServerChat
+	Chat     *notify.ServerChat
 	Log      *slog.Logger
 	Host     Host
 }
@@ -84,7 +84,7 @@ type Budget struct {
 	harness  *harnesschoice.Harness
 	events   *broker.Broker
 	guards   *runs.Guards
-	chat     *ralphloop.ServerChat
+	chat     *notify.ServerChat
 	log      *slog.Logger
 	host     Host
 

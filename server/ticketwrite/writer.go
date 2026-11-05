@@ -11,8 +11,8 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
@@ -99,7 +99,7 @@ type Deps struct {
 	Index    *index.Index
 	Events   *broker.Broker
 	Projects *projects.Registry
-	Chat     *ralphloop.ServerChat
+	Chat     *notify.ServerChat
 	Registry *runs.Registry
 	Guards   *runs.Guards
 	Harness  *harnesschoice.Harness

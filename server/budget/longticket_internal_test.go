@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/osnotify"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/testutil"
@@ -56,7 +56,7 @@ func TestAlertLongTicket_MarksTheTicketAndFilesTheSameKeyedFollowUpEachTime(t *t
 	host := &followUpHost{}
 	b := &Budget{
 		settings: &h, events: events, host: host,
-		chat: ralphloop.NewServerChat(ralphloop.ServerChatConfig{}),
+		chat: notify.NewServerChat(notify.ServerChatConfig{}),
 		log:  slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 

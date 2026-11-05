@@ -7,7 +7,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -32,7 +32,7 @@ type Merger struct {
 	oneOffs  *queue.OneOffs
 	events   *broker.Broker
 	writer   *ticketwrite.Writer
-	chat     *ralphloop.ServerChat
+	chat     *notify.ServerChat
 	registry *runs.Registry
 	guards   *runs.Guards
 	settings *settings.Holder

@@ -16,7 +16,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
@@ -126,7 +126,7 @@ type OneOffsDeps struct {
 	Registry    *runs.Registry
 	Events      *broker.Broker
 	Log         *slog.Logger
-	Chat        *ralphloop.ServerChat
+	Chat        *notify.ServerChat
 	Host        Host
 	TicketStore string
 }

@@ -1,4 +1,4 @@
-package ralphloop
+package notify
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/logger"
-	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
 
@@ -249,19 +248,4 @@ func sanitizeSendError(err error) error {
 		return urlErr.Err
 	}
 	return err
-}
-
-// lastIterationSession finds the most recent iteration-started event for
-// identifier (a ticket's Identifier, not Number, so lettered split siblings
-// aren't cross-attributed) with a recorded AgentSession — the session
-// id/cwd/agent to backfill a reattached ticket close's metadata with (ticket
-// 06a), since the reattaching run never captured a fresh session of its own.
-// Agent defaults to agent.AgentClaude for historical logs that omitted it (see
-// runlog.Event.Agent).
-func lastIterationSession(evs []runlog.Event, identifier string) (agentSession, cwd string, agentKind agent.AgentKind, ok bool) {
-	all := runlog.IterationSessions(evs, identifier)
-	if len(all) == 0 {
-		return "", "", "", false
-	}
-	return all[0].Session, all[0].Cwd, all[0].Agent, true
 }

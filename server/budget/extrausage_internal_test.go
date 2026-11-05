@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/subscription"
 )
@@ -28,7 +28,7 @@ func chatBudget(t *testing.T, state subscription.State, set settings.Settings) (
 		mu.Unlock()
 	}))
 	t.Cleanup(hook.Close)
-	chat := ralphloop.NewServerChat(ralphloop.ServerChatConfig{
+	chat := notify.NewServerChat(notify.ServerChatConfig{
 		SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 50 * time.Millisecond,
 	})
 	t.Cleanup(chat.Close)

@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 )
 
 // fakeRunner is a runner that only has a name.
@@ -33,7 +33,7 @@ func (h *fakeHost) Runner() agentrunner.Runner { return h.runner }
 func (h *fakeHost) Configured() bool           { return h.configured }
 func (h *fakeHost) Waiting() []string          { return h.waiting }
 func (h *fakeHost) Publish(event, _ string)    { h.events = append(h.events, event) }
-func (h *fakeHost) Notice(n ralphloop.ServerNotice) {
+func (h *fakeHost) Notice(n notify.ServerNotice) {
 	h.notices = append(h.notices, n.Detail)
 }
 func (h *fakeHost) FlushPauseFold() { h.flushed++ }

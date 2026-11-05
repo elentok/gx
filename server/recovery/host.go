@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
@@ -39,7 +39,7 @@ type Deps struct {
 	Guards   *runs.Guards
 	Registry *runs.Registry
 	Harness  *harnesschoice.Harness
-	Chat     *ralphloop.ServerChat
+	Chat     *notify.ServerChat
 	Writer   *ticketwrite.Writer
 	// Hold is the pause hold the server also reads for a ticket's recovery state.
 	Hold *ticketwrite.RecoveryHold

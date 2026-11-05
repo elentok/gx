@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/broker"
@@ -54,7 +55,7 @@ type Deps struct {
 	OneOffs  *queue.OneOffs
 	Events   *broker.Broker
 	Writer   *ticketwrite.Writer
-	Chat     *ralphloop.ServerChat
+	Chat     *notify.ServerChat
 	Registry *runs.Registry
 	Guards   *runs.Guards
 	Settings *settings.Holder

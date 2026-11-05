@@ -13,8 +13,8 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/gocachegate"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -174,6 +174,6 @@ func (s *Disk) sendCleanNotice(disk, outcome string, free uint64, held bool) {
 	if strings.HasPrefix(outcome, "failed") {
 		title = "disk clean failed on " + disk
 	}
-	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskClean, Emoji: "🧹", Title: title,
+	s.chat.Notice(notify.ServerNotice{Kind: NoticeDiskClean, Emoji: "🧹", Title: title,
 		Detail: outcome + "; " + humanize.Bytes(free) + " free now; " + state})
 }

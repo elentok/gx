@@ -65,13 +65,13 @@ var allowed = map[string]int{
 	"nativerunner/pty_pending_test.go":                     1,
 	"nativerunner/pty_ratelimit_test.go":                   1, // negative wait: another API error never marks the session limited
 	"nativerunner/pty_test.go":                             1,
-	"ralphloop/chat_eventsink_test.go":                     4,
+	"ralphloop/notify/chat_eventsink_test.go":              4,
 	"ralphloop/commitless_test.go":                         1, // negative wait: a kept worktree is not removed and no wait is scheduled
 	"ralphloop/ticketops/claim_test.go":                    1,
-	"ralphloop/eventlog_notify_test.go":                    2,
+	"ralphloop/notify/eventlog_notify_test.go":             2,
 	"ralphloop/ticketops/resumeticket_test.go":             1,
-	"ralphloop/slack_transport_test.go":                    4, // 15 renamed slack_eventsink_test.go and dropped its entry by mistake
-	"ralphloop/telegram_transport_test.go":                 7, // same rename as slack_transport_test.go
+	"ralphloop/notify/slack_transport_test.go":             4, // 15 renamed slack_eventsink_test.go and dropped its entry by mistake
+	"ralphloop/notify/telegram_transport_test.go":          7, // same rename as slack_transport_test.go
 	"server/budget/grace_test.go":                          5,
 	"server/budget/limits_test.go":                         2,
 	"server/sched/claimhold_test.go":                       1, // negative wait: a herdr event would show within a few retries

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/notify"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/subscription"
 )
@@ -59,7 +59,7 @@ func (b *Budget) CheckExtraUsage(now time.Time) bool {
 		return false
 	}
 	if b.extraUsage.firstToday(now.Format(time.DateOnly)) {
-		b.chat.Notice(ralphloop.ServerNotice{Kind: NoticeExtraUsage, Emoji: "⚠️", Title: "extra usage is on",
+		b.chat.Notice(notify.ServerNotice{Kind: NoticeExtraUsage, Emoji: "⚠️", Title: "extra usage is on",
 			Detail: "Your Claude account will auto-purchase extra usage once included usage runs out."})
 	}
 	return true

@@ -12,7 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/recovery"
 )
 
@@ -68,7 +68,7 @@ type Settings struct {
 	StalledNudgeDelay time.Duration
 
 	// Chat names the chat destinations the server notifies; empty means none.
-	Chat ralphloop.ServerChatConfig
+	Chat notify.ServerChatConfig
 
 	// SuppressExtraUsageWarning is config subscription.suppress-extra-usage-warning.
 	SuppressExtraUsageWarning bool
@@ -146,7 +146,7 @@ func FromConfig(cfg config.Config) Settings {
 		WaitingSlotGrace:    cfg.ExecutionQueue.WaitingSlotGrace,
 		MaxReleasedAgents:   cfg.ExecutionQueue.MaxReleasedAgents,
 		StalledNudgeDelay:   cfg.ExecutionQueue.StalledNudgeDelay,
-		Chat: ralphloop.ServerChatConfig{
+		Chat: notify.ServerChatConfig{
 			TelegramBotToken: cfg.Notifications.Telegram.BotToken,
 			TelegramChatID:   cfg.Notifications.Telegram.ChatID,
 			SlackWebhookURL:  cfg.Notifications.Slack.WebhookURL,

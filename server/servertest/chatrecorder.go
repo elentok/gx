@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 )
 
@@ -33,7 +33,7 @@ func ChatRecorder(t *testing.T) (opt func(*server.Config), count func(s string) 
 	}))
 	t.Cleanup(hook.Close)
 	opt = func(c *server.Config) {
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: FlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: FlushInterval}
 	}
 	count = func(s string) int {
 		mu.Lock()

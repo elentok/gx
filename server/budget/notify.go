@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -80,15 +80,15 @@ func (b *Budget) notify(now time.Time) {
 	n.mu.Unlock()
 
 	if prevDay != "" && prevDay != st.Day {
-		b.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDailySummary, Emoji: "📊", Title: "daily summary",
+		b.chat.Notice(notify.ServerNotice{Kind: NoticeDailySummary, Emoji: "📊", Title: "daily summary",
 			Detail: fmt.Sprintf("%s: %s spent", prevDay, tickets.FormatCost(b.ledger.day(prevDay)))})
 	}
 	if softNow {
-		b.chat.Notice(ralphloop.ServerNotice{Kind: NoticeBudgetSoft, Emoji: "💸", Title: "budget soft limit reached",
+		b.chat.Notice(notify.ServerNotice{Kind: NoticeBudgetSoft, Emoji: "💸", Title: "budget soft limit reached",
 			Detail: fmt.Sprintf("%s of %s today", tickets.FormatCost(used), tickets.FormatCost(st.SoftLimit))})
 	}
 	if hardNow {
-		b.chat.Notice(ralphloop.ServerNotice{Kind: NoticeBudgetHard, Emoji: "🛑", Title: "budget hard limit reached",
+		b.chat.Notice(notify.ServerNotice{Kind: NoticeBudgetHard, Emoji: "🛑", Title: "budget hard limit reached",
 			Detail: fmt.Sprintf("%s of %s today", tickets.FormatCost(used), tickets.FormatCost(st.HardLimit))})
 	}
 }

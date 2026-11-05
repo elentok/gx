@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -80,7 +80,7 @@ func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
-		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: global, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush},
+		Chat: notify.ServerChatConfig{SlackWebhookURL: global, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +104,7 @@ func writeChatConfig(t *testing.T, s *Server, path, slack string, maxAgents int)
 }
 
 func notice(s *Server, kind string) {
-	s.chat.Notice(ralphloop.ServerNotice{Kind: kind, Emoji: "🔔", Title: kind})
+	s.chat.Notice(notify.ServerNotice{Kind: kind, Emoji: "🔔", Title: kind})
 }
 
 func TestConfigReloadChat_ChangedDestinationTakesLaterMessages(t *testing.T) {
@@ -162,7 +162,7 @@ func TestConfigReloadChat_ProjectSinkKeepsItsBatch(t *testing.T) {
 	t.Parallel()
 	oldHook, newHook, projectHook := newChatHook(t, nil), newChatHook(t, nil), newChatHook(t, nil)
 	s, path := reloadChatServer(t, oldHook.URL, time.Hour)
-	override := &ralphloop.ServerChatConfig{SlackWebhookURL: projectHook.URL}
+	override := &notify.ServerChatConfig{SlackWebhookURL: projectHook.URL}
 
 	s.chat.Pause("proj", override, "epic", "/t/01.md", "01", "paused", "zero-commit", "before-reload", schedule.EpicCounts{})
 	writeChatConfig(t, s, path, newHook.URL, 3)

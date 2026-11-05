@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
@@ -65,7 +66,7 @@ type LauncherDeps struct {
 	Landing  *merge.Landing
 	Merger   *merge.Merger
 	OneOffs  *queue.OneOffs
-	Chat     *ralphloop.ServerChat
+	Chat     *notify.ServerChat
 	// DropAskedAgent closes an agent that asked instead of keeping it alive.
 	DropAskedAgent bool
 }

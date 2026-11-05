@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -150,8 +150,8 @@ func TestExecute_Notify_PerDestinationMutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ralphloop.UpdateNotificationState(statePath, func(s *ralphloop.NotificationState) {
-		s.Transports["slack"] = ralphloop.TransportState{Muted: true, Reason: "manual-disable"}
+	if err := notify.UpdateNotificationState(statePath, func(s *notify.NotificationState) {
+		s.Transports["slack"] = notify.TransportState{Muted: true, Reason: "manual-disable"}
 	}); err != nil {
 		t.Fatal(err)
 	}

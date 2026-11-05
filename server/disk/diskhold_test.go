@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -64,7 +64,7 @@ func startHoldRig(t *testing.T, repos map[string]string, clean config.ByteSize, 
 		c.PollInterval = 20 * time.Millisecond
 		c.DiskSpace = config.DiskSpaceConfig{CleanBelow: clean}
 		c.GoCacheDir = func() (string, error) { return "/gocache", nil }
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
 	}}, opts...)
 	rig.h = servertest.StartWithStore(t, store, all...)
 	rig.start, _, _ = servertest.RegisterTurn(rig.h)

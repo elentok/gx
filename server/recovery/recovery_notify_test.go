@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
@@ -55,7 +55,7 @@ func startNotifyRecoveryWith(t *testing.T, hold time.Duration, entry recovery.En
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = recovery.Catalog{Enabled: true, Entries: []recovery.Entry{entry}}
 		c.RecoverySettings.NotifyHold = hold
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 	return h, func() []string {
 		mu.Lock()

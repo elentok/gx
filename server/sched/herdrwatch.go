@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 )
 
 const defaultHerdrRetryInterval = 30 * time.Second
@@ -31,7 +31,7 @@ type HerdrHost interface {
 	// and tracked runs it hosts.
 	Waiting() []string
 	Publish(event, id string)
-	Notice(ralphloop.ServerNotice)
+	Notice(notify.ServerNotice)
 	// FlushPauseFold sends the digest of pauses held back while herdr was down.
 	FlushPauseFold()
 }
@@ -161,12 +161,12 @@ func (w *HerdrWatch) SyncBanner() {
 	}
 	if show {
 		w.host.Publish(wire.EventHerdrUnavailable, "")
-		w.host.Notice(ralphloop.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text})
+		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text})
 		return
 	}
 	w.host.Publish(wire.EventHerdrAvailable, "")
 	if !w.IsUnavailable() {
-		w.host.Notice(ralphloop.ServerNotice{Kind: wire.EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
+		w.host.Notice(notify.ServerNotice{Kind: wire.EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
 	}
 }
 

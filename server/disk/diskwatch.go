@@ -15,7 +15,7 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
@@ -58,7 +58,7 @@ type Deps struct {
 	Settings   *settings.Holder
 	Projects   *projects.Registry
 	Events     *broker.Broker
-	Chat       *ralphloop.ServerChat
+	Chat       *notify.ServerChat
 	Guards     *runs.Guards
 	Log        *slog.Logger
 	HealthSink func(now time.Time)
@@ -70,7 +70,7 @@ type Disk struct {
 	settings   *settings.Holder
 	projects   *projects.Registry
 	events     *broker.Broker
-	chat       *ralphloop.ServerChat
+	chat       *notify.ServerChat
 	guards     *runs.Guards
 	log        *slog.Logger
 	healthSink func(now time.Time)
@@ -238,7 +238,7 @@ func (s *Disk) observe(r wire.DiskReading, probe string, projects []string, now 
 	}
 	s.publishChange(r, c)
 	if c.resumed {
-		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
+		s.chat.Notice(notify.ServerNotice{Kind: wire.NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
 			Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
 		s.guards.Kick()
 	}
@@ -268,7 +268,7 @@ func (s *Disk) publishChange(r wire.DiskReading, c diskChange) {
 	s.events.Publish(wire.EventDiskWarnChanged, "")
 	if c.warnSet {
 		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", c.warn)
-		s.chat.Notice(ralphloop.ServerNotice{Kind: wire.NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
+		s.chat.Notice(notify.ServerNotice{Kind: wire.NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
 			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(c.warn)})
 	}
 	if c.holdSet {

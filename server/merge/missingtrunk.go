@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migratefail"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -84,7 +84,7 @@ func (s *Reconciler) CheckTrunks() {
 			if s.TrunkMissing.clear(addr.Project) {
 				s.log.Info("trunk found", "project", addr.Project)
 				s.events.PublishEvent(wire.Event{Type: wire.EventTrunkFound, Address: addr.Project, Level: wire.EventLevelSuccess, Message: "trunk found, claiming resumes"})
-				s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkFound, Emoji: "🌳", Title: "project " + addr.Project + ": trunk found",
+				s.chat.Notice(notify.ServerNotice{Kind: NoticeTrunkFound, Emoji: "🌳", Title: "project " + addr.Project + ": trunk found",
 					Detail: "trunk found, claiming resumes"})
 			}
 			continue
@@ -100,7 +100,7 @@ func (s *Reconciler) enterTrunkMissing(project, reason string) {
 	}
 	s.log.Warn("trunk missing", "project", project, "reason", reason)
 	s.events.PublishEvent(wire.Event{Type: wire.EventTrunkMissing, Address: project, Level: wire.EventLevelWarning, Message: reason})
-	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
+	s.chat.Notice(notify.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
 		Detail: reason + "; its tickets will not be claimed until it is fixed"})
 }
 

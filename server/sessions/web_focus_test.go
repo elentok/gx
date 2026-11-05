@@ -11,7 +11,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -34,7 +34,7 @@ func startWebFocus(t *testing.T) *webFocus {
 	gate := filepath.Join(t.TempDir(), "gate.json")
 	h, ctx, evs, id, conv := startBannerSession(t, func(c *server.Config) {
 		c.WebAddr = "127.0.0.1:0"
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: testFlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: testFlushInterval}
 	})
 	started := chat.WaitStarted(t)
 	afk := true

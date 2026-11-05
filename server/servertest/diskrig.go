@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 )
@@ -79,7 +79,7 @@ func StartDiskRig(t *testing.T, projects map[string]string, warn config.ByteSize
 		c.FreeSpace = rig.Disks.Read
 		c.DiskPollInterval = DiskInterval
 		c.DiskSpace = config.DiskSpaceConfig{WarnBelow: warn, CleanBelow: 10 * GB}
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: FlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: FlushInterval}
 	}}, opts...)
 	rig.H = StartWithStore(t, store, all...)
 	return rig

@@ -1,4 +1,4 @@
-package ralphloop
+package notify
 
 import (
 	"github.com/elentok/gx/ralphloop/ticketops"

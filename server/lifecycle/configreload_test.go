@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/osnotify"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -176,7 +176,7 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {
 		c.MaxAgents = 3
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: time.Millisecond}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: time.Millisecond}
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

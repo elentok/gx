@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -36,7 +36,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	fake.SetStartErr(label, errors.New("Herdr rejected Codex integration"))
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond // several ticks pass while the test waits
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

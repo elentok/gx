@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/osnotify"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
@@ -51,7 +51,7 @@ type Manager struct {
 	focus *FocusReports
 	afk   *queue.AFK
 	// alerts sends the AFK chat alert of a banner.
-	alerts *ralphloop.ServerChat
+	alerts *notify.ServerChat
 	// queue is the Queue whose live agents the reads show.
 	queue   agentRows
 	banners sessionBanners
@@ -83,7 +83,7 @@ type ManagerDeps struct {
 	Chat     *chat.Chat
 	Focus    *FocusReports
 	AFK      *queue.AFK
-	Alerts   *ralphloop.ServerChat
+	Alerts   *notify.ServerChat
 	Queue    agentRows
 	Host     Host
 	Prompter Prompter

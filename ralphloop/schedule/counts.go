@@ -3,7 +3,7 @@ package schedule
 import "github.com/elentok/gx/tickets"
 
 // EpicCounts tallies an epic's tickets by rendered status, the input to
-// ralphloop.RenderCountsLine. Done and Total are the two fields that describe
+// notify.RenderCountsLine. Done and Total are the two fields that describe
 // the whole epic regardless of bucket; the rest name what's keeping the
 // remainder from being done. PausedIdentifiers drives the inline "paused:
 // 07, 12" clause — its length is the paused count, so there is exactly one

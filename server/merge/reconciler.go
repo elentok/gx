@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/index"
@@ -31,7 +31,7 @@ type Reconciler struct {
 	queue    *queue.Queue
 	events   *broker.Broker
 	writer   *ticketwrite.Writer
-	chat     *ralphloop.ServerChat
+	chat     *notify.ServerChat
 	settings *settings.Holder
 	harness  *harnesschoice.Harness
 	sessions *sessions.Manager

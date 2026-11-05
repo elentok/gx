@@ -13,9 +13,9 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/migrations"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
@@ -36,7 +36,7 @@ type Env struct {
 	Env                          []string
 	Migrations                   *migrations.Registry
 	MigrationFailurePollInterval time.Duration
-	Chat                         ralphloop.ServerChatConfig
+	Chat                         notify.ServerChatConfig
 	GuardPoll                    time.Duration
 	InstallDeps                  func(path, logDir string) ([]string, error)
 	RateLimitResetBuffer         time.Duration
@@ -54,13 +54,13 @@ type Registry struct {
 	log         *slog.Logger
 	idx         *index.Index
 	settings    *settings.Holder
-	chat        *ralphloop.ServerChat
+	chat        *notify.ServerChat
 	back        RegistryBack
 	unavailable unavailableNotes
 }
 
 // NewRegistry builds the Registry.
-func NewRegistry(cfg func() Env, log *slog.Logger, idx *index.Index, set *settings.Holder, chat *ralphloop.ServerChat, back RegistryBack) *Registry {
+func NewRegistry(cfg func() Env, log *slog.Logger, idx *index.Index, set *settings.Holder, chat *notify.ServerChat, back RegistryBack) *Registry {
 	return &Registry{cfg: cfg, log: log, idx: idx, settings: set, chat: chat, back: back}
 }
 
@@ -162,7 +162,7 @@ func (p *Registry) DepsWith(runner agentrunner.Runner) deps.Deps {
 
 // ChatOverride is the project's own notification block from project.json, nil
 // when it has none (or is unreadable) so its notifications use the global one.
-func (p *Registry) ChatOverride(project string) *ralphloop.ServerChatConfig {
+func (p *Registry) ChatOverride(project string) *notify.ServerChatConfig {
 	dir, err := p.Dir(project)
 	if err != nil {
 		return nil
@@ -172,7 +172,7 @@ func (p *Registry) ChatOverride(project string) *ralphloop.ServerChatConfig {
 		return nil
 	}
 	n := pf.Notifications
-	return &ralphloop.ServerChatConfig{
+	return &notify.ServerChatConfig{
 		TelegramBotToken: n.Telegram.BotToken,
 		TelegramChatID:   n.Telegram.ChatID,
 		SlackWebhookURL:  n.Slack.WebhookURL,

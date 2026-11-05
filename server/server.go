@@ -25,7 +25,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/osnotify"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/designs"
@@ -125,7 +125,7 @@ type Server struct {
 	merger    *merge.Merger
 	scheduler *sched.Scheduler
 
-	chat      *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
+	chat      *notify.ServerChat // never nil; sends nothing when no destination is configured
 	registry  *runs.Registry
 	reclaimer *sched.Reclaimer
 	launcher  *sched.Launcher
@@ -166,7 +166,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.ChatPollInterval = chat.DefaultPollInterval
 	}
 	if cfg.Chat.GateStatePath == "" {
-		cfg.Chat.GateStatePath = ralphloop.NotificationStatePath(cfg.StateDir)
+		cfg.Chat.GateStatePath = notify.NotificationStatePath(cfg.StateDir)
 	}
 	if cfg.StallThreshold == 0 {
 		cfg.StallThreshold = chat.DefaultStallThreshold
@@ -288,7 +288,7 @@ func New(cfg Config) (*Server, error) {
 		log:  log,
 		idx:  idx,
 
-		chat:     ralphloop.NewServerChat(cfg.Chat),
+		chat:     notify.NewServerChat(cfg.Chat),
 		registry: registry,
 
 		queue:  q,
@@ -504,7 +504,7 @@ const DefaultMergeStopTimeout = 30 * time.Second
 func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
 	s.budget.SeedNotes(time.Now())
-	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
+	s.chat.Notice(notify.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
 	s.budget.StartExtraUsageCheck(time.Now())
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	// Armed before the socket serves, so no save after startup goes unseen.

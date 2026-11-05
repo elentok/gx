@@ -381,6 +381,21 @@ func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent ag
 	return lastIterationSession(events, p.Ticket.Identifier)
 }
 
+// lastIterationSession finds the most recent iteration-started event for
+// identifier (a ticket's Identifier, not Number, so lettered split siblings
+// aren't cross-attributed) with a recorded AgentSession — the session
+// id/cwd/agent to backfill a reattached ticket close's metadata with (ticket
+// 06a), since the reattaching run never captured a fresh session of its own.
+// Agent defaults to agent.AgentClaude for historical logs that omitted it (see
+// runlog.Event.Agent).
+func lastIterationSession(evs []runlog.Event, identifier string) (agentSession, cwd string, agentKind agent.AgentKind, ok bool) {
+	all := runlog.IterationSessions(evs, identifier)
+	if len(all) == 0 {
+		return "", "", "", false
+	}
+	return all[0].Session, all[0].Cwd, all[0].Agent, true
+}
+
 // stampCommitlessMetrics writes actual_context_window/elapsed_time for a
 // commitless finish, the ahead==0 counterpart to mergeCherryPick's
 // writeMergedMetrics call on the committed path. A fresh iteration's own

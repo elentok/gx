@@ -13,7 +13,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/menu"
 
@@ -333,7 +333,7 @@ func runConfigTestNotifications(d deps) error {
 
 	if cfg.Notifications.Telegram.BotToken != "" {
 		configured++
-		if err := ralphloop.SendTelegramTestMessage(cfg.Notifications.Telegram.BotToken, cfg.Notifications.Telegram.ChatID); err != nil {
+		if err := notify.SendTelegramTestMessage(cfg.Notifications.Telegram.BotToken, cfg.Notifications.Telegram.ChatID); err != nil {
 			failed++
 			fmt.Fprintf(d.stderr, "telegram: failed: %v\n", err)
 		} else {
@@ -343,7 +343,7 @@ func runConfigTestNotifications(d deps) error {
 
 	if cfg.Notifications.Slack.WebhookURL != "" {
 		configured++
-		if err := ralphloop.SendSlackTestMessage(cfg.Notifications.Slack.WebhookURL); err != nil {
+		if err := notify.SendSlackTestMessage(cfg.Notifications.Slack.WebhookURL); err != nil {
 			failed++
 			fmt.Fprintf(d.stderr, "slack: failed: %v\n", err)
 		} else {
@@ -362,12 +362,12 @@ func runConfigTestNotifications(d deps) error {
 }
 
 func isKnownNotifyTransport(name string) bool {
-	return slices.Contains(ralphloop.NotifyTransports, name)
+	return slices.Contains(notify.NotifyTransports, name)
 }
 
 // notifyDestinations lists every notification destination: the global one per
 // transport plus any a project's override adds.
-func notifyDestinations(d deps) ([]ralphloop.Destination, error) {
+func notifyDestinations(d deps) ([]notify.Destination, error) {
 	load := d.loadConfig
 	if load == nil {
 		load = d.dirs().Load
@@ -388,7 +388,7 @@ func notifyDestinations(d deps) ([]ralphloop.Destination, error) {
 		}
 		overrides[tickets.ProjectName(dir)] = n
 	}
-	return ralphloop.NotificationDestinations(cfg.Notifications, overrides), nil
+	return notify.NotificationDestinations(cfg.Notifications, overrides), nil
 }
 
 // runNotify dispatches `gx notify` to whichever of its mutually exclusive
@@ -446,7 +446,7 @@ func sendNotify(text string, d deps) error {
 	if err != nil {
 		return err
 	}
-	sent, err := ralphloop.SendMessage(cfg.Notifications, statePath, text)
+	sent, err := notify.SendMessage(cfg.Notifications, statePath, text)
 	if len(sent) == 0 {
 		if err == nil {
 			fmt.Fprintf(d.stdout, "no notification service configured (see `gx config edit`)\n")
@@ -468,7 +468,7 @@ func sendTestBatch(d deps) error {
 		return err
 	}
 
-	sent, err := ralphloop.SendTestBatch(cfg.Notifications)
+	sent, err := notify.SendTestBatch(cfg.Notifications)
 	if len(sent) == 0 {
 		if err == nil {
 			fmt.Fprintf(d.stdout, "no notification service configured (see `gx config edit`)\n")
@@ -490,7 +490,7 @@ func runNotifySetMute(transport, project string, muted bool, d deps) error {
 	if err != nil {
 		return err
 	}
-	var targets []ralphloop.Destination
+	var targets []notify.Destination
 	for _, dest := range all {
 		if dest.Transport == transport && (project == "" || slices.Contains(dest.Projects, project)) {
 			targets = append(targets, dest)
@@ -504,7 +504,7 @@ func runNotifySetMute(transport, project string, muted bool, d deps) error {
 	if err != nil {
 		return err
 	}
-	err = ralphloop.UpdateNotificationState(statePath, func(state *ralphloop.NotificationState) {
+	err = notify.UpdateNotificationState(statePath, func(state *notify.NotificationState) {
 		for _, dest := range targets {
 			ts := state.Transports[dest.Key]
 			ts.Muted = muted
@@ -539,7 +539,7 @@ func notificationStatePath(dirs config.Dirs) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return ralphloop.NotificationStatePath(dir), nil
+	return notify.NotificationStatePath(dir), nil
 }
 
 // runNotifyStatus reports every destination's mute state and projects, plus
@@ -549,7 +549,7 @@ func runNotifyStatus(d deps) error {
 	if err != nil {
 		return err
 	}
-	state, err := ralphloop.LoadNotificationState(statePath)
+	state, err := notify.LoadNotificationState(statePath)
 	if err != nil {
 		return err
 	}

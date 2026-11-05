@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/servertest"
@@ -283,7 +283,7 @@ func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
 	t.Cleanup(hook.Close)
 	f := startGraceServer(t, 300*time.Millisecond, func(c *server.Config) {
 		c.BudgetPollInterval = time.Millisecond
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL,
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: hook.URL,
 			GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 20 * time.Millisecond}
 	})
 	f.h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { return 0, false })

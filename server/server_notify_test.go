@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/subscription"
@@ -61,7 +62,7 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
-		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}},
+		Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}},
 		// Not the real ~/.claude.json, which could add an extra-usage notice.
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
 	if err != nil {
@@ -484,7 +485,7 @@ func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(),
-		Settings:        Settings{Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL}},
+		Settings:        Settings{Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL}},
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
 	if err != nil {
 		t.Fatal(err)
@@ -493,7 +494,7 @@ func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
 	s.writer.NotifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, "", events.BudgetKilled, "why")
 	s.chat.Close()
 
-	if _, err := os.Stat(ralphloop.NotificationStatePath(stateDir)); err != nil {
+	if _, err := os.Stat(notify.NotificationStatePath(stateDir)); err != nil {
 		t.Errorf("gate state not under the server's state dir: %v", err)
 	}
 }

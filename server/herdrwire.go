@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/tickets"
 )
@@ -23,7 +23,7 @@ func (h herdrHost) Configured() bool { return h.s.cfg.Runner.Name() == runs.Runn
 
 func (h herdrHost) Publish(event, id string) { h.s.events.Publish(event, id) }
 
-func (h herdrHost) Notice(n ralphloop.ServerNotice) { h.s.chat.Notice(n) }
+func (h herdrHost) Notice(n notify.ServerNotice) { h.s.chat.Notice(n) }
 
 func (h herdrHost) FlushPauseFold() { h.s.writer.FlushPauseFold() }
 

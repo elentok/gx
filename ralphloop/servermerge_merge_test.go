@@ -1,15 +1,20 @@
 package ralphloop
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/worktree"
@@ -72,8 +77,21 @@ func TestMergeBuilt_FinishSinkSendsConflictStartAndChildPauseOnly(t *testing.T) 
 	picked := false
 	d.CherryPickRange = func(string, string, string) error { picked = true; return &fakeConflictErr{} }
 	d.CherryPickInProgress = func(string) (bool, error) { return picked, nil }
-	srv, reqs := fakeSlackServer(t, 200)
-	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
+	var mu sync.Mutex
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Text string `json:"text"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode slack body: %v", err)
+		}
+		mu.Lock()
+		sent = append(sent, req.Text)
+		mu.Unlock()
+	}))
+	t.Cleanup(srv.Close)
+	c := notify.NewServerChat(notify.ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 	p.Sink = c.FinishSink("alpha", nil, "epic", ticketPath, "01", func() schedule.EpicCounts { return schedule.EpicCounts{Total: 2} })
 
 	if err := mergeBuilt(d, p, built); err != nil {
@@ -81,11 +99,13 @@ func TestMergeBuilt_FinishSinkSendsConflictStartAndChildPauseOnly(t *testing.T) 
 	}
 	c.Close()
 
-	got := reqs()
+	mu.Lock()
+	got := append([]string(nil), sent...)
+	mu.Unlock()
 	if len(got) != 1 {
 		t.Fatalf("got %d sends, want one batch", len(got))
 	}
-	text := got[0].Text
+	text := got[0]
 	if !strings.Contains(text, "resolving merge conflict") {
 		t.Errorf("missing the conflict-started message:\n%s", text)
 	}

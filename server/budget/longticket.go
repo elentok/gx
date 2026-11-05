@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -59,7 +60,7 @@ func (b *Budget) alertLongTicket(addr tickets.Address, ticketPath string, turns 
 	b.events.Publish(wire.EventTicketChanged, addr.String())
 	body := fmt.Sprintf("%s has run %d assistant turns", addr, turns)
 	b.settings.Banner(wire.EventLevelWarning, "Long ticket", body)
-	b.chat.Notice(ralphloop.ServerNotice{Kind: NoticeLongTicket, Emoji: "⏳", Title: "long ticket", Detail: body})
+	b.chat.Notice(notify.ServerNotice{Kind: NoticeLongTicket, Emoji: "⏳", Title: "long ticket", Detail: body})
 	if _, err := b.host.WriteFollowUp(addr, longTicketFollowUp(addr, turns)); err != nil {
 		b.log.Warn("file long-ticket follow-up", "ticket", addr.String(), "err", err)
 	}

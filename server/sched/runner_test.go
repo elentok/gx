@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/runs"
@@ -460,7 +460,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	chat := newSlackHook(t)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 	servertest.RegisterTurn(h) // the agent finishes without committing, so the ticket pauses
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/servertest"
@@ -117,7 +117,7 @@ func startCleanRig(t *testing.T, projects map[string]string, warn, cleanBelow co
 		c.DiskPollInterval = diskInterval
 		c.PollInterval = 20 * time.Millisecond
 		c.DiskSpace = config.DiskSpaceConfig{WarnBelow: warn, CleanBelow: cleanBelow, CleanupCommand: []string{"go", "clean", "-cache"}}
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
+		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
 	}}, opts...)
 	r.h = servertest.StartWithStore(t, store, all...)
 	r.start, _, _ = servertest.RegisterTurn(r.h)
