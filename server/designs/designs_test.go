@@ -1,4 +1,4 @@
-package server_test
+package designs_test
 
 import (
 	"context"
@@ -248,7 +248,7 @@ func TestDesignLiveCheck_LeavesOutTheCallerAndRebaseSkipsForAnother(t *testing.T
 	first := f.open(t, "proj:map", false)
 	id := first.Session.ID
 	dir, _ := readMeta(t, f.h, id)["dir"].(string)
-	s := f.h.Server
+	s := f.h.Server.Designs()
 	if got := s.LiveDesignSessionID("proj:map", ""); got != id {
 		t.Fatalf("live = %q, want %q", got, id)
 	}

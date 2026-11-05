@@ -12,21 +12,6 @@ import (
 // the placeholder embed does not have.
 func ServeAsset(assets fs.FS) http.Handler { return serveAsset(assets) }
 
-// LiveDesignSessionID is the ID of epicAddr's newest live design session
-// leaving out excludeID, or "".
-func (s *Server) LiveDesignSessionID(epicAddr, excludeID string) string {
-	live, err := s.liveDesignSessionExcept(epicAddr, excludeID)
-	if err != nil || live == nil {
-		return ""
-	}
-	return live.ID
-}
-
-// RebaseDesign is rebaseDesign: the skip note, or "" when it rebased.
-func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string {
-	return s.rebaseDesign(project, epic, worktree, excludeID)
-}
-
 // ResumeAsWeb is the resume the web mux serves: it needs a state token.
 func (s *Server) ResumeAsWeb(req wire.RepairRequest) (wire.RepairResult, error) {
 	return s.repairResume(req, repairCtx{RequireState: true, origin: wire.OriginWeb})

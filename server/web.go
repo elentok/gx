@@ -171,10 +171,8 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/sessions/auto-advance/cancel": func(s *Server) http.HandlerFunc {
 		return s.sessionWriteDesignWeb(s.cancelAutoAdvanceRoute)
 	},
-	"POST /v1/designs/open":   func(s *Server) http.HandlerFunc { return s.designOpenWeb() },
-	"POST /v1/designs/delete": func(s *Server) http.HandlerFunc { return s.designDeleteWrite },
-	"POST /v1/restart":        func(s *Server) http.HandlerFunc { return s.restartWrite },
-	"POST /v1/client-errors":  func(s *Server) http.HandlerFunc { return s.clientErrorReport },
+	"POST /v1/restart":       func(s *Server) http.HandlerFunc { return s.restartWrite },
+	"POST /v1/client-errors": func(s *Server) http.HandlerFunc { return s.clientErrorReport },
 }
 
 func (s *Server) webNow() time.Time {

@@ -1,4 +1,4 @@
-package server_test
+package designs_test
 
 import (
 	"context"

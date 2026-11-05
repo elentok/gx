@@ -1,11 +1,9 @@
-package server
+package designs
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/sessions"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +12,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/git"
@@ -44,7 +44,7 @@ type designCtx struct {
 	path       string
 }
 
-func (s *Server) designCtxOf(project, epic string) (designCtx, error) {
+func (s *Designs) designCtxOf(project, epic string) (designCtx, error) {
 	projectDir, repoDir, err := s.projects.Of(project)
 	if err != nil {
 		return designCtx{}, err
@@ -85,7 +85,7 @@ type designDir struct {
 // design worktree and returns the trunk checkout; before it ensures the
 // worktree and rebases it. excludeID is a session that does not count as
 // another live one in the rebase.
-func (s *Server) resolveDesignDir(project, epic, excludeID string) (designDir, error) {
+func (s *Designs) resolveDesignDir(project, epic, excludeID string) (designDir, error) {
 	c, err := s.designCtxOf(project, epic)
 	if err != nil {
 		return designDir{}, err
@@ -95,7 +95,7 @@ func (s *Server) resolveDesignDir(project, epic, excludeID string) (designDir, e
 	}
 	if c.afterBranch() {
 		s.CleanupDesign(project, epic)
-		path := tickets.TrunkCheckout(s.cfg.TicketStore, project)
+		path := tickets.TrunkCheckout(s.ticketStore, project)
 		if path == "" {
 			return designDir{}, fmt.Errorf("no trunk checkout for project %s", project)
 		}
@@ -112,7 +112,7 @@ func (s *Server) resolveDesignDir(project, epic, excludeID string) (designDir, e
 // past Branch, no design session of the map is live, the worktree has no
 // uncommitted edits and every design patch is in <map>-impl. Anything else
 // keeps both and logs a warning; the next trigger checks again.
-func (s *Server) CleanupDesign(project, epic string) {
+func (s *Designs) CleanupDesign(project, epic string) {
 	if err := s.tryCleanupDesign(project, epic); err != nil {
 		s.log.Warn("design cleanup kept the worktree and branch", "map", project+":"+epic, "err", err)
 		return
@@ -120,7 +120,7 @@ func (s *Server) CleanupDesign(project, epic string) {
 	s.log.Info("design cleanup checked", "map", project+":"+epic)
 }
 
-func (s *Server) tryCleanupDesign(project, epic string) error {
+func (s *Designs) tryCleanupDesign(project, epic string) error {
 	c, err := s.designCtxOf(project, epic)
 	if err != nil || !c.afterBranch() {
 		return err
@@ -166,14 +166,14 @@ func (c designCtx) removeWorktreeAndBranch(force bool) error {
 	return git.DeleteLocalBranch(*c.repo, c.branch, true)
 }
 
-// scanDesignCleanups runs the design cleanup for every map whose design_step
+// ScanCleanups runs the design cleanup for every map whose design_step
 // moved to Branch or Done since the last rescan. A plain Claude session at step
 // 8 reports no exit, and `gx tickets set --design-step` writes the file without
 // telling the server, so the rescan is what notices. Only the transition
 // triggers the check, so an idle server does no git work for old maps; session
 // exit and design open cover a map that keeps its worktree.
-func (s *Server) scanDesignCleanups() {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+func (s *Designs) ScanCleanups() {
+	dirs, err := tickets.ProjectDirs(s.ticketStore)
 	if err != nil {
 		return
 	}
@@ -203,7 +203,7 @@ func (s *Server) scanDesignCleanups() {
 // stopFinishedDesign ends the map's live design session once its design_step is
 // done: the agent has nothing left to do and would otherwise stay in the list.
 // Branch is not enough, as the agent still runs the last step then.
-func (s *Server) stopFinishedDesign(project, epic string) {
+func (s *Designs) stopFinishedDesign(project, epic string) {
 	live, err := s.liveDesignSession(project + ":" + epic)
 	if err != nil || live == nil {
 		return
@@ -217,7 +217,7 @@ func (s *Server) stopFinishedDesign(project, epic string) {
 
 // ensureDesignWorktree makes sure the map's design worktree exists and returns
 // its path: on a new branch from trunk, or re-added on the existing branch.
-func (s *Server) ensureDesignWorktree(c designCtx) (string, error) {
+func (s *Designs) ensureDesignWorktree(c designCtx) (string, error) {
 	if _, err := os.Stat(c.path); err == nil {
 		return c.path, nil
 	}
@@ -235,14 +235,14 @@ func (s *Server) ensureDesignWorktree(c designCtx) (string, error) {
 // reads current code and docs. A problem never blocks the open: it skips the
 // rebase, leaves the branch at its old tip and returns a note saying why.
 // excludeID is a session that does not count as another live one.
-func (s *Server) rebaseDesign(project, epic, worktree, excludeID string) string {
+func (s *Designs) rebaseDesign(project, epic, worktree, excludeID string) string {
 	if err := s.tryRebase(project, epic, worktree, excludeID); err != nil {
 		return "the design branch was not rebased onto trunk: " + err.Error()
 	}
 	return ""
 }
 
-func (s *Server) tryRebase(project, epic, worktree, excludeID string) error {
+func (s *Designs) tryRebase(project, epic, worktree, excludeID string) error {
 	live, err := s.liveDesignSessionExcept(project+":"+epic, excludeID)
 	if err != nil {
 		return err
@@ -283,14 +283,9 @@ var (
 	designSlugRe   = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 )
 
-func (s *Server) designOpenWrite(w http.ResponseWriter, r *http.Request) {
-	s.designOpenHandler(false)(w, r)
-}
-
-// designOpenWeb is designOpenWrite for the web mux: New needs the state token.
-func (s *Server) designOpenWeb() http.HandlerFunc { return s.designOpenHandler(true) }
-
-func (s *Server) designOpenHandler(web bool) http.HandlerFunc {
+// openHandler serves designs open. web is the web mux's variant: New needs the
+// state token.
+func (s *Designs) openHandler(web bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req wire.DesignOpenRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -302,13 +297,13 @@ func (s *Server) designOpenHandler(web bool) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }
 
 // openDesign returns the Design's newest live session, or creates one. Calls
 // for one epic run one at a time, so a double click starts one session.
-func (s *Server) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionResult, error) {
+func (s *Designs) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionResult, error) {
 	if req.NewDesign {
 		return s.openNewDesign(req)
 	}
@@ -370,7 +365,7 @@ func (s *Server) openDesign(req wire.DesignOpenRequest, web bool) (wire.SessionR
 
 // mapEpicDir returns the project dir of a map epic, or the refusal reason and
 // message when the project or epic is unknown or the epic is not a map.
-func (s *Server) mapEpicDir(project, epic string) (dir, reason, msg string) {
+func (s *Designs) mapEpicDir(project, epic string) (dir, reason, msg string) {
 	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return "", wire.ReasonDesignUnknownEpic, err.Error()
@@ -389,7 +384,7 @@ func designWorktreeRefusal(reason, msg string) wire.DesignWorktreeResult {
 	return wire.DesignWorktreeResult{Refused: true, Reason: reason, Message: msg}
 }
 
-func (s *Server) designWorktreeWrite(w http.ResponseWriter, r *http.Request) {
+func (s *Designs) worktreeWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.DesignWorktreeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -400,13 +395,13 @@ func (s *Server) designWorktreeWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // designWorktree is designs open without the session: it ensures and rebases
 // the map's design worktree under the same rules, or after Branch returns the
 // trunk checkout and makes nothing.
-func (s *Server) designWorktree(req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error) {
+func (s *Designs) designWorktree(req wire.DesignWorktreeRequest) (wire.DesignWorktreeResult, error) {
 	project, epic, ok := strings.Cut(req.Epic, ":")
 	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
 		return designWorktreeRefusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
@@ -432,7 +427,7 @@ func (s *Server) designWorktree(req wire.DesignWorktreeRequest) (wire.DesignWork
 
 // openNewDesign starts a design session for an idea with no map yet: Epic is
 // the slug the map will take in Project. It creates no epic; Chart writes it.
-func (s *Server) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult, error) {
+func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult, error) {
 	slug := req.Epic
 	if !designSlugRe.MatchString(slug) {
 		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", slug)), nil
@@ -461,7 +456,7 @@ func (s *Server) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult, 
 		return sessions.Refusal(wire.ReasonDesignBranchClash, msg), nil
 	}
 
-	if err := createMap(s.cfg.ConversationsDir, dir, slug, idea); err != nil {
+	if err := createMap(s.conversationsDir, dir, slug, idea); err != nil {
 		return wire.SessionResult{}, err
 	}
 	d, err := s.resolveDesignDir(req.Project, slug, "")
@@ -484,7 +479,7 @@ func createMap(conversationsDir, dir, slug, idea string) error {
 // startSession starts the design session for a map that now exists. A failure
 // is a result, not a refusal: the map is there, so the caller reports it as
 // created with the reason in StartError.
-func (s *Server) startSession(project, slug, worktree, rebaseNote string) wire.SessionResult {
+func (s *Designs) startSession(project, slug, worktree, rebaseNote string) wire.SessionResult {
 	addr := project + ":" + slug
 	res, err := s.sessions.CreateSession(wire.CreateSessionRequest{
 		Project:      project,
@@ -504,10 +499,10 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) wire.S
 	return res
 }
 
-// designUncharted is the one rule behind EpicDetail.Deletable and the delete
+// Uncharted is the one rule behind EpicDetail.Deletable and the delete
 // route: a map with no Destination, no tickets of any status and no live
 // design session.
-func (s *Server) designUncharted(epicAddr string, e tickets.Epic) (bool, error) {
+func (s *Designs) Uncharted(epicAddr string, e tickets.Epic) (bool, error) {
 	if !e.IsMap || schema.Section(e.Body, "Destination") != "" || len(e.Tickets) > 0 {
 		return false, nil
 	}
@@ -515,7 +510,7 @@ func (s *Server) designUncharted(epicAddr string, e tickets.Epic) (bool, error) 
 	return live == nil, err
 }
 
-func (s *Server) designDeleteWrite(w http.ResponseWriter, r *http.Request) {
+func (s *Designs) deleteWrite(w http.ResponseWriter, r *http.Request) {
 	var req wire.DesignDeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -526,13 +521,13 @@ func (s *Server) designDeleteWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, res)
+	wire.WriteJSON(w, res)
 }
 
 // deleteDesign removes an uncharted design's epic directory. It re-checks the
 // rule from disk under the lock designs open takes, so a session or a chart
 // that lands first wins. Exited session records stay.
-func (s *Server) deleteDesign(req wire.DesignDeleteRequest) (wire.SessionResult, error) {
+func (s *Designs) deleteDesign(req wire.DesignDeleteRequest) (wire.SessionResult, error) {
 	project, epic, ok := strings.Cut(req.Epic, ":")
 	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
 		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
@@ -557,7 +552,7 @@ func (s *Server) deleteDesign(req wire.DesignDeleteRequest) (wire.SessionResult,
 	if !epics[i].IsMap {
 		return sessions.Refusal(wire.ReasonDesignNotMapEpic, fmt.Sprintf("%s is not a map epic", req.Epic)), nil
 	}
-	uncharted, err := s.designUncharted(req.Epic, epics[i])
+	uncharted, err := s.Uncharted(req.Epic, epics[i])
 	if err != nil {
 		return wire.SessionResult{}, err
 	}
@@ -577,7 +572,7 @@ func (s *Server) deleteDesign(req wire.DesignDeleteRequest) (wire.SessionResult,
 // forceRemoveDesign drops the map's design worktree and branch whatever they
 // hold: deleting the Design discards its edits and commits. A map that never
 // had either is a no-op.
-func (s *Server) forceRemoveDesign(project, epic string) error {
+func (s *Designs) forceRemoveDesign(project, epic string) error {
 	c, err := s.designCtxOf(project, epic)
 	if err != nil {
 		return err
@@ -585,16 +580,31 @@ func (s *Server) forceRemoveDesign(project, epic string) error {
 	return c.removeWorktreeAndBranch(true)
 }
 
+// LiveDesignSessionID is the ID of epicAddr's newest live design session
+// leaving out excludeID, or "". For tests.
+func (s *Designs) LiveDesignSessionID(epicAddr, excludeID string) string {
+	live, err := s.liveDesignSessionExcept(epicAddr, excludeID)
+	if err != nil || live == nil {
+		return ""
+	}
+	return live.ID
+}
+
+// RebaseDesign is rebaseDesign: the skip note, or "" when it rebased. For tests.
+func (s *Designs) RebaseDesign(project, epic, worktree, excludeID string) string {
+	return s.rebaseDesign(project, epic, worktree, excludeID)
+}
+
 // liveDesignSession is the session of the Design at epicAddr that has not
 // exited and has the latest RunStartedAt, or nil. The Design page picks by the
 // same key (webui/src/design/view.ts).
-func (s *Server) liveDesignSession(epicAddr string) (*wire.SessionInfo, error) {
+func (s *Designs) liveDesignSession(epicAddr string) (*wire.SessionInfo, error) {
 	return s.liveDesignSessionExcept(epicAddr, "")
 }
 
 // liveDesignSessionExcept is liveDesignSession leaving out the session
 // excludeID, so a caller never counts itself. Empty excludes none.
-func (s *Server) liveDesignSessionExcept(epicAddr, excludeID string) (*wire.SessionInfo, error) {
+func (s *Designs) liveDesignSessionExcept(epicAddr, excludeID string) (*wire.SessionInfo, error) {
 	list, err := s.sessions.ListSessions()
 	if err != nil {
 		return nil, err

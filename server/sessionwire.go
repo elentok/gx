@@ -28,7 +28,7 @@ func newManager(s *Server) *sessions.Manager {
 		Alerts:   s.chat,
 		Host:     s,
 		Prompter: serverPrompter{s},
-		Designs:  s,
+		Designs:  s.designs,
 		Rollouts: s,
 	})
 }

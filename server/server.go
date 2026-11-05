@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
+	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -154,7 +154,6 @@ type Server struct {
 	landing *merge.Landing
 	// merger merges epics and recovers merges a crash cut short.
 	merger      *merge.Merger
-	designSteps sync.Map // map address -> design step at the last rescan
 	deadlocks   deadlocks
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 
@@ -164,11 +163,12 @@ type Server struct {
 	guards    *runs.Guards
 	verdicts  verdictLog
 	// sessions creates, stops and watches the sessions; resumer brings them back.
-	sessions    *sessions.Manager
-	resumer     *sessions.Resumer
-	designOpens sync.Map // epic address -> *sync.Mutex, serializing designs open
-	focus       *sessions.FocusReports
-	epics       *epics.Epics
+	sessions *sessions.Manager
+	resumer  *sessions.Resumer
+	// designs opens, cleans up and deletes the Design sessions; the Manager calls it back.
+	designs *designs.Designs
+	focus   *sessions.FocusReports
+	epics   *epics.Epics
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -434,7 +434,9 @@ func New(cfg Config) (*Server, error) {
 		Source: chatSource{s}, Log: log,
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
+	s.designs = designs.New(s.designsDeps())
 	s.sessions = newManager(s)
+	s.designs.GiveSessions(s.sessions)
 	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
 	s.epics = epics.New(s.epicsDeps())
@@ -449,7 +451,7 @@ func New(cfg Config) (*Server, error) {
 	s.idx.OnRescan(s.rec.ScanParentDefects)
 	s.idx.OnRescan(s.rec.ScanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
-	s.idx.OnRescan(s.scanDesignCleanups)
+	s.idx.OnRescan(s.designs.ScanCleanups)
 	s.idx.SetReady(s.migrationsEnded)
 	s.routes = subsystemRoutes(s)
 	registerRoutes(mux, s.routes)
@@ -507,9 +509,6 @@ var routeTable = []struct {
 	{"POST /v1/sessions/auto-advance/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) {
 		sessions.SessionWrite(s.cancelAutoAdvanceRoute)(w, r)
 	}},
-	{"POST /v1/designs/open", (*Server).designOpenWrite},
-	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
-	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

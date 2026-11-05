@@ -24,6 +24,6 @@ func (s *Server) epicsDeps() epics.Deps {
 		CheckWaitingLabel: s.CheckWaitingLabel,
 		AgentGone:         s.agentGone,
 		AmbiguousBlockers: s.ambiguousBlockers,
-		DesignUncharted:   s.designUncharted,
+		DesignUncharted:   s.designs.Uncharted,
 	}
 }
