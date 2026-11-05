@@ -26,6 +26,8 @@ export interface ComposerImages {
   addFiles: (files: File[]) => Promise<void>;
   retry: (key: string) => void;
   remove: (key: string) => void;
+  /** Empties the draft once a send succeeded. */
+  clear: () => void;
 }
 
 /** Image draft of a session plus the uploads this tab runs. A pending entry this tab does not run reads as cut off. */
@@ -91,6 +93,13 @@ export function useComposerImages(sessionId: string): ComposerImages {
     [draft, sessionId, update],
   );
 
+  // After a send the server owns the files: drop the draft without deleting them.
+  const clear = useCallback(() => {
+    local.current.clear();
+    update(() => []);
+    touch();
+  }, [update]);
+
   const images: ComposerImage[] = draft.map((e) => {
     const mine = local.current.get(e.key);
     if (e.id) return { key: e.key, state: "ready", url: sessionImageUrl(sessionId, e.id), canRetry: false };
@@ -107,5 +116,6 @@ export function useComposerImages(sessionId: string): ComposerImages {
     addFiles,
     retry,
     remove,
+    clear,
   };
 }

@@ -242,3 +242,51 @@ test("Send stays off while an image failed", async () => {
   await screen.findByText("Upload failed, tap to retry");
   expect((send() as HTMLButtonElement).disabled).toBe(true);
 });
+
+async function addImages(...ids: string[]) {
+  for (const id of ids) {
+    uploads.upload.mockResolvedValueOnce(id);
+    fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } });
+  }
+  await screen.findByText(`${ids.length} of 10 images`);
+}
+
+test("a ready image with no text turns Send on and the post carries the ids in attach order", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  await addImages("i1", "i2");
+  expect((send() as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(send());
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0]).toMatchObject({ text: "", images: ["i1", "i2"] });
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Remove image" })).toBeNull());
+});
+
+test("the key sends an images-only message on a wide screen", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  await addImages("i1");
+  cmdEnter(box());
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].images).toEqual(["i1"]);
+});
+
+test("a refused send keeps the images and the text", async () => {
+  const post = vi.fn(async () => ({ refused: true, message: "nope" })) as unknown as PostPrompt;
+  render({ post });
+  fireEvent.change(box(), { target: { value: "hi" } });
+  await addImages("i1");
+  fireEvent.click(send());
+  await screen.findByText("nope");
+  expect(screen.getByRole("button", { name: "Remove image" })).toBeTruthy();
+  expect((box() as HTMLTextAreaElement).value).toBe("hi");
+});
+
+test("a text-only post has no images field", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  fireEvent.change(box(), { target: { value: "hi" } });
+  fireEvent.click(send());
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect("images" in post.mock.calls[0][0]).toBe(false);
+});

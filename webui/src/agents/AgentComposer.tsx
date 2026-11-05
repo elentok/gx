@@ -42,15 +42,17 @@ export function AgentComposer({
     onStale,
     toastRefusal: false,
   });
+  const hasContent = text.trim() !== "" || images.readyIds.length > 0;
   const sendText = () =>
-    send({ text }, () => {
+    send({ text, ...(images.readyIds.length > 0 && { images: images.readyIds }) }, () => {
       onSent?.(text);
       setText("");
+      images.clear();
     });
   // A phone has no key send.
   const onSubmit = wide
     ? () => {
-        if (enabled && text.trim() !== "") sendText();
+        if (enabled && hasContent && images.uploading === 0 && images.failed === 0) sendText();
       }
     : undefined;
 
@@ -82,7 +84,7 @@ export function AgentComposer({
         state={images}
         send={
           <Button
-            disabled={!enabled || text.trim() === "" || images.uploading > 0 || images.failed > 0}
+            disabled={!enabled || !hasContent || images.uploading > 0 || images.failed > 0}
             onClick={sendText}
           >
             {pending && <Spinner size="sm" />}

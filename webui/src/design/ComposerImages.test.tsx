@@ -16,6 +16,7 @@ function state(images: ComposerImage[], over: Partial<State> = {}): State {
     addFiles: vi.fn(async () => undefined),
     retry: vi.fn(),
     remove: vi.fn(),
+    clear: vi.fn(),
     ...over,
   };
 }
