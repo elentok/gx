@@ -50,7 +50,7 @@ func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
 		harness.NoteEditorOverride(meta.SessionID, nil)
 	}
 	// A concurrent adopt of label may have won meanwhile.
-	s, _ := p.reg.putUnlessLive(label, ss, func() { go p.watchExit(ss, meta) })
+	s, _ := p.reg.putUnlessLive(label, ss, func() { go p.launcher().watchExit(ss, meta) })
 	return s, adoptedLive, nil
 }
 

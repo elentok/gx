@@ -132,7 +132,8 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 			return agentrunner.Session{}, err
 		}
 	}
-	cmd, err := p.spawn(opts, dir, sessionID)
+	l := p.launcher()
+	cmd, err := l.spawn(opts, dir, sessionID)
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
@@ -147,7 +148,7 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 		_ = cmd.Wait()
 		close(ss.exited)
 	}()
-	if err := p.launch(ss, dir, opts.Cwd, ptyKind(opts)); err != nil {
+	if err := l.launch(ss, dir, opts.Cwd, ptyKind(opts)); err != nil {
 		killLaunch(ss.claudePID, ss.holderPID)
 		<-ss.exited
 		return agentrunner.Session{}, err

@@ -70,7 +70,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 		Now:   time.Now,
 		Sleep: time.Sleep,
 	}
-	err = claudeui.CheckLaunchDelivered(ctx, proof, text, p.launchCaps())
+	err = claudeui.CheckLaunchDelivered(ctx, proof, text, p.launcher().launchCaps())
 	if errors.Is(err, errPersonInput) {
 		// The person's keys end the resends; the transcript may still show the
 		// command from before they typed.
@@ -133,35 +133,63 @@ func (pr *ptyPrompter) awaitReady(ctx context.Context, home string) error {
 	}
 }
 
+// ptyLauncher starts and watches holders. It holds copies of the Pty settings
+// it reads, so it has no back-pointer to the Pty.
+type ptyLauncher struct {
+	holder       []string
+	claude       string
+	codex        string
+	env          []string
+	procs        ProcessTable
+	poll         time.Duration
+	startTimeout time.Duration
+	// capsOverride is Pty.LaunchCaps: set fields replace the default caps.
+	capsOverride claudeui.LaunchProofCaps
+}
+
+// launcher snapshots the settings the launch group reads.
+func (p *Pty) launcher() ptyLauncher {
+	return ptyLauncher{
+		holder:       p.Holder,
+		claude:       p.Claude,
+		codex:        p.Codex,
+		env:          p.Env,
+		procs:        p.Procs,
+		poll:         p.pollInterval(),
+		startTimeout: p.startTimeout(),
+		capsOverride: p.LaunchCaps,
+	}
+}
+
 // launchCaps is the launch proof's caps with LaunchCaps' set fields applied.
-func (p *Pty) launchCaps() claudeui.LaunchProofCaps {
+func (l ptyLauncher) launchCaps() claudeui.LaunchProofCaps {
 	caps := claudeui.DefaultLaunchProofCaps
-	caps.Grace = cmp.Or(p.LaunchCaps.Grace, caps.Grace)
-	caps.UnknownGrace = cmp.Or(p.LaunchCaps.UnknownGrace, caps.UnknownGrace)
-	caps.Poll = cmp.Or(p.LaunchCaps.Poll, p.pollInterval())
-	caps.ResendEvery = cmp.Or(p.LaunchCaps.ResendEvery, caps.ResendEvery)
+	caps.Grace = cmp.Or(l.capsOverride.Grace, caps.Grace)
+	caps.UnknownGrace = cmp.Or(l.capsOverride.UnknownGrace, caps.UnknownGrace)
+	caps.Poll = cmp.Or(l.capsOverride.Poll, l.poll)
+	caps.ResendEvery = cmp.Or(l.capsOverride.ResendEvery, caps.ResendEvery)
 	return caps
 }
 
 // launch connects to the holder ss started, records meta.json and waits for
 // claude to turn idle.
-func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) error {
+func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) error {
 	h, err := harness.Lookup(kind)
 	if err != nil {
 		return err
 	}
-	deadline := time.Now().Add(p.startTimeout())
+	deadline := time.Now().Add(l.startTimeout)
 	for {
 		holder, err := DialHolder(dir)
 		if err == nil {
 			ss.holder, ss.claudePID = holder, holder.ChildPID()
 			break
 		}
-		if err := p.launchTick(ss, dir, deadline, "holder.sock never answered"); err != nil {
+		if err := l.launchTick(ss, dir, deadline, "holder.sock never answered"); err != nil {
 			return err
 		}
 	}
-	procs := orPS(p.Procs)
+	procs := orPS(l.procs)
 	holderProc, ok, err := procs.Lookup(ss.holderPID)
 	if err != nil {
 		return err
@@ -245,14 +273,14 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) err
 		}
 		select {
 		case <-ss.exited:
-			return p.holderExitedErr(dir)
-		case <-time.After(p.pollInterval()):
+			return l.holderExitedErr(dir)
+		case <-time.After(l.poll):
 		}
 		if time.Now().After(deadline) {
 			if claude == nil {
-				return p.noPidFileErr(ss)
+				return l.noPidFileErr(ss)
 			}
-			return fmt.Errorf("pty start: claude never turned idle within %v", p.startTimeout())
+			return fmt.Errorf("pty start: claude never turned idle within %v", l.startTimeout)
 		}
 	}
 }
@@ -263,7 +291,7 @@ const trustKeyRepeat = 500 * time.Millisecond
 
 // holderExitedErr reports a holder gone before claude turned idle, with
 // claude's exit code when the holder saved one.
-func (p *Pty) holderExitedErr(dir string) error {
+func (l ptyLauncher) holderExitedErr(dir string) error {
 	code, err := os.ReadFile(filepath.Join(dir, ExitCodeFile))
 	if err != nil {
 		return errors.New("pty start: holder exited before claude turned idle")
@@ -273,9 +301,9 @@ func (p *Pty) holderExitedErr(dir string) error {
 
 // watchExit closes ss.exited once an adopted holder is gone. It isn't the
 // server's child, so there is no Wait to block on.
-func (p *Pty) watchExit(ss *ptySession, meta Meta) {
-	procs := orPS(p.Procs)
-	ticker := time.NewTicker(p.pollInterval())
+func (l ptyLauncher) watchExit(ss *ptySession, meta Meta) {
+	procs := orPS(l.procs)
+	ticker := time.NewTicker(l.poll)
 	defer ticker.Stop()
 	for range ticker.C {
 		// A failed lookup is retried rather than taken as an exit.
@@ -291,7 +319,7 @@ func (p *Pty) watchExit(ss *ptySession, meta Meta) {
 // reads besides the visible screen.
 const startupScrollback = 50
 
-func (p *Pty) startupScreen(ss *ptySession) (string, error) {
+func (l ptyLauncher) startupScreen(ss *ptySession) (string, error) {
 	rows, scrolled, err := ss.holder.Screen(startupScrollback)
 	if err != nil {
 		return "", err
@@ -302,35 +330,35 @@ func (p *Pty) startupScreen(ss *ptySession) (string, error) {
 // noPidFileErr reports a claude that never wrote its pid status file: either
 // it is too old to write one, or it sits on a screen gx can't answer, which
 // the error carries for the doctor hint.
-func (p *Pty) noPidFileErr(ss *ptySession) error {
-	text, err := p.startupScreen(ss)
+func (l ptyLauncher) noPidFileErr(ss *ptySession) error {
+	text, err := l.startupScreen(ss)
 	if err != nil {
 		text = fmt.Sprintf("(unreadable: %v)", err)
 	}
 	return fmt.Errorf("%w: no pid status file within %v; screen: %s",
-		agentrunner.ErrMissingCapability, p.startTimeout(), text)
+		agentrunner.ErrMissingCapability, l.startTimeout, text)
 }
 
 // launchTick sleeps one poll, failing with what once the holder exited or
 // deadline passed.
-func (p *Pty) launchTick(ss *ptySession, dir string, deadline time.Time, what string) error {
+func (l ptyLauncher) launchTick(ss *ptySession, dir string, deadline time.Time, what string) error {
 	select {
 	case <-ss.exited:
 		if text := holderErrText(dir); text != "" {
 			return fmt.Errorf("pty start: holder exited: %s", text)
 		}
 		return fmt.Errorf("pty start: holder exited: %s", what)
-	case <-time.After(p.pollInterval()):
+	case <-time.After(l.poll):
 	}
 	if time.Now().After(deadline) {
-		return fmt.Errorf("pty start: %s within %v", what, p.startTimeout())
+		return fmt.Errorf("pty start: %s within %v", what, l.startTimeout)
 	}
 	return nil
 }
 
 // spawn starts the holder detached, running claude in its pty.
-func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec.Cmd, error) {
-	holder := p.Holder
+func (l ptyLauncher) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec.Cmd, error) {
+	holder := l.holder
 	if len(holder) == 0 {
 		exe, err := os.Executable()
 		if err != nil {
@@ -339,7 +367,7 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 		holder = []string{exe, "agent-holder"}
 	}
 	kind := ptyKind(opts)
-	launch, err := p.launchCommand(opts, dir, sessionID)
+	launch, err := l.launchCommand(opts, dir, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +393,7 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 }
 
 // launchCommand is the command that runs the agent for opts in its pty.
-func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string) (harness.Command, error) {
+func (l ptyLauncher) launchCommand(opts agentrunner.StartOptions, dir, sessionID string) (harness.Command, error) {
 	kind := ptyKind(opts)
 	h, err := harness.Lookup(kind)
 	if err != nil {
@@ -379,7 +407,7 @@ func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string
 			return harness.Command{}, err
 		}
 	}
-	env := slices.Concat(p.Env, opts.Env)
+	env := slices.Concat(l.env, opts.Env)
 	if kind == harness.Codex {
 		// The SessionStart hook writes Codex's own session id here.
 		env = append(env, harness.CodexSessionEnv(dir)...)
@@ -395,12 +423,12 @@ func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string
 	}
 	switch kind {
 	case harness.Claude:
-		if p.Claude != "" {
-			launch.Name = p.Claude
+		if l.claude != "" {
+			launch.Name = l.claude
 		}
 	case harness.Codex:
-		if p.Codex != "" {
-			launch.Name = p.Codex
+		if l.codex != "" {
+			launch.Name = l.codex
 		}
 	}
 	return launch, nil

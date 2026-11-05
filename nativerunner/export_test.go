@@ -25,7 +25,7 @@ func AnswerCodex(c *HolderClient, dir string, a agentrunner.Answer, unreadableDe
 
 // LaunchCommand is the command p runs the agent for opts with.
 func LaunchCommand(p *Pty, opts agentrunner.StartOptions, dir, sessionID string) (harness.Command, error) {
-	return p.launchCommand(opts, dir, sessionID)
+	return p.launcher().launchCommand(opts, dir, sessionID)
 }
 
 // RunTestHolder runs a holder with h as its harness.
