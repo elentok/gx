@@ -233,14 +233,28 @@ func resolveImages(msg *ChatMessage, meta chatLine, imagesDir string) {
 	for _, b := range decodeContentBlocks(meta.Message.Content) {
 		for _, m := range imageSourceRE.FindAllStringSubmatch(b.Text, -1) {
 			if n < len(msg.Images) {
-				msg.Images[n] = savedImage(strings.TrimSpace(m[1]), imagesDir)
+				msg.Images[n] = SavedImage(strings.TrimSpace(m[1]), imagesDir)
 			}
 			n++
 		}
 	}
 }
 
-func savedImage(path, imagesDir string) ChatImage {
+// StripImageChips removes the "[Image #N]" chips from a prompt's text.
+func StripImageChips(text string) string { return imageChipRE.ReplaceAllString(text, "") }
+
+// ImagesDir returns the images folder the options set, or "".
+func ImagesDir(opts []ChatOption) string {
+	var o chatOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o.imagesDir
+}
+
+// SavedImage maps a pasted image's source path to a saved image, or to a
+// placeholder when the path is outside imagesDir or the file is gone.
+func SavedImage(path, imagesDir string) ChatImage {
 	placeholder := ChatImage{Placeholder: true}
 	if imagesDir == "" || filepath.Dir(filepath.Clean(path)) != filepath.Clean(imagesDir) {
 		return placeholder
@@ -314,7 +328,7 @@ func (l chatLine) message() (ChatMessage, bool) {
 		case b.Type == "text":
 			t := b.Text
 			if l.Type == "user" {
-				t = imageChipRE.ReplaceAllString(t, "")
+				t = StripImageChips(t)
 			}
 			if t = strings.TrimSpace(t); t != "" {
 				texts = append(texts, t)

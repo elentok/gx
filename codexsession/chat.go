@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -80,6 +81,7 @@ type chatRolloutLine struct {
 		Input      string `json:"input"`
 		CLIVersion string `json:"cli_version"`
 		Content    []struct {
+			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
 	} `json:"payload"`
@@ -90,13 +92,18 @@ var injectedPrefixes = []string{"# AGENTS.md instructions", "<environment_contex
 
 const gxCommandPrefix = "$gx-"
 
+// imageOpenRE matches the wrapper text that opens a pasted image and captures
+// its source path.
+var imageOpenRE = regexp.MustCompile(`^<image\b[^>]*\bpath="([^"]*)"`)
+
 // ReadChat turns a rollout into the visible messages: agent text, the person's
 // prompts, folded tool runs and compactions. Reasoning, developer and injected
 // lines stay hidden and unknown lines are skipped. A message's ID is its
-// line's ordinal ("o20"), or "l<line>" when the line has none.
-func ReadChat(r io.Reader) (Chat, error) {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+// line's ordinal ("o20"), or "l<line>" when the line has none. Lines have no
+// size cap: an image line is megabytes of base64.
+func ReadChat(r io.Reader, opts ...transcript.ChatOption) (Chat, error) {
+	imagesDir := transcript.ImagesDir(opts)
+	br := bufio.NewReaderSize(r, 64*1024)
 	var chat Chat
 	var run *transcript.ChatMessage
 	flush := func() {
@@ -105,9 +112,14 @@ func ReadChat(r io.Reader) (Chat, error) {
 			run = nil
 		}
 	}
-	for n := 1; scanner.Scan(); n++ {
+	for n, eof := 1, false; !eof; n++ {
+		raw, readErr := br.ReadBytes('\n')
+		if readErr != nil && readErr != io.EOF {
+			return Chat{}, readErr
+		}
+		eof = readErr == io.EOF
 		var line chatRolloutLine
-		if json.Unmarshal(scanner.Bytes(), &line) != nil {
+		if json.Unmarshal(raw, &line) != nil {
 			continue
 		}
 		id := fmt.Sprintf("l%d", n)
@@ -139,16 +151,39 @@ func ReadChat(r io.Reader) (Chat, error) {
 			run.Calls = append(run.Calls, transcript.SummarizeCall(p.Name, args))
 		case p.Type == "message" && (p.Role == "assistant" || p.Role == "user"):
 			var texts []string
+			var images []transcript.ChatImage
+			inImage := false
 			for _, c := range p.Content {
-				if t := strings.TrimSpace(c.Text); t != "" && (p.Role == "assistant" || !IsInjected(t)) {
+				if p.Role == "user" {
+					if m := imageOpenRE.FindStringSubmatch(c.Text); m != nil {
+						images = append(images, transcript.SavedImage(m[1], imagesDir))
+						inImage = true
+						continue
+					}
+					if strings.TrimSpace(c.Text) == "</image>" {
+						inImage = false
+						continue
+					}
+					if c.Type == "input_image" {
+						if !inImage {
+							images = append(images, transcript.ChatImage{Placeholder: true})
+						}
+						continue
+					}
+				}
+				t := c.Text
+				if p.Role == "user" {
+					t = transcript.StripImageChips(t)
+				}
+				if t = strings.TrimSpace(t); t != "" && (p.Role == "assistant" || !IsInjected(t)) {
 					texts = append(texts, t)
 				}
 			}
-			if len(texts) == 0 {
+			if len(texts) == 0 && len(images) == 0 {
 				continue
 			}
 			flush()
-			msg := transcript.ChatMessage{ID: id, Text: strings.Join(texts, "\n\n"), At: at}
+			msg := transcript.ChatMessage{ID: id, Text: strings.Join(texts, "\n\n"), Images: images, At: at}
 			switch {
 			case p.Role == "assistant":
 				msg.Role, msg.Kind = transcript.ChatRoleAgent, transcript.ChatKindText
@@ -159,9 +194,6 @@ func ReadChat(r io.Reader) (Chat, error) {
 			}
 			chat.Messages = append(chat.Messages, msg)
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return Chat{}, err
 	}
 	flush()
 	return chat, nil

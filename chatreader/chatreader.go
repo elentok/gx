@@ -28,7 +28,7 @@ type Result struct {
 // writes the Claude format.
 func Read(kind agentrunner.Kind, r io.Reader, opts ...transcript.ChatOption) (Result, error) {
 	if kind == harness.Codex {
-		chat, err := codexsession.ReadChat(r)
+		chat, err := codexsession.ReadChat(r, opts...)
 		if err != nil {
 			return Result{}, err
 		}
