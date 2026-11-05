@@ -158,6 +158,53 @@ func runAgentLink(ctx context.Context, client func() (*apiclient.Client, error),
 	})
 }
 
+// newAgentTranscriptCmd is `gx agent transcript`: the path of the calling
+// session's conversation file.
+func newAgentTranscriptCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "transcript",
+		Short: "print the conversation file of this gx session; exits 1 outside one or with no file",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runAgentTranscript(ctx, d.Dial(), c.OutOrStdout(), jsonOut, os.Getenv(holder.AgentSessionEnv))
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "always exit 0 and emit harness, conversation_id, path and found")
+	return cmd
+}
+
+// runAgentTranscript reports the conversation file of session id. Text mode
+// fails with the reason on stderr (the returned error) and nothing on stdout;
+// --json reports found=false instead.
+func runAgentTranscript(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, id string) error {
+	var res wire.SessionTranscriptResponse
+	var lookupErr error
+	if id == "" {
+		lookupErr = fmt.Errorf("not in a gx session (%s unset)", holder.AgentSessionEnv)
+	} else if cl, err := client(); err != nil {
+		lookupErr = err
+	} else if res, err = cl.Sessions.Transcript(ctx, id); err != nil {
+		lookupErr = fmt.Errorf("read transcript: %w", err)
+	} else if !res.Found {
+		lookupErr = fmt.Errorf("no transcript file found for session %s", id)
+	}
+	if jsonOut {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(res)
+	}
+	if lookupErr != nil {
+		return lookupErr
+	}
+	_, err := fmt.Fprintln(w, res.Path)
+	return err
+}
+
 // newAgentStepCmd is `gx agent step`: the calling agent reports the Design
 // step it is running.
 func newAgentStepCmd(d Deps) *cobra.Command {

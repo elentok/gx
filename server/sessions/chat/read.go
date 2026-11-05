@@ -29,6 +29,21 @@ func (c *Chat) readable(w http.ResponseWriter, id string) (dir string, meta Meta
 	return dir, meta, true
 }
 
+// transcriptRead names the conversation file of a session, by the same lookup
+// the chat uses, so the CLI and the web chat agree.
+func (c *Chat) transcriptRead(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("session")
+	_, meta, ok := c.readable(w, id)
+	if !ok {
+		return
+	}
+	out := wire.SessionTranscriptResponse{Harness: meta.Harness, ConversationID: meta.ConversationID}
+	if c.src.HasChatReader(meta.Harness) {
+		out.Path, _, out.Found = c.Transcript(id, meta)
+	}
+	wire.WriteJSON(w, out)
+}
+
 // archiveRead decodes a session's archived rollout on demand and answers like
 // a plain chat read would.
 func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {

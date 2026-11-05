@@ -236,6 +236,13 @@ func (s *Sessions) Permission(ctx context.Context, id string) (wire.SessionPermi
 	return res, err
 }
 
+// Transcript locates a session's conversation file.
+func (s *Sessions) Transcript(ctx context.Context, id string) (wire.SessionTranscriptResponse, error) {
+	var res wire.SessionTranscriptResponse
+	err := s.t.get(ctx, "/v1/sessions/transcript?session="+url.QueryEscape(id), &res)
+	return res, err
+}
+
 // SetAFK sets AFK mode; a nil on toggles it.
 func (s *Sessions) SetAFK(ctx context.Context, on *bool) (wire.AFKResult, error) {
 	var res wire.AFKResult

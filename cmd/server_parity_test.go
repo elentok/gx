@@ -100,6 +100,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/show":                "agents focus",
 	"POST /v1/sessions/actionable":          "agent actionable",
 	"POST /v1/sessions/link":                "agent link",
+	"GET /v1/sessions/transcript":           "agent transcript",
 	"POST /v1/sessions/step":                "agent step",
 	"POST /v1/sessions/run-action":          "agents run-action",
 	"POST /v1/sessions/resume":              "agents resume",

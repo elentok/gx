@@ -15,6 +15,7 @@ func Routes(get func() *Chat) []wire.Route {
 	return []wire.Route{
 		{Pattern: "GET /v1/sessions/chat", Web: wire.WebRead, Handler: read((*Chat).read)},
 		{Pattern: "GET /v1/sessions/chat/archive", Web: wire.WebRead, Handler: read((*Chat).archiveRead)},
+		{Pattern: "GET /v1/sessions/transcript", Handler: read((*Chat).transcriptRead)},
 		{Pattern: "GET /v1/sessions/screen", Web: wire.WebRead, Handler: read((*Chat).screenRead)},
 		{Pattern: "GET /v1/sessions/commands", Web: wire.WebRead, Handler: read((*Chat).commandsRead)},
 		{Pattern: "GET /v1/sessions/permission", Web: wire.WebRead, Handler: read((*Chat).permissionRead)},

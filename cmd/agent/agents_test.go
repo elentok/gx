@@ -256,6 +256,59 @@ func TestAgentActionable_NoServerInSession(t *testing.T) {
 	}
 }
 
+func TestAgentTranscript(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	created, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	client := func() (*apiclient.Client, error) { return h.Client, nil }
+	noServer := func() (*apiclient.Client, error) {
+		t.Error("outside a session the server was called")
+		return h.Client, nil
+	}
+	decode := func(out *bytes.Buffer) wire.SessionTranscriptResponse {
+		t.Helper()
+		var got wire.SessionTranscriptResponse
+		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+			t.Fatalf("output %q: %v", out.String(), err)
+		}
+		return got
+	}
+
+	t.Run("outside a session, text", func(t *testing.T) {
+		var out bytes.Buffer
+		if err := runAgentTranscript(ctx, noServer, &out, false, ""); err == nil || out.Len() != 0 {
+			t.Errorf("err = %v, stdout = %q; want an error and empty stdout", err, out.String())
+		}
+	})
+	t.Run("outside a session, json", func(t *testing.T) {
+		var out bytes.Buffer
+		if err := runAgentTranscript(ctx, noServer, &out, true, ""); err != nil {
+			t.Fatal(err)
+		}
+		if got := decode(&out); got != (wire.SessionTranscriptResponse{}) {
+			t.Errorf("got %+v, want found=false and no harness", got)
+		}
+	})
+	t.Run("session without a file, text", func(t *testing.T) {
+		var out bytes.Buffer
+		if err := runAgentTranscript(ctx, client, &out, false, created.Session.ID); err == nil || out.Len() != 0 {
+			t.Errorf("err = %v, stdout = %q; want an error and empty stdout", err, out.String())
+		}
+	})
+	t.Run("session without a file, json", func(t *testing.T) {
+		var out bytes.Buffer
+		if err := runAgentTranscript(ctx, client, &out, true, created.Session.ID); err != nil {
+			t.Fatal(err)
+		}
+		if got := decode(&out); got.Found || got.Path != "" {
+			t.Errorf("got %+v, want found=false", got)
+		}
+	})
+}
+
 func TestAgentLink(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()

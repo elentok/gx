@@ -112,6 +112,44 @@ func chatOf(t *testing.T, lines ...string) wire.SessionChatResponse {
 	return f.chat(t, "/v1/sessions/chat")
 }
 
+func TestTranscriptRead(t *testing.T) {
+	t.Parallel()
+	read := func(t *testing.T, f *readFixture) wire.SessionTranscriptResponse {
+		t.Helper()
+		code, body := f.get(t, "/v1/sessions/transcript")
+		var got wire.SessionTranscriptResponse
+		if err := json.Unmarshal(body, &got); err != nil || code != http.StatusOK {
+			t.Fatalf("transcript = %d %q (%v)", code, body, err)
+		}
+		return got
+	}
+	for _, tc := range []struct {
+		name    string
+		fixture func(*testing.T) *readFixture
+		harness string
+	}{
+		{"claude", newClaudeFixture, "claude"},
+		{"codex", newCodexFixture, "codex"},
+	} {
+		t.Run(tc.name+" found", func(t *testing.T) {
+			t.Parallel()
+			f := tc.fixture(t)
+			writeLines(t, f.path, `{"type":"user"}`)
+			want := wire.SessionTranscriptResponse{Harness: tc.harness, ConversationID: testConv, Path: f.path, Found: true}
+			if got := read(t, f); got != want {
+				t.Errorf("transcript = %+v, want %+v", got, want)
+			}
+		})
+		t.Run(tc.name+" missing", func(t *testing.T) {
+			t.Parallel()
+			want := wire.SessionTranscriptResponse{Harness: tc.harness, ConversationID: testConv}
+			if got := read(t, tc.fixture(t)); got != want {
+				t.Errorf("transcript = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
 func TestRead_ShowsVisibleMessagesInOrder(t *testing.T) {
 	t.Parallel()
 	f := newClaudeFixture(t)

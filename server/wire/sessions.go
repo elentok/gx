@@ -67,6 +67,16 @@ type SessionChatMessage struct {
 	Calls []string `json:"calls,omitempty"`
 }
 
+// SessionTranscriptResponse locates a session's conversation file. Harness
+// and ConversationID are the session's own, so they are set even when Found is
+// false.
+type SessionTranscriptResponse struct {
+	Harness        string `json:"harness"`
+	ConversationID string `json:"conversation_id"`
+	Path           string `json:"path"`
+	Found          bool   `json:"found"`
+}
+
 // SessionChatResponse is the visible messages of a session's newest
 // conversation. ConversationID changes after a /clear. Unsupported marks a
 // session of a harness that has no chat; its Messages stay empty. Truncated
