@@ -97,7 +97,7 @@ func (m Model) OnDeactivate() tea.Cmd {
 // A kitty placement would paint over it at the graphics layer, so the overlay
 // waits for the modal to close (ADR 0010).
 func (m Model) ModalOpen() bool {
-	return m.amendConfirm.IsOpen || m.reword.IsOpen || m.help.IsOpen
+	return m.commitOps.IsOpen() || m.help.IsOpen
 }
 
 // SelectedImageFile implements imagediff.SettleHost: the selected file's path

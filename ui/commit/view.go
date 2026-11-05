@@ -44,12 +44,7 @@ func (m Model) View() tea.View {
 			out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 		}
 	}
-	if m.amendConfirm.IsOpen {
-		out = ui.OverlayCenter(out, m.amendConfirm.View(m.width), m.width, m.height)
-	}
-	if m.reword.IsOpen {
-		out = ui.OverlayCenter(out, m.reword.View(m.width), m.width, m.height)
-	}
+	out = m.commitOps.Overlay(out, m.width, m.height)
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}

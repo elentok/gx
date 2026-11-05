@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/commitops"
 	"github.com/elentok/gx/ui/diffview"
 )
 
@@ -205,12 +206,12 @@ func TestYankCommitBodyWithYYInHeader(t *testing.T) {
 	testutil.CommitAll(t, repo, "subject\n\nline 1\nline 2")
 
 	var got string
-	prev := commitClipboardWrite
-	commitClipboardWrite = func(s string) error {
+	prev := commitops.ClipboardWrite
+	commitops.ClipboardWrite = func(s string) error {
 		got = s
 		return nil
 	}
-	t.Cleanup(func() { commitClipboardWrite = prev })
+	t.Cleanup(func() { commitops.ClipboardWrite = prev })
 
 	m := newTestModel(repo, "HEAD")
 	m.ready = true

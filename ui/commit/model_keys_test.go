@@ -217,7 +217,7 @@ func TestDispatchBindingAmendOpensConfirm(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'A', Text: "A", ShiftedCode: 'A'})
 	m = updated.(Model)
 
-	if !m.amendConfirm.IsOpen {
+	if !m.commitOps.AmendOpen() {
 		t.Fatal("A key should open amend confirm dialog")
 	}
 }

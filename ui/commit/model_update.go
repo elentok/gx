@@ -48,12 +48,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	}
 
 	// Delegate all messages to amend.Model while it's open.
-	if m.amendConfirm.IsOpen {
-		return m.handleAmendUpdate(msg)
-	}
-	// Delegate all messages to reword.Model while it's running.
-	if m.reword.IsOpen {
-		return m.handleRewordRunningUpdate(msg)
+	if m.commitOps.IsOpen() {
+		return m.handleCommitOpsUpdate(msg)
 	}
 
 	switch msg := msg.(type) {
@@ -72,7 +68,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case editCommentFinishedMsg:
 		return m.handleEditCommentFinished(msg)
 	case reword.EditorFinishedMsg:
-		return m.handleRewordEditorDone(msg.Err)
+		return m.handleCommitOpsUpdate(msg)
 	}
 	return m, nil
 }

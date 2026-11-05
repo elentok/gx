@@ -14,9 +14,8 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tree"
 
-	"github.com/elentok/gx/ui/amend"
+	"github.com/elentok/gx/ui/commitops"
 	"github.com/elentok/gx/ui/help"
-	"github.com/elentok/gx/ui/reword"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -51,9 +50,7 @@ type Model struct {
 	help help.Model
 	keys keys.Manager
 
-	amendConfirm amend.Model
-
-	reword reword.Model
+	commitOps commitops.Model
 
 	// Inline image-diff overlay (ADR 0010). The detail panel is composed into a
 	// split view and never learns its absolute screen position from
@@ -104,8 +101,7 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 		},
 	}
 	m.help = help.NewModel(help.BuildSections(m.keys, extraKeys), settings.About)
-	m.amendConfirm = amend.New()
-	m.reword = reword.New()
+	m.commitOps = commitops.New()
 	m.reload()
 	return m
 }

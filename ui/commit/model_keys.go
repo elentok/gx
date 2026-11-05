@@ -2,6 +2,7 @@ package commit
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/commitops"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -233,7 +234,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingYankContent:
 		if m.focusHeader {
-			return m, m.yankCommitBody()
+			return m, commitops.YankBody(m.commitMessageBody())
 		}
 		return m, m.yankContentOnly()
 	case bindingYankLoc:
@@ -243,23 +244,23 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingYankFile:
 		return m, m.yankFilename()
 	case bindingYankHash:
-		return m, m.yankCommitHash()
+		return m, commitops.YankHash(m.details.FullHash)
 	case bindingYankSubject:
-		return m, m.yankCommitSubject()
+		return m, commitops.YankSubject(m.details.Subject)
 	case bindingYankMessage:
-		return m, m.yankCommitMessage()
+		return m, commitops.YankMessage(m.details.Subject, m.commitMessageBody())
 	case bindingComment:
 		if !m.focusDiff {
 			return m, nil
 		}
 		return m, m.cmdCreateCommentFromDiff()
 	case bindingAmend:
-		if err := m.openAmendConfirm(); err != nil {
+		if err := m.commitOps.OpenAmend(m.worktreeRoot, m.details.FullHash, m.details.Subject); err != nil {
 			return m, notify.Error(err.Error())
 		}
 		return m, nil
 	case bindingReword:
-		return m, m.openRewordEditor()
+		return m, m.commitOps.OpenReword(m.worktreeRoot, m.details.FullHash, m.details.Subject, m.details.Body)
 	case bindingCancelChord:
 		return m, nil
 	case bindingFilterLog:

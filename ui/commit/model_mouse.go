@@ -11,7 +11,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		m.help = next
 		return m, cmd
 	}
-	if m.amendConfirm.IsOpen || m.diffModel.Search().IsActive() || m.fileTreeModel.Search().IsActive() {
+	if m.commitOps.AmendOpen() || m.diffModel.Search().IsActive() || m.fileTreeModel.Search().IsActive() {
 		return m, nil
 	}
 	mouse := msg.Mouse()
