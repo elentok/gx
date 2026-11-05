@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -20,12 +21,12 @@ func TestMain(m *testing.M) {
 // Aliases for the helpers that live in servertest, so the callers here keep
 // their short names.
 const (
-	apiError401       = servertest.APIError401
-	reply             = servertest.Reply
+	apiError401       = rigs.APIError401
+	reply             = rigs.Reply
 	testFlushInterval = servertest.FlushInterval
 )
 
-type slackHook = servertest.SlackHook
+type slackHook = rigs.SlackHook
 
 var (
 	report                 = servertest.Report
@@ -37,10 +38,10 @@ var (
 	writeTranscript        = servertest.WriteTranscript
 	startFakeSessionWith   = servertest.StartFakeSessionWith
 	stopFakeSession        = servertest.StopFakeSession
-	failureNow             = servertest.FailureNow
-	waitForFailure         = servertest.WaitForFailure
+	failureNow             = rigs.FailureNow
+	waitForFailure         = rigs.WaitForFailure
 	waitFor                = servertest.Await
-	newSlackHook           = servertest.NewSlackHook
+	newSlackHook           = rigs.NewSlackHook
 	idleWithAction         = servertest.IdleWithAction
 	withAlerts             = servertest.WithAlerts
 	startBannerSession     = servertest.StartBannerSession
