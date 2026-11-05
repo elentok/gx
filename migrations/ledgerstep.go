@@ -88,14 +88,10 @@ func rebuildLedger(e Env) ([]tickets.MigrationChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	cutoff, err := ledger.FirstLiveDay()
+	days, skipped, tokens, dollars, err := ledger.PlanRebuilt(rows)
 	if err != nil {
 		return nil, err
 	}
-	if cutoff == "" {
-		cutoff = time.Now().Format(tokenledger.DayLayout)
-	}
-	days, skipped, tokens, dollars := sumRebuilt(rows, cutoff)
 
 	verb := "written"
 	if e.DryRun {
@@ -141,20 +137,4 @@ func ledgerRows(attr Attributions, project string, noProject bool, claude []metr
 		out = append(out, r)
 	}
 	return out
-}
-
-// sumRebuilt totals the rows ApplyRebuilt would take (days before cutoff) and
-// counts the days it would skip.
-func sumRebuilt(rows []tokenledger.Row, cutoff string) (days, skipped int, tokens int64, dollars float64) {
-	taken, skip := map[string]bool{}, map[string]bool{}
-	for _, r := range rows {
-		if r.Day >= cutoff {
-			skip[r.Day] = true
-			continue
-		}
-		taken[r.Day] = true
-		tokens += r.Tokens
-		dollars += r.Dollars
-	}
-	return len(taken), len(skip), tokens, dollars
 }

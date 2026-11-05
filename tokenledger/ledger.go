@@ -339,22 +339,51 @@ func (l *Ledger) FirstRebuiltDay() (string, error) {
 	return l.data.FirstRebuiltDay, nil
 }
 
-// ApplyRebuilt writes rebuilt rows. It skips days on or after the first live
-// day (or, with no live row yet, on or after today), never lowers a bucket and
-// writes nothing when no bucket changes. It returns the rows written and the
-// distinct days skipped.
+// splitRebuilt separates the rows ApplyRebuilt takes from those it skips: days
+// on or after the first live day (or, with no live row yet, on or after today)
+// are skipped. The caller holds the ledger state fresh.
+func (l *Ledger) splitRebuilt(rows []Row) (taken []Row, skippedDays int) {
+	cutoff := l.data.FirstLiveDay
+	if cutoff == "" {
+		cutoff = l.today()
+	}
+	skipped := map[string]bool{}
+	for _, in := range rows {
+		if in.Day >= cutoff {
+			skipped[in.Day] = true
+			continue
+		}
+		taken = append(taken, in)
+	}
+	return taken, len(skipped)
+}
+
+// PlanRebuilt reports what ApplyRebuilt would take from rows without writing:
+// the distinct days taken, the distinct days skipped and the taken totals.
+func (l *Ledger) PlanRebuilt(rows []Row) (days, skippedDays int, tokens int64, dollars float64, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err = l.refresh(); err != nil {
+		return 0, 0, 0, 0, err
+	}
+	taken, skippedDays := l.splitRebuilt(rows)
+	seen := map[string]bool{}
+	for _, r := range taken {
+		seen[r.Day] = true
+		tokens += r.Tokens
+		dollars += r.Dollars
+	}
+	return len(seen), skippedDays, tokens, dollars, nil
+}
+
+// ApplyRebuilt writes rebuilt rows. It skips the days PlanRebuilt reports as
+// skipped, never lowers a bucket and writes nothing when no bucket changes. It
+// returns the rows written and the distinct days skipped.
 func (l *Ledger) ApplyRebuilt(rows []Row) (written, skippedDays int, err error) {
 	err = l.mutate(func() bool {
-		cutoff := l.data.FirstLiveDay
-		if cutoff == "" {
-			cutoff = l.today()
-		}
-		skipped := map[string]bool{}
-		for _, in := range rows {
-			if in.Day >= cutoff {
-				skipped[in.Day] = true
-				continue
-			}
+		var taken []Row
+		taken, skippedDays = l.splitRebuilt(rows)
+		for _, in := range taken {
 			old, exists := l.buckets[in.Key]
 			next := Row{Key: in.Key, Tokens: in.Tokens, Dollars: in.Dollars, Rebuilt: true}
 			if exists {
@@ -370,7 +399,6 @@ func (l *Ledger) ApplyRebuilt(rows []Row) (written, skippedDays int, err error) 
 				l.data.FirstRebuiltDay = in.Day
 			}
 		}
-		skippedDays = len(skipped)
 		return written > 0
 	})
 	return written, skippedDays, err

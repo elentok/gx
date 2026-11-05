@@ -258,6 +258,25 @@ func TestTokenLedgerApplyRebuiltSkipsLiveDayAndToday(t *testing.T) {
 	}
 }
 
+func TestTokenLedgerPlanRebuiltMatchesApplyWithoutWriting(t *testing.T) {
+	l := openAt(t, t.TempDir(), "2026-05-10")
+	rows := []Row{
+		{Key: key("2026-05-08", "gx", GroupQueue, "claude"), Tokens: 5, Dollars: 1},
+		{Key: key("2026-05-08", "gx", GroupDesign, "claude"), Tokens: 3, Dollars: 2},
+		{Key: key("2026-05-10", "gx", GroupQueue, "claude"), Tokens: 9},
+	}
+	days, skipped, tokens, dollars, err := l.PlanRebuilt(rows)
+	if err != nil || days != 1 || skipped != 1 || tokens != 8 || dollars != 3 {
+		t.Fatalf("days=%d skipped=%d tokens=%d dollars=%v err=%v", days, skipped, tokens, dollars, err)
+	}
+	if r := mustDay(t, l, "2026-05-08"); len(r) != 0 {
+		t.Fatalf("plan wrote rows: %+v", r)
+	}
+	if _, s, _ := l.ApplyRebuilt(rows); s != skipped {
+		t.Fatalf("apply skipped %d, plan %d", s, skipped)
+	}
+}
+
 func TestTokenLedgerApplyRebuiltNeverLowersAndRepeatWritesNothing(t *testing.T) {
 	dir := t.TempDir()
 	l := openAt(t, dir, "2026-05-10")
