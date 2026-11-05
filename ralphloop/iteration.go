@@ -321,7 +321,7 @@ func adoptAskingReport(p iterationParams, path, pane, sessionID string) (adopted
 // pauseAsking routes a finish-time paused (answer) pause through the single
 // pause path, carrying the iteration's pane/tab/session on the event.
 func (p iterationParams) pauseAsking(kind events.Kind, reason, pane, sessionID, cwd string) (string, error) {
-	return pause(p.Sink, pauseRequest{
+	return PauseTicket(p.Sink, PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 		Type: events.Paused, Kind: kind, Reason: reason,
 		Event: p.agentEvent(pane, sessionID, cwd),
@@ -842,7 +842,7 @@ func pauseConflictResolutionChildRepair(p iterationParams, childPath, childID, l
 		Branch:   p.FeatureBranch,
 		Worktree: p.FeatureWorktree,
 	}
-	pause(p.Sink, pauseRequest{
+	PauseTicket(p.Sink, PauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: childID, Path: childPath,
 		Type: events.Paused, Kind: events.IterationError, Reason: reason, Repair: state,
 	})

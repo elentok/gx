@@ -518,7 +518,7 @@ func mergeBuilt(d Deps, p iterationParams, built *builtAwaitingMergeError) error
 		reason := "merge conflict not resolved: " + r.childReason +
 			"\nThe cherry-pick was rolled back; the iteration branch " + built.job.branch +
 			" is intact. Merge it again with `gx server tickets merge`."
-		_, err := pause(p.Sink, pauseRequest{
+		_, err := PauseTicket(p.Sink, PauseRequest{
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 			Type: events.Paused, Kind: events.MergeConflict, Reason: reason,
 			Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},

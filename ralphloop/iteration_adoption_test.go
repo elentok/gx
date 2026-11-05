@@ -19,7 +19,7 @@ func reportIterationStatus(t *testing.T, d Deps, path, label, value string) {
 		if s.Label != label {
 			return
 		}
-		if err := updateTicket(path, func(tk *schema.Ticket) {
+		if err := UpdateTicket(path, func(tk *schema.Ticket) {
 			tk.IterationStatus = schema.IterationStatus(value)
 		}); err != nil {
 			t.Errorf("seeding iteration_status on %s: %v", path, err)

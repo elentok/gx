@@ -11,9 +11,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// pauseRequest describes one pause outcome. Kind is mandatory: every pause event
+// PauseRequest describes one pause outcome. Kind is mandatory: every pause event
 // carries the failure fields (kind, address, reason) so a catalog can match it.
-type pauseRequest struct {
+type PauseRequest struct {
 	ScratchDir string
 	EpicName   string
 	Ticket     string // identifier
@@ -135,9 +135,9 @@ func PauseStatus(k events.Kind) string {
 }
 
 // RecordManualMerge writes done through the pause path and appends the one
-// manual-merge event. Only the ticket write's error is returned, matching pause.
+// manual-merge event. Only the ticket write's error is returned, matching PauseTicket.
 func RecordManualMerge(scratchDir, epicName, ticket, path string, alreadyDone bool, ev runlog.Event) error {
-	_, err := pause(runlog.NoopEventSink{}, pauseRequest{
+	_, err := PauseTicket(runlog.NoopEventSink{}, PauseRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
 		Type: events.ManualMerge, Reason: ev.Reason, AlreadyDone: alreadyDone, Event: ev,
 	})
@@ -151,24 +151,24 @@ func RecordManualMerge(scratchDir, epicName, ticket, path string, alreadyDone bo
 // Pause pauses the ticket through the pause path: one status write, one event and
 // no live notification. The event type and the reason stub come from the kind.
 // A blank reason is refused before anything is written. ev carries the run's
-// agent context onto the event, as pauseRequest.Event does.
+// agent context onto the event, as PauseRequest.Event does.
 func Pause(scratchDir, epicName, ticket, path string, kind events.Kind, reason string, ev runlog.Event) error {
-	_, err := pause(runlog.NoopEventSink{}, pauseRequest{
+	_, err := PauseTicket(runlog.NoopEventSink{}, PauseRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
 		Type: events.Paused, Kind: kind, Reason: reason, Event: ev,
 	})
 	return err
 }
 
-// pause is the single pause path: it writes the ticket, appends exactly one
+// PauseTicket is the single PauseTicket path: it writes the ticket, appends exactly one
 // event and notifies. Every status writer is routed here:
 // paused (repair), paused (answer) and the CLI merge's done write.
 //
 // A failed ticket write is folded into the notified/logged reason so the event
-// and notification still fire — a silent pause is the bug this exists to
+// and notification still fire — a silent PauseTicket is the bug this exists to
 // remove — and is also returned, for callers whose flow must not continue past
-// an unwritten pause.
-func pause(sink runlog.EventSink, req pauseRequest) (reason string, writeErr error) {
+// an unwritten PauseTicket.
+func PauseTicket(sink runlog.EventSink, req PauseRequest) (reason string, writeErr error) {
 	reason = req.Reason
 	switch {
 	case req.Type == events.Paused && !req.Kind.AwaitsAnswer():

@@ -513,7 +513,7 @@ func (s *chatEventSink) pauseTicket(source, reason string) error {
 	if t, err := schema.ParseTicket(source); err == nil {
 		identifier = string(t.ID)
 	}
-	_, err := pause(s.EventSink, pauseRequest{
+	_, err := PauseTicket(s.EventSink, PauseRequest{
 		ScratchDir: s.scratchDir,
 		EpicName:   s.epicName,
 		Ticket:     identifier,

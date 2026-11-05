@@ -32,7 +32,7 @@ func TestPause_CommitsStoreWithAddressAndStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := pause(runlog.NoopEventSink{}, pauseRequest{
+	if _, err := PauseTicket(runlog.NoopEventSink{}, PauseRequest{
 		ScratchDir: store, EpicName: "myepic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.Kind("ticket-answered"), Reason: "q",
 	}); err != nil {

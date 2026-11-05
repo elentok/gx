@@ -329,7 +329,7 @@ func writeMergedMetrics(homes SessionHomes, agentKind agent.AgentKind, cwd, sess
 		m.contextWindow = stats.peakOccupancy
 		m.elapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
 	}
-	err = updateTicket(ticketPath, func(t *schema.Ticket) {
+	err = UpdateTicket(ticketPath, func(t *schema.Ticket) {
 		if stats.ok {
 			t.ActualContextWindow = m.contextWindow
 			t.ElapsedTime = m.elapsedSeconds

@@ -155,7 +155,7 @@ func mergeOne(d Deps, lp mergeQueueParams, job mergeJob) outcome {
 		var amb *ambiguousMergeError
 		if errors.As(err, &amb) {
 			// Paused, not failed: callers then see it via the pause check / the ticket.
-			if _, perr := pause(p.Sink, pauseRequest{
+			if _, perr := PauseTicket(p.Sink, PauseRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 				Type: events.Paused, Kind: events.AmbiguousMerge, Reason: amb.Error(),
 				Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},

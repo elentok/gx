@@ -61,7 +61,7 @@ func MarkDone(path string) error {
 // schema.IterationStatus's doc); RenderedStatus keys only off Status, so a
 // claimed ticket bearing this never leaks into the frontier while it waits.
 func MarkBuiltAwaitingMerge(path string) error {
-	return updateTicket(path, func(t *schema.Ticket) {
+	return UpdateTicket(path, func(t *schema.Ticket) {
 		t.IterationStatus = schema.IterationStatusFinished
 	})
 }
@@ -127,7 +127,7 @@ func markRepairWithReason(path, reason string, pauseKind schema.PauseKind, state
 // not persisted: per .scratch/ticket-frontmatter/spec.md, the Session field
 // is dropped from frontmatter entirely.
 func MarkDoneWithMetadata(path string, compactions int, sessionID string) error {
-	return updateTicket(path, func(t *schema.Ticket) {
+	return UpdateTicket(path, func(t *schema.Ticket) {
 		t.Status = schema.StatusDone
 		t.Compactions = compactions
 	})
@@ -140,7 +140,7 @@ func MarkDoneWithMetadata(path string, compactions int, sessionID string) error 
 // single-value Session field MarkDoneWithMetadata's doc comment describes as
 // dropped.
 func AppendSessionID(path, sessionID string) error {
-	return updateTicket(path, func(t *schema.Ticket) {
+	return UpdateTicket(path, func(t *schema.Ticket) {
 		t.SessionIDs = append(t.SessionIDs, sessionID)
 	})
 }
@@ -149,7 +149,7 @@ func AppendSessionID(path, sessionID string) error {
 // first time) a ticket file's frontmatter status field to value, leaving
 // the rest of the file - other frontmatter fields and the body - unchanged.
 func SetStatus(path, value string) error {
-	return updateTicket(path, func(t *schema.Ticket) {
+	return UpdateTicket(path, func(t *schema.Ticket) {
 		t.Status = schema.Status(value)
 	})
 }
@@ -163,19 +163,19 @@ func CancelWithResolution(path, resolution string) error {
 	})
 }
 
-// updateTicket reads path's frontmatter ticket, applies mutate to it, and
+// UpdateTicket reads path's frontmatter ticket, applies mutate to it, and
 // writes the result back via schema.MarshalTicket, leaving the body
 // untouched. The write goes through writeFileAtomic so a concurrent reader
 // (the scheduler re-scanning the frontier while another goroutine
 // claims/completes a ticket) always sees either the old or the new content
 // in full, never a torn/truncated write from an in-place os.WriteFile.
-func updateTicket(path string, mutate func(*schema.Ticket)) error {
+func UpdateTicket(path string, mutate func(*schema.Ticket)) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, _ *string) {
 		mutate(t)
 	})
 }
 
-// updateTicketWithBody is updateTicket's variant for mutations that also
+// updateTicketWithBody is UpdateTicket's variant for mutations that also
 // need to rewrite the ticket's markdown body (e.g. appending a note),
 // leaving the same atomic-write/torn-read guarantees.
 func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) error {

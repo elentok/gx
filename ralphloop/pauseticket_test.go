@@ -23,7 +23,7 @@ func TestPause_WritesTicketEventAndNotifies(t *testing.T) {
 	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 	sink := &recordingSink{}
 
-	pause(sink, pauseRequest{
+	PauseTicket(sink, PauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.IterationError, Reason: "boom",
 		Repair: schema.FaultState{Label: "l", Branch: "b", Worktree: "w"},
@@ -56,7 +56,7 @@ func TestPause_RefusesDoneTicket(t *testing.T) {
 			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 			sink := &recordingSink{}
 
-			_, err := pause(sink, pauseRequest{
+			_, err := PauseTicket(sink, PauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 				Type: events.Paused, Kind: kind, Reason: "late", Repair: schema.FaultState{Label: "l"},
 			})
@@ -93,7 +93,7 @@ func TestPause_AskingKinds(t *testing.T) {
 			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 			sink := &recordingSink{}
 
-			if _, err := pause(sink, pauseRequest{
+			if _, err := PauseTicket(sink, PauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 				Type: events.Paused, Kind: kind, Reason: "why", Event: runlog.Event{Pane: "p1"},
 			}); err != nil {
@@ -122,7 +122,7 @@ func TestPause_LogsGxQuestionPerKind(t *testing.T) {
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
-			if _, err := pause(&recordingSink{}, pauseRequest{
+			if _, err := PauseTicket(&recordingSink{}, PauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 				Type: events.Paused, Kind: kind, Reason: "why",
 			}); err != nil {
@@ -145,7 +145,7 @@ func TestPause_RepairKindOpensRepairRoundWithNoQuestion(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
-	if _, err := pause(&recordingSink{}, pauseRequest{
+	if _, err := PauseTicket(&recordingSink{}, PauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.BudgetKilled, Reason: "why",
 	}); err != nil {
@@ -169,7 +169,7 @@ func TestPause_RepairStampsPauseKindClearedOnClaim(t *testing.T) {
 	})
 	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 
-	pause(&recordingSink{}, pauseRequest{
+	PauseTicket(&recordingSink{}, PauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.BudgetKilled, Reason: "boom",
 	})
@@ -209,7 +209,7 @@ func TestPause_BlockedPaneLongReasonStillOpensAQuestion(t *testing.T) {
 	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 	reason := strings.Repeat("blocked on a prompt gx did not send; ", 6)
 
-	got, err := pause(&recordingSink{}, pauseRequest{
+	got, err := PauseTicket(&recordingSink{}, PauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.BlockedPane, Reason: reason,
 	})
