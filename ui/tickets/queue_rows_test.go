@@ -410,7 +410,7 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(QueueModel)
-	m.server.runningEpics = map[string]bool{"already-running": true}
+	m.server.RunningEpics = map[string]bool{"already-running": true}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(QueueModel)
@@ -534,9 +534,9 @@ func seedFromDisk(t *testing.T, m QueueModel) QueueModel {
 		t.Fatal(err)
 	}
 	m.applyEpics(epics, false)
-	m.server.summaries = map[string]wire.EpicSummary{}
+	m.server.Summaries = map[string]wire.EpicSummary{}
 	for _, sum := range fixtureSummaries(epics, nil) {
-		m.server.summaries[sum.Address] = sum
+		m.server.Summaries[sum.Address] = sum
 	}
 	return m
 }

@@ -25,11 +25,11 @@ func TestQueue_HarnessLabelsByAddress(t *testing.T) {
 		"gx:a/03": "keeps Claude (ran before)",
 		"gx:a/04": "Codex · Worker · gpt-6.1-sol medium",
 	}
-	if len(m.server.harnessLabels) != len(want) {
-		t.Errorf("labels = %v, want %v (unlabelled row must have none)", m.server.harnessLabels, want)
+	if len(m.server.HarnessLabels) != len(want) {
+		t.Errorf("labels = %v, want %v (unlabelled row must have none)", m.server.HarnessLabels, want)
 	}
 	for addr, w := range want {
-		if got := m.server.harnessLabels[addr]; got != w {
+		if got := m.server.HarnessLabels[addr]; got != w {
 			t.Errorf("%s: label %q, want %q", addr, got, w)
 		}
 	}

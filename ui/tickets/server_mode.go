@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -122,11 +123,11 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 	case rowactions.EpicQueuedMsg:
 		return m, showQueueIfAdded(msg.Queued, msg.Toast()), true
 
-	case serverDoneMsg:
-		if msg.problem != "" {
-			return m, notify.Error("refused: " + msg.problem), true
+	case queue.ServerDoneMsg:
+		if msg.Problem != "" {
+			return m, notify.Error("refused: " + msg.Problem), true
 		}
-		return m, notify.Success(msg.ok), true
+		return m, notify.Success(msg.OK), true
 
 	case rowactions.ServerWriteMsg:
 		return m, msg.Toast(), true

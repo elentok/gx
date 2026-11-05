@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 func newMaintenanceQueue(t *testing.T, api tickettest.FakeServerAPI) QueueModel {
@@ -59,26 +60,6 @@ func accept(t *testing.T, m QueueModel) QueueModel {
 	return next.(QueueModel)
 }
 
-// Seam D: "p" offers override when a budget latch holds, resume when paused,
-// pause otherwise.
-func TestServerPauseActionFor(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		budget wire.BudgetStatus
-		paused bool
-		want   serverPauseAction
-	}{
-		{"running", wire.BudgetStatus{}, false, serverActionPause},
-		{"paused", wire.BudgetStatus{}, true, serverActionResume},
-		{"soft latched", wire.BudgetStatus{BudgetPaused: true}, false, serverActionOverride},
-		{"hard latched beats paused", wire.BudgetStatus{HardLatched: true}, true, serverActionOverride},
-	} {
-		if got := serverPauseActionFor(tc.budget, tc.paused); got != tc.want {
-			t.Errorf("%s: got %v want %v", tc.name, got, tc.want)
-		}
-	}
-}
-
 func TestQueueServerKeys_PauseResumeOverrideReachVerbs(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -92,7 +73,7 @@ func TestQueueServerKeys_PauseResumeOverrideReachVerbs(t *testing.T) {
 	} {
 		var calls []string
 		m := newMaintenanceQueue(t, tickettest.FakeServerAPI{Calls: &calls, BudgetRes: tc.budget})
-		m.server.paused = tc.paused
+		m.server.Paused = tc.paused
 		m = accept(t, pressQueue(t, m, 'p'))
 		if !slices.Equal(calls, []string{tc.want}) {
 			t.Errorf("%s: calls = %v", tc.name, calls)
@@ -144,9 +125,9 @@ func TestQueueServerKeys_DequeueAndDelete(t *testing.T) {
 func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
 	api := tickettest.FakeServerAPI{RemoveRes: wire.QueueResult{Refused: true, Reason: wire.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}}
 	m := newMaintenanceQueue(t, api)
-	msg := m.srv.cmdRemove([]string{"gx:alpha/01"})()
-	got := msg.(serverRemovedMsg)
-	if got.removed != 0 || !strings.Contains(got.problem, "live iteration") {
+	msg := m.srv.CmdRemove([]string{"gx:alpha/01"})()
+	got := msg.(queue.ServerRemovedMsg)
+	if got.Removed != 0 || !strings.Contains(got.Problem, "live iteration") {
 		t.Fatalf("got %+v", got)
 	}
 }
@@ -163,7 +144,7 @@ func TestServerMode_FinishAndPauseKeyIsFinishAndPause(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("accept produced no command")
 	}
-	if _, ok := cmd().(serverDoneMsg); !ok || !slices.Equal(calls, []string{"pause"}) {
+	if _, ok := cmd().(queue.ServerDoneMsg); !ok || !slices.Equal(calls, []string{"pause"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 }

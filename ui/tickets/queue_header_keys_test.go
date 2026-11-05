@@ -52,8 +52,8 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 
 	t.Run("running", func(t *testing.T) {
 		m := base
-		m.server.runningEpics = map[string]bool{"alpha": true}
-		m.server.summaries = map[string]wire.EpicSummary{"alpha": {State: wire.EpicStateRunning, Total: 1}}
+		m.server.RunningEpics = map[string]bool{"alpha": true}
+		m.server.Summaries = map[string]wire.EpicSummary{"alpha": {State: wire.EpicStateRunning, Total: 1}}
 		got := m.header().Title()
 		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing... · today $0.00") {
 			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing... · today $0.00\"", got)
@@ -66,7 +66,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 
 	t.Run("idle but globally paused", func(t *testing.T) {
 		m := base
-		m.server.paused = true
+		m.server.Paused = true
 		if got, want := m.header().Title(), "Queue · today $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}

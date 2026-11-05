@@ -41,8 +41,8 @@ func (m QueueModel) View() tea.View {
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
-	if m.harnessPicker.open {
-		content = ui.OverlayCenter(content, m.harnessPicker.view(m.width), m.width, m.height)
+	if m.harnessPicker.Open {
+		content = ui.OverlayCenter(content, m.harnessPicker.View(m.width), m.width, m.height)
 	}
 	if m.watch.IsOpen() {
 		content = ui.OverlayCenter(content, m.watch.View(), m.width, m.height)
@@ -75,10 +75,10 @@ func (m QueueModel) View() tea.View {
 func (m QueueModel) queueBody(width int) []string {
 	// A server down before the first load never loads, so its banner must
 	// not wait behind "loading…".
-	if m.server.olderServer {
+	if m.server.OlderServer {
 		return []string{ui.StyleWarning.Render("  " + olderServerNotice)}
 	}
-	if !m.loaded && !m.server.down() {
+	if !m.loaded && !m.server.Down() {
 		return []string{ui.StyleDim.Render("  loading…")}
 	}
 

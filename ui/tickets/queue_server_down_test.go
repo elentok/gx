@@ -52,7 +52,7 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}})
 	next, _ = m.WithServerState(&st, tabapi.ServerLinkUp)
-	if next.(QueueModel).server.down() {
+	if next.(QueueModel).server.Down() {
 		t.Fatal("still down after an up delivery")
 	}
 	if view := ansi.Strip(next.(QueueModel).View().Content); !strings.Contains(view, "First") {
@@ -105,7 +105,7 @@ func TestQueueServerDown_SOpensStartConfirm(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("start not issued")
 	}
-	if _, ok := cmd().(queueServerStartedMsg); !ok || !started {
+	if _, ok := cmd().(queue.ServerStartedMsg); !ok || !started {
 		t.Fatalf("started = %v", started)
 	}
 }

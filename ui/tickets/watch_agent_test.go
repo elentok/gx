@@ -550,7 +550,7 @@ func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
 		if _, ready := requestQueueMenu(t, m); hasItem(ready.Items, "Go to pane") {
 			t.Error("Go to pane shown for a ticket with no herdr agent")
 		}
-		m.server.serverAPI, m.srv.reads = herdrAPI("codex", ""), tickettest.FakeReads{FakeServerAPI: herdrAPI("codex", "")}
+		m.server.ServerAPI, m.srv.Reads = herdrAPI("codex", ""), tickettest.FakeReads{FakeServerAPI: herdrAPI("codex", "")}
 		_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Go to pane")
 		if cmd == nil {
 			t.Fatal("Go to pane returned no Cmd")

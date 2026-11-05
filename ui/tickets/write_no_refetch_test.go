@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
@@ -27,7 +28,7 @@ func TestWrites_TicketsTabOnlyToasts(t *testing.T) {
 	m := newServerModel(t)
 	for name, msg := range map[string]tea.Msg{
 		"epic":   rowactions.EpicQueuedMsg{Refusals: []string{"gx:a/01: refused"}},
-		"action": serverDoneMsg{ok: "paused"},
+		"action": queue.ServerDoneMsg{OK: "paused"},
 	} {
 		_, cmd := m.Update(msg)
 		assertOnlyToast(t, name, cmd)
@@ -56,8 +57,8 @@ func TestStatusChanged_DownModeReloadsDisk(t *testing.T) {
 func TestWrites_QueueTabOnlyToasts(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
 	for name, msg := range map[string]tea.Msg{
-		"remove": serverRemovedMsg{removed: 1},
-		"action": serverDoneMsg{ok: "queue paused"},
+		"remove": queue.ServerRemovedMsg{Removed: 1},
+		"action": queue.ServerDoneMsg{OK: "queue paused"},
 	} {
 		_, cmd := m.Update(msg)
 		assertOnlyToast(t, name, cmd)

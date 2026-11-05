@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 func finishedQueue(t *testing.T, now time.Time) QueueModel {
@@ -51,7 +52,7 @@ func TestQueueFinished_TickRerendersRelativeTime(t *testing.T) {
 	m = next.(QueueModel)
 
 	m.now = func() time.Time { return now.Add(time.Hour) }
-	next, cmd := m.Update(finishedTickMsg{gen: m.server.finishedGen})
+	next, cmd := m.Update(queue.FinishedTickMsg{Gen: m.server.FinishedGen})
 	m = next.(QueueModel)
 
 	if cmd == nil {
@@ -73,7 +74,7 @@ func TestQueueFinished_NoTickChainWhileHidden(t *testing.T) {
 	m = next.(QueueModel)
 
 	// A tick from the chain before the latest activation ends the old chain.
-	if _, cmd := m.Update(finishedTickMsg{gen: m.server.finishedGen - 1}); cmd != nil {
+	if _, cmd := m.Update(queue.FinishedTickMsg{Gen: m.server.FinishedGen - 1}); cmd != nil {
 		t.Error("stale tick re-armed itself")
 	}
 }

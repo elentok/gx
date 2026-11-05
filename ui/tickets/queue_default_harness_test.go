@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
@@ -42,23 +43,23 @@ func TestDefaultHarness_GlobalPickerSendsGlobalRequest(t *testing.T) {
 	}, "")
 
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
-	if !m.harnessPicker.open || len(m.harnessPicker.menu.Items) != 2 {
+	if !m.harnessPicker.Open || len(m.harnessPicker.Menu.Items) != 2 {
 		t.Fatalf("global picker = %+v", m.harnessPicker)
 	}
-	if it, _ := m.harnessPicker.menu.Selected(); it.Value != "claude" {
+	if it, _ := m.harnessPicker.Menu.Selected(); it.Value != "claude" {
 		t.Fatalf("cursor starts on %q, want the current value claude", it.Value)
 	}
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyDown})
 	m, msg := runKey(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	if m.harnessPicker.open {
+	if m.harnessPicker.Open {
 		t.Fatal("picker still open after enter")
 	}
 	want := wire.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}
 	if len(*sets) != 1 || (*sets)[0] != want {
 		t.Fatalf("requests = %+v, want %+v", *sets, want)
 	}
-	if _, ok := msg.(defaultHarnessWroteMsg); !ok {
+	if _, ok := msg.(queue.DefaultHarnessWroteMsg); !ok {
 		t.Fatalf("enter produced %T", msg)
 	}
 }
@@ -74,13 +75,13 @@ func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T)
 	}, "gx")
 
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
-	if len(m.harnessPicker.menu.Items) != 3 || m.harnessPicker.menu.Items[0].Label != "Follow global" {
-		t.Fatalf("project picker items = %+v", m.harnessPicker.menu.Items)
+	if len(m.harnessPicker.Menu.Items) != 3 || m.harnessPicker.Menu.Items[0].Label != "Follow global" {
+		t.Fatalf("project picker items = %+v", m.harnessPicker.Menu.Items)
 	}
-	if it, _ := m.harnessPicker.menu.Selected(); it.Value != "codex" {
+	if it, _ := m.harnessPicker.Menu.Selected(); it.Value != "codex" {
 		t.Fatalf("cursor starts on %q, want the override codex", it.Value)
 	}
-	if view := m.harnessPicker.view(m.width); !strings.Contains(view, "gx") {
+	if view := m.harnessPicker.View(m.width); !strings.Contains(view, "gx") {
 		t.Fatalf("picker is not titled with the project:\n%s", view)
 	}
 	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyUp})
@@ -115,7 +116,7 @@ func TestDefaultHarness_RefusalShowsMessage(t *testing.T) {
 func TestDefaultHarness_NoServerWarnsAndOpensNothing(t *testing.T) {
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil))
 	next, cmd := m.Update(tea.KeyPressMsg{Code: 'H', Text: "H"})
-	if next.(QueueModel).harnessPicker.open {
+	if next.(QueueModel).harnessPicker.Open {
 		t.Fatal("picker opened without a server")
 	}
 	got, ok := cmd().(notify.NotifyMsg)

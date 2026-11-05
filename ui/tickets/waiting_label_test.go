@@ -16,7 +16,7 @@ func TestQueueRow_WaitingLabel(t *testing.T) {
 	}}
 	const label = "waiting for the check lock, held by 7"
 	var m QueueModel
-	m.server.waitingLabels = map[string]string{"gx:epic/01": label}
+	m.server.WaitingLabels = map[string]string{"gx:epic/01": label}
 
 	if got := m.rows.RenderTicketRow(m.rowsEnv(), queue.Row{Epic: epic, Ticket: epic.Tickets[0]}, 0); !strings.Contains(got, label) {
 		t.Errorf("waiting row = %q, want label %q", got, label)
