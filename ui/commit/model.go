@@ -1,7 +1,6 @@
 package commit
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/elentok/gx/git"
@@ -28,23 +27,18 @@ type Model struct {
 	settings     ui.Settings
 	filterPath   string
 
-	width        int
-	height       int
-	ready        bool
-	inactive     bool
-	focusHeader  bool
-	focusDiff    bool
-	bodyExpanded bool
-	details      git.CommitDetails
-	trunk        string // empty while unresolved, so no badge is coloured as trunk
-	headerOffset int
-	pushState    pushstate.PushState
-	err          error
+	width       int
+	height      int
+	ready       bool
+	inactive    bool
+	focusHeader bool
+	focusDiff   bool
+	details     git.CommitDetails
+	trunk       string // empty while unresolved, so no badge is coloured as trunk
+	pushState   pushstate.PushState
+	err         error
 
-	// compiledRefRules/compiledHideRefs sort and filter decoration badges the
-	// same way ui/log does, so tags appear in the same order in both views.
-	compiledRefRules []refrules.CompiledRefRule
-	compiledHideRefs []*regexp.Regexp
+	header headerPane
 
 	commitDiffArea
 	commitSidebarState
@@ -81,13 +75,15 @@ type commitSidebarState struct {
 
 func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraKeys keys.Manager) Model {
 	m := Model{
-		worktreeRoot:     worktreeRoot,
-		ref:              normalizedRef(ref),
-		settings:         settings,
-		filterPath:       strings.TrimSpace(filterPath),
-		bodyExpanded:     true,
-		compiledRefRules: refrules.CompileRefRules(settings.LogConfig.ImportantRefs),
-		compiledHideRefs: refrules.CompileHideRefs(settings.LogConfig.HideRefs),
+		worktreeRoot: worktreeRoot,
+		ref:          normalizedRef(ref),
+		settings:     settings,
+		filterPath:   strings.TrimSpace(filterPath),
+		header: headerPane{
+			bodyExpanded:     true,
+			compiledRefRules: refrules.CompileRefRules(settings.LogConfig.ImportantRefs),
+			compiledHideRefs: refrules.CompileHideRefs(settings.LogConfig.HideRefs),
+		},
 		commitDiffArea: commitDiffArea{
 			diffModel:        diffview.NewModel(settings.UseNerdFontIcons),
 			diffContextLines: settings.DiffContextLines,
@@ -185,13 +181,13 @@ func (m *Model) reload() {
 	if m.err != nil {
 		m.files = nil
 		m.diffModel.SetData(diffview.NewDiffData())
-		m.headerOffset = 0
+		m.header.headerOffset = 0
 		return
 	}
 	m.files, m.err = stage.CommitFilesForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.diffModel.SetData(diffview.NewDiffData())
-		m.headerOffset = 0
+		m.header.headerOffset = 0
 		return
 	}
 	entries := tree.BuildEntriesFromPaths(
@@ -204,7 +200,7 @@ func (m *Model) reload() {
 		m.selectFirstCommitFile()
 	}
 	m.applyFilterPathSearch()
-	m.headerOffset = 0
+	m.header.headerOffset = 0
 	m.refreshDiff()
 }
 

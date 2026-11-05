@@ -107,7 +107,7 @@ func TestPackBadgeLines_WrapsOntoNewLines(t *testing.T) {
 
 func TestHeaderLines_NoDecorations_Unchanged(t *testing.T) {
 	m := Model{details: git.CommitDetails{Subject: "fix bug", AuthorName: "Dave"}, width: 80}
-	lines := m.headerLines()
+	lines := m.header.headerLines(m.headerInput())
 	if len(lines) != 2 {
 		t.Fatalf("expected subject line + meta line with no decorations, got %d: %v", len(lines), lines)
 	}
@@ -125,7 +125,7 @@ func TestHeaderLines_PushStateColorsSubjectAndAddsLabel(t *testing.T) {
 		width:     80,
 		pushState: pushstate.CommitPushState(git.BranchHistoryLocalOnly, false),
 	}
-	lines := m.headerLines()
+	lines := m.header.headerLines(m.headerInput())
 	stripped := ansi.Strip(lines[0])
 	if !strings.Contains(stripped, "fix bug") || !strings.Contains(stripped, "unpushed") {
 		t.Fatalf("expected subject line with unpushed label, got %q", stripped)
@@ -144,7 +144,7 @@ func TestHeaderLines_WithDecorations_KeepsBadgeOnMetaLineWhenItFits(t *testing.T
 		},
 		width: 80,
 	}
-	lines := m.headerLines()
+	lines := m.header.headerLines(m.headerInput())
 	if len(lines) != 2 {
 		t.Fatalf("expected subject line + meta line with badge, got %d lines: %v", len(lines), lines)
 	}
@@ -165,7 +165,7 @@ func TestHeaderLines_WithDecorations_WrapsBadgeWhenItDoesNotFit(t *testing.T) {
 		},
 		width: 15,
 	}
-	lines := m.headerLines()
+	lines := m.header.headerLines(m.headerInput())
 	if len(lines) != 3 {
 		t.Fatalf("expected subject line + meta line + separate badge line, got %d lines: %v", len(lines), lines)
 	}
@@ -226,7 +226,7 @@ func TestContainerFocusDisablesCommitPaneActiveStyling(t *testing.T) {
 
 	inactive.focusDiff = false
 	inactive.focusHeader = true
-	if inactive.headerPaneBorderColor() != ui.ColorBorder {
+	if inactive.header.headerPaneBorderColor(inactive.headerInput()) != ui.ColorBorder {
 		t.Fatal("expected inactive header border even when header has internal focus")
 	}
 }
@@ -237,7 +237,7 @@ func TestRenderHeaderPopup_HasBorder(t *testing.T) {
 		details: git.CommitDetails{FullHash: "abc123", Hash: "abc123", Subject: "a subject", AuthorName: "Jane"},
 	}
 	m.focusHeader = true
-	out := m.renderHeaderPopup()
+	out := m.header.renderHeaderPopup(m.headerInput())
 	if !strings.Contains(out, "╭") || !strings.Contains(out, "╮") ||
 		!strings.Contains(out, "╰") || !strings.Contains(out, "╯") {
 		t.Errorf("expected bordered popup output, got:\n%s", out)
@@ -318,7 +318,7 @@ func TestHeaderViewportMaxRowsAndScrollMarkers(t *testing.T) {
 	m.width = 100
 	m.height = 24
 
-	if got := m.headerViewportRowsCount(); got != 9 {
+	if got := m.header.headerViewportRowsCount(m.headerInput()); got != 9 {
 		t.Fatalf("expected header viewport rows capped at 9 (50%% of height=24), got %d", got)
 	}
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
@@ -352,10 +352,10 @@ func TestHeaderScrollRequiresHeaderFocus(t *testing.T) {
 	m.width = 100
 	m.height = 24
 
-	before := m.headerOffset
+	before := m.header.headerOffset
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.headerOffset != before {
+	if m.header.headerOffset != before {
 		t.Fatalf("expected j without header focus not to scroll header")
 	}
 
@@ -369,7 +369,7 @@ func TestHeaderScrollRequiresHeaderFocus(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	if m.headerOffset <= before {
+	if m.header.headerOffset <= before {
 		t.Fatalf("expected j with header focus to scroll header")
 	}
 }

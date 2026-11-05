@@ -50,45 +50,9 @@ func (m Model) View() tea.View {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
 	if m.focusHeader {
-		out = ui.OverlayCenter(out, m.renderHeaderPopup(), m.width, m.height)
+		out = ui.OverlayCenter(out, m.header.renderHeaderPopup(m.headerInput()), m.width, m.height)
 	}
 	return ui.NewMainView(out)
-}
-
-func (m Model) headerLines() []string {
-	subjectLine := m.subjectLine()
-	metaLine := m.metaLine()
-	badges := decorationBadgeParts(m.details.Decorations, m.compiledHideRefs, m.compiledRefRules, m.trunk)
-	lines := append([]string{subjectLine}, metaLineWithBadges(metaLine, badges, max(1, m.width-2))...)
-	if m.bodyExpanded {
-		body := m.commitMessageBody()
-		if body != "" {
-			lines = append(lines, "")
-			lines = append(lines, strings.Split(body, "\n")...)
-		}
-	}
-	return lines
-}
-
-// subjectLine renders the commit subject, colored by push/pull state when
-// known, with a parenthetical icon + label spelling out that state (there's
-// no surrounding list to infer it from, unlike the log view's rows).
-func (m Model) subjectLine() string {
-	subject := commitSubjectStyle.Render(m.details.Subject)
-	if m.pushState.Label == "" {
-		return subject
-	}
-	return m.pushState.Style.Render(m.details.Subject) + " " +
-		commitMetaStyle.Render("(") + m.pushState.Style.Render(m.pushState.Icon) +
-		commitMetaStyle.Render(" "+m.pushState.Label+")")
-}
-
-// metaLine renders the hash, relative date, and author on their own line
-// below the subject.
-func (m Model) metaLine() string {
-	return commitMetaStyle.Render(m.details.Hash) + " " +
-		commitMetaStyle.Render(ui.RelativeTimeCompact(m.details.Date)) +
-		commitMetaStyle.Render(" by ") + commitMetaStyle.Render(m.details.AuthorName)
 }
 
 // metaLineWithBadges appends as many badges as fit onto metaLine (separated
@@ -148,84 +112,10 @@ func packBadgeLines(badges []string, maxWidth int) []string {
 	return lines
 }
 
-func (m Model) headerTitle() string {
-	if !m.bodyExpanded && m.commitMessageBody() != "" {
-		return "Commit " + commitMetaStyle.Render("(b to expand)")
-	}
-	return "Commit"
-}
-
-// renderHeaderPopup renders the commit header (subject/meta/badges/expanded
-// body) as a standalone popup panel; the caller centers it via
-// ui.OverlayCenter when the popup is open (m.focusHeader).
-func (m Model) renderHeaderPopup() string {
-	width := m.headerPopupWidth()
-	height := m.headerPopupHeight()
-	title := m.headerTitle()
-	rightTitle := m.headerRightTitle()
-	lines := m.visibleHeaderLines(max(1, height-2))
-	active := m.isContainerFocused() && m.focusHeader
-	titleColor := m.headerPaneTitleColor()
-	return ui.RenderPanelFrame(ui.PanelFrameOptions{
-		Width: width, Height: height, Title: title, RightTitle: rightTitle, Lines: lines,
-		BorderColor: m.headerPaneBorderColor(), TitleColor: titleColor, TitleBold: active,
-	})
-}
-
-func (m Model) headerPopupWidth() int {
-	return max(20, m.width-4)
-}
-
-// headerPopupHeight caps the popup at half the available body height (mirroring
-// the space this header pane used to reserve when it rendered inline), so a
-// long commit body scrolls inside the popup instead of covering the screen.
-func (m Model) headerPopupHeight() int {
-	maxBody := max(1, (m.height-2)/2)
-	natural := len(m.headerLines()) + 2
-	return min(maxBody, natural)
-}
-
-func (m Model) headerPaneTitleColor() color.Color {
-	if m.isContainerFocused() && m.focusHeader {
-		return ui.ColorOrange
-	}
-	return ui.ColorBlue
-}
-
-func (m Model) headerPaneBorderColor() color.Color {
-	if m.isContainerFocused() && m.focusHeader {
-		return ui.ColorOrange
-	}
-	return ui.ColorBorder
-}
-
-func (m Model) commitMessageBody() string {
-	body := normalizeCommitBody(m.details.Body)
-	if body == "" {
-		return ""
-	}
-	subject := strings.TrimSpace(m.details.Subject)
-	if subject == "" {
-		return body
-	}
-	lines := strings.Split(body, "\n")
-	if len(lines) == 0 {
-		return ""
-	}
-	if strings.TrimSpace(lines[0]) == subject {
-		lines = lines[1:]
-	}
-	return strings.TrimSpace(strings.Join(lines, "\n"))
-}
-
 func normalizeCommitBody(body string) string {
 	body = strings.ReplaceAll(body, "\r\n", "\n")
 	body = strings.ReplaceAll(body, "\r", "\n")
 	return strings.TrimSpace(body)
-}
-
-func (m Model) headerRightTitle() string {
-	return commitMetaStyle.Render(m.details.Date.Format("2006-01-02 15:04"))
 }
 
 func (m Model) contentView(contentH int) string {
@@ -272,49 +162,6 @@ func (m Model) narrowPaneHeights(contentH int) (filesH, diffH int) {
 func (m Model) layoutHeights() (bodyH, contentH int) {
 	contentH = max(1, m.height)
 	return 0, contentH
-}
-
-func (m Model) headerViewportRowsCount() int {
-	return max(1, m.headerPopupHeight()-2)
-}
-
-func (m Model) visibleHeaderLines(viewportRows int) []string {
-	all := m.headerLines()
-	if len(all) == 0 {
-		return []string{""}
-	}
-	if viewportRows < 1 {
-		viewportRows = 1
-	}
-	if viewportRows > len(all) {
-		viewportRows = len(all)
-	}
-	offset := m.headerOffset
-	maxOffset := max(0, len(all)-viewportRows)
-	if offset < 0 {
-		offset = 0
-	}
-	if offset > maxOffset {
-		offset = maxOffset
-	}
-	out := make([]string, 0, viewportRows)
-	for i := 0; i < viewportRows; i++ {
-		out = append(out, all[offset+i])
-	}
-	if len(all) > viewportRows {
-		topMark, bottomMark := "↑ ", "↓ "
-		if m.settings.UseNerdFontIcons {
-			topMark, bottomMark = " ", " "
-		}
-		markerStyle := commitMetaStyle.Bold(true)
-		if offset > 0 && len(out) > 0 {
-			out[0] = markerStyle.Render(topMark) + out[0]
-		}
-		if offset+viewportRows < len(all) && len(out) > 0 {
-			out[len(out)-1] = markerStyle.Render(bottomMark) + out[len(out)-1]
-		}
-	}
-	return out
 }
 
 func (m Model) renderFilesPane(width, height int) string {

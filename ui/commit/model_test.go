@@ -65,12 +65,12 @@ func TestBToggleBody(t *testing.T) {
 	testutil.CommitAll(t, repo, "subject\n\nbody")
 
 	m := newTestModel(repo, "HEAD")
-	if !m.bodyExpanded {
+	if !m.header.bodyExpanded {
 		t.Fatalf("expected body expanded by default")
 	}
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
-	if m.bodyExpanded {
+	if m.header.bodyExpanded {
 		t.Fatalf("expected body collapsed after b")
 	}
 	m.ready = true
@@ -267,7 +267,7 @@ func TestCommitMessageBodyNormalizesMixedNewlines(t *testing.T) {
 		},
 	}
 
-	if got := m.commitMessageBody(); got != "line 1\nline 2\nline 3" {
+	if got := m.header.commitMessageBody(m.headerInput()); got != "line 1\nline 2\nline 3" {
 		t.Fatalf("commitMessageBody = %q", got)
 	}
 }

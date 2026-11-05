@@ -152,40 +152,40 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case bindingExpandBody:
-		m.bodyExpanded = !m.bodyExpanded
-		m.scrollHeader(0)
+		m.header.bodyExpanded = !m.header.bodyExpanded
+		m.header.scrollHeader(m.headerInput(), 0)
 		m.syncDiffViewport()
 		return m, nil
 	case bindingDown:
 		if m.focusHeader {
-			m.scrollHeader(1)
+			m.header.scrollHeader(m.headerInput(), 1)
 		}
 		return m, nil
 	case bindingUp:
 		if m.focusHeader {
-			m.scrollHeader(-1)
+			m.header.scrollHeader(m.headerInput(), -1)
 		}
 		return m, nil
 	case bindingScrollDown:
 		if m.focusHeader {
-			m.scrollHeader(1)
+			m.header.scrollHeader(m.headerInput(), 1)
 		}
 		return m, nil
 	case bindingScrollUp:
 		if m.focusHeader {
-			m.scrollHeader(-1)
+			m.header.scrollHeader(m.headerInput(), -1)
 		}
 		return m, nil
 	case bindingPageDown:
 		if m.focusHeader {
-			m.scrollHeaderPage(1)
+			m.header.scrollHeaderPage(m.headerInput(), 1)
 		} else {
 			m.scrollSidebarPage(1)
 		}
 		return m, nil
 	case bindingPageUp:
 		if m.focusHeader {
-			m.scrollHeaderPage(-1)
+			m.header.scrollHeaderPage(m.headerInput(), -1)
 		} else {
 			m.scrollSidebarPage(-1)
 		}
@@ -234,7 +234,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingYankContent:
 		if m.focusHeader {
-			return m, commitops.YankBody(m.commitMessageBody())
+			return m, commitops.YankBody(m.header.commitMessageBody(m.headerInput()))
 		}
 		return m, m.yankContentOnly()
 	case bindingYankLoc:
@@ -248,7 +248,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingYankSubject:
 		return m, commitops.YankSubject(m.details.Subject)
 	case bindingYankMessage:
-		return m, commitops.YankMessage(m.details.Subject, m.commitMessageBody())
+		return m, commitops.YankMessage(m.details.Subject, m.header.commitMessageBody(m.headerInput()))
 	case bindingComment:
 		if !m.focusDiff {
 			return m, nil

@@ -38,7 +38,7 @@ func (m Model) overlaySignature() overlaySignature {
 		path:         path,
 		focusDiff:    m.focusDiff,
 		focusHeader:  m.focusHeader,
-		bodyExpanded: m.bodyExpanded,
+		bodyExpanded: m.header.bodyExpanded,
 		scroll:       m.diffModel.Viewport().YOffset(),
 		width:        m.width,
 		height:       m.height,
