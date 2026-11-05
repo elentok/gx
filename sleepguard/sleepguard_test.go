@@ -76,7 +76,7 @@ var allowed = map[string]int{
 	"server/budget/limits_test.go":                         2,
 	"server/claimhold_test.go":                             1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":                     2,
-	"server/configreload_test.go":                          2,
+	"server/lifecycle/configreload_test.go":                2,
 	"server/deadlock_test.go":                              2,
 	"server/disk/diskhealth_test.go":                       1, // negative wait: failed readings never leave the waiting state
 	"server/disk/diskhold_test.go":                         3,
@@ -90,7 +90,7 @@ var allowed = map[string]int{
 	"server/merge/merge_finish_test.go":                    1,
 	"server/merge/mergedecide_test.go":                     3,
 	"server/merge/mergefork_test.go":                       1,
-	"server/migrate_gate_test.go":                          1, // negative wait: a gate that leaks would have acted by now
+	"server/lifecycle/migrate_gate_test.go":                1, // negative wait: a gate that leaks would have acted by now
 	"server/projects/migrate_test.go":                      1, // negative wait: a step that ignored the gate would have run by now
 	"server/merge/missingtrunk_test.go":                    2,
 	"server/queue/oneoffsweep_test.go":                     2,

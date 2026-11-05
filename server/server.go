@@ -39,6 +39,7 @@ import (
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/health"
 	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/lifecycle"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/projects"
@@ -60,7 +61,6 @@ import (
 )
 
 const (
-	lockFileName   = "server.lock"
 	socketFileName = "server.sock"
 )
 
@@ -83,28 +83,27 @@ type Server struct {
 	cfg Config
 	// routes is what the moved subsystems serve (subsystemRoutes), gathered once in New.
 	routes []wire.Route
-	// instanceID is new on every start: a restart is done when it changes.
-	instanceID string
+	// restarter serves the restart check and the restart; startup runs the steps
+	// that wait for the migrations.
+	restarter *lifecycle.Restarter
+	startup   *lifecycle.Startup
 	// settings is the live copy of cfg.Settings, its reload, status, config
 	// watcher and store commit loop. A reader loads it once per decision; a
 	// reload swaps in a new value and never mutates the old one.
 	settings settings.Holder
-	// restarting is set once a restart is under way and never cleared on
-	// success: the new server replaces this one.
-	restarting atomic.Bool
-	disks      *disk.Disk
-	health     *health.Health
+	disks    *disk.Disk
+	health   *health.Health
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
 	// prompt holds the auto-advance countdowns and the turn settling.
 	prompt   *sessprompt.Prompt
-	lock     *serverLock
+	lock     *lifecycle.Lock
 	ln       net.Listener
 	tcp      net.Listener // nil unless Config.TCPAddr is set
 	http     *http.Server
 	tcpHTTP  *http.Server // the socket's routes behind refuseBrowsers
 	web      *webhttp.Web // the web listener; off unless Config.WebAddr is set and bound
-	logf     *rotatingFile
+	logf     *lifecycle.RotatingFile
 	log      *slog.Logger
 	idx      *index.Index
 	harness  *harnesschoice.Harness
@@ -211,39 +210,39 @@ func New(cfg Config) (*Server, error) {
 	if err := os.Chmod(cfg.StateDir, 0o700); err != nil {
 		return nil, err
 	}
-	lock, err := acquireLock(filepath.Join(cfg.StateDir, lockFileName))
+	lock, err := lifecycle.AcquireLock(filepath.Join(cfg.StateDir, lifecycle.LockFileName))
 	if err != nil {
 		return nil, err
 	}
 	if cfg.TicketStore != "" {
 		if err := projects.EnsureScratchProject(cfg.TicketStore); err != nil {
-			lock.release()
+			lock.Release()
 			return nil, fmt.Errorf("create scratch project: %w", err)
 		}
 		if err := projects.PruneScratchWorkspace(cfg.TicketStore); err != nil {
-			lock.release()
+			lock.Release()
 			return nil, fmt.Errorf("prune scratch workspace: %w", err)
 		}
 	}
 	events := broker.New(cfg.SubscriberBuffer)
 	q, err := queue.OpenQueue(cfg.StateDir)
 	if err != nil {
-		lock.release()
+		lock.Release()
 		return nil, fmt.Errorf("load queue: %w", err)
 	}
 	afk, err := queue.OpenAFK(cfg.StateDir, events)
 	if err != nil {
-		lock.release()
+		lock.Release()
 		return nil, fmt.Errorf("load afk mode: %w", err)
 	}
 	viMode, err := queue.OpenViMode(cfg.StateDir, events)
 	if err != nil {
-		lock.release()
+		lock.Release()
 		return nil, fmt.Errorf("load vi mode: %w", err)
 	}
 	tokens, err := tokenledger.Open(cfg.StateDir)
 	if err != nil {
-		lock.release()
+		lock.Release()
 		return nil, fmt.Errorf("load token ledger: %w", err)
 	}
 	sock := SocketPath(cfg.StateDir)
@@ -251,29 +250,29 @@ func New(cfg Config) (*Server, error) {
 	_ = os.Remove(sock)
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
-		lock.release()
+		lock.Release()
 		return nil, err
 	}
 	if err := os.Chmod(sock, 0o600); err != nil {
 		ln.Close()
-		lock.release()
+		lock.Release()
 		return nil, err
 	}
 	var tcp net.Listener
 	if cfg.TCPAddr != "" {
 		if tcp, err = listenLoopback(cfg.TCPAddr); err != nil {
 			ln.Close()
-			lock.release()
+			lock.Release()
 			return nil, err
 		}
 	}
-	logf, err := openRotatingFile(LogPath(cfg.StateDir), logMaxBytes, logMaxFiles)
+	logf, err := lifecycle.OpenServerLog(cfg.StateDir)
 	if err != nil {
 		ln.Close()
 		if tcp != nil {
 			tcp.Close()
 		}
-		lock.release()
+		lock.Release()
 		return nil, err
 	}
 	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: cfg.LogLevel}))
@@ -285,7 +284,7 @@ func New(cfg Config) (*Server, error) {
 			tcp.Close()
 		}
 		_ = logf.Close()
-		lock.release()
+		lock.Release()
 		return nil, fmt.Errorf("load runs: %w", err)
 	}
 	s := &Server{
@@ -300,8 +299,6 @@ func New(cfg Config) (*Server, error) {
 		chat:     ralphloop.NewServerChat(cfg.Chat),
 		registry: registry,
 
-		instanceID: newInstanceID(),
-
 		queue:  q,
 		afk:    afk,
 		viMode: viMode,
@@ -311,7 +308,9 @@ func New(cfg Config) (*Server, error) {
 
 		focus: sessions.NewFocusReports(),
 	}
+	s.restarter = s.newRestarter()
 	s.initProjects()
+	s.startup = lifecycle.NewStartup(startupHost{s}, log)
 	s.harness = harnesschoice.New(harnesschoice.Deps{
 		Config: harnesschoice.Config{
 			Env: cfg.Env, LookPath: cfg.LookPath, Runner: cfg.Runner, RunnerFor: cfg.RunnerFor,
@@ -336,7 +335,7 @@ func New(cfg Config) (*Server, error) {
 			tcp.Close()
 		}
 		_ = logf.Close()
-		lock.release()
+		lock.Release()
 		return nil, fmt.Errorf("load budget ledger: %w", err)
 	}
 	host := queueHost{s, s.harness}
@@ -367,7 +366,7 @@ func New(cfg Config) (*Server, error) {
 		HardStopAt:    s.budget.HardStopAt,
 	})
 	s.settings.Store(&cfg.Settings)
-	s.settings.SetAppliers(s.reloadAppliers())
+	s.settings.SetAppliers(lifecycle.ReloadAppliers(reloadHost{s}))
 	s.disks = disk.New(disk.Deps{
 		Config: disk.Config{
 			FreeSpace: cfg.FreeSpace, GoCacheDir: cfg.GoCacheDir, DiskPollInterval: cfg.DiskPollInterval,
@@ -443,7 +442,7 @@ func New(cfg Config) (*Server, error) {
 	s.idx.OnRescan(s.rec.ScanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.designs.ScanCleanups)
-	s.idx.SetReady(s.migrationsEnded)
+	s.idx.SetReady(s.startup.MigrationsEnded)
 	s.routes = subsystemRoutes(s)
 	registerRoutes(mux, s.routes)
 	s.http = &http.Server{Handler: mux}
@@ -479,8 +478,8 @@ var routeTable = []struct {
 	{"POST /v1/web/set-password", func(s *Server, w http.ResponseWriter, r *http.Request) { s.web.SetPassword(w, r) }},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
-	{"GET /v1/restart/check", (*Server).restartCheckRead},
-	{"POST /v1/restart", (*Server).restartWrite},
+	{"GET /v1/restart/check", restartCheckRoute},
+	{"POST /v1/restart", restartWriteRoute},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"GET /v1/queue", (*Server).queueView},
@@ -538,7 +537,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	}
 	s.merger.FillEpicMergeTargets(snap.Tickets)
 	snap.Build = s.cfg.Build
-	snap.Instance = s.instanceID
+	snap.Instance = s.restarter.Instance()
 	snap.MigrationFailures = s.MigrationFailures()
 	snap.Migrating = s.migrator.Migrating()
 	snap.Budget = s.budget.Status(time.Now())
@@ -698,7 +697,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		s.idx.KeepFresh(freshCtx, index.WatchConfig{
 			PollInterval: s.cfg.PollInterval,
 			DisableWatch: s.cfg.DisableWatch,
-			Start:        s.startAfterMigrations,
+			Start:        s.startup.AfterMigrations,
 		})
 	}()
 	herdrDone := make(chan struct{})
@@ -794,7 +793,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server stopped")
 	_ = s.logf.Close()
 	recordShutdown("lock-release")
-	s.lock.release()
+	s.lock.Release()
 	if err != nil {
 		return fmt.Errorf("serve: %w", err)
 	}
@@ -804,6 +803,16 @@ func (s *Server) Serve(ctx context.Context) error {
 // shutdownRecorder is nil in production; a test sets it to observe the order
 // Serve stops its parts in.
 var shutdownRecorder atomic.Pointer[func(step string)]
+
+// SetShutdownRecorder makes Serve report each shutdown step to rec; nil clears
+// it. It is exported only so lifecycle's tests can reach it.
+func SetShutdownRecorder(rec func(step string)) {
+	if rec == nil {
+		shutdownRecorder.Store(nil)
+		return
+	}
+	shutdownRecorder.Store(&rec)
+}
 
 func recordShutdown(step string) {
 	if rec := shutdownRecorder.Load(); rec != nil {

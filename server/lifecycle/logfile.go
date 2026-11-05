@@ -1,4 +1,4 @@
-package server
+package lifecycle
 
 import (
 	"fmt"
@@ -18,9 +18,14 @@ const (
 // LogPath is the server's slog JSON file inside stateDir.
 func LogPath(stateDir string) string { return filepath.Join(stateDir, logFileName) }
 
-// rotatingFile is an append-only file that rolls to path.1, path.2, ... once a
+// OpenServerLog opens the server's rotating log file inside stateDir.
+func OpenServerLog(stateDir string) (*RotatingFile, error) {
+	return OpenRotatingFile(LogPath(stateDir), logMaxBytes, logMaxFiles)
+}
+
+// RotatingFile is an append-only file that rolls to path.1, path.2, ... once a
 // write would push it past maxBytes. Only maxFiles files ever exist.
-type rotatingFile struct {
+type RotatingFile struct {
 	path     string
 	maxBytes int64
 	maxFiles int
@@ -30,15 +35,16 @@ type rotatingFile struct {
 	size int64
 }
 
-func openRotatingFile(path string, maxBytes int64, maxFiles int) (*rotatingFile, error) {
-	r := &rotatingFile{path: path, maxBytes: maxBytes, maxFiles: maxFiles}
+// OpenRotatingFile opens path for appending with the given rotation bounds.
+func OpenRotatingFile(path string, maxBytes int64, maxFiles int) (*RotatingFile, error) {
+	r := &RotatingFile{path: path, maxBytes: maxBytes, maxFiles: maxFiles}
 	if err := r.open(); err != nil {
 		return nil, err
 	}
 	return r, nil
 }
 
-func (r *rotatingFile) open() error {
+func (r *RotatingFile) open() error {
 	f, err := os.OpenFile(r.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
@@ -52,7 +58,7 @@ func (r *rotatingFile) open() error {
 	return nil
 }
 
-func (r *rotatingFile) Write(p []byte) (int, error) {
+func (r *RotatingFile) Write(p []byte) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	// Rotating an empty file would loop forever on an oversized line.
@@ -66,7 +72,7 @@ func (r *rotatingFile) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func (r *rotatingFile) rotate() error {
+func (r *RotatingFile) rotate() error {
 	if err := r.f.Close(); err != nil {
 		return err
 	}
@@ -83,7 +89,8 @@ func (r *rotatingFile) rotate() error {
 	return r.open()
 }
 
-func (r *rotatingFile) Close() error {
+// Close closes the live file.
+func (r *RotatingFile) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.f.Close()

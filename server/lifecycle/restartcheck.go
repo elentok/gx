@@ -1,10 +1,8 @@
-package server
+package lifecycle
 
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -19,49 +17,32 @@ import (
 
 const restartCheckTimeout = 2 * time.Minute
 
-func newInstanceID() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
 // restartBinary is the binary a restart would start.
-func (s *Server) restartBinary() string {
-	if s.cfg.RestartBinary != nil {
-		return s.cfg.RestartBinary()
+func (rs *Restarter) restartBinary() string {
+	if rs.cfg.RestartBinary != nil {
+		return rs.cfg.RestartBinary()
 	}
 	exe, _ := os.Executable()
 	return exe
 }
 
-// runningAgents counts loop agents and live interactive sessions.
-func (s *Server) runningAgents() int {
-	n := s.registry.Count()
-	sessions, _ := s.sessions.ListSessions()
-	for _, si := range sessions {
-		if si.Status.State != wire.SessionExited {
-			n++
-		}
-	}
-	return n
+// ServeCheck handles GET /v1/restart/check.
+func (rs *Restarter) ServeCheck(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, rs.Check(r.Context()))
 }
 
-func (s *Server) restartCheckRead(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, s.restartCheck(r.Context()))
-}
-
-// restartCheck runs the restart check from the binary a restart would start.
+// Check runs the restart check from the binary a restart would start.
 // It never touches this server.
-func (s *Server) restartCheck(ctx context.Context) wire.RestartCheckReport {
+func (rs *Restarter) Check(ctx context.Context) wire.RestartCheckReport {
 	rep := wire.RestartCheckReport{
-		Binary:         s.restartBinary(),
-		RunningVersion: s.cfg.Build,
+		Binary:         rs.restartBinary(),
+		RunningVersion: rs.cfg.Build,
 		Projects:       []wire.RestartCheckProject{},
-		Agents:         s.runningAgents(),
-		Instance:       s.instanceID,
-		RestartLog:     migratefail.RestartLogPath(s.cfg.StateDir),
+		Agents:         rs.agents(),
+		Instance:       rs.instanceID,
+		RestartLog:     migratefail.RestartLogPath(rs.cfg.StateDir),
 	}
-	out, status, detail := runRestartCheckBinary(ctx, rep.Binary, s.cfg.Env)
+	out, status, detail := runRestartCheckBinary(ctx, rep.Binary, rs.cfg.Env)
 	rep.Status, rep.Error = status, detail
 	switch status {
 	case wire.RestartCheckOK:

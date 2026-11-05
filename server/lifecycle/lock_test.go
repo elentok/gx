@@ -1,4 +1,4 @@
-package server
+package lifecycle_test
 
 import (
 	"os"
@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/lifecycle"
 )
 
 // holdLock takes the flock on its own fd and writes pid into the file.
@@ -28,25 +30,25 @@ func holdLock(t *testing.T, path, pid string) *os.File {
 
 func TestAcquireLock_SamePidRetriesUntilFree(t *testing.T) {
 	t.Parallel()
-	path := filepath.Join(t.TempDir(), lockFileName)
+	path := filepath.Join(t.TempDir(), lifecycle.LockFileName)
 	held := holdLock(t, path, strconv.Itoa(os.Getpid()))
 	time.AfterFunc(200*time.Millisecond, func() { held.Close() })
 
-	l, err := acquireLock(path)
+	l, err := lifecycle.AcquireLock(path)
 	if err != nil {
 		t.Fatalf("same-pid lock freed mid-retry: %v", err)
 	}
-	l.release()
+	l.Release()
 }
 
 func TestAcquireLock_OtherPidFailsAtOnce(t *testing.T) {
 	t.Parallel()
-	path := filepath.Join(t.TempDir(), lockFileName)
+	path := filepath.Join(t.TempDir(), lifecycle.LockFileName)
 	held := holdLock(t, path, "999999")
 	defer held.Close()
 
 	start := time.Now()
-	_, err := acquireLock(path)
+	_, err := lifecycle.AcquireLock(path)
 	if err == nil || !strings.Contains(err.Error(), "already running (pid 999999)") {
 		t.Fatalf("got %v, want already running (pid 999999)", err)
 	}
@@ -58,25 +60,25 @@ func TestAcquireLock_OtherPidFailsAtOnce(t *testing.T) {
 func TestLockHeldBy(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, held := LockHeldBy(dir); held {
+	if _, held := lifecycle.LockHeldBy(dir); held {
 		t.Fatal("no lock file: should not be held")
 	}
-	l, err := acquireLock(filepath.Join(dir, lockFileName))
+	l, err := lifecycle.AcquireLock(filepath.Join(dir, lifecycle.LockFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
-	pid, held := LockHeldBy(dir)
+	pid, held := lifecycle.LockHeldBy(dir)
 	if !held || pid != os.Getpid() {
 		t.Fatalf("held lock: got pid %d held %v", pid, held)
 	}
-	l.release()
+	l.Release()
 	// A process forked by a parallel test can still hold the inherited fd for a
-	// moment after release, as the same-pid retry in acquireLock expects.
+	// moment after release, as the same-pid retry in AcquireLock expects.
 	deadline := time.After(5 * time.Second)
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
 	for {
-		if _, held := LockHeldBy(dir); !held {
+		if _, held := lifecycle.LockHeldBy(dir); !held {
 			return
 		}
 		select {

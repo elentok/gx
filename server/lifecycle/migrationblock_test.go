@@ -1,4 +1,4 @@
-package server_test
+package lifecycle_test
 
 import (
 	"context"

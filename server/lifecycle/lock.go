@@ -1,4 +1,8 @@
-package server
+// Package lifecycle owns the server's start, stop and restart plumbing: the
+// state-dir lock, the rotating log file, the start-up steps, the restart
+// check and the config-reload apply order. It reaches the rest of the server
+// through small host interfaces the root implements.
+package lifecycle
 
 import (
 	"errors"
@@ -11,10 +15,13 @@ import (
 	"time"
 )
 
-// serverLock is an flock on a file holding the owner's pid. The kernel drops
+// LockFileName is the lock file inside the state dir.
+const LockFileName = "server.lock"
+
+// Lock is an flock on a file holding the owner's pid. The kernel drops
 // the flock when the process dies, so a crash never leaves a stale lock; the
 // pid in the file is only for the "already running" message.
-type serverLock struct{ f *os.File }
+type Lock struct{ f *os.File }
 
 // samePidLockRetry bounds the wait when the lock file names this process. That
 // happens when a restart re-locks its state dir while a forked child still
@@ -24,7 +31,8 @@ const (
 	samePidLockRetryTick = 20 * time.Millisecond
 )
 
-func acquireLock(path string) (*serverLock, error) {
+// AcquireLock takes the lock at path or says who holds it.
+func AcquireLock(path string) (*Lock, error) {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
@@ -59,15 +67,16 @@ func acquireLock(path string) (*serverLock, error) {
 		f.Close()
 		return nil, err
 	}
-	return &serverLock{f: f}, nil
+	return &Lock{f: f}, nil
 }
 
-func (l *serverLock) release() { l.f.Close() }
+// Release drops the lock.
+func (l *Lock) Release() { l.f.Close() }
 
 // LockHeldBy reports the pid of a live server that holds the lock. Unlike
-// acquireLock it never writes the file, so it is safe to call beside a server.
+// AcquireLock it never writes the file, so it is safe to call beside a server.
 func LockHeldBy(stateDir string) (int, bool) {
-	path := filepath.Join(stateDir, lockFileName)
+	path := filepath.Join(stateDir, LockFileName)
 	f, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return 0, false

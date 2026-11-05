@@ -10,7 +10,7 @@ Method per slice (same as the Launcher move in 62): new `server/<pkg>` owns the 
 
 - [ ] S1 web: `web.go`, `webroutes.go`, `webinfo.go`, tests `web_*`, `webhost`, `webroutes`, `origin`, `unmute_origin` (~45 tests, ~18 methods) -> `server/webhttp`
 - [ ] S2 session glue: `sessionhost.go`, `sessioninfo.go`, `sessionwire.go`, `readablesession.go`, tests `session*`, `permission_card`, `retry_prompt`, `sessions_afk` (~55 tests, ~10 methods) -> existing `server/sessions` (or `sessions/host`)
-- [ ] S3 lifecycle: `startup.go`, `restart.go`, `restartcheck.go`, `configreload.go`, tests `restart*`, `configreload*`, `lock`, `logfile`, `stop`, `shutdown_order`, `migrat*` (~45 tests, ~13 methods) -> `server/lifecycle`
+- [x] S3 lifecycle: `startup.go`, `restart.go`, `restartcheck.go`, `configreload.go`, tests `restart*`, `configreload*`, `lock`, `logfile`, `stop`, `shutdown_order`, `migrat*` (~45 tests, ~13 methods) -> `server/lifecycle`
 - [ ] S4 reads and verdicts: `verdicts.go`, `reads.go`, `waitinglabel.go`, `claimhold.go`, tests `reads`, `verdicts_epic`, `waiting*`, `snapshot*`, `claimhold*`, `ratelimit_claim_hold` (~30 tests, ~15 methods) -> `server/explain`
 - [ ] S5 ticket and project wiring: `ticketopswire.go`, `projectsinit.go`, `ticketwrites.go`, `iterations.go`, `runs.go`, tests `checkstatus`, `checksave`, `retrohook`, `oneoff*`, `rootrefs`, `store_commit` (~45 tests, ~16 methods) -> `server/ticketops` / `server/runs` hosts
 - [ ] S6 verify: remaining root tests (`server_test`, `server_notify`, `deadlock`, `runner*`, ...), run the count script, confirm all limits, `gx check`.

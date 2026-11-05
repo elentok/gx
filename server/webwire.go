@@ -29,8 +29,8 @@ type webHost struct{ s *Server }
 func (h webHost) Settings() *Settings                                     { return h.s.settings.Load() }
 func (h webHost) Routes() []wire.Route                                    { return h.s.routes }
 func (h webHost) Snapshot(w http.ResponseWriter, r *http.Request)         { h.s.snapshot(w, r) }
-func (h webHost) RestartCheckRead(w http.ResponseWriter, r *http.Request) { h.s.restartCheckRead(w, r) }
-func (h webHost) RestartWrite(w http.ResponseWriter, r *http.Request)     { h.s.restartWrite(w, r) }
+func (h webHost) RestartCheckRead(w http.ResponseWriter, r *http.Request) { h.s.restarter.ServeCheck(w, r) }
+func (h webHost) RestartWrite(w http.ResponseWriter, r *http.Request)     { h.s.restarter.ServeWrite(w, r) }
 func (h webHost) StreamEvents(w http.ResponseWriter, r *http.Request)     { h.s.streamEvents(w, r) }
 
 func (s *Server) newWeb() *webhttp.Web {
