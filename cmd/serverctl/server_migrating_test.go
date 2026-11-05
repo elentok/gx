@@ -40,8 +40,11 @@ func heldServer(t *testing.T) (h *servertest.Harness, release func()) {
 		return nil, nil
 	}})
 	release = func() { releaseOnce.Do(func() { close(gate) }) }
-	t.Cleanup(release)
 	h = servertest.StartWithStore(t, store, func(c *server.Config) { c.Migrations = reg })
+	// Registered after the harness so it runs first: the held step must finish
+	// before the server stops, or it writes into the store while TempDir is
+	// being removed.
+	t.Cleanup(release)
 	<-entered
 	return h, release
 }
