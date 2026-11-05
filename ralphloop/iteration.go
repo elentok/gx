@@ -782,7 +782,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 	label := worktree.ConflictLabel(p.Ticket.Identifier)
 	prompt := agent.SkillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
 
-	l, err := startAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
+	l, err := supervise.StartAndPromptLogged(context.Background(), d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
@@ -794,7 +794,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		p.logPromptNudged(label, attempt, decision)
 	})
 
-	var launchFail *launchFailure
+	var launchFail *supervise.LaunchFailure
 	if errors.As(err, &launchFail) {
 		return "", fmt.Errorf("starting conflict-resolution agent %s: %w", label, err)
 	}
@@ -815,9 +815,9 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 	case err != nil:
 		err = fmt.Errorf("sending initial prompt: %w", err)
 	case l.Adopted:
-		sessionID, err = adoptedLaunch(d, launchParams)
+		sessionID, err = supervise.AdoptedLaunch(d, launchParams)
 	default:
-		sessionID, err = promptedLaunch(d, launchParams, l.Baseline)
+		sessionID, err = supervise.PromptedLaunch(d, launchParams, l.Baseline)
 	}
 	if err != nil {
 		return "", fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)

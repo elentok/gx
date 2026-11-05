@@ -105,7 +105,7 @@ func (l *Launcher) ClaimAndLaunch(root queue.RootRef, queued tickets.Address, t 
 		kind, reason := events.IterationError, "launch failed: "+err.Error()
 		if taken := (*nameTakenError)(nil); errors.As(err, &taken) {
 			kind, reason = events.AgentNameTaken, "agent name taken: "+taken.reason
-		} else if k, ok := ralphloop.LaunchFailureKind(err); ok {
+		} else if k, ok := supervise.LaunchFailureKind(err); ok {
 			kind = k
 		}
 		if perr := l.Writer.Pause(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {

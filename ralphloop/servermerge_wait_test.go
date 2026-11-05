@@ -114,13 +114,13 @@ func TestWaitIterationFinished_NudgesIdleAgentWithNoReportOnce(t *testing.T) {
 	t.Parallel()
 	d, r, one, sleeps := stallNudgeFixture(t, "", 2*time.Minute)
 	waitStallFixture(t, d, one)
-	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
 		t.Errorf("prompts = %q, want exactly the stall nudge", got)
 	}
 	if !slices.Contains(*sleeps, 2*time.Minute) {
 		t.Errorf("sleeps = %v, want the 2m delay", *sleeps)
 	}
-	if evs := stallNudgeEvents(t, one); len(evs) != 1 || evs[0].Text != StallNudgeText || evs[0].Ticket != "01" {
+	if evs := stallNudgeEvents(t, one); len(evs) != 1 || evs[0].Text != supervise.StallNudgeText || evs[0].Ticket != "01" {
 		t.Errorf("run log stall-nudged events = %+v, want one with the nudge text", evs)
 	}
 }
@@ -151,7 +151,7 @@ func TestWaitIterationFinished_NudgesIdleCodexAgentOnce(t *testing.T) {
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
 	one.Agent = agent.AgentCodex
 	waitStallFixture(t, d, one)
-	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
 		t.Errorf("prompts = %q, want exactly the stall nudge", got)
 	}
 	if evs := stallNudgeEvents(t, one); len(evs) != 1 {
@@ -191,7 +191,7 @@ func TestWaitIterationFinished_CodexBackToWorkDuringDelayGetsNoErrorAndOneNudge(
 	one.Agent = agent.AgentCodex
 	d.Runner = &busyAfterWaitRunner{Runner: r}
 	waitStallFixture(t, d, one)
-	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
 		t.Errorf("prompts = %q, want one stall nudge after the agent settled", got)
 	}
 	if evs := stallNudgeEvents(t, one); len(evs) != 1 {
@@ -220,7 +220,7 @@ func TestWaitIterationFinished_UserRecordKeepsGenericNudge(t *testing.T) {
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
 	d.ReadHasUserRecord = func(string, string) (bool, bool, error) { return true, true, nil }
 	waitStallFixture(t, d, one)
-	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
 		t.Errorf("prompts = %q, want the generic nudge", got)
 	}
 }
@@ -235,7 +235,7 @@ func TestWaitIterationFinished_InputNotEmptyIsRetriedOnce(t *testing.T) {
 	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
 	r.FailNextPrompts("iter-01", 1, inputNotEmptyErr())
 	waitStallFixture(t, d, one)
-	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
 		t.Errorf("prompts = %q, want the nudge delivered once after the retry", got)
 	}
 	evs, _, err := runlog.ReadEvents(one.ScratchDir, one.Epic)
@@ -306,7 +306,7 @@ func TestWaitIterationFinished_PersonInputRestartsStallDelay(t *testing.T) {
 	if n := countSleeps(sleeps, 2*time.Minute); n != 2 {
 		t.Errorf("stall delay slept %d times, want 2 (restarted by the key)", n)
 	}
-	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != supervise.StallNudgeText {
 		t.Errorf("prompts = %q, want the stall nudge once", got)
 	}
 }

@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/worktree"
 )
@@ -102,11 +101,11 @@ func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakes.FakeDeps()
 	var kinds []events.Kind
-	_, err := startAndPrompt(context.Background(), unknownSkillRunner{d.Runner}, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
+	_, err := StartAndPromptLogged(context.Background(), unknownSkillRunner{d.Runner}, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/gx-implement gx:epic/01",
 		func(_ int, kind events.Kind, _ error) { kinds = append(kinds, kind) }, func(int, string) {})
-	var lf *launchFailure
+	var lf *LaunchFailure
 	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
-		t.Fatalf("err = %v, want agent_prompt_stalled launchFailure", err)
+		t.Fatalf("err = %v, want agent_prompt_stalled LaunchFailure", err)
 	}
 	for _, want := range []string{"/gx-implement", "gx skills install", "Retry"} {
 		if !strings.Contains(lf.Error(), want) {
@@ -220,23 +219,6 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 
 	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "gx claude doctor") {
 		t.Errorf("StartAndPrompt = %v, want ErrMissingCapability with the doctor hint", err)
-	}
-}
-
-func TestWaitIterationFinished_SessionDied_ReturnsDiedReason(t *testing.T) {
-	t.Parallel()
-	d, _, _ := fakes.FakeDeps()
-	r := fakes.FakeRunner(d)
-	r.DieAfterPrompt(launchLabel, agentrunner.SessionDied("claude exited (code 1)"))
-	res := launchOn(t, r)
-	if res.err != nil {
-		t.Fatalf("StartAndPrompt = %v", res.err)
-	}
-
-	err := WaitIterationFinished(d, OneIteration{Agent: agent.AgentClaude, Epic: launchEpic}, IterationWorktree{Label: launchLabel}, res.session)
-
-	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.Contains(err.Error(), "claude exited (code 1)") {
-		t.Errorf("WaitIterationFinished = %v, want ErrSessionDied carrying the died reason", err)
 	}
 }
 

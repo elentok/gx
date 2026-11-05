@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
@@ -139,7 +140,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	ctx, release := l.Sessions.Watches.Context()
 	defer release()
 	start := func() (agentrunner.Session, error) {
-		return ralphloop.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
+		return supervise.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
 			Label:           label,
 			Epic:            ticket.Epic,
 			Cwd:             cwd,

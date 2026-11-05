@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"testing"
@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -19,7 +18,7 @@ import (
 // covers ticket 02's two start-time requirements: IterationStarted must carry
 // cwd/sessionID (so a consumer can resolve the transcript itself), and one
 // extra immediate ContextOccupancy read/emit must fire right away, rather
-// than waiting up to supervise.SmartZonePollMs for the first poll tick to report it.
+// than waiting up to SmartZonePollMs for the first poll tick to report it.
 func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccupancy(t *testing.T) {
 	t.Parallel()
 	var started struct {
@@ -41,7 +40,7 @@ func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccup
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := promptedLaunch(d, supervise.LaunchParams{
+	sessionID, err := PromptedLaunch(d, LaunchParams{
 		Label:      "iter-01",
 		Agent:      agent.AgentClaude,
 		Session:    agentrunner.Session{Label: "iter-01", ID: "pane-1"},
@@ -91,7 +90,7 @@ func TestPromptedLaunch_CodexAdoptsSessionIDFromStatusAfterPrompt(t *testing.T) 
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := promptedLaunch(d, supervise.LaunchParams{
+	sessionID, err := PromptedLaunch(d, LaunchParams{
 		Label:      "iter-09",
 		Agent:      agent.AgentCodex,
 		Session:    agentrunner.Session{Label: "iter-09", ID: "pane-9"},

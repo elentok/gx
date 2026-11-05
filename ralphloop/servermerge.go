@@ -94,9 +94,6 @@ func (o OneIteration) smartZone() int {
 	return o.SmartZone
 }
 
-// StallNudgeText is the fixed text of the stall nudge.
-const StallNudgeText = "If you are waiting for a person's reply, run `gx tickets ask` now. Otherwise continue."
-
 func (o OneIteration) sink() runlog.EventSink {
 	if o.Sink == nil {
 		return runlog.NoopEventSink{}
@@ -410,15 +407,15 @@ func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w It
 // or missing transcript keeps the generic text.
 func stallNudgeText(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) string {
 	if d.ReadHasUserRecord == nil {
-		return StallNudgeText
+		return supervise.StallNudgeText
 	}
 	status, err := d.Runner.Status(s)
 	if err != nil || status.SessionID == "" {
-		return StallNudgeText
+		return supervise.StallNudgeText
 	}
 	has, known, err := d.ReadHasUserRecord(w.Path, status.SessionID)
 	if err != nil || !known || has {
-		return StallNudgeText
+		return supervise.StallNudgeText
 	}
 	return agent.SkillPrompt(o.Agent, agent.LaunchSkill(o.Ticket, agent.DefaultWorkerSkill), ticketAddress(o.Ticket))
 }

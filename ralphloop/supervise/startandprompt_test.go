@@ -1,4 +1,4 @@
-package ralphloop
+package supervise
 
 import (
 	"context"
@@ -19,7 +19,7 @@ type launchFail struct {
 func startAndPromptFake(t *testing.T, r *runnerfake.Runner) (agentrunner.Session, error, []launchFail) {
 	t.Helper()
 	var fails []launchFail
-	l, err := startAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
+	l, err := StartAndPromptLogged(context.Background(), r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
 		fails = append(fails, launchFail{attempt, kind})
 	}, func(int, string) {})
 
@@ -63,7 +63,7 @@ func TestStartAndPrompt_NotDeliveredTwicePausesStalled(t *testing.T) {
 	r := runnerfake.NewRunner()
 	r.FailNextPrompts("it-01", 2, agentrunner.ErrNotDelivered)
 	_, err, fails := startAndPromptFake(t, r)
-	var lf *launchFailure
+	var lf *LaunchFailure
 	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
 		t.Fatalf("err = %v, want AgentPromptStalled launchFailure", err)
 	}
@@ -79,7 +79,7 @@ func TestStartAndPrompt_LabelTakenIsNameTaken(t *testing.T) {
 	r := runnerfake.NewRunner()
 	r.SetStartErr("it-01", agentrunner.ErrLabelTaken)
 	_, err, _ := startAndPromptFake(t, r)
-	var lf *launchFailure
+	var lf *LaunchFailure
 	if !errors.As(err, &lf) || lf.Kind != events.AgentNameTaken {
 		t.Fatalf("err = %v, want AgentNameTaken launchFailure", err)
 	}
