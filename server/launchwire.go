@@ -28,8 +28,3 @@ func (h launchHost) StalledNudgeDelay() time.Duration { return h.s.stalledNudgeD
 func (s *Server) LogEvent(ticket tickets.Address, ev ralphloop.Event) {
 	s.launcher.LogEvent(ticket, ev)
 }
-
-// CodexRolloutExists is the root's sessions rollouts method.
-func (s *Server) CodexRolloutExists(cwd, id string) bool {
-	return s.launcher.CodexRolloutExists(cwd, id)
-}

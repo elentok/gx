@@ -19,6 +19,7 @@ func (f fakePrompter) SettleTurn(string, string, chat.TurnMark, chat.DesignRef, 
 }
 func (f fakePrompter) DetectDesignActionable(string, string, chat.DesignRef) {}
 func (f fakePrompter) CancelAutoAdvance(string, string) bool                 { return false }
+func (f fakePrompter) AutoAdvanceDeadline(string) time.Time                  { return time.Time{} }
 func (f fakePrompter) SendAction(_, _ string, action []string)               { f.sent <- action }
 
 func TestStartContinue_SendsTheActionThroughThePrompter(t *testing.T) {

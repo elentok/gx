@@ -317,7 +317,7 @@ func New(cfg Config) (*Server, error) {
 			Env: cfg.Env, LookPath: cfg.LookPath, Runner: cfg.Runner, RunnerFor: cfg.RunnerFor,
 			AgentRunner: cfg.AgentRunner, ConfigPath: cfg.ConfigPath,
 		},
-		Host: s, Log: log, Index: idx, Projects: s.projects, Queue: q, Registry: registry, Settings: &s.settings,
+		Host: sessionHost{s}, Log: log, Index: idx, Projects: s.projects, Queue: q, Registry: registry, Settings: &s.settings,
 	})
 	// The ledger loads here, after the listeners, so a failure releases them as a runs failure does.
 	s.budget, err = budget.New(budget.Deps{
@@ -339,7 +339,7 @@ func New(cfg Config) (*Server, error) {
 		lock.Release()
 		return nil, fmt.Errorf("load budget ledger: %w", err)
 	}
-	host := queueHost{s, s.harness}
+	host := queueHost{sessionHost{s}, s.harness}
 	s.queue.Attach(queue.QueueDeps{Events: events, Guards: s.guards, Index: idx, Projects: s.projects, Registry: registry, Host: host})
 	s.oneOffs = queue.NewOneOffs(queue.OneOffsDeps{Queue: s.queue, Index: idx, Projects: s.projects, Registry: registry, Events: events, Log: log, Chat: s.chat, Host: host, TicketStore: cfg.TicketStore})
 	s.harness.GiveLog(cfg.Runner)

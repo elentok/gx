@@ -1,8 +1,14 @@
 package server
 
 import (
+	"net/http"
+
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/sound"
 )
 
 // newManager copies the fields it needs from s at call time, so s must have
@@ -25,19 +31,56 @@ func newManager(s *Server) *sessions.Manager {
 		Focus:    s.focus,
 		AFK:      s.afk,
 		Alerts:   s.chat,
-		Host:     s,
+		Queue:    s.queue,
+		Host:     sessionHost{s},
 		Prompter: s.prompt,
 		Designs:  s.designs,
-		Rollouts: s,
+		Rollouts: sessionHost{s},
 	})
-}
-
-// FindTicket is sessions.Host's lookup, served by the ticket writer.
-func (s *Server) FindTicket(address string) (queue.TicketRef, bool, error) {
-	return s.writer.FindTicket(address)
 }
 
 // newResumer needs s.sessions set.
 func newResumer(s *Server) *sessions.Resumer {
-	return sessions.NewResumer(s.sessions, s)
+	return sessions.NewResumer(s.sessions, sessionHost{s})
+}
+
+// sessionHost is the Server as the sessions package, and the other packages
+// that call into the Manager through their Host interfaces, see it. Its
+// methods forward to the Manager or the owner of the call.
+type sessionHost struct{ *Server }
+
+// ListSessions reads every session dir, oldest first.
+func (h sessionHost) ListSessions() ([]wire.SessionInfo, error) { return h.sessions.ListSessions() }
+
+// SessionDir finds a session's dir and meta by id.
+func (h sessionHost) SessionDir(id string) (string, sessions.Meta, wire.SessionResult, error) {
+	return h.sessions.SessionDir(id)
+}
+
+// SessionFinished reports whether a finished session was a ticket agent that
+// reported iteration_status finished.
+func (h sessionHost) SessionFinished(sess agentrunner.Session) bool {
+	return h.sessions.SessionFinished(sess)
+}
+
+func (h sessionHost) triggerBanner(id string, snd sound.Name, reason string) {
+	h.sessions.TriggerBanner(id, snd, reason)
+}
+func (h sessionHost) noteFailure(id string)         { h.sessions.NoteFailure(id) }
+func (h sessionHost) onMapEpic(address string) bool { return h.sessions.Maps.OnMapEpic(address) }
+func (h sessionHost) sessionWriteDesignWeb(do func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+	return h.sessions.SessionWriteDesignWeb(do)
+}
+func (h sessionHost) designLaunchTier(address string) ralphloop.Tier {
+	return h.sessions.Maps.DesignLaunchTier(address)
+}
+
+// FindTicket is sessions.Host's lookup, served by the ticket writer.
+func (h sessionHost) FindTicket(address string) (queue.TicketRef, bool, error) {
+	return h.writer.FindTicket(address)
+}
+
+// CodexRolloutExists is the sessions rollouts lookup, served by the launcher.
+func (h sessionHost) CodexRolloutExists(cwd, id string) bool {
+	return h.launcher.CodexRolloutExists(cwd, id)
 }

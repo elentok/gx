@@ -1,7 +1,7 @@
-package server
+package sessions_test
 
 import (
-	"github.com/elentok/gx/server/sessions"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -11,8 +11,10 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -39,7 +41,43 @@ func TestDesignContinueAction_UsesAgentfakeDesignPromptPrefix(t *testing.T) {
 	}
 }
 
-func modelTestServer(t *testing.T, cwd string, lines ...string) *Server {
+// infoSource is the chat Source of a bare Manager: only the Codex home is real.
+type infoSource struct{ codexHome string }
+
+func (s infoSource) SessionDir(string) (string, chat.Meta, wire.SessionResult, error) {
+	return "", chat.Meta{}, wire.SessionResult{}, errors.New("unused")
+}
+func (s infoSource) ReadableSession(string) (string, chat.Meta, wire.SessionResult, error) {
+	return "", chat.Meta{}, wire.SessionResult{}, errors.New("unused")
+}
+func (s infoSource) ReadMeta(string) (chat.Meta, error) { return chat.Meta{}, errors.New("unused") }
+func (s infoSource) CheckProjectDir(string, string) (*wire.SessionResult, error) {
+	return nil, errors.New("unused")
+}
+func (s infoSource) DesignFinal(string) bool    { return false }
+func (s infoSource) NoteFailure(string)         {}
+func (s infoSource) Stopped() <-chan struct{}   { return nil }
+func (s infoSource) HasChatReader(string) bool  { return false }
+func (s infoSource) CodexHome() (string, error) { return s.codexHome, nil }
+func (s infoSource) Publish(string, string)     {}
+
+// infoManager is a Manager with the session chat and prompt that New builds.
+func infoManager(env []string, codexHome string) *sessions.Manager {
+	log := slog.New(slog.DiscardHandler)
+	return sessions.NewManager(sessions.ManagerDeps{
+		Chat:     chat.New(chat.Deps{Config: chat.Config{Env: env}, Source: infoSource{codexHome}, Log: log}),
+		Prompter: sessprompt.New(sessprompt.Deps{Log: log}),
+	})
+}
+
+func modelTestServer(t *testing.T, cwd string, lines ...string) *sessions.Manager {
+	t.Helper()
+	mg, _ := modelTestManager(t, cwd, lines...)
+	return mg
+}
+
+// modelTestManager also returns the path of the transcript it wrote.
+func modelTestManager(t *testing.T, cwd string, lines ...string) (*sessions.Manager, string) {
 	t.Helper()
 	config := t.TempDir()
 	path := filepath.Join(config, "projects", transcript.Slugify(cwd), "conv.jsonl")
@@ -49,14 +87,7 @@ func modelTestServer(t *testing.T, cwd string, lines ...string) *Server {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return withChat(withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}))
-}
-
-// withChat gives a bare test Server the session chat and prompt that New builds.
-func withChat(s *Server) *Server {
-	s.sessionChat = chat.New(chat.Deps{Config: chat.Config{Env: s.cfg.Env}, Source: chatSource{s}, Log: s.log})
-	s.prompt = sessprompt.New(sessprompt.Deps{Log: s.log})
-	return s
+	return infoManager([]string{"CLAUDE_CONFIG_DIR=" + config}, ""), path
 }
 
 func replyWithModel(model string) string {
@@ -97,14 +128,10 @@ func TestSessionInfoModel_OldMetaShowsTheReportedModelOnceItReplies(t *testing.T
 
 func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
 	t.Parallel()
-	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
+	s, path := modelTestManager(t, "/work/proj", replyWithModel("claude-opus-5-5"))
 	meta := sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
 	if got := s.SessionInfo(meta).Model; got != "claude-opus-5-5" {
 		t.Fatalf("model = %q, want claude-opus-5-5", got)
-	}
-	path, ok := s.sessionChat.ClaudeTranscript("s1", meta.ChatMeta())
-	if !ok {
-		t.Fatal("no transcript")
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -143,7 +170,7 @@ func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "rollout-conv.jsonl"), []byte(rollout), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := withChat(withProjects(&Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}))
+	s := infoManager(nil, home)
 	info := s.SessionInfo(sessions.Meta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
 	if info.Model != "gpt-6.1-terra" || info.Effort != "high" || !info.ModelSwitched {
 		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-6.1-terra/high/true", info.Model, info.Effort, info.ModelSwitched)

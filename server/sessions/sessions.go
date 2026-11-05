@@ -468,7 +468,7 @@ func (mg *Manager) ListSessions() ([]wire.SessionInfo, error) {
 	}
 	out := make([]wire.SessionInfo, len(metas))
 	for i, m := range metas {
-		out[i] = mg.host.SessionInfo(m)
+		out[i] = mg.SessionInfo(m)
 	}
 	return out, nil
 }

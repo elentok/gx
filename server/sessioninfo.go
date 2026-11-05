@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
@@ -16,7 +15,7 @@ func (c chatSource) SessionDir(id string) (string, chat.Meta, wire.SessionResult
 }
 
 func (c chatSource) ReadableSession(id string) (string, chat.Meta, wire.SessionResult, error) {
-	dir, m, res, err := c.s.readableSession(id)
+	dir, m, res, err := c.s.sessions.ReadableSession(id)
 	return dir, m.ChatMeta(), res, err
 }
 
@@ -30,25 +29,8 @@ func (c chatSource) CheckProjectDir(project, dir string) (*wire.SessionResult, e
 }
 
 func (c chatSource) DesignFinal(ticket string) bool { return c.s.prompt.DesignFinal(ticket) }
-func (c chatSource) NoteFailure(id string)          { c.s.noteFailure(id) }
+func (c chatSource) NoteFailure(id string)          { c.s.sessions.NoteFailure(id) }
 func (c chatSource) Stopped() <-chan struct{}       { return c.s.sessions.Watches.Stop }
 func (c chatSource) CodexHome() (string, error)     { return c.s.projects.CodexHome() }
 func (c chatSource) Publish(event, id string)       { c.s.events.Publish(event, id) }
 func (c chatSource) HasChatReader(h string) bool    { return c.s.settings.Load().HasChatReader(h) }
-
-// SessionInfo is m.info() plus the failure that needs a transcript read, the
-// reported model and the running countdown.
-func (s *Server) SessionInfo(m sessions.Meta) wire.SessionInfo {
-	cm := m.ChatMeta()
-	info := m.Info()
-	info.Model = s.sessionChat.ReportedModel(cm)
-	info.ModelSwitched = chat.ModelSwitched(m.Model, info.Model)
-	if m.Harness == string(harness.Codex) {
-		info.Effort = s.sessionChat.ReportedCodexTurn(cm).Effort
-	}
-	if at := s.prompt.AutoAdvanceDeadline(m.ID); !at.IsZero() {
-		info.AutoAdvanceAt = &at
-	}
-	info.Failure = s.sessionChat.Failure(cm)
-	return info
-}

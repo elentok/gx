@@ -77,7 +77,7 @@ func (mg *Manager) NoteFailure(id string) {
 	if res.Refused || err != nil {
 		return
 	}
-	f := mg.host.SessionInfo(m).Failure
+	f := mg.SessionInfo(m).Failure
 	kind := ""
 	if f != nil {
 		kind = f.Kind

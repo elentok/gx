@@ -10,7 +10,7 @@ type tokenHost struct{ s *Server }
 
 func (h tokenHost) Snapshot() wire.Snapshot { return h.s.idx.Snapshot() }
 
-func (h tokenHost) OnMapEpic(address string) bool { return h.s.onMapEpic(address) }
+func (h tokenHost) OnMapEpic(address string) bool { return h.s.sessions.Maps.OnMapEpic(address) }
 
 func (h tokenHost) BudgetIteration(address string) (wire.IterationInfo, bool) {
 	return h.s.budget.Iteration(address)

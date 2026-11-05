@@ -33,7 +33,6 @@ type SessionsConfig struct {
 
 // Host is what the Manager and the Resumer need from the rest of the root.
 type Host interface {
-	SessionInfo(m Meta) wire.SessionInfo
 	WebURL() string
 	FindTicket(address string) (queue.TicketRef, bool, error)
 	MigrationFailures() []wire.MigrationFailure
@@ -54,7 +53,9 @@ type Manager struct {
 	focus *FocusReports
 	afk   *queue.AFK
 	// alerts sends the AFK chat alert of a banner.
-	alerts  *ralphloop.ServerChat
+	alerts *ralphloop.ServerChat
+	// queue is the Queue whose live agents the reads show.
+	queue   agentRows
 	banners sessionBanners
 	host    Host
 	Watches *sessionWatches
@@ -83,6 +84,7 @@ type ManagerDeps struct {
 	Focus    *FocusReports
 	AFK      *queue.AFK
 	Alerts   *ralphloop.ServerChat
+	Queue    agentRows
 	Host     Host
 	Prompter Prompter
 	Designs  designCleaner
@@ -94,7 +96,7 @@ func NewManager(d ManagerDeps) *Manager {
 	return &Manager{
 		cfg: d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
-		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, host: d.Host,
+		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, queue: d.Queue, host: d.Host,
 		Watches: NewSessionWatches(), prompter: d.Prompter,
 		Logs:    &AgentLogs{ticketStore: d.Cfg.TicketStore, log: d.Log, settings: d.Settings, harness: d.Harness},
 		Maps:    &MapEpics{projects: d.Projects},
@@ -124,6 +126,7 @@ type Prompter interface {
 	DetectDesignActionable(dir, id string, design chat.DesignRef)
 	SendAction(dir, label string, action []string)
 	CancelAutoAdvance(id, why string) bool
+	AutoAdvanceDeadline(id string) time.Time
 }
 
 // FirstPrompt is the first-prompt tracker of one watch.

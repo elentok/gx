@@ -16,7 +16,7 @@ import (
 // queueHost is queue.Host: the harness methods the queue reads, and the rest
 // from the root.
 type queueHost struct {
-	*Server
+	sessionHost
 	*harnesschoice.Harness
 }
 
