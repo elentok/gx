@@ -7,12 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/rowactions"
@@ -84,36 +80,5 @@ func TestAuthorWrites_OpenRefusedOnAnEmptyBody(t *testing.T) {
 	}
 	if toast := applyStatus(t, m, schema.StatusOpen); !strings.Contains(toast, "empty body") || tickettest.ReadStatus(t, file) != "draft" {
 		t.Errorf("toast %q, status %q", toast, tickettest.ReadStatus(t, file))
-	}
-}
-
-func TestQueueModel_DeleteWithoutAServerWritesNothing(t *testing.T) {
-	root := t.TempDir()
-	tickettest.WriteTicket(t, root, "alpha", "01-root.md", "Status: open\n\nBody.\n")
-	file := tickettest.TicketPath(root, "alpha", "01-root.md")
-	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), map[string]bool{file: true}))
-	m = selectFirstQueueTicketRow(t, m)
-
-	next, cmd := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
-	if next.(QueueModel).confirm.IsOpen {
-		t.Fatal("x opened a confirm with no server")
-	}
-	if msg, ok := cmd().(notify.NotifyMsg); !ok || msg.Message != rowactions.ServerNotRunning {
-		t.Fatalf("result = %+v, want the %q toast", msg, rowactions.ServerNotRunning)
-	}
-	if _, err := os.Stat(file); err != nil {
-		t.Fatalf("ticket file gone: %v", err)
-	}
-}
-
-func TestQueueModel_EditTargetIsTheAddressFile(t *testing.T) {
-	store := t.TempDir()
-	file := tickettest.WriteStoreTicket(t, store, "01-first.md", "---\nid: \"01\"\nstatus: open\n---\n\nBody.\n")
-	m := newMaintenanceQueue(t, tickettest.FakeServerAPI{})
-	m.settings.TicketStore = store
-	m.rows.Epics[0].Tickets[0].File = filepath.Join(t.TempDir(), "stale.md")
-
-	if got, ok := m.selectedEditTarget(); !ok || got != file {
-		t.Errorf("edit target = %q, %v, want %q", got, ok, file)
 	}
 }

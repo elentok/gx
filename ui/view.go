@@ -12,3 +12,11 @@ func NewMainView(content string) tea.View {
 	v.ReportFocus = true
 	return v
 }
+
+// NewHoverView is NewMainView in all-motion mode, so the terminal reports
+// motion with no button held.
+func NewHoverView(content string) tea.View {
+	v := NewMainView(content)
+	v.MouseMode = tea.MouseModeAllMotion
+	return v
+}

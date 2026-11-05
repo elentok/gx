@@ -409,23 +409,6 @@ func epicCollapseDefaults(epics []tickets.Epic, archivedEpics []tickets.Epic) ma
 	return defaults
 }
 
-// ticketMatchesQuery is the search rule for a ticket row, shared by both
-// tabs: case-insensitive substring over its "<id> <title>" row text and its
-// rendered status word. An epic-name match is epicMatchesQuery's job, so it
-// lands on the epic row rather than on every ticket inside it. q must already
-// be lowercased and trimmed.
-func ticketMatchesQuery(epic tickets.Epic, t tickets.Ticket, q string) bool {
-	haystack := t.DisplayNumber() + " " + t.Title + " " + rowfmt.TicketStatus(epic, t).Word()
-	return strings.Contains(strings.ToLower(haystack), q)
-}
-
-// epicMatchesQuery is the search rule for an epic row, shared by both tabs.
-// An epic's Name is both its slug and its displayed title. q must already be
-// lowercased and trimmed.
-func epicMatchesQuery(epic tickets.Epic, q string) bool {
-	return strings.Contains(strings.ToLower(epic.Name), q)
-}
-
 // searchExpandOverrides is the transient half of the sidebar's collapse
 // layering: every epic containing a ticket match reports its own path and
 // containing section as wanting to render expanded, and an epic whose own
@@ -441,12 +424,12 @@ func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
 	for _, epic := range epics {
 		ticketMatched := false
 		for _, t := range epic.Tickets {
-			if ticketMatchesQuery(epic, t, q) {
+			if rowfmt.TicketMatchesQuery(epic, t, q) {
 				ticketMatched = true
 				break
 			}
 		}
-		if !ticketMatched && !epicMatchesQuery(epic, q) {
+		if !ticketMatched && !rowfmt.EpicMatchesQuery(epic, q) {
 			continue
 		}
 		if overrides == nil {

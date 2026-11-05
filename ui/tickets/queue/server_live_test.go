@@ -1,0 +1,327 @@
+package queue
+
+import (
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
+	"github.com/elentok/gx/ui/tickets/tabapi"
+	"github.com/elentok/gx/viewmodel"
+)
+
+func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
+	t.Helper()
+	claimedAt := time.Time{}
+	if status == "claimed" {
+		claimedAt = time.Now()
+	}
+	return loadedServerQueueWith(t, status, claimedAt, false)
+}
+
+// deliverQueue hands a fresh Queue tab the state the app shell would build
+// from snap and the queue order, as WithServerState does on every delivery.
+func deliverQueue(t *testing.T, snap wire.Snapshot, queue []wire.QueueItem) (QueueModel, tea.Cmd) {
+	t.Helper()
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(tickettest.FakeServerAPI{}, nil).WithTickets(tickettest.FakeServerAPI{}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	return deliverQueueTo(next.(QueueModel), snap, queue)
+}
+
+func deliverQueueTo(m QueueModel, snap wire.Snapshot, queue []wire.QueueItem) (QueueModel, tea.Cmd) {
+	if snap.Epics == nil {
+		claimedAt := map[string]time.Time{}
+		for _, t := range snap.Tickets {
+			if !t.ClaimedAt.IsZero() {
+				claimedAt[t.Address] = t.ClaimedAt
+			}
+		}
+		snap.Epics = fixtureSummaries(tabapi.EpicsFromViewModel(viewmodel.State{Tickets: snap.Tickets}, viewmodel.Scope{}), claimedAt)
+	}
+	st := applySnapshot(viewmodel.State{}, snap)
+	st = st.SetQueue(queue)
+	next, cmd := m.WithServerState(&st, tabapi.ServerLinkUp)
+	return next.(QueueModel), cmd
+}
+
+func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, herdrDown bool) (QueueModel, tea.Cmd) {
+	t.Helper()
+	snap := wire.Snapshot{Seq: 1, HerdrUnavailable: herdrDown, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: status, ClaimedAt: claimedAt},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
+	}}
+	return deliverQueue(t, snap, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+}
+
+func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
+	m, cmd := loadedServerQueue(t, "claimed")
+
+	if !m.server.RunningEpics["gx:alpha"] {
+		t.Fatalf("runningEpics = %v, want gx:alpha running", m.server.RunningEpics)
+	}
+	if got := m.header().RunState(); got != RunRunning {
+		t.Errorf("queueRunState = %v, want running", got)
+	}
+	live, ok := m.server.Live["gx:alpha"]["01"]
+	if !ok || !live.Running || live.StartedAt.IsZero() {
+		t.Errorf("live[01] = %+v, want running with a start time", live)
+	}
+	if cmd == nil {
+		t.Error("no spinner tick returned when the tab went idle -> running")
+	}
+}
+
+func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "done"},
+		{Address: "gx:alpha/02", Title: "Second", Status: "claimed", ClaimedAt: time.Now()},
+		{Address: "gx:alpha/03", Title: "Third", Status: "open"},
+	}}, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}})
+
+	got := m.header().Title()
+	if !strings.HasPrefix(got, "Queue · 1 of 3 done · ") || !strings.Contains(got, "implementing...") {
+		t.Errorf("queueHeaderTitle() = %q, want \"Queue · 1 of 3 done · <spinner> implementing...\"", got)
+	}
+}
+
+func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
+	m, _ := loadedServerQueue(t, "open")
+	m.server.RunningEpics = map[string]bool{"gx:missing": true}
+
+	got := m.header().Title()
+	if strings.Contains(got, "of 0 done") || !strings.HasPrefix(got, "Queue · ") || !strings.Contains(got, "implementing...") {
+		t.Errorf("queueHeaderTitle() = %q, want a running title with no count", got)
+	}
+}
+
+func TestQueueServerMode_NoClaimedTicketStaysIdleWithServerCopy(t *testing.T) {
+	m, _ := loadedServerQueue(t, "open")
+
+	if got := m.header().RunState(); got != RunIdle {
+		t.Fatalf("queueRunState = %v, want idle", got)
+	}
+	body := strings.Join(m.header().BodyLines(), "\n")
+	if strings.Contains(body, "press enter") {
+		t.Errorf("idle banner %q tells the user to press enter in server mode", body)
+	}
+}
+
+func TestQueueServerMode_EnterNeverStartsInProcessRun(t *testing.T) {
+	m, _ := loadedServerQueue(t, "open")
+
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	nm := next.(QueueModel)
+
+	if len(nm.server.RunningEpics) != 0 || nm.confirm.IsOpen {
+		t.Errorf("enter opened an in-process run: running=%v confirm=%v",
+			nm.server.RunningEpics, nm.confirm.IsOpen)
+	}
+	_ = cmd
+}
+
+func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {
+	claimed := time.Now().Add(-10 * time.Minute)
+	m, _ := loadedServerQueueWith(t, "claimed", claimed, false)
+
+	if got := m.server.Live["gx:alpha"]["01"].StartedAt; !got.Equal(claimed) {
+		t.Errorf("startedAt = %v, want the server's claim time %v", got, claimed)
+	}
+}
+
+func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
+	m, _ := loadedServerQueueWith(t, "open", time.Time{}, true)
+
+	body := strings.Join(m.header().BodyLines(), "\n")
+	if !strings.Contains(body, "herdr unavailable") {
+		t.Errorf("header body %q does not say herdr is unavailable", body)
+	}
+}
+
+func TestQueueServerMode_HerdrDownBannerNamesWhatWaits(t *testing.T) {
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, HerdrUnavailable: true, HerdrText: "herdr is down; waiting: gx:alpha/01"}, nil)
+
+	body := strings.Join(m.header().BodyLines(), "\n")
+	if !strings.Contains(body, "waiting: gx:alpha/01") {
+		t.Errorf("header body %q does not name the waiting ticket", body)
+	}
+}
+
+// The web UI queues a whole epic as one epic-address item, which names no
+// ticket; every ticket of that epic must still show.
+func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
+	}}, []wire.QueueItem{{Address: "gx:alpha"}})
+
+	var shown []string
+	for _, e := range m.rows.BuildEntries(m.rowsEnv()) {
+		if e.Value.Kind == NodeTicket {
+			shown = append(shown, e.Value.Ticket.Ticket.Path)
+		}
+	}
+	if want := []string{"gx:alpha/01", "gx:alpha/02"}; !slices.Equal(shown, want) {
+		t.Errorf("ticket rows = %v, want %v", shown, want)
+	}
+}
+
+// A conflict-resolution child runs inside its parent's merge, so the server has
+// no run for it: it still shows as resolving, and the parent as waiting on it.
+func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T) {
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
+		{Address: "gx:alpha/01a", Title: "Conflict resolution for 01", Status: "claimed",
+			Type: "conflict-resolution", Parent: "gx:alpha/01"},
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}})
+
+	child := m.server.Live["gx:alpha"]["01a"]
+	if !child.Running || child.Phase != rowfmt.LivePhaseResolvingConflicts {
+		t.Errorf("live[01a] = %+v, want running and resolving conflicts", child)
+	}
+	parent := m.server.Live["gx:alpha"]["01"]
+	if !parent.Running || parent.WaitingOn != "01a" {
+		t.Errorf("live[01] = %+v, want running and waiting on 01a", parent)
+	}
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.Epics[0].Tickets[0], parent, "")
+	if suffix != "(waiting on 01a...)" {
+		t.Errorf("parent suffix = %q, want %q", suffix, "(waiting on 01a...)")
+	}
+}
+
+func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "done"},
+		{Address: "gx:alpha/02", Title: "Merge alpha", Status: "claimed", Type: "merge", ClaimedAt: time.Now()},
+	}}, []wire.QueueItem{{Address: "gx:alpha/02"}})
+
+	live := m.server.Live["gx:alpha"]["02"]
+	if !live.Running || live.Phase != rowfmt.LivePhaseMerging {
+		t.Errorf("live[02] = %+v, want running and merging", live)
+	}
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.rows.Epics[0].Tickets[1], live, "")
+	if suffix != "(merging...)" {
+		t.Errorf("suffix = %q, want %q", suffix, "(merging...)")
+	}
+	if got := m.header().Title(); !strings.HasPrefix(got, "Queue · 1 of 2 done · ") {
+		t.Errorf("queueHeaderTitle() = %q, want the merge ticket counted: \"Queue · 1 of 2 done · ...\"", got)
+	}
+}
+
+func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
+	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "Widened", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic2/b"},
+			ExternalBlockers: []string{"epic2/b"}, WidenedBlockers: map[string]string{"epic2/b": "epic2"}},
+		{Address: "gx:alpha/02", Title: "Whole epic", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic3"},
+			ExternalBlockers: []string{"epic3"}},
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+
+	epic := m.rows.Epics[0]
+	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
+		tk := epic.Tickets[i]
+		if got := rowfmt.BlockedBySuffix(epic, tk, rowfmt.TicketStatus(epic, tk)); got != want {
+			t.Errorf("blockedBySuffix(%s) = %q, want %q", tk.Identifier, got, want)
+		}
+	}
+}
+
+func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) {
+	m, _ := loadedServerQueueWith(t, "claimed", time.Time{}, false)
+
+	if len(m.server.RunningEpics) != 0 {
+		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.server.RunningEpics)
+	}
+	if got := m.header().RunState(); got != RunIdle {
+		t.Errorf("queueRunState = %v, want idle", got)
+	}
+}
+
+// A later delivery replaces the rows with no reload: a claim shows up running.
+func TestQueueServerMode_NewDeliveryUpdatesRunningStateWithoutReload(t *testing.T) {
+	m, _ := loadedServerQueue(t, "open")
+	if len(m.server.RunningEpics) != 0 {
+		t.Fatalf("runningEpics = %v, want idle before the claim", m.server.RunningEpics)
+	}
+
+	m, cmd := deliverQueueTo(m, wire.Snapshot{Seq: 2, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+
+	if !m.server.RunningEpics["gx:alpha"] || cmd == nil {
+		t.Errorf("runningEpics = %v, cmd = %v, want running with a spinner tick", m.server.RunningEpics, cmd)
+	}
+}
+
+func TestQueueServerMode_ActivationRestartsSpinner(t *testing.T) {
+	m, _ := loadedServerQueue(t, "claimed")
+
+	next, cmd := m.Update(m.OnPageActivated()())
+	_ = next
+	if cmd == nil {
+		t.Fatal("activation returned no spinner tick for a running queue")
+	}
+
+	idle, _ := loadedServerQueue(t, "open")
+	if _, cmd := idle.Update(idle.OnPageActivated()()); cmd != nil {
+		t.Error("activation started a spinner for an idle queue")
+	}
+}
+
+func TestQueueServerMode_PausedFollowsDeliveredMode(t *testing.T) {
+	m, _ := loadedServerQueue(t, "open")
+	if m.server.Paused {
+		t.Fatal("paused before any mode change")
+	}
+
+	st := viewmodel.State{Seq: 1, Loaded: true, Mode: wire.QueueModePaused}
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
+
+	if !next.(QueueModel).server.Paused {
+		t.Error("paused = false after a delivered paused mode")
+	}
+}
+
+func TestQueueServerMode_ReloadAsksShellForSnapshot(t *testing.T) {
+	m, _ := loadedServerQueue(t, "open")
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
+
+	if cmd == nil {
+		t.Fatal("R returned no command")
+	}
+	if _, ok := cmd().(tabapi.ResnapshotRequestedMsg); !ok {
+		t.Errorf("R produced %T, want tabapi.ResnapshotRequestedMsg", cmd())
+	}
+}
+
+func TestQueueServerMode_InitDoesNotFetch(t *testing.T) {
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(tickettest.FakeServerAPI{}, nil).WithTickets(tickettest.FakeServerAPI{}).WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
+
+	if cmd := m.Init(); cmd != nil {
+		t.Errorf("Init returned a command in server mode")
+	}
+}
+
+// The server dequeues a root only when its epic completes, so a ticket that
+// turns done after a ticket-done event keeps its row without a queue refetch.
+func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testing.T) {
+	m, _ := loadedServerQueue(t, "claimed")
+	st := applySnapshot(viewmodel.State{}, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
+	}}).SetQueue([]wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+	st, _ = st.Reduce(wire.Event{Seq: 2, Type: wire.EventTicketDone, Address: "gx:alpha/01"})
+
+	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
+	view := next.(QueueModel).View().Content
+	if !strings.Contains(view, "First") {
+		t.Fatalf("done ticket's row vanished:\n%s", view)
+	}
+}

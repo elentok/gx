@@ -8,7 +8,6 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
-	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -49,53 +48,5 @@ func TestModel_ClickOnEpicIconTogglesIt(t *testing.T) {
 		if got := len(m.sidebarTree.Entries()); got != before {
 			t.Fatalf("x=%d: second click should re-expand, entries %d, want %d", x, got, before)
 		}
-	}
-}
-
-func TestQueueModel_ClickOnTicketIconTogglesIt(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	tickettest.WriteTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
-	tickettest.WriteRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
-	checked := map[string]bool{
-		tickettest.TicketPath(root, "alpha", "01-parent.md"): true,
-		tickettest.TicketPath(root, "alpha", "02-child.md"):  true,
-	}
-	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
-
-	parentIdx := -1
-	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == queue.NodeTicket && e.HasChildren {
-			parentIdx = i
-			break
-		}
-	}
-	if parentIdx < 0 {
-		t.Fatal("no parent ticket entry")
-	}
-	parent := m.rows.Tree.Entries()[parentIdx]
-	iconX := rowfmt.PanelPaddingX + tree.LabelColumn(parent) + 1
-	y := 1 + len(m.header().BodyLines()) + parentIdx
-	before := len(m.rows.Tree.Entries())
-
-	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: iconX + 10, Y: y})
-	m = updated.(QueueModel)
-	if got := len(m.rows.Tree.Entries()); got != before {
-		t.Fatalf("click off the icon changed entries: %d -> %d", before, got)
-	}
-
-	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: iconX, Y: y})
-	m = updated.(QueueModel)
-	if got := len(m.rows.Tree.Entries()); got != before-1 {
-		t.Fatalf("click on icon should collapse the ticket, entries %d -> %d", before, got)
-	}
-	if m.rows.Tree.SelectedIndex() != parentIdx {
-		t.Fatalf("click should select the parent row %d, got %d", parentIdx, m.rows.Tree.SelectedIndex())
-	}
-
-	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: iconX, Y: y})
-	m = updated.(QueueModel)
-	if got := len(m.rows.Tree.Entries()); got != before {
-		t.Fatalf("second click should re-expand, entries %d, want %d", got, before)
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
-	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 // hoverFixture drives the Tickets and Queue tabs through the same hover cases.
@@ -54,41 +53,10 @@ func ticketsHoverFixture(t *testing.T) hoverFixture {
 	}
 }
 
-func queueHoverFixture(t *testing.T) hoverFixture {
-	t.Helper()
-	root := t.TempDir()
-	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	tickettest.WriteTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{
-		tickettest.TicketPath(root, "alpha", "01-first.md"):  true,
-		tickettest.TicketPath(root, "alpha", "02-second.md"): true,
-	}
-	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
-	other := -1
-	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == queue.NodeTicket && i != m.rows.Tree.SelectedIndex() {
-			other = i
-		}
-	}
-	return hoverFixture{
-		model:    m,
-		selected: m.rows.Tree.SelectedIndex(),
-		other:    other,
-		outside:  m.layout().previewRect(),
-		rowY:     func(entry int) int { return 1 + queue.HeaderReservedLines + entry },
-		state: func(tm tea.Model) (int, int, bool) {
-			tree := tm.(QueueModel).rows.Tree
-			hovered, ok := tree.HoveredIndex()
-			return tree.SelectedIndex(), hovered, ok
-		},
-	}
-}
-
 func eachHoverTab(t *testing.T, run func(t *testing.T, f hoverFixture)) {
 	t.Helper()
 	for name, build := range map[string]func(*testing.T) hoverFixture{
 		"tickets": ticketsHoverFixture,
-		"queue":   queueHoverFixture,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

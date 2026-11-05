@@ -60,10 +60,5 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 		if len(m.epics) != 1 {
 			t.Fatalf("Model from %q: expected 1 epic loaded from shared .scratch, got %d", wt, len(m.epics))
 		}
-
-		qm := loadQueueModel(t, withChecked(NewQueueModel(wt, settings, keys.Manager{}), map[string]bool{}))
-		if len(qm.rows.Epics) != 1 {
-			t.Fatalf("QueueModel from %q: expected 1 epic loaded from shared .scratch, got %d", wt, len(qm.rows.Epics))
-		}
 	}
 }

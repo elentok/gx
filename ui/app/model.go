@@ -23,6 +23,7 @@ import (
 	stashlistui "github.com/elentok/gx/ui/stashlist"
 	statusui "github.com/elentok/gx/ui/status"
 	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/worktrees"
 )
 
@@ -126,8 +127,8 @@ func cwdProjectName(store, root string) string {
 	return gxtickets.ProjectName(dir)
 }
 
-func (m Model) newQueueModel(root string, s ui.Settings, focusEpic string) ticketsui.QueueModel {
-	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings())).WithFocusEpic(focusEpic)
+func (m Model) newQueueModel(root string, s ui.Settings, focusEpic string) queue.QueueModel {
+	qm := queue.NewQueueModel(root, s, keys.New(Bindings())).WithFocusEpic(focusEpic)
 	if m.settings.Server != nil {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start).WithAdmin(m.settings.Server.Admin).WithSessions(m.settings.Server.Sessions).WithTickets(m.settings.Server.Tickets).WithQueue(m.settings.Server.Queue).WithReads(m.settings.Server.Reads)
 	}

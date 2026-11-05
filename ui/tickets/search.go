@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 // ticketRef identifies a ticket by its epic and position within that epic's
@@ -43,11 +44,11 @@ func (m *Model) recomputeSearchMatches() {
 	// sidebarNode's ticketIdx.
 	wanted := map[ticketRef]bool{}
 	for epicIdx, epic := range m.epics {
-		if epicMatchesQuery(epic, q) {
+		if rowfmt.EpicMatchesQuery(epic, q) {
 			wanted[ticketRef{epicIdx: epicIdx, ticketIdx: -1}] = true
 		}
 		for ticketIdx, t := range epic.Tickets {
-			if ticketMatchesQuery(epic, t, q) {
+			if rowfmt.TicketMatchesQuery(epic, t, q) {
 				wanted[ticketRef{epicIdx: epicIdx, ticketIdx: ticketIdx}] = true
 			}
 		}

@@ -184,28 +184,6 @@ func TestWatchLive_CloseStopsTick(t *testing.T) {
 	}
 }
 
-func TestQueueWatch_OpensLiveModal(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "out.jsonl")
-	appendWatchLog(t, path, "hello from the queue")
-	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return false }}, nil)
-
-	m := newServerQueueModel(t, nil)
-	m = selectFirstQueueTicketRow(t, m)
-	_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Watch")
-	if cmd == nil {
-		t.Fatal("Watch returned no Cmd")
-	}
-	next, tick := m.Update(cmd())
-	m = next.(QueueModel)
-	t.Cleanup(func() { m.watch.Close() })
-	if view := m.watch.View(); !m.watch.IsOpen() || !strings.Contains(view, "hello from the queue") || !strings.Contains(view, "· live") {
-		t.Errorf("Queue Watch did not open the live modal:\n%s", view)
-	}
-	if tick == nil {
-		t.Error("Queue Watch armed no tick")
-	}
-}
-
 func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "transcript.jsonl")
 	appendWatchLog(t, path, "pty conversation")
@@ -432,14 +410,6 @@ func TestWatch_NoOrPrunedLogDims(t *testing.T) {
 				t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 			}
 		})
-		t.Run(name+"/queue", func(t *testing.T) {
-			fakeNativeLog(t, c.log, c.err)
-			m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
-			_, ready := requestQueueMenu(t, m)
-			if got := itemByLabel(t, ready.Items, "Watch").Disabled; got != rowactions.NoAgentLog {
-				t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
-			}
-		})
 	}
 }
 
@@ -535,23 +505,6 @@ func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
 		m, ready := requestTicketMenu(t, watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", "")).WithReads(tickettest.FakeReads{FakeServerAPI: herdrAPI("claude", "")}))
 		updated, _ := m.Update(ready)
 		_, cmd := chooseTicketMenuItem(t, updated.(Model), "Go to pane")
-		if cmd == nil {
-			t.Fatal("Go to pane returned no Cmd")
-		}
-		cmd()
-		if !slices.Equal(*focused, []string{"t1"}) {
-			t.Errorf("focused = %v, want [t1]", *focused)
-		}
-	})
-	t.Run("queue", func(t *testing.T) {
-		fakeHerdrOnlyLog(t)
-		focused := fakeFocus(t)
-		m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
-		if _, ready := requestQueueMenu(t, m); hasItem(ready.Items, "Go to pane") {
-			t.Error("Go to pane shown for a ticket with no herdr agent")
-		}
-		m.server.ServerAPI, m.srv.Reads = herdrAPI("codex", ""), tickettest.FakeReads{FakeServerAPI: herdrAPI("codex", "")}
-		_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Go to pane")
 		if cmd == nil {
 			t.Fatal("Go to pane returned no Cmd")
 		}

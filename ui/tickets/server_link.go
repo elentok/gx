@@ -7,11 +7,6 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// olderServerNotice replaces every tab's ticket data when the server predates
-// rendered status and epic summaries. There is no client-side fallback: the TUI
-// and the server ship in one binary.
-const olderServerNotice = "older server — update the server"
-
 // serverBlockedBindings lists every binding that needs a writable server. A
 // new server-backed binding needs an entry here — nothing else enforces that.
 var serverBlockedBindings = map[keys.BindingID]bool{

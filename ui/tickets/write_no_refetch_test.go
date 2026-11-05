@@ -54,17 +54,6 @@ func TestStatusChanged_DownModeReloadsDisk(t *testing.T) {
 	}
 }
 
-func TestWrites_QueueTabOnlyToasts(t *testing.T) {
-	m, _ := loadedServerQueue(t, "open")
-	for name, msg := range map[string]tea.Msg{
-		"remove": queue.ServerRemovedMsg{Removed: 1},
-		"action": queue.ServerDoneMsg{OK: "queue paused"},
-	} {
-		_, cmd := m.Update(msg)
-		assertOnlyToast(t, name, cmd)
-	}
-}
-
 // Seam: a successful add (single or epic) toasts and switches to the Queue
 // tab; a total failure only toasts.
 func TestWrites_AddToQueueSwitchesToQueueTab(t *testing.T) {

@@ -1,12 +1,14 @@
 package rowactions
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/notify"
@@ -38,6 +40,12 @@ type Editor struct {
 // Edit launches the editor on path. An archived row opens read-only.
 func (e Editor) Edit(path string, splitType terminalrun.SplitType, readOnly bool) tea.Cmd {
 	return LaunchTicketEditor(e.WorktreeRoot, e.Settings, path, splitType, readOnly)
+}
+
+// FormatTicketSummary renders a ticket for the "yy" chord: "{epic} - {id}
+// {title}".
+func FormatTicketSummary(epicName string, t tickets.Ticket) string {
+	return fmt.Sprintf("%s - %s %s", epicName, t.DisplayNumber(), t.Title)
 }
 
 // Yank copies text to the clipboard and reports "yanked <what>".

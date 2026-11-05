@@ -29,24 +29,11 @@ func TestOlderServer_TicketsTabShowsNoticeAndNoTickets(t *testing.T) {
 	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
 	next, _ = next.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	view := ansi.Strip(next.View().Content)
-	if !strings.Contains(view, olderServerNotice) || strings.Contains(view, "First") {
+	if !strings.Contains(view, tabapi.OlderServerNotice) || strings.Contains(view, "First") {
 		t.Fatalf("view = %s", view)
 	}
 	if got := len(next.(Model).epics); got != 0 {
 		t.Fatalf("epics = %d, want none (no ticket data for menu, preview or search)", got)
-	}
-}
-
-func TestOlderServer_QueueTabShowsNoticeAndNoTickets(t *testing.T) {
-	m := newServerQueueModel(t, nil)
-	st := olderServerState()
-	next, _ := m.WithServerState(&st, tabapi.ServerLinkUp)
-	view := ansi.Strip(next.View().Content)
-	if !strings.Contains(view, olderServerNotice) || strings.Contains(view, "First") {
-		t.Fatalf("view = %s", view)
-	}
-	if got := len(next.(QueueModel).rows.Epics); got != 0 {
-		t.Fatalf("epics = %d, want none", got)
 	}
 }
 
@@ -59,16 +46,8 @@ func TestOlderServer_CurrentServerClearsNotice(t *testing.T) {
 	}})
 	next, _ = next.(Model).WithServerState(&current, tabapi.ServerLinkUp)
 	next, _ = next.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	if view := ansi.Strip(next.View().Content); strings.Contains(view, olderServerNotice) {
+	if view := ansi.Strip(next.View().Content); strings.Contains(view, tabapi.OlderServerNotice) {
 		t.Fatalf("notice stays after a current server's snapshot:\n%s", view)
-	}
-}
-
-func TestNoServer_QueueSaysServerNotRunning(t *testing.T) {
-	m := newServerQueueModel(t, nil)
-	next, _ := m.WithServerState(nil, tabapi.ServerLinkDown)
-	if view := ansi.Strip(next.View().Content); !strings.Contains(view, "server not running") {
-		t.Fatalf("view = %s", view)
 	}
 }
 

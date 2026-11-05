@@ -63,6 +63,11 @@ type SessionsAPI interface {
 	FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire.FixAgentResult, error)
 }
 
+// OlderServerNotice replaces every tab's ticket data when the server predates
+// rendered status and epic summaries. There is no client-side fallback: the TUI
+// and the server ship in one binary.
+const OlderServerNotice = "older server — update the server"
+
 // ServerLink is how the Tickets tab currently reaches the server. The zero
 // value is "no restriction" (up).
 type ServerLink int

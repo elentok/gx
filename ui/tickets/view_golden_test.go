@@ -5,15 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -75,41 +72,3 @@ func selectGoldenTicket(t *testing.T, m Model) Model {
 
 // goldenModelView renders a Model and returns the plain view text.
 func goldenModelView(m Model) string { return m.View().Content }
-
-// goldenQueue builds a server-mode QueueModel at the golden size, with the
-// clock fixed.
-func goldenQueue(t *testing.T) QueueModel {
-	t.Helper()
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).
-		WithServerLink(tickettest.FakeServerAPI{}, nil).
-		WithTickets(tickettest.FakeServerAPI{}).
-		WithAdmin(tickettest.FakeAdmin{FakeServerAPI: tickettest.FakeServerAPI{}}).
-		WithQueue(tickettest.FakeQueue{FakeServerAPI: tickettest.FakeServerAPI{}}).
-		WithReads(tickettest.FakeReads{FakeServerAPI: tickettest.FakeServerAPI{}})
-	next, _ := m.Update(tea.WindowSizeMsg{Width: goldenWidth, Height: goldenHeight})
-	return next.(QueueModel)
-}
-
-// goldenQueueState delivers snap and queue to m and fixes the clock.
-func goldenQueueState(m QueueModel, snap wire.Snapshot, queue []wire.QueueItem, now time.Time) QueueModel {
-	m, _ = deliverQueueTo(m, snap, queue)
-	m.now = func() time.Time { return now }
-	return m
-}
-
-// setGoldenLive stamps the live row's token count, the one live field the
-// state delivery does not carry.
-func setGoldenLive(m QueueModel, epic, id string, tokens int) QueueModel {
-	l := m.server.Live[epic][id]
-	l.Tokens = tokens
-	m.server.Live[epic][id] = l
-	return m
-}
-
-func goldenSnapshotTickets(status string, claimedAt time.Time) []wire.TicketInfo {
-	return []wire.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "done", ElapsedTime: 754, ActualContextWindow: 45_200, ActualCost: 1.5},
-		{Address: "gx:alpha/02", Title: "Second", Status: status, ClaimedAt: claimedAt},
-		{Address: "gx:alpha/03", Title: "Third", Status: "open", BlockedBy: []string{"gx:alpha/02"}},
-	}
-}

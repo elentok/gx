@@ -6,21 +6,10 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 )
 
 var muted = tickettest.Muted
-
-func queueWithTicket(t *testing.T, m QueueModel, reason schema.PauseReason, mutes []schema.MuteRecord) QueueModel {
-	t.Helper()
-	m.rows.Epics[0].Tickets[0].Status = string(schema.StatusPaused)
-	m.rows.Epics[0].Tickets[0].PauseReason = reason
-	m.rows.Epics[0].Tickets[0].Mutes = mutes
-	m.clampSelected()
-	m = selectFirstQueueTicketRow(t, m)
-	return m
-}
 
 // writeMenuTicketFile writes a paused (answer) ticket file and returns its path.
 func writeMenuTicketFile(t *testing.T) string {

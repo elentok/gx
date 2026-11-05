@@ -6,31 +6,20 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/terminalrun"
-	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
 // The root half of rowactions.Menus: each tab model adapts itself to
 // rowactions.Tab and forwards its Update cases. Nothing here belongs with the
-// menus, which never see Model or QueueModel.
+// menus, which never see Model.
 
-// modelMenuTab and queueMenuTab adapt a tab model to rowactions.Tab.
+// modelMenuTab adapts the Tickets tab model to rowactions.Tab.
 type modelMenuTab struct{ m Model }
-
-type queueMenuTab struct{ m QueueModel }
 
 func (m Model) menuEnv() rowactions.Env {
 	return rowactions.Env{
 		ServerAPI: m.serverAPI, Admin: m.admin, Reads: m.reads, Sessions: m.sessions,
 		Tickets: m.tickets, Queue: m.queue, Link: m.link, Settings: m.settings,
-		Width: m.width, WorktreeRoot: m.worktreeRoot,
-	}
-}
-
-func (m QueueModel) menuEnv() rowactions.Env {
-	return rowactions.Env{
-		ServerAPI: m.server.ServerAPI, Admin: m.srv.Admin, Reads: m.srv.Reads, Sessions: m.sessions,
-		Tickets: m.srv.Tickets, Queue: m.srv.Queue, Link: m.server.Link, Settings: m.settings,
 		Width: m.width, WorktreeRoot: m.worktreeRoot,
 	}
 }
@@ -62,28 +51,6 @@ func (t modelMenuTab) Selection() rowactions.Selection {
 		Session:    rowactions.TicketSession(m.vm.Sessions, epic.Path, ticket),
 		QueueAgent: rowactions.QueueAgentOf(m.vm.Sessions, ticket.Path),
 	}
-}
-
-func (t queueMenuTab) Env() rowactions.Env                      { return t.m.menuEnv() }
-func (t queueMenuTab) ModalOpen() bool                          { return t.m.ModalOpen() }
-func (t queueMenuTab) YankSummary() tea.Cmd                     { return t.m.yankQueueTicketSummary() }
-func (t queueMenuTab) YankFilePath() tea.Cmd                    { return t.m.yankQueueTicketFilePath() }
-func (t queueMenuTab) EditFile(s terminalrun.SplitType) tea.Cmd { return t.m.cmdEditSelectedFile(s) }
-
-func (t queueMenuTab) Selection() rowactions.Selection {
-	m := t.m
-	if epic, ok := m.selectedQueueEpic(); ok {
-		return rowactions.Selection{
-			OK: true, IsEpic: true, Epic: epic,
-			Queueable: rowactions.EpicQueueable(epic, m.checkedPaths()),
-			Actions:   m.server.Summaries[epic.Name].Actions,
-		}
-	}
-	r, ok := m.selectedQueueRow()
-	if !ok {
-		return rowactions.Selection{}
-	}
-	return rowactions.Selection{OK: true, Epic: r.Epic, Ticket: r.Ticket}
 }
 
 // handleSuggestedActionsKey applies the "m" keymap.
@@ -148,36 +115,4 @@ func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.C
 	next, cmd, _ := m.confirm.UpdateMouse(msg, m.width, m.width, m.height)
 	m.confirm = next
 	return m, cmd
-}
-
-// handleQueueTicketMenuKey applies the "m" keymap.
-func (m QueueModel) handleQueueTicketMenuKey() (tea.Model, tea.Cmd) {
-	cmd := m.menus.HandleKey(queueMenuTab{m})
-	return m, cmd
-}
-
-// selectedQueuePath is the selected ticket row's path, or "" off a ticket.
-func (m QueueModel) selectedQueuePath() string {
-	r, _ := m.selectedQueueRow()
-	return r.Ticket.Path
-}
-
-// selectedQueueEpic is the selected epic header's epic; ok is false off one.
-func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
-	entries := m.rows.Tree.Entries()
-	idx := m.rows.Tree.SelectedIndex()
-	if idx < 0 || idx >= len(entries) || entries[idx].Value.Kind != queue.NodeEpicName {
-		return tickets.Epic{}, false
-	}
-	return entries[idx].Value.Epic, true
-}
-
-// menuAnchor is the selected queue row on screen, under the panel's header
-// line and the queue header, for the Context menu to open next to.
-func (m QueueModel) menuAnchor() contextmenu.Anchor {
-	line, h, ok := m.rows.Tree.SelectedBodyLine()
-	if !ok {
-		return contextmenu.Anchor{}
-	}
-	return contextmenu.Anchor{X: 1, Y: 1 + queue.HeaderReservedLines + line, H: h}
 }

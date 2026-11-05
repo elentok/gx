@@ -14,7 +14,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 var ctrlO = tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
@@ -361,7 +361,7 @@ func TestSwitch_ToQueueWithAnEpicAddressFocusesThatEpic(t *testing.T) {
 	if got := m.navState.ActiveTab(); got != nav.TabQueue {
 		t.Fatalf("active tab = %q, want queue", got)
 	}
-	if _, ok := m.activePage().model.(ticketsui.QueueModel); !ok {
+	if _, ok := m.activePage().model.(queue.QueueModel); !ok {
 		t.Fatalf("queue page = %#v, want a QueueModel", m.activePage().model)
 	}
 }

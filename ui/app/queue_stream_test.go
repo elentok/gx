@@ -10,12 +10,12 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui/nav"
-	ticketsui "github.com/elentok/gx/ui/tickets"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 func queueView(h *harness) string {
 	h.t.Helper()
-	q, ok := h.m.activePage().model.(ticketsui.QueueModel)
+	q, ok := h.m.activePage().model.(queue.QueueModel)
 	if !ok {
 		h.t.Fatalf("active page is %T, want the Queue tab", h.m.activePage().model)
 	}

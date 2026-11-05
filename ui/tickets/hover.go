@@ -4,16 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/tickets/queue"
 )
-
-// newHoverView is ui.NewMainView in all-motion mode, so the terminal reports
-// motion with no button held.
-func newHoverView(content string) tea.View {
-	v := ui.NewMainView(content)
-	v.MouseMode = tea.MouseModeAllMotion
-	return v
-}
 
 // hoverTarget is the sidebar entry under a motion event: none while a modal
 // is open or outside the sidebar panel.
@@ -44,19 +35,4 @@ func (m *Model) refreshHover(msg tea.Msg) {
 	} else if m.ModalOpen() {
 		m.sidebarTree.SetHoveredIndex(0, false)
 	}
-}
-
-// queueHoverTarget is QueueModel's hoverTarget: the run-state banner above
-// the tree holds no rows.
-func (m QueueModel) queueHoverTarget(msg tea.MouseMotionMsg) (int, bool) {
-	mouse := msg.Mouse()
-	rect := m.layout().treeRect()
-	if m.ModalOpen() || !rect.Contains(mouse.X, mouse.Y) {
-		return -1, false
-	}
-	return m.rows.Tree.EntryAtBodyLine(mouse.Y - rect.Y - 1 - queue.HeaderReservedLines)
-}
-
-func (m QueueModel) HoverChanges(msg tea.MouseMotionMsg) bool {
-	return m.rows.Tree.SetHoveredIndex(m.queueHoverTarget(msg))
 }

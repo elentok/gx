@@ -1,0 +1,133 @@
+package queue
+
+import (
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/rowactions"
+)
+
+// runKey sends a key and feeds the command's message back once.
+func runKey(t *testing.T, m QueueModel, k tea.KeyPressMsg) (QueueModel, tea.Msg) {
+	t.Helper()
+	next, cmd := m.Update(k)
+	m = next.(QueueModel)
+	if cmd == nil {
+		return m, nil
+	}
+	msg := cmd()
+	next, _ = m.Update(msg)
+	return next.(QueueModel), msg
+}
+
+func harnessQueue(t *testing.T, api tickettest.FakeServerAPI, project string) QueueModel {
+	m := newMaintenanceQueue(t, api)
+	m.rows.ProjectFilter = project
+	return m
+}
+
+func TestDefaultHarness_GlobalPickerSendsGlobalRequest(t *testing.T) {
+	sets := &[]wire.SetDefaultHarnessRequest{}
+	m := harnessQueue(t, tickettest.FakeServerAPI{
+		Harness:     wire.DefaultHarnessStatus{Default: "claude"},
+		HarnessSets: sets,
+		HarnessRes:  wire.SetDefaultHarnessResult{Notice: "switched"},
+	}, "")
+
+	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
+	if !m.harnessPicker.Open || len(m.harnessPicker.Menu.Items) != 2 {
+		t.Fatalf("global picker = %+v", m.harnessPicker)
+	}
+	if it, _ := m.harnessPicker.Menu.Selected(); it.Value != "claude" {
+		t.Fatalf("cursor starts on %q, want the current value claude", it.Value)
+	}
+	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyDown})
+	m, msg := runKey(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if m.harnessPicker.Open {
+		t.Fatal("picker still open after enter")
+	}
+	want := wire.SetDefaultHarnessRequest{Scope: "global", Harness: "codex"}
+	if len(*sets) != 1 || (*sets)[0] != want {
+		t.Fatalf("requests = %+v, want %+v", *sets, want)
+	}
+	if _, ok := msg.(DefaultHarnessWroteMsg); !ok {
+		t.Fatalf("enter produced %T", msg)
+	}
+}
+
+func TestDefaultHarness_ProjectPickerFollowGlobalSendsEmptyHarness(t *testing.T) {
+	sets := &[]wire.SetDefaultHarnessRequest{}
+	m := harnessQueue(t, tickettest.FakeServerAPI{
+		Harness: wire.DefaultHarnessStatus{
+			Default:  "claude",
+			Projects: []wire.ProjectDefaultHarness{{Project: "gx", Harness: "codex"}},
+		},
+		HarnessSets: sets,
+	}, "gx")
+
+	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
+	if len(m.harnessPicker.Menu.Items) != 3 || m.harnessPicker.Menu.Items[0].Label != "Follow global" {
+		t.Fatalf("project picker items = %+v", m.harnessPicker.Menu.Items)
+	}
+	if it, _ := m.harnessPicker.Menu.Selected(); it.Value != "codex" {
+		t.Fatalf("cursor starts on %q, want the override codex", it.Value)
+	}
+	if view := m.harnessPicker.View(m.width); !strings.Contains(view, "gx") {
+		t.Fatalf("picker is not titled with the project:\n%s", view)
+	}
+	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyUp})
+	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyUp})
+	runKey(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	want := wire.SetDefaultHarnessRequest{Scope: "project", Project: "gx", Harness: ""}
+	if len(*sets) != 1 || (*sets)[0] != want {
+		t.Fatalf("requests = %+v, want %+v", *sets, want)
+	}
+}
+
+func TestDefaultHarness_RefusalShowsMessage(t *testing.T) {
+	m := harnessQueue(t, tickettest.FakeServerAPI{
+		Harness:     wire.DefaultHarnessStatus{Default: "claude"},
+		HarnessSets: &[]wire.SetDefaultHarnessRequest{},
+		HarnessRes:  wire.SetDefaultHarnessResult{Refused: true, Message: "codex is not on PATH"},
+	}, "")
+	m, _ = runKey(t, m, tea.KeyPressMsg{Code: 'H', Text: "H"})
+	m, _ = runKey(t, m, tea.KeyPressMsg{Code: tea.KeyDown})
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, toast := next.(QueueModel).Update(cmd())
+	if toast == nil {
+		t.Fatal("no toast for the refusal")
+	}
+	got, ok := toast().(notify.NotifyMsg)
+	if !ok || !strings.Contains(got.Message, "refused: codex is not on PATH") {
+		t.Fatalf("toast = %#v", toast())
+	}
+}
+
+func TestDefaultHarness_NoServerWarnsAndOpensNothing(t *testing.T) {
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil))
+	next, cmd := m.Update(tea.KeyPressMsg{Code: 'H', Text: "H"})
+	if next.(QueueModel).harnessPicker.Open {
+		t.Fatal("picker opened without a server")
+	}
+	got, ok := cmd().(notify.NotifyMsg)
+	if !ok || got.Message != rowactions.ServerNotRunning {
+		t.Fatalf("toast = %#v", cmd())
+	}
+}
+
+func TestDefaultHarness_HelpListsTheBinding(t *testing.T) {
+	m := harnessQueue(t, tickettest.FakeServerAPI{}, "")
+	m.help.Open(m.width, m.height)
+	if view := m.help.View(); !strings.Contains(view, "Default harness...") {
+		t.Fatalf("help lacks the binding:\n%s", view)
+	}
+}

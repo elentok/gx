@@ -103,7 +103,7 @@ type Model struct {
 	// writes it (server_link.go).
 	link tabapi.ServerLink
 	// olderServer: the last snapshot came from a server without rendered
-	// status; the tab shows olderServerNotice and no tickets.
+	// status; the tab shows tabapi.OlderServerNotice and no tickets.
 	olderServer bool
 	vm          viewmodel.State
 	// scope is which projects the tab shows; owned by the tab, so no snapshot
@@ -368,7 +368,7 @@ func (m Model) sidebarViewportHeight() int {
 // an empty active `.scratch/` alone must not suppress the whole tree.
 func (m Model) sidebarBody(sidebarViewportH, width int) []string {
 	if m.olderServer {
-		return []string{ui.StyleWarning.Render("  " + olderServerNotice)}
+		return []string{ui.StyleWarning.Render("  " + tabapi.OlderServerNotice)}
 	}
 	if m.loaded && len(m.epics) == 0 && m.archivedEpicCount == 0 {
 		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
@@ -471,7 +471,7 @@ func (m Model) scratchDir() string {
 
 func (m Model) View() tea.View {
 	if !m.ready {
-		return newHoverView("\n  Initializing…")
+		return ui.NewHoverView("\n  Initializing…")
 	}
 	content := m.normalView()
 	if m.menus.Menu.IsOpen {
@@ -498,7 +498,7 @@ func (m Model) View() tea.View {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 		}
 	}
-	return newHoverView(content)
+	return ui.NewHoverView(content)
 }
 
 // activeInputSearch returns whichever of the sidebar's or preview's search

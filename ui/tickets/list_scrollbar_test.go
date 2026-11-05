@@ -107,28 +107,3 @@ func TestModel_CtrlDCtrlUPagesSidebar(t *testing.T) {
 		t.Fatalf("expected ctrl+u to clamp at 0, got %d", m.sidebarTree.SelectedIndex())
 	}
 }
-
-func TestQueueModel_ScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	tickettest.WriteTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{tickettest.TicketPath(root, "epic", "01-only-ticket.md"): true}
-
-	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
-	shortContent := m.View().Content
-	if strings.Contains(shortContent, "┃") {
-		t.Fatalf("expected no queue scrollbar thumb when list fits, got:\n%s", shortContent)
-	}
-
-	checked2 := map[string]bool{}
-	for i := 1; i <= 60; i++ {
-		name := fmt.Sprintf("%02d-ticket.md", i)
-		tickettest.WriteTicket(t, root, "epic2", name, "Status: open\n\nBody.\n")
-		checked2[tickettest.TicketPath(root, "epic2", name)] = true
-	}
-	m2 := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked2))
-	longContent := m2.View().Content
-	if !strings.Contains(longContent, "┃") {
-		t.Fatalf("expected a queue scrollbar thumb when the list overflows, got:\n%s", longContent)
-	}
-}

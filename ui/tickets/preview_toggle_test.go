@@ -58,40 +58,9 @@ func TestModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 	}
 }
 
-func TestQueueModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	tickettest.WriteTicket(t, root, "alpha", "01-solo.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-solo.md"): true}
-
-	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = pressKeys(t, updated, 't', 'v').(QueueModel)
-
-	if !m.preview.Hidden {
-		t.Fatal("expected \"tv\" to hide the preview")
-	}
-	if r := m.layout().treeRect(); r.W != 120 {
-		t.Fatalf("expected list to fill the full width, got %d", r.W)
-	}
-	if strings.Contains(m.View().Content, "Preview") {
-		t.Fatal("expected no preview panel while hidden")
-	}
-
-	m = pressKeys(t, m, 'l').(QueueModel)
-	if m.preview.Focus != preview.FocusSidebar {
-		t.Fatalf("expected focus to stay on the list while preview hidden, got %v", m.preview.Focus)
-	}
-
-	m = pressKeys(t, m, 't', 'v').(QueueModel)
-	if m.preview.Hidden || !strings.Contains(m.View().Content, "Preview") {
-		t.Fatal("expected a second \"tv\" to show the preview again")
-	}
-}
-
 func TestPreviewToggle_ListedInHelp(t *testing.T) {
 	t.Parallel()
-	for name, km := range map[string]keys.Manager{"tickets": newTicketsManager(), "queue": newQueueKeysManager()} {
+	for name, km := range map[string]keys.Manager{"tickets": newTicketsManager()} {
 		found := false
 		for _, b := range km.Bindings() {
 			if strings.Join(b.Seq, " ") == "t v" && b.Title != "" {

@@ -65,36 +65,3 @@ func TestOpenHelp_TicketsIgnoredWhileModalOpen(t *testing.T) {
 		t.Fatal("OpenHelp opened help over the context menu")
 	}
 }
-
-func TestOpenHelp_QueueOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	tickettest.WriteTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{tickettest.TicketPath(root, "alpha", "01-first.md"): true}
-
-	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
-	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
-	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
-	updated, _ = updated.Update(nav.OpenHelp()())
-	m = updated.(QueueModel)
-
-	if !m.help.IsOpen {
-		t.Fatal("OpenHelp did not open help")
-	}
-	if m.search.Mode() != search.SearchModeNone || m.search.Query() != "" {
-		t.Fatalf("search not ended: mode %v query %q", m.search.Mode(), m.search.Query())
-	}
-}
-
-func TestOpenHelp_QueueIgnoredWhileTicketMenuOpen(t *testing.T) {
-	t.Parallel()
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.Manager{})
-	m.menus.Menu.IsOpen = true
-	if !m.ModalOpen() {
-		t.Fatal("the ticket menu does not count as a modal")
-	}
-	updated, _ := m.Update(nav.OpenHelp()())
-	if updated.(QueueModel).help.IsOpen {
-		t.Fatal("OpenHelp opened help over the ticket menu")
-	}
-}
