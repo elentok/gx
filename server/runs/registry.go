@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -36,8 +37,8 @@ type Run struct {
 
 // PauseEvent is the run's agent context on its pause event: the pause drops the
 // runs.json entry, so late-finish adoption finds the runner from here.
-func (r Run) PauseEvent() ralphloop.Event {
-	return ralphloop.Event{Agent: agent.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID, Model: r.Model, Effort: r.Effort}
+func (r Run) PauseEvent() runlog.Event {
+	return runlog.Event{Agent: agent.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID, Model: r.Model, Effort: r.Effort}
 }
 
 // RunnerHerdr is the Runner of every launch until the server launches

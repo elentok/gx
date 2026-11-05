@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -176,7 +177,7 @@ func TestFinishIteration_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPau
 		})
 	})
 
-	if out := driveIteration(t, d, scratchDir, ticketPath, noopEventSink{}); !out.Merged {
+	if out := driveIteration(t, d, scratchDir, ticketPath, runlog.NoopEventSink{}); !out.Merged {
 		t.Errorf("outcome = %+v, want merged", out)
 	}
 

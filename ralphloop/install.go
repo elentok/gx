@@ -17,6 +17,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // lockfileManagers maps each tracked lockfile name to the package manager that
@@ -191,7 +192,7 @@ func installDepsIn(d Deps, o OneIteration, path string) error {
 	if err != nil {
 		return err
 	}
-	_ = logEvent(o.ScratchDir, o.Epic, Event{
+	_ = runlog.AppendEvent(o.ScratchDir, o.Epic, runlog.Event{
 		Type:   string(events.DepsInstalled),
 		Ticket: o.Ticket.Identifier,
 		Agent:  o.Agent,

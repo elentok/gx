@@ -13,7 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/projects"
@@ -315,11 +315,11 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	}
 	// The merge writes under the project, where the manual merge and the
 	// tickets live, never under a phantom <store>/<epic>.
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.CherryPicked) }) {
+	if !slices.ContainsFunc(logged, func(ev runlog.Event) bool { return ev.Type == string(events.CherryPicked) }) {
 		t.Errorf("no cherry-picked event in the project's run log: %v", logged)
 	}
 	if _, err := os.Stat(filepath.Join(store, "epic-a")); !os.IsNotExist(err) {

@@ -3,7 +3,7 @@ package wire
 import (
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // ProjectInfo is one project in the /v1/projects payload.
@@ -28,8 +28,8 @@ type LockInfo struct {
 
 // History is the /v1/tickets/history payload: the ticket's events in log order.
 type History struct {
-	Address string            `json:"address"`
-	Events  []ralphloop.Event `json:"events"`
+	Address string         `json:"address"`
+	Events  []runlog.Event `json:"events"`
 }
 
 // Explanation is the /v1/tickets/explain payload: why the scheduler would or

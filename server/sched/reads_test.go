@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -27,7 +28,7 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	projectDir := filepath.Join(store, "proj")
 	for _, ticket := range []string{"01", "02", "01"} {
-		if err := ralphloop.AppendEvent(projectDir, "epic-a", ralphloop.Event{Type: string(events.CherryPicked), Ticket: ticket}); err != nil {
+		if err := runlog.AppendEvent(projectDir, "epic-a", runlog.Event{Type: string(events.CherryPicked), Ticket: ticket}); err != nil {
 			t.Fatal(err)
 		}
 	}

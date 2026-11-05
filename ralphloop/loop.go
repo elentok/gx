@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"strings"
 
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -73,13 +74,13 @@ type outcome struct {
 // tickets, in file order, each labeled with why the scheduler did or didn't
 // claim it this pass. claimed is the zero-value Ticket when this pass found
 // nothing to claim.
-func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket, claimed tickets.Ticket) []ScanDecision {
+func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket, claimed tickets.Ticket) []runlog.ScanDecision {
 	inFrontier := make(map[string]bool, len(frontier))
 	for _, t := range frontier {
 		inFrontier[t.Path] = true
 	}
 
-	decisions := make([]ScanDecision, 0, len(epic.Tickets))
+	decisions := make([]runlog.ScanDecision, 0, len(epic.Tickets))
 	for _, t := range epic.Tickets {
 		isClaimed := claimed.Path != "" && t.Path == claimed.Path
 		decisions = append(decisions, TicketVerdict(epic, scope, t, isClaimed, inFrontier[t.Path]))
@@ -90,28 +91,28 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 // TicketVerdict is the scheduler's single per-ticket eligibility decision:
 // why t was or wasn't claimed this pass, with the reason a scan line reports.
 // The first matching rule wins, so the order is the precedence.
-func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed, inFrontier bool) ScanDecision {
+func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed, inFrontier bool) runlog.ScanDecision {
 	status := epic.RenderedStatus(t)
-	d := ScanDecision{Ticket: t.Identifier, Status: status.Word()}
+	d := runlog.ScanDecision{Ticket: t.Identifier, Status: status.Word()}
 	switch {
 	case claimed:
-		d.Decision = DecisionClaimed
+		d.Decision = runlog.DecisionClaimed
 	case !scope.Contains(t, epic):
-		d.Decision = DecisionOutOfScope
+		d.Decision = runlog.DecisionOutOfScope
 	case status.Terminal():
-		d.Decision = DecisionDone
+		d.Decision = runlog.DecisionDone
 	case status == tickets.StatusError:
-		d.Decision = DecisionError
+		d.Decision = runlog.DecisionError
 		d.Reason = cmp.Or(t.ReadErr, t.GraphErr, t.BlockedByErr, "unrecognized status "+t.Status)
 	case epic.IsPaused(t):
-		d.Decision = DecisionStalled
+		d.Decision = runlog.DecisionStalled
 	case inFrontier:
-		d.Decision = DecisionFrontier
+		d.Decision = runlog.DecisionFrontier
 	case status == tickets.StatusBlocked:
-		d.Decision = DecisionBlocked
+		d.Decision = runlog.DecisionBlocked
 		d.Reason = strings.Join(epic.UnresolvedBlockers(t), ", ")
 	default:
-		d.Decision = DecisionUnclaimed
+		d.Decision = runlog.DecisionUnclaimed
 	}
 	return d
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -172,11 +172,11 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	}
 	f.assertRootQueued(t)
 
-	log, _, err := ralphloop.ReadEvents(filepath.Join(f.Store, "proj"), schedEpic)
+	log, _, err := runlog.ReadEvents(filepath.Join(f.Store, "proj"), schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := slices.IndexFunc(log, func(ev ralphloop.Event) bool { return events.Type(ev.Type) == events.TrunkConflictOpened })
+	i := slices.IndexFunc(log, func(ev runlog.Event) bool { return events.Type(ev.Type) == events.TrunkConflictOpened })
 	if i < 0 || log[i].BackupRef != refs[0] || log[i].Reason != "same.txt" {
 		t.Errorf("run log = %+v, want a trunk-conflict-opened event naming the ref and files", log)
 	}

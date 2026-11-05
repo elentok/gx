@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -756,7 +757,7 @@ func smartZoneOccupancy(d Deps, agentKind agent.AgentKind, cwd, sessionID string
 // smartZonePollMs after starting/reattaching. A missing/unreadable occupancy
 // (occErr != nil or !ok, e.g. no session id yet) is silently skipped rather
 // than emitting a misleading zero.
-func emitContextOccupancy(d Deps, sink EventSink, agentKind agent.AgentKind, identifier, cwd, sessionID string) {
+func emitContextOccupancy(d Deps, sink runlog.EventSink, agentKind agent.AgentKind, identifier, cwd, sessionID string) {
 	occupancy, ok, err := contextOccupancy(d, agentKind, cwd, sessionID)
 	if err != nil || !ok {
 		return

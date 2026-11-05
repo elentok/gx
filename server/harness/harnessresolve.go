@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -124,11 +124,11 @@ func (h *Harness) EarlierRunHarness(addr tickets.Address) string {
 	if err != nil {
 		return ""
 	}
-	evs, _, err := ralphloop.ReadEvents(dir, addr.Epic)
+	evs, _, err := runlog.ReadEvents(dir, addr.Epic)
 	if err != nil {
 		return ""
 	}
-	for _, r := range ralphloop.IterationSessions(evs, addr.ID) {
+	for _, r := range runlog.IterationSessions(evs, addr.ID) {
 		if h.sessionRecorded(r) {
 			return string(r.Agent)
 		}
@@ -136,7 +136,7 @@ func (h *Harness) EarlierRunHarness(addr tickets.Address) string {
 	return ""
 }
 
-func (h *Harness) sessionRecorded(r ralphloop.IterationSession) bool {
+func (h *Harness) sessionRecorded(r runlog.IterationSession) bool {
 	key := string(r.Agent) + "\x00" + r.Cwd + "\x00" + r.Session
 	now := time.Now()
 	if found, ok := h.recorded.lookup(key, now); ok {
@@ -147,7 +147,7 @@ func (h *Harness) sessionRecorded(r ralphloop.IterationSession) bool {
 	return found
 }
 
-func (h *Harness) sessionRecordedUncached(r ralphloop.IterationSession) bool {
+func (h *Harness) sessionRecordedUncached(r runlog.IterationSession) bool {
 	switch r.Agent {
 	case agent.AgentClaude:
 		home, err := h.projects.EnvHome()

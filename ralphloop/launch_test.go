@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -123,11 +124,11 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		t.Parallel()
 		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
-		if err := logEvent(scratchDir, epicName, Event{
+		if err := runlog.AppendEvent(scratchDir, epicName, runlog.Event{
 			Type:         string(events.IterationStarted),
 			AgentSession: "sess-live",
 		}); err != nil {
-			t.Fatalf("logEvent: %v", err)
+			t.Fatalf("runlog.AppendEvent: %v", err)
 		}
 
 		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 0); got {
@@ -139,11 +140,11 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		t.Parallel()
 		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
-		if err := logEvent(scratchDir, epicName, Event{
+		if err := runlog.AppendEvent(scratchDir, epicName, runlog.Event{
 			Type:         string(events.IterationStarted),
 			AgentSession: "sess-other",
 		}); err != nil {
-			t.Fatalf("logEvent: %v", err)
+			t.Fatalf("runlog.AppendEvent: %v", err)
 		}
 
 		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 946); got {
@@ -155,12 +156,12 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		t.Parallel()
 		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
-		if err := logEvent(scratchDir, epicName, Event{
+		if err := runlog.AppendEvent(scratchDir, epicName, runlog.Event{
 			Type:           string(events.IterationStarted),
 			AgentSession:   "sess-live",
 			StateChangeSeq: 946,
 		}); err != nil {
-			t.Fatalf("logEvent: %v", err)
+			t.Fatalf("runlog.AppendEvent: %v", err)
 		}
 
 		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 946); !got {
@@ -175,18 +176,18 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		t.Parallel()
 		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
-		if err := logEvent(scratchDir, epicName, Event{
+		if err := runlog.AppendEvent(scratchDir, epicName, runlog.Event{
 			Type:         string(events.IterationStarted),
 			AgentSession: "sess-live",
 		}); err != nil {
-			t.Fatalf("logEvent: %v", err)
+			t.Fatalf("runlog.AppendEvent: %v", err)
 		}
-		if err := logEvent(scratchDir, epicName, Event{
+		if err := runlog.AppendEvent(scratchDir, epicName, runlog.Event{
 			Type:           string(events.IterationStarted),
 			AgentSession:   "sess-live",
 			StateChangeSeq: 946,
 		}); err != nil {
-			t.Fatalf("logEvent: %v", err)
+			t.Fatalf("runlog.AppendEvent: %v", err)
 		}
 
 		if got := noActivitySinceLaunch(scratchDir, epicName, "sess-live", 946); !got {
@@ -196,7 +197,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 }
 
 // recordingSinkWithArgs embeds occupancySink (itself embedding
-// noopEventSink) and additionally hooks IterationStarted, for tests that
+// runlog.NoopEventSink) and additionally hooks IterationStarted, for tests that
 // need both start-time signals asserted together.
 type recordingSinkWithArgs struct {
 	*occupancySink

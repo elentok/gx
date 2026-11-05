@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/projects"
 )
 
@@ -33,7 +33,7 @@ func TestLastLoggedAssistantText_Codex(t *testing.T) {
 		{"died before the first prompt", "c2", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := s.lastLoggedAssistantText(ralphloop.Event{Agent: agent.AgentCodex, Cwd: "/w", AgentSession: tc.session})
+			got := s.lastLoggedAssistantText(runlog.Event{Agent: agent.AgentCodex, Cwd: "/w", AgentSession: tc.session})
 			if got != tc.want {
 				t.Errorf("text = %q, want %q", got, tc.want)
 			}

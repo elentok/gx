@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -30,7 +31,7 @@ type lateFinish struct {
 	dir        string
 	addr       tickets.Address
 	path       string
-	pause      ralphloop.Event
+	pause      runlog.Event
 	finishedAt time.Time
 	commitless bool
 }
@@ -132,7 +133,7 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 	if err != nil || !AdoptablePause(t.Status, t.PauseReason) || t.IterationStatus != schema.IterationStatusFinished {
 		return lateFinish{}, false
 	}
-	pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID)
+	pause, ok := runlog.LatestPauseEvent(dir, addr.Epic, addr.ID)
 	if !ok || pause.Type != string(events.Paused) || pause.Kind != string(t.PauseReason) || !t.IterationFinishedAt.After(pause.Time) {
 		return lateFinish{}, false
 	}
@@ -246,7 +247,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 		sha = ralphloop.LatestMergedSHA(lf.dir, addr.Epic, addr.ID)
 		outcome = "merged " + sha
 	}
-	s.host.LogEvent(addr, ralphloop.Event{
+	s.host.LogEvent(addr, runlog.Event{
 		Type: string(events.LateFinishAdopted), SHA: sha,
 		Reason: fmt.Sprintf("paused %s, finished %s; %s",
 			lf.pause.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),

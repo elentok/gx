@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -33,9 +34,9 @@ var frictionRunEvents = map[events.Type]events.Type{
 // (old data) counts one pause per spell in the run log: a spell starts at the
 // first paused event after the ticket last started an iteration, so repeated
 // paused lines count once, and it ends at the next start or resume.
-func Friction(ticket string, runEvents []Event, log []tickets.LogEvent) schema.FrictionSummary {
+func Friction(ticket string, runEvents []runlog.Event, log []tickets.LogEvent) schema.FrictionSummary {
 	var f schema.FrictionSummary
-	var mine []Event
+	var mine []runlog.Event
 	for _, ev := range runEvents {
 		if ev.Ticket != ticket {
 			continue
@@ -61,7 +62,7 @@ func Friction(ticket string, runEvents []Event, log []tickets.LogEvent) schema.F
 // empty. It replaces any earlier summary, so a ticket finished again after a
 // new claim gets a fresh one.
 func StampFriction(scratchDir, epic, ticket, ticketPath string) error {
-	runEvents, _, err := ReadEvents(scratchDir, epic)
+	runEvents, _, err := runlog.ReadEvents(scratchDir, epic)
 	if err != nil {
 		return err
 	}
@@ -87,8 +88,8 @@ func frictionRound(f *schema.FrictionSummary, r tickets.PauseRound) {
 	}
 }
 
-func frictionSpells(f *schema.FrictionSummary, evs []Event) {
-	var start *Event
+func frictionSpells(f *schema.FrictionSummary, evs []runlog.Event) {
+	var start *runlog.Event
 	for i, ev := range evs {
 		switch events.Type(ev.Type) {
 		case events.Paused:

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
@@ -36,7 +36,7 @@ func (fakeQueue) RootQueued(queue.RootRef) bool { return false }
 
 type fakeHistory struct{ err error }
 
-func (f fakeHistory) ReadHistory(tickets.Address) ([]ralphloop.Event, error) { return nil, f.err }
+func (f fakeHistory) ReadHistory(tickets.Address) ([]runlog.Event, error) { return nil, f.err }
 
 type fakeWriter struct{}
 

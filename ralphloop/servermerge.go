@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -56,7 +57,7 @@ type OneIteration struct {
 	// KeepAskedAgent: see iterationParams.KeepAskedAgent.
 	KeepAskedAgent bool
 	// Sink hears the finish path's events; nil hears nothing.
-	Sink EventSink
+	Sink runlog.EventSink
 	// StallNudgeDelay is how long an idle agent with no question and no finished
 	// report waits before the one stall nudge; zero sends none.
 	StallNudgeDelay time.Duration
@@ -101,9 +102,9 @@ func (e *BlockedPausedError) Error() string {
 // StallNudgeText is the fixed text of the stall nudge.
 const StallNudgeText = "If you are waiting for a person's reply, run `gx tickets ask` now. Otherwise continue."
 
-func (o OneIteration) sink() EventSink {
+func (o OneIteration) sink() runlog.EventSink {
 	if o.Sink == nil {
-		return noopEventSink{}
+		return runlog.NoopEventSink{}
 	}
 	return o.Sink
 }
@@ -266,7 +267,7 @@ func pausedOutcome(o OneIteration, t schema.Ticket) FinishOutcome {
 	}
 	reason := latestPauseReason(o.ScratchDir, o.Epic, o.Ticket.Identifier)
 	if reason == "" {
-		reason = "the run log had no pause reason; see " + RunLogPath(o.ScratchDir, o.Epic)
+		reason = "the run log had no pause reason; see " + runlog.RunLogPath(o.ScratchDir, o.Epic)
 	}
 	return FinishOutcome{Status: t.PausedClass().LegacyStatus(), Kind: kind, Reason: reason}
 }
@@ -274,29 +275,14 @@ func pausedOutcome(o OneIteration, t schema.Ticket) FinishOutcome {
 // latestPauseReason is the reason of the ticket's most recent pause event, or ""
 // when the run log has none.
 func latestPauseReason(scratchDir, epic, ticket string) string {
-	ev, _ := LatestPauseEvent(scratchDir, epic, ticket)
+	ev, _ := runlog.LatestPauseEvent(scratchDir, epic, ticket)
 	return ev.Reason
-}
-
-// LatestPauseEvent is the ticket's most recent pause event; false when the run
-// log has none.
-func LatestPauseEvent(scratchDir, epic, ticket string) (Event, bool) {
-	evs, ok, err := ReadEvents(scratchDir, epic)
-	if err != nil || !ok {
-		return Event{}, false
-	}
-	for i := len(evs) - 1; i >= 0; i-- {
-		if evs[i].Ticket == ticket && isPauseType(events.Type(evs[i].Type)) {
-			return evs[i], true
-		}
-	}
-	return Event{}, false
 }
 
 // LatestMergedSHA is the SHA of the ticket's most recent cherry-pick, "" when
 // none was logged.
 func LatestMergedSHA(scratchDir, epic, ticket string) string {
-	evs, _, err := ReadEvents(scratchDir, epic)
+	evs, _, err := runlog.ReadEvents(scratchDir, epic)
 	if err != nil {
 		return ""
 	}
@@ -451,7 +437,7 @@ func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree
 	err = d.Runner.Prompt(s, text)
 	// A not-delivered prompt started no turn, so one retry cannot double-send.
 	if errors.Is(err, agentrunner.ErrNotDelivered) && errors.Is(err, claudeui.ErrInputNotEmpty) {
-		_ = logEvent(o.ScratchDir, o.Epic, Event{
+		_ = runlog.AppendEvent(o.ScratchDir, o.Epic, runlog.Event{
 			Type: string(events.PromptNudged), Ticket: o.Ticket.Identifier, Label: w.Label, Attempt: 1,
 			Reason: "stall nudge retried: " + err.Error(),
 		})
@@ -466,7 +452,7 @@ func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree
 		}
 		return false, false, fmt.Errorf("stall nudge for %s: %w", w.Label, err)
 	}
-	err = logEvent(o.ScratchDir, o.Epic, Event{
+	err = runlog.AppendEvent(o.ScratchDir, o.Epic, runlog.Event{
 		Type: string(events.StallNudged), Ticket: o.Ticket.Identifier, Label: w.Label, Text: text,
 	})
 	return true, true, err

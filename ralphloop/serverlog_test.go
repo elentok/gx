@@ -5,19 +5,20 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 func TestAppendServerEvent_BudgetEventMergesInServerLogNotEpicLog(t *testing.T) {
 	store := fixture.EpicScratchDir(t, "epic-a")
 
-	if err := AppendEvent(store, "epic-a", Event{Type: string(events.Resumed), Ticket: "01"}); err != nil {
+	if err := runlog.AppendEvent(store, "epic-a", runlog.Event{Type: string(events.Resumed), Ticket: "01"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := AppendServerEvent(store, Event{Type: string(events.BudgetSoftLimitPaused)}); err != nil {
+	if err := runlog.AppendServerEvent(store, runlog.Event{Type: string(events.BudgetSoftLimitPaused)}); err != nil {
 		t.Fatal(err)
 	}
 
-	server, ok, err := ReadServerEvents(store)
+	server, ok, err := runlog.ReadServerEvents(store)
 	if err != nil || !ok {
 		t.Fatalf("ReadServerEvents ok=%v err=%v", ok, err)
 	}
@@ -25,7 +26,7 @@ func TestAppendServerEvent_BudgetEventMergesInServerLogNotEpicLog(t *testing.T) 
 		t.Fatalf("server log = %+v, want one budget event", server)
 	}
 
-	epic, _, err := ReadEvents(store, "epic-a")
+	epic, _, err := runlog.ReadEvents(store, "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,10 +37,10 @@ func TestAppendServerEvent_BudgetEventMergesInServerLogNotEpicLog(t *testing.T) 
 
 func TestAppendServerEvent_RejectsAddressedEvent(t *testing.T) {
 	store := t.TempDir()
-	if err := AppendServerEvent(store, Event{Type: string(events.Resumed), Ticket: "01"}); err == nil {
+	if err := runlog.AppendServerEvent(store, runlog.Event{Type: string(events.Resumed), Ticket: "01"}); err == nil {
 		t.Fatal("want error for an event that names a ticket")
 	}
-	if _, ok, _ := ReadServerEvents(store); ok {
+	if _, ok, _ := runlog.ReadServerEvents(store); ok {
 		t.Fatal("rejected event must not create the server log")
 	}
 }

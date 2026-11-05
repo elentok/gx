@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -100,12 +101,12 @@ func StartOver(in StartOverInput, d ralphloop.Deps) (StartOverResult, error) {
 	}
 
 	res := StartOverResult{Ticket: in.ID, Status: string(schema.StatusOpen), AtticRef: attic.Ref, Warning: StartOverLiveRunWarning}
-	ev := ralphloop.Event{Type: string(events.TicketStartedOver), Ticket: t.Identifier, Outcome: "started-over", Reason: in.Reason}
+	ev := runlog.Event{Type: string(events.TicketStartedOver), Ticket: t.Identifier, Outcome: "started-over", Reason: in.Reason}
 	if attic.Ref != nil {
 		ev.AtticRef = *attic.Ref
 		ev.SHA = attic.Tip
 	}
-	if err := ralphloop.AppendEvent(filepath.Dir(filepath.Clean(in.EpicPath)), epicName, ev); err != nil {
+	if err := runlog.AppendEvent(filepath.Dir(filepath.Clean(in.EpicPath)), epicName, ev); err != nil {
 		return StartOverResult{}, fmt.Errorf("logging ticket-started-over: %w", err)
 	}
 	return res, nil

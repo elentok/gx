@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -51,7 +52,7 @@ func rateLimitFixture(t *testing.T, limit func(r *runnerfake.Runner), onPrompt f
 
 func eventsOfType(t *testing.T, one OneIteration, typ events.Type) int {
 	t.Helper()
-	evs, _, err := ReadEvents(one.ScratchDir, one.Epic)
+	evs, _, err := runlog.ReadEvents(one.ScratchDir, one.Epic)
 	if err != nil {
 		t.Fatal(err)
 	}

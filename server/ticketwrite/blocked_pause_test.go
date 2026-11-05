@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
@@ -32,7 +32,7 @@ func TestBlockedPause_AgentErrorPausesWithItsTextAndOffersRetry(t *testing.T) {
 			}
 			var reason string
 			servertest.Await(t, func() bool {
-				log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+				log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 				for _, ev := range log {
 					if events.Type(ev.Type) == events.Paused && ev.Kind == string(events.BlockedPane) {
 						reason = ev.Reason
@@ -64,7 +64,7 @@ func TestBlockedPause_PTYDwellPausesOnlyIfStillBlocked(t *testing.T) {
 		servertest.WaitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 		var reason string
 		servertest.Await(t, func() bool {
-			log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+			log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 			for _, ev := range log {
 				if events.Type(ev.Type) == events.Paused && ev.Kind == string(events.BlockedPane) {
 					reason = ev.Reason

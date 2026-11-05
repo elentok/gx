@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketspec"
@@ -90,11 +91,11 @@ type InputsTable struct {
 
 // buildInputsTable derives every row from frontmatter, the run log and the
 // merged set; none of it needs a transcript. merged may be nil (no repo).
-func buildInputsTable(t evolveTarget, evs []ralphloop.Event, merged map[string]bool) (InputsTable, error) {
+func buildInputsTable(t evolveTarget, evs []runlog.Event, merged map[string]bool) (InputsTable, error) {
 	e := t.epic
 	forkParents := e.ForkParents()
 
-	byTicket := map[string][]ralphloop.Event{}
+	byTicket := map[string][]runlog.Event{}
 	deadlocks := 0
 	for _, ev := range evs {
 		if ev.Type == string(events.Deadlocked) {
@@ -161,7 +162,7 @@ func buildInputsTable(t evolveTarget, evs []ralphloop.Event, merged map[string]b
 // digestTicketEvents folds a ticket's run-log events into its session ids
 // (frontmatter first, then iteration starts), its conflict-resolution
 // sessions and per-type event counts.
-func digestTicketEvents(frontmatter []string, evs []ralphloop.Event) (sessions, conflict []string, counts map[string]int) {
+func digestTicketEvents(frontmatter []string, evs []runlog.Event) (sessions, conflict []string, counts map[string]int) {
 	add := func(list []string, id string) []string {
 		if id == "" || slices.Contains(list, id) {
 			return list
@@ -195,7 +196,7 @@ const (
 
 // eventCountKey is the per-type count key of ev: its type, except a pause,
 // which is counted under its class.
-func eventCountKey(ev ralphloop.Event) string {
+func eventCountKey(ev runlog.Event) string {
 	if ev.Type != string(events.Paused) {
 		return ev.Type
 	}
@@ -273,7 +274,7 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 	if err != nil {
 		return err
 	}
-	evs, _, err := ralphloop.ReadEvents(filepath.Dir(t.epic.Path), t.name)
+	evs, _, err := runlog.ReadEvents(filepath.Dir(t.epic.Path), t.name)
 	if err != nil {
 		return err
 	}

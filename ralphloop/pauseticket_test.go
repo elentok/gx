@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -29,7 +30,7 @@ func TestPause_WritesTicketEventAndNotifies(t *testing.T) {
 	})
 
 	assertPaused(t, fixture.MustParse(t, path), schema.PauseClassRepair, schema.PauseIterationError)
-	evs, _, _ := ReadEvents(scratchDir, "my-epic")
+	evs, _, _ := runlog.ReadEvents(scratchDir, "my-epic")
 	if len(evs) != 1 || evs[0].Kind != "iteration-error" || evs[0].Reason != "boom" {
 		t.Errorf("events = %+v, want one iteration-error event", evs)
 	}
@@ -66,7 +67,7 @@ func TestPause_RefusesDoneTicket(t *testing.T) {
 			if raw, _ := os.ReadFile(path); string(raw) != content {
 				t.Errorf("ticket rewritten:\n%s", raw)
 			}
-			if evs, _, _ := ReadEvents(scratchDir, "my-epic"); len(evs) != 0 {
+			if evs, _, _ := runlog.ReadEvents(scratchDir, "my-epic"); len(evs) != 0 {
 				t.Errorf("events = %+v, want none", evs)
 			}
 			if calls := sink.snapshot(); len(calls) != 0 {
@@ -94,14 +95,14 @@ func TestPause_AskingKinds(t *testing.T) {
 
 			if _, err := pause(sink, pauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-				Type: events.Paused, Kind: kind, Reason: "why", Event: Event{Pane: "p1"},
+				Type: events.Paused, Kind: kind, Reason: "why", Event: runlog.Event{Pane: "p1"},
 			}); err != nil {
 				t.Fatal(err)
 			}
 
 			got := fixture.MustParse(t, path)
 			assertPaused(t, got, schema.PauseClassAnswer, schema.ParsePauseReason(string(kind)))
-			evs, _, _ := ReadEvents(scratchDir, "my-epic")
+			evs, _, _ := runlog.ReadEvents(scratchDir, "my-epic")
 			if len(evs) != 1 || evs[0].Type != "paused" || evs[0].Kind != string(kind) || evs[0].Pane != "p1" {
 				t.Errorf("events = %+v, want one paused event kind %s", evs, kind)
 			}
@@ -180,7 +181,7 @@ func TestPause_RepairStampsPauseKindClearedOnClaim(t *testing.T) {
 	if got := fixture.MustParse(t, path); got.PauseReason != "" || got.Status == schema.StatusPaused {
 		t.Errorf("after claim = (%q, %q), want pause reason cleared", got.Status, got.PauseReason)
 	}
-	evs, _, _ := ReadEvents(scratchDir, "my-epic")
+	evs, _, _ := runlog.ReadEvents(scratchDir, "my-epic")
 	if len(evs) != 1 || evs[0].Kind != "budget-killed" {
 		t.Errorf("events = %+v, want the pause event kept", evs)
 	}
@@ -257,7 +258,7 @@ func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
-			if err := Pause(scratchDir, "my-epic", "01", path, c.kind, "the-reason", Event{}); err != nil {
+			if err := Pause(scratchDir, "my-epic", "01", path, c.kind, "the-reason", runlog.Event{}); err != nil {
 				t.Fatal(err)
 			}
 			got := fixture.MustParse(t, path)
@@ -272,7 +273,7 @@ func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T
 			if open := tickets.OpenQuestion(qevs); (open != nil) != c.question {
 				t.Errorf("open question = %+v, want present=%v", open, c.question)
 			}
-			evs, _, _ := ReadEvents(scratchDir, "my-epic")
+			evs, _, _ := runlog.ReadEvents(scratchDir, "my-epic")
 			if len(evs) != 1 || evs[0].Type != "paused" || evs[0].Kind != string(c.kind) {
 				t.Errorf("events = %+v, want one paused event kind %s", evs, c.kind)
 			}

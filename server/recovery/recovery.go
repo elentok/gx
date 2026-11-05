@@ -10,8 +10,8 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
@@ -36,7 +36,7 @@ const (
 // investigation, a proposal awaiting approval, or an escalation.
 type recoveryPlan struct {
 	ref     queue.TicketRef
-	log     []ralphloop.Event
+	log     []runlog.Event
 	entry   recovery.Entry
 	matched bool
 	action  recoveryAction
@@ -149,7 +149,7 @@ func (rec *Recovery) RecoverAsync(f recovery.Failure) {
 // of a pause that stands.
 func (rec *Recovery) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 	if plan.matched {
-		ev := ralphloop.Event{Type: string(events.RecoveryMatched), Ticket: plan.ref.Addr.ID, Kind: string(f.Kind), Reason: plan.entry.ID, Signature: plan.entry.Signature()}
+		ev := runlog.Event{Type: string(events.RecoveryMatched), Ticket: plan.ref.Addr.ID, Kind: string(f.Kind), Reason: plan.entry.ID, Signature: plan.entry.Signature()}
 		rec.appendRecoveryEvent(plan.ref, f, ev)
 	}
 	switch plan.action {
@@ -258,7 +258,7 @@ func (rec *Recovery) stillPaused(address string) bool {
 
 // RecoveredCount is how many remedies in the epic's run log ended ok.
 func RecoveredCount(projectDir, epic string) int {
-	log, _, _ := ralphloop.ReadEvents(projectDir, epic)
+	log, _, _ := runlog.ReadEvents(projectDir, epic)
 	n := 0
 	for _, ev := range log {
 		if events.Type(ev.Type) == events.RecoveryApplied && ev.Outcome == "ok" {
@@ -293,7 +293,7 @@ func (rec *Recovery) propose(plan recoveryPlan, f recovery.Failure) {
 		rec.d.Log.Warn("recovery cannot fingerprint proposal", "entry", entry.ID, "ticket", f.Address, "err", err)
 		return
 	}
-	ev := ralphloop.Event{Type: string(events.RecoveryProposed), Ticket: ref.Addr.ID, Kind: string(f.Kind), Reason: entry.ID, Text: text, Fingerprint: fingerprint}
+	ev := runlog.Event{Type: string(events.RecoveryProposed), Ticket: ref.Addr.ID, Kind: string(f.Kind), Reason: entry.ID, Text: text, Fingerprint: fingerprint}
 	rec.appendRecoveryEvent(ref, f, ev)
 	rec.d.Events.Publish(wire.EventTicketChanged, ref.Addr.String())
 	rec.escalate(plan, f, entry.ID+" proposes a remedy awaiting approval", "")
@@ -312,7 +312,7 @@ func fileFingerprint(path string) (string, error) {
 func (rec *Recovery) ticketApprove(req wire.QueueRequest) (wire.QueueResult, error) {
 	return rec.d.Writer.TicketWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		f := recovery.Failure{Address: ref.Addr.String()}
-		var proposal *ralphloop.Event
+		var proposal *runlog.Event
 		for _, ev := range rec.ticketEvents(ref, f) {
 			switch events.Type(ev.Type) {
 			case events.RecoveryProposed:
@@ -375,7 +375,7 @@ const investigateRetryEntry = "investigate-retry"
 
 // AppendRecoveryApplied records the recovery an investigate retry applied.
 func (rec *Recovery) AppendRecoveryApplied(ref queue.TicketRef, f recovery.Failure, investigator string) {
-	rec.appendRecoveryEvent(ref, f, ralphloop.Event{
+	rec.appendRecoveryEvent(ref, f, runlog.Event{
 		Type: string(events.RecoveryApplied), Ticket: ref.Addr.ID, Kind: string(f.Kind),
 		Reason: investigateRetryEntry, Outcome: "ok", Text: investigator,
 	})
@@ -425,12 +425,12 @@ const (
 // ticketEvents is the ticket's run-log events, oldest first. An epic-level ref
 // also gets every ticket's merging, reset and manual merge: progress anywhere in
 // the epic clears its earlier recovery.
-func (rec *Recovery) ticketEvents(ref queue.TicketRef, f recovery.Failure) []ralphloop.Event {
-	log, _, err := ralphloop.ReadEvents(ref.ProjectDir, ref.Addr.Epic)
+func (rec *Recovery) ticketEvents(ref queue.TicketRef, f recovery.Failure) []runlog.Event {
+	log, _, err := runlog.ReadEvents(ref.ProjectDir, ref.Addr.Epic)
 	if err != nil {
 		rec.d.Log.Warn("recovery cannot read the run log", "ticket", f.Address, "err", err)
 	}
-	var mine []ralphloop.Event
+	var mine []runlog.Event
 	for _, ev := range log {
 		if ev.Ticket == ref.Addr.ID || (ref.Addr.ID == "" && clearsRecovery(events.Type(ev.Type))) {
 			mine = append(mine, ev)
@@ -445,10 +445,10 @@ func (rec *Recovery) ticketEvents(ref queue.TicketRef, f recovery.Failure) []ral
 // and per-ticket caps apply. An investigation or a parent backfill remedies
 // nothing the next pause could be a re-failure of, so only the caps see them.
 // A person's relaunch starts the budget over.
-func GuardRailStop(log []ralphloop.Event, f recovery.Failure) string {
+func GuardRailStop(log []runlog.Event, f recovery.Failure) string {
 	var applied int
 	perKind := map[string]int{}
-	var last *ralphloop.Event
+	var last *runlog.Event
 	for i, ev := range log {
 		switch events.Type(ev.Type) {
 		case events.HumanRelaunch:
@@ -483,7 +483,7 @@ func clearsRecovery(t events.Type) bool {
 // the failure itself (already appended by the pause). A logged failure with no
 // kind, like the loop's gate hold, takes the failure's. A logged failure also
 // carries its session's last assistant text, which R2 and R3 read.
-func (rec *Recovery) failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
+func (rec *Recovery) failureSequence(log []runlog.Event, f recovery.Failure) []recovery.Event {
 	var seq []recovery.Event
 	for _, ev := range log {
 		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason, Time: ev.Time})
@@ -502,7 +502,7 @@ func (rec *Recovery) failureSequence(log []ralphloop.Event, f recovery.Failure) 
 // lastAssistantText is the last assistant text of the session a logged event
 // names, or "" when it names none or the transcript cannot be read. A Codex
 // agent that died before its first prompt has no rollout, which also reads "".
-func (rec *Recovery) lastLoggedAssistantText(ev ralphloop.Event) string {
+func (rec *Recovery) lastLoggedAssistantText(ev runlog.Event) string {
 	if ev.AgentSession != "" && ev.Agent == agent.AgentCodex {
 		home, err := rec.d.Projects.CodexHome()
 		if err != nil {
@@ -523,11 +523,11 @@ func (rec *Recovery) lastLoggedAssistantText(ev ralphloop.Event) string {
 }
 
 func (rec *Recovery) recordRecovery(ref queue.TicketRef, typ events.Type, f recovery.Failure, entryID, outcome string) {
-	rec.appendRecoveryEvent(ref, f, ralphloop.Event{Type: string(typ), Ticket: ref.Addr.ID, Kind: string(f.Kind), Reason: entryID, Outcome: outcome})
+	rec.appendRecoveryEvent(ref, f, runlog.Event{Type: string(typ), Ticket: ref.Addr.ID, Kind: string(f.Kind), Reason: entryID, Outcome: outcome})
 }
 
-func (rec *Recovery) appendRecoveryEvent(ref queue.TicketRef, f recovery.Failure, ev ralphloop.Event) {
-	if err := ralphloop.AppendEvent(ref.ProjectDir, ref.Addr.Epic, ev); err != nil {
+func (rec *Recovery) appendRecoveryEvent(ref queue.TicketRef, f recovery.Failure, ev runlog.Event) {
+	if err := runlog.AppendEvent(ref.ProjectDir, ref.Addr.Epic, ev); err != nil {
 		rec.d.Log.Warn("recovery cannot record event", "type", ev.Type, "ticket", f.Address, "err", err)
 	}
 }

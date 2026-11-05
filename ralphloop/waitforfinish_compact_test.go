@@ -10,6 +10,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
@@ -99,7 +100,7 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 		t.Errorf("prompts = %v, want 2 (/compact, then finish-up)", prompts)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -153,7 +154,7 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 		t.Errorf("prompts = %v, want /compact only, no finish-up after failure", prompts)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -408,7 +409,7 @@ func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
 // the timeout route on separate names.
 func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
 	t.Helper()
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}

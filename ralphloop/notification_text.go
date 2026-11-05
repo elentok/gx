@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -129,7 +130,7 @@ func (s mrkdwnStyle) iterationResumedText(label, epicName, ticketIdentifier stri
 // populates): a ticket-merged message reports what this merging changed,
 // not the epic's full paused/blocked/ready breakdown, which belongs to the
 // epic-level messages alone (see epicStartedText/epicCompleteText).
-func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats IterationStats) chatmarkup.Text {
+func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) chatmarkup.Text {
 	line := RenderCountsLine(EpicCounts{Done: stats.Completed, InProgress: stats.InProgress, Total: stats.Total})
 	counts := fmt.Sprintf(
 		"%s · %s · %s · %s",

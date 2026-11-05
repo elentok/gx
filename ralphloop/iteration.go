@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -370,7 +371,7 @@ func markDoneWithCompactions(d Deps, agent agent.AgentKind, path, cwd, sessionID
 // iteration-started run-log event, for a reattached close that has no live
 // session of its own.
 func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent agent.AgentKind, ok bool) {
-	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
+	events, ok, err := runlog.ReadEvents(p.ScratchDir, p.FeatureBranch)
 	if err != nil || !ok {
 		return "", "", "", false
 	}
@@ -627,7 +628,7 @@ func foreignCherryPick(d Deps, p iterationParams) (foreign bool, sha string) {
 // (ladder rung one) is best-effort: an unreadable run log just skips that rung.
 func mergeParamsFor(p iterationParams, base, branch, sessionID string) MergeParams {
 	recorded := ""
-	if events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch); err == nil && ok {
+	if events, ok, err := runlog.ReadEvents(p.ScratchDir, p.FeatureBranch); err == nil && ok {
 		recorded = latestCherryPickedSHA(events, p.Ticket.Identifier)
 	}
 	return MergeParams{

@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -153,9 +153,9 @@ func EndedRounds(t *testing.T, ticketPath string) []tickets.PauseRound {
 }
 
 // RunLog returns the run-log events of proj:epic-a.
-func RunLog(t *testing.T, h *Harness) []ralphloop.Event {
+func RunLog(t *testing.T, h *Harness) []runlog.Event {
 	t.Helper()
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	logged, _, err := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,8 +163,8 @@ func RunLog(t *testing.T, h *Harness) []ralphloop.Event {
 }
 
 // OfType filters logged to the events of type typ.
-func OfType(logged []ralphloop.Event, typ events.Type) []ralphloop.Event {
-	var out []ralphloop.Event
+func OfType(logged []runlog.Event, typ events.Type) []runlog.Event {
+	var out []runlog.Event
 	for _, ev := range logged {
 		if ev.Type == string(typ) {
 			out = append(out, ev)

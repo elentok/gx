@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -101,7 +102,7 @@ type VerifyParams struct {
 	WorktreeDir     string
 	WorkspaceID     string
 	Tickets         []tickets.Ticket
-	Events          []Event
+	Events          []runlog.Event
 }
 
 // VerifyEpic is the single merging-truth gatherer: for each ticket it climbs
@@ -144,7 +145,7 @@ func VerifyEpic(vd VerifyDeps, p VerifyParams) ([]TicketVerification, error) {
 // verifyTicket verifies one ticket. live nil means herdr did not answer;
 // mergedErr non-nil means the trailer rung couldn't run, which only matters
 // when no earlier rung already proved the merging.
-func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live, merged map[string]bool, mergedErr error) TicketVerification {
+func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []runlog.Event, live, merged map[string]bool, mergedErr error) TicketVerification {
 	v := TicketVerification{ID: t.Identifier, Status: t.Status, Evidence: EvidenceNone}
 	fail := func(err error) TicketVerification {
 		v.Merging, v.Unknown, v.err = MergingUnknown, true, err

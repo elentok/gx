@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -130,10 +130,10 @@ func TestMergeFinish_AgentStoppingWithoutAReportPausesStuck(t *testing.T) {
 // its pause, and the store rescan that follows.
 func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
 	t.Helper()
-	var pause ralphloop.Event
+	var pause runlog.Event
 	waitFor(t, func() bool {
 		var ok bool
-		pause, ok = ralphloop.LatestPauseEvent(filepath.Join(f.Store, "proj"), schedEpic, "01")
+		pause, ok = runlog.LatestPauseEvent(filepath.Join(f.Store, "proj"), schedEpic, "01")
 		return ok
 	})
 	if err := schema.UpdateTicket(f.TicketFile(t, "01"), func(tk *schema.Ticket) {

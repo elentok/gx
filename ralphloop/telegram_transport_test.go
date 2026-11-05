@@ -12,11 +12,12 @@ import (
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // newTelegramEventSink wires a chatEventSink to a Telegram transport the way
 // ServerChat does, with a live flush loop.
-func newTelegramEventSink(inner EventSink, botToken, chatID, apiBaseURL, scratchDir, epicName string) *chatEventSink {
+func newTelegramEventSink(inner runlog.EventSink, botToken, chatID, apiBaseURL, scratchDir, epicName string) *chatEventSink {
 	s := newChatEventSink(inner, telegramStyle, newTelegramTransport(botToken, chatID, apiBaseURL), scratchDir, epicName)
 	s.startFlushLoop(batchFlushInterval)
 	return s
@@ -161,12 +162,12 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 // goroutine — including its notificationRetryBackoff sleep and second
 // attempt (each bounded by the transport's timeout) — has exited before the
 // test returns.
-func waitForRunLogEvent(t *testing.T, dir, epicName string) []Event {
+func waitForRunLogEvent(t *testing.T, dir, epicName string) []runlog.Event {
 	t.Helper()
-	var events []Event
+	var events []runlog.Event
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, epicName)
+		events, _, _ = runlog.ReadEvents(dir, epicName)
 		if len(events) > 0 && events[0].Type == string(eventsc.NotificationFailed) {
 			return events
 		}
@@ -462,10 +463,10 @@ func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t 
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
 
-	var events []Event
+	var events []runlog.Event
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -498,10 +499,10 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
 
-	var events []Event
+	var events []runlog.Event
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -524,12 +525,12 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
 
-	var events []Event
+	var events []runlog.Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -563,12 +564,12 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *tes
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
 
-	var events []Event
+	var events []runlog.Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}

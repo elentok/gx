@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -50,7 +51,7 @@ type LiveEvent struct {
 	Label      string
 	Reason     string
 	Status     string
-	PauseKind  PauseKind
+	PauseKind  runlog.PauseKind
 	Line       string
 	Ticket     tickets.Ticket
 	Done       int
@@ -65,11 +66,11 @@ type LiveEvent struct {
 	// Tokens is ContextOccupancy's context-window token count.
 	Tokens int
 	// Stats is IterationFinished's metrics and epic progress counts.
-	Stats IterationStats
+	Stats runlog.IterationStats
 	// ElapsedSeconds is EpicComplete's total wall-clock duration.
 	ElapsedSeconds int
 	// Stalled is EpicPaused's human-clearable tickets.
-	Stalled []StalledTicket
+	Stalled []runlog.StalledTicket
 	// Channel is NotificationFailed's chat transport ("telegram"/"slack").
 	Channel string
 }
@@ -133,15 +134,15 @@ func (s *recordingEventSink) IterationStarted(ticket tickets.Ticket, label, cwd,
 	s.record(LiveEvent{Kind: LiveEventIterationStarted, Identifier: ticket.Identifier, Ticket: ticket, Label: label, Cwd: cwd, SessionID: sessionID, AgentKind: agent, PaneID: paneID})
 }
 
-func (s *recordingEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
+func (s *recordingEventSink) IterationPaused(identifier, label string, kind runlog.PauseKind, reason string) {
 	s.record(LiveEvent{Kind: LiveEventIterationPaused, Identifier: identifier, Label: label, PauseKind: kind, Reason: reason})
 }
 
-func (s *recordingEventSink) IterationResumed(identifier, label string, kind PauseKind) {
+func (s *recordingEventSink) IterationResumed(identifier, label string, kind runlog.PauseKind) {
 	s.record(LiveEvent{Kind: LiveEventIterationResumed, Identifier: identifier, Label: label, PauseKind: kind})
 }
 
-func (s *recordingEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
+func (s *recordingEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) {
 	s.record(LiveEvent{Kind: LiveEventIterationFinished, Identifier: ticket.Identifier, Ticket: ticket, EpicName: epicName, Stats: stats})
 }
 
@@ -193,7 +194,7 @@ func (s *recordingEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record(LiveEvent{Kind: LiveEventTicketUnrecoverable, Identifier: identifier, EpicName: epicName})
 }
 
-func (s *recordingEventSink) EpicPaused(epicName string, stalled []StalledTicket) {
+func (s *recordingEventSink) EpicPaused(epicName string, stalled []runlog.StalledTicket) {
 	s.record(LiveEvent{Kind: LiveEventEpicPaused, EpicName: epicName, Stalled: stalled})
 }
 

@@ -12,6 +12,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -227,7 +228,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		t.Errorf("VirtualTime() = %s, want >= %s (the compact polls must advance the clock far enough for the boundary to merge)", got, want)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -415,7 +416,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}

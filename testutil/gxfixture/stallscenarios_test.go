@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -25,13 +26,13 @@ const (
 )
 
 // events is the ticket's run-log events of one type.
-func (r *running) events(t *testing.T, addr, typ string) []ralphloop.Event {
+func (r *running) events(t *testing.T, addr, typ string) []runlog.Event {
 	t.Helper()
 	var h wire.History
 	if err := json.Unmarshal([]byte(r.gx(t, "server", "tickets", "history", addr, "--json")), &h); err != nil {
 		t.Fatal(err)
 	}
-	var out []ralphloop.Event
+	var out []runlog.Event
 	for _, ev := range h.Events {
 		if ev.Type == typ {
 			out = append(out, ev)
@@ -40,9 +41,9 @@ func (r *running) events(t *testing.T, addr, typ string) []ralphloop.Event {
 	return out
 }
 
-func (r *running) waitEvents(t *testing.T, addr, typ string) []ralphloop.Event {
+func (r *running) waitEvents(t *testing.T, addr, typ string) []runlog.Event {
 	t.Helper()
-	var got []ralphloop.Event
+	var got []runlog.Event
 	if !testutil.Poll(nudgeEventWaitLimit, 500*time.Millisecond, func() bool {
 		got = r.events(t, addr, typ)
 		return len(got) > 0

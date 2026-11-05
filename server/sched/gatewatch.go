@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
 )
@@ -73,17 +73,17 @@ func (s *Scheduler) WatchGates(now time.Time) {
 
 // heldGate is the newest gate-held event of the ticket's latest iteration
 // whose task is still held.
-func (s *Scheduler) heldGate(addr tickets.Address) (ralphloop.Event, bool) {
+func (s *Scheduler) heldGate(addr tickets.Address) (runlog.Event, bool) {
 	dir, _, err := s.Projects.Of(addr.Project)
 	if err != nil {
-		return ralphloop.Event{}, false
+		return runlog.Event{}, false
 	}
-	log, _, err := ralphloop.ReadEvents(dir, addr.Epic)
+	log, _, err := runlog.ReadEvents(dir, addr.Epic)
 	if err != nil {
 		s.Log.Warn("gate watch cannot read the run log", "ticket", addr, "err", err)
-		return ralphloop.Event{}, false
+		return runlog.Event{}, false
 	}
-	held := map[string]ralphloop.Event{}
+	held := map[string]runlog.Event{}
 	for _, ev := range log {
 		if ev.Ticket != addr.ID {
 			continue
@@ -97,7 +97,7 @@ func (s *Scheduler) heldGate(addr tickets.Address) (ralphloop.Event, bool) {
 			delete(held, ev.TaskID)
 		}
 	}
-	var newest ralphloop.Event
+	var newest runlog.Event
 	for _, ev := range held {
 		if ev.Time.After(newest.Time) {
 			newest = ev

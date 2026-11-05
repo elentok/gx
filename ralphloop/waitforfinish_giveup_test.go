@@ -12,6 +12,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -208,7 +209,7 @@ func TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort(t *testing.T) {
 		t.Errorf("prompts = %v, want [/compact] only, no finish-up", prompts)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -304,9 +305,9 @@ func TestContextOccupancy_UnaffectedByStaleness(t *testing.T) {
 }
 
 // occupancySink is a minimal EventSink test double that only records
-// ContextOccupancy calls, embedding noopEventSink for the rest.
+// ContextOccupancy calls, embedding runlog.NoopEventSink for the rest.
 type occupancySink struct {
-	noopEventSink
+	runlog.NoopEventSink
 	mu    sync.Mutex
 	calls []occupancyCall
 }

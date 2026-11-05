@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -48,18 +48,18 @@ func (s *Reconciler) ScanParentDefects() {
 }
 
 func (s *Reconciler) raiseParentDefect(projectDir, epic, id, want string) {
-	log, _, err := ralphloop.ReadEvents(projectDir, epic)
+	log, _, err := runlog.ReadEvents(projectDir, epic)
 	if err != nil {
 		s.log.Warn("parent scan cannot read the run log", "epic", epic, "err", err)
 		return
 	}
-	if slices.ContainsFunc(log, func(ev ralphloop.Event) bool {
+	if slices.ContainsFunc(log, func(ev runlog.Event) bool {
 		return ev.Ticket == id && events.Type(ev.Type) == events.TicketGraphDefect && events.Kind(ev.Kind) == events.ParentDefect
 	}) {
 		return
 	}
-	ev := ralphloop.Event{Type: string(events.TicketGraphDefect), Ticket: id, Kind: string(events.ParentDefect), Reason: want}
-	if err := ralphloop.AppendEvent(projectDir, epic, ev); err != nil {
+	ev := runlog.Event{Type: string(events.TicketGraphDefect), Ticket: id, Kind: string(events.ParentDefect), Reason: want}
+	if err := runlog.AppendEvent(projectDir, epic, ev); err != nil {
 		s.log.Warn("parent scan cannot record event", "epic", epic, "ticket", id, "err", err)
 		return
 	}

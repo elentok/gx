@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -14,14 +15,14 @@ import (
 type recordingSink struct {
 	mu                     sync.Mutex
 	calls                  []string
-	lastIterationStats     IterationStats
+	lastIterationStats     runlog.IterationStats
 	lastEpicElapsedSeconds int
 	// iterationStatsByTicket records every IterationFinished call's stats
 	// keyed by ticket identifier, for scenarios (unlike
 	// lastIterationStats) that need to inspect more than the most recent
 	// call, e.g. asserting a scripted scheduling scenario's per-ticket
 	// progress counts.
-	iterationStatsByTicket map[string]IterationStats
+	iterationStatsByTicket map[string]runlog.IterationStats
 	// onIterationFinished, if set, runs synchronously after recording each
 	// IterationFinished call, letting a test unblock a still-running
 	// iteration's fake AgentWait exactly once this ticket's stats have been
@@ -30,7 +31,7 @@ type recordingSink struct {
 	// pausedStalled records the stalled-ticket list of every EpicPaused
 	// call, so a test can assert both how many times a run paused and what
 	// it named as blocking each pause.
-	pausedStalled [][]StalledTicket
+	pausedStalled [][]runlog.StalledTicket
 	// ticketNeedsHumanCalls records every TicketNeedsHuman call's
 	// (identifier, epicName, status, reason) tuple, for asserting both the
 	// count and the identity/status a pausing-write transition reports.
@@ -73,17 +74,17 @@ func (s *recordingSink) TicketClaimed(ticket tickets.Ticket) { s.record("TicketC
 func (s *recordingSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
 	s.record("IterationStarted")
 }
-func (s *recordingSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
+func (s *recordingSink) IterationPaused(identifier, label string, kind runlog.PauseKind, reason string) {
 	s.record("IterationPaused")
 }
-func (s *recordingSink) IterationResumed(identifier, label string, kind PauseKind) {
+func (s *recordingSink) IterationResumed(identifier, label string, kind runlog.PauseKind) {
 	s.record("IterationResumed")
 }
-func (s *recordingSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
+func (s *recordingSink) IterationFinished(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) {
 	s.mu.Lock()
 	s.lastIterationStats = stats
 	if s.iterationStatsByTicket == nil {
-		s.iterationStatsByTicket = map[string]IterationStats{}
+		s.iterationStatsByTicket = map[string]runlog.IterationStats{}
 	}
 	s.iterationStatsByTicket[ticket.Identifier] = stats
 	hook := s.onIterationFinished
@@ -109,7 +110,7 @@ func (s *recordingSink) TicketRecovered(identifier, epicName, branch, mergedSHA 
 func (s *recordingSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record("TicketUnrecoverable")
 }
-func (s *recordingSink) EpicPaused(epicName string, stalled []StalledTicket) {
+func (s *recordingSink) EpicPaused(epicName string, stalled []runlog.StalledTicket) {
 	s.mu.Lock()
 	s.pausedStalled = append(s.pausedStalled, stalled)
 	s.mu.Unlock()
@@ -142,7 +143,7 @@ func TestRecordingSink_CapturesIterationFinishedStatsAndEpicCompleteElapsedSecon
 	t.Parallel()
 	sink := &recordingSink{}
 
-	stats := IterationStats{ElapsedSeconds: 42, PeakContextTokens: 12345, InProgress: 2, Completed: 3, Total: 5}
+	stats := runlog.IterationStats{ElapsedSeconds: 42, PeakContextTokens: 12345, InProgress: 2, Completed: 3, Total: 5}
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", stats)
 	if sink.lastIterationStats != stats {
 		t.Errorf("lastIterationStats = %+v, want %+v", sink.lastIterationStats, stats)

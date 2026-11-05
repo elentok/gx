@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 )
@@ -55,13 +55,13 @@ func (f *schedFixture) backupRefs(t *testing.T) []string {
 	return strings.Fields(f.Git(t, "for-each-ref", "--format=%(refname)", "refs/gx/backups/"))
 }
 
-func (f *schedFixture) landedEvents(t *testing.T) []ralphloop.Event {
+func (f *schedFixture) landedEvents(t *testing.T) []runlog.Event {
 	t.Helper()
-	log, _, err := ralphloop.ReadEvents(filepath.Join(f.Store, "proj"), schedEpic)
+	log, _, err := runlog.ReadEvents(filepath.Join(f.Store, "proj"), schedEpic)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got []ralphloop.Event
+	var got []runlog.Event
 	for _, ev := range log {
 		if events.Type(ev.Type) == events.DirtyTrunkLanded {
 			got = append(got, ev)

@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -37,9 +38,9 @@ func iterationAgent(t *testing.T, name string, state agentrunner.State) (renamed
 
 // gateRaise is what raiseGateHeld saw once R10 was done.
 type gateRaise struct {
-	applied   ralphloop.Event
-	escalated *ralphloop.Event
-	log       []ralphloop.Event
+	applied   runlog.Event
+	escalated *runlog.Event
+	log       []runlog.Event
 	ticket    string
 	question  string // text of the ticket log's events
 	worktree  string
@@ -65,8 +66,8 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	const addr = "proj:epic-a/01"
 	h.Server.Registry().PutRunFrom("proj:epic-a", runs.Run{Address: addr, Runner: runner, Session: sess}, "main")
 	dir := filepath.Join(store, "proj")
-	held := ralphloop.Event{Type: string(events.BackgroundTaskGateHeld), Ticket: "01", Reason: "background task task-1"}
-	if err := ralphloop.AppendEvent(dir, "epic-a", held); err != nil {
+	held := runlog.Event{Type: string(events.BackgroundTaskGateHeld), Ticket: "01", Reason: "background task task-1"}
+	if err := runlog.AppendEvent(dir, "epic-a", held); err != nil {
 		t.Fatal(err)
 	}
 	h.Server.Recovery().RecoverAsync(recovery.Failure{Address: addr, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
@@ -75,7 +76,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 		if h.Server.Registry().IsGateReleased(addr) {
 			h.Server.SettleReleasedRun(addr)
 		}
-		got.log, _, _ = ralphloop.ReadEvents(dir, "epic-a")
+		got.log, _, _ = runlog.ReadEvents(dir, "epic-a")
 		var done bool
 		for i, ev := range got.log {
 			switch events.Type(ev.Type) {
@@ -191,9 +192,9 @@ func startParentDefect(t *testing.T, store string, cat recovery.Catalog) *server
 }
 
 // parentDefectEvents is the run log's events of kind parent-defect, by type.
-func parentDefectEvents(h *servertest.Harness) map[events.Type][]ralphloop.Event {
-	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
-	byType := map[events.Type][]ralphloop.Event{}
+func parentDefectEvents(h *servertest.Harness) map[events.Type][]runlog.Event {
+	log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	byType := map[events.Type][]runlog.Event{}
 	for _, ev := range log {
 		if ev.Kind == string(events.ParentDefect) {
 			byType[events.Type(ev.Type)] = append(byType[events.Type(ev.Type)], ev)
@@ -277,7 +278,7 @@ func TestRecovery_ParentDefectScanSkipsDrafts(t *testing.T) {
 	h.Server.Rescan()
 	time.Sleep(200 * time.Millisecond) // negative wait: a recovery event would show by now
 	for _, epic := range []string{"epic-a", "epic-b"} {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), epic)
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), epic)
 		for _, ev := range log {
 			if ev.Kind == string(events.ParentDefect) {
 				t.Errorf("%s: %+v, want no parent-defect event for a draft", epic, ev)
@@ -316,7 +317,7 @@ func TestRecovery_ManualAndUnmatchedBlockedPanePausesForkNothing(t *testing.T) {
 
 func assertNoInvestigation(t *testing.T, h *servertest.Harness) {
 	t.Helper()
-	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 	for _, ev := range log {
 		if strings.HasPrefix(ev.Type, "recovery-") {
 			t.Errorf("recovery event %+v, want none", ev)
@@ -384,7 +385,7 @@ func TestRecovery_UnfixedParentDefectIsRaisedOnce(t *testing.T) {
 // watchHeldGate seeds ticket 01's run log, puts its run in the registry with an
 // agent in state, and runs one watchdog pass an hour after the start. It
 // returns a counter of the gate's recovery-applied events on 01 and a rerun.
-func watchHeldGate(t *testing.T, state agentrunner.State, seed ...ralphloop.Event) (applied func() int, pass func()) {
+func watchHeldGate(t *testing.T, state agentrunner.State, seed ...runlog.Event) (applied func() int, pass func()) {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -396,14 +397,14 @@ func watchHeldGate(t *testing.T, state agentrunner.State, seed ...ralphloop.Even
 	dir := filepath.Join(store, "proj")
 	for _, ev := range seed {
 		ev.Ticket = "01"
-		if err := ralphloop.AppendEvent(dir, "epic-a", ev); err != nil {
+		if err := runlog.AppendEvent(dir, "epic-a", ev); err != nil {
 			t.Fatal(err)
 		}
 	}
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "headless", Session: sess})
 	pass = func() { h.Server.Scheduler().WatchGates(gateWatchStart.Add(time.Hour)) }
 	applied = func() int {
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ := runlog.ReadEvents(dir, "epic-a")
 		n := 0
 		for _, ev := range log {
 			if ev.Ticket == "01" && events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.BackgroundTaskGate) {
@@ -418,8 +419,8 @@ func watchHeldGate(t *testing.T, state agentrunner.State, seed ...ralphloop.Even
 
 var gateWatchStart = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-func gateEvent(typ events.Type, after time.Duration) ralphloop.Event {
-	return ralphloop.Event{Type: string(typ), TaskID: "task-1", Reason: "background task task-1", Time: gateWatchStart.Add(after)}
+func gateEvent(typ events.Type, after time.Duration) runlog.Event {
+	return runlog.Event{Type: string(typ), TaskID: "task-1", Reason: "background task task-1", Time: gateWatchStart.Add(after)}
 }
 
 func TestGateWatch_TracksTheGateByTaskIDNotReasonText(t *testing.T) {
@@ -446,15 +447,15 @@ func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		status agentrunner.State
-		seed   []ralphloop.Event
+		seed   []runlog.Event
 	}{
-		{"busy pane", "working", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute)}},
-		{"released gate", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.BackgroundTaskGateReleased, 2*time.Minute)}},
-		{"gate recovery forced open", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), {
+		{"busy pane", "working", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute)}},
+		{"released gate", "idle", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.BackgroundTaskGateReleased, 2*time.Minute)}},
+		{"gate recovery forced open", "idle", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), {
 			Type: string(events.BackgroundTaskGateReleased), TaskID: "task-1", Reason: "background task task-1: recovery forced the release", Time: gateWatchStart.Add(2 * time.Minute),
 		}}},
-		{"held within the quiet period", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, 59*time.Minute)}},
-		{"held in an earlier iteration", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.IterationStarted, 2*time.Minute)}},
+		{"held within the quiet period", "idle", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, 59*time.Minute)}},
+		{"held in an earlier iteration", "idle", []runlog.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.IterationStarted, 2*time.Minute)}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			applied, _ := watchHeldGate(t, tc.status, tc.seed...)

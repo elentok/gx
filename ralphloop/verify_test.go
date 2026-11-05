@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -23,7 +24,7 @@ func verifyFixture() VerifyDeps {
 	}
 }
 
-func verifyOne(t *testing.T, vd VerifyDeps, tk tickets.Ticket, events []Event) TicketVerification {
+func verifyOne(t *testing.T, vd VerifyDeps, tk tickets.Ticket, events []runlog.Event) TicketVerification {
 	t.Helper()
 	got, err := VerifyEpic(vd, VerifyParams{Epic: "epic", Tickets: []tickets.Ticket{tk}, Events: events})
 	if err != nil {
@@ -39,8 +40,8 @@ func doneTicket() tickets.Ticket {
 	return tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}
 }
 
-func pickedEvent() []Event {
-	return []Event{{Type: string(events.CherryPicked), Ticket: "03", SHA: "abc123"}}
+func pickedEvent() []runlog.Event {
+	return []runlog.Event{{Type: string(events.CherryPicked), Ticket: "03", SHA: "abc123"}}
 }
 
 func TestVerifyEpic_SHARung(t *testing.T) {

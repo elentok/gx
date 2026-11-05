@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -189,8 +190,8 @@ func TestFinishCommitless_StrandedCommitsPauseAndKeepWorktree(t *testing.T) {
 	if _, err := os.Stat(wt.Path); err != nil {
 		t.Errorf("worktree gone: %v", err)
 	}
-	evs, _, _ := ReadEvents(one.ScratchDir, "fix-it")
-	evs = slices.DeleteFunc(evs, func(e Event) bool { return e.Type == string(events.DepsInstalled) })
+	evs, _, _ := runlog.ReadEvents(one.ScratchDir, "fix-it")
+	evs = slices.DeleteFunc(evs, func(e runlog.Event) bool { return e.Type == string(events.DepsInstalled) })
 	if len(evs) != 1 || !strings.Contains(evs[0].Reason, sha+" the fix") {
 		t.Errorf("events = %+v, want one pause naming %s", evs, sha)
 	}

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -24,7 +25,7 @@ type pauseRequest struct {
 	Repair schema.FaultState
 	// Event carries optional agent context (runner, label, pane, session, cwd) merged
 	// into the appended event; pause overwrites its type, ticket, kind and reason.
-	Event Event
+	Event runlog.Event
 	// AlreadyDone skips the ticket write of a manual-merge whose ticket was
 	// already done.
 	AlreadyDone bool
@@ -135,8 +136,8 @@ func PauseStatus(k events.Kind) string {
 
 // RecordManualMerge writes done through the pause path and appends the one
 // manual-merge event. Only the ticket write's error is returned, matching pause.
-func RecordManualMerge(scratchDir, epicName, ticket, path string, alreadyDone bool, ev Event) error {
-	_, err := pause(noopEventSink{}, pauseRequest{
+func RecordManualMerge(scratchDir, epicName, ticket, path string, alreadyDone bool, ev runlog.Event) error {
+	_, err := pause(runlog.NoopEventSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
 		Type: events.ManualMerge, Reason: ev.Reason, AlreadyDone: alreadyDone, Event: ev,
 	})
@@ -151,8 +152,8 @@ func RecordManualMerge(scratchDir, epicName, ticket, path string, alreadyDone bo
 // no live notification. The event type and the reason stub come from the kind.
 // A blank reason is refused before anything is written. ev carries the run's
 // agent context onto the event, as pauseRequest.Event does.
-func Pause(scratchDir, epicName, ticket, path string, kind events.Kind, reason string, ev Event) error {
-	_, err := pause(noopEventSink{}, pauseRequest{
+func Pause(scratchDir, epicName, ticket, path string, kind events.Kind, reason string, ev runlog.Event) error {
+	_, err := pause(runlog.NoopEventSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
 		Type: events.Paused, Kind: kind, Reason: reason, Event: ev,
 	})
@@ -167,7 +168,7 @@ func Pause(scratchDir, epicName, ticket, path string, kind events.Kind, reason s
 // and notification still fire — a silent pause is the bug this exists to
 // remove — and is also returned, for callers whose flow must not continue past
 // an unwritten pause.
-func pause(sink EventSink, req pauseRequest) (reason string, writeErr error) {
+func pause(sink runlog.EventSink, req pauseRequest) (reason string, writeErr error) {
 	reason = req.Reason
 	switch {
 	case req.Type == events.Paused && !req.Kind.AwaitsAnswer():
@@ -203,7 +204,7 @@ func pause(sink EventSink, req pauseRequest) (reason string, writeErr error) {
 	}
 	ev := req.Event
 	ev.Type, ev.Ticket, ev.Kind, ev.Reason = string(req.Type), req.Ticket, string(req.Kind), reason
-	if err := logEvent(req.ScratchDir, req.EpicName, ev); err != nil {
+	if err := runlog.AppendEvent(req.ScratchDir, req.EpicName, ev); err != nil {
 		reason = fmt.Sprintf("%s (also failed logging event: %v)", reason, err)
 	}
 	if req.Type == events.ManualMerge {

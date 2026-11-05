@@ -9,7 +9,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
@@ -24,7 +24,7 @@ type liveTicketState struct {
 	running   bool
 	paused    bool
 	label     string // iteration/tab label, e.g. "iter-04a"
-	pauseKind ralphloop.PauseKind
+	pauseKind runlog.PauseKind
 	reason    string
 	phase     livePhase
 	// waitingOn is the conflict-resolution child a merging ticket waits on;
@@ -130,7 +130,7 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 	title := rowTitle(icons, t)
 
 	switch {
-	case live.paused && live.pauseKind == ralphloop.PauseRepair:
+	case live.paused && live.pauseKind == runlog.PauseRepair:
 		base = prefix + statusPausedRepairStyle.Render(icons.TicketPausedRepair) + " " + title
 		return base, live.reason, true
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -135,7 +136,7 @@ func TestPrepareIteration_LogsDepsInstalled(t *testing.T) {
 	if _, err := PrepareIteration(d, o); err != nil {
 		t.Fatal(err)
 	}
-	evs, _, err := ReadEvents(o.ScratchDir, o.Epic)
+	evs, _, err := runlog.ReadEvents(o.ScratchDir, o.Epic)
 	if err != nil {
 		t.Fatal(err)
 	}

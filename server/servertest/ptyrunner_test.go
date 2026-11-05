@@ -18,7 +18,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
@@ -581,11 +581,11 @@ func TestPty_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
 		runs := h.Server.Runs()
 		return len(runs) == 1 && runs[0].Session.ID != ""
 	})
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	logged, _, err := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var closed []ralphloop.Event
+	var closed []runlog.Event
 	for _, ev := range logged {
 		if ev.Type == string(events.StalePaneClosed) {
 			closed = append(closed, ev)

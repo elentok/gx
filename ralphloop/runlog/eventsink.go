@@ -1,4 +1,4 @@
-package ralphloop
+package runlog
 
 import (
 	"github.com/elentok/gx/events"
@@ -207,36 +207,36 @@ type EventSink interface {
 	NotificationFailed(channel, reason string)
 }
 
-// noopEventSink implements EventSink with every method a no-op, used
+// NoopEventSink implements EventSink with every method a no-op, used
 // wherever a launchAndPromptParams is built directly in isolation (mostly
 // tests exercising pause/resume plumbing) without wiring up a real sink.
-type noopEventSink struct{}
+type NoopEventSink struct{}
 
-func (noopEventSink) EpicStarted(epicName string, done, total int)              {}
-func (noopEventSink) TicketReverted(identifier string)                          {}
-func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string) {}
-func (noopEventSink) TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string) {
+func (NoopEventSink) EpicStarted(epicName string, done, total int)              {}
+func (NoopEventSink) TicketReverted(identifier string)                          {}
+func (NoopEventSink) TicketReattached(identifier, label, cwd, sessionID string) {}
+func (NoopEventSink) TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string) {
 }
-func (noopEventSink) TicketClaimed(ticket tickets.Ticket) {}
-func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
+func (NoopEventSink) TicketClaimed(ticket tickets.Ticket) {}
+func (NoopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent agent.AgentKind, paneID string) {
 }
-func (noopEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {}
-func (noopEventSink) IterationResumed(identifier, label string, kind PauseKind)               {}
-func (noopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
+func (NoopEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {}
+func (NoopEventSink) IterationResumed(identifier, label string, kind PauseKind)               {}
+func (NoopEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
 }
-func (noopEventSink) TranscriptLine(label, line string)                               {}
-func (noopEventSink) ContextOccupancy(identifier string, tokens int)                  {}
-func (noopEventSink) CherryPickStarted(identifier string)                             {}
-func (noopEventSink) ConflictResolutionStarted(identifier string)                     {}
-func (noopEventSink) SmartZoneCompactStarted(identifier string)                       {}
-func (noopEventSink) SmartZoneFinishingUp(identifier string)                          {}
-func (noopEventSink) SmartZoneRecovered(identifier string)                            {}
-func (noopEventSink) VerifyCapStopped(identifier string)                              {}
-func (noopEventSink) TicketCleanupFinished(identifier string)                         {}
-func (noopEventSink) TicketRecovering(identifier string)                              {}
-func (noopEventSink) TicketRecovered(identifier, epicName, branch, mergedSHA string)  {}
-func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                 {}
-func (noopEventSink) EpicPaused(epicName string, stalled []StalledTicket)             {}
-func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
-func (noopEventSink) EpicFailed(epicName string, err error)                           {}
-func (noopEventSink) NotificationFailed(channel, reason string)                       {}
+func (NoopEventSink) TranscriptLine(label, line string)                               {}
+func (NoopEventSink) ContextOccupancy(identifier string, tokens int)                  {}
+func (NoopEventSink) CherryPickStarted(identifier string)                             {}
+func (NoopEventSink) ConflictResolutionStarted(identifier string)                     {}
+func (NoopEventSink) SmartZoneCompactStarted(identifier string)                       {}
+func (NoopEventSink) SmartZoneFinishingUp(identifier string)                          {}
+func (NoopEventSink) SmartZoneRecovered(identifier string)                            {}
+func (NoopEventSink) VerifyCapStopped(identifier string)                              {}
+func (NoopEventSink) TicketCleanupFinished(identifier string)                         {}
+func (NoopEventSink) TicketRecovering(identifier string)                              {}
+func (NoopEventSink) TicketRecovered(identifier, epicName, branch, mergedSHA string)  {}
+func (NoopEventSink) TicketUnrecoverable(identifier, epicName string)                 {}
+func (NoopEventSink) EpicPaused(epicName string, stalled []StalledTicket)             {}
+func (NoopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
+func (NoopEventSink) EpicFailed(epicName string, err error)                           {}
+func (NoopEventSink) NotificationFailed(channel, reason string)                       {}

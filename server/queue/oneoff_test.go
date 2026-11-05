@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
@@ -56,7 +56,7 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 	if epicMD, err := os.ReadFile(filepath.Join(epicDir, "ticket.md")); err != nil || !strings.Contains(string(epicMD), "status: draft") {
 		t.Fatalf("epic ticket.md = %q, %v; want status: draft", epicMD, err)
 	}
-	log, _ := os.ReadFile(ralphloop.RunLogPath(filepath.Join(h.TicketStore, a.Project), a.Epic))
+	log, _ := os.ReadFile(runlog.RunLogPath(filepath.Join(h.TicketStore, a.Project), a.Epic))
 	if !strings.Contains(string(log), `"type":"submitted"`) || !strings.Contains(string(log), res.Address) {
 		t.Fatalf("run log = %s", log)
 	}

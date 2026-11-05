@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 func inputsFixture(t *testing.T) *evolveFixture {
@@ -34,7 +35,7 @@ func inputsFixture(t *testing.T) *evolveFixture {
 	write("07-nometrics.md", "id: \"07\"\nstatus: done\ntype: implement\n")
 
 	scratch := filepath.Dir(f.epic)
-	for _, ev := range []ralphloop.Event{
+	for _, ev := range []runlog.Event{
 		{Type: "iteration-started", Ticket: "02", AgentSession: "s2"},
 		{Type: "iteration-started", Ticket: "02", AgentSession: "s2b"},
 		{Type: "nudged", Ticket: "02"},
@@ -43,7 +44,7 @@ func inputsFixture(t *testing.T) *evolveFixture {
 		{Type: "recovery-applied", Ticket: "07", Kind: "zero-commit"},
 		{Type: "deadlocked", Kind: "all-paused"},
 	} {
-		if err := ralphloop.AppendEvent(scratch, "epic", ev); err != nil {
+		if err := runlog.AppendEvent(scratch, "epic", ev); err != nil {
 			t.Fatal(err)
 		}
 	}

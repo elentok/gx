@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -95,7 +95,7 @@ func TestRecovery_ZeroCommitPauseWithR2DisabledInvestigatesWithoutR2Events(t *te
 		}
 		return false
 	})
-	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 	for _, ev := range log {
 		if ev.Reason == "R2" {
 			t.Errorf("unexpected %s event for disabled R2", ev.Type)
@@ -132,7 +132,7 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 		return false
 	})
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AmbiguousMerge) && ev.Outcome == "proj:epic-a/01a" {
 				return true
@@ -188,7 +188,7 @@ func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testin
 	servertest.RunToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ := runlog.ReadEvents(dir, "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryProposed && ev.Reason == "R3" && ev.Text == "commitless-done proj:epic-a/01" {
 				return true
@@ -222,7 +222,7 @@ func TestRecovery_R3LostCommitsEscalateWithoutAnInvestigation(t *testing.T) {
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ := runlog.ReadEvents(dir, "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryEscalated && strings.Contains(ev.Reason, "R3") {
 				return true
@@ -230,7 +230,7 @@ func TestRecovery_R3LostCommitsEscalateWithoutAnInvestigation(t *testing.T) {
 		}
 		return false
 	})
-	log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+	log, _, _ := runlog.ReadEvents(dir, "epic-a")
 	for _, ev := range log {
 		if typ := events.Type(ev.Type); typ == events.RecoveryApplied || typ == events.RecoveryProposed {
 			t.Errorf("unexpected %s for lost commits", ev.Type)
@@ -270,7 +270,7 @@ func TestRecovery_EnabledR4MatchForksAnInvestigateTicketNamingR4(t *testing.T) {
 		return false
 	})
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.BlockedPane) && ev.Outcome == "proj:epic-a/01a" {
 				return true
@@ -288,13 +288,13 @@ func pauseLaunchCollision(t *testing.T, kind events.Kind, earlier ...events.Type
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	seeds := []ralphloop.Event{}
+	seeds := []runlog.Event{}
 	for _, typ := range earlier {
-		seeds = append(seeds, ralphloop.Event{Type: string(typ), Ticket: "01"})
+		seeds = append(seeds, runlog.Event{Type: string(typ), Ticket: "01"})
 	}
-	seeds = append(seeds, ralphloop.Event{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(kind), Attempt: 1, Reason: string(kind)})
+	seeds = append(seeds, runlog.Event{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(kind), Attempt: 1, Reason: string(kind)})
 	for _, seed := range seeds {
-		if err := ralphloop.AppendEvent(filepath.Join(store, "proj"), "epic-a", seed); err != nil {
+		if err := runlog.AppendEvent(filepath.Join(store, "proj"), "epic-a", seed); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -315,7 +315,7 @@ func TestRecovery_R6BusyPaneIsRelaunchedByARule(t *testing.T) {
 	t.Parallel()
 	h := pauseLaunchCollision(t, events.AgentPaneBusy)
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AgentPaneBusy) && ev.Reason == "R6" && ev.Outcome == "ok" {
 				return true
@@ -340,7 +340,7 @@ func TestRecovery_R6TakenNameForksAnInvestigateTicketNamingR6(t *testing.T) {
 		return false
 	})
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AgentNameTaken) && ev.Outcome == "proj:epic-a/01a" {
 				return true
@@ -365,7 +365,7 @@ func TestRecovery_R11ClobberedClaimForksAnInvestigateTicketNamingR11(t *testing.
 		return false
 	})
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AgentNameTaken) && ev.Outcome == "proj:epic-a/01a" {
 				return true
@@ -383,11 +383,11 @@ func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	for _, seed := range []ralphloop.Event{
+	for _, seed := range []runlog.Event{
 		{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(events.AgentPromptStalled), Attempt: 1, Reason: "prompt stalled"},
 		{Type: string(events.Reclaimed), Ticket: "01"},
 	} {
-		if err := ralphloop.AppendEvent(filepath.Join(store, "proj"), "epic-a", seed); err != nil {
+		if err := runlog.AppendEvent(filepath.Join(store, "proj"), "epic-a", seed); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -411,7 +411,7 @@ func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.
 		return false
 	})
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.ZeroCommit) && ev.Outcome == "proj:epic-a/01a" {
 				return true

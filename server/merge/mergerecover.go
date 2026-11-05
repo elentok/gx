@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 )
@@ -80,7 +81,7 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 	s.log.Info("verified interrupted merge", "ticket", addr, "merging", v.Merging, "evidence", v.Evidence)
 	switch v.Merging {
 	case ralphloop.MergingMerged:
-		ev := ralphloop.Event{Outcome: string(ralphloop.Merged), SHA: v.SHA}
+		ev := runlog.Event{Outcome: string(ralphloop.Merged), SHA: v.SHA}
 		if err := tickets.EndOpenRound(t.Path, tickets.SourceGx, tickets.HowManualMerge, "manual-merge"); err != nil {
 			return fmt.Errorf("end pause round of %s: %w", addr, err)
 		}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -63,7 +64,7 @@ func Verify(run VerifyRun) (VerifyResult, error) {
 		}
 	}
 
-	events, _, err := ralphloop.ReadEvents(filepath.Dir(epicPath), epicName)
+	events, _, err := runlog.ReadEvents(filepath.Dir(epicPath), epicName)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("reading run log: %w", err)
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -88,13 +89,13 @@ func waitStallFixture(t *testing.T, d Deps, one OneIteration) {
 	}
 }
 
-func stallNudgeEvents(t *testing.T, one OneIteration) []Event {
+func stallNudgeEvents(t *testing.T, one OneIteration) []runlog.Event {
 	t.Helper()
-	evs, _, err := ReadEvents(one.ScratchDir, one.Epic)
+	evs, _, err := runlog.ReadEvents(one.ScratchDir, one.Epic)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out []Event
+	var out []runlog.Event
 	for _, ev := range evs {
 		if ev.Type == string(events.StallNudged) {
 			out = append(out, ev)
@@ -233,7 +234,7 @@ func TestWaitIterationFinished_InputNotEmptyIsRetriedOnce(t *testing.T) {
 	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
 		t.Errorf("prompts = %q, want the nudge delivered once after the retry", got)
 	}
-	evs, _, err := ReadEvents(one.ScratchDir, one.Epic)
+	evs, _, err := runlog.ReadEvents(one.ScratchDir, one.Epic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +423,7 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 			_ = ReleaseMergeLock(lockDir)
 		}
 	}
-	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, WorktreeLock: &worktreeLock, Gate: NewGate(), Sink: noopEventSink{}}
+	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, WorktreeLock: &worktreeLock, Gate: NewGate(), Sink: runlog.NoopEventSink{}}
 	built := &builtAwaitingMergeError{job: mergeJob{ticket: tickets.Ticket{Identifier: "01"}}}
 
 	err := mergeBuilt(d, p, built)
@@ -446,7 +447,7 @@ func driveDeferredMerge(t *testing.T, d Deps, scratchDir, path string, onRetry f
 			onRetry(retries)
 		}
 	}
-	out := driveIteration(t, d, scratchDir, path, noopEventSink{})
+	out := driveIteration(t, d, scratchDir, path, runlog.NoopEventSink{})
 	return out, retries
 }
 
@@ -550,7 +551,7 @@ func TestMergeBuilt_LockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 	if retries != holds {
 		t.Fatalf("retry sleeps = %d, want %d", retries, holds)
 	}
-	evs, _, err := ReadEvents(scratchDir, "epic")
+	evs, _, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil {
 		t.Fatal(err)
 	}

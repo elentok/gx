@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -78,7 +79,7 @@ func (w *Writer) sendPause(addr tickets.Address, ticketPath string, kind events.
 
 // FinishSink carries the finish path's chat-worthy events the outcome cannot
 // show: a merge conflict's resolution starting, and its child pausing.
-func (w *Writer) FinishSink(addr tickets.Address, ticketPath string) ralphloop.EventSink {
+func (w *Writer) FinishSink(addr tickets.Address, ticketPath string) runlog.EventSink {
 	return w.d.Chat.FinishSink(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() ralphloop.EpicCounts {
 		return w.epicCounts(addr.Project, addr.Epic)
 	})

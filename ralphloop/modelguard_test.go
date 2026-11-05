@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -71,13 +72,13 @@ func runModelGuardWait(t *testing.T, ticketType, expected string, read func(sinc
 	return f
 }
 
-func modelEvents(t *testing.T, scratchDir string) []Event {
+func modelEvents(t *testing.T, scratchDir string) []runlog.Event {
 	t.Helper()
-	evs, _, err := ReadEvents(scratchDir, "epic")
+	evs, _, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out []Event
+	var out []runlog.Event
 	for _, ev := range evs {
 		if ev.Type == string(events.ModelMismatch) {
 			out = append(out, ev)

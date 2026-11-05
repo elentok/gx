@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -34,7 +34,7 @@ type ZeroCommitPaused struct {
 	Store      string
 	WtPath     string
 	TicketPath string
-	Pause      ralphloop.Event
+	Pause      runlog.Event
 	// AgentGone makes the runner's Find miss the agent.
 	AgentGone func()
 	// Stops counts runner Stops from now on.
@@ -75,7 +75,7 @@ func PauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 	// The pause writes the ticket's status before its run-log event.
 	Await(t, func() bool {
 		var ok bool
-		p.Pause, ok = ralphloop.LatestPauseEvent(filepath.Join(store, "proj"), "epic-a", "01")
+		p.Pause, ok = runlog.LatestPauseEvent(filepath.Join(store, "proj"), "epic-a", "01")
 		return ok
 	})
 	r, err := git.FindRepo(repo)

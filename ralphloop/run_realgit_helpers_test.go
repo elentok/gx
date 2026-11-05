@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
@@ -138,7 +139,7 @@ func agentJSON(pane, status, session string) ([]byte, int) {
 }
 
 type compactRecoverySink struct {
-	noopEventSink
+	runlog.NoopEventSink
 	mu     sync.Mutex
 	phases []string
 }
@@ -249,7 +250,7 @@ func writeFakeExecutable(t *testing.T, name, body string) string {
 // launch-environment failure that's caught before a ticket is claimed:
 // repository (no feature worktree ever created), tracker (ticket left open,
 // never claimed, so no done/paused (answer)/paused (repair) residue), and
-// diagnostic-trace (no run-log.jsonl at all — logEvent is never reached this
+// diagnostic-trace (no run-log.jsonl at all — runlog.AppendEvent is never reached this
 // early) outcomes. A failure this early also never opens a Herdr tab, since
 // FindOrCreateWorkspace/AddWorktree/TabCreate all run strictly after these
 // checks in Run (see loop.go) — verified structurally by the same feature-
@@ -276,7 +277,7 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 		}
 	}
 
-	if _, ok, readErr := ReadEvents(scratchDir, epicName); readErr != nil || ok {
+	if _, ok, readErr := runlog.ReadEvents(scratchDir, epicName); readErr != nil || ok {
 		t.Errorf("ReadEvents = ok:%v err:%v, want no run-log written for a failure caught before claim", ok, readErr)
 	}
 

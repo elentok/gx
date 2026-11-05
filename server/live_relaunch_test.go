@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/wire"
@@ -94,15 +94,15 @@ func TestRelaunch_OnlyAHumanRelaunchIsLogged(t *testing.T) {
 
 func TestGuardRail_AHumanRelaunchResetsTheBudget(t *testing.T) {
 	t.Parallel()
-	applied := func(kind string) ralphloop.Event {
-		return ralphloop.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: kind, Reason: "relaunch"}
+	applied := func(kind string) runlog.Event {
+		return runlog.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: kind, Reason: "relaunch"}
 	}
-	full := []ralphloop.Event{applied("a"), applied("b"), applied("c")}
+	full := []runlog.Event{applied("a"), applied("b"), applied("c")}
 	f := recovery.Failure{Address: "proj:epic-a/01", Type: events.Paused, Kind: "d"}
 	if why := srvrecovery.GuardRailStop(full, f); why == "" {
 		t.Fatal("three recoveries did not stop recovery")
 	}
-	human := append(full, ralphloop.Event{Type: string(events.HumanRelaunch), Ticket: "01"})
+	human := append(full, runlog.Event{Type: string(events.HumanRelaunch), Ticket: "01"})
 	if why := srvrecovery.GuardRailStop(human, f); why != "" {
 		t.Errorf("after a human relaunch: %q, want recovery allowed", why)
 	}

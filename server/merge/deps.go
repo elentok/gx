@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/broker"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -26,7 +27,7 @@ type Host interface {
 	MergeTarget(addr tickets.Address) (string, error)
 	FreshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool)
 	ResolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, IterationMode, error)
-	LogEvent(ticket tickets.Address, ev ralphloop.Event)
+	LogEvent(ticket tickets.Address, ev runlog.Event)
 	RecoverAsync(f recovery.Failure)
 	// EpicState and EpicMergeBlocked answer for the epic list's rules, which
 	// stay in the root until the epic summary moves.

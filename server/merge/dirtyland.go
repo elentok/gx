@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // backupMaxAge is how long a backup ref lives; the next backup prunes older ones.
@@ -34,7 +34,7 @@ func (s *Landing) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, t
 		return landed, err
 	}
 	if pdir, err := s.projects.Dir(project); err == nil {
-		_ = ralphloop.AppendEvent(pdir, epic, ralphloop.Event{
+		_ = runlog.AppendEvent(pdir, epic, runlog.Event{
 			Time: now, Type: string(events.DirtyTrunkLanded), Reason: strings.Join(clashing, ", "), BackupRef: ref,
 		})
 	}

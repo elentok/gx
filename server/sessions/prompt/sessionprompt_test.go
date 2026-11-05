@@ -12,7 +12,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -226,7 +226,7 @@ func TestSessionPrompt_LogsOneEventWithoutTheText(t *testing.T) {
 	if res := f.prompt(t, text); res.Refused {
 		t.Fatalf("prompt = %+v", res)
 	}
-	evs, ok, err := ralphloop.ReadServerEvents(f.h.TicketStore)
+	evs, ok, err := runlog.ReadServerEvents(f.h.TicketStore)
 	if err != nil || !ok || len(evs) != 1 {
 		t.Fatalf("server events = %+v, ok=%v, err=%v; want one", evs, ok, err)
 	}
@@ -279,7 +279,7 @@ func TestSessionPrompt_ContinueTypesClearThenGxDesign(t *testing.T) {
 		t.Fatalf("continue = %+v", res)
 	}
 	waitForSubmitted(t, f.conv, "\"/clear\"\n\"/gx-design map\"\n")
-	evs, ok, err := ralphloop.ReadServerEvents(f.h.TicketStore)
+	evs, ok, err := runlog.ReadServerEvents(f.h.TicketStore)
 	if err != nil || !ok || len(evs) != 1 || evs[0].Action != "continue" || evs[0].Bytes != len("/clear")+len("/gx-design map") {
 		t.Errorf("server events = %+v, ok=%v, err=%v; want one continue", evs, ok, err)
 	}

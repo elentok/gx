@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
@@ -57,7 +58,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	}
 	resolution += tickets.OriginalLine(a) + "\n"
 
-	runEvents, _, err := ralphloop.ReadEvents(root, a.Epic)
+	runEvents, _, err := runlog.ReadEvents(root, a.Epic)
 	if err != nil {
 		return err
 	}

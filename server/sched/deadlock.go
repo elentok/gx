@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/queue"
@@ -73,14 +73,14 @@ func (s *Scheduler) CheckDeadlock(root queue.RootRef, projectDir string, e ticke
 	}
 	reason := deadlockReason(root, e, kind)
 	if kind == events.AllPaused && e.AllAwaitAnswer(epics.PausedTickets(e)) {
-		ev := ralphloop.Event{Type: string(events.WaitingForAnswer), Reason: reason}
-		if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
+		ev := runlog.Event{Type: string(events.WaitingForAnswer), Reason: reason}
+		if err := runlog.AppendEvent(projectDir, root.Epic, ev); err != nil {
 			s.Log.Warn("cannot record waiting-for-answer", "root", root, "err", err)
 		}
 		return
 	}
-	ev := ralphloop.Event{Type: string(events.Deadlocked), Kind: string(kind), Reason: reason}
-	if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
+	ev := runlog.Event{Type: string(events.Deadlocked), Kind: string(kind), Reason: reason}
+	if err := runlog.AppendEvent(projectDir, root.Epic, ev); err != nil {
 		s.Log.Warn("cannot record deadlock", "root", root, "err", err)
 	}
 	s.Recovery.RecoverAsync(recovery.Failure{Address: root.String(), Type: events.Deadlocked, Kind: kind, Reason: reason})

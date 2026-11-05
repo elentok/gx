@@ -1,12 +1,12 @@
 package server
 
 import (
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
 // LogEvent appends ev to ticket's run log. It is the root's merge.Host method.
-func (s *Server) LogEvent(ticket tickets.Address, ev ralphloop.Event) {
+func (s *Server) LogEvent(ticket tickets.Address, ev runlog.Event) {
 	s.launcher.LogEvent(ticket, ev)
 }
 

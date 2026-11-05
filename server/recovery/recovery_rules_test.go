@@ -16,7 +16,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -90,9 +90,9 @@ func TestRecovery_RecoveredPauseLeavesMatchedAndAppliedWithKind(t *testing.T) {
 		t.Fatal("remedy never ran")
 	}
 
-	var matched, applied *ralphloop.Event
+	var matched, applied *runlog.Event
 	servertest.Poll(5*time.Second, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		matched, applied = nil, nil
 		for i, ev := range log {
 			switch events.Type(ev.Type) {
@@ -107,7 +107,7 @@ func TestRecovery_RecoveredPauseLeavesMatchedAndAppliedWithKind(t *testing.T) {
 	if matched == nil || applied == nil {
 		t.Fatalf("matched = %v, applied = %v, want both recorded", matched, applied)
 	}
-	for _, ev := range []*ralphloop.Event{matched, applied} {
+	for _, ev := range []*runlog.Event{matched, applied} {
 		if ev.Ticket != "01" || ev.Kind != string(events.IterationError) || ev.Reason != "TEST" {
 			t.Errorf("%s = %+v, want ticket 01, kind iteration-error, entry TEST", ev.Type, *ev)
 		}
@@ -131,7 +131,7 @@ func TestRecovery_SpinningPauseIsRecordedByR1WithoutANudge(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryMatched && ev.Kind == string(events.Spinning) && ev.Reason == "R1" {
 				return true
@@ -139,7 +139,7 @@ func TestRecovery_SpinningPauseIsRecordedByR1WithoutANudge(t *testing.T) {
 		}
 		return false
 	})
-	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 	for _, ev := range log {
 		switch events.Type(ev.Type) {
 		case events.RecoveryApplied, events.RecoveryEscalated, events.RecoveryProposed, events.Reclaimed:
@@ -151,7 +151,7 @@ func TestRecovery_SpinningPauseIsRecordedByR1WithoutANudge(t *testing.T) {
 // pauseStalledLaunch pauses ticket 01 the way a launch whose prompt stalled ends,
 // with the pane answering prompts with promptErr, and returns R5's applied
 // event plus what the pane was typed and whether its session was stopped.
-func pauseStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, typed []string, stopped bool) {
+func pauseStalledLaunch(t *testing.T, promptErr error) (applied runlog.Event, typed []string, stopped bool) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -164,15 +164,15 @@ func pauseStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event,
 	const addr = "proj:epic-a/01"
 	h.Server.Registry().PutRunFrom("proj:epic-a", runs.Run{Address: addr, Runner: "headless", Session: sess}, "main")
 	dir := filepath.Join(store, "proj")
-	stalled := ralphloop.Event{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(events.AgentPromptStalled), Attempt: 1}
-	if err := ralphloop.AppendEvent(dir, "epic-a", stalled); err != nil {
+	stalled := runlog.Event{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(events.AgentPromptStalled), Attempt: 1}
+	if err := runlog.AppendEvent(dir, "epic-a", stalled); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.Server.PauseAs("proj:epic-a/01", events.AgentPromptStalled, "agent_prompt_stalled"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ := runlog.ReadEvents(dir, "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied {
 				applied = ev
@@ -215,7 +215,7 @@ func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
 // smart-zone compaction wait timed out, with the agent's launch turn held open
 // until finish (if finish) and R7 waiting at most rewait for it. It returns
 // R7's applied event plus every prompt the agent got.
-func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (applied ralphloop.Event, prompts []string) {
+func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (applied runlog.Event, prompts []string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -254,7 +254,7 @@ func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (a
 			!h.Server.Scheduler().AgentWaiting("proj", "epic-a", "01")
 	})
 	dir := filepath.Join(store, "proj")
-	if err := ralphloop.AppendEvent(dir, "epic-a", ralphloop.Event{Type: string(events.SmartZoneRecoveryFailed), Ticket: "01", Reason: `compacting epic-a-01 after smart-zone breach: {"code":"timeout"}`}); err != nil {
+	if err := runlog.AppendEvent(dir, "epic-a", runlog.Event{Type: string(events.SmartZoneRecoveryFailed), Ticket: "01", Reason: `compacting epic-a-01 after smart-zone breach: {"code":"timeout"}`}); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "compact recovery exhausted"); err != nil {
@@ -266,7 +266,7 @@ func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (a
 		mu.Unlock()
 	}
 	servertest.WaitFor(t, time.Minute, "R7 is applied", func() bool {
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ := runlog.ReadEvents(dir, "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied {
 				applied = ev
@@ -303,22 +303,22 @@ func TestRecovery_SecondCompactionTimeoutLeavesThePauseToAPerson(t *testing.T) {
 // pauseAfterSeeding appends seed events to ticket 01's run log (as a previous
 // server run would have left them), pauses it, and returns the escalation, or
 // nil once the pause's own recovery is applied instead.
-func pauseAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, <-chan recovery.Result) {
+func pauseAfterSeeding(t *testing.T, seed ...runlog.Event) (*runlog.Event, <-chan recovery.Result) {
 	t.Helper()
 	h, results := startRecovery(t, false)
 	dir := filepath.Join(h.TicketStore, "proj")
 	for _, ev := range seed {
 		ev.Ticket = "01"
-		if err := ralphloop.AppendEvent(dir, "epic-a", ev); err != nil {
+		if err := runlog.AppendEvent(dir, "epic-a", ev); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	var escalated *ralphloop.Event
+	var escalated *runlog.Event
 	servertest.Poll(2*time.Second, func() bool {
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ := runlog.ReadEvents(dir, "epic-a")
 		for i, ev := range log {
 			switch events.Type(ev.Type) {
 			case events.RecoveryEscalated:
@@ -335,14 +335,14 @@ func pauseAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event,
 	return escalated, results
 }
 
-func applied(kind events.Kind) ralphloop.Event {
-	return ralphloop.Event{Type: string(events.RecoveryApplied), Kind: string(kind), Reason: "TEST", Outcome: "ok"}
+func applied(kind events.Kind) runlog.Event {
+	return runlog.Event{Type: string(events.RecoveryApplied), Kind: string(kind), Reason: "TEST", Outcome: "ok"}
 }
 
 func TestRecovery_SecondFailureOfTheSameKindEscalatesInsteadOfRecovering(t *testing.T) {
 	t.Parallel()
 	// A merging between the two clears the failed-recovery rule, leaving the cap.
-	esc, results := pauseAfterSeeding(t, applied(events.IterationError), ralphloop.Event{Type: string(events.CherryPicked)})
+	esc, results := pauseAfterSeeding(t, applied(events.IterationError), runlog.Event{Type: string(events.CherryPicked)})
 	if esc == nil || esc.Kind != string(events.IterationError) {
 		t.Fatalf("escalation = %+v, want recovery-escalated for iteration-error", esc)
 	}
@@ -355,7 +355,7 @@ func TestRecovery_SecondFailureOfTheSameKindEscalatesInsteadOfRecovering(t *test
 
 func TestRecovery_PerTicketCapEscalatesDifferentKinds(t *testing.T) {
 	t.Parallel()
-	merged := ralphloop.Event{Type: string(events.CherryPicked)}
+	merged := runlog.Event{Type: string(events.CherryPicked)}
 	esc, _ := pauseAfterSeeding(t,
 		applied(events.ZeroCommit), merged, applied(events.Spinning), merged, applied(events.RetryExhausted), merged)
 	if esc == nil {
@@ -382,7 +382,7 @@ func TestRecovery_UnrelatedPriorRecoveryDoesNotTripTheGuardRail(t *testing.T) {
 	investigated.Reason = "investigate"
 	backfilled := applied(events.ParentDefect)
 	backfilled.Reason = "R14"
-	for name, seed := range map[string]ralphloop.Event{
+	for name, seed := range map[string]runlog.Event{
 		"other kind":  applied(events.ZeroCommit),
 		"set-parent":  backfilled,
 		"investigate": investigated,
@@ -431,7 +431,7 @@ func proposeByPausing(t *testing.T) (h *servertest.Harness, results <-chan recov
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
 	servertest.WaitFor(t, 5*time.Second, "a recovery-proposed event", func() bool {
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ := runlog.ReadEvents(dir, "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryProposed {
 				if ev.Text != "relaunch proj:epic-a/01" {
@@ -473,8 +473,8 @@ func TestRecovery_ApproveRunsTheLatestProposal(t *testing.T) {
 		t.Fatalf("approve = %+v, %v", res, err)
 	}
 	_ = results
-	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
-	var got *ralphloop.Event
+	log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	var got *runlog.Event
 	for i, ev := range log {
 		if events.Type(ev.Type) == events.RecoveryApplied {
 			got = &log[i]

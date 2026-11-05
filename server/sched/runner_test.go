@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
@@ -437,7 +438,7 @@ func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 	if !strings.Contains(string(body), schema.PausedHeading) {
 		t.Errorf("ticket has no Paused section:\n%s", body)
 	}
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}

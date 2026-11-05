@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // Sources of a session prompt, as the event's source.
@@ -76,7 +76,7 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 	if st := meta.Info().Status; !st.Promptable() {
 		return sessions.Refusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
 	}
-	ev := ralphloop.Event{
+	ev := runlog.Event{
 		Time: time.Now(), Type: string(events.SessionPrompted),
 		Session: req.ID, Source: source, Action: "text", Bytes: len(text),
 	}
@@ -114,7 +114,7 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 			return wire.SessionResult{}, err
 		}
 	}
-	if err := ralphloop.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
+	if err := runlog.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
 		p.log.Warn("logging session prompt", "session", req.ID, "err", err)
 	}
 	info := meta.Info()

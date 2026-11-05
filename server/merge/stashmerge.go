@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
@@ -105,7 +106,7 @@ func (s *Landing) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration
 	if err := tickets.ClearEpicFields(e.Path, "completed_at"); err != nil {
 		return wire.QueueResult{}, nil, fmt.Errorf("clear completed_at of %s: %w", root, err)
 	}
-	_ = ralphloop.AppendEvent(m.dir, root.Epic, ralphloop.Event{
+	_ = runlog.AppendEvent(m.dir, root.Epic, runlog.Event{
 		Time: now, Type: string(events.TrunkConflictOpened), Reason: strings.Join(files, ", "), BackupRef: ref,
 	})
 	_, id, err := ticketwrite.WriteNewTicket(e.Path, "", "trunk-conflict", func(id string) (schema.Ticket, string) {

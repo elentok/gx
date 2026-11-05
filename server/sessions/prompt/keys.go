@@ -19,7 +19,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // sessionKeyBytes maps the named keys to the terminal sequences both
@@ -109,11 +109,11 @@ func (p *Prompt) sendSessionKeys(req wire.SessionKeysRequest, source, seq string
 	if req.Key != "" {
 		action = "key"
 	}
-	ev := ralphloop.Event{
+	ev := runlog.Event{
 		Time: time.Now(), Type: string(events.SessionKeyed),
 		Session: req.ID, Source: source, Action: action, Bytes: n,
 	}
-	if err := ralphloop.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
+	if err := runlog.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
 		p.log.Warn("logging session keys", "session", req.ID, "err", err)
 	}
 	if meta.Design && !req.OnlyBlocked {
@@ -155,11 +155,11 @@ func (p *Prompt) answerSessionPermission(req wire.SessionKeysRequest, source str
 	if err := holder.AnswerSessionPermission(c, dir, agentrunner.Kind(meta.Harness), answer, 20*time.Millisecond, grace); err != nil {
 		return sessionAnswerRefusal(req.ID, err)
 	}
-	ev := ralphloop.Event{
+	ev := runlog.Event{
 		Time: time.Now(), Type: string(events.SessionKeyed),
 		Session: req.ID, Source: source, Action: "permission", Bytes: 1,
 	}
-	if err := ralphloop.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
+	if err := runlog.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
 		p.log.Warn("logging session permission", "session", req.ID, "err", err)
 	}
 	info := meta.Info()

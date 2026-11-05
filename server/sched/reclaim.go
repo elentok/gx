@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -35,7 +36,7 @@ type ReclaimHost interface {
 	Pause(dir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run runs.Run) error
 	// StalledNudgeDelay is how long an idle agent with no report waits for its nudge.
 	StalledNudgeDelay() time.Duration
-	FinishSink(addr tickets.Address, ticketPath string) ralphloop.EventSink
+	FinishSink(addr tickets.Address, ticketPath string) runlog.EventSink
 	IterationModeFor(addr tickets.Address, t tickets.Ticket) merge.IterationMode
 	DefaultDeps() ralphloop.Deps
 	Publish(event, id string)
@@ -305,7 +306,7 @@ func (r *Reclaimer) reopenEmptyClaim(t runs.TrackedRun) (bool, error) {
 	if err := ticketlog.StartOver(t.TicketPath, time.Now(), "reopened automatically after restart: "+reason, ""); err != nil {
 		return false, err
 	}
-	if err := ralphloop.AppendEvent(dir, addr.Epic, ralphloop.Event{
+	if err := runlog.AppendEvent(dir, addr.Epic, runlog.Event{
 		Type: string(events.ClaimReopened), Ticket: addr.ID, Address: t.Address, Reason: reason,
 	}); err != nil {
 		r.log.Warn("log claim-reopened", "ticket", t.Address, "err", err)

@@ -5,10 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,161 +13,12 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
-
-func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
-	t.Parallel()
-	dir := fixture.EpicScratchDir(t, "epic")
-
-	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "01", Pane: "pane-1", AgentSession: "sess-1"}); err != nil {
-		t.Fatalf("logEvent: %v", err)
-	}
-	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationFinished), Ticket: "01"}); err != nil {
-		t.Fatalf("logEvent: %v", err)
-	}
-
-	raw, err := os.ReadFile(runLogPath(dir, "epic"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")
-	if len(lines) != 2 {
-		t.Fatalf("got %d lines, want 2:\n%s", len(lines), raw)
-	}
-	if !strings.Contains(lines[0], `"iteration-started"`) || !strings.Contains(lines[0], `"sess-1"`) {
-		t.Errorf("line 0 = %q, want it to record type+agent_session", lines[0])
-	}
-	if !strings.Contains(lines[1], `"iteration-finished"`) {
-		t.Errorf("line 1 = %q, want it to record iteration-finished", lines[1])
-	}
-}
-
-func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
-	t.Parallel()
-	dir := fixture.EpicScratchDir(t, "epic")
-
-	err := AppendEvent(dir, "epic", Event{
-		Type: string(eventsc.ManualMerge), Ticket: "04", Outcome: "merged",
-		TrailerValue: "epic/04", AtticRef: "refs/attic/04", Reason: "by hand",
-	})
-	if err != nil {
-		t.Fatalf("AppendEvent: %v", err)
-	}
-	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.TicketStartedOver), Ticket: "05"}); err != nil {
-		t.Fatalf("AppendEvent: %v", err)
-	}
-
-	raw, err := os.ReadFile(runLogPath(dir, "epic"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if n := strings.Count(string(raw), "\n"); n != 2 {
-		t.Fatalf("got %d lines, want 2:\n%s", n, raw)
-	}
-	events, ok, err := ReadEvents(dir, "epic")
-	if err != nil || !ok || len(events) != 2 {
-		t.Fatalf("ReadEvents = %v, %v, %v; want 2 events", events, ok, err)
-	}
-	got := events[0]
-	if got.Type != "manual-merge" || got.Outcome != "merged" || got.TrailerValue != "epic/04" || got.AtticRef != "refs/attic/04" {
-		t.Errorf("event 0 = %+v, want new fields round-tripped", got)
-	}
-	if events[1].Type != "ticket-started-over" || strings.Contains(strings.Split(string(raw), "\n")[1], "outcome") {
-		t.Errorf("event 1 should omit empty new fields: %q", raw)
-	}
-}
-
-func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
-	t.Parallel()
-	dir := fixture.EpicScratchDir(t, "epic")
-
-	// Multi-byte and escaped characters exercise the encoded-size accounting.
-	reason := strings.Repeat("é\"\n", 5000)
-	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.ManualMerge), Ticket: "04", Reason: reason}); err != nil {
-		t.Fatalf("AppendEvent: %v", err)
-	}
-
-	raw, err := os.ReadFile(runLogPath(dir, "epic"))
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if len(raw) > eventsc.MaxLineBytes {
-		t.Errorf("line is %d bytes, want <= %d", len(raw), eventsc.MaxLineBytes)
-	}
-	events, _, _ := ReadEvents(dir, "epic")
-	if len(events) != 1 || events[0].Reason == "" || !strings.HasPrefix(reason, events[0].Reason) {
-		t.Errorf("want one event with a non-empty truncated prefix of Reason, got %+v", events)
-	}
-}
-
-func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
-	t.Parallel()
-	dir := fixture.EpicScratchDir(t, "epic")
-	before := time.Now()
-	if err := logEvent(dir, "epic", Event{Type: string(eventsc.Paused), Ticket: "02"}); err != nil {
-		t.Fatalf("logEvent: %v", err)
-	}
-	events, ok, err := ReadEvents(dir, "epic")
-	if err != nil || !ok {
-		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
-	}
-	if len(events) != 1 {
-		t.Fatalf("got %d events, want 1", len(events))
-	}
-	if events[0].Time.Before(before.Add(-time.Second)) {
-		t.Errorf("Time = %v, want it defaulted to roughly now (%v)", events[0].Time, before)
-	}
-}
-
-func TestLogEvent_EmptyScratchDirOrEpicName_NoOp(t *testing.T) {
-	t.Parallel()
-	if err := logEvent("", "epic", Event{Type: string(eventsc.Paused)}); err != nil {
-		t.Errorf("logEvent(scratchDir=\"\") error = %v, want nil no-op", err)
-	}
-	if err := logEvent(t.TempDir(), "", Event{Type: string(eventsc.Paused)}); err != nil {
-		t.Errorf("logEvent(epicName=\"\") error = %v, want nil no-op", err)
-	}
-}
-
-func TestReadEvents_NoLogYet_OkFalse(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	events, ok, err := ReadEvents(dir, "epic")
-	if err != nil {
-		t.Fatalf("ReadEvents: %v", err)
-	}
-	if ok {
-		t.Error("ok = true, want false when run-log.jsonl doesn't exist yet")
-	}
-	if events != nil {
-		t.Errorf("events = %v, want nil", events)
-	}
-}
-
-func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	path := runLogPath(dir, "epic")
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	content := `{"type":"iteration-started","ticket":"01"}` + "\n" + `{"type":"iteration-fin` // torn last line
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	events, ok, err := ReadEvents(dir, "epic")
-	if err != nil || !ok {
-		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
-	}
-	if len(events) != 1 || events[0].Type != string(eventsc.IterationStarted) {
-		t.Errorf("events = %+v, want only the well-formed first line", events)
-	}
-}
 
 func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 	t.Parallel()
-	events := []Event{
+	events := []runlog.Event{
 		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: agent.AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
 		{Type: string(eventsc.IterationFinished), Ticket: "01"},
 		{Type: string(eventsc.Paused), Ticket: "01"},
@@ -189,7 +37,7 @@ func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 
 func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 	t.Parallel()
-	events := []Event{
+	events := []runlog.Event{
 		{Type: string(eventsc.IterationStarted), Ticket: "01", AgentSession: "sess-1"},
 	}
 	_, _, agentKind, ok := lastIterationSession(events, "01")
@@ -203,35 +51,13 @@ func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 
 func TestLastIterationSession_NoMatch_OkFalse(t *testing.T) {
 	t.Parallel()
-	events := []Event{
+	events := []runlog.Event{
 		{Type: string(eventsc.IterationStarted), Ticket: "02", AgentSession: "sess-2"},
 		{Type: string(eventsc.IterationStarted), Ticket: "01", AgentSession: ""},
 	}
 	_, _, _, ok := lastIterationSession(events, "01")
 	if ok {
 		t.Error("ok = true, want false when no matching event has a recorded session")
-	}
-}
-
-func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
-	t.Parallel()
-	dir := fixture.EpicScratchDir(t, "epic")
-	var wg sync.WaitGroup
-	for i := range 20 {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
-			_ = logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: fmt.Sprintf("%02d", n)})
-		}(i)
-	}
-	wg.Wait()
-
-	events, ok, err := ReadEvents(dir, "epic")
-	if err != nil || !ok {
-		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
-	}
-	if len(events) != 20 {
-		t.Errorf("got %d events, want 20 (no interleaved/corrupted lines)", len(events))
 	}
 }
 
@@ -265,7 +91,7 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete, "epic complete!")
 	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500", "iteration paused")
 
-	events, ok, err := ReadEvents(dir, "epic")
+	events, ok, err := runlog.ReadEvents(dir, "epic")
 	if err != nil || !ok || len(events) != 2 {
 		t.Fatalf("ReadEvents: events=%#v ok=%v err=%v", events, ok, err)
 	}
@@ -292,10 +118,10 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 	var onFailedCalls atomic.Int32
 	sendNotification(dir, "epic", "slack", notifyKindEpicComplete, "epic complete!", time.Second, sendSync, func(string) { onFailedCalls.Add(1) })
 
-	var events []Event
+	var events []runlog.Event
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -328,10 +154,10 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 		onFailedCalls.Add(1)
 	})
 
-	var events []Event
+	var events []runlog.Event
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		// onFailed runs after the event is logged; wait for both.
 		if len(events) > 0 && onFailedCalls.Load() > 0 {
 			break
@@ -505,73 +331,5 @@ func TestSendWithRetry_DeadlineShorterThanRetryAfter_SkipsRetry(t *testing.T) {
 	}
 	if elapsed >= time.Duration(retryAfter)*time.Second {
 		t.Errorf("elapsed = %v, want well under retry_after (%ds) — should not have waited it out", elapsed, retryAfter)
-	}
-}
-
-func TestLogEvent_FailureEventWithoutKindIsRejected(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-
-	err := logEvent(dir, "epic", Event{Type: string(eventsc.LaunchFailed), Ticket: "01", Reason: "free text only"})
-	if err == nil {
-		t.Fatal("logEvent accepted a launch-failed event without a kind")
-	}
-	if _, statErr := os.Stat(runLogPath(dir, "epic")); !os.IsNotExist(statErr) {
-		t.Errorf("rejected event still reached the log (stat err %v)", statErr)
-	}
-}
-
-func TestLogEvent_EveryTicketEventCarriesCanonicalAddressInEpicLog(t *testing.T) {
-	t.Parallel()
-	dir := fixture.EpicScratchDir(t, "epic")
-
-	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "05"}); err != nil {
-		t.Fatalf("logEvent: %v", err)
-	}
-	evs, ok, err := ReadEvents(dir, "epic")
-	if err != nil || !ok || len(evs) != 1 {
-		t.Fatalf("ReadEvents = %v, %v, %v; want one event in the epic's store dir", evs, ok, err)
-	}
-	if want := fixture.CanonicalAddr(dir, "epic", "05"); evs[0].Address != want {
-		t.Errorf("address = %q, want %q", evs[0].Address, want)
-	}
-}
-
-func TestLogEvent_FailureEventCarriesAddressAndTruncatedReason(t *testing.T) {
-	t.Parallel()
-	dir := fixture.EpicScratchDir(t, "epic")
-
-	err := logEvent(dir, "epic", Event{
-		Type: string(eventsc.LaunchFailed), Kind: string(eventsc.AgentNameTaken), Ticket: "07",
-		Attempt: 2, Reason: strings.Repeat("x", 10000),
-	})
-	if err != nil {
-		t.Fatalf("logEvent: %v", err)
-	}
-	raw, _ := os.ReadFile(runLogPath(dir, "epic"))
-	if len(raw) > eventsc.MaxLineBytes {
-		t.Errorf("line is %d bytes, want <= %d", len(raw), eventsc.MaxLineBytes)
-	}
-	line := string(raw)
-	for _, want := range []string{`"kind":"agent_name_taken"`, `"address":"` + fixture.CanonicalAddr(dir, "epic", "07") + `"`, `"attempt":2`} {
-		if !strings.Contains(line, want) {
-			t.Errorf("line missing %s: %.200s", want, line)
-		}
-	}
-	if strings.Contains(line, `"iteration"`) {
-		t.Errorf("unknown iteration must be omitted, not a placeholder: %.200s", line)
-	}
-}
-
-func TestAppendEvent_MissingEpicDirIsNotCreated(t *testing.T) {
-	t.Parallel()
-	scratchDir := t.TempDir()
-
-	if err := AppendEvent(scratchDir, "no-such-epic", Event{Type: string(eventsc.IterationStarted), Ticket: "01"}); err != nil {
-		t.Fatalf("AppendEvent: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(scratchDir, "no-such-epic")); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("epic dir stat err = %v, want not-exist", err)
 	}
 }

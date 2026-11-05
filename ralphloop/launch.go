@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -44,7 +45,7 @@ type iterationParams struct {
 	KeepAskedAgent bool
 	Ticket         tickets.Ticket
 	// ScratchDir locates this run's run-log.jsonl (see eventlog.go);
-	// logEvent no-ops if it's empty. The epic name half of that path is
+	// runlog.AppendEvent no-ops if it's empty. The epic name half of that path is
 	// FeatureBranch, not a separate field — Run names the feature branch
 	// after the epic, so the two are always the same value.
 	ScratchDir string
@@ -67,7 +68,7 @@ type iterationParams struct {
 	Gate *Gate
 	// Sink receives this Run call's lifecycle events, safe to call
 	// concurrently from any iteration's goroutine.
-	Sink EventSink
+	Sink runlog.EventSink
 	// Report writes a line to the loop's output, safe to call concurrently.
 	// Nil (a no-op) when driven through Run, which has no legacy text sink to
 	// source one from — see launchAndPromptParams.Report for why this
@@ -105,8 +106,8 @@ func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd, 
 }
 
 // agentEvent is the pause event fields naming the iteration's agent.
-func (p iterationParams) agentEvent(pane, sessionID, cwd string) Event {
-	return Event{Agent: p.Agent, Runner: p.Runner, Label: p.Label, Pane: pane, AgentSession: sessionID, Cwd: cwd}
+func (p iterationParams) agentEvent(pane, sessionID, cwd string) runlog.Event {
+	return runlog.Event{Agent: p.Agent, Runner: p.Runner, Label: p.Label, Pane: pane, AgentSession: sessionID, Cwd: cwd}
 }
 
 // logTicketEvent appends eventType to p's run-log with p's ticket number
@@ -129,7 +130,7 @@ func (p iterationParams) logTicketEventReason(eventType, pane, agentSession, cwd
 // cherry-picked event — the feature branch's merged tip, recorded so startup
 // reconciliation can later confirm it's still reachable (see Event.SHA).
 func (p iterationParams) logTicketEventSHA(eventType, pane, agentSession, cwd, reason, sha string) {
-	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
+	_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, runlog.Event{
 		Type:         eventType,
 		Ticket:       p.Ticket.Identifier,
 		Agent:        p.Agent,
@@ -183,7 +184,7 @@ type launchAndPromptParams struct {
 	Gate *Gate
 	// Sink receives this Run call's lifecycle events, safe to call
 	// concurrently.
-	Sink EventSink
+	Sink runlog.EventSink
 	// Report writes a line to the loop's output, safe to call concurrently.
 	// Only the reattach path still reads this — the rest of the package
 	// reports through Sink instead. Run itself has no
@@ -224,11 +225,11 @@ func (p launchAndPromptParams) logLifecycleEvent(eventType, agentSession string)
 }
 
 func (p launchAndPromptParams) logAgentEvent(eventType, agentSession, reason string) {
-	_ = logEvent(p.ScratchDir, p.EpicName, p.agentEvent(eventType, agentSession, reason))
+	_ = runlog.AppendEvent(p.ScratchDir, p.EpicName, p.agentEvent(eventType, agentSession, reason))
 }
 
-func (p launchAndPromptParams) agentEvent(eventType, agentSession, reason string) Event {
-	return Event{
+func (p launchAndPromptParams) agentEvent(eventType, agentSession, reason string) runlog.Event {
+	return runlog.Event{
 		Type:         eventType,
 		Ticket:       p.Ticket,
 		Agent:        p.Agent,
@@ -243,7 +244,7 @@ func (p launchAndPromptParams) agentEvent(eventType, agentSession, reason string
 func (p launchAndPromptParams) logGateEvent(eventType events.Type, agentSession, taskID, reason string) {
 	ev := p.agentEvent(string(eventType), agentSession, reason)
 	ev.TaskID = taskID
-	_ = logEvent(p.ScratchDir, p.EpicName, ev)
+	_ = runlog.AppendEvent(p.ScratchDir, p.EpicName, ev)
 }
 
 // logAgentStartEvent is logLifecycleEvent for the launch-time start event
@@ -254,7 +255,7 @@ func (p launchAndPromptParams) logAgentStartEvent(eventType, agentSession string
 	if eventType == "" {
 		return
 	}
-	_ = logEvent(p.ScratchDir, p.EpicName, Event{
+	_ = runlog.AppendEvent(p.ScratchDir, p.EpicName, runlog.Event{
 		Type:           eventType,
 		Ticket:         p.Ticket,
 		Agent:          p.Agent,
@@ -275,9 +276,9 @@ func (p launchAndPromptParams) report(format string, args ...any) {
 // sink returns p.Sink, or a no-op EventSink when unset — tests that build a
 // launchAndPromptParams directly to exercise pause/resume plumbing in
 // isolation don't always wire one up.
-func (p launchAndPromptParams) sink() EventSink {
+func (p launchAndPromptParams) sink() runlog.EventSink {
 	if p.Sink == nil {
-		return noopEventSink{}
+		return runlog.NoopEventSink{}
 	}
 	return p.Sink
 }
@@ -304,7 +305,7 @@ func LaunchFailureKind(err error) (events.Kind, bool) {
 
 // logLaunchFailed appends one launch-failed event for a failed attempt.
 func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.Kind, err error) {
-	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
+	_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, runlog.Event{
 		Type:    string(events.LaunchFailed),
 		Ticket:  p.Ticket.Identifier,
 		Kind:    string(kind),
@@ -316,7 +317,7 @@ func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.
 
 // logPromptNudged appends one prompt-nudged event for a nudge decision.
 func (p iterationParams) logPromptNudged(label string, attempt int, decision string) {
-	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
+	_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, runlog.Event{
 		Type:    string(events.PromptNudged),
 		Ticket:  p.Ticket.Identifier,
 		Label:   label,
@@ -493,7 +494,7 @@ func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq
 	if agentSession == "" {
 		return false
 	}
-	evs, ok, err := ReadEvents(scratchDir, epicName)
+	evs, ok, err := runlog.ReadEvents(scratchDir, epicName)
 	if !ok || err != nil {
 		return false
 	}

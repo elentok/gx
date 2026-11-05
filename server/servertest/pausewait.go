@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -41,11 +41,11 @@ func WaitStatus(t *testing.T, ticketPath string, want schema.Status) {
 func AssertPauseRecordsRun(t *testing.T, store string, pause events.Type, runner string, session agentrunner.Session) {
 	t.Helper()
 	// The pause writes the ticket's status before its run-log event.
-	var logged []ralphloop.Event
+	var logged []runlog.Event
 	var i int
 	if !Poll(30*time.Second, func() bool {
-		logged, _, _ = ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
-		i = slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(pause) })
+		logged, _, _ = runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+		i = slices.IndexFunc(logged, func(ev runlog.Event) bool { return ev.Type == string(pause) })
 		return i >= 0
 	}) {
 		t.Fatalf("no %s event in the run log: %v", pause, logged)

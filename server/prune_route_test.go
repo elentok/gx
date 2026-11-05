@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -52,7 +53,7 @@ func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
 	if err := ralphloop.Claim(ticket); err != nil {
 		t.Fatal(err)
 	}
-	if err := ralphloop.Pause(filepath.Join(store, "proj"), "epic-a", "01", ticket, events.IterationError, "stuck", ralphloop.Event{}); err != nil {
+	if err := ralphloop.Pause(filepath.Join(store, "proj"), "epic-a", "01", ticket, events.IterationError, "stuck", runlog.Event{}); err != nil {
 		t.Fatal(err)
 	}
 	root := t.TempDir()

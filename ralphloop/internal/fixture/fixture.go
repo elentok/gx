@@ -101,14 +101,14 @@ func MustParse(t *testing.T, path string) schema.Ticket {
 	return ticket
 }
 
-// CanonicalAddr is the address logEvent stamps for ticket id in epic under
+// CanonicalAddr is the address runlog.AppendEvent stamps for ticket id in epic under
 // scratchDir (no project.json in tests, so the project is the dir name).
 func CanonicalAddr(scratchDir, epic, id string) string {
 	return filepath.Base(scratchDir) + ":" + epic + "/" + id
 }
 
 // EpicScratchDir returns a fresh scratch dir with epicName's directory
-// already created, since logEvent drops events for a missing epic dir.
+// already created, since runlog.AppendEvent drops events for a missing epic dir.
 func EpicScratchDir(t *testing.T, epicName string) string {
 	t.Helper()
 	dir := t.TempDir()

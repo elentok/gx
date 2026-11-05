@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -129,7 +130,7 @@ func MergeFinishFault(d Deps, o OneIteration, dir, target string) (events.Kind, 
 // claimTargetTip is the merge target SHA recorded when the ticket was last
 // claimed, "" when the run log has none (a ticket claimed before it was kept).
 func claimTargetTip(o OneIteration) string {
-	evs, _, err := ReadEvents(o.ScratchDir, o.Epic)
+	evs, _, err := runlog.ReadEvents(o.ScratchDir, o.Epic)
 	if err != nil {
 		return ""
 	}

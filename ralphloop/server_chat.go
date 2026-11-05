@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -147,7 +148,7 @@ func (c *ServerChat) projectSinks(override *ServerChatConfig) []*chatEventSink {
 func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerChatConfig) *chatEventSink {
 	// The server has no TUI to relay to and tracks the epic by address, so the
 	// sink decorates a noop and carries no scratch dir or epic of its own.
-	s := newChatEventSink(noopEventSink{}, style, transport, "", "")
+	s := newChatEventSink(runlog.NoopEventSink{}, style, transport, "", "")
 	s.gateStatePath = seams.GateStatePath
 	interval := seams.FlushInterval
 	if interval <= 0 {
@@ -174,12 +175,12 @@ func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, tic
 // one ticket. It forwards only what the server cannot see from the outcome: a
 // conflict resolution starting, and the resolution child pausing. The ticket's
 // own pause is dropped, since the server notifies it from the outcome.
-func (c *ServerChat) FinishSink(project string, override *ServerChatConfig, epic, ticketPath, ticketID string, counts func() EpicCounts) EventSink {
+func (c *ServerChat) FinishSink(project string, override *ServerChatConfig, epic, ticketPath, ticketID string, counts func() EpicCounts) runlog.EventSink {
 	return finishSink{c: c, project: project, override: override, epic: epic, ticketPath: ticketPath, ticketID: ticketID, counts: counts}
 }
 
 type finishSink struct {
-	noopEventSink
+	runlog.NoopEventSink
 	c                          *ServerChat
 	project                    string
 	override                   *ServerChatConfig
@@ -250,7 +251,7 @@ func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic
 	if c == nil {
 		return
 	}
-	stats := IterationStats{
+	stats := runlog.IterationStats{
 		ElapsedSeconds: t.ElapsedTime, PeakContextTokens: t.ActualContextWindow, Cost: t.ActualCost,
 		InProgress: counts.InProgress, Completed: counts.Done, Total: counts.Total,
 	}

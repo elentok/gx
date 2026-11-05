@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // runTicketsFilterRunLog reads epicPath's run-log.jsonl (via
-// ralphloop.ReadEvents, the same decoding the scheduler itself uses) and
+// runlog.ReadEvents, the same decoding the scheduler itself uses) and
 // prints only the events matching ticketFilter/eventFilter as pretty-printed
 // JSON blocks, in file order. Both filters are optional and AND together;
 // with neither, every event is printed. epicPath must already be a resolved
@@ -29,7 +29,7 @@ func runTicketsFilterRunLog(epicPath, ticketFilter string, eventFilter []string,
 	scratchDir := filepath.Dir(epicPath)
 	epicName := filepath.Base(epicPath)
 
-	events, ok, err := ralphloop.ReadEvents(scratchDir, epicName)
+	events, ok, err := runlog.ReadEvents(scratchDir, epicName)
 	if err != nil {
 		return err
 	}

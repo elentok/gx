@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/chatmarkup"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -33,7 +34,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 		Total:             10,
 	}
 	ticket := tickets.Ticket{Identifier: adversarialTicket, Title: adversarialTitle}
-	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: fractionalCost, Completed: 2, Total: 5}
+	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: fractionalCost, Completed: 2, Total: 5}
 
 	cases := map[string]chatmarkup.Text{
 		"epicStartedText":                  telegramStyle.epicStartedText(adversarialEpic, overflowCounts),
@@ -99,7 +100,7 @@ func TestMarkdownV2Validity_RenderBatchWithDedupSuffix(t *testing.T) {
 	items := []batchedMessage{
 		{text: telegramStyle.iterationStartedText(ticket1, epicName), kind: "iteration-started", count: 1},
 		{
-			text: telegramStyle.iterationFinishedText(ticket2, epicName, IterationStats{
+			text: telegramStyle.iterationFinishedText(ticket2, epicName, runlog.IterationStats{
 				ElapsedSeconds: 65, PeakContextTokens: 1500, Cost: 3.456, Completed: 1, Total: 4,
 			}),
 			kind:  "iteration-finished",

@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // recoverCodexContextExhaustionPoll handles Codex context-exhaustion evidence
@@ -152,6 +153,6 @@ func (p launchAndPromptParams) pauseBlockedPane(sessionID, reason string) {
 	pause(p.sink(), pauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
 		Type: events.Paused, Kind: events.BlockedPane, Reason: reason,
-		Event: Event{Agent: p.Agent, Pane: p.Pane, AgentSession: sessionID, Cwd: p.SessionCwd},
+		Event: runlog.Event{Agent: p.Agent, Pane: p.Pane, AgentSession: sessionID, Cwd: p.SessionCwd},
 	})
 }

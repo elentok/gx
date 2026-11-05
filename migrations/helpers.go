@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
@@ -137,7 +138,7 @@ func epicLogRoot(root, epicName string) string {
 // ticket from its epic's run log.
 func conflictSessionsUnder(root string) func(epicName, ticketID string) ([]string, error) {
 	return func(epicName, ticketID string) ([]string, error) {
-		evs, _, err := ralphloop.ReadEvents(epicLogRoot(root, epicName), epicName)
+		evs, _, err := runlog.ReadEvents(epicLogRoot(root, epicName), epicName)
 		var ids []string
 		for _, ev := range evs {
 			if ev.Type == string(events.ConflictResolved) && ev.Ticket == ticketID &&
@@ -158,9 +159,9 @@ const earlyRunLogProject = "gx"
 // root, which only a project directory's own log supersedes.
 func ticketFrictionUnder(root string) func(epicName string, t tickets.Ticket) (schema.FrictionSummary, error) {
 	return func(epicName string, t tickets.Ticket) (schema.FrictionSummary, error) {
-		runEvents, ok, err := ralphloop.ReadEvents(epicLogRoot(root, epicName), epicName)
+		runEvents, ok, err := runlog.ReadEvents(epicLogRoot(root, epicName), epicName)
 		if err == nil && !ok && tickets.ProjectName(root) == earlyRunLogProject {
-			runEvents, _, err = ralphloop.ReadEvents(filepath.Dir(root), epicName)
+			runEvents, _, err = runlog.ReadEvents(filepath.Dir(root), epicName)
 		}
 		if err != nil {
 			return schema.FrictionSummary{}, fmt.Errorf("run log of %s: %w", epicName, err)

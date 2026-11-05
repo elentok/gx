@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -53,8 +53,8 @@ func TestInvestigateRetry_NotAnInvestigateTicketIsRefused(t *testing.T) {
 func TestInvestigateRetry_PastTheGuardRailIsRefused(t *testing.T) {
 	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
-	prior := ralphloop.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: string(events.IterationError), Reason: "relaunch", Outcome: "ok"}
-	if err := ralphloop.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", prior); err != nil {
+	prior := runlog.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: string(events.IterationError), Reason: "relaunch", Outcome: "ok"}
+	if err := runlog.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", prior); err != nil {
 		t.Fatal(err)
 	}
 	if res := retryAs(t, h, investigateAddr); !res.Refused || res.Reason != wire.ReasonInvestigateStop {
@@ -83,8 +83,8 @@ func TestInvestigateRetry_SecondRetryOfTheKindIsRefused(t *testing.T) {
 func TestInvestigateRetry_TheForksOwnEventDoesNotSpendTheKindsCap(t *testing.T) {
 	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
-	fork := ralphloop.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: string(events.IterationError), Reason: "investigate", Outcome: investigateAddr}
-	if err := ralphloop.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", fork); err != nil {
+	fork := runlog.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: string(events.IterationError), Reason: "investigate", Outcome: investigateAddr}
+	if err := runlog.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", fork); err != nil {
 		t.Fatal(err)
 	}
 	if res := retryAs(t, h, investigateAddr); res.Refused {

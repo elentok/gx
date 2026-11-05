@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -75,7 +76,7 @@ type mergeQueueParams struct {
 	WorktreeLock *sync.Mutex
 	SmartZone    int
 	Gate         *Gate
-	Sink         EventSink
+	Sink         runlog.EventSink
 }
 
 // iterationParamsFor rebuilds the iterationParams mergeCherryPick/

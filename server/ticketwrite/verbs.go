@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/queue"
@@ -103,7 +104,7 @@ func (w *Writer) Relaunch(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult
 			if err := h.CancelInvestigateChild(ref, req.Source); err != nil {
 				return wire.QueueResult{}, err
 			}
-			err := ralphloop.AppendEvent(ref.ProjectDir, ref.Addr.Epic, ralphloop.Event{
+			err := runlog.AppendEvent(ref.ProjectDir, ref.Addr.Epic, runlog.Event{
 				Time: time.Now(), Type: string(events.HumanRelaunch), Ticket: ref.Addr.ID, Address: ref.Addr.String(),
 			})
 			if err != nil {

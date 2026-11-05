@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -134,7 +135,7 @@ func TestFinishIteration_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *te
 		tk.Commitless = true
 	})
 
-	out := driveIteration(t, d, scratchDir, path, noopEventSink{})
+	out := driveIteration(t, d, scratchDir, path, runlog.NoopEventSink{})
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
@@ -144,11 +145,11 @@ func TestFinishIteration_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *te
 		t.Errorf("outcome = %+v, want done for the retry's declared-commitless finish", out)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
-	var commitless *Event
+	var commitless *runlog.Event
 	for i, ev := range events {
 		if ev.Type == string(eventsc.Commitless) && ev.Ticket == "01" {
 			commitless = &events[i]

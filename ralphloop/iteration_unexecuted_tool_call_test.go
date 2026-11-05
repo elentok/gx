@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -29,7 +30,7 @@ func finishFixture(t *testing.T) (scratchDir, path string) {
 // driveIteration runs the fixture ticket through the path the server drives:
 // PrepareIteration, launch, WaitIterationFinished, FinishIteration. A finish
 // that pauses the ticket is an outcome, not an error.
-func driveIteration(t *testing.T, d Deps, scratchDir, path string, sink EventSink) FinishOutcome {
+func driveIteration(t *testing.T, d Deps, scratchDir, path string, sink runlog.EventSink) FinishOutcome {
 	t.Helper()
 	one := OneIteration{
 		RepoDir: "/fake/repo", Epic: "epic", ScratchDir: scratchDir, Agent: agent.AgentClaude, Sink: sink,

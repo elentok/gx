@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -26,7 +27,7 @@ import (
 // (session sess-old) and was paused, then waits for its next claim to launch.
 // answered says whether the pause ended with a person's answer or a plain resume.
 // rollout says whether Codex holds a rollout for sess-old in the claim's worktree.
-func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool, fake *runnerfake.Runner) []ralphloop.Event {
+func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool, fake *runnerfake.Runner) []runlog.Event {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	codexHome := t.TempDir()
@@ -83,11 +84,11 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 		}
 	}
 	t.Cleanup(func() { fake.SetState(servertest.ResumeLabel, agentrunner.StateDone, "") })
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return slices.DeleteFunc(logged, func(ev ralphloop.Event) bool { return ev.Type != string(events.IterationStarted) })
+	return slices.DeleteFunc(logged, func(ev runlog.Event) bool { return ev.Type != string(events.IterationStarted) })
 }
 
 func TestClaim_ResumesOrColdStarts(t *testing.T) {

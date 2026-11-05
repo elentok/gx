@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,7 +27,7 @@ const batchFlushInterval = 6 * time.Second
 // chatTransport abstracts the wire format and destination a chatEventSink
 // posts its rendered text to — Slack's {"text": ...} webhook body, or
 // Telegram's Bot API sendMessage call. name tags run-log
-// notification-sent/notification-failed lines (see eventlog.go); timeout
+// notification-sent/notification-failed lines (see eventlog_notify.go); timeout
 // bounds a single send attempt.
 type chatTransport interface {
 	name() string
@@ -48,7 +49,7 @@ type chatTransport interface {
 // response's retry_after (seconds), if Telegram's body included one — nil
 // when absent or when the transport doesn't support it (slackTransport never
 // sets it), which sendWithRetry treats as "not honorable" rather than "retry
-// immediately" (see eventlog.go's retryDelay).
+// immediately" (see eventlog_notify.go's retryDelay).
 type sendResult struct {
 	StatusCode  int
 	Description string
@@ -76,7 +77,7 @@ type sendResult struct {
 // on shutdown, instead of an anonymous method-set cast that would silently
 // no-op if the concrete type ever stopped implementing it.
 type ChatEventSink interface {
-	EventSink
+	runlog.EventSink
 	// Close stops the periodic flush loop and flushes any queued messages
 	// synchronously (bounded by the transport's timeout) before returning.
 	Close()
@@ -85,7 +86,7 @@ type ChatEventSink interface {
 var _ ChatEventSink = (*chatEventSink)(nil)
 
 type chatEventSink struct {
-	EventSink
+	runlog.EventSink
 	style      mrkdwnStyle
 	transport  chatTransport
 	scratchDir string
@@ -167,7 +168,7 @@ type batchedMessage struct {
 // does, so a bare
 // newChatEventSink is inert until flush()/Close() is driven explicitly —
 // the shape tests rely on.
-func newChatEventSink(inner EventSink, style mrkdwnStyle, transport chatTransport, scratchDir, epicName string) *chatEventSink {
+func newChatEventSink(inner runlog.EventSink, style mrkdwnStyle, transport chatTransport, scratchDir, epicName string) *chatEventSink {
 	sendCtx, sendCancel := context.WithCancel(context.Background())
 	return &chatEventSink{
 		EventSink:  inner,
@@ -546,9 +547,9 @@ func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sess
 	s.send(s.style.iterationStartedText(ticket, s.epicName), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
 }
 
-func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
+func (s *chatEventSink) IterationPaused(identifier, label string, kind runlog.PauseKind, reason string) {
 	s.EventSink.IterationPaused(identifier, label, kind, reason)
-	if kind == PauseRepair {
+	if kind == runlog.PauseRepair {
 		// A paused (repair) pause always accompanies a TicketNeedsHuman pause —
 		// that's the one chat-visible message for this outcome, so this
 		// pause itself stays TUI-only (see "pause cardinality").
@@ -557,15 +558,15 @@ func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind
 	s.send(s.style.iterationPausedText(label, reason, s.epicName, identifier), notifyKindIterationPaused, s.resolveTicketPath(identifier), identifier)
 }
 
-func (s *chatEventSink) IterationResumed(identifier, label string, kind PauseKind) {
+func (s *chatEventSink) IterationResumed(identifier, label string, kind runlog.PauseKind) {
 	s.EventSink.IterationResumed(identifier, label, kind)
-	if kind == PauseRepair {
+	if kind == runlog.PauseRepair {
 		return
 	}
 	s.send(s.style.iterationResumedText(label, s.epicName, identifier), notifyKindIterationResumed, s.resolveTicketPath(identifier), identifier)
 }
 
-func (s *chatEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats) {
+func (s *chatEventSink) IterationFinished(ticket tickets.Ticket, epicName string, stats runlog.IterationStats) {
 	s.EventSink.IterationFinished(ticket, epicName, stats)
 	s.send(s.style.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished, ticket.Path, ticket.Identifier)
 }
@@ -576,7 +577,7 @@ func (s *chatEventSink) TicketNeedsHuman(identifier, epicName, status string, ki
 	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, kind, reason, counts), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
 }
 
-func (s *chatEventSink) EpicPaused(epicName string, stalled []StalledTicket) {
+func (s *chatEventSink) EpicPaused(epicName string, stalled []runlog.StalledTicket) {
 	s.EventSink.EpicPaused(epicName, stalled)
 	identifiers := make([]string, len(stalled))
 	for i, t := range stalled {

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -53,7 +54,7 @@ func constOccupancy(n int) func([]string) int { return func([]string) int { retu
 
 func capStopEvents(t *testing.T, scratchDir string) int {
 	t.Helper()
-	evs, _, err := ReadEvents(scratchDir, "epic")
+	evs, _, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +123,7 @@ func TestWaitForFinish_VerifyCap_FailedPromptSendLogsCapStop(t *testing.T) {
 	if got.err != nil {
 		t.Fatal(got.err)
 	}
-	evs, _, err := ReadEvents(got.scratchDir, "epic")
+	evs, _, err := runlog.ReadEvents(got.scratchDir, "epic")
 	if err != nil {
 		t.Fatal(err)
 	}

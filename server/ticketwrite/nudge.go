@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
@@ -47,7 +47,7 @@ func (w *Writer) Nudge(req wire.QueueRequest) (wire.QueueResult, error) {
 			}
 			return wire.QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
 		}
-		err := ralphloop.AppendEvent(ref.ProjectDir, ref.Addr.Epic, ralphloop.Event{
+		err := runlog.AppendEvent(ref.ProjectDir, ref.Addr.Epic, runlog.Event{
 			Time: now, Type: string(events.Nudged), Ticket: ref.Addr.ID, Address: address,
 			Pane: it.Info.Pane, Text: text,
 		})

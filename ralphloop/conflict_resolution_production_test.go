@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -208,7 +209,7 @@ func conflictParams(t *testing.T, dir string) iterationParams {
 		ScratchDir:      scratchDir,
 		SmartZone:       1_000_000,
 		Gate:            NewGate(),
-		Sink:            noopEventSink{},
+		Sink:            runlog.NoopEventSink{},
 	}
 }
 
@@ -268,11 +269,11 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Errorf("merged commit subject = %q, want original cherry-picked subject %q preserved", gotSubject, wantSubject)
 	}
 
-	evs, ok, err := ReadEvents(p.ScratchDir, "main")
+	evs, ok, err := runlog.ReadEvents(p.ScratchDir, "main")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
-	var conflictHit *Event
+	var conflictHit *runlog.Event
 	for i, e := range evs {
 		if e.Type == string(events.ConflictHit) {
 			conflictHit = &evs[i]

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -179,7 +180,7 @@ func recordLanded(epicPath, epic, source string, t tickets.Ticket, status schema
 	if err := tickets.EndOpenRound(t.Path, source, tickets.HowManualMerge, "manual-merge"); err != nil {
 		return fmt.Errorf("end pause round of %s: %w", t.Identifier, err)
 	}
-	ev := ralphloop.Event{
+	ev := runlog.Event{
 		Outcome:      string(res.Outcome),
 		SHA:          res.SHA,
 		TrailerValue: res.TrailerValue,

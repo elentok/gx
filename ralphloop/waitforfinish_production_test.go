@@ -15,6 +15,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
 	"go.uber.org/goleak"
@@ -233,7 +234,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 		t.Errorf("VirtualTime() = %s, want >= 3m (scenario must advance virtual time, not sleep)", got)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -328,7 +329,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 		t.Errorf("compact prompts = %d, want exactly 1", compactCalls)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -564,7 +565,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 		t.Fatal("test bug: compact boundary line was never written")
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}

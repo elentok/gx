@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -87,7 +88,7 @@ func TestTelegramStyleIterationStartedText_IdentityLineLast(t *testing.T) {
 func TestTelegramStyleIterationFinishedText_EscapesAndFormats(t *testing.T) {
 	t.Parallel()
 	ticket := tickets.Ticket{Identifier: "02", Title: "Migrate ui"}
-	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
+	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
 
 	got := telegramStyle.iterationFinishedText(ticket, "ui-tree-migration", stats).String()
 	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · $1\\.23 · 2 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/02"
@@ -99,7 +100,7 @@ func TestTelegramStyleIterationFinishedText_EscapesAndFormats(t *testing.T) {
 func TestSlackStyleIterationFinishedText_NoEscaping(t *testing.T) {
 	t.Parallel()
 	ticket := tickets.Ticket{Identifier: "02", Title: "Migrate ui"}
-	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
+	stats := runlog.IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: 1.234, Completed: 2, Total: 5}
 
 	got := slackStyle.iterationFinishedText(ticket, "ui-tree-migration", stats).String()
 	want := "✅ *Migrate ui*\n\n5m32s · 39k tok · $1.23 · 2 done · 5 total\n[gx] ui-tree-migration/02"

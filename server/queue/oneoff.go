@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
@@ -253,7 +254,7 @@ func (o *OneOffs) oneOffEnqueue(p oneOffPlan, w writtenOneOff) (wire.OneOffResul
 		}
 		return res, err
 	}
-	if err := ralphloop.AppendEvent(p.dir, p.epic, ralphloop.Event{
+	if err := runlog.AppendEvent(p.dir, p.epic, runlog.Event{
 		Time: time.Now(), Type: string(events.Submitted), Ticket: w.addr.ID, Address: w.addr.String(),
 	}); err != nil {
 		return wire.OneOffResult{}, err
@@ -345,7 +346,7 @@ func liveDuplicate(projectDir, key string) (*duplicate, error) {
 // has no epic of its own) and answers with the duplicate's address.
 func (d *duplicate) refusal(project, projectDir string) (wire.OneOffResult, error) {
 	addr := tickets.Address{Project: project, Epic: d.epic, ID: d.id}.String()
-	if err := ralphloop.AppendEvent(projectDir, d.epic, ralphloop.Event{
+	if err := runlog.AppendEvent(projectDir, d.epic, runlog.Event{
 		Time: time.Now(), Type: string(events.SubmitRefused), Ticket: d.id, Address: addr,
 		Kind: string(events.DuplicateLive), Reason: "a live ticket already has this dedupe key",
 	}); err != nil {

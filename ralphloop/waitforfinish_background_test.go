@@ -9,6 +9,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -65,7 +66,7 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 		t.Errorf("Sleep calls = %d, want 4: the gate must pace re-reads at smartZonePollMs, not spin, and recheck idle once it releases", sleeps)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -110,7 +111,7 @@ func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 	if reads != 2 {
 		t.Errorf("ReadBackgroundTasks calls = %d, want 2 (held, released by recovery)", reads)
 	}
-	events, _, err := ReadEvents(scratchDir, "epic")
+	events, _, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil {
 		t.Fatalf("ReadEvents: %v", err)
 	}
@@ -154,7 +155,7 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 		t.Fatalf("waitForFinish: %v, want the aged-out marker to fall through to a plain finish", err)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
@@ -197,7 +198,7 @@ func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
 	if reads != 0 {
 		t.Errorf("ReadBackgroundTasks calls = %d, want 0 for Codex", reads)
 	}
-	events, _, err := ReadEvents(scratchDir, "epic")
+	events, _, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +251,7 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 		t.Errorf("Runner.Wait calls = %d, want at least 4: the gate-release recheck finding the pane busy must send waitForFinish back around its outer poll loop", r.waits)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}

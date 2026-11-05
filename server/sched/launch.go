@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -144,7 +145,7 @@ func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralph
 			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agentKind),
 			ResumeSessionID: resumeID,
 		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
-			l.LogEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
+			l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
 	}
 	session, err := start()
@@ -164,14 +165,14 @@ func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralph
 			if serr := deps.Runner.Stop(h.Session); serr != nil {
 				l.Log.Warn("close stale holder", "ticket", ticket.String(), "pane", h.ID, "err", serr)
 			} else {
-				l.LogEvent(ticket, ralphloop.Event{Type: string(events.StalePaneClosed), Label: label, Pane: h.ID, Cwd: h.cwd, Reason: string(h.State)})
+				l.LogEvent(ticket, runlog.Event{Type: string(events.StalePaneClosed), Label: label, Pane: h.ID, Cwd: h.cwd, Reason: string(h.State)})
 				session, err = start()
 			}
 		}
 	}
 	if errors.Is(err, agentrunner.ErrLabelTaken) {
 		taken := &nameTakenError{reason: l.labelHolder(deps.Runner, ticket, label, err).describe(), err: err}
-		l.LogEvent(ticket, ralphloop.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
+		l.LogEvent(ticket, runlog.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
 		return runs.Run{}, taken
 	}
 	if err != nil {
@@ -181,7 +182,7 @@ func (l *Launcher) launch(deps ralphloop.Deps, ticket tickets.Address, one ralph
 	if resumeID != "" {
 		path = "resumed"
 	}
-	l.LogEvent(ticket, ralphloop.Event{
+	l.LogEvent(ticket, runlog.Event{
 		Type: string(events.IterationStarted), Agent: agentKind, Label: label, Cwd: cwd,
 		AgentSession: session.SessionID, Path: path, TargetTip: one.TargetTip,
 	})
@@ -219,13 +220,13 @@ func AnsweredSession(t tickets.Ticket) string {
 }
 
 // LogEvent appends ev to ticket's run log, best effort.
-func (l *Launcher) LogEvent(ticket tickets.Address, ev ralphloop.Event) {
+func (l *Launcher) LogEvent(ticket tickets.Address, ev runlog.Event) {
 	dir, err := l.Projects.Dir(ticket.Project)
 	if err != nil {
 		return
 	}
 	ev.Ticket, ev.Address = ticket.ID, ticket.String()
-	_ = ralphloop.AppendEvent(dir, ticket.Epic, ev)
+	_ = runlog.AppendEvent(dir, ticket.Epic, ev)
 }
 
 // nameTakenError is a launch whose label a holder gx may not close still

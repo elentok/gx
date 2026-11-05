@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -48,7 +49,7 @@ func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 	d, peak := compactedMergingFixture(t, t.TempDir(), cwd, sessionID)
 	p := iterationParams{
 		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: agent.AgentClaude,
-		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
+		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: runlog.NoopEventSink{},
 	}
 
 	if _, err := mergeCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
@@ -75,14 +76,14 @@ func TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T)
 	sessionID := "sess-orig-01"
 	cwd := "/fake/worktrees/epic-item-01"
 	d, peak := compactedMergingFixture(t, t.TempDir(), cwd, sessionID)
-	if err := logEvent(scratchDir, "epic", Event{
+	if err := runlog.AppendEvent(scratchDir, "epic", runlog.Event{
 		Type: string(eventsc.IterationStarted), Ticket: "01", Agent: agent.AgentClaude, AgentSession: sessionID, Cwd: cwd,
 	}); err != nil {
-		t.Fatalf("logEvent: %v", err)
+		t.Fatalf("runlog.AppendEvent: %v", err)
 	}
 	p := iterationParams{
 		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: agent.AgentClaude,
-		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
+		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: runlog.NoopEventSink{},
 	}
 
 	if _, err := mergeCherryPick(d, p, "base", "branch", "", ""); err != nil {
@@ -129,7 +130,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 		Agent:           agent.AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
-		Sink:            noopEventSink{},
+		Sink:            runlog.NoopEventSink{},
 	}
 
 	if _, err := mergeCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
@@ -187,7 +188,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 		Agent:           agent.AgentClaude,
 		Ticket:          tickets.Ticket{Identifier: "01", Path: ticketPath},
 		ScratchDir:      scratchDir,
-		Sink:            noopEventSink{},
+		Sink:            runlog.NoopEventSink{},
 	}
 
 	if _, err := mergeCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {

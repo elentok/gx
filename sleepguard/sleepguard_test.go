@@ -68,7 +68,7 @@ var allowed = map[string]int{
 	"ralphloop/chat_eventsink_test.go":                     4,
 	"ralphloop/commitless_test.go":                         1, // negative wait: a kept worktree is not removed and no wait is scheduled
 	"ralphloop/claim_test.go":                              1,
-	"ralphloop/eventlog_test.go":                           2,
+	"ralphloop/eventlog_notify_test.go":                    2,
 	"ralphloop/resumeticket_test.go":                       1,
 	"ralphloop/slack_transport_test.go":                    4, // 15 renamed slack_eventsink_test.go and dropped its entry by mistake
 	"ralphloop/telegram_transport_test.go":                 7, // same rename as slack_transport_test.go

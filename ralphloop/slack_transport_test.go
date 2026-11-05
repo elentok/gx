@@ -12,13 +12,14 @@ import (
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 // newSlackEventSink wires a chatEventSink to a Slack transport the way
 // ServerChat does, with a live flush loop.
-func newSlackEventSink(inner EventSink, webhookURL, scratchDir, epicName string) *chatEventSink {
+func newSlackEventSink(inner runlog.EventSink, webhookURL, scratchDir, epicName string) *chatEventSink {
 	s := newChatEventSink(inner, slackStyle, newSlackTransport(webhookURL), scratchDir, epicName)
 	s.startFlushLoop(batchFlushInterval)
 	return s
@@ -113,10 +114,10 @@ func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T
 	sink.gateStatePath = filepath.Join(t.TempDir(), "notifications-state.json")
 
 	sink.EpicStarted("epic", 0, 3)
-	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{Completed: 1, Total: 3})
+	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", runlog.IterationStats{Completed: 1, Total: 3})
 	sink.TicketNeedsHuman("02", "epic", string(schema.StatusLegacyAnswer), "zero-commit", "no commits merged")
-	sink.IterationPaused("03", "iter-03", PauseRateLimit, "rate limit hit")
-	sink.EpicPaused("epic", []StalledTicket{{Identifier: "03"}})
+	sink.IterationPaused("03", "iter-03", runlog.PauseRateLimit, "rate limit hit")
+	sink.EpicPaused("epic", []runlog.StalledTicket{{Identifier: "03"}})
 	sink.EpicComplete("epic", 1, 300)
 	sink.flush()
 
@@ -300,10 +301,10 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
 
-	var events []Event
+	var events []runlog.Event
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -325,12 +326,12 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
 
-	var events []Event
+	var events []runlog.Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}
@@ -357,12 +358,12 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 	sink.EpicComplete("epic", 1, 0)
 	sink.flush()
 
-	var events []Event
+	var events []runlog.Event
 	// 4s headroom: sendNotification retries once after notificationRetryBackoff
 	// (1.5s) before logging notification-failed.
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
-		events, _, _ = ReadEvents(dir, "epic")
+		events, _, _ = runlog.ReadEvents(dir, "epic")
 		if len(events) > 0 {
 			break
 		}

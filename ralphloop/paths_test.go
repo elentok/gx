@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	eventsc "github.com/elentok/gx/events"
+
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // A mid-flight split keeps the same Number across every letter (04 ->
@@ -24,7 +26,7 @@ func TestIterLabelIterBranch_DistinctForLetteredSiblingsSharingNumber(t *testing
 // Number; and it returns the latest SHA when a ticket was picked twice.
 func TestLatestCherryPickedSHA_KeyedByIdentifierAndLatestWins(t *testing.T) {
 	t.Parallel()
-	evs := []Event{
+	evs := []runlog.Event{
 		{Type: string(eventsc.CherryPicked), Ticket: "04a", SHA: "sha-04a-old"},
 		{Type: string(eventsc.CherryPicked), Ticket: "04b", SHA: "sha-04b"},
 		{Type: string(eventsc.CherryPicked), Ticket: "04a", SHA: "sha-04a"},

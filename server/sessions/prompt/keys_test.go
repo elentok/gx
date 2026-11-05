@@ -11,7 +11,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -226,7 +226,7 @@ func TestSessionKeys_LogsOneEventWithoutTheText(t *testing.T) {
 	if reason := f.keysWeb(t, wire.SessionKeysRequest{Key: "Tab"}); reason != "" {
 		t.Fatalf("web keys refused: %s", reason)
 	}
-	evs, ok, err := ralphloop.ReadServerEvents(f.h.TicketStore)
+	evs, ok, err := runlog.ReadServerEvents(f.h.TicketStore)
 	if err != nil || !ok || len(evs) != 2 {
 		t.Fatalf("server events = %+v, ok=%v, err=%v; want two", evs, ok, err)
 	}

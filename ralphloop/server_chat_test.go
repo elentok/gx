@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 func TestServerChat_PausesGoToTheirOwnDestinationAndSharedTargetsShareABatch(t *testing.T) {
@@ -118,7 +120,7 @@ func TestServerChat_ResultIsTruncatedAndLogsNotificationSent(t *testing.T) {
 	if len(got) != 1 || !strings.Contains(got[0].Text, "alpha:e/01") || len(got[0].Text) > 3000 {
 		t.Fatalf("sends = %+v, want one truncated message naming the address", got)
 	}
-	evs, _, err := ReadEvents(dir, "e")
+	evs, _, err := runlog.ReadEvents(dir, "e")
 	if err != nil {
 		t.Fatal(err)
 	}

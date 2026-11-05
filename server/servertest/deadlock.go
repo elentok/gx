@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
@@ -25,13 +25,13 @@ func StartDeadlock(t *testing.T, cat recovery.Catalog) *Harness {
 
 // RunLogOf is the run log's epic-level events of typ. The claim loop may
 // launch and pause 01 meanwhile; its own events are not the epic's.
-func RunLogOf(t *testing.T, h *Harness, typ events.Type) []ralphloop.Event {
+func RunLogOf(t *testing.T, h *Harness, typ events.Type) []runlog.Event {
 	t.Helper()
-	log, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	log, _, err := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got []ralphloop.Event
+	var got []runlog.Event
 	for _, ev := range log {
 		if events.Type(ev.Type) == typ && ev.Ticket == "" {
 			got = append(got, ev)

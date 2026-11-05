@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // rateLimitPollInterval is how often holdRateLimit re-checks a pane when the
@@ -39,7 +40,7 @@ func holdRateLimit(d Deps, o OneIteration, p launchAndPromptParams, waitStates [
 	if !resetAt.IsZero() {
 		reason = fmt.Sprintf("rate limit detected, resets %s", resetAt.UTC().Format(time.RFC3339))
 	}
-	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
+	p.sink().IterationPaused(p.Ticket, p.Label, runlog.PauseRateLimit, reason)
 	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
 	for {
 		if o.OnRateLimit != nil {
@@ -78,7 +79,7 @@ func holdRateLimit(d Deps, o OneIteration, p launchAndPromptParams, waitStates [
 	if o.OnRateLimit != nil {
 		o.OnRateLimit(false, time.Time{})
 	}
-	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
+	p.sink().IterationResumed(p.Ticket, p.Label, runlog.PauseRateLimit)
 	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 // Exported seams for `gx server tickets merge`: the label/branch naming and the
@@ -68,7 +69,7 @@ func StampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) { return stam
 // can recover: the ticket's last iteration session (zero when none was logged)
 // and the SHA of a prior merging (empty when none).
 func RecoverMergeSession(scratchDir, epic, identifier string) (MergeSession, string) {
-	events, ok, err := ReadEvents(scratchDir, epic)
+	events, ok, err := runlog.ReadEvents(scratchDir, epic)
 	if err != nil || !ok {
 		return MergeSession{}, ""
 	}

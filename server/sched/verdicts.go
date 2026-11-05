@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
@@ -28,14 +29,14 @@ func (x *Explainer) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Add
 	}
 	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, claimed, false)
 	switch d.Decision {
-	case ralphloop.DecisionStalled:
+	case runlog.DecisionStalled:
 		return wire.Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // asking, stuck or draft
-	case ralphloop.DecisionUnclaimed:
+	case runlog.DecisionUnclaimed:
 		if path, missing := x.Projects.UnavailablePath(addr.Project); missing {
 			return wire.Explanation{Address: addr.String(), Verdict: wire.VerdictProjectUnavailable, Reason: path + " does not exist"}
 		}
 		return x.scheduleVerdict(e, t, addr)
-	case ralphloop.DecisionBlocked:
+	case runlog.DecisionBlocked:
 		// The scheduler's reason lists only Blocked by: tokens, so a fork child
 		// held by its parent alone would explain as blocked by nothing.
 		if !e.ParentDone(t) {

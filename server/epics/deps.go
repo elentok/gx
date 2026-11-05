@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
@@ -46,7 +46,7 @@ type Runs interface {
 
 // History reads a ticket's event history.
 type History interface {
-	ReadHistory(addr tickets.Address) ([]ralphloop.Event, error)
+	ReadHistory(addr tickets.Address) ([]runlog.Event, error)
 }
 
 // Queue is the ralph-loop queue as the read models see it.

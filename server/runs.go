@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
@@ -43,7 +44,7 @@ func (h reclaimHost) Pause(dir string, addr tickets.Address, ticketPath string, 
 
 func (h reclaimHost) StalledNudgeDelay() time.Duration { return h.s.scheduler.StalledNudgeDelay() }
 
-func (h reclaimHost) FinishSink(addr tickets.Address, ticketPath string) ralphloop.EventSink {
+func (h reclaimHost) FinishSink(addr tickets.Address, ticketPath string) runlog.EventSink {
 	return h.s.writer.FinishSink(addr, ticketPath)
 }
 

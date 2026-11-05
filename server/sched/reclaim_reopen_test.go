@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -74,8 +74,8 @@ func assertEmptyClaimReopened(t *testing.T, store, repo, wtPath, ticketPath stri
 	waitStatus(t, ticketPath, schema.StatusOpen)
 	// The reopen writes the ticket's status before its run-log event.
 	waitFor(t, func() bool {
-		logged, _, _ := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
-		return slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.ClaimReopened) })
+		logged, _, _ := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+		return slices.ContainsFunc(logged, func(ev runlog.Event) bool { return ev.Type == string(events.ClaimReopened) })
 	})
 	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
 		t.Errorf("worktree still there: %v", err)
@@ -126,11 +126,11 @@ func TestReclaim_HerdrLookupErrorNeverReopens(t *testing.T) {
 	if _, err := git.RevParse(repo, "ralph-loop/epic-a-item-01"); err != nil {
 		t.Errorf("iteration branch gone: %v", err)
 	}
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.ClaimReopened) }) {
+	if slices.ContainsFunc(logged, func(ev runlog.Event) bool { return ev.Type == string(events.ClaimReopened) }) {
 		t.Errorf("run log has claim-reopened: %v", logged)
 	}
 }

@@ -281,7 +281,7 @@ kept as history of what the code did at the time, not as a description of today'
   `skills/gx-code-review/SKILL.md` "Close out" step.
 - **Telegram notifications silently drop on any transient network blip, including epic-complete.**
   `ralphloop/telegram_eventsink.go`'s `send` is one-shot, 10s timeout, zero retries
-  (`ralphloop/eventlog.go:216-227`) — a ~3min DNS/network stall reaching `api.telegram.org`
+  (`ralphloop/eventlog_notify.go`) — a ~3min DNS/network stall reaching `api.telegram.org`
   dropped 4 consecutive notifications (3 `iteration-finished` + the final `epic-complete`) in one
   `gx-merge` run, confirmed via `notification-failed` "context deadline exceeded" entries in
   `run-log.jsonl` with the send goroutine running to completion (ruling out the process-exit race

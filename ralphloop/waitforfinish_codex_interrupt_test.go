@@ -11,6 +11,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 )
 
 func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t *testing.T) {
@@ -40,7 +41,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	if prompts := r.Prompts("iter-20"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want compact then finish-up", prompts)
 	}
-	events, ok, err := ReadEvents(scratchDir, "epic")
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
 	if err != nil || !ok || len(events) == 0 {
 		t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
 	}

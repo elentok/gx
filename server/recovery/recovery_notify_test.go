@@ -17,6 +17,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	srvrecovery "github.com/elentok/gx/server/recovery"
@@ -314,7 +315,7 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 		{"guard rail", rule(ok), func(t *testing.T, h *servertest.Harness) {
 			ev := applied(events.IterationError)
 			ev.Ticket = "01"
-			if err := ralphloop.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", ev); err != nil {
+			if err := runlog.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", ev); err != nil {
 				t.Fatal(err)
 			}
 		}, "TEST"},
@@ -351,15 +352,15 @@ func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigatio
 		t.Fatal(err)
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
-	var log []ralphloop.Event
+	var log []runlog.Event
 	appliedAt := func() int {
-		return slices.IndexFunc(log, func(ev ralphloop.Event) bool { return events.Type(ev.Type) == events.RecoveryApplied })
+		return slices.IndexFunc(log, func(ev runlog.Event) bool { return events.Type(ev.Type) == events.RecoveryApplied })
 	}
 	servertest.WaitFor(t, 10*time.Second, "recovery-applied", func() bool {
-		log, _, _ = ralphloop.ReadEvents(dir, "epic-a")
+		log, _, _ = runlog.ReadEvents(dir, "epic-a")
 		return appliedAt() >= 0
 	})
-	matchedAt := slices.IndexFunc(log, func(ev ralphloop.Event) bool { return events.Type(ev.Type) == events.RecoveryMatched })
+	matchedAt := slices.IndexFunc(log, func(ev runlog.Event) bool { return events.Type(ev.Type) == events.RecoveryMatched })
 	if matchedAt < 0 || matchedAt > appliedAt() {
 		t.Fatalf("log = %+v, want recovery-matched before recovery-applied", log)
 	}

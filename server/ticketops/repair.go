@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -335,8 +336,8 @@ func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairRes
 			if err := tickets.PromptOpenRound(t.Path, rc.origin); err != nil {
 				return wire.RepairResult{}, fmt.Errorf("log prompt of %s: %w", addr, err)
 			}
-			ev := ralphloop.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: prompt}
-			if err := ralphloop.AppendEvent(dir, addr.Epic, ev); err != nil {
+			ev := runlog.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: prompt}
+			if err := runlog.AppendEvent(dir, addr.Epic, ev); err != nil {
 				o.d.Log.Warn("logging pause prompt", "ticket", addr.String(), "err", err)
 			}
 			o.d.Log.Info("prompted the live agent of a paused ticket", "ticket", addr.String(), "origin", rc.origin)
@@ -547,7 +548,7 @@ func (o *Ops) iterationSession(dir string, addr tickets.Address) (agentrunner.Ru
 	}
 	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, o.d.Projects.WorktreeDir(addr.Project))
 	runner := o.d.Harness.RunnerFor(addr.Project)
-	if pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
+	if pause, ok := runlog.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
 		if pause.Label != "" {
 			label = pause.Label
 		}

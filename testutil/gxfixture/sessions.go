@@ -17,7 +17,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner/holder"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -450,7 +450,7 @@ func (f *fixture) seedRanOnClaude(addr string) error {
 	project, rest, _ := strings.Cut(addr, ":")
 	epicName, id, _ := strings.Cut(rest, "/")
 	const session = "00000000-0000-4000-8000-0000000000c1"
-	ev := ralphloop.Event{
+	ev := runlog.Event{
 		Time:         time.Now(),
 		Type:         string(events.IterationStarted),
 		Ticket:       id,
@@ -458,7 +458,7 @@ func (f *fixture) seedRanOnClaude(addr string) error {
 		AgentSession: session,
 		Cwd:          filepath.Join(f.root, "repo"),
 	}
-	if err := ralphloop.AppendEvent(filepath.Join(f.store, project), epicName, ev); err != nil {
+	if err := runlog.AppendEvent(filepath.Join(f.store, project), epicName, ev); err != nil {
 		return fmt.Errorf("run log for %s: %w", addr, err)
 	}
 	dir := filepath.Join(f.root, "home", ".claude", "projects", "fixture")

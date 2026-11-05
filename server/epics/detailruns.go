@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -15,7 +15,7 @@ import (
 // runSources is everything the run lines of one ticket are built from.
 type runSources struct {
 	// events is the ticket's run-log events, oldest first.
-	events []ralphloop.Event
+	events []runlog.Event
 	// answers are the times of the ticket log's pause answers, oldest first.
 	answers []time.Time
 	// ticket is the ticket as stored; its status says whether an open last run
@@ -88,7 +88,7 @@ func (b *runBuilder) answer(at time.Time) {
 	}
 }
 
-func (b *runBuilder) event(ev ralphloop.Event) {
+func (b *runBuilder) event(ev runlog.Event) {
 	switch events.Type(ev.Type) {
 	case events.IterationStarted:
 		if b.open {
@@ -148,7 +148,7 @@ func (b *runBuilder) finish(t schema.Ticket, cancelledAt time.Time) {
 }
 
 // runEnd is the outcome an event ends a run with, or "" for an event that does not.
-func runEnd(ev ralphloop.Event) string {
+func runEnd(ev runlog.Event) string {
 	switch events.Type(ev.Type) {
 	case events.CherryPicked, events.ManualMerge:
 		return wire.RunMerged

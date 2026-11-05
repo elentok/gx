@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 )
 
@@ -21,12 +21,12 @@ func TestRecoveryPlan_DecideMapsEachCaseToOneAction(t *testing.T) {
 	pause := recovery.Failure{Type: events.Paused, Kind: events.Spinning}
 	blocked := recovery.Failure{Type: events.Paused, Kind: events.BlockedPane}
 	deadlock := recovery.Failure{Type: events.Deadlocked}
-	recovered := []ralphloop.Event{{Type: string(events.RecoveryApplied), Kind: string(events.Spinning), Reason: "R9"}}
+	recovered := []runlog.Event{{Type: string(events.RecoveryApplied), Kind: string(events.Spinning), Reason: "R9"}}
 
 	tests := []struct {
 		name     string
 		f        recovery.Failure
-		log      []ralphloop.Event
+		log      []runlog.Event
 		entry    recovery.Entry
 		matched  bool
 		diagnose bool

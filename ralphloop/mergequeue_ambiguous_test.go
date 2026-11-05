@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -38,7 +39,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	d.Runner = runnerfake.NewRunner()
 	lp := mergeQueueParams{
 		RepoDir: repo, FeatureWorktree: repo, FeatureBranch: "epic", ScratchDir: scratchDir,
-		WorktreeLock: &sync.Mutex{}, Gate: NewGate(), Sink: noopEventSink{},
+		WorktreeLock: &sync.Mutex{}, Gate: NewGate(), Sink: runlog.NoopEventSink{},
 	}
 	r := mergeOne(d, lp, mergeJob{ticket: tickets.Ticket{Identifier: "01", Path: path}, base: base, branch: "iter", path: repo})
 	if r.err != nil || r.mergeDeferred || r.pausedOnChild {
@@ -72,7 +73,7 @@ func TestPausedOutcome_NoKindNoReason_FallsBackHonestly(t *testing.T) {
 	if out.Kind != events.IterationError {
 		t.Errorf("Kind = %q, want %q", out.Kind, events.IterationError)
 	}
-	if !strings.Contains(out.Reason, "no pause reason") || !strings.Contains(out.Reason, RunLogPath(scratchDir, "epic")) {
+	if !strings.Contains(out.Reason, "no pause reason") || !strings.Contains(out.Reason, runlog.RunLogPath(scratchDir, "epic")) {
 		t.Errorf("Reason = %q, want it to name the run log", out.Reason)
 	}
 }

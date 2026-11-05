@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/storecommit"
 )
 
@@ -31,7 +32,7 @@ func TestPause_CommitsStoreWithAddressAndStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := pause(noopEventSink{}, pauseRequest{
+	if _, err := pause(runlog.NoopEventSink{}, pauseRequest{
 		ScratchDir: store, EpicName: "myepic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.Kind("ticket-answered"), Reason: "q",
 	}); err != nil {

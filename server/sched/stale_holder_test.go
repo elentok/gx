@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -51,10 +51,10 @@ func TestLaunch_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
 func assertPausedNameTaken(t *testing.T, h *servertest.Harness, want ...string) {
 	t.Helper()
 	logged := runLog(t, h)
-	failed := slices.IndexFunc(logged, func(ev ralphloop.Event) bool {
+	failed := slices.IndexFunc(logged, func(ev runlog.Event) bool {
 		return ev.Type == string(events.LaunchFailed) && ev.Kind == string(events.AgentNameTaken)
 	})
-	pause := slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.Paused) })
+	pause := slices.IndexFunc(logged, func(ev runlog.Event) bool { return ev.Type == string(events.Paused) })
 	if failed < 0 || pause < failed || logged[pause].Kind != string(events.AgentNameTaken) {
 		t.Fatalf("run log = %+v, want launch-failed then a stuck agent_name_taken pause", logged)
 	}
