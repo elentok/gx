@@ -1,4 +1,4 @@
-package cmd
+package limits
 
 import (
 	"bytes"
@@ -10,14 +10,15 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
 
 func TestUsageSummary_JSONVerb(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
-	d := deps{serverClient: func() (*apiclient.Client, error) { return h.Client, nil }}
-	c := newUsageCmd(d)
+	d := Deps{Env: cmdbase.Env{NewClient: func() (*apiclient.Client, error) { return h.Client, nil }}}
+	c := NewUsage(d)
 	var out bytes.Buffer
 	c.SetOut(&out)
 	c.SetArgs([]string{"summary", "--json"})
@@ -53,8 +54,8 @@ func TestUsageSummary_JSONVerbCarriesForecastAndCodex(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.Restart(t)
-	d := deps{serverClient: func() (*apiclient.Client, error) { return h.Client, nil }}
-	c := newUsageCmd(d)
+	d := Deps{Env: cmdbase.Env{NewClient: func() (*apiclient.Client, error) { return h.Client, nil }}}
+	c := NewUsage(d)
 	var out bytes.Buffer
 	c.SetOut(&out)
 	c.SetArgs([]string{"summary", "--json"})

@@ -1,4 +1,4 @@
-package cmd
+package limits
 
 import (
 	"strings"
@@ -24,7 +24,7 @@ func TestPrintBudget_ShowsOverrideAndWhatIsLeft(t *testing.T) {
 
 func TestBudgetLine_NamesOverride(t *testing.T) {
 	t.Parallel()
-	got := budgetLine(wire.BudgetStatus{Total: 304.19, SoftLimit: 300, Override: 301.22})
+	got := BudgetLine(wire.BudgetStatus{Total: 304.19, SoftLimit: 300, Override: 301.22})
 	if !strings.Contains(got, "overridden at $301.22") {
 		t.Errorf("line = %q, want the override point", got)
 	}

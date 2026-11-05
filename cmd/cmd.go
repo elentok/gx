@@ -14,6 +14,7 @@ import (
 	codexcmd "github.com/elentok/gx/cmd/codex"
 	configcmd "github.com/elentok/gx/cmd/config"
 	"github.com/elentok/gx/cmd/doctor"
+	"github.com/elentok/gx/cmd/limits"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
 	"github.com/elentok/gx/codexsession"
@@ -251,10 +252,10 @@ Run without a command to open the status UI.`,
 		newRecoveryCmd(d),
 		newEvolveCmd(d),
 		newProjectCmd(d),
-		newBudgetCmd(d),
-		newUsageCmd(d),
-		newAFKCmd(d),
-		newViModeCmd(d),
+		limits.New(limits.Deps{Env: d.base()}),
+		limits.NewUsage(limits.Deps{Env: d.base()}),
+		limits.NewAFK(limits.Deps{Env: d.base()}),
+		limits.NewViMode(limits.Deps{Env: d.base()}),
 		newMergeCmd(d),
 		newCleanupCmd(d),
 		skillscmd.New(d.skillsDeps()),

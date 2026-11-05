@@ -1,4 +1,4 @@
-package cmd
+package limits
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
@@ -14,7 +15,7 @@ import (
 func TestUsageOverrideCmd_NamesTheHarnessAndRefusesUnknownOnes(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	run := func(args ...string) error {
-		c := newUsageCmd(deps{serverClient: func() (*apiclient.Client, error) { return h.Client, nil }})
+		c := NewUsage(Deps{Env: cmdbase.Env{NewClient: func() (*apiclient.Client, error) { return h.Client, nil }}})
 		c.SetContext(context.Background())
 		c.SetArgs(append([]string{"override"}, args...))
 		c.SetOut(&bytes.Buffer{})

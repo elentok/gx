@@ -1,15 +1,16 @@
-package cmd
+package limits
 
 import (
 	"bytes"
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 )
 
 func TestViMode_TogglesAndSets(t *testing.T) {
@@ -44,7 +45,7 @@ func TestViMode_TogglesAndSets(t *testing.T) {
 }
 
 func TestViMode_RefusesWhenNoServerRunning(t *testing.T) {
-	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
+	cl := apiclient.New(filepath.Join(cmdtest.ShortTempDir(t), "a.sock"))
 	var out bytes.Buffer
 	err := runViMode(context.Background(), cl, &out, false, nil)
 	if err == nil || !strings.Contains(err.Error(), wire.ReasonServerNotRunning) {

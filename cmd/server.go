@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/limits"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
@@ -451,7 +452,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		}
 	}
 	if info.Budget != nil {
-		if _, err = fmt.Fprintln(w, "budget: "+budgetLine(*info.Budget)); err != nil {
+		if _, err = fmt.Fprintln(w, "budget: "+limits.BudgetLine(*info.Budget)); err != nil {
 			return err
 		}
 	}

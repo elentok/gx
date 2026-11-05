@@ -1,4 +1,4 @@
-package cmd
+package limits
 
 import (
 	"context"
@@ -13,7 +13,8 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-func newViModeCmd(d deps) *cobra.Command {
+// NewViMode builds `gx vimode`.
+func NewViMode(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:       "vimode [on|off]",
@@ -25,7 +26,7 @@ func newViModeCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			cl, err := d.dial()()
+			cl, err := d.Dial()()
 			if err != nil {
 				return err
 			}
