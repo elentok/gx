@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
@@ -66,7 +67,7 @@ func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 	if !m.server.RunningEpics["gx:alpha"] {
 		t.Fatalf("runningEpics = %v, want gx:alpha running", m.server.RunningEpics)
 	}
-	if got := m.header().RunState(); got != RunRunning {
+	if got := m.header().RunState(); got != header.RunRunning {
 		t.Errorf("queueRunState = %v, want running", got)
 	}
 	live, ok := m.server.Live["gx:alpha"]["01"]
@@ -104,7 +105,7 @@ func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
 func TestQueueServerMode_NoClaimedTicketStaysIdleWithServerCopy(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
 
-	if got := m.header().RunState(); got != RunIdle {
+	if got := m.header().RunState(); got != header.RunIdle {
 		t.Fatalf("queueRunState = %v, want idle", got)
 	}
 	body := strings.Join(m.header().BodyLines(), "\n")
@@ -237,7 +238,7 @@ func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) 
 	if len(m.server.RunningEpics) != 0 {
 		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.server.RunningEpics)
 	}
-	if got := m.header().RunState(); got != RunIdle {
+	if got := m.header().RunState(); got != header.RunIdle {
 		t.Errorf("queueRunState = %v, want idle", got)
 	}
 }

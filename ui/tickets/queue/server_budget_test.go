@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 )
 
 func loadedServerQueueWithBudget(t *testing.T, budget wire.BudgetStatus) QueueModel {
@@ -35,12 +36,12 @@ func TestQueueServerMode_HeaderColourBands(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := BudgetTotalStyle(tc.total, 50)
+			got := header.BudgetTotalStyle(tc.total, 50)
 			var name string
 			switch got.GetForeground() {
-			case EpicStatusPausedRepairStyle.GetForeground():
+			case header.EpicStatusPausedRepairStyle.GetForeground():
 				name = "alarm"
-			case EpicStatusProblemStyle.GetForeground():
+			case header.EpicStatusProblemStyle.GetForeground():
 				name = "warning"
 			default:
 				name = "default"

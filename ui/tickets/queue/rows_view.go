@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -40,10 +41,10 @@ func (r Rows) RenderOpts(env RowsEnv, width int) tree.RenderOpts[Node] {
 				return ""
 			case NodeEpicName:
 				_, _, fill := h.EpicStatus(entry.Value.Epic)
-				return EpicNameLine(entry.Value.Epic.Name, h.Summaries[entry.Value.Epic.Name], fill, entry.Value.Layout, env.LabelWidth)
+				return header.EpicNameLine(entry.Value.Epic.Name, h.Summaries[entry.Value.Epic.Name], fill, entry.Value.Layout, env.LabelWidth)
 			case NodeEpicBar:
 				_, _, fill := h.EpicStatus(entry.Value.Epic)
-				return EpicBarLine(h.Summaries[entry.Value.Epic.Name], fill, entry.Value.Layout)
+				return header.EpicBarLine(h.Summaries[entry.Value.Epic.Name], fill, entry.Value.Layout)
 			case NodeEpicSpacer:
 				return ""
 			case NodeEpicStatusLine:

@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
@@ -75,7 +76,7 @@ func (m QueueModel) menuAnchor() contextmenu.Anchor {
 	if !ok {
 		return contextmenu.Anchor{}
 	}
-	return contextmenu.Anchor{X: 1, Y: 1 + HeaderReservedLines + line, H: h}
+	return contextmenu.Anchor{X: 1, Y: 1 + header.HeaderReservedLines + line, H: h}
 }
 
 // yankQueueTicketSummary is the Queue tab's counterpart to

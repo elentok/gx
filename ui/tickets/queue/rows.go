@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -62,7 +63,7 @@ type Node struct {
 	Epic   tickets.Epic
 	Err    error
 	Ticket Row
-	Layout EpicHeaderLayout
+	Layout header.EpicHeaderLayout
 }
 
 // entriesCache memoizes buildQueueEntries' output (see QueueModel.
@@ -122,7 +123,7 @@ func NewRows(queueTree tree.Model[Node]) Rows {
 
 // RowsEnv is what queueRows reads from the rest of the tab.
 type RowsEnv struct {
-	Header        Header
+	Header        header.Header
 	MaxParallel   int
 	LabelWidth    int
 	HarnessLabels map[string]string
@@ -239,7 +240,7 @@ func (r Rows) BuildEntries(env RowsEnv) []tree.Entry[Node] {
 
 		roots = append(roots, Node{Kind: NodeEpicSeparator, Epic: epic})
 		roots = append(roots, Node{Kind: NodeEpicName, Epic: epic, Layout: layout})
-		if layout != EpicLayoutWide && env.Header.Summaries[epic.Name].Total > 0 {
+		if layout != header.EpicLayoutWide && env.Header.Summaries[epic.Name].Total > 0 {
 			roots = append(roots, Node{Kind: NodeEpicBar, Epic: epic, Layout: layout})
 		}
 		roots = append(roots, Node{Kind: NodeEpicStatusLine, Epic: epic})

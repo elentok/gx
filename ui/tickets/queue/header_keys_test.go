@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
@@ -34,8 +35,8 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		lines := m.header().BodyLines()
-		if len(lines) != HeaderReservedLines {
-			t.Fatalf("body lines = %v, want %d line(s)", lines, HeaderReservedLines)
+		if len(lines) != header.HeaderReservedLines {
+			t.Fatalf("body lines = %v, want %d line(s)", lines, header.HeaderReservedLines)
 		}
 		got := ansi.Strip(lines[0])
 		if !strings.Contains(got, "Idle") || strings.Contains(got, "enter") {
@@ -44,7 +45,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		if strings.Contains(got, "·") {
 			t.Fatalf("body line = %q, want no redundant \"· enter start\" hint suffix", got)
 		}
-		if want := EpicStatusPausedAnswerStyle.Render(got); lines[0] != want {
+		if want := header.EpicStatusPausedAnswerStyle.Render(got); lines[0] != want {
 			t.Fatalf("body line = %q, want orange-styled %q", lines[0], want)
 		}
 	})
@@ -70,8 +71,8 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		lines := m.header().BodyLines()
-		if len(lines) != HeaderReservedLines {
-			t.Fatalf("body lines = %v, want %d line(s)", lines, HeaderReservedLines)
+		if len(lines) != header.HeaderReservedLines {
+			t.Fatalf("body lines = %v, want %d line(s)", lines, header.HeaderReservedLines)
 		}
 		got := ansi.Strip(lines[0])
 		if got != "Paused. No tickets running." {
@@ -83,14 +84,14 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		emptyRoot := t.TempDir()
 		m := loadQueueModel(t, withChecked(NewQueueModel(emptyRoot, ui.Settings{}, keys.Manager{}), map[string]bool{}))
 		lines := m.header().BodyLines()
-		if len(lines) != HeaderReservedLines {
-			t.Fatalf("body lines = %v, want %d line(s)", lines, HeaderReservedLines)
+		if len(lines) != header.HeaderReservedLines {
+			t.Fatalf("body lines = %v, want %d line(s)", lines, header.HeaderReservedLines)
 		}
 		want := "No selected tickets — go to the Tickets tab first"
 		if got := ansi.Strip(lines[0]); got != want {
 			t.Fatalf("body line = %q, want %q", got, want)
 		}
-		if wantStyled := EpicStatusPausedAnswerStyle.Render(want); lines[0] != wantStyled {
+		if wantStyled := header.EpicStatusPausedAnswerStyle.Render(want); lines[0] != wantStyled {
 			t.Fatalf("body line = %q, want orange-styled %q", lines[0], wantStyled)
 		}
 

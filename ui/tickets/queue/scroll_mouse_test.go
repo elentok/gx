@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 )
 
 // TestQueueModelScrollsWithKeysAndMouse covers ticket 25's third request: the
@@ -321,7 +322,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 			secondTicket = i
 		}
 	}
-	rowY := func(entryIdx int) int { return 1 + HeaderReservedLines + entryIdx }
+	rowY := func(entryIdx int) int { return 1 + header.HeaderReservedLines + entryIdx }
 	start := m.rows.Tree.SelectedIndex()
 	px, py := m.layout().previewRect().X, m.layout().previewRect().Y
 
@@ -378,7 +379,7 @@ func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.
 	if len(ticketRows) != 2 {
 		t.Fatalf("expected 2 ticket rows, got %d: %v", len(ticketRows), ticketRows)
 	}
-	rowY := 1 + HeaderReservedLines + ticketRows[1]
+	rowY := 1 + header.HeaderReservedLines + ticketRows[1]
 
 	// Idle -> running with no WindowSizeMsg in between: the reserved slot's
 	// height (and thus SetVisibleHeight/the mouse-click offset) must not

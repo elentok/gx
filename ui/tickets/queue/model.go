@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/queue/header"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -172,7 +173,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// The epic header layout depends on the width (see buildQueueEntries).
 			m.rows.Tree.SetEntries(m.rows.BuildEntriesCached(m.rowsEnv()))
 		}
-		m.rows.Tree.SetVisibleHeight(m.layout().viewportHeight() - HeaderReservedLines)
+		m.rows.Tree.SetVisibleHeight(m.layout().viewportHeight() - header.HeaderReservedLines)
 		return m, nil
 	case queueSpinnerRestartMsg:
 		// The tick chain dies while the tab is hidden, so a claim that arrived
@@ -331,7 +332,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		}
 		return m, nil
 	}
-	bodyLine := mouse.Y - 1 - HeaderReservedLines
+	bodyLine := mouse.Y - 1 - header.HeaderReservedLines
 	if mouse.Button == tea.MouseRight {
 		idx, ok := m.rows.Tree.EntryAtBodyLine(bodyLine)
 		if !ok {
@@ -466,7 +467,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, notify.Info(label)
 		case bindingQueueTogglePreview:
 			m.preview.Toggle()
-			m.rows.Tree.SetVisibleHeight(m.layout().viewportHeight() - HeaderReservedLines)
+			m.rows.Tree.SetVisibleHeight(m.layout().viewportHeight() - header.HeaderReservedLines)
 		case bindingQueueEditInPlace:
 			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 		case bindingQueueEditHSplit:
@@ -602,8 +603,8 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 }
 
 // header builds the stateless header from the tab's current inputs.
-func (m QueueModel) header() Header {
-	h := Header{
+func (m QueueModel) header() header.Header {
+	h := header.Header{
 		Icons:        m.icons(),
 		Summaries:    m.server.Summaries,
 		RunningEpics: m.server.RunningEpics,

@@ -1,6 +1,6 @@
-// Package queue holds the Queue tab's header: the title, the run-state banner
+// Package header holds the Queue tab's header: the title, the run-state banner
 // and the per-epic status rows.
-package queue
+package header
 
 import (
 	"fmt"
