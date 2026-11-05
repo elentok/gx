@@ -194,7 +194,7 @@ func (s *Server) claimRoot(item wire.QueueItem) (bool, error) {
 		if filepath.Base(e.Path) != addr.Epic {
 			continue
 		}
-		s.checkDeadlock(root, projectDir, e)
+		s.scheduler.CheckDeadlock(root, projectDir, e)
 		t, ok := s.nextUntracked(addr.Project, e)
 		if !ok {
 			s.merger.RetryHeldMerge(root, e, loaded, repo)

@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
+	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/tickets"
 )
@@ -55,15 +56,9 @@ func (s *Server) SettleReleasedRun(address string) {
 	s.registry.Delete(address)
 }
 
-// AgentWaiting reports whether the run's agent is not working (idle or done).
-// For tests.
-func (s *Server) AgentWaiting(project, epic, id string) bool {
-	_, idle, err := s.recovery.AgentState(tickets.Address{Project: project, Epic: epic, ID: id})
-	return err == nil && idle
-}
-
-// WatchGates runs one gate watchdog pass as of now. For tests.
-func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
+// Scheduler is the claim loop's watchdogs. Tests outside the package read their
+// seams through here.
+func (s *Server) Scheduler() *sched.Scheduler { return s.scheduler }
 
 // WebAuth is the web login gate, nil unless the web listener is bound. Tests
 // outside the package read its seams through here.

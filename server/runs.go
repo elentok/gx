@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -54,7 +55,9 @@ func (h reclaimHost) DefaultDeps() ralphloop.Deps { return h.s.projects.DefaultD
 
 func (h reclaimHost) Publish(event, id string) { h.s.events.Publish(event, id) }
 
-func (h reclaimHost) ReportedFinished(ticketPath string) bool { return reportedFinished(ticketPath) }
+func (h reclaimHost) ReportedFinished(ticketPath string) bool {
+	return sched.ReportedFinished(ticketPath)
+}
 
 func (h reclaimHost) Continue(runner agentrunner.Runner, t runs.TrackedRun, root queue.RootRef, mode merge.IterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, settleNow bool) {
 	h.s.launcher.Continue(runner, t, root, mode, one, wt, settleNow)

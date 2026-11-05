@@ -37,6 +37,9 @@ var (
 	registerLiveAgent       = servertest.RegisterLiveAgent
 	restartUnder            = servertest.RestartUnder
 	runLog                  = servertest.RunLog
+	runLogOf                = servertest.RunLogOf
+	epicTickets             = servertest.EpicTickets
+	startDeadlock           = servertest.StartDeadlock
 	runnerShapes            = servertest.RunnerShapes
 	runsJSONHas             = servertest.RunsJSONHas
 	stampRun                = servertest.StampRun

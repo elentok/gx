@@ -401,7 +401,7 @@ func watchHeldGate(t *testing.T, state agentrunner.State, seed ...ralphloop.Even
 		}
 	}
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "headless", Session: sess})
-	pass = func() { h.Server.WatchGates(gateWatchStart.Add(time.Hour)) }
+	pass = func() { h.Server.Scheduler().WatchGates(gateWatchStart.Add(time.Hour)) }
 	applied = func() int {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
 		n := 0

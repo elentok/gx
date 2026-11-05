@@ -1,4 +1,4 @@
-package server_test
+package sched_test
 
 import (
 	"context"
@@ -62,12 +62,12 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h.Server.PauseStuckFinishedClaims(finishedAt.Add(time.Minute))
+	h.Server.Scheduler().PauseStuckFinishedClaims(finishedAt.Add(time.Minute))
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusClaimed {
 		t.Fatalf("within the grace: status = %q, err = %v, want claimed", tk.Status, err)
 	}
 
-	h.Server.PauseStuckFinishedClaims(finishedAt.Add(time.Hour))
+	h.Server.Scheduler().PauseStuckFinishedClaims(finishedAt.Add(time.Hour))
 	tk, err := schema.ParseTicket(path)
 	if err != nil {
 		t.Fatal(err)
@@ -96,13 +96,13 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 	reclaim()
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
 	h.Server.Registry().MarkSettling("proj:epic-a/01")
-	h.Server.PauseStuckFinishedClaims(past)
+	h.Server.Scheduler().PauseStuckFinishedClaims(past)
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusClaimed {
 		t.Fatalf("settling run: status = %q, err = %v, want claimed", tk.Status, err)
 	}
 
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
-	h.Server.PauseStuckFinishedClaims(past)
+	h.Server.Scheduler().PauseStuckFinishedClaims(past)
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusPaused {
 		t.Errorf("run stuck in a wait: status = %q, err = %v, want paused", tk.Status, err)
 	}

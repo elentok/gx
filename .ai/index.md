@@ -198,7 +198,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/sched/` holds the scheduling top of the lifecycle; so far the `HerdrWatch` (herdr
   availability, hold reason, banner, retry loop), the `Reclaimer` (startup reclaim of saved
   runs, `ResolveRun`, `Resume`) and the `Launcher` (`ClaimAndLaunch`, launch, `finishRun`/`settleRun`,
-  `NotifyDone`). The root implements their `HerdrHost`, `ReclaimHost` and `LaunchHost`
+  `NotifyDone`) and the `Scheduler` (gate watchdog, deadlock check, finished-claim watchdog). The root implements their `HerdrHost`, `ReclaimHost` and `LaunchHost`
 - `ralphloop/` — ralph-loop scheduler, landing and verification
 - `tickets/`, `tickets/schema/` — local markdown ticket tracker; `tickets/tickettest` — its shared test helpers; `tickets/ticketlog` — pause-round readers (question, rounds, answered, start-over, pause detail); `tickets/ticketmove` — ticket move, id allocation and ref rewriting; `tickets/ticketmigrate` — migrations and backfills (Migrate*, Backfill*, pause migration, store walk); `tickets/ticketgit` — trunk resolution, repo opening, epic spec path and iteration-branch parsing (imports `tickets`, never the reverse); `tickets/ticketspec` — publish-side code (lint-claims, manifest, verify plan, publish checks, estimates)
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners; `nativerunner/holder` — the pty holder process, its socket protocol and client (`nativerunner` imports it, never the reverse)

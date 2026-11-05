@@ -1,4 +1,4 @@
-package server
+package sched
 
 import (
 	"context"
@@ -26,9 +26,9 @@ type gateHold struct {
 	at      time.Time
 }
 
-// keepGatesWatched raises held background-task gates until ctx ends. The loop
+// KeepGatesWatched raises held background-task gates until ctx ends. The loop
 // only logs a hold and keeps polling; nothing else turns it into a failure.
-func (s *Server) keepGatesWatched(ctx context.Context) {
+func (s *Scheduler) KeepGatesWatched(ctx context.Context) {
 	ticker := time.NewTicker(gateWatchInterval)
 	defer ticker.Stop()
 	for {
@@ -37,19 +37,20 @@ func (s *Server) keepGatesWatched(ctx context.Context) {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			s.watchGates(now)
-			s.pauseStuckFinishedClaims(now)
+			s.WatchGates(now)
+			s.PauseStuckFinishedClaims(now)
 		}
 	}
 }
 
-// watchGates raises each live run whose latest iteration holds a background
-// task gate past the quiet period while its agent is idle, for R10.
-func (s *Server) watchGates(now time.Time) {
+// WatchGates raises each live run whose latest iteration holds a background
+// task gate past the quiet period while its agent is idle, for R10. It runs
+// one pass as of now; tests call it directly.
+func (s *Scheduler) WatchGates(now time.Time) {
 	if s.gatesRaised == nil {
 		s.gatesRaised = map[gateHold]bool{}
 	}
-	for _, run := range s.registry.List() {
+	for _, run := range s.Registry.List() {
 		addr, err := tickets.ParseAddress(run.Address, tickets.AddressContext{})
 		if err != nil {
 			continue
@@ -62,24 +63,24 @@ func (s *Server) watchGates(now time.Time) {
 		if s.gatesRaised[hold] {
 			continue
 		}
-		if _, idle, err := s.recovery.AgentState(addr); err != nil || !idle {
+		if _, idle, err := s.Recovery.AgentState(addr); err != nil || !idle {
 			continue
 		}
 		s.gatesRaised[hold] = true
-		s.recovery.RecoverAsync(recovery.Failure{Address: run.Address, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
+		s.Recovery.RecoverAsync(recovery.Failure{Address: run.Address, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
 	}
 }
 
 // heldGate is the newest gate-held event of the ticket's latest iteration
 // whose task is still held.
-func (s *Server) heldGate(addr tickets.Address) (ralphloop.Event, bool) {
-	dir, _, err := s.projects.Of(addr.Project)
+func (s *Scheduler) heldGate(addr tickets.Address) (ralphloop.Event, bool) {
+	dir, _, err := s.Projects.Of(addr.Project)
 	if err != nil {
 		return ralphloop.Event{}, false
 	}
 	log, _, err := ralphloop.ReadEvents(dir, addr.Epic)
 	if err != nil {
-		s.log.Warn("gate watch cannot read the run log", "ticket", addr, "err", err)
+		s.Log.Warn("gate watch cannot read the run log", "ticket", addr, "err", err)
 		return ralphloop.Event{}, false
 	}
 	held := map[string]ralphloop.Event{}

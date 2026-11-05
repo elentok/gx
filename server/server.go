@@ -132,9 +132,8 @@ type Server struct {
 	// landing lands over a dirty trunk and handles trunk conflicts.
 	landing *merge.Landing
 	// merger merges epics and recovers merges a crash cut short.
-	merger      *merge.Merger
-	deadlocks   deadlocks
-	gatesRaised map[gateHold]bool // touched only by the gate watchdog
+	merger    *merge.Merger
+	scheduler *sched.Scheduler
 
 	chat      *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry  *runs.Registry
@@ -462,6 +461,10 @@ func New(cfg Config) (*Server, error) {
 		Budget: s.budget, Writer: s.writer, Harness: s.harness, Landing: s.landing, Merger: s.merger,
 		OneOffs: s.oneOffs, Chat: s.chat, DropAskedAgent: s.cfg.DropAskedAgent,
 	})
+	s.scheduler = sched.NewScheduler(sched.SchedulerDeps{
+		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
+		Index: s.idx, Writer: s.writer, TicketStore: s.cfg.TicketStore,
+	})
 	s.reclaimer = sched.NewReclaimer(s.log, reclaimHost{s}, s.registry, savedRuns)
 	s.herdr.Check()
 	return s, nil
@@ -718,7 +721,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	tokensDone := make(chan struct{})
 	go func() { defer close(tokensDone); s.limits.KeepTokensPolled(freshCtx) }()
 	gatesDone := make(chan struct{})
-	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
+	go func() { defer close(gatesDone); s.scheduler.KeepGatesWatched(freshCtx) }()
 	cpuDone := make(chan struct{})
 	go func() { defer close(cpuDone); s.health.KeepCPUWatched(freshCtx) }()
 	disksDone := make(chan struct{})

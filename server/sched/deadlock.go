@@ -1,4 +1,4 @@
-package server
+package sched
 
 import (
 	"sync"
@@ -60,11 +60,11 @@ func deadlockReason(root queue.RootRef, e tickets.Epic, kind events.Kind) string
 	return epics.CycleReason(root, e)
 }
 
-// checkDeadlock logs deadlocked when root's epic enters deadlock and starts its
+// CheckDeadlock logs deadlocked when root's epic enters deadlock and starts its
 // recovery; it forgets the deadlock once the epic can move again.
-func (s *Server) checkDeadlock(root queue.RootRef, projectDir string, e tickets.Epic) {
+func (s *Scheduler) CheckDeadlock(root queue.RootRef, projectDir string, e tickets.Epic) {
 	kind, stuck := deadlockKind(e)
-	if !stuck || s.registry.CountRoot(root.String()) > 0 {
+	if !stuck || s.Registry.CountRoot(root.String()) > 0 {
 		s.deadlocks.leave(root)
 		return
 	}
@@ -75,13 +75,13 @@ func (s *Server) checkDeadlock(root queue.RootRef, projectDir string, e tickets.
 	if kind == events.AllPaused && e.AllAwaitAnswer(epics.PausedTickets(e)) {
 		ev := ralphloop.Event{Type: string(events.WaitingForAnswer), Reason: reason}
 		if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
-			s.log.Warn("cannot record waiting-for-answer", "root", root, "err", err)
+			s.Log.Warn("cannot record waiting-for-answer", "root", root, "err", err)
 		}
 		return
 	}
 	ev := ralphloop.Event{Type: string(events.Deadlocked), Kind: string(kind), Reason: reason}
 	if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
-		s.log.Warn("cannot record deadlock", "root", root, "err", err)
+		s.Log.Warn("cannot record deadlock", "root", root, "err", err)
 	}
-	s.recovery.RecoverAsync(recovery.Failure{Address: root.String(), Type: events.Deadlocked, Kind: kind, Reason: reason})
+	s.Recovery.RecoverAsync(recovery.Failure{Address: root.String(), Type: events.Deadlocked, Kind: kind, Reason: reason})
 }

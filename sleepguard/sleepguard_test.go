@@ -77,7 +77,7 @@ var allowed = map[string]int{
 	"server/explain/claimhold_test.go":                     1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":                     2,
 	"server/lifecycle/configreload_test.go":                2,
-	"server/deadlock_test.go":                              2,
+	"server/sched/deadlock_test.go":                        2,
 	"server/disk/diskhealth_test.go":                       1, // negative wait: failed readings never leave the waiting state
 	"server/disk/diskhold_test.go":                         3,
 	"server/disk/diskwatch_test.go":                        3,
