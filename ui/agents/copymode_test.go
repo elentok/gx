@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/ui/agents/terminal"
 )
 
 var copyRowsText = []string{"$ claude", "foo bar.baz  qux"}
@@ -50,8 +51,8 @@ func letters(s string) []tea.KeyPressMsg {
 
 func TestCopyMode_StartsOnTheLastNonBlankRow(t *testing.T) {
 	m, _, _ := copyModel(t, 0, 100)
-	if want := (holder.LinePos{Line: 101}); m.copy.cursor != want {
-		t.Fatalf("cursor = %+v, want %+v", m.copy.cursor, want)
+	if want := (holder.LinePos{Line: 101}); m.copy.Cursor != want {
+		t.Fatalf("cursor = %+v, want %+v", m.copy.Cursor, want)
 	}
 }
 
@@ -85,8 +86,8 @@ func TestCopyMode_Moves(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m, _, _ := copyModel(t, 0, 100)
 			m = pressKeys(t, m, tt.keys...)
-			if m.copy.cursor != tt.want {
-				t.Fatalf("cursor = %+v, want %+v", m.copy.cursor, tt.want)
+			if m.copy.Cursor != tt.want {
+				t.Fatalf("cursor = %+v, want %+v", m.copy.Cursor, tt.want)
 			}
 		})
 	}
@@ -112,8 +113,8 @@ func TestCopyMode_LinesStayPutWhileTheScrollbackTrims(t *testing.T) {
 			fa.msgs <- holder.AttachMessage{Type: holder.StreamFrame, Frame: fr}
 			m, _ = read(t, m, next)
 			m = pressKeys(t, m, letters(tt.keys)...)
-			if m.copy.cursor != tt.want {
-				t.Fatalf("cursor = %+v, want %+v", m.copy.cursor, tt.want)
+			if m.copy.Cursor != tt.want {
+				t.Fatalf("cursor = %+v, want %+v", m.copy.Cursor, tt.want)
 			}
 		})
 	}
@@ -157,8 +158,8 @@ func copyMouseModel(t *testing.T) (Model, *fakeAttach) {
 func TestCopyMode_CursorPastTheViewWheelsAChildThatReportsTheMouse(t *testing.T) {
 	m, fa := copyMouseModel(t)
 	m = pressKeys(t, m, letters("lkkk")...)
-	if want := (holder.LinePos{Line: 100, Col: 1}); m.copy.cursor != want {
-		t.Fatalf("cursor = %+v, want %+v on the top row", m.copy.cursor, want)
+	if want := (holder.LinePos{Line: 100, Col: 1}); m.copy.Cursor != want {
+		t.Fatalf("cursor = %+v, want %+v on the top row", m.copy.Cursor, want)
 	}
 	m = pressKeys(t, m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = pressKeys(t, m, letters("G")...)
@@ -180,23 +181,23 @@ func TestCopyMode_SelectingKeepsAMouseChildStill(t *testing.T) {
 	if len(fa.log) != 0 {
 		t.Fatalf("sent %v while selecting, want nothing", fa.log)
 	}
-	if m.copy.cursor.Line != 100 {
-		t.Fatalf("cursor on line %d, want the top row 100", m.copy.cursor.Line)
+	if m.copy.Cursor.Line != 100 {
+		t.Fatalf("cursor on line %d, want the top row 100", m.copy.Cursor.Line)
 	}
 }
 
 func TestCopyMode_RendersTheSelection(t *testing.T) {
 	m, _, _ := copyModel(t, 0, 100)
 	m = pressKeys(t, m, letters("vll")...)
-	if view := m.View().Content; !strings.Contains(view, styleCopySelection.Render("fo")) {
+	if view := m.View().Content; !strings.Contains(view, terminal.StyleCopySelection.Render("fo")) {
 		t.Fatalf("v selection not drawn:\n%q", view)
 	}
 
 	m = pressKeys(t, m, letters("V")...)
-	cols, _ := m.termView().screenSize()
+	cols, _ := m.termView().ScreenSize()
 	// The cursor, still on the third cell, splits the line's highlight.
 	selected := " bar.baz  qux" + strings.Repeat(" ", cols-len(copyRowsText[1]))
-	if view := m.View().Content; !strings.Contains(view, styleCopySelection.Render(selected)) {
+	if view := m.View().Content; !strings.Contains(view, terminal.StyleCopySelection.Render(selected)) {
 		t.Fatalf("V selection not drawn over the whole line:\n%q", view)
 	}
 }
@@ -234,7 +235,7 @@ func TestCopyMode_EscClearsTheSelectionThenLeaves(t *testing.T) {
 	m, _, _ := copyModel(t, 0, 100)
 	m = pressKeys(t, m, letters("v")...)
 	m = pressKeys(t, m, esc)
-	if m.copy == nil || m.copy.selecting {
+	if m.copy == nil || m.copy.Selecting {
 		t.Fatal("esc with a selection did not just clear it")
 	}
 	m = pressKeys(t, m, esc)

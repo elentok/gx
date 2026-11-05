@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
@@ -297,7 +298,7 @@ func TestTerminalFocused_FalseInTheSidebarAndCopyMode(t *testing.T) {
 		t.Fatal("TerminalFocused()=true in the sidebar")
 	}
 	m, _ = focusedTerminal(t)
-	m.copy = &copyMode{}
+	m.copy = &terminal.CopyMode{}
 	if m.TerminalFocused() {
 		t.Fatal("TerminalFocused()=true in copy mode")
 	}

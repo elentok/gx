@@ -63,7 +63,7 @@ func TestScroll_WheelGoesToAChildThatReportsTheMouse(t *testing.T) {
 	}}
 	m, _ = read(t, m, next)
 
-	ox, oy := m.termView().screenOrigin()
+	ox, oy := m.termView().ScreenOrigin()
 	m = update1(t, m, wheel(ox+3, oy+2, tea.MouseWheelUp))
 	m = update1(t, m, wheel(ox+3, oy+2, tea.MouseWheelDown))
 	// Over the panel's header, off the screen: nowhere to send it.

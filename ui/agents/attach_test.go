@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
@@ -129,7 +130,7 @@ type fakeHolders struct {
 	dialed []string
 }
 
-func (h *fakeHolders) dial(dir string) (AttachStream, []string, error) {
+func (h *fakeHolders) dial(dir string) (terminal.AttachStream, []string, error) {
 	id := filepath.Base(dir)
 	h.dialed = append(h.dialed, id)
 	if h.down[id] {
@@ -151,7 +152,7 @@ var idleStatus = wire.SessionStatus{State: wire.SessionIdle}
 func attachModel(t *testing.T, h *fakeHolders) (Model, tea.Cmd) {
 	t.Helper()
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	m.term.sessionsDir = "/sessions"
+	m.term.SessionsDir = "/sessions"
 	m.dial = h.dial
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
 	return withStatusOfA(m, idleStatus)
@@ -173,7 +174,7 @@ func dialed(t *testing.T, m Model, cmd tea.Cmd) (Model, tea.Cmd) {
 	if cmd == nil {
 		t.Fatal("no dial scheduled")
 	}
-	msg, ok := cmd().(attachedMsg)
+	msg, ok := cmd().(terminal.AttachedMsg)
 	if !ok {
 		t.Fatalf("expected a dial, got %T", msg)
 	}
@@ -296,7 +297,7 @@ func TestAttach_PasteOverTheLimitIsRefused(t *testing.T) {
 		t.Fatalf("refusal message = %#v, want a warning", n)
 	}
 
-	limit := strings.Repeat("x", maxPasteBytes)
+	limit := strings.Repeat("x", terminal.MaxPasteBytes)
 	m = update1(t, m, tea.PasteMsg{Content: limit})
 	if !slices.Equal(fa.pastes, []string{limit}) {
 		t.Fatal("a paste at the limit was not sent")
@@ -385,7 +386,7 @@ func TestAttach_WriteErrorEndsTheAttach(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	m, _ = read(t, m, next)
-	if !m.attach.ended {
+	if !m.attach.Ended {
 		t.Fatal("a failed write did not end the attach")
 	}
 	if view := plainView(m); !strings.Contains(view, "broken pipe") {
@@ -426,7 +427,7 @@ func TestAttach_SwitchingSessionDetachesTheOldOne(t *testing.T) {
 	if !slices.Equal(h.dialed, []string{"a", "b"}) {
 		t.Fatalf("dialed %v, want a then b", h.dialed)
 	}
-	if m.attach == nil || m.attach.id != "b" || m.attach.stream != h.attaches["b"] {
+	if m.attach == nil || m.attach.ID != "b" || m.attach.Stream != h.attaches["b"] {
 		t.Fatal("the new session is not attached")
 	}
 }
@@ -445,7 +446,7 @@ func TestAttach_LeavingTheTabDetachesAndReturningReattaches(t *testing.T) {
 	delete(h.attaches, "a")
 	next, cmd := m.Update(m.OnPageActivated()())
 	m, _ = dialed(t, next.(Model), cmd)
-	if h.attaches["a"] == nil || m.attach.stream != h.attaches["a"] {
+	if h.attaches["a"] == nil || m.attach.Stream != h.attaches["a"] {
 		t.Fatal("returning to the tab did not reattach")
 	}
 }
@@ -469,7 +470,7 @@ func startingModel(t *testing.T) (Model, tea.Cmd, *fakeHolders) {
 	t.Helper()
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}, down: map[string]bool{"a": true}}
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	m.term.sessionsDir = "/sessions"
+	m.term.SessionsDir = "/sessions"
 	m.dial = h.dial
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
 	m, cmd := withStatusOfA(m, startingStatus)
@@ -487,10 +488,10 @@ func TestAttach_StartingSessionRetriesUntilTheHolderAppears(t *testing.T) {
 	}
 
 	h.down["a"] = false
-	next, cmd := m.Update(attachRetryMsg{a: m.attach})
+	next, cmd := m.Update(terminal.AttachRetryMsg{A: m.attach})
 	m, _ = dialed(t, next.(Model), cmd)
 	h.attaches["a"].frame("$ claude")
-	m, _ = read(t, m, readAttach(m.attach))
+	m, _ = read(t, m, terminal.ReadAttach(m.attach))
 	if view := plainView(m); !strings.Contains(view, "$ claude") || strings.Contains(view, "attach failed") {
 		t.Fatalf("the retry did not attach:\n%s", view)
 	}
@@ -500,11 +501,11 @@ func TestAttach_RetriesAreBounded(t *testing.T) {
 	m, cmd, h := startingModel(t)
 	m, retry := dialed(t, m, cmd)
 	for retry != nil {
-		next, cmd := m.Update(attachRetryMsg{a: m.attach})
+		next, cmd := m.Update(terminal.AttachRetryMsg{A: m.attach})
 		m, retry = dialed(t, next.(Model), cmd)
 	}
-	if len(h.dialed) != 1+maxAttachRetries {
-		t.Fatalf("dialed %d times, want %d", len(h.dialed), 1+maxAttachRetries)
+	if len(h.dialed) != 1+terminal.MaxAttachRetries {
+		t.Fatalf("dialed %d times, want %d", len(h.dialed), 1+terminal.MaxAttachRetries)
 	}
 	if view := plainView(m); !strings.Contains(view, "attach failed: no holder") {
 		t.Fatalf("giving up did not show the error:\n%s", view)
@@ -514,7 +515,7 @@ func TestAttach_RetriesAreBounded(t *testing.T) {
 func TestAttach_StaleRetryIsDropped(t *testing.T) {
 	m, cmd, h := startingModel(t)
 	m, _ = dialed(t, m, cmd)
-	stale := attachRetryMsg{a: m.attach}
+	stale := terminal.AttachRetryMsg{A: m.attach}
 	m = update1(t, m, tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if _, cmd := m.Update(stale); cmd != nil {
 		t.Fatal("a retry of a session no longer on screen redialed")
@@ -540,7 +541,7 @@ func TestAttach_FailedAttachRedialsWhenTheSessionChanges(t *testing.T) {
 	h.down["a"] = false
 	m, cmd = withStatusOfA(m, startingStatus)
 	m, _ = dialed(t, m, cmd)
-	if m.attach.stream != h.attaches["a"] {
+	if m.attach.Stream != h.attaches["a"] {
 		t.Fatal("a session change did not redial the failed attach")
 	}
 }
@@ -584,8 +585,8 @@ func TestAttach_ExitSwitchesToTheExitedView(t *testing.T) {
 func TestAttach_QueueAgentDialsItsHolderDir(t *testing.T) {
 	var dialedDir string
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	m.term.sessionsDir = "/sessions"
-	m.dial = func(dir string) (AttachStream, []string, error) {
+	m.term.SessionsDir = "/sessions"
+	m.dial = func(dir string) (terminal.AttachStream, []string, error) {
 		dialedDir = dir
 		return newFakeAttach(), nil, nil
 	}

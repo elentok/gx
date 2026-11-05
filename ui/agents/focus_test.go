@@ -42,7 +42,7 @@ func openedModel(t *testing.T, f *fakeSessionClient, lastViewed string, sessions
 	m := newTestModel(f, ui.Settings{}).WithLastViewedFile(path)
 	// Runs before TempDir's cleanup: a late save would race its removal.
 	t.Cleanup(func() { waitIdle(t, m.reporter) })
-	m.term.sessionsDir = "/sessions"
+	m.term.SessionsDir = "/sessions"
 	m.dial = (&fakeHolders{attaches: map[string]*fakeAttach{}}).dial
 	m.termProgram = "iTerm.app"
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})

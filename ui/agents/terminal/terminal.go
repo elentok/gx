@@ -1,4 +1,4 @@
-package agents
+package terminal
 
 import (
 	"fmt"
@@ -10,28 +10,28 @@ import (
 	"github.com/elentok/gx/ui/agents/agentstyle"
 )
 
-// lastScreen is an Exited session's saved last screen; changedAt tells a
+// LastScreen is an Exited session's saved last screen; changedAt tells a
 // later exit of the same session (after a resume) from the one loaded.
-type lastScreen struct {
-	id        string
-	changedAt time.Time
-	rows      []string
+type LastScreen struct {
+	ID        string
+	ChangedAt time.Time
+	Rows      []string
 }
 
-type lastScreenMsg lastScreen
+type LastScreenMsg LastScreen
 
 // infoLines is the info row then a blank row, or none without an info row.
 func infoLines(s wire.SessionInfo, now time.Time) []string {
-	if info := infoRow(s, now); info != "" {
+	if info := InfoRow(s, now); info != "" {
 		return []string{info, ""}
 	}
 	return nil
 }
 
-// infoRow is the Actionable reason with the prompts `<leader> a` would run,
+// InfoRow is the Actionable reason with the prompts `<leader> a` would run,
 // else the status detail. A running auto-advance countdown ends it, with the
 // way to cancel.
-func infoRow(s wire.SessionInfo, now time.Time) string {
+func InfoRow(s wire.SessionInfo, now time.Time) string {
 	if s.Actionable.Reason != "" {
 		row := agentstyle.Reason.Render(s.Actionable.Reason)
 		if len(s.Actionable.Action) > 0 {

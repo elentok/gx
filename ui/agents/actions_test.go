@@ -135,7 +135,7 @@ func TestActions_ResumeReattachesTheNewHolder(t *testing.T) {
 			if got := calls(f); got[len(got)-1] != "resume done" {
 				t.Fatalf("calls = %v", got)
 			}
-			if m.attach == nil || m.attach.id != "done" {
+			if m.attach == nil || m.attach.ID != "done" {
 				t.Fatalf("attach = %+v, want one to done", m.attach)
 			}
 			assertFocus(t, m, true, "done")
@@ -149,7 +149,7 @@ func TestActions_ResumeRefusalShowsItsMessage(t *testing.T) {
 	if note != "dir is gone" {
 		t.Fatalf("footer = %q, want the refusal", note)
 	}
-	if m.attach != nil && m.attach.id == "done" {
+	if m.attach != nil && m.attach.ID == "done" {
 		t.Fatal("a refused resume attached")
 	}
 }

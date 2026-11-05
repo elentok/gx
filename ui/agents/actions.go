@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/nav"
@@ -116,14 +117,14 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 }
 
 // unlockMsg lifts the read-only of a, once the person confirmed.
-type unlockMsg struct{ a *attachment }
+type unlockMsg struct{ a *terminal.Attachment }
 
 // unlockSelected asks before letting keys and paste reach a Queue or Design
 // agent; Cancel is the default.
 func (m Model) unlockSelected() (tea.Model, tea.Cmd) {
 	s, ok := m.selected()
 	a := m.attach
-	if !ok || a == nil || a.id != s.ID || !a.readOnly {
+	if !ok || a == nil || a.ID != s.ID || !a.ReadOnly {
 		return m, nil
 	}
 	prompt := "This Design agent is waiting on gx-design. Typing into it can derail the hand-off. Unlock input?"
@@ -138,8 +139,8 @@ func (m Model) unlockSelected() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateUnlock(msg unlockMsg) (tea.Model, tea.Cmd) {
-	if msg.a == m.attach && !msg.a.closed {
-		msg.a.readOnly = false
+	if msg.a == m.attach && !msg.a.Closed {
+		msg.a.ReadOnly = false
 	}
 	return m, nil
 }

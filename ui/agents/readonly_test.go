@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
@@ -22,7 +23,7 @@ func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) 
 	t.Helper()
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{})
-	m.term.sessionsDir = "/sessions"
+	m.term.SessionsDir = "/sessions"
 	m.dial = h.dial
 	m.showQueue, m.showDesign = true, true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
@@ -44,7 +45,7 @@ func readOnlyTerminal(t *testing.T, info wire.SessionInfo) (Model, *fakeAttach) 
 func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
-	m.term.sessionsDir = "/sessions"
+	m.term.SessionsDir = "/sessions"
 	m.dial = h.dial
 	m.opened = true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
@@ -59,7 +60,7 @@ func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
 	if m.showQueue || m.selectedID() != "q2" {
 		t.Fatalf("showQueue=%v selected=%q, want the hidden group's q2 selected", m.showQueue, m.selectedID())
 	}
-	if a := m.attach; a == nil || a.id != "q2" || !a.readOnly {
+	if a := m.attach; a == nil || a.ID != "q2" || !a.ReadOnly {
 		t.Fatalf("attach = %+v, want q2 read-only", a)
 	}
 }
@@ -92,7 +93,7 @@ func TestReadOnly_PlainSessionAndFixAgentAreWritable(t *testing.T) {
 func TestReadOnly_WheelAndCopyModeStillWork(t *testing.T) {
 	m, fa := readOnlyTerminal(t, wire.SessionInfo{Queue: true})
 	fa.scrolledFrame(0, 100, 0, "$ claude")
-	m, _ = read(t, m, readAttach(m.attach))
+	m, _ = read(t, m, terminal.ReadAttach(m.attach))
 	m = update1(t, m, wheel(sidebarWidth+5, 4, tea.MouseWheelUp))
 	if !slices.Contains(fa.log, "scroll:3") {
 		t.Fatalf("wheel sent %v, want scroll:3", fa.log)
@@ -147,7 +148,7 @@ func TestReadOnly_ConfirmedUnlockLetsKeysThroughUntilTheNextOpen(t *testing.T) {
 	m, _ = m.syncAttach()
 	m.cursor = here
 	m, _ = m.syncAttach()
-	if m.attach == opened || m.attach == nil || !m.attach.readOnly {
+	if m.attach == opened || m.attach == nil || !m.attach.ReadOnly {
 		t.Fatal("selecting the agent again did not open it read-only")
 	}
 }

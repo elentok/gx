@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -31,7 +32,7 @@ func terminalModel(t *testing.T, s wire.SessionInfo, sessionsDir string) Model {
 	t.Helper()
 	m := newTestModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: true})
 	m.now = func() time.Time { return terminalNow }
-	m.term.sessionsDir = sessionsDir
+	m.term.SessionsDir = sessionsDir
 	m.hideSidebar = true
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 8})
 	next, cmd := m.WithServerState(&viewmodel.State{Sessions: []wire.SessionInfo{s}}, tabapi.ServerLinkUp)
@@ -51,7 +52,7 @@ func runBatch(t *testing.T, m Model, cmd tea.Cmd) Model {
 				m = runBatch(t, m, c)
 			}
 		}
-	case lastScreenMsg:
+	case terminal.LastScreenMsg:
 		m = update1(t, m, msg)
 	}
 	return m
@@ -103,7 +104,7 @@ func TestTerminal_HeaderShowsTimeSinceTheLastStatusChange(t *testing.T) {
 func TestTerminal_ActionableReasonWinsOverStatusDetail(t *testing.T) {
 	s := terminalSession(wire.SessionStatus{State: wire.SessionBlocked, Kind: "permission", Message: "Bash"})
 	s.Actionable = wire.SessionActionable{Reason: "needs approval", Action: []string{"yes"}}
-	got := ansi.Strip(infoRow(s, time.Now()))
+	got := ansi.Strip(terminal.InfoRow(s, time.Now()))
 	if got != "needs approval  <leader> a: yes" {
 		t.Fatalf("info row = %q", got)
 	}
@@ -115,7 +116,7 @@ func TestTerminal_InfoRowShowsTheCountdownAndCancel(t *testing.T) {
 	s := terminalSession(idleStatus)
 	s.Actionable = wire.SessionActionable{Reason: "waiting", Action: []string{"Continue"}}
 	s.AutoAdvanceAt = &at
-	got := ansi.Strip(infoRow(s, now))
+	got := ansi.Strip(terminal.InfoRow(s, now))
 	for _, want := range []string{"Continuing in 7s", "Cancel"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("info row %q lacks %q", got, want)

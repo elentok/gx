@@ -1,4 +1,4 @@
-package agents
+package terminal
 
 import (
 	"strings"
@@ -16,12 +16,12 @@ import (
 
 var (
 	styleCopyCursor    = lipgloss.NewStyle().Reverse(true)
-	styleCopySelection = lipgloss.NewStyle().Background(ui.ColorSurface1)
+	StyleCopySelection = lipgloss.NewStyle().Background(ui.ColorSurface1)
 )
 
-// screenInfo is the screen copy mode works over. Lines count as
+// ScreenInfo is the screen copy mode works over. Lines count as
 // nativerunner.LinePos does; top is the line shown in the first row.
-type screenInfo struct {
+type ScreenInfo struct {
 	cols, height int
 	top          int
 	// base is the oldest line kept; scrollMax is how far the view can scroll
@@ -32,110 +32,86 @@ type screenInfo struct {
 	mouse bool
 }
 
-// screenSource is what copy mode reads from and drives on the attach.
-type screenSource interface {
-	screen() screenInfo
+// ScreenSource is what copy mode reads from and drives on the attach.
+type ScreenSource interface {
+	Screen() ScreenInfo
 	scroll(offset int)
 	write(f func(AttachStream) error)
 	snapToBottom()
 }
 
-// attachScreen is an attachment seen as a screenSource at the panel's size.
-type attachScreen struct {
-	*attachment
+// AttachScreen is an attachment seen as a screenSource at the panel's size.
+type AttachScreen struct {
+	*Attachment
 	cols, rows int
 }
 
-func (s attachScreen) screen() screenInfo {
-	a := s.attachment
-	return screenInfo{
+// NewAttachScreen is a at the panel's size.
+func NewAttachScreen(a *Attachment, cols, rows int) AttachScreen {
+	return AttachScreen{Attachment: a, cols: cols, rows: rows}
+}
+
+func (s AttachScreen) Screen() ScreenInfo {
+	a := s.Attachment
+	return ScreenInfo{
 		cols: s.cols, height: s.rows,
 		top:  a.scrollBase + a.scrollMax - a.offset,
 		base: a.scrollBase, scrollMax: a.scrollMax, offset: a.offset,
-		rows: a.rows, mouse: a.mouse,
+		rows: a.Rows, mouse: a.mouse,
 	}
 }
 
 // last is the last line the view can show.
-func (s screenInfo) last() int { return s.base + s.scrollMax + s.height - 1 }
+func (s ScreenInfo) last() int { return s.base + s.scrollMax + s.height - 1 }
 
 // lineText is the plain text of a line in view, "" for one out of view.
-func (s screenInfo) lineText(line int) string {
+func (s ScreenInfo) lineText(line int) string {
 	if i := line - s.top; i >= 0 && i < len(s.rows) {
 		return ansi.Strip(s.rows[i])
 	}
 	return ""
 }
 
-// copyMode is keyboard copy mode over the attach's frames. Positions are
+// CopyMode is keyboard copy mode over the attach's frames. Positions are
 // nativerunner.LinePos: lines count from the oldest line ever pushed to the
 // scrollback, so they stay put while the view scrolls and the scrollback
 // trims.
-type copyMode struct {
-	// a is the attach copy mode was entered on; another attach ends it. Only
+type CopyMode struct {
+	// A is the attach copy mode was entered on; another attach ends it. Only
 	// compared, never read through: the screenSource does the reading.
-	a      *attachment
-	cursor holder.LinePos
+	A      *Attachment
+	Cursor holder.LinePos
 	// anchor is the selection's other end, set while selecting.
 	anchor    holder.LinePos
-	selecting bool
+	Selecting bool
 	linewise  bool
 	// pendingG: the first g of `g g` was pressed.
 	pendingG bool
 }
 
-// copyResult tells the tab what a key did.
-type copyResult struct {
+// CopyResult tells the tab what a key did.
+type CopyResult struct {
 	// Done: copy mode ended.
 	Done bool
 }
 
-// enterCopyMode starts copy mode on the bottom-most non-blank row in view.
-func (m Model) enterCopyMode() (tea.Model, tea.Cmd) {
-	a := m.attach
-	if a == nil || a.stream == nil || a.ended {
-		return m, nil
-	}
-	m.copy = newCopyMode(a, m.copyScreen().screen())
-	return m, nil
-}
-
-// copyScreen is the attach at the panel's current size.
-func (m Model) copyScreen() attachScreen {
-	cols, rows := m.termView().screenSize()
-	return attachScreen{attachment: m.attach, cols: cols, rows: rows}
-}
-
-func newCopyMode(a *attachment, sc screenInfo) *copyMode {
-	c := &copyMode{a: a}
-	c.cursor.Line = sc.top
+// NewCopyMode starts copy mode on the bottom-most non-blank row in view.
+func NewCopyMode(a *Attachment, sc ScreenInfo) *CopyMode {
+	c := &CopyMode{A: a}
+	c.Cursor.Line = sc.top
 	for i := sc.height - 1; i >= 0; i-- {
 		if strings.TrimSpace(sc.lineText(sc.top+i)) != "" {
-			c.cursor.Line = sc.top + i
+			c.Cursor.Line = sc.top + i
 			break
 		}
 	}
 	return c
 }
 
-func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	c := m.copy
-	if c.a != m.attach || c.a.ended {
-		m.copy = nil
-		return m, nil
-	}
-	c, cmd, res := c.Update(msg, m.copyScreen())
-	if res.Done {
-		c = nil
-	}
-	m.copy = c
-	return m, cmd
-}
-
 // Update handles a key in copy mode.
-func (c *copyMode) Update(msg tea.KeyPressMsg, src screenSource) (*copyMode, tea.Cmd, copyResult) {
+func (c *CopyMode) Update(msg tea.KeyPressMsg, src ScreenSource) (*CopyMode, tea.Cmd, CopyResult) {
 	k := msg.String()
-	sc := src.screen()
+	sc := src.Screen()
 	switch {
 	case c.pendingG:
 		c.pendingG = false
@@ -149,51 +125,51 @@ func (c *copyMode) Update(msg tea.KeyPressMsg, src screenSource) (*copyMode, tea
 	default:
 		return c, nil, c.exitKey(k, src)
 	}
-	return c, nil, copyResult{}
+	return c, nil, CopyResult{}
 }
 
 // goTop finishes `g g`; any other second key drops the g.
-func (c *copyMode) goTop(k string, src screenSource, sc screenInfo) {
+func (c *CopyMode) goTop(k string, src ScreenSource, sc ScreenInfo) {
 	if k != "g" {
 		return
 	}
 	if sc.mouse {
 		// The child's history has no known top to wheel to.
-		c.cursor = holder.LinePos{Line: sc.top}
+		c.Cursor = holder.LinePos{Line: sc.top}
 		return
 	}
-	c.cursor = holder.LinePos{Line: sc.base}
+	c.Cursor = holder.LinePos{Line: sc.base}
 	c.scrollToCursor(src, sc)
 }
 
 // move applies a cursor motion key, reporting whether k was one.
-func (c *copyMode) move(k string, sc screenInfo) bool {
+func (c *CopyMode) move(k string, sc ScreenInfo) bool {
 	h := sc.height
 	switch k {
 	case "h", "left":
-		c.cursor.Col = max(c.cursor.Col-1, 0)
+		c.Cursor.Col = max(c.Cursor.Col-1, 0)
 	case "l", "right":
-		c.cursor.Col = min(c.cursor.Col+1, sc.cols-1)
+		c.Cursor.Col = min(c.Cursor.Col+1, sc.cols-1)
 	case "j", "down":
-		c.cursor.Line++
+		c.Cursor.Line++
 	case "k", "up":
-		c.cursor.Line--
+		c.Cursor.Line--
 	case "0":
-		c.cursor.Col = 0
+		c.Cursor.Col = 0
 	case "$":
-		c.cursor.Col = max(ansi.StringWidth(strings.TrimRight(sc.lineText(c.cursor.Line), " "))-1, 0)
+		c.Cursor.Col = max(ansi.StringWidth(strings.TrimRight(sc.lineText(c.Cursor.Line), " "))-1, 0)
 	case "w", "b", "e":
-		c.cursor = wordMove(k, c.cursor, sc.top, sc.top+h-1, sc.lineText)
+		c.Cursor = wordMove(k, c.Cursor, sc.top, sc.top+h-1, sc.lineText)
 	case "ctrl+d":
-		c.cursor.Line += h / 2
+		c.Cursor.Line += h / 2
 	case "ctrl+u":
-		c.cursor.Line -= h / 2
+		c.Cursor.Line -= h / 2
 	case "pgdown":
-		c.cursor.Line += h
+		c.Cursor.Line += h
 	case "pgup":
-		c.cursor.Line -= h
+		c.Cursor.Line -= h
 	case "G":
-		c.cursor = holder.LinePos{Line: sc.last()}
+		c.Cursor = holder.LinePos{Line: sc.last()}
 	default:
 		return false
 	}
@@ -201,28 +177,28 @@ func (c *copyMode) move(k string, sc screenInfo) bool {
 }
 
 // follow keeps the cursor in the scrollback and in view after a motion.
-func (c *copyMode) follow(src screenSource, sc screenInfo) {
+func (c *CopyMode) follow(src ScreenSource, sc ScreenInfo) {
 	if sc.mouse {
 		c.wheelToCursor(src, sc)
 		return
 	}
-	c.cursor.Line = max(sc.base, min(c.cursor.Line, sc.last()))
+	c.Cursor.Line = max(sc.base, min(c.Cursor.Line, sc.last()))
 	c.scrollToCursor(src, sc)
 }
 
-func (c *copyMode) toggleSelect(linewise bool) {
-	if c.selecting && c.linewise == linewise {
-		c.selecting = false
+func (c *CopyMode) toggleSelect(linewise bool) {
+	if c.Selecting && c.linewise == linewise {
+		c.Selecting = false
 		return
 	}
-	if !c.selecting {
-		c.anchor = c.cursor
+	if !c.Selecting {
+		c.anchor = c.Cursor
 	}
-	c.selecting, c.linewise = true, linewise
+	c.Selecting, c.linewise = true, linewise
 }
 
 // exitKey handles the keys that copy or leave; other keys do nothing.
-func (c *copyMode) exitKey(k string, src screenSource) copyResult {
+func (c *CopyMode) exitKey(k string, src ScreenSource) CopyResult {
 	switch k {
 	case "y", "enter":
 		c.copySelection(src)
@@ -230,13 +206,13 @@ func (c *copyMode) exitKey(k string, src screenSource) copyResult {
 	case "q":
 		return c.leave(src)
 	case "esc":
-		if c.selecting {
-			c.selecting = false
-			return copyResult{}
+		if c.Selecting {
+			c.Selecting = false
+			return CopyResult{}
 		}
 		return c.leave(src)
 	}
-	return copyResult{}
+	return CopyResult{}
 }
 
 // wheelToCursor keeps the cursor on screen for a child that reports the
@@ -245,19 +221,19 @@ func (c *copyMode) exitKey(k string, src screenSource) copyResult {
 // child's wheel, one tick per line. A selection pins the child, since the
 // text under it would move. Ticks go wheelTickGap apart, as claude speeds up
 // a burst of them.
-func (c *copyMode) wheelToCursor(src screenSource, sc screenInfo) {
+func (c *CopyMode) wheelToCursor(src ScreenSource, sc ScreenInfo) {
 	top, h := sc.top, sc.height
 	over := 0
-	if c.cursor.Line < top {
-		over = c.cursor.Line - top
-	} else if bottom := top + h - 1; c.cursor.Line > bottom {
-		over = c.cursor.Line - bottom
+	if c.Cursor.Line < top {
+		over = c.Cursor.Line - top
+	} else if bottom := top + h - 1; c.Cursor.Line > bottom {
+		over = c.Cursor.Line - bottom
 	}
-	c.cursor.Line -= over
-	if over == 0 || c.selecting {
+	c.Cursor.Line -= over
+	if over == 0 || c.Selecting {
 		return
 	}
-	x, y, down := c.cursor.Col, c.cursor.Line-top, over > 0
+	x, y, down := c.Cursor.Col, c.Cursor.Line-top, over > 0
 	for i := range max(over, -over) {
 		src.write(func(s AttachStream) error {
 			if i > 0 {
@@ -273,8 +249,8 @@ const wheelTickGap = 40 * time.Millisecond
 
 // scrollToCursor scrolls the view through the holder just enough to show
 // the cursor.
-func (c *copyMode) scrollToCursor(src screenSource, sc screenInfo) {
-	line, top, h := c.cursor.Line, sc.top, sc.height
+func (c *CopyMode) scrollToCursor(src ScreenSource, sc ScreenInfo) {
+	line, top, h := c.Cursor.Line, sc.top, sc.height
 	offset := sc.offset
 	if line < top {
 		offset = sc.base + sc.scrollMax - line
@@ -287,8 +263,8 @@ func (c *copyMode) scrollToCursor(src screenSource, sc screenInfo) {
 }
 
 // selection is the selected range, end exclusive as the holder takes it.
-func (c *copyMode) selection() (start, end holder.LinePos) {
-	start, end = c.anchor, c.cursor
+func (c *CopyMode) selection() (start, end holder.LinePos) {
+	start, end = c.anchor, c.Cursor
 	if end.Line < start.Line || (end.Line == start.Line && end.Col < start.Col) {
 		start, end = end, start
 	}
@@ -302,38 +278,38 @@ func (c *copyMode) selection() (start, end holder.LinePos) {
 
 // copySelection asks the holder for the selected text; its reply goes to
 // the clipboard in updateAttachStream. Without a selection nothing is copied.
-func (c *copyMode) copySelection(src screenSource) {
-	if c.selecting {
+func (c *CopyMode) copySelection(src ScreenSource) {
+	if c.Selecting {
 		start, end := c.selection()
 		src.write(func(s AttachStream) error { return s.Copy(start, end) })
 	}
 }
 
-func (c *copyMode) leave(src screenSource) copyResult {
+func (c *CopyMode) leave(src ScreenSource) CopyResult {
 	src.snapToBottom()
-	return copyResult{Done: true}
+	return CopyResult{Done: true}
 }
 
-// writeCopied puts the holder's copy reply on the clipboard. The reply can
+// WriteCopied puts the holder's copy reply on the clipboard. The reply can
 // land after copy mode has ended, so this is not a copyMode method.
-func writeCopied(clipWrite func(string) error, text string) tea.Cmd {
+func WriteCopied(clipWrite func(string) error, text string) tea.Cmd {
 	if err := clipWrite(text); err != nil {
 		return notify.Error("copy failed: " + err.Error())
 	}
 	return notify.Success("copied")
 }
 
-// copyRows draws the cursor and the selection over the rows in view.
-func (c *copyMode) copyRows(rows []string, sc screenInfo) []string {
+// CopyRows draws the cursor and the selection over the rows in view.
+func (c *CopyMode) CopyRows(rows []string, sc ScreenInfo) []string {
 	top, cols := sc.top, sc.cols
 	var start, end holder.LinePos
-	if c.selecting {
+	if c.Selecting {
 		start, end = c.selection()
 	}
 	out := make([]string, len(rows))
 	for i, row := range rows {
 		line := top + i
-		if c.selecting && line >= start.Line && line <= end.Line {
+		if c.Selecting && line >= start.Line && line <= end.Line {
 			from, to := 0, cols
 			if line == start.Line {
 				from = start.Col
@@ -341,10 +317,10 @@ func (c *copyMode) copyRows(rows []string, sc screenInfo) []string {
 			if line == end.Line {
 				to = min(end.Col, cols)
 			}
-			row = overlayCells(row, from, to, styleCopySelection)
+			row = overlayCells(row, from, to, StyleCopySelection)
 		}
-		if line == c.cursor.Line {
-			row = overlayCells(row, c.cursor.Col, c.cursor.Col+1, styleCopyCursor)
+		if line == c.Cursor.Line {
+			row = overlayCells(row, c.Cursor.Col, c.Cursor.Col+1, styleCopyCursor)
 		}
 		out[i] = row
 	}

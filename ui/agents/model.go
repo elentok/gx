@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -87,12 +88,12 @@ type Model struct {
 	help          help.Model
 	width, height int
 	// term renders the terminal panel (see termView).
-	term terminalView
-	dial attachDialer
+	term terminal.View
+	dial terminal.AttachDialer
 	// attach is nil when no session is on screen.
-	attach *attachment
+	attach *terminal.Attachment
 	// copy is nil outside copy mode.
-	copy      *copyMode
+	copy      *terminal.CopyMode
 	clipWrite func(string) error
 	now       func() time.Time
 	// opened: the opening focus was picked, on the first snapshot.
@@ -119,13 +120,13 @@ type Model struct {
 func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, term: terminalView{mainMemo: &ui.Memo{}}, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]formProject, error) { return listFormProjects(settings.TicketStore) },
+	m := Model{client: client, sessionAPI: sessions, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]formProject, error) { return listFormProjects(settings.TicketStore) },
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{sessions: sessions}
 	}
 	if data, err := settings.Dirs.DataDir(); err == nil {
-		m.term.sessionsDir = filepath.Join(data, "sessions")
+		m.term.SessionsDir = filepath.Join(data, "sessions")
 	}
 	m.groupsPath = groupsFile(settings.Dirs)
 	m.showQueue, m.showDesign = loadGroups(m.groupsPath)
@@ -184,7 +185,7 @@ func (m Model) OnPageActivated() tea.Cmd {
 // OnPageDeactivated detaches, since only the session on screen is attached,
 // and tells the server no session is on screen. The next activation redials.
 func (m Model) OnPageDeactivated() tea.Cmd {
-	m.attach.close()
+	m.attach.Close()
 	r := m.focusReport()
 	r.Session = ""
 	m.reporter.report(r)
@@ -199,7 +200,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	nm.refreshHover()
 	nm.reportFocus()
 	if nm.terminalFocused {
-		nm.attach.syncSize(nm.termView().screenSize())
+		nm.attach.SyncSize(nm.termView().ScreenSize())
 	}
 	return nm, cmd
 }
@@ -225,30 +226,30 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.help, _ = m.help.Update(msg)
 		return m.startSpinner()
-	case lastScreenMsg:
-		if msg.id == m.selectedID() {
-			m.term.lastScreen = lastScreen(msg)
+	case terminal.LastScreenMsg:
+		if msg.ID == m.selectedID() {
+			m.term.LastScreen = terminal.LastScreen(msg)
 		}
 		return m, nil
 	case afkMsg:
 		return m.updateAFK(msg)
-	case attachedMsg:
-		return m, m.attach.updateAttached(msg)
-	case attachRetryMsg:
-		if !m.attach.current(msg.a) {
+	case terminal.AttachedMsg:
+		return m, m.attach.UpdateAttached(msg)
+	case terminal.AttachRetryMsg:
+		if !m.attach.Current(msg.A) {
 			return m, nil
 		}
-		return m.dialAttach(msg.a.attempt + 1)
-	case attachStreamMsg:
-		res, cmd := m.attach.updateStream(msg)
+		return m.dialAttach(msg.A.Attempt + 1)
+	case terminal.AttachStreamMsg:
+		res, cmd := m.attach.UpdateStream(msg)
 		if res.Exited {
 			m.terminalFocused = false
 			// Shown until the server reports the exit and the saved last screen loads.
-			m.term.lastScreen = lastScreen{id: m.attach.id, rows: m.attach.rows}
+			m.term.LastScreen = terminal.LastScreen{ID: m.attach.ID, Rows: m.attach.Rows}
 			m.copy = nil
 		}
 		if res.Copied != nil {
-			cmd = tea.Batch(writeCopied(m.clipWrite, *res.Copied), cmd)
+			cmd = tea.Batch(terminal.WriteCopied(m.clipWrite, *res.Copied), cmd)
 		}
 		return m, cmd
 	case formProjectsMsg:
@@ -271,7 +272,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.refresh()
 	case tea.PasteMsg:
 		if m.terminalFocused && m.copy == nil {
-			return m, m.attach.sendPaste(msg.Content)
+			return m, m.attach.SendPaste(msg.Content)
 		}
 		return m, nil
 	case spinner.TickMsg:
@@ -289,19 +290,19 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateKey(msg)
 	case tea.MouseWheelMsg:
 		v := m.termView()
-		if dir, ok := ui.WheelDirection(msg); ok && v.overPanel(msg.Mouse()) {
-			x, y, inCell := v.screenCell(msg.Mouse())
-			m.attach.wheel(dir, x, y, inCell)
+		if dir, ok := ui.WheelDirection(msg); ok && v.OverPanel(msg.Mouse()) {
+			x, y, inCell := v.ScreenCell(msg.Mouse())
+			m.attach.Wheel(dir, x, y, inCell)
 		}
 		return m, nil
 	case tea.MouseClickMsg:
 		return m.updateClick(msg)
 	case tea.MouseReleaseMsg:
-		m.attach.forwardMove(msg.Mouse(), screen.MouseRelease, m.termView().clampedCell)
+		m.attach.ForwardMove(msg.Mouse(), screen.MouseRelease, m.termView().ClampedCell)
 		return m, nil
 	case tea.MouseMotionMsg:
 		m.hoverAt = msg.Mouse()
-		m.attach.forwardMove(msg.Mouse(), screen.MouseDrag, m.termView().clampedCell)
+		m.attach.ForwardMove(msg.Mouse(), screen.MouseDrag, m.termView().ClampedCell)
 		return m, nil
 	}
 	return m, nil
@@ -363,7 +364,7 @@ func (m Model) selectAndFocus(i int) (tea.Model, tea.Cmd) {
 func (m *Model) focusTerminal() {
 	if m.attachTarget() != "" {
 		m.terminalFocused = true
-		m.attach.resize(m.termView().screenSize())
+		m.attach.Resize(m.termView().ScreenSize())
 	}
 }
 
@@ -372,7 +373,7 @@ func (m *Model) focusTerminal() {
 func (m Model) refresh() (tea.Model, tea.Cmd) {
 	m, attach := m.syncAttach()
 	next, spin := m.startSpinner()
-	return next, tea.Batch(spin, attach, next.(Model).termView().loadLastScreen())
+	return next, tea.Batch(spin, attach, next.(Model).termView().LoadLastScreen())
 }
 
 // startSpinner starts the Working spinner's tick chain when a Working session
@@ -439,25 +440,27 @@ func (m Model) View() tea.View {
 	// and the mode drops the motion it did not ask for.
 	v := ui.NewMainView(m.render())
 	v.MouseMode = tea.MouseModeAllMotion
-	v.Cursor = m.termView().terminalCursor()
+	v.Cursor = m.termView().TerminalCursor()
 	return v
 }
 
 // termView is the terminal panel's view over the tab's current state.
-func (m Model) termView() terminalView {
-	v := m.term
-	v.in = termInput{
-		settings: m.settings, spinner: m.spinner.View(), afk: m.afk, now: m.now,
-		width: m.width, height: m.height, mainWidth: m.mainWidth(),
-		sessions: m.sessions, cursor: m.cursor, attach: m.attach, copy: m.copy,
-		focused: m.terminalFocused, covered: m.ModalOpen() || m.leaderPending, selected: m.selectedID(),
+func (m Model) termView() terminal.View {
+	in := terminal.Input{
+		Settings: m.settings, Spinner: m.spinner.View(), AFK: m.afk, Now: m.now,
+		Width: m.width, Height: m.height, MainWidth: m.mainWidth(),
+		Sessions: m.sessions, Cursor: m.cursor, Attach: m.attach, Copy: m.copy,
+		Focused: m.terminalFocused, Covered: m.ModalOpen() || m.leaderPending, Selected: m.selectedID(),
+		DisplayName: displayName,
 	}
+	v := m.term.WithInput(in)
 	if m.copy != nil {
 		c, a := m.copy, m.attach
-		v.in.copyRows = func(rows []string) []string {
-			cols, h := v.screenSize()
-			return c.copyRows(rows, attachScreen{attachment: a, cols: cols, rows: h}.screen())
+		in.CopyRows = func(rows []string) []string {
+			cols, h := v.ScreenSize()
+			return c.CopyRows(rows, terminal.NewAttachScreen(a, cols, h).Screen())
 		}
+		v = m.term.WithInput(in)
 	}
 	return v
 }
@@ -512,13 +515,13 @@ func (m Model) renderMain(width int, lines []string) string {
 	active := m.terminalFocused || !m.sidebarShown()
 	if lines != nil || m.selectedID() == "" {
 		opts := ui.PanelOptionsFor(width, m.height, "agents", "", lines, active, ui.ColorText, ui.ColorOrange, false)
-		return m.term.mainMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
+		return m.term.MainMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
 	}
 	s, v := m.sessions[m.cursor], m.termView()
 	titleColor, headerBg := headerColors(active)
-	title := ui.RenderRowWithBackground(v.terminalTitle(s, lipgloss.NewStyle().Foreground(titleColor).Bold(active)), headerBg)
-	opts := ui.PanelOptionsFor(width, m.height, title, v.terminalRightTitle(s, width-2), v.terminalLines(s), active, titleColor, titleColor, false)
-	return m.term.mainMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
+	title := ui.RenderRowWithBackground(v.TerminalTitle(s, lipgloss.NewStyle().Foreground(titleColor).Bold(active)), headerBg)
+	opts := ui.PanelOptionsFor(width, m.height, title, v.TerminalRightTitle(s, width-2), v.TerminalLines(s), active, titleColor, titleColor, false)
+	return m.term.MainMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
 }
 
 func (m Model) lines() []string {
