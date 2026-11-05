@@ -78,9 +78,9 @@ func TestBuildStatusEntries_CompressesSingleChildDirectoryChains(t *testing.T) {
 }
 
 func TestVisibleStatusLines_UsesStatusSpecificLabelAndMeta(t *testing.T) {
-	m := Model{settings: ui.Settings{}, focus: focusFiletree, fileTreeModel: tree.NewModel[stage.StageFileStatus]()}
+	m := Model{settings: ui.Settings{}, focus: focusFiletree, filetree: filetreePane{model: tree.NewModel[stage.StageFileStatus]()}}
 	file := stage.StageFileStatus{Path: "new.go", RenameFrom: "old.go", IndexStatus: 'R', WorktreeCode: ' '}
-	m.fileTreeModel.SetEntries([]tree.Entry[stage.StageFileStatus]{
+	m.filetree.model.SetEntries([]tree.Entry[stage.StageFileStatus]{
 		{DisplayName: "new.go", Value: file},
 	})
 

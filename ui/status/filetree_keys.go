@@ -4,7 +4,6 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
-	"github.com/elentok/gx/ui/tree"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -29,48 +28,35 @@ func (m Model) delegateToChild(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) delegateToFiletree(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	m.reconcileFileTreeFromStatusState()
-	updatedFileTree, childCmd, result := m.fileTreeModel.Update(msg)
-	selectionChanged := updatedFileTree.SelectedIndex() != m.fileTreeModel.SelectedIndex()
-	m.fileTreeModel = updatedFileTree
+	var childCmd tea.Cmd
+	var result FiletreeResult
+	m.filetree, childCmd, result = m.filetree.Update(msg)
 
-	if !result.Handled {
-		match, consumed := m.fileTreeModel.Keys().Process(msg)
-		if consumed && match == nil {
-			return m, nil // chord in progress
+	switch {
+	case result.Back:
+		if m.settings.EnableNavigation {
+			return m, nav.Back()
 		}
-		if match != nil {
-			switch match.ID {
-			case tree.BindingBack:
-				if m.settings.EnableNavigation {
-					return m, nav.Back()
-				}
-			case tree.BindingPageDown:
-				if m.scrollFiletreePage(1) {
-					return m, m.scheduleDiffReload()
-				}
-			case tree.BindingPageUp:
-				if m.scrollFiletreePage(-1) {
-					return m, m.scheduleDiffReload()
-				}
-			case bindingToggleStage:
-				return m, m.toggleStageStatusEntry()
-			case bindingDiscard:
-				m.openDiscardStatusConfirm()
-			}
-		}
+		return m, nil
+	case result.PageMoved:
+		return m, m.scheduleDiffReload()
+	case result.ToggleStage:
+		return m, m.toggleStageStatusEntry()
+	case result.Discard:
+		m.openDiscardStatusConfirm()
 		return m, nil
 	}
 
 	var actionCmd tea.Cmd
-	if result.RebuildRequested {
-		m, actionCmd = m.handleFileTreeRebuildRequested()
+	if result.Rebuilt {
+		actionCmd = m.reloadDiffsForSelection()
 	}
 	if result.OpenSelected {
-		m, actionCmd = m.handleFileTreeOpenSelected()
+		actionCmd = m.openSelectedFile()
 	}
+	selectionChanged := result.SelectionChanged
 	if selectionChanged {
-		m.statusData.listState.SetSelected(m.fileTreeModel.SelectedIndex(), len(m.statusData.statusEntries))
+		m.filetree.syncListSelection()
 		m.onFiletreeSelectionChanged()
 	}
 	if childCmd != nil {

@@ -61,12 +61,12 @@ func TestGInFiletreeAndDiffJumpsBottom(t *testing.T) {
 	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
+	m.filetree.data.listState.SetSelected(0, len(m.filetree.data.statusEntries))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = updated.(Model)
-	if m.statusData.listState.Selected() != len(m.statusData.statusEntries)-1 {
-		t.Fatalf("expected G to jump filetree selection to bottom, got %d", m.statusData.listState.Selected())
+	if m.filetree.data.listState.Selected() != len(m.filetree.data.statusEntries)-1 {
+		t.Fatalf("expected G to jump filetree selection to bottom, got %d", m.filetree.data.listState.Selected())
 	}
 
 	m.focus = focusDiff
@@ -93,12 +93,12 @@ func TestUppercaseGUsingShiftedCodeJumpsBottom(t *testing.T) {
 	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
+	m.filetree.data.listState.SetSelected(0, len(m.filetree.data.statusEntries))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "G", ShiftedCode: 'G'})
 	m = updated.(Model)
-	if m.statusData.listState.Selected() != len(m.statusData.statusEntries)-1 {
-		t.Fatalf("expected shifted G to jump to bottom, got %d", m.statusData.listState.Selected())
+	if m.filetree.data.listState.Selected() != len(m.filetree.data.statusEntries)-1 {
+		t.Fatalf("expected shifted G to jump to bottom, got %d", m.filetree.data.listState.Selected())
 	}
 }
 
@@ -111,12 +111,12 @@ func TestUppercaseGUsingShiftModifierJumpsBottom(t *testing.T) {
 	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.statusData.listState.SetSelected(0, len(m.statusData.statusEntries))
+	m.filetree.data.listState.SetSelected(0, len(m.filetree.data.statusEntries))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g", Mod: tea.ModShift})
 	m = updated.(Model)
-	if m.statusData.listState.Selected() != len(m.statusData.statusEntries)-1 {
-		t.Fatalf("expected shifted modifier G to jump to bottom, got %d", m.statusData.listState.Selected())
+	if m.filetree.data.listState.Selected() != len(m.filetree.data.statusEntries)-1 {
+		t.Fatalf("expected shifted modifier G to jump to bottom, got %d", m.filetree.data.listState.Selected())
 	}
 }
 
@@ -132,18 +132,18 @@ func TestCtrlDAndCtrlUScrollFiletreeAndDiff(t *testing.T) {
 	m.width = 120
 	m.height = 24
 	m.focus = focusFiletree
-	beforeSel := m.statusData.listState.Selected()
+	beforeSel := m.filetree.data.listState.Selected()
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.statusData.listState.Selected() <= beforeSel {
+	if m.filetree.data.listState.Selected() <= beforeSel {
 		t.Fatalf("expected ctrl+d to move filetree selection down")
 	}
 
-	midSel := m.statusData.listState.Selected()
+	midSel := m.filetree.data.listState.Selected()
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = updated.(Model)
-	if m.statusData.listState.Selected() >= midSel {
+	if m.filetree.data.listState.Selected() >= midSel {
 		t.Fatalf("expected ctrl+u to move filetree selection up")
 	}
 
@@ -262,8 +262,8 @@ func TestGGJumpsToTop(t *testing.T) {
 	m := newTestModelDefault(repo)
 	m.ready = true
 	m.focus = focusFiletree
-	m.statusData.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
-	m.statusData.listState.SetSelected(2, len(m.statusData.statusEntries))
+	m.filetree.data.statusEntries = []statusEntry{{Kind: statusEntryFile}, {Kind: statusEntryFile}, {Kind: statusEntryFile}}
+	m.filetree.data.listState.SetSelected(2, len(m.filetree.data.statusEntries))
 
 	// First g sets chord prefix
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
@@ -278,8 +278,8 @@ func TestGGJumpsToTop(t *testing.T) {
 		t.Fatalf("gg should schedule a diff reload after jumping to top")
 	}
 	m = updated.(Model)
-	if m.statusData.listState.Selected() != 0 {
-		t.Fatalf("expected gg to jump to top, got selected=%d", m.statusData.listState.Selected())
+	if m.filetree.data.listState.Selected() != 0 {
+		t.Fatalf("expected gg to jump to top, got selected=%d", m.filetree.data.listState.Selected())
 	}
 }
 

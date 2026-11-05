@@ -8,7 +8,7 @@ import (
 )
 
 func (m Model) searchCounterForFiletreePane() string {
-	search := m.fileTreeModel.Search()
+	search := m.filetree.model.Search()
 	if m.focus != focusFiletree || !search.HasQuery() || search.MatchesCount() == 0 {
 		return ""
 	}

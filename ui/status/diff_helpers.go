@@ -33,7 +33,7 @@ func (m Model) sectionHasContent(section diffarea.Section) bool {
 }
 
 func (m Model) selectedStatusFile() (statusDiffFileSelection, bool) {
-	file, ok := m.selectedFile()
+	file, ok := m.filetree.selectedFile()
 	if !ok {
 		return statusDiffFileSelection{}, false
 	}

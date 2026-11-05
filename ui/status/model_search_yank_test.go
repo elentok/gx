@@ -217,20 +217,20 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = updated.(Model)
-	if m.fileTreeModel.Search().Mode() != search.SearchModeInput {
+	if m.filetree.model.Search().Mode() != search.SearchModeInput {
 		t.Fatalf("expected search input mode after /")
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'p', Text: "p"})
-	if m.fileTreeModel.Search().MatchesCount() < 2 {
-		t.Fatalf("expected multiple filetree search matches, got %d", m.fileTreeModel.Search().MatchesCount())
+	if m.filetree.model.Search().MatchesCount() < 2 {
+		t.Fatalf("expected multiple filetree search matches, got %d", m.filetree.model.Search().MatchesCount())
 	}
 
-	first := m.statusData.listState.Selected()
+	first := m.filetree.data.listState.Selected()
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	if m.fileTreeModel.Search().Mode() != search.SearchModeResults || !m.fileTreeModel.Search().HasQuery() || m.fileTreeModel.Search().MatchesCount() == 0 {
+	if m.filetree.model.Search().Mode() != search.SearchModeResults || !m.filetree.model.Search().HasQuery() || m.filetree.model.Search().MatchesCount() == 0 {
 		t.Fatalf("expected enter to show search results mode while keeping highlights")
 	}
 	if pane := ansi.Strip(m.renderFiletreePane(40, 10)); !strings.Contains(pane, "1/2") {
@@ -238,7 +238,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 	}
 
 	m = runStatusCmds(t, m, tea.KeyPressMsg{Code: 'n', Text: "n"})
-	if m.statusData.listState.Selected() == first {
+	if m.filetree.data.listState.Selected() == first {
 		t.Fatalf("expected n to move to next search result")
 	}
 
@@ -246,7 +246,7 @@ func TestStageSearchFiletreeModeAndNavigation(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = updated.(Model)
-	if m.fileTreeModel.Search().Mode() != search.SearchModeNone || m.fileTreeModel.Search().HasQuery() || m.fileTreeModel.Search().MatchesCount() != 0 {
+	if m.filetree.model.Search().Mode() != search.SearchModeNone || m.filetree.model.Search().HasQuery() || m.filetree.model.Search().MatchesCount() != 0 {
 		t.Fatalf("expected esc to clear active search state")
 	}
 }

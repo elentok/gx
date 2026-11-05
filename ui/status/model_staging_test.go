@@ -90,8 +90,8 @@ func TestFiletreeDDiscardsUntrackedFileAfterConfirm(t *testing.T) {
 	if _, err := os.Stat(repo + "/new.txt"); err == nil {
 		t.Fatalf("expected untracked file to be deleted after discard confirm")
 	}
-	if len(m.statusData.statusEntries) != 0 {
-		t.Fatalf("expected no status entries after discard, got %d", len(m.statusData.statusEntries))
+	if len(m.filetree.data.statusEntries) != 0 {
+		t.Fatalf("expected no status entries after discard, got %d", len(m.filetree.data.statusEntries))
 	}
 }
 
@@ -109,7 +109,7 @@ func TestFiletreeDDiscardsDirectoryAfterConfirm(t *testing.T) {
 	m.ready = true
 	m.focus = focusFiletree
 
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "dir" {
 		t.Fatalf("expected selected directory entry, got %+v ok=%v", entry, ok)
 	}
@@ -133,8 +133,8 @@ func TestFiletreeDDiscardsDirectoryAfterConfirm(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, "dir/new.txt")); err == nil {
 		t.Fatalf("expected untracked file inside directory to be deleted after discard confirm")
 	}
-	if len(m.statusData.statusEntries) != 0 {
-		t.Fatalf("expected no status entries after directory discard, got %d", len(m.statusData.statusEntries))
+	if len(m.filetree.data.statusEntries) != 0 {
+		t.Fatalf("expected no status entries after directory discard, got %d", len(m.filetree.data.statusEntries))
 	}
 }
 
@@ -547,7 +547,7 @@ func TestDiffDotMovesToNextFile(t *testing.T) {
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
 
-	before, ok := m.selectedFile()
+	before, ok := m.filetree.selectedFile()
 	if !ok {
 		t.Fatalf("expected selected file before navigation")
 	}
@@ -555,7 +555,7 @@ func TestDiffDotMovesToNextFile(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '.', Text: "."})
 	m = updated.(Model)
 
-	after, ok := m.selectedFile()
+	after, ok := m.filetree.selectedFile()
 	if !ok {
 		t.Fatalf("expected selected file after navigation")
 	}
@@ -578,7 +578,7 @@ func TestDiffCommaMovesToPreviousFile(t *testing.T) {
 	m.focus = focusDiff
 	m.diffarea.ActiveSection = diffarea.SectionUnstaged
 
-	first, ok := m.selectedFile()
+	first, ok := m.filetree.selectedFile()
 	if !ok {
 		t.Fatalf("expected selected file")
 	}
@@ -589,7 +589,7 @@ func TestDiffCommaMovesToPreviousFile(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: ',', Text: ","})
 	m = updated.(Model)
 
-	back, ok := m.selectedFile()
+	back, ok := m.filetree.selectedFile()
 	if !ok {
 		t.Fatalf("expected selected file after ','")
 	}

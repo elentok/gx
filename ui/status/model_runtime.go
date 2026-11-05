@@ -41,7 +41,7 @@ func cmdLazygitLog(worktreeRoot string) tea.Cmd {
 }
 
 func (m *Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
-	file, ok := m.selectedFile()
+	file, ok := m.filetree.selectedFile()
 	if !ok {
 		return notify.Warning("no file selected")
 	}
@@ -118,7 +118,7 @@ func (m *Model) refreshPreserveScroll() tea.Cmd {
 
 func (m *Model) refreshWithBehavior(preserveScroll bool) tea.Cmd {
 	preserve := ""
-	if entry, ok := m.selectedFiletreeEntry(); ok {
+	if entry, ok := m.filetree.selectedEntry(); ok {
 		preserve = entry.Path
 	}
 	unstagedOffset := m.diffarea.Unstaged.Viewport().YOffset()

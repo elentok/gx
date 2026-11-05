@@ -37,8 +37,8 @@ func TestFiletreeLOnFileEntersDiffAndKeepsSectionOnFileChange(t *testing.T) {
 	m.focus = focusFiletree
 	m.diffarea.ActiveSection = diffarea.SectionStaged
 
-	if len(m.statusData.statusEntries) < 2 {
-		t.Fatalf("expected two status entries, got %d", len(m.statusData.statusEntries))
+	if len(m.filetree.data.statusEntries) < 2 {
+		t.Fatalf("expected two status entries, got %d", len(m.filetree.data.statusEntries))
 	}
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
@@ -79,9 +79,9 @@ func TestReloadDiffsForSelection_KeepsSectionForUntrackedFile(t *testing.T) {
 	m.diffarea.ActiveSection = diffarea.SectionStaged
 
 	found := false
-	for i, entry := range m.statusData.statusEntries {
+	for i, entry := range m.filetree.data.statusEntries {
 		if entry.Path == "untracked.txt" {
-			m.setStatusSelection(i)
+			m.filetree.setSelection(i)
 			found = true
 			break
 		}
@@ -162,7 +162,7 @@ func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
 	m.focus = focusFiletree
 
 	fileIdx := -1
-	for i, entry := range m.statusData.statusEntries {
+	for i, entry := range m.filetree.data.statusEntries {
 		if entry.Kind == statusEntryFile && entry.Path == "ui/status/model.go" {
 			fileIdx = i
 			break
@@ -171,7 +171,7 @@ func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
 	if fileIdx < 0 {
 		t.Fatalf("expected ui/status/model.go entry in status tree")
 	}
-	m.statusData.listState.SetSelected(fileIdx, len(m.statusData.statusEntries))
+	m.filetree.data.listState.SetSelected(fileIdx, len(m.filetree.data.statusEntries))
 
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
@@ -179,7 +179,7 @@ func TestFiletreeHOnFileMovesSelectionToParentDir(t *testing.T) {
 	if m.focus != focusFiletree {
 		t.Fatalf("expected h to keep filetree focus")
 	}
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "ui/status" {
 		t.Fatalf("expected selection to move to parent dir, got %+v", entry)
 	}
@@ -195,7 +195,7 @@ func TestFiletreeLeftDoesNotMoveCompressedDirSelection(t *testing.T) {
 	m.ready = true
 	m.focus = focusFiletree
 
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "keyboards/iris/keymaps" {
 		t.Fatalf("expected compressed dir selected by default, got %+v", entry)
 	}
@@ -205,7 +205,7 @@ func TestFiletreeLeftDoesNotMoveCompressedDirSelection(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("expected left in filetree to be a no-op")
 	}
-	entry, ok = m.selectedFiletreeEntry()
+	entry, ok = m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "keyboards/iris/keymaps" {
 		t.Fatalf("expected selection to stay on compressed dir, got %+v", entry)
 	}
@@ -217,7 +217,7 @@ func TestFiletreeHOnSelectedDirCollapsesDirectory(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" {
 		t.Fatalf("expected docs dir selected after h, got %+v", entry)
 	}
@@ -232,7 +232,7 @@ func TestFiletreeEnterOnSelectedDirCollapsesDirectory(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" {
 		t.Fatalf("expected docs dir selected after enter, got %+v", entry)
 	}
@@ -247,14 +247,14 @@ func TestFiletreeRightOnSelectedDirExpandsDirectory(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" || entry.Expanded {
 		t.Fatalf("expected docs dir collapsed before expand test, got %+v", entry)
 	}
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m = updated.(Model)
-	entry, ok = m.selectedFiletreeEntry()
+	entry, ok = m.filetree.selectedEntry()
 	if !ok || entry.Kind != statusEntryDir || entry.Path != "docs" {
 		t.Fatalf("expected docs dir selected after l, got %+v", entry)
 	}
@@ -270,9 +270,9 @@ func TestFiletreePaneShowsBranchSummaryInTitle(t *testing.T) {
 	m.ready = true
 	m.width = 100
 	m.height = 20
-	m.statusData.branchName = "feature/test"
-	m.statusData.branchBaseRef = "origin/main"
-	m.statusData.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
+	m.filetree.data.branchName = "feature/test"
+	m.filetree.data.branchBaseRef = "origin/main"
+	m.filetree.data.branchSync = git.SyncStatus{Name: git.StatusAhead, Ahead: 2}
 
 	pane := ansi.Strip(m.renderFiletreePane(72, 10))
 	if !strings.Contains(pane, "Changes in") {
@@ -327,7 +327,7 @@ func TestNewWithInitialPathSelectsFileAndKeepsFiletreeFocus(t *testing.T) {
 		UseNerdFontIcons: true,
 	}, "dir/b.txt")
 
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok {
 		t.Fatal("expected selected entry")
 	}
@@ -346,13 +346,13 @@ func TestBranchSummaryTitleOmitsBaseRef(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		settings: ui.Settings{UseNerdFontIcons: true},
-		statusData: statusData{
+		filetree: filetreePane{data: statusData{
 			branchName:    "feature/x",
 			branchBaseRef: "origin/release",
 			branchSync:    git.SyncStatus{Name: git.StatusBehind, Behind: 1},
-		},
+		}},
 	}
-	line := m.branchSummaryTitleSuffix(math.MaxInt32)
+	line := m.filetree.branchSummaryTitleSuffix(math.MaxInt32, m.settings.UseNerdFontIcons)
 	if !strings.Contains(line, " feature/x ↓1") {
 		t.Fatalf("unexpected title suffix: %q", line)
 	}
@@ -364,12 +364,12 @@ func TestBranchSummaryTitleOmitsBaseRef(t *testing.T) {
 func TestBranchSummaryTitleTruncatesLongBranchNameWithEllipsis(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		statusData: statusData{
+		filetree: filetreePane{data: statusData{
 			branchName: "feature/some-extremely-verbose-branch-name-that-keeps-going",
 			branchSync: git.SyncStatus{Name: git.StatusBehind, Behind: 1},
-		},
+		}},
 	}
-	line := m.branchSummaryTitleSuffix(30)
+	line := m.filetree.branchSummaryTitleSuffix(30, m.settings.UseNerdFontIcons)
 	if !strings.Contains(line, "…") {
 		t.Fatalf("expected truncated branch name to use ellipsis, got %q", line)
 	}
@@ -390,22 +390,22 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 	testutil.CommitAll(t, wtDir, "ahead")
 
 	m := newTestModelDefault(wtDir)
-	m.reloadBranchState()
+	m.filetree.reloadBranchState(m.worktreeRoot)
 
-	if m.statusData.branchName != "feature" {
-		t.Fatalf("expected current branch feature, got %q", m.statusData.branchName)
+	if m.filetree.data.branchName != "feature" {
+		t.Fatalf("expected current branch feature, got %q", m.filetree.data.branchName)
 	}
-	if m.statusData.branchBaseRef != "origin/feature" {
-		t.Fatalf("expected upstream base ref origin/feature, got %q", m.statusData.branchBaseRef)
+	if m.filetree.data.branchBaseRef != "origin/feature" {
+		t.Fatalf("expected upstream base ref origin/feature, got %q", m.filetree.data.branchBaseRef)
 	}
 
 	// Branch sync is now async; run the cmd synchronously to get the result.
-	if cmd := m.cmdLoadBranchSync(); cmd != nil {
+	if cmd := m.filetree.cmdLoadBranchSync(m.worktreeRoot); cmd != nil {
 		updated, _ := m.Update(cmd())
 		m = updated.(Model)
 	}
-	if m.statusData.branchSync.Name != git.StatusAhead || m.statusData.branchSync.Ahead != 1 {
-		t.Fatalf("expected branch sync ahead of origin/feature, got %+v", m.statusData.branchSync)
+	if m.filetree.data.branchSync.Name != git.StatusAhead || m.filetree.data.branchSync.Ahead != 1 {
+		t.Fatalf("expected branch sync ahead of origin/feature, got %+v", m.filetree.data.branchSync)
 	}
 }
 

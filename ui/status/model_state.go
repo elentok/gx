@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/imagediff"
 	"github.com/elentok/gx/ui/keys"
-	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/status/diffarea"
 	"github.com/elentok/gx/ui/status/stagemodal"
 	"github.com/elentok/gx/ui/tree"
@@ -30,8 +29,7 @@ type Model struct {
 	focus            focusPane
 	diffarea         diffarea.Model
 	diffContextLines int
-	statusData       statusData
-	fileTreeModel    tree.Model[stage.StageFileStatus]
+	filetree         filetreePane
 
 	err            error
 	help           help.Model
@@ -45,16 +43,6 @@ type Model struct {
 
 	overlay             imagediff.Overlay
 	fetchImageDiffBlobs func(file stage.StageFileStatus, cached bool) (old, new []byte, oldOK, newOK bool)
-}
-
-type statusData struct {
-	files         []stage.StageFileStatus
-	branchName    string
-	branchBaseRef string
-	branchSync    git.SyncStatus
-	statusEntries []statusEntry
-	statusRows    []tree.Entry[stage.StageFileStatus]
-	listState     list.Model
 }
 
 func DefaultSettings() ui.Settings {
@@ -108,8 +96,7 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 		keys:             statusKeys,
 		focus:            focusFiletree,
 		diffarea:         diffarreaModel,
-		statusData:       statusData{},
-		fileTreeModel:    fileTreeModel,
+		filetree:         filetreePane{model: fileTreeModel},
 		git:              gitops.New(),
 
 		overlay: imagediff.NewOverlay(imagediff.WriteToStdout, imagediff.DefaultDetectCapability),

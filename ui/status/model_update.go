@@ -22,7 +22,7 @@ func (m Model) Init() tea.Cmd {
 	if m.settings.EnableNavigation {
 		return tea.Batch(heartbeatCmd, statusStartupLoadCmd())
 	}
-	return tea.Batch(heartbeatCmd, m.cmdLoadBranchSync())
+	return tea.Batch(heartbeatCmd, m.filetree.cmdLoadBranchSync(m.worktreeRoot))
 }
 
 func renderTickCmd() tea.Cmd {
@@ -118,23 +118,17 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleFileTreeRebuildRequested() (Model, tea.Cmd) {
-	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedIDs())
-	m.reconcileFileTreeFromStatusState()
-	return m, m.reloadDiffsForSelection()
-}
-
-func (m Model) handleFileTreeOpenSelected() (Model, tea.Cmd) {
-	entry, ok := m.selectedFiletreeEntry()
+func (m *Model) openSelectedFile() tea.Cmd {
+	entry, ok := m.filetree.selectedEntry()
 	if ok && entry.Kind == statusEntryFile {
-		return m, m.enterDiffFromStatus(false)
+		return m.enterDiffFromStatus(false)
 	}
-	return m, nil
+	return nil
 }
 
 func (m Model) handleSearchQueryUpdated(msg search.SearchQueryUpdatedMsg) (Model, tea.Cmd) {
 	matches := m.computeSearchMatches(msg.Query)
-	return m, m.fileTreeModel.SetSearchMatchesAndJump(matches)
+	return m, m.filetree.model.SetSearchMatchesAndJump(matches)
 }
 
 func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
@@ -154,9 +148,9 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleStartupLoad() (Model, tea.Cmd) {
-	m.reloadBranchState()
+	m.filetree.reloadBranchState(m.worktreeRoot)
 	reloadCmd := m.reloadDiffsForSelection()
-	return m, tea.Batch(reloadCmd, m.cmdLoadBranchSync())
+	return m, tea.Batch(reloadCmd, m.filetree.cmdLoadBranchSync(m.worktreeRoot))
 }
 
 func (m Model) handleActionPoll() (Model, tea.Cmd) {
@@ -183,9 +177,7 @@ func (m Model) handleDiffReload(msg diffReloadMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleBranchSyncLoaded(msg branchSyncLoadedMsg) (Model, tea.Cmd) {
-	if msg.branchName == m.statusData.branchName {
-		m.statusData.branchSync = msg.sync
-	}
+	m.filetree.applyBranchSync(msg.branchName, msg.sync)
 	return m, nil
 }
 

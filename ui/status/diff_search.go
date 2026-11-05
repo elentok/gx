@@ -16,7 +16,7 @@ func (m Model) InputFocused() bool {
 
 func (m Model) searchInputFocused() bool {
 	if m.focus == focusFiletree {
-		return m.fileTreeModel.Search().InputFocused()
+		return m.filetree.model.Search().InputFocused()
 	}
 	return m.diffarea.ActiveSectionModel().Search().InputFocused()
 }
@@ -32,7 +32,7 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 		return []search.Match{}
 	}
 	var matches []search.Match
-	for i, entry := range m.fileTreeModel.Entries() {
+	for i, entry := range m.filetree.model.Entries() {
 		text := strings.ToLower(m.filetreeEntrySearchText(entry))
 		if strings.Contains(text, q) {
 			matches = append(matches, search.Match{DataIndex: i})
@@ -44,8 +44,8 @@ func (m *Model) computeSearchMatches(query string) []search.Match {
 func (m Model) handleJumpToMatch(msg search.JumpToMatchMsg) (Model, tea.Cmd) {
 	match := msg.Match
 	if m.focus == focusFiletree {
-		if match.DataIndex >= 0 && match.DataIndex < len(m.fileTreeModel.Entries()) {
-			m.setStatusSelection(match.DataIndex)
+		if match.DataIndex >= 0 && match.DataIndex < len(m.filetree.model.Entries()) {
+			m.filetree.setSelection(match.DataIndex)
 			m.onFiletreeSelectionChanged()
 			return m, m.scheduleDiffReload()
 		}

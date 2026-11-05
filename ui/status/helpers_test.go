@@ -29,7 +29,7 @@ func statusModelWithDir(t *testing.T) Model {
 	m.ready = true
 	m.focus = focusFiletree
 	dirIdx := -1
-	for i, entry := range m.statusData.statusEntries {
+	for i, entry := range m.filetree.data.statusEntries {
 		if entry.Kind == statusEntryDir && entry.Path == "docs" {
 			dirIdx = i
 			break
@@ -38,8 +38,8 @@ func statusModelWithDir(t *testing.T) Model {
 	if dirIdx < 0 {
 		t.Fatalf("precondition: expected docs dir in status tree")
 	}
-	m.setStatusSelection(dirIdx)
-	entry, ok := m.selectedFiletreeEntry()
+	m.filetree.setSelection(dirIdx)
+	entry, ok := m.filetree.selectedEntry()
 	if !ok || !entry.Expanded {
 		t.Fatalf("precondition: expected docs dir to be expanded")
 	}

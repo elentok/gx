@@ -40,22 +40,24 @@ func TestSplitWidthExpandsForLongVisibleFiletreeRows(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		width: 180,
-		statusData: statusData{
-			statusEntries: []statusEntry{{
-				Kind:        statusEntryFile,
-				DisplayName: "renamed.go",
-				File: stage.StageFileStatus{
-					Path:         "new/renamed.go",
-					RenameFrom:   "old/name.go",
-					IndexStatus:  'R',
-					WorktreeCode: ' ',
-				},
-				HasStaged: true,
-			}},
+		filetree: filetreePane{
+			data: statusData{
+				statusEntries: []statusEntry{{
+					Kind:        statusEntryFile,
+					DisplayName: "renamed.go",
+					File: stage.StageFileStatus{
+						Path:         "new/renamed.go",
+						RenameFrom:   "old/name.go",
+						IndexStatus:  'R',
+						WorktreeCode: ' ',
+					},
+					HasStaged: true,
+				}},
+			},
+			model: tree.NewModel[stage.StageFileStatus](),
 		},
-		fileTreeModel: tree.NewModel[stage.StageFileStatus](),
 	}
-	m.fileTreeModel.SetEntries([]tree.Entry[stage.StageFileStatus]{
+	m.filetree.model.SetEntries([]tree.Entry[stage.StageFileStatus]{
 		{DisplayName: "renamed.go", Value: stage.StageFileStatus{Path: "new/renamed.go", RenameFrom: "old/name.go", IndexStatus: 'R', WorktreeCode: ' '}},
 	})
 
@@ -76,11 +78,11 @@ func TestSplitWidthHonorsMaximumFiletreePaneWidth(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		width: 200,
-		statusData: statusData{
+		filetree: filetreePane{data: statusData{
 			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
 			branchBaseRef: "origin/release/very-long-train-name",
 			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
-		},
+		}},
 	}
 
 	filetreeW, diffW := m.splitWidth()
@@ -96,11 +98,11 @@ func TestSplitWidthPreservesMinimumDiffWidth(t *testing.T) {
 	t.Parallel()
 	m := Model{
 		width: 101,
-		statusData: statusData{
+		filetree: filetreePane{data: statusData{
 			branchName:    "feature/some-extremely-verbose-branch-name-that-keeps-going",
 			branchBaseRef: "origin/release/very-long-train-name",
 			branchSync:    git.SyncStatus{Name: git.StatusDiverged, Ahead: 12, Behind: 8},
-		},
+		}},
 	}
 
 	filetreeW, diffW := m.splitWidth()

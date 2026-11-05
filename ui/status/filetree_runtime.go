@@ -2,39 +2,14 @@ package status
 
 import (
 	"fmt"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui/status/stagemodal"
-	"github.com/elentok/gx/ui/tree"
 )
 
-func (m Model) selectedFiletreeEntry() (statusEntry, bool) {
-	if m.statusData.listState.Selected() < 0 || m.statusData.listState.Selected() >= len(m.statusData.statusEntries) {
-		return statusEntry{}, false
-	}
-	return m.statusData.statusEntries[m.statusData.listState.Selected()], true
-}
-
-func (m Model) selectedFiletreeRow() (tree.Entry[stage.StageFileStatus], bool) {
-	if m.statusData.listState.Selected() < 0 || m.statusData.listState.Selected() >= len(m.statusData.statusRows) {
-		return tree.Entry[stage.StageFileStatus]{}, false
-	}
-	return m.statusData.statusRows[m.statusData.listState.Selected()], true
-}
-
-func (m Model) selectedFile() (stage.StageFileStatus, bool) {
-	entry, ok := m.selectedFiletreeEntry()
-	if !ok || entry.Kind != statusEntryFile {
-		return stage.StageFileStatus{}, false
-	}
-	return entry.File, true
-}
-
 func (m *Model) reload(preservePath string) tea.Cmd {
-	m.reloadBranchState()
+	m.filetree.reloadBranchState(m.worktreeRoot)
 	m.reloadFileList(preservePath)
 	return m.reloadDiffsForSelection()
 }
@@ -43,24 +18,19 @@ func (m *Model) reloadFileList(preservePath string) {
 	files, err := stage.ListStageFiles(m.worktreeRoot)
 	if err != nil {
 		m.err = err
-		m.statusData.files = nil
-		m.statusData.statusEntries = nil
-		m.statusData.statusRows = nil
-		m.reconcileFileTreeFromStatusState()
+		m.filetree.clearFiles()
 		m.diffarea.ResetSections()
 		return
 	}
 	m.err = nil
-	m.statusData.files = files
-	m.statusData.statusEntries, m.statusData.statusRows = buildStatusEntriesAndRows(m.statusData.files, m.fileTreeModel.CollapsedIDs())
-	m.reconcileFileTreeFromStatusState()
-	if m.fileTreeModel.Search().HasQuery() {
-		matches := m.computeSearchMatches(m.fileTreeModel.Search().Query())
-		_ = m.fileTreeModel.SetSearchMatchesAndJump(matches)
+	m.filetree.setFiles(files)
+	if m.filetree.model.Search().HasQuery() {
+		matches := m.computeSearchMatches(m.filetree.model.Search().Query())
+		_ = m.filetree.model.SetSearchMatchesAndJump(matches)
 	}
 
-	if len(m.statusData.statusEntries) == 0 {
-		m.setStatusSelection(0)
+	if len(m.filetree.data.statusEntries) == 0 {
+		m.filetree.setSelection(0)
 		m.activeFilePath = ""
 		m.diffarea.ResetSections()
 		m.focus = focusFiletree
@@ -74,50 +44,20 @@ func (m *Model) reloadFileList(preservePath string) {
 	}
 
 	if targetPath != "" {
-		for i, entry := range m.statusData.statusEntries {
+		for i, entry := range m.filetree.data.statusEntries {
 			if entry.Path == targetPath {
-				m.setStatusSelection(i)
+				m.filetree.setSelection(i)
 				break
 			}
 		}
 	}
-	m.setStatusSelection(m.statusData.listState.Selected())
-}
-
-func (m *Model) reloadBranchState() {
-	m.statusData.branchName = ""
-	m.statusData.branchBaseRef = ""
-	m.statusData.branchSync = git.SyncStatus{Name: git.StatusUnknown}
-
-	branch, err := git.CurrentBranch(m.worktreeRoot)
-	if err != nil || strings.TrimSpace(branch) == "" || strings.TrimSpace(branch) == "HEAD" {
-		return
-	}
-	m.statusData.branchName = strings.TrimSpace(branch)
-	m.statusData.branchBaseRef = git.UpstreamBranch(m.worktreeRoot, m.statusData.branchName)
-}
-
-func (m *Model) cmdLoadBranchSync() tea.Cmd {
-	if m.statusData.branchName == "" || m.statusData.branchBaseRef == "" {
-		return nil
-	}
-	worktreeRoot := m.worktreeRoot
-	branchName := m.statusData.branchName
-	branchBaseRef := m.statusData.branchBaseRef
-	return func() tea.Msg {
-		sync, err := git.BranchSyncStatusAgainstRef(worktreeRoot, branchName, branchBaseRef)
-		if err != nil {
-			return branchSyncLoadedMsg{branchName: branchName, sync: git.SyncStatus{Name: git.StatusUnknown}}
-		}
-		return branchSyncLoadedMsg{branchName: branchName, sync: sync}
-	}
+	m.filetree.setSelection(m.filetree.data.listState.Selected())
 }
 
 func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
-	if !m.fileTreeModel.MoveToAdjacentFile(delta) {
+	if !m.filetree.moveToAdjacent(delta) {
 		return false, nil
 	}
-	m.setStatusSelection(m.fileTreeModel.SelectedIndex())
 	m.onFiletreeSelectionChanged()
 	cmd := m.reloadDiffsForSelection()
 	if m.focus == focusDiff {
@@ -127,7 +67,7 @@ func (m *Model) moveToAdjacentFile(delta int) (bool, tea.Cmd) {
 }
 
 func (m *Model) toggleStageStatusEntry() tea.Cmd {
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok {
 		return nil
 	}
@@ -150,11 +90,11 @@ func (m *Model) toggleStageStatusEntry() tea.Cmd {
 }
 
 func (m *Model) openDiscardStatusConfirm() {
-	entry, ok := m.selectedFiletreeEntry()
+	entry, ok := m.filetree.selectedEntry()
 	if !ok {
 		return
 	}
-	row, ok := m.selectedFiletreeRow()
+	row, ok := m.filetree.selectedRow()
 	if !ok {
 		return
 	}

@@ -1,15 +1,9 @@
 package status
 
 import (
-	"fmt"
 	"math"
-	"strings"
 
-	"github.com/elentok/gx/git"
-
-	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/tree"
 
 	"github.com/charmbracelet/x/ansi"
 )
@@ -88,79 +82,27 @@ func (m Model) renderLeftPane(width, height int) string {
 
 func (m Model) filetreePaneTitle(maxWidth int) string {
 	prefix := "Changes in "
-	if summary := m.branchSummaryTitleSuffix(maxWidth - ansi.StringWidth(prefix)); summary != "" {
+	if summary := m.filetree.branchSummaryTitleSuffix(maxWidth-ansi.StringWidth(prefix), m.settings.UseNerdFontIcons); summary != "" {
 		return prefix + summary
 	}
 	return "Filetree"
 }
 
+func (m Model) filetreeView() filetreeView {
+	return filetreeView{
+		worktreeRoot: m.worktreeRoot,
+		nerdIcons:    m.settings.UseNerdFontIcons,
+		active:       m.focus == focusFiletree,
+	}
+}
+
 func (m Model) visibleStatusLines(width, height int) []string {
-	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	return m.fileTreeModel.RenderLines(height, tree.RenderOpts[stage.StageFileStatus]{
-		AccentColor: ui.ColorBlue,
-		Active:      m.focus == focusFiletree,
-		Width:       width - 2,
-		EmptyLine:   ui.StyleMuted.Render("clean working tree"),
-		Icon:        m.statusTreeIcon(icons),
-		Label:       m.statusTreeLabel(),
-		MetaText: func(entry tree.Entry[stage.StageFileStatus]) string {
-			return statusEntryMeta(statusEntryFromRow(entry), m.settings.UseNerdFontIcons, icons)
-		},
-		RowColor: func(entry tree.Entry[stage.StageFileStatus]) string {
-			return statusEntryColor(statusEntryFromRow(entry))
-		},
-		Faint: func(entry tree.Entry[stage.StageFileStatus]) bool {
-			return !entry.HasChildren && isDeletedFileStatus(entry.Value)
-		},
-	})
-}
-
-// statusTreeIcon renders a directory's expand/collapse folder glyph or a
-// file's change-kind glyph, replacing filetree's built-in EntryKind-based
-// folder icon now that ui/tree has no leaf-vs-directory split of its own.
-func (m Model) statusTreeIcon(icons filetreePaneIcons) func(entry tree.Entry[stage.StageFileStatus]) string {
-	return func(entry tree.Entry[stage.StageFileStatus]) string {
-		if entry.HasChildren {
-			if entry.Expanded {
-				return icons.folderOpen
-			}
-			return icons.folderClosed
-		}
-		return statusFileIcon(entry.Value, isWorktreeSymlink(m.worktreeRoot, entry.Value.Path), icons)
-	}
-}
-
-func (m Model) statusTreeLabel() func(entry tree.Entry[stage.StageFileStatus]) string {
-	return func(entry tree.Entry[stage.StageFileStatus]) string {
-		if entry.HasChildren {
-			return entry.DisplayName + "/"
-		}
-		if entry.Value.IsRenamed() && entry.Value.RenameFrom != "" {
-			return entry.Value.RenameFrom + " -> " + entry.Value.Path
-		}
-		return entry.DisplayName
-	}
+	return m.filetree.renderLines(width, height, m.filetreeView())
 }
 
 func (m Model) requiredFiletreePaneWidth(height int) int {
 	required := ansi.StringWidth(" " + m.filetreePaneTitle(math.MaxInt32) + " ")
-	icons := filetreePaneIconsFor(m.settings.UseNerdFontIcons)
-	if w := m.fileTreeModel.RequiredWidth(height, tree.RenderOpts[stage.StageFileStatus]{
-		AccentColor: ui.ColorBlue,
-		Active:      m.focus == focusFiletree,
-		EmptyLine:   ui.StyleMuted.Render("clean working tree"),
-		Icon:        m.statusTreeIcon(icons),
-		Label:       m.statusTreeLabel(),
-		MetaText: func(entry tree.Entry[stage.StageFileStatus]) string {
-			return statusEntryMeta(statusEntryFromRow(entry), m.settings.UseNerdFontIcons, icons)
-		},
-		RowColor: func(entry tree.Entry[stage.StageFileStatus]) string {
-			return statusEntryColor(statusEntryFromRow(entry))
-		},
-		Faint: func(entry tree.Entry[stage.StageFileStatus]) bool {
-			return !entry.HasChildren && isDeletedFileStatus(entry.Value)
-		},
-	}); w > required {
+	if w := m.filetree.requiredWidth(height, m.filetreeView()); w > required {
 		required = w
 	}
 	return required + 2
@@ -210,38 +152,6 @@ func (m Model) filetreeInfoLines() []string {
 		icon = ui.Icons(true).Worktree + " "
 	}
 	return []string{ui.StyleMuted.Faint(true).Render(icon + "worktree: " + name)}
-}
-
-func (m Model) branchSummaryTitleSuffix(maxWidth int) string {
-	if strings.TrimSpace(m.statusData.branchName) == "" {
-		return ""
-	}
-	branchLabel := "branch"
-	if m.settings.UseNerdFontIcons {
-		branchLabel = ""
-	}
-	prefix := branchLabel + " "
-	suffix := " " + m.branchSyncToken()
-	name := m.statusData.branchName
-	available := maxWidth - ansi.StringWidth(prefix) - ansi.StringWidth(suffix)
-	if available > 0 && ansi.StringWidth(name) > available {
-		name = ansi.Truncate(name, available, "…")
-	}
-	return prefix + name + suffix
-}
-
-func (m Model) branchSyncToken() string {
-	switch m.statusData.branchSync.Name {
-	case git.StatusSame:
-		return "✓"
-	case git.StatusAhead:
-		return fmt.Sprintf("↑%d", m.statusData.branchSync.Ahead)
-	case git.StatusBehind:
-		return fmt.Sprintf("↓%d", m.statusData.branchSync.Behind)
-	case git.StatusDiverged:
-		return fmt.Sprintf("↑%d ↓%d", m.statusData.branchSync.Ahead, m.statusData.branchSync.Behind)
-	}
-	return "?"
 }
 
 func minInt(a, b int) int {
