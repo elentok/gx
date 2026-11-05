@@ -103,6 +103,17 @@ func TicketFrontmatter(id, extra string) string {
 	return "---\nid: \"" + id + "\"\nstatus: open\ntype: implement\n" + extra + "---\nBody.\n"
 }
 
+// LogQuestionLine is one open pause.question event line of a ticket log.
+const LogQuestionLine = `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.question","by":"agent","handoff":"h","summary":"Which one?"}` + "\n"
+
+// WriteLogFile writes content as the log beside the ticket at ticketPath.
+func WriteLogFile(t *testing.T, ticketPath, content string) {
+	t.Helper()
+	if err := os.WriteFile(tickets.LogPath(ticketPath), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 const showTicketFixture = "---\nid: \"06\"\nstatus: open\ntype: implement\n---\n\n# 06 — Hello\n\nbody text\n"
 
 // SetupShowProject is a project "mine" holding epic/06.

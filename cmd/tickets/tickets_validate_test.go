@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -7,35 +7,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
-
-// ensureIssueEpic gives a ticket at <epic>/issues/<file> its epic's ticket.md.
-func ensureIssueEpic(t *testing.T, path string) {
-	t.Helper()
-	if issuesDir := filepath.Dir(path); filepath.Base(issuesDir) == "issues" {
-		testutil.EnsureEpicTicketMD(t, filepath.Dir(issuesDir))
-	}
-}
-
-func writeTicketFile(t *testing.T, path, content string) {
-	t.Helper()
-	ensureIssueEpic(t, path)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestExecute_TicketsValidate_OldFormatMissingFrontmatterFails(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-a-ticket.md")
-	writeTicketFile(t, path, "Status: open\n\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "Status: open\n\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "validate", path}, d)
+	err := execute(t, []string{"tickets", "validate", path}, d)
 	if err == nil {
 		t.Fatal("expected error for a file with no frontmatter block, got nil")
 	}
@@ -48,12 +33,12 @@ func TestExecute_TicketsValidate_ValidNewFormat(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	if err := execute([]string{"tickets", "validate", path}, d); err != nil {
+	if err := execute(t, []string{"tickets", "validate", path}, d); err != nil {
 		t.Fatalf("execute tickets validate: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "04b") {
@@ -65,12 +50,12 @@ func TestExecute_TicketsValidate_InvalidTicketExitsNonZero(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: bogus-status\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: bogus-status\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "validate", path}, d)
+	err := execute(t, []string{"tickets", "validate", path}, d)
 	if err == nil {
 		t.Fatal("expected error for invalid ticket, got nil")
 	}
@@ -89,8 +74,8 @@ func TestExecute_TicketsValidate_EpicWithoutTicketMDFails(t *testing.T) {
 	testutil.WriteFile(t, filepath.Dir(path), "01-a.md", "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 	testutil.WriteFile(t, epicDir, "epic.yaml", "started_at: 2026-01-02T03:04:05Z\n")
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-	err := execute([]string{"tickets", "validate", path}, d)
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+	err := execute(t, []string{"tickets", "validate", path}, d)
 	if err == nil {
 		t.Fatal("expected error for an epic directory with no ticket.md, got nil")
 	}
@@ -102,9 +87,9 @@ func TestExecute_TicketsValidate_EpicWithoutTicketMDFails(t *testing.T) {
 func TestExecute_TicketsValidate_MissingFileExitsNonZero(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := testDeps(t, &stdout, bytes.NewBuffer(nil), nil)
 
-	err := execute([]string{"tickets", "validate", filepath.Join(t.TempDir(), "does-not-exist.md")}, d)
+	err := execute(t, []string{"tickets", "validate", filepath.Join(t.TempDir(), "does-not-exist.md")}, d)
 	if err == nil {
 		t.Fatal("expected error for missing file, got nil")
 	}

@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -10,28 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
-const showTicketFixture = "---\nid: \"06\"\nstatus: open\ntype: implement\n---\n\n# 06 — Hello\n\nbody text\n"
-
-func setupShowProject(t *testing.T) (repo, project string) {
-	t.Helper()
-	store := isolateTicketStore(t)
-	repo = testutil.TempRepo(t)
-	project = addProject(t, store, "mine", repo)
-	issues := filepath.Join(project, "epic", "issues")
-	if err := os.MkdirAll(issues, 0755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "epic"))
-	testutil.WriteFile(t, issues, "06-hello.md", showTicketFixture)
-	return repo, project
-}
-
 func TestExecute_TicketsList_IsHiddenAliasOfShow(t *testing.T) {
-	repo, _ := setupShowProject(t)
+	repo, _ := cmdtest.SetupShowProject(t)
 
 	for _, addr := range []string{"mine:epic", "mine:epic/06"} {
 		want, err := runIn(t, repo, "tickets", "show", addr)
@@ -48,9 +33,9 @@ func TestExecute_TicketsList_IsHiddenAliasOfShow(t *testing.T) {
 	}
 
 	var help bytes.Buffer
-	tickets, _, _ := newRootCmd(deps{}).Find([]string{"tickets"})
-	tickets.SetOut(&help)
-	if err := tickets.Help(); err != nil {
+	tk := New(testDeps(t, nil, nil, nil))
+	tk.SetOut(&help)
+	if err := tk.Help(); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(help.String(), "list") {
@@ -59,7 +44,7 @@ func TestExecute_TicketsList_IsHiddenAliasOfShow(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
-	repo, _ := setupShowProject(t)
+	repo, _ := cmdtest.SetupShowProject(t)
 
 	if out, err := exec.Command("git", "-C", repo, "checkout", "-q", "-b", "ralph-loop/epic-item-07").CombinedOutput(); err != nil {
 		t.Fatalf("checkout: %v\n%s", err, out)
@@ -90,13 +75,13 @@ func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
 	if got.Address != "mine:epic/06" || got.Status != "open" || got.Type != "implement" {
 		t.Errorf("json = %+v", got)
 	}
-	if m := decodeJSON(t, []byte(out)); m["via"] != "direct" || m["actor"] == nil {
+	if m := cmdtest.DecodeJSON(t, []byte(out)); m["via"] != "direct" || m["actor"] == nil {
 		t.Errorf("via/actor = %v/%v, want direct/<actor>", m["via"], m["actor"])
 	}
 }
 
 func TestExecute_TicketsShow_UnpaddedSubIDResolvesPaddedTicket(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "06a-sub.md",
 		strings.Replace(showTicketFixture, `id: "06"`, `id: "06a"`, 1))
 
@@ -110,7 +95,7 @@ func TestExecute_TicketsShow_UnpaddedSubIDResolvesPaddedTicket(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_FollowsArchivedOneOff(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	archived := filepath.Join(project, tickets.ArchivedOneOffsEpic)
 	if err := os.MkdirAll(filepath.Join(archived, "issues"), 0o755); err != nil {
 		t.Fatal(err)
@@ -129,7 +114,7 @@ func TestExecute_TicketsShow_FollowsArchivedOneOff(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_RendersWidenedBlocker(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	other := filepath.Join(project, "other", "issues")
 	if err := os.MkdirAll(other, 0755); err != nil {
 		t.Fatal(err)
@@ -150,7 +135,7 @@ func TestExecute_TicketsShow_RendersWidenedBlocker(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_EpicAddressPrintsEntryAndTickets(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-second.md",
 		"---\nid: \"07\"\nstatus: done\ntype: implement\n---\n\n# 07 — Second\n")
 	entry, err := os.ReadFile(filepath.Join(project, "epic", "ticket.md"))
@@ -172,7 +157,7 @@ func TestExecute_TicketsShow_EpicAddressPrintsEntryAndTickets(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_SectionPrintsOnlyMatchingSections(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	issues := filepath.Join(project, "epic", "issues")
 	testutil.WriteFile(t, issues, "07-second.md",
 		"---\nid: \"07\"\nstatus: done\ntype: implement\n---\n\n# 07 — Second\n\n## What to build\n\nSecret.\n\n## Spec deviations\n\n- narrowed X\n")
@@ -201,7 +186,7 @@ func TestExecute_TicketsShow_SectionPrintsOnlyMatchingSections(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 
 	// A ticket.md one level above the epic dirs must stay unreachable via "..".
 	testutil.WriteFile(t, filepath.Dir(project), "ticket.md", "escaped\n")
@@ -239,8 +224,8 @@ func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_CrossProject(t *testing.T) {
-	repo, project := setupShowProject(t)
-	theirs := addProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
+	repo, project := cmdtest.SetupShowProject(t)
+	theirs := cmdtest.AddProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
 	if err := os.MkdirAll(filepath.Join(theirs, "epic", "issues"), 0755); err != nil {
 		t.Fatal(err)
 	}

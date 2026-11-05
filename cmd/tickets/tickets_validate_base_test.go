@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
@@ -6,20 +6,22 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 func validateStderr(t *testing.T, path string) (string, error) {
 	t.Helper()
 	stderr := bytes.NewBuffer(nil)
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: stderr}
-	err := execute([]string{"tickets", "validate", path}, d)
+	d := testDeps(t, bytes.NewBuffer(nil), stderr, nil)
+	err := execute(t, []string{"tickets", "validate", path}, d)
 	return stderr.String(), err
 }
 
 func TestExecute_TicketsValidate_BaseOnCommitlessIsError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	path := writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", "commitless: true\nbase: main\n"))
+	path := cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", "commitless: true\nbase: main\n"))
 
 	_, err := validateStderr(t, path)
 	if err == nil || !strings.Contains(err.Error(), "base: not allowed on a commitless ticket") {
@@ -33,7 +35,7 @@ func TestExecute_TicketsValidate_BaseInVCSNoneProjectIsError(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte(`{"vcs":"none"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	path := writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", "base: main\n"))
+	path := cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", "base: main\n"))
 
 	_, err := validateStderr(t, path)
 	if err == nil || !strings.Contains(err.Error(), "base: not allowed in a vcs: none project") {
@@ -44,7 +46,7 @@ func TestExecute_TicketsValidate_BaseInVCSNoneProjectIsError(t *testing.T) {
 func TestExecute_TicketsValidate_BaseOnCommitfulPasses(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	path := writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", "base: main\nresolved_base: main@abc123\n"))
+	path := cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", "base: main\nresolved_base: main@abc123\n"))
 
 	if stderr, err := validateStderr(t, path); err != nil || stderr != "" {
 		t.Errorf("validate = %v, stderr %q, want clean pass", err, stderr)
@@ -54,12 +56,12 @@ func TestExecute_TicketsValidate_BaseOnCommitfulPasses(t *testing.T) {
 func TestExecute_TicketsValidate_OtherTicketsWarningsAreNotMentioned(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", ""))
-	writeEpicTicket(t, dir, "e", "02-b.md", ticketFrontmatter("02", ""))
+	cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", ""))
+	cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", cmdtest.TicketFrontmatter("02", ""))
 	blocked := "blocked_by:\n  - \"01\"\n  - \"02\"\n"
-	writeEpicTicket(t, dir, "e", "03-c.md", ticketFrontmatter("03", blocked))
-	writeEpicTicket(t, dir, "other", "01-d.md", ticketFrontmatter("01", "blocked_by:\n  - \"e/01\"\n"))
-	path04 := writeEpicTicket(t, dir, "e", "04-d.md", ticketFrontmatter("04", blocked))
+	cmdtest.WriteEpicTicket(t, dir, "e", "03-c.md", cmdtest.TicketFrontmatter("03", blocked))
+	cmdtest.WriteEpicTicket(t, dir, "other", "01-d.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"e/01\"\n"))
+	path04 := cmdtest.WriteEpicTicket(t, dir, "e", "04-d.md", cmdtest.TicketFrontmatter("04", blocked))
 
 	stderr, err := validateStderr(t, path04)
 	if err != nil {
@@ -145,7 +147,7 @@ func TestExecute_TicketsValidate_BaseWarnings(t *testing.T) {
 			paths := map[string]string{}
 			for rel, extra := range tt.files {
 				epic, file := filepath.Split(rel)
-				paths[rel] = writeEpicTicket(t, dir, strings.TrimSuffix(epic, "/"), file, ticketFrontmatter(file[:2], extra))
+				paths[rel] = cmdtest.WriteEpicTicket(t, dir, strings.TrimSuffix(epic, "/"), file, cmdtest.TicketFrontmatter(file[:2], extra))
 			}
 			if strings.Contains(tt.name, "last claim") {
 				log := `{"type":"iteration-started","ticket":"01","resolved_base":"main@aaa"}` + "\n"

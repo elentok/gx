@@ -1,20 +1,22 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 func TestExecute_TicketsValidate_DanglingBlockedByFails(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
-	path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", "blocked_by:\n  - \"09\"\n"))
+	cmdtest.WriteEpicTicket(t, dir, "e", "01-first.md", cmdtest.TicketFrontmatter("01", ""))
+	path := cmdtest.WriteEpicTicket(t, dir, "e", "02-second.md", cmdtest.TicketFrontmatter("02", "blocked_by:\n  - \"09\"\n"))
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-	err := execute([]string{"tickets", "validate", path}, d)
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+	err := execute(t, []string{"tickets", "validate", path}, d)
 	if err == nil {
 		t.Fatal("expected an error for a blocked_by naming no ticket, got nil")
 	}
@@ -40,12 +42,12 @@ func TestExecute_TicketsValidate_QualifiedBlockedBy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
-			writeEpicTicket(t, dir, "other", "06-target.md", ticketFrontmatter("06", ""))
+			cmdtest.WriteEpicTicket(t, dir, "other", "06-target.md", cmdtest.TicketFrontmatter("06", ""))
 			ref := strings.ReplaceAll(tt.ref, "PROJECT", filepath.Base(dir))
-			path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", "blocked_by:\n  - \""+ref+"\"\n"))
+			path := cmdtest.WriteEpicTicket(t, dir, "e", "02-second.md", cmdtest.TicketFrontmatter("02", "blocked_by:\n  - \""+ref+"\"\n"))
 
-			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-			err := execute([]string{"tickets", "validate", path}, d)
+			d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+			err := execute(t, []string{"tickets", "validate", path}, d)
 			if tt.want == "" {
 				if err != nil {
 					t.Fatalf("validate: %v", err)
@@ -62,12 +64,12 @@ func TestExecute_TicketsValidate_QualifiedBlockedBy(t *testing.T) {
 func TestExecute_TicketsValidate_CrossEpicCycleReportsEveryEdge(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	path := writeEpicTicket(t, dir, "a", "01-a.md", ticketFrontmatter("01", "blocked_by:\n  - \"b/01\"\n"))
-	writeEpicTicket(t, dir, "b", "01-b.md", ticketFrontmatter("01", "blocked_by:\n  - \"c/01\"\n"))
-	writeEpicTicket(t, dir, "c", "01-c.md", ticketFrontmatter("01", "blocked_by:\n  - \"a/01\"\n"))
+	path := cmdtest.WriteEpicTicket(t, dir, "a", "01-a.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"b/01\"\n"))
+	cmdtest.WriteEpicTicket(t, dir, "b", "01-b.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"c/01\"\n"))
+	cmdtest.WriteEpicTicket(t, dir, "c", "01-c.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"a/01\"\n"))
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-	err := execute([]string{"tickets", "validate", path}, d)
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+	err := execute(t, []string{"tickets", "validate", path}, d)
 	if err == nil {
 		t.Fatal("expected a cycle error, got nil")
 	}
@@ -113,10 +115,10 @@ func TestExecute_TicketsValidate_BlockedByCycles(t *testing.T) {
 			dir := t.TempDir()
 			paths := map[string]string{}
 			for name, extra := range tt.files {
-				paths[name] = writeEpicTicket(t, dir, "e", name, ticketFrontmatter(tt.ids[name], extra))
+				paths[name] = cmdtest.WriteEpicTicket(t, dir, "e", name, cmdtest.TicketFrontmatter(tt.ids[name], extra))
 			}
-			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-			err := execute([]string{"tickets", "validate", paths[tt.path]}, d)
+			d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+			err := execute(t, []string{"tickets", "validate", paths[tt.path]}, d)
 			if err == nil {
 				t.Fatal("expected a cycle error, got nil")
 			}
@@ -130,11 +132,11 @@ func TestExecute_TicketsValidate_BlockedByCycles(t *testing.T) {
 func TestExecute_TicketsValidate_ResolvableBlockedByPasses(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
-	path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", "blocked_by:\n  - \"01\"\n"))
+	cmdtest.WriteEpicTicket(t, dir, "e", "01-first.md", cmdtest.TicketFrontmatter("01", ""))
+	path := cmdtest.WriteEpicTicket(t, dir, "e", "02-second.md", cmdtest.TicketFrontmatter("02", "blocked_by:\n  - \"01\"\n"))
 
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
-	if err := execute([]string{"tickets", "validate", path}, d); err != nil {
+	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
+	if err := execute(t, []string{"tickets", "validate", path}, d); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
 }

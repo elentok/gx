@@ -1,60 +1,21 @@
-package cmd
+package tickets
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
 
-// isolateTicketStore gives the test a temp HOME and XDG dirs (so neither the
-// user's config.json nor their real store is read) and returns the store path.
-// The env is available to the test as envFor(t).
-func isolateTicketStore(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(envValue(envFor(t), "XDG_DATA_HOME"), "gx", "tickets")
-}
-
-// addProject writes <store>/<name>/project.json pointing at repoPath and
-// returns the project directory.
-func addProject(t *testing.T, store, name, repoPath string) string {
-	t.Helper()
-	dir := filepath.Join(store, name)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	data, err := json.Marshal(map[string]string{"name": name, "repo": repoPath})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "project.json"), data, 0644); err != nil {
-		t.Fatal(err)
-	}
-	return dir
-}
-
-func runIn(t *testing.T, cwd string, args ...string) (string, error) {
-	t.Helper()
-	var stdout bytes.Buffer
-	d := deps{
-		stdout: &stdout,
-		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return cwd, nil },
-		env:    envFor(t),
-	}
-	err := execute(args, d)
-	return stdout.String(), err
-}
-
 func TestExecute_TicketsRoot_ResolvesIntoStoreByProjectFile(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
-	addProject(t, store, "other", filepath.Join(t.TempDir(), "elsewhere"))
-	project := addProject(t, store, "mine", repo)
+	cmdtest.AddProject(t, store, "other", filepath.Join(t.TempDir(), "elsewhere"))
+	project := cmdtest.AddProject(t, store, "mine", repo)
 
 	out, err := runIn(t, repo, "tickets", "root")
 	if err != nil {
@@ -66,11 +27,11 @@ func TestExecute_TicketsRoot_ResolvesIntoStoreByProjectFile(t *testing.T) {
 }
 
 func TestExecute_TicketsRoot_HonorsConfiguredStorePath(t *testing.T) {
-	isolateTicketStore(t)
+	cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	custom := filepath.Join(t.TempDir(), "custom-store")
-	project := addProject(t, custom, "mine", repo)
-	cfgDir := filepath.Join(envValue(envFor(t), "HOME"), ".config", "gx")
+	project := cmdtest.AddProject(t, custom, "mine", repo)
+	cfgDir := filepath.Join(cmdtest.EnvValue(cmdtest.EnvFor(t), "HOME"), ".config", "gx")
 	if err := os.MkdirAll(cfgDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -86,9 +47,9 @@ func TestExecute_TicketsRoot_HonorsConfiguredStorePath(t *testing.T) {
 }
 
 func TestExecute_TicketsRoot_NoProjectRefusesWithProjectAddHint(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
-	addProject(t, store, "other", filepath.Join(t.TempDir(), "elsewhere"))
+	cmdtest.AddProject(t, store, "other", filepath.Join(t.TempDir(), "elsewhere"))
 
 	for _, args := range [][]string{{"tickets", "root"}, {"tickets", "epics"}} {
 		out, err := runIn(t, repo, args...)
@@ -109,14 +70,9 @@ func TestExecute_TicketsRoot_NotAGitRepo(t *testing.T) {
 	dir := t.TempDir()
 
 	var stdout, stderr bytes.Buffer
-	d := deps{
-		stdout: &stdout,
-		stderr: &stderr,
-		getwd:  func() (string, error) { return dir, nil },
-		env:    envFor(t),
-	}
+	d := testDeps(t, &stdout, &stderr, func() (string, error) { return dir, nil })
 
-	err := execute([]string{"tickets", "root"}, d)
+	err := execute(t, []string{"tickets", "root"}, d)
 	if err == nil {
 		t.Fatal("expected error when cwd is outside a git repo, got nil")
 	}

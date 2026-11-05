@@ -6,19 +6,6 @@ import (
 	"testing"
 )
 
-func TestOldRepairVerbsAreUnknownTicketsCommands(t *testing.T) {
-	for _, verb := range []string{"land", "reset", "unpark", "verify"} {
-		root := newRootCmd(deps{})
-		root.SetArgs([]string{"tickets", verb, "epic", "01"})
-		root.SetOut(&bytes.Buffer{})
-		root.SetErr(&bytes.Buffer{})
-		err := root.Execute()
-		if err == nil || !strings.Contains(err.Error(), "unknown command") {
-			t.Errorf("gx tickets %s: err = %v, want unknown command", verb, err)
-		}
-	}
-}
-
 func TestServerTicketsMergeAndStartOverReplaceLandAndReset(t *testing.T) {
 	root := newRootCmd(deps{})
 	for _, verb := range []string{"merge", "start-over"} {

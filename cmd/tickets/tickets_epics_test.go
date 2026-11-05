@@ -1,4 +1,4 @@
-package cmd
+package tickets
 
 import (
 	"os"
@@ -6,13 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
 
 func TestExecute_TicketsEpics_ListsBareSlugsSortedExcludingArchive(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
-	project := addProject(t, store, "mine", repo)
+	project := cmdtest.AddProject(t, store, "mine", repo)
 	for _, name := range []string{"zebra-epic", "alpha-epic"} {
 		testutil.EnsureEpicTicketMD(t, filepath.Join(project, name))
 	}
@@ -30,9 +31,9 @@ func TestExecute_TicketsEpics_ListsBareSlugsSortedExcludingArchive(t *testing.T)
 }
 
 func TestExecute_TicketsEpics_MapsFlagFiltersToWayfinderMapEpics(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
-	project := addProject(t, store, "mine", repo)
+	project := cmdtest.AddProject(t, store, "mine", repo)
 	for _, name := range []string{"zebra-epic", "alpha-epic"} {
 		if err := os.MkdirAll(filepath.Join(project, name), 0755); err != nil {
 			t.Fatalf("mkdir %s: %v", name, err)
@@ -50,9 +51,9 @@ func TestExecute_TicketsEpics_MapsFlagFiltersToWayfinderMapEpics(t *testing.T) {
 }
 
 func TestExecute_TicketsEpics_EmptyProjectExitsZeroWithNoOutput(t *testing.T) {
-	store := isolateTicketStore(t)
+	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
-	addProject(t, store, "mine", repo)
+	cmdtest.AddProject(t, store, "mine", repo)
 
 	out, err := runIn(t, repo, "tickets", "epics")
 	if err != nil {

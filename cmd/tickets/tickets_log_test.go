@@ -1,10 +1,11 @@
-package cmd
+package tickets
 
 import (
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -22,7 +23,7 @@ func appendTestLog(t *testing.T, project string) {
 }
 
 func TestExecute_TicketsLog_PrintsRawEventsAndFiltersByType(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 	appendTestLog(t, project)
 
 	out, err := runIn(t, repo, "tickets", "log", "epic/06")
@@ -45,7 +46,7 @@ func TestExecute_TicketsLog_PrintsRawEventsAndFiltersByType(t *testing.T) {
 }
 
 func TestExecute_TicketsLog_NoLogPrintsNothing(t *testing.T) {
-	repo, _ := setupShowProject(t)
+	repo, _ := cmdtest.SetupShowProject(t)
 	out, err := runIn(t, repo, "tickets", "log", "epic/06")
 	if err != nil || out != "" {
 		t.Errorf("log = %q, %v; want empty", out, err)
@@ -53,7 +54,7 @@ func TestExecute_TicketsLog_NoLogPrintsNothing(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_AppendsPauseRoundsNotRawEvents(t *testing.T) {
-	repo, project := setupShowProject(t)
+	repo, project := cmdtest.SetupShowProject(t)
 
 	out, err := runIn(t, repo, "tickets", "show", "epic/06")
 	if err != nil || strings.Contains(out, "Pause rounds") {

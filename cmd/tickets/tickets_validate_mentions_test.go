@@ -1,8 +1,10 @@
-package cmd
+package tickets
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 func TestExecute_TicketsValidate_BodyMentionMissingFromBlockedByWarns(t *testing.T) {
@@ -14,8 +16,8 @@ func TestExecute_TicketsValidate_BodyMentionMissingFromBlockedByWarns(t *testing
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
-			writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", ""))
-			path := writeEpicTicket(t, dir, "e", "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n"+body+"\n")
+			cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", ""))
+			path := cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n"+body+"\n")
 
 			stderr, err := validateStderr(t, path)
 			if err != nil {
@@ -38,8 +40,8 @@ func TestExecute_TicketsValidate_BodyMentionStaysQuiet(t *testing.T) {
 	t.Run("covered by blocked_by", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", ""))
-		path := writeEpicTicket(t, dir, "e", "02-b.md", frontmatter("02", "blocked_by:\n  - \"01\"\n", "After ticket 01."))
+		cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", ""))
+		path := cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", frontmatter("02", "blocked_by:\n  - \"01\"\n", "After ticket 01."))
 		if stderr, err := validateStderr(t, path); err != nil || stderr != "" {
 			t.Errorf("validate = %v, stderr %q, want clean pass", err, stderr)
 		}
@@ -47,9 +49,9 @@ func TestExecute_TicketsValidate_BodyMentionStaysQuiet(t *testing.T) {
 	t.Run("covered transitively", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", ""))
-		writeEpicTicket(t, dir, "e", "02-b.md", ticketFrontmatter("02", "blocked_by:\n  - \"01\"\n"))
-		path := writeEpicTicket(t, dir, "e", "03-c.md", frontmatter("03", "blocked_by:\n  - \"02\"\n", "Builds on ticket 01."))
+		cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", ""))
+		cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", cmdtest.TicketFrontmatter("02", "blocked_by:\n  - \"01\"\n"))
+		path := cmdtest.WriteEpicTicket(t, dir, "e", "03-c.md", frontmatter("03", "blocked_by:\n  - \"02\"\n", "Builds on ticket 01."))
 		if stderr, err := validateStderr(t, path); err != nil || stderr != "" {
 			t.Errorf("validate = %v, stderr %q, want clean pass", err, stderr)
 		}
@@ -57,8 +59,8 @@ func TestExecute_TicketsValidate_BodyMentionStaysQuiet(t *testing.T) {
 	t.Run("covered by parent", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", ""))
-		path := writeEpicTicket(t, dir, "e", "01a-b.md", frontmatter("01a", "parent: \"01\"\n", "Forked from ticket 01."))
+		cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", ""))
+		path := cmdtest.WriteEpicTicket(t, dir, "e", "01a-b.md", frontmatter("01a", "parent: \"01\"\n", "Forked from ticket 01."))
 		if stderr, err := validateStderr(t, path); err != nil || stderr != "" {
 			t.Errorf("validate = %v, stderr %q, want clean pass", err, stderr)
 		}
@@ -66,8 +68,8 @@ func TestExecute_TicketsValidate_BodyMentionStaysQuiet(t *testing.T) {
 	t.Run("done ticket skipped", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		writeEpicTicket(t, dir, "e", "01-a.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
-		path := writeEpicTicket(t, dir, "e", "02-b.md", frontmatter("02", "", "Landed in ticket 01."))
+		cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
+		path := cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", frontmatter("02", "", "Landed in ticket 01."))
 		if stderr, err := validateStderr(t, path); err != nil || stderr != "" {
 			t.Errorf("validate = %v, stderr %q, want clean pass", err, stderr)
 		}
@@ -75,8 +77,8 @@ func TestExecute_TicketsValidate_BodyMentionStaysQuiet(t *testing.T) {
 	t.Run("bare number and own number ignored", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", ""))
-		path := writeEpicTicket(t, dir, "e", "02-b.md", frontmatter("02", "", "Handle 01 items. This is ticket 02."))
+		cmdtest.WriteEpicTicket(t, dir, "e", "01-a.md", cmdtest.TicketFrontmatter("01", ""))
+		path := cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", frontmatter("02", "", "Handle 01 items. This is ticket 02."))
 		stderr, err := validateStderr(t, path)
 		if err != nil || strings.Contains(stderr, "mentions") {
 			t.Errorf("validate = %v, stderr %q, want no mention warning", err, stderr)
