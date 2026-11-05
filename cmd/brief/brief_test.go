@@ -1,4 +1,4 @@
-package cmd
+package brief
 
 import (
 	"bytes"
@@ -13,23 +13,21 @@ import (
 	"time"
 
 	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/testutil"
 )
 
-// runBriefCmd drives `gx brief` through the root command and returns stdout
-// and the exit code.
+// runBriefCmd drives `gx brief` and returns stdout and the exit code.
 func runBriefCmd(t *testing.T, cwd string, args ...string) (string, int) {
 	t.Helper()
-	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }, env: envFor(t)})
 	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetErr(&out)
-	root.SetArgs(append([]string{"brief"}, args...))
-	err := root.Execute()
-	var ee *ExitError
+	d := Deps{Env: cmdbase.Env{Stdout: &out, Stderr: &out, Getwd: func() (string, error) { return cwd, nil }, Env: cmdtest.EnvFor(t)}}
+	err := cmdtest.Run(t, d.Env, append([]string{"brief"}, args...), New(d))
+	var ee *cmdbase.ExitError
 	if errors.As(err, &ee) {
 		return out.String(), ee.Code
 	}
@@ -55,7 +53,7 @@ func lastLine(out string) string {
 
 func TestBrief_GoTestIndexRecordsTestDurations(t *testing.T) {
 	t.Parallel()
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	dir := t.TempDir()
 	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, dir, "a_test.go", "package tiny\n\nimport (\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestSlow(t *testing.T) { time.Sleep(time.Second) }\nfunc TestFast(t *testing.T) {}\n")
@@ -78,7 +76,7 @@ func TestBrief_GoTestIndexRecordsTestDurations(t *testing.T) {
 
 func TestBrief_GoTestPass(t *testing.T) {
 	t.Parallel()
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	mod := goModule(t)
 
 	out, code := runBriefCmd(t, mod, "go-test", "./...")
@@ -137,8 +135,8 @@ func TestBrief_GoTestPass(t *testing.T) {
 
 func TestBrief_GoTestHangKillsAndNamesTest(t *testing.T) {
 	t.Parallel()
-	data := envValue(envFor(t), "XDG_DATA_HOME")
-	setEnvFor(t, brief.EnvCheckHang, "2s")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
+	cmdtest.SetEnvFor(t, brief.EnvCheckHang, "2s")
 	dir := t.TempDir()
 	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, dir, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestOK(t *testing.T) {}\nfunc TestStuck(t *testing.T) { select {} }\n")
@@ -162,8 +160,8 @@ func TestBrief_GoTestHangKillsAndNamesTest(t *testing.T) {
 
 func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
 	t.Parallel()
-	data := envValue(envFor(t), "XDG_DATA_HOME")
-	setEnvFor(t, brief.EnvCheckRun, "run-1")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
+	cmdtest.SetEnvFor(t, brief.EnvCheckRun, "run-1")
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\nfunc TestB(t *testing.T) { t.Fail() }\n")
@@ -197,8 +195,8 @@ func TestBrief_GoToolsHoldCacheGate(t *testing.T) {
 	if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	prependPath(t, bin)
-	stateDir, err := config.DirsFrom(envFor(t)).StateDir()
+	cmdtest.PrependPath(t, bin)
+	stateDir, err := config.DirsFrom(cmdtest.EnvFor(t)).StateDir()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +247,7 @@ func TestBrief_GoTestArgs(t *testing.T) {
 	if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	prependPath(t, bin)
+	cmdtest.PrependPath(t, bin)
 	proj := evalSymlinks(t, t.TempDir())
 
 	_, code := runBriefCmd(t, t.TempDir(), "-C", proj, "go-test", "-v", "-run", "TestX", "-count=1", "./a", "./b")
@@ -291,7 +289,7 @@ func TestBrief_NoTestsRan(t *testing.T) {
 }
 
 func TestBrief_GoMissingExits2(t *testing.T) {
-	setEnvFor(t, "PATH", t.TempDir())
+	cmdtest.SetEnvFor(t, "PATH", t.TempDir())
 
 	out, code := runBriefCmd(t, t.TempDir(), "go-test")
 	if code != 2 {
@@ -338,7 +336,7 @@ func TestBrief_NoArgsAndHelpPrintHelp(t *testing.T) {
 }
 
 func TestBrief_UnwritableLogExits2(t *testing.T) {
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	if err := os.MkdirAll(data, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +403,7 @@ func TestResolveRelativeC(t *testing.T) {
 
 func TestBrief_GoTestFailures(t *testing.T) {
 	t.Parallel()
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	mod := failingModule(t, false)
 
 	out, code := runBriefCmd(t, mod, "go-test", "-count=1", "./...")

@@ -1,4 +1,4 @@
-package cmd
+package brief
 
 import (
 	"os"
@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/cmd/cmdtest"
 )
 
 // fakeGo puts a `go` shell script with the given body first on PATH.
@@ -16,7 +18,7 @@ func fakeGo(t *testing.T, body string) {
 	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	prependPath(t, bin)
+	cmdtest.PrependPath(t, bin)
 }
 
 func briefDir(data string) string { return filepath.Join(data, "gx", "brief") }
@@ -32,7 +34,7 @@ func indexLines(t *testing.T, data string) []string {
 
 func TestBrief_SweepRemovesOldLogsAndIndexLines(t *testing.T) {
 	t.Parallel()
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	dir := briefDir(data)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -75,7 +77,7 @@ func TestBrief_SweepRemovesOldLogsAndIndexLines(t *testing.T) {
 
 func TestBrief_SweepErrorDoesNotFailRun(t *testing.T) {
 	t.Parallel()
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	dir := briefDir(data)
 	// A directory named like a log, an unparsable index line and an index
 	// that can only be rewritten through an unwritable temp path.
@@ -97,7 +99,7 @@ func TestBrief_SweepErrorDoesNotFailRun(t *testing.T) {
 }
 
 func TestBrief_SignalKilledChildIsFailure(t *testing.T) {
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	fakeGo(t, "echo partial-output\nkill -9 $$")
 
 	out, code := runBriefCmd(t, t.TempDir(), "go-test")
@@ -117,7 +119,7 @@ func TestBrief_SignalKilledChildIsFailure(t *testing.T) {
 }
 
 func TestBrief_InterruptIsForwardedToChild(t *testing.T) {
-	data := envValue(envFor(t), "XDG_DATA_HOME")
+	data := cmdtest.EnvValue(cmdtest.EnvFor(t), "XDG_DATA_HOME")
 	started := filepath.Join(t.TempDir(), "started")
 	fakeGo(t, "trap 'echo got-interrupt; exit 3' INT\necho partial-output\ntouch "+started+"\nwhile :; do sleep 0.05; done")
 

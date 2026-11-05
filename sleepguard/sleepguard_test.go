@@ -28,11 +28,11 @@ var allowed = map[string]int{
 	"brief/brief_test.go":                                  2, // poll loops with a deadline
 	"check/check_test.go":                                  1, // poll loop with a deadline waiting on the go step
 	"check/lock_test.go":                                   2, // a held-lock stand-in that sleeps until killed, and a poll loop with a deadline waiting on the lock state
-	"cmd/brief_cleancache_test.go":                         1, // negative wait: go clean does not run while a build holds the gate
-	"cmd/brief_test.go":                                    2, // poll loop with a deadline waiting on the fake go; a fixture test source that is slow on purpose
+	"cmd/brief/brief_cleancache_test.go":                   1, // negative wait: go clean does not run while a build holds the gate
+	"cmd/brief/brief_test.go":                              2, // poll loop with a deadline waiting on the fake go; a fixture test source that is slow on purpose
 	"cmd/check_record_test.go":                             3, // fixture test sources that are slow on purpose, run by a child go test
 	"cmd/agent_permission_request_test.go":                 3, // one poll loop with a deadline; negative waits: no request is filed; a stale decision is ignored
-	"cmd/brief_retention_test.go":                          1,
+	"cmd/brief/brief_retention_test.go":                    1,
 	"codexdoctor/session_test.go":                          1, // poll loop with a deadline waiting on the rollout
 	"codexsetup/setup_test.go":                             1, // negative wait: a rerun leaves the files' mtimes alone
 	"nativerunner/pty_codex_prompt_test.go":                3, // two poll loops with a deadline; negative wait: a queued prompt is not submitted

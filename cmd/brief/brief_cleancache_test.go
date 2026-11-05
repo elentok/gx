@@ -1,4 +1,4 @@
-package cmd
+package brief
 
 import (
 	"bytes"
@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/testutil"
@@ -25,19 +27,19 @@ func fakeGoRecording(t *testing.T) string {
 	if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	prependPath(t, bin)
+	cmdtest.PrependPath(t, bin)
 	return rec
 }
 
 func runCleanCache(t *testing.T, gate gocachegate.Deps) (string, int) {
 	t.Helper()
-	root := newRootCmd(deps{getwd: func() (string, error) { return t.TempDir(), nil }, env: envFor(t), cacheGate: gate})
 	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetErr(&out)
-	root.SetArgs([]string{"brief", "go-clean-cache"})
-	err := root.Execute()
-	var ee *ExitError
+	d := Deps{
+		Env:       cmdbase.Env{Stdout: &out, Stderr: &out, Getwd: func() (string, error) { return t.TempDir(), nil }, Env: cmdtest.EnvFor(t)},
+		CacheGate: gate,
+	}
+	err := cmdtest.Run(t, d.Env, []string{"brief", "go-clean-cache"}, New(d))
+	var ee *cmdbase.ExitError
 	if errors.As(err, &ee) {
 		return out.String(), ee.Code
 	}
@@ -69,7 +71,7 @@ func TestBrief_GoCleanCacheRunsCleanWithoutGateHolder(t *testing.T) {
 
 func TestBrief_GoCleanCacheWaitsForRegisteredBuild(t *testing.T) {
 	rec := fakeGoRecording(t)
-	stateDir, err := config.DirsFrom(envFor(t)).StateDir()
+	stateDir, err := config.DirsFrom(cmdtest.EnvFor(t)).StateDir()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +120,7 @@ func TestBrief_GoCleanCacheFailureExits1(t *testing.T) {
 	if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	prependPath(t, bin)
+	cmdtest.PrependPath(t, bin)
 	out, code := runCleanCache(t, quietGate(time.Second))
 	if code != 1 || !strings.Contains(out, "boom") {
 		t.Fatalf("exit = %d, out:\n%s", code, out)

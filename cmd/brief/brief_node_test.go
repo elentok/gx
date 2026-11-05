@@ -1,4 +1,4 @@
-package cmd
+package brief
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -19,7 +20,7 @@ func nodeStub(t *testing.T, dir, tool, sample string, exit int) string {
 	rec := filepath.Join(t.TempDir(), tool+".args")
 	script := "#!/bin/sh\npwd > '" + rec + "'\nfor a in \"$@\"; do echo \"$a\" >> '" + rec + "'; done\n"
 	if sample != "" {
-		abs, err := filepath.Abs(filepath.Join("..", "brief", "testdata", sample))
+		abs, err := filepath.Abs(filepath.Join("..", "..", "brief", "testdata", sample))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -79,7 +80,7 @@ func TestBrief_NodeBinaryWalkUp(t *testing.T) {
 	// A global tsc on PATH must never be used.
 	globalBin := t.TempDir()
 	globalRec := nodeStub(t, globalBin, "tsc", "", 0)
-	prependPath(t, filepath.Join(globalBin, "node_modules", ".bin"))
+	cmdtest.PrependPath(t, filepath.Join(globalBin, "node_modules", ".bin"))
 
 	for _, args := range [][]string{{"-C", web, "tsc", "--noEmit"}, {"-C", filepath.Join(web, "src"), "tsc", "-p", "..", "--noEmit"}} {
 		if out, code := runBriefCmd(t, repo, args...); code != 0 {

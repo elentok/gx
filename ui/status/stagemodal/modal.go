@@ -191,7 +191,7 @@ func (s Model) updateError(msg tea.KeyPressMsg) (Model, tea.Cmd, Result) {
 	return s, cmd, Result{}
 }
 
-// Poll drains the running action's output, opens the credential prompt when it
+// Poll reads the running action's output, opens the credential prompt when it
 // asks for one and reports its result once. It reschedules itself while the
 // running modal is waiting on the action.
 func (s Model) Poll() (Model, tea.Cmd, Result) {

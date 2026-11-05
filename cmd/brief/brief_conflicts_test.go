@@ -1,4 +1,4 @@
-package cmd
+package brief
 
 import (
 	"os/exec"

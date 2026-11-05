@@ -1,4 +1,6 @@
-package cmd
+// Package brief is the `gx brief` command, a thin wrapper over the brief
+// package's tools.
+package brief
 
 import (
 	"fmt"
@@ -9,7 +11,20 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/gocachegate"
 )
+
+// Deps is what `gx brief` reads from its surroundings.
+type Deps struct {
+	cmdbase.Env
+	// CacheGate holds the hooks of `brief go-clean-cache`; the zero value is
+	// production (tests shorten the cap).
+	CacheGate gocachegate.Deps
+}
+
+// DefaultDeps is the production wiring: the zero value of every hook.
+func DefaultDeps() Deps { return Deps{} }
 
 // briefTools lists the wrapped tools by subcommand name.
 var briefTools = map[string]brief.Tool{
@@ -24,7 +39,8 @@ var briefTools = map[string]brief.Tool{
 
 const goCleanCache = "go-clean-cache"
 
-func newBriefCmd(d deps) *cobra.Command {
+// New builds the `brief` command.
+func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "brief [-C dir] <tool> [args...]",
 		Short: "run a dev tool and print a short report plus the path of the full log",
@@ -62,7 +78,7 @@ everything after the tool name goes to the tool unchanged.`,
 // tool failed".
 func briefUsageError(c *cobra.Command, msg string) error {
 	fmt.Fprintf(c.OutOrStdout(), "brief: %s\n", msg)
-	return &ExitError{Code: brief.ExitCantRun}
+	return &cmdbase.ExitError{Code: brief.ExitCantRun}
 }
 
 // resolveRelativeC joins a relative -C value onto cwd. When that directory is
@@ -76,7 +92,7 @@ func resolveRelativeC(cwd, dir string) string {
 	return joined
 }
 
-func runBrief(c *cobra.Command, d deps, args []string) error {
+func runBrief(c *cobra.Command, d Deps, args []string) error {
 	dir := ""
 	if len(args) >= 2 && args[0] == "-C" {
 		dir, args = args[1], args[2:]
@@ -95,7 +111,7 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 		// conflicts and go-clean-cache are not brief.Tools: they keep no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
-	cwd, err := d.getwd()
+	cwd, err := d.Getwd()
 	if err != nil {
 		return err
 	}
@@ -106,28 +122,28 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 	}
 	if args[0] == "conflicts" {
 		if code := brief.Conflicts(dir, c.OutOrStdout()); code != brief.ExitPass {
-			return &ExitError{Code: code}
+			return &cmdbase.ExitError{Code: code}
 		}
 		return nil
 	}
-	stateDir, err := d.dirs().StateDir()
+	stateDir, err := d.Dirs().StateDir()
 	if err != nil {
 		return err
 	}
 	if args[0] == goCleanCache {
-		if code := brief.GoCleanCache(dir, stateDir, d.env, d.cacheGate, c.OutOrStdout()); code != brief.ExitPass {
-			return &ExitError{Code: code}
+		if code := brief.GoCleanCache(dir, stateDir, d.Env.Env, d.CacheGate, c.OutOrStdout()); code != brief.ExitPass {
+			return &cmdbase.ExitError{Code: code}
 		}
 		return nil
 	}
-	dataDir, err := d.dirs().DataDir()
+	dataDir, err := d.Dirs().DataDir()
 	if err != nil {
 		return err
 	}
 	code := brief.Run(tool, brief.Options{Dir: dir, Args: args[1:], CDir: cFlag, DataDir: dataDir, StateDir: stateDir, Out: c.OutOrStdout(),
-		Env: d.env, CheckRun: d.dirs().Getenv(brief.EnvCheckRun), CheckKind: d.dirs().Getenv(brief.EnvCheckKind)})
+		Env: d.Env.Env, CheckRun: d.Dirs().Getenv(brief.EnvCheckRun), CheckKind: d.Dirs().Getenv(brief.EnvCheckKind)})
 	if code != brief.ExitPass {
-		return &ExitError{Code: code}
+		return &cmdbase.ExitError{Code: code}
 	}
 	return nil
 }

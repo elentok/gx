@@ -9,11 +9,11 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
+	"github.com/elentok/gx/cmd/brief"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/sessionlookup"
@@ -80,9 +80,6 @@ type deps struct {
 	serverClient func() (*apiclient.Client, error)
 	// env is the process environment every config dir is resolved from.
 	env []string
-	// cacheGate holds the hooks of `brief go-clean-cache`; the zero value is
-	// production (tests shorten the cap).
-	cacheGate gocachegate.Deps
 	// writeFile writes ticket files in `tickets publish`; nil means os.WriteFile
 	// (tests inject a faulty one).
 	writeFile func(path string, data []byte, perm os.FileMode) error
@@ -274,7 +271,7 @@ Run without a command to open the status UI.`,
 		newRunCmd(d),
 		newAgentHolderCmd(),
 		newTermCmd(d),
-		newBriefCmd(d),
+		brief.New(brief.Deps{Env: d.base(), CacheGate: brief.DefaultDeps().CacheGate}),
 		newCheckCmd(d),
 		newDoctorCmd(d),
 		newVersionCmd(d),
