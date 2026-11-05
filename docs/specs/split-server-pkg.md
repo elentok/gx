@@ -273,8 +273,8 @@ Per story:
 32. `go test ./sleepguard ./oldwords ./envguard ./agentrunner` passes after the last move. The `agentrunner` herdr list contains only packages that import `herdr`.
 33. `.ai/index.md` lists every new package in the package map, has the new "Adding a server route" steps, and states the guardrail limits. `scripts/test.sh` runs `./server/...` and the generic step skips it. `make test` runs.
 34. Test time before and after are measured with the same command on the same machine: `make test` plus `gx brief go-test -count=1 ./server/... ./cmd/... ./ralphloop/...`. The command runs alone, with no other suite and no `gx check` running at the same time. `gx check --full` runs before or after it, not during. They are written here, in this section:
-    - Before: recorded by the before-records ticket on the epic's base commit, before any other wave-0 ticket merges. To be recorded.
-    - After: recorded by the guardrail ticket. To be recorded.
+    - Before: recorded by the before-records ticket on the epic's base commit, before any other wave-0 ticket merges. `make test` 418 s; `gx brief go-test -count=1 ./server/... ./cmd/... ./ralphloop/...` 396 s (4235 tests, 4 packages).
+    - After: recorded by the guardrail ticket. `make test` 449 s; the `gx brief go-test` command 313 s (4075 tests, 67 packages).
     There is no target.
 35. The flow catalog runs with no new or changed flow, once, in the guardrail ticket (`make web-e2e`), and `gx check --full` passes there. The verify ticket starts a temporary gx server, opens the web UI, runs a few CLI verbs as a smoke check, and points at the guardrail ticket's flow-catalog result.
 36. Every behaviour bug found during the split has a follow-up in `gx:follow-ups` (`gx tickets epics` and the follow-ups listing; the ticket logs name them). No fix for them is in the epic's commits.
