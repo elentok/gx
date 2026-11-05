@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -31,7 +32,7 @@ func TestConflictResolutionHandoff(t *testing.T) {
 		{
 			name: "invalid child status with a clean pick ends done",
 			edit: func(t *testing.T, path string) {
-				raw := mustRead(t, path)
+				raw := fixture.MustRead(t, path)
 				if err := os.WriteFile(path, []byte(strings.Replace(raw, "status: claimed", "status: resolved", 1)), 0644); err != nil {
 					t.Fatalf("WriteFile: %v", err)
 				}
@@ -129,7 +130,7 @@ func TestConflictResolutionHandoff(t *testing.T) {
 					t.Fatalf("handoff: %v", err)
 				}
 
-				child := mustParse(t, childPath)
+				child := fixture.MustParse(t, childPath)
 				if tc.stillConflicted && path == "fresh" {
 					assertPaused(t, child, schema.PauseClassRepair, "")
 				} else if child.Status != tc.wantChild {
@@ -160,7 +161,7 @@ func loadChild(p iterationParams) (string, error) {
 // commitless ticket and write done rather than pausing on validation.
 func TestFinishIteration_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\nbase: main\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
@@ -179,7 +180,7 @@ func TestFinishIteration_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPau
 		t.Errorf("outcome = %+v, want merged", out)
 	}
 
-	got := mustParse(t, ticketPath)
+	got := fixture.MustParse(t, ticketPath)
 	if got.Status != schema.StatusDone || !got.Commitless {
 		t.Errorf("ticket status = %q commitless = %v, want done and commitless", got.Status, got.Commitless)
 	}

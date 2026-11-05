@@ -9,12 +9,13 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 )
 
 func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t *testing.T) {
 	t.Parallel()
 	const failure = "■ stream disconnected before completion: Your input exceeds the context window of this model. Please adjust your input and try again."
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20"), timeoutOn: 1, contextExhausted: failure}
 	d := Deps{
 		Runner: r,
@@ -110,7 +111,7 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 
 func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfPausing(t *testing.T) {
 	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
+	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 	r := &blipRunner{
 		Runner:           idlePromptRunner("iter-22", "codex-session-22"),
 		contextExhausted: "■ Codex ran out of room in the model's context window.",
@@ -185,7 +186,7 @@ func TestWaitForFinish_InterruptNotReadyRetriesNextPoll(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ticketPath := writeFrontmatterTicket(t, "claimed")
+			ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 			r := &blipRunner{Runner: idlePromptRunner("iter-30", "codex-session-30")}
 			tc.setup(r)
 			d := Deps{Runner: &refuseFirstInterrupt{blipRunner: r, evidence: r.contextExhausted}, Sleep: func(time.Duration) {}}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -180,7 +181,7 @@ func TestDefaultDepsWithOverrides_NoHomeReadsNoTranscript(t *testing.T) {
 	t.Parallel()
 	const cwd, session = "/work/tree", "sess-1"
 	home := t.TempDir()
-	writeFakeTranscript(t, home, cwd, session, time.Now(), [3]any{"claude-sonnet-5", 1000, 0})
+	fixture.WriteFakeTranscript(t, home, cwd, session, time.Now(), [3]any{"claude-sonnet-5", 1000, 0})
 
 	if _, ok, err := DefaultDepsWithOverrides(DepsOverrides{Home: home}).ReadOccupancy(cwd, session); err != nil || !ok {
 		t.Fatalf("ReadOccupancy() with the home = ok %v, err %v; want the transcript found", ok, err)
@@ -200,7 +201,7 @@ func TestDefaultDepsWithOverrides_ReadTurnsResolvesPathLikeReadOccupancy(t *test
 	t.Parallel()
 	const cwd, session = "/work/tree", "sess-1"
 	home := t.TempDir()
-	writeFakeTranscript(t, home, cwd, session, time.Now(), [3]any{"claude-sonnet-5", 1000, 0})
+	fixture.WriteFakeTranscript(t, home, cwd, session, time.Now(), [3]any{"claude-sonnet-5", 1000, 0})
 
 	turns, ok, err := DefaultDepsWithOverrides(DepsOverrides{Home: home}).ReadTurns(cwd, session, time.Time{})
 	if err != nil || !ok || turns.Model != "claude-sonnet-5" || turns.Count != 1 {

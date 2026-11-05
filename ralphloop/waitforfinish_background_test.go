@@ -7,6 +7,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -36,7 +37,7 @@ func backgroundTaskGateParams(scratchDir string) launchAndPromptParams {
 // until that task resolves.
 func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -91,7 +92,7 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 // that never resolves stops holding once GateReleased reports true.
 func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -134,7 +135,7 @@ func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 // (never gate-released) for that marker.
 func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -177,7 +178,7 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 // holds: a Codex turn that ends with a terminal running finishes at turn end.
 func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -216,7 +217,7 @@ func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
 // until a later idle genuinely holds up.
 func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -272,7 +273,7 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 // calls, so an idle recheck alone passed. The transcript's turn end decides.
 func TestWaitForFinish_BackgroundTaskGateHoldsUntilTheWokenTurnEnds(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++

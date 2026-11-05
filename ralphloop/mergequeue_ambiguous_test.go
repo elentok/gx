@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -15,10 +16,10 @@ import (
 // A feature branch carrying the ticket's trailer on a commit that is neither
 // the recorded SHA nor patch-equivalent must pause, not count as merged.
 func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "epic", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "epic", "01-a.md")
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-b", "epic")
 	// testutil.CommitAll runs plain git, which has no identity on CI runners.
@@ -57,10 +58,10 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 }
 
 func TestPausedOutcome_NoKindNoReason_FallsBackHonestly(t *testing.T) {
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: paused\ntype: implement\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "epic", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "epic", "01-a.md")
 	tk, err := schema.ParseTicket(path)
 	if err != nil {
 		t.Fatal(err)

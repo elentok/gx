@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
 	"go.uber.org/goleak"
@@ -186,14 +187,14 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	setHomeEnv(t, home)
+	fixture.SetHomeEnv(t, home)
 	writeOccupancyTranscript(t, home, cwd, sessionID, smartZone+100)
 
 	// Models the whole scenario's ~3 real minutes of compaction without
 	// sleeping for them.
 	s.AdvanceVirtualTime(3 * time.Minute)
 
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	deps := testDepsWithOverrides(DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
@@ -300,7 +301,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 
 	_, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	deps := testDepsWithOverrides(DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -514,14 +515,14 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	setHomeEnv(t, home)
+	fixture.SetHomeEnv(t, home)
 	writeOccupancyTranscript(t, home, cwd, sessionID, smartZone+100)
 
 	// Models the whole scenario's ~8 real minutes of compaction without
 	// sleeping for them.
 	s.AdvanceVirtualTime(8 * time.Minute)
 
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	deps := testDepsWithOverrides(DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}

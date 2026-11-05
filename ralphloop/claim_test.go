@@ -10,64 +10,31 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/runnerfake"
 
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func writeTicket(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "01-some-ticket.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-	return path
-}
-
-// writeFrontmatterTicket writes a minimal valid ticket file with the given
-// status and returns its path.
-func writeFrontmatterTicket(t *testing.T, status string) string {
-	t.Helper()
-	return writeTicket(t, "---\nid: \"01\"\nstatus: "+status+"\ntype: implement\n---\n# Ticket\n\nBody text.\n")
-}
-
-func mustRead(t *testing.T, path string) string {
-	t.Helper()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	return string(raw)
-}
-
-func mustParse(t *testing.T, path string) schema.Ticket {
-	t.Helper()
-	ticket, err := schema.ParseTicket(path)
-	if err != nil {
-		t.Fatalf("schema.ParseTicket: %v", err)
-	}
-	return ticket
-}
-
 func TestClaim_RewritesStatus(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "open")
+	path := fixture.WriteFrontmatterTicket(t, "open")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	if got := mustParse(t, path).Status; got != schema.StatusClaimed {
+	if got := fixture.MustParse(t, path).Status; got != schema.StatusClaimed {
 		t.Errorf("Status = %q, want %q", got, schema.StatusClaimed)
 	}
 }
 
 func TestClaimAndDone_StampClaimedAtAndDoneAt(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "open")
+	path := fixture.WriteFrontmatterTicket(t, "open")
 	before := time.Now().UTC().Add(-time.Second)
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	got := mustParse(t, path)
+	got := fixture.MustParse(t, path)
 	if got.ClaimedAt.Before(before) || !got.DoneAt.IsZero() {
 		t.Fatalf("after claim ClaimedAt = %v, DoneAt = %v, want stamped claim and no done", got.ClaimedAt, got.DoneAt)
 	}
@@ -83,7 +50,7 @@ func TestClaimAndDone_StampClaimedAtAndDoneAt(t *testing.T) {
 		if err := markDone(path); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if got := mustParse(t, path); got.DoneAt.Before(before) || got.ClaimedAt.Before(before) {
+		if got := fixture.MustParse(t, path); got.DoneAt.Before(before) || got.ClaimedAt.Before(before) {
 			t.Errorf("%s: ClaimedAt = %v, DoneAt = %v, want both stamped", name, got.ClaimedAt, got.DoneAt)
 		}
 	}
@@ -91,19 +58,19 @@ func TestClaimAndDone_StampClaimedAtAndDoneAt(t *testing.T) {
 	if err := Claim(path); err != nil {
 		t.Fatalf("re-claim: %v", err)
 	}
-	if got := mustParse(t, path); !got.DoneAt.IsZero() {
+	if got := fixture.MustParse(t, path); !got.DoneAt.IsZero() {
 		t.Errorf("DoneAt = %v after a fresh claim, want cleared", got.DoneAt)
 	}
 }
 
 func TestClaimWithBase_StampsEveryClaim(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "open")
+	path := fixture.WriteFrontmatterTicket(t, "open")
 	for _, stamp := range []string{"a@111", "main@222"} {
 		if err := ClaimWithBase(path, stamp); err != nil {
 			t.Fatalf("ClaimWithBase: %v", err)
 		}
-		if got := mustParse(t, path).ResolvedBase; got != stamp {
+		if got := fixture.MustParse(t, path).ResolvedBase; got != stamp {
 			t.Errorf("ResolvedBase = %q, want %q", got, stamp)
 		}
 	}
@@ -113,7 +80,7 @@ func TestClaimWithBase_StampsEveryClaim(t *testing.T) {
 // lose `claimed`: both read-modify-writes hold the same per-ticket lock.
 func TestClaim_RacingCLIWriteKeepsClaimed(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "open")
+	path := fixture.WriteFrontmatterTicket(t, "open")
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -134,7 +101,7 @@ func TestClaim_RacingCLIWriteKeepsClaimed(t *testing.T) {
 	}()
 	wg.Wait()
 
-	got := mustParse(t, path)
+	got := fixture.MustParse(t, path)
 	if got.Status != schema.StatusClaimed {
 		t.Errorf("Status = %q, want %q", got.Status, schema.StatusClaimed)
 	}
@@ -145,37 +112,37 @@ func TestClaim_RacingCLIWriteKeepsClaimed(t *testing.T) {
 
 func TestClaim_ClearsIterationStatus(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\niteration_finished_at: 2026-01-02T03:04:05Z\ntype: implement\n---\n# Ticket\n\nBody.\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\niteration_finished_at: 2026-01-02T03:04:05Z\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	ticket := mustParse(t, path)
+	ticket := fixture.MustParse(t, path)
 	if ticket.IterationStatus != "" {
 		t.Errorf("IterationStatus = %q, want cleared", ticket.IterationStatus)
 	}
 	// A claimed ticket's old finish must never read as a late finish.
-	if !ticket.IterationFinishedAt.IsZero() || strings.Contains(mustRead(t, path), "finished_at") {
+	if !ticket.IterationFinishedAt.IsZero() || strings.Contains(fixture.MustRead(t, path), "finished_at") {
 		t.Errorf("IterationFinishedAt = %v, want cleared", ticket.IterationFinishedAt)
 	}
 	if ticket.Status != schema.StatusClaimed {
 		t.Errorf("Status = %q, want %q", ticket.Status, schema.StatusClaimed)
 	}
-	if strings.Contains(mustRead(t, path), "iteration_status") {
-		t.Errorf("ticket file = %q, want iteration_status omitted entirely", mustRead(t, path))
+	if strings.Contains(fixture.MustRead(t, path), "iteration_status") {
+		t.Errorf("ticket file = %q, want iteration_status omitted entirely", fixture.MustRead(t, path))
 	}
 }
 
 func TestClaim_ClearsPauseKind(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-answer\npark_kind: zero-commit\ntype: implement\n---\n# Ticket\n\nBody.\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: needs-answer\npark_kind: zero-commit\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	ticket := mustParse(t, path)
+	ticket := fixture.MustParse(t, path)
 	if ticket.PauseReason != "" || ticket.Status == schema.StatusPaused {
 		t.Errorf("ticket = (%q, %q), want pause reason cleared", ticket.Status, ticket.PauseReason)
 	}
-	if raw := mustRead(t, path); strings.Contains(raw, "park_kind") || strings.Contains(raw, "pause_reason") {
+	if raw := fixture.MustRead(t, path); strings.Contains(raw, "park_kind") || strings.Contains(raw, "pause_reason") {
 		t.Errorf("ticket file = %q, want park_kind and pause_reason omitted entirely", raw)
 	}
 }
@@ -184,29 +151,29 @@ func TestClaim_PreservesOtherFrontmatterFieldsAndBody(t *testing.T) {
 	t.Parallel()
 	original := "---\nid: \"01\"\nstatus: open\nblocked_by: [\"02\", \"03\"]\ntype: implement\n---\n" +
 		"# Ticket\n\n- [ ] some criterion\n- [ ] another **bold** criterion\n\nTrailing prose with `code`.\n"
-	path := writeTicket(t, original)
+	path := fixture.WriteTicket(t, original)
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	got := mustParse(t, path)
+	got := fixture.MustParse(t, path)
 	if got.Status != schema.StatusClaimed {
 		t.Errorf("Status = %q, want %q", got.Status, schema.StatusClaimed)
 	}
 	if want := []schema.TicketID{"02", "03"}; len(got.BlockedBy) != 2 || got.BlockedBy[0] != want[0] || got.BlockedBy[1] != want[1] {
 		t.Errorf("BlockedBy = %v, want %v", got.BlockedBy, want)
 	}
-	if body := schema.ParseBody(mustRead(t, path)); !strings.Contains(body, "some criterion") || !strings.Contains(body, "Trailing prose") {
+	if body := schema.ParseBody(fixture.MustRead(t, path)); !strings.Contains(body, "some criterion") || !strings.Contains(body, "Trailing prose") {
 		t.Errorf("body = %q, want original body content preserved", body)
 	}
 }
 
 func TestMarkDone_RewritesStatus(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "claimed")
+	path := fixture.WriteFrontmatterTicket(t, "claimed")
 	if err := MarkDone(path); err != nil {
 		t.Fatalf("MarkDone: %v", err)
 	}
-	if got := mustParse(t, path).Status; got != schema.StatusDone {
+	if got := fixture.MustParse(t, path).Status; got != schema.StatusDone {
 		t.Errorf("Status = %q, want %q", got, schema.StatusDone)
 	}
 }
@@ -214,14 +181,14 @@ func TestMarkDone_RewritesStatus(t *testing.T) {
 func TestMarkChildDone_RepairsInvalidStatus(t *testing.T) {
 	t.Parallel()
 	for _, status := range []string{"resolved", "claimed"} {
-		path := writeFrontmatterTicket(t, status)
+		path := fixture.WriteFrontmatterTicket(t, status)
 		if err := MarkDone(path); status == "resolved" && err == nil {
 			t.Fatalf("MarkDone accepted invalid status %q", status)
 		}
 		if err := MarkChildDone(path, "s1"); err != nil {
 			t.Fatalf("MarkChildDone(%s): %v", status, err)
 		}
-		if got := mustParse(t, path).Status; got != schema.StatusDone {
+		if got := fixture.MustParse(t, path).Status; got != schema.StatusDone {
 			t.Errorf("from %s: Status = %q, want %q", status, got, schema.StatusDone)
 		}
 	}
@@ -229,8 +196,8 @@ func TestMarkChildDone_RepairsInvalidStatus(t *testing.T) {
 
 func TestMarkChildDone_InvalidStatusPlusOtherInvalidFieldErrorsWithoutWriting(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: resolved\ntype: bogus-type\n---\n# Ticket\n")
-	before := mustRead(t, path)
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: resolved\ntype: bogus-type\n---\n# Ticket\n")
+	before := fixture.MustRead(t, path)
 	err := MarkChildDone(path, "s1")
 	if err == nil {
 		t.Fatal("MarkChildDone accepted a ticket with another invalid field")
@@ -238,18 +205,18 @@ func TestMarkChildDone_InvalidStatusPlusOtherInvalidFieldErrorsWithoutWriting(t 
 	if !strings.Contains(err.Error(), "still invalid") {
 		t.Errorf("err = %v, want a still-invalid error", err)
 	}
-	if after := mustRead(t, path); after != before {
+	if after := fixture.MustRead(t, path); after != before {
 		t.Errorf("file rewritten: %q", after)
 	}
 }
 
 func TestMarkDoneWithMetadata_SetsStatusAndCompactions(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "claimed")
+	path := fixture.WriteFrontmatterTicket(t, "claimed")
 	if err := MarkDoneWithMetadata(path, 2, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
-	got := mustParse(t, path)
+	got := fixture.MustParse(t, path)
 	if got.Status != schema.StatusDone {
 		t.Errorf("Status = %q, want %q", got.Status, schema.StatusDone)
 	}
@@ -263,14 +230,14 @@ func TestMarkDoneWithMetadata_SetsStatusAndCompactions(t *testing.T) {
 // dated "## Comments" sub-entry and removes the "## Needs Repair" heading.
 func TestClaim_DemotesRepairIntoDatedComments(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
 
-	body := schema.ParseBody(mustRead(t, path))
+	body := schema.ParseBody(fixture.MustRead(t, path))
 	if strings.Contains(body, "\n## Needs Repair\n") {
 		t.Errorf("body = %q, want ## Needs Repair heading removed", body)
 	}
@@ -292,18 +259,18 @@ func TestClaim_DemotesRepairIntoDatedComments(t *testing.T) {
 // entry.
 func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
 
 	if err := Claim(path); err != nil {
 		t.Fatalf("first Claim: %v", err)
 	}
-	afterFirst := schema.ParseBody(mustRead(t, path))
+	afterFirst := schema.ParseBody(fixture.MustRead(t, path))
 
 	if err := Claim(path); err != nil {
 		t.Fatalf("second Claim: %v", err)
 	}
-	afterSecond := schema.ParseBody(mustRead(t, path))
+	afterSecond := schema.ParseBody(fixture.MustRead(t, path))
 
 	if afterFirst != afterSecond {
 		t.Errorf("second Claim changed the body:\nfirst:  %q\nsecond: %q", afterFirst, afterSecond)
@@ -319,7 +286,7 @@ func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
 // one "## Comments" heading, not two "## Comments" headings.
 func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
 
 	if err := Claim(path); err != nil {
@@ -332,7 +299,7 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 		t.Fatalf("second Claim: %v", err)
 	}
 
-	body := schema.ParseBody(mustRead(t, path))
+	body := schema.ParseBody(fixture.MustRead(t, path))
 	if n := strings.Count(body, "## Comments"); n != 1 {
 		t.Errorf("## Comments appears %d times, want exactly 1", n)
 	}
@@ -347,14 +314,14 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 // ticket should still see what they were told, right up until it's claimed.
 func TestClaim_ResumedButUnclaimedKeepsRepairVisible(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
 	if err := SetStatus(path, "open"); err != nil {
 		t.Fatalf("SetStatus: %v", err)
 	}
 
-	body := schema.ParseBody(mustRead(t, path))
+	body := schema.ParseBody(fixture.MustRead(t, path))
 	if !strings.Contains(body, "## Needs Repair") {
 		t.Errorf("body = %q, want ## Needs Repair still present after resume", body)
 	}
@@ -368,14 +335,14 @@ func TestClaim_ResumedButUnclaimedKeepsRepairVisible(t *testing.T) {
 // retiring here would fire repeatedly instead of exactly once at claim.
 func TestReattach_ClearIterationStatusDoesNotRetireRepair(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: working\ntype: implement\n---\n"+
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: working\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
 	if err := schema.ClearIterationStatus(path); err != nil {
 		t.Fatalf("ClearIterationStatus: %v", err)
 	}
 
-	body := schema.ParseBody(mustRead(t, path))
+	body := schema.ParseBody(fixture.MustRead(t, path))
 	if !strings.Contains(body, "\n## Needs Repair\n") {
 		t.Errorf("body = %q, want ## Needs Repair still present after reattach", body)
 	}
@@ -383,13 +350,13 @@ func TestReattach_ClearIterationStatusDoesNotRetireRepair(t *testing.T) {
 
 func TestAppendSessionID_AppendsWithoutOverwriting(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nsession_ids: [\"sess-1\"]\n---\n# Ticket\n\nBody.\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nsession_ids: [\"sess-1\"]\n---\n# Ticket\n\nBody.\n")
 
 	if err := AppendSessionID(path, "sess-2"); err != nil {
 		t.Fatalf("AppendSessionID: %v", err)
 	}
 
-	got := mustParse(t, path)
+	got := fixture.MustParse(t, path)
 	want := []string{"sess-1", "sess-2"}
 	if len(got.SessionIDs) != len(want) || got.SessionIDs[0] != want[0] || got.SessionIDs[1] != want[1] {
 		t.Errorf("SessionIDs = %v, want %v", got.SessionIDs, want)
@@ -398,13 +365,13 @@ func TestAppendSessionID_AppendsWithoutOverwriting(t *testing.T) {
 
 func TestAppendSessionID_FirstEntryOnUnsetField(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "claimed")
+	path := fixture.WriteFrontmatterTicket(t, "claimed")
 
 	if err := AppendSessionID(path, "sess-1"); err != nil {
 		t.Fatalf("AppendSessionID: %v", err)
 	}
 
-	got := mustParse(t, path)
+	got := fixture.MustParse(t, path)
 	if want := []string{"sess-1"}; len(got.SessionIDs) != 1 || got.SessionIDs[0] != want[0] {
 		t.Errorf("SessionIDs = %v, want %v", got.SessionIDs, want)
 	}
@@ -412,19 +379,19 @@ func TestAppendSessionID_FirstEntryOnUnsetField(t *testing.T) {
 
 func TestClaimThenMarkDone_UpdatesStatus(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "open")
+	path := fixture.WriteFrontmatterTicket(t, "open")
 
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	if got := mustParse(t, path).Status; got != schema.StatusClaimed {
+	if got := fixture.MustParse(t, path).Status; got != schema.StatusClaimed {
 		t.Errorf("after Claim, Status = %q, want %q", got, schema.StatusClaimed)
 	}
 
 	if err := MarkDone(path); err != nil {
 		t.Fatalf("MarkDone: %v", err)
 	}
-	if got := mustParse(t, path).Status; got != schema.StatusDone {
+	if got := fixture.MustParse(t, path).Status; got != schema.StatusDone {
 		t.Errorf("after MarkDone, Status = %q, want %q", got, schema.StatusDone)
 	}
 }
@@ -443,12 +410,12 @@ func TestClaim_MissingFileReturnsError(t *testing.T) {
 // line that no longer matches the "status" key).
 func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Ticket\n\nBody.\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
 
-	raw := mustRead(t, path)
+	raw := fixture.MustRead(t, path)
 	ticket, err := schema.ParseTicketFromRaw(raw, path)
 	if err != nil {
 		t.Fatalf("ParseTicketFromRaw: %v (raw=%q)", err, raw)
@@ -469,12 +436,12 @@ func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 // follow-ups-2026-10-11/04, the merged peak actual_context_window untouched.
 func TestMarkDoneWithMetadata_FrontmatterTicket_KeepsMergedContextWindow(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
 	if err := MarkDoneWithMetadata(path, 0, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
 
-	raw := mustRead(t, path)
+	raw := fixture.MustRead(t, path)
 	ticket, err := schema.ParseTicketFromRaw(raw, path)
 	if err != nil {
 		t.Fatalf("ParseTicketFromRaw: %v (raw=%q)", err, raw)
@@ -502,12 +469,12 @@ func TestMarkDoneWithMetadata_FrontmatterTicket_KeepsMergedContextWindow(t *test
 // frontmatter-format ticket.
 func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Ticket\n\nBody.\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Ticket\n\nBody.\n")
 
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
-	ticket, err := schema.ParseTicketFromRaw(mustRead(t, path), path)
+	ticket, err := schema.ParseTicketFromRaw(fixture.MustRead(t, path), path)
 	if err != nil {
 		t.Fatalf("ParseTicketFromRaw: %v", err)
 	}
@@ -518,7 +485,7 @@ func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.
 	if err := MarkDone(path); err != nil {
 		t.Fatalf("MarkDone: %v", err)
 	}
-	ticket, err = schema.ParseTicketFromRaw(mustRead(t, path), path)
+	ticket, err = schema.ParseTicketFromRaw(fixture.MustRead(t, path), path)
 	if err != nil {
 		t.Fatalf("ParseTicketFromRaw: %v", err)
 	}
@@ -533,7 +500,7 @@ func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.
 // silently line-splicing a Status: line into it.
 func TestClaim_NoFrontmatterReturnsError(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "# Ticket\n\nJust a body, no frontmatter.\n")
+	path := fixture.WriteTicket(t, "# Ticket\n\nJust a body, no frontmatter.\n")
 	if err := Claim(path); err == nil {
 		t.Error("Claim(file with no frontmatter) = nil error, want error")
 	}
@@ -548,7 +515,7 @@ func TestClaim_NoFrontmatterReturnsError(t *testing.T) {
 // rename so every read sees a complete, valid ticket.
 func TestSetStatus_ConcurrentWritesAndReads_NeverExposesATornFile(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "open")
+	path := fixture.WriteFrontmatterTicket(t, "open")
 
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
@@ -607,7 +574,7 @@ func TestSetStatus_ConcurrentWritesAndReads_NeverExposesATornFile(t *testing.T) 
 
 func TestRecordLiveSession_AppendsOnceAndReturnsSession(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "claimed")
+	path := fixture.WriteFrontmatterTicket(t, "claimed")
 	d := Deps{Runner: idleRunner("iter-01")}
 
 	for range 2 { // a reclaimed run finishes twice
@@ -616,20 +583,20 @@ func TestRecordLiveSession_AppendsOnceAndReturnsSession(t *testing.T) {
 		}
 	}
 
-	if got := mustParse(t, path).SessionIDs; len(got) != 1 || got[0] != "sess-1" {
+	if got := fixture.MustParse(t, path).SessionIDs; len(got) != 1 || got[0] != "sess-1" {
 		t.Errorf("SessionIDs = %v, want [sess-1] once", got)
 	}
 }
 
 func TestRecordLiveSession_NoLiveAgentLeavesTicketAlone(t *testing.T) {
 	t.Parallel()
-	path := writeFrontmatterTicket(t, "claimed")
+	path := fixture.WriteFrontmatterTicket(t, "claimed")
 	d := Deps{Runner: runnerfake.NewRunner()}
 
 	if got := recordLiveSession(d, "iter-01", path); got != "" {
 		t.Errorf("recordLiveSession = %q, want empty", got)
 	}
-	if got := mustParse(t, path).SessionIDs; len(got) != 0 {
+	if got := fixture.MustParse(t, path).SessionIDs; len(got) != 0 {
 		t.Errorf("SessionIDs = %v, want none", got)
 	}
 }

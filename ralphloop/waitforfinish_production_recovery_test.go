@@ -10,6 +10,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -39,7 +40,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	sessionID := "sess-07"
 
 	home := t.TempDir()
-	setHomeEnv(t, home)
+	fixture.SetHomeEnv(t, home)
 
 	s := herdrfake.NewState(t)
 
@@ -181,7 +182,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	deps := testDepsWithOverrides(DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
@@ -265,7 +266,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	sessionID := "sess-08"
 
 	home := t.TempDir()
-	setHomeEnv(t, home)
+	fixture.SetHomeEnv(t, home)
 
 	s := herdrfake.NewState(t)
 
@@ -376,7 +377,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	deps := testDepsWithOverrides(DepsOverrides{Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}

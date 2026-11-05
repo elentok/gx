@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -67,7 +68,7 @@ func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration
 	if iterationStatus != "" {
 		front += "iteration_status: " + iterationStatus + "\n"
 	}
-	scratchDir := writeEpic(t, "epic", map[string]string{"01-a.md": front + "---\n# A\n"})
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{"01-a.md": front + "---\n# A\n"})
 	r := idleRunner("iter-01")
 	r.PromptState = agentrunner.StateIdle
 	var sleeps []time.Duration
@@ -404,7 +405,7 @@ func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, tim
 
 // A held merge lock is routine; mergeBuilt retries instead of failing the finish.
 func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	lockDir := mustMergeLockDir(t, scratchDir, "epic")

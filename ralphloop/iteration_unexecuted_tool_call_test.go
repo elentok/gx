@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -18,7 +19,7 @@ import (
 // leaves it before launching, and returns its scratch dir and ticket path.
 func finishFixture(t *testing.T) (scratchDir, path string) {
 	t.Helper()
-	scratchDir = writeEpic(t, "epic", map[string]string{
+	scratchDir = fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	return scratchDir, filepath.Join(scratchDir, "epic", "issues", "01-a.md")

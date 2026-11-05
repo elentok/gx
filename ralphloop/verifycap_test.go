@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -28,7 +29,7 @@ func runVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, smartZon
 	for _, f := range tweak {
 		f(r)
 	}
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	read := func(string, string) (int, bool, error) { return occupancy(r.Prompts("iter-19")), true, nil }
 	d := Deps{
 		Runner:           r,
@@ -100,7 +101,7 @@ func TestWaitForFinish_VerifyCap_FiredStateSurvivesASecondWait(t *testing.T) {
 	p := boundGiveUpParams()
 	p.SmartZone = verifyCapTestZone
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: "verify"}
-	p.ScratchDir = epicScratchDir(t, "epic")
+	p.ScratchDir = fixture.EpicScratchDir(t, "epic")
 	p.EpicName = "epic"
 	p.verifyCap = new(verifyCapState)
 	for i := range 2 {
@@ -245,7 +246,7 @@ func TestWaitIterationFinished_VerifyCap_FollowsOneIterationSmartZone(t *testing
 	zone := defaultSmartZone + 40_000
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
 	r.finishPollsOnly = false
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	read := func(string, string) (int, bool, error) { return defaultSmartZone, true, nil }
 	d := Deps{Runner: r, ReadOccupancy: read, ReadCodexContext: read, Sleep: func(time.Duration) {}}
 	one := OneIteration{

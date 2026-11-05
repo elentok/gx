@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -119,7 +120,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 
 	t.Run("zero-seq match is not a real baseline", func(t *testing.T) {
 		t.Parallel()
-		scratchDir := epicScratchDir(t, "fix-spinner")
+		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
 			Type:         string(events.IterationStarted),
@@ -135,7 +136,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 
 	t.Run("no matching event falls through to false", func(t *testing.T) {
 		t.Parallel()
-		scratchDir := epicScratchDir(t, "fix-spinner")
+		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
 			Type:         string(events.IterationStarted),
@@ -151,7 +152,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 
 	t.Run("genuine non-zero baseline still matches", func(t *testing.T) {
 		t.Parallel()
-		scratchDir := epicScratchDir(t, "fix-spinner")
+		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
 			Type:           string(events.IterationStarted),
@@ -171,7 +172,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 
 	t.Run("skips zero-seq event to find a later genuine baseline", func(t *testing.T) {
 		t.Parallel()
-		scratchDir := epicScratchDir(t, "fix-spinner")
+		scratchDir := fixture.EpicScratchDir(t, "fix-spinner")
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
 			Type:         string(events.IterationStarted),

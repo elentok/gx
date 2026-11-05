@@ -8,11 +8,12 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 )
 
 func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
+	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 	gate := NewGate()
 	var observedCwd, observedSession string
 	r := &blipRunner{Runner: idlePromptRunner("iter-01", "codex-session-1"), timeoutOn: 1}
@@ -67,7 +68,7 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 // that as success (and finish up) instead of reporting a failure.
 func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var compactionCount int
 	r := breachRunner(func(wait int) bool {
 		// Ticks past smartZoneCompactTimeoutMs before the transcript records
@@ -130,7 +131,7 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 // report a genuine failure, not poll forever.
 func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	r := breachRunner(alwaysTimeout)
 	d := Deps{
 		Runner: r,
@@ -423,7 +424,7 @@ func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
 // must log the gated event rather than borrowing the timeout one.
 func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	compactionCount := 0
 	d := Deps{
 		Runner: breachRunner(func(wait int) bool {
@@ -456,7 +457,7 @@ func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 // keeps the expired event and must not pick up the gated one.
 func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	compactionCount := 0
 	d := Deps{
 		Runner: breachRunner(func(wait int) bool {
@@ -490,7 +491,7 @@ func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing
 // in the run log.
 func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var reads int
 	d := Deps{
 		Runner: breachRunner(nil),

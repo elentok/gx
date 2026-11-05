@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -67,10 +68,10 @@ func finishedCommitlessOneOff(t *testing.T) (Deps, OneIteration, IterationWorktr
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-b", "main")
 	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
-	scratchDir := writeEpic(t, "fix-it", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "fix-it", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: investigate\niteration_status: finished\ncommitless: true\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "fix-it", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "fix-it", "01-a.md")
 	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
 	d := DefaultDeps()
 	d.Runner = runnerfake.NewRunner()
@@ -100,10 +101,10 @@ func TestFinishCommitless_AskOnNonKeepingRunKeepsWorktreeAndStopsSession(t *test
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-b", "main")
 	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
-	scratchDir := writeEpic(t, "fix-it", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "fix-it", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: investigate\niteration_status: asking\ncommitless: true\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "fix-it", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "fix-it", "01-a.md")
 	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
 	d := DefaultDeps()
 	runner := runnerfake.NewRunner()
@@ -139,10 +140,10 @@ func TestFinishCommitless_AskKeepsWorktreeWhateverTheClockSays(t *testing.T) {
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-b", "main")
 	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
-	scratchDir := writeEpic(t, "fix-it", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "fix-it", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: investigate\niteration_status: asking\ncommitless: true\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "fix-it", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "fix-it", "01-a.md")
 	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
 	d := DefaultDeps()
 	d.Runner = runnerfake.NewRunner()

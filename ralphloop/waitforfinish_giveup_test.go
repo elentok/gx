@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -187,7 +188,7 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 // failing the iteration: the agent may still finish on its own.
 func TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	var r *blipRunner
 	r = breachRunner(func(int) bool {
 		r.FailNextPrompts("iter-19", 1, errors.New("finish-up never submitted"))
@@ -356,7 +357,7 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 // for an operator-raised prompt and paused.
 func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t *testing.T) {
 	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
+	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 	var readCompactionsCalls int
 	fake := idleRunner("iter-01")
 	fake.PromptState = agentrunner.StateIdle
@@ -410,7 +411,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 
 func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing.T) {
 	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
+	ticketPath := fixture.WriteFrontmatterTicket(t, "claimed")
 	r := blockedRunner("iter-01")
 	r.SetRateLimitErr("iter-01", errors.New("rollout unreadable"))
 	d := Deps{Runner: r}

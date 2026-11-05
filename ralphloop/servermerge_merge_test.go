@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -15,7 +16,7 @@ import (
 // server's mergeBuilt.
 func serverMergeFixture(t *testing.T) (Deps, iterationParams, *builtAwaitingMergeError, string) {
 	t.Helper()
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)

@@ -11,6 +11,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -21,7 +22,7 @@ import (
 // post-compaction (last) value, so a test can tell peak from last.
 func compactedMergingFixture(t *testing.T, home, cwd, sessionID string) (d Deps, peak int) {
 	t.Helper()
-	writeFakeTranscript(t, home, cwd, sessionID, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	fixture.WriteFakeTranscript(t, home, cwd, sessionID, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		[3]any{"claude-sonnet-5", 1000, 129000},
 		[3]any{"claude-sonnet-5", 1000, 69000},
 	)
@@ -37,7 +38,7 @@ func compactedMergingFixture(t *testing.T, home, cwd, sessionID string) (d Deps,
 // keeps mergeCherryPick's peak actual_context_window instead of overwriting it
 // with the post-compaction occupancy.
 func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
@@ -56,7 +57,7 @@ func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 		t.Fatalf("markDoneStampingCloseMetadata() error = %v", err)
 	}
 
-	got := mustParse(t, ticketPath)
+	got := fixture.MustParse(t, ticketPath)
 	if got.Status != schema.StatusDone || got.ActualContextWindow != peak || got.Compactions != 1 {
 		t.Errorf("got status=%q actual_context_window=%d compactions=%d, want done/%d/1", got.Status, got.ActualContextWindow, got.Compactions, peak)
 	}
@@ -66,7 +67,7 @@ func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 // reattached close: mergeCherryPick has no session to stamp from, so the
 // backfill recovers the run log's session and must stamp its peak itself.
 func TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) {
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
@@ -90,7 +91,7 @@ func TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T)
 		t.Fatalf("markDoneStampingCloseMetadata() error = %v", err)
 	}
 
-	got := mustParse(t, ticketPath)
+	got := fixture.MustParse(t, ticketPath)
 	if got.Status != schema.StatusDone || got.ActualContextWindow != peak || got.Compactions != 1 {
 		t.Errorf("got status=%q actual_context_window=%d compactions=%d, want done/%d/1", got.Status, got.ActualContextWindow, got.Compactions, peak)
 	}
@@ -105,7 +106,7 @@ func TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T)
 func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter(t *testing.T) {
 	home := t.TempDir()
 
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
@@ -113,7 +114,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, home, cwd, sessionID, start,
+	fixture.WriteFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
@@ -158,7 +159,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	home := t.TempDir()
 
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
@@ -166,7 +167,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, home, cwd, sessionID, start,
+	fixture.WriteFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
@@ -227,7 +228,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime(t *testing.T) {
 	home := t.TempDir()
 
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
@@ -235,7 +236,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 	sessionID := "sess-commitless-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, home, cwd, sessionID, start,
+	fixture.WriteFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
@@ -272,7 +273,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutError(t *testing.T) {
 	home := t.TempDir()
 
-	scratchDir := writeEpic(t, "epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")

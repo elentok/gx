@@ -9,16 +9,17 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestPause_WritesTicketEventAndNotifies(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "my-epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 	sink := &recordingSink{}
 
 	pause(sink, pauseRequest{
@@ -27,7 +28,7 @@ func TestPause_WritesTicketEventAndNotifies(t *testing.T) {
 		Repair: schema.FaultState{Label: "l", Branch: "b", Worktree: "w"},
 	})
 
-	assertPaused(t, mustParse(t, path), schema.PauseClassRepair, schema.PauseIterationError)
+	assertPaused(t, fixture.MustParse(t, path), schema.PauseClassRepair, schema.PauseIterationError)
 	evs, _, _ := ReadEvents(scratchDir, "my-epic")
 	if len(evs) != 1 || evs[0].Kind != "iteration-error" || evs[0].Reason != "boom" {
 		t.Errorf("events = %+v, want one iteration-error event", evs)
@@ -50,8 +51,8 @@ func TestPause_RefusesDoneTicket(t *testing.T) {
 		t.Run(string(kind), func(t *testing.T) {
 			logged.Reset()
 			content := "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# A\n"
-			scratchDir := writeEpic(t, "my-epic", map[string]string{"01-a.md": content})
-			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{"01-a.md": content})
+			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 			sink := &recordingSink{}
 
 			_, err := pause(sink, pauseRequest{
@@ -85,10 +86,10 @@ func TestPause_AskingKinds(t *testing.T) {
 	for _, kind := range []events.Kind{events.ZeroCommit, events.SelfReported} {
 		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
-			scratchDir := writeEpic(t, "my-epic", map[string]string{
+			scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
-			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 			sink := &recordingSink{}
 
 			if _, err := pause(sink, pauseRequest{
@@ -98,7 +99,7 @@ func TestPause_AskingKinds(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			got := mustParse(t, path)
+			got := fixture.MustParse(t, path)
 			assertPaused(t, got, schema.PauseClassAnswer, schema.ParsePauseReason(string(kind)))
 			evs, _, _ := ReadEvents(scratchDir, "my-epic")
 			if len(evs) != 1 || evs[0].Type != "paused" || evs[0].Kind != string(kind) || evs[0].Pane != "p1" {
@@ -116,10 +117,10 @@ func TestPause_LogsGxQuestionPerKind(t *testing.T) {
 	for kind, summary := range gxQuestions {
 		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
-			scratchDir := writeEpic(t, "my-epic", map[string]string{
+			scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
-			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 			if _, err := pause(&recordingSink{}, pauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 				Type: events.Paused, Kind: kind, Reason: "why",
@@ -139,10 +140,10 @@ func TestPause_LogsGxQuestionPerKind(t *testing.T) {
 
 func TestPause_RepairKindOpensRepairRoundWithNoQuestion(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "my-epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 	if _, err := pause(&recordingSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.BudgetKilled, Reason: "why",
@@ -162,21 +163,21 @@ func TestPause_RepairKindOpensRepairRoundWithNoQuestion(t *testing.T) {
 // pause_kind; a claim (resume) clears it while the event stays in the log.
 func TestPause_RepairStampsPauseKindClearedOnClaim(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "my-epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 
 	pause(&recordingSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.BudgetKilled, Reason: "boom",
 	})
-	assertPaused(t, mustParse(t, path), schema.PauseClassRepair, schema.PauseBudgetKilled)
+	assertPaused(t, fixture.MustParse(t, path), schema.PauseClassRepair, schema.PauseBudgetKilled)
 
 	if err := Claim(path); err != nil {
 		t.Fatal(err)
 	}
-	if got := mustParse(t, path); got.PauseReason != "" || got.Status == schema.StatusPaused {
+	if got := fixture.MustParse(t, path); got.PauseReason != "" || got.Status == schema.StatusPaused {
 		t.Errorf("after claim = (%q, %q), want pause reason cleared", got.Status, got.PauseReason)
 	}
 	evs, _, _ := ReadEvents(scratchDir, "my-epic")
@@ -203,8 +204,8 @@ func openQuestionSummary(t *testing.T, path string) string {
 // reason in its text.
 func TestPause_BlockedPaneLongReasonStillOpensAQuestion(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "my-epic", map[string]string{"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n"})
-	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n"})
+	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 	reason := strings.Repeat("blocked on a prompt gx did not send; ", 6)
 
 	got, err := pause(&recordingSink{}, pauseRequest{
@@ -252,14 +253,14 @@ func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T
 	for _, c := range cases {
 		t.Run(string(c.kind), func(t *testing.T) {
 			t.Parallel()
-			scratchDir := writeEpic(t, "my-epic", map[string]string{
+			scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
-			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 			if err := Pause(scratchDir, "my-epic", "01", path, c.kind, "the-reason", Event{}); err != nil {
 				t.Fatal(err)
 			}
-			got := mustParse(t, path)
+			got := fixture.MustParse(t, path)
 			assertPaused(t, got, legacyClass(c.status), schema.ParsePauseReason(string(c.kind)))
 			if data, _ := os.ReadFile(path); strings.Contains(string(data), "## Handoff") {
 				t.Errorf("pause wrote a conversation section into the .md:\n%s", data)

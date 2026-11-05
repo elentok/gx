@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -17,7 +18,7 @@ func serverVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, polls
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= polls })
 	// The server's wait does not stop on blocked here, so every Wait is a poll.
 	r.finishPollsOnly = false
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	read := func(string, string) (int, bool, error) { return occupancy, true, nil }
 	d := Deps{Runner: r, ReadOccupancy: read, ReadCodexContext: read, Sleep: func(time.Duration) {}}
 	one := OneIteration{

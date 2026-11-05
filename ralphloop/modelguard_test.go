@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -47,7 +48,7 @@ func runModelGuardWait(t *testing.T, ticketType, expected string, read func(sinc
 	t.Helper()
 	var f modelGuardFixture
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
-	f.scratchDir = epicScratchDir(t, "epic")
+	f.scratchDir = fixture.EpicScratchDir(t, "epic")
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 	if read != nil {
 		d.ReadTurns = func(_, _ string, since time.Time) (transcript.Turns, bool, error) {

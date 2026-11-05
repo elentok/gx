@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -16,7 +17,7 @@ func TestReadSessionStats_SubagentTranscripts(t *testing.T) {
 
 	setup := func(t *testing.T) (home string) {
 		home = t.TempDir()
-		writeFakeTranscript(t, home, cwd, session, start, [3]any{"claude-sonnet-4-5", 1000, 0})
+		fixture.WriteFakeTranscript(t, home, cwd, session, start, [3]any{"claude-sonnet-4-5", 1000, 0})
 		return home
 	}
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
@@ -442,7 +443,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testin
 			pauses = append(pauses, ev)
 		}
 	}
-	if len(pauses) != 1 || pauses[0].Kind != string(events.IterationError) || pauses[0].Address != canonicalAddr(scratchDir, epicName, "04") {
+	if len(pauses) != 1 || pauses[0].Kind != string(events.IterationError) || pauses[0].Address != fixture.CanonicalAddr(scratchDir, epicName, "04") {
 		t.Errorf("pause events = %+v, want one of kind iteration-error for 04", pauses)
 	}
 }
@@ -551,7 +552,7 @@ func TestChatEventSink_Close_FlushesQueuedMessageSynchronously(t *testing.T) {
 // exactly one notification-suppressed run-log line naming the queued kinds.
 func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *testing.T) {
 	t.Parallel()
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	epicName := "epic"
 	sink, transport := newFakeChatSink(t, &recordingSink{})
 	sink.scratchDir = scratchDir
@@ -726,7 +727,7 @@ func TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget(t *testin
 // run-log line instead of silently dropped into a queue nobody will ever
 // flush again.
 func TestChatEventSink_Requeue_SkippedAfterClose_LogsSuppression(t *testing.T) {
-	scratchDir := epicScratchDir(t, "epic")
+	scratchDir := fixture.EpicScratchDir(t, "epic")
 	epicName := "epic"
 	sink, _ := newFakeChatSink(t, &recordingSink{})
 	sink.scratchDir = scratchDir

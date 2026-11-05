@@ -2,7 +2,6 @@ package ralphloop
 
 import (
 	"os"
-	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
@@ -10,66 +9,15 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git/history"
-	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 )
-
-// setHomeEnv points $HOME at dir for the rest of the test, restored on
-// cleanup via a manual os.Setenv/os.Unsetenv pair rather than t.Setenv, which
-// panics once a test has called t.Parallel(). Production code in this
-// package that still reads $HOME from the process env sees dir, so
-// this remains a process-wide mutation — a test using it must stay
-// non-parallel with any other test that also touches $HOME.
-func setHomeEnv(t *testing.T, dir string) {
-	t.Helper()
-	setTestDepsHome(t, dir)
-	prev, had := os.LookupEnv("HOME")
-	if err := os.Setenv("HOME", dir); err != nil {
-		t.Fatalf("Setenv HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if had {
-			os.Setenv("HOME", prev)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	})
-}
-
-func ticketPath(scratchDir, epicName, file string) string {
-	return filepath.Join(scratchDir, epicName, "issues", file)
-}
 
 // idleRunner hosts one idle session under label, with ID "pane-1" and
 // SessionID "sess-1".
 func idleRunner(label string) *runnerfake.Runner {
 	return paneRunner(label, "pane-1", "sess-1")
-}
-
-// writeEpic builds a fixture epic directory under a fresh t.TempDir()'s
-// .scratch/{name}/issues/, with one ticket file per entry in tickets (each a
-// "NN-slug.md" -> content pair), and returns the scratch dir.
-func writeEpic(t *testing.T, epicName string, tickets map[string]string) string {
-	t.Helper()
-	// t.TempDir() always ends in "001", and the merge lock dir is keyed by that
-	// basename, so parallel tests would share one lock. Use a unique name.
-	scratchDir, err := os.MkdirTemp("", "gx-epic-")
-	if err != nil {
-		t.Fatalf("MkdirTemp: %v", err)
-	}
-	t.Cleanup(func() { os.RemoveAll(scratchDir) })
-	issuesDir := filepath.Join(scratchDir, epicName, "issues")
-	if err := os.MkdirAll(issuesDir, 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	testutil.EnsureEpicTicketMD(t, filepath.Join(scratchDir, epicName))
-	for name, content := range tickets {
-		if err := os.WriteFile(filepath.Join(issuesDir, name), []byte(content), 0644); err != nil {
-			t.Fatalf("WriteFile %s: %v", name, err)
-		}
-	}
-	return scratchDir
 }
 
 // ticketAddr is the address iteration prompts name for ticket id in the
@@ -88,17 +36,6 @@ func testDeps() Deps {
 // testStateDir is the state dir merge locks live under for this package's
 // tests; TestMain sets it.
 var testStateDir string
-
-// testDepsHome is the Home testDepsWithOverrides gives deps that name none,
-// for the tests that still point the process HOME at a fixture with
-// setHomeEnv. Those tests are not parallel, so no parallel test sees it.
-var testDepsHome string
-
-func setTestDepsHome(t *testing.T, dir string) {
-	t.Helper()
-	testDepsHome = dir
-	t.Cleanup(func() { testDepsHome = "" })
-}
 
 // mergeLockDir is where an epic's merge lock lives under testStateDir.
 func mergeLockDir(scratchDir, epic string) (string, error) {
@@ -122,7 +59,8 @@ func testDepsWithOverrides(overrides DepsOverrides) Deps {
 		overrides.StateDir = testStateDir
 	}
 	if overrides.Home == "" {
-		overrides.Home = testDepsHome
+		// Set by fixture.SetHomeEnv for the tests that point the process HOME at a fixture.
+		overrides.Home = fixture.HomeDir()
 	}
 	d := DefaultDepsWithOverrides(overrides)
 	d.PauseTimer = readyTimer

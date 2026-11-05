@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 )
 
 func TestAppendServerEvent_BudgetEventMergesInServerLogNotEpicLog(t *testing.T) {
-	store := epicScratchDir(t, "epic-a")
+	store := fixture.EpicScratchDir(t, "epic-a")
 
 	if err := AppendEvent(store, "epic-a", Event{Type: string(events.Resumed), Ticket: "01"}); err != nil {
 		t.Fatal(err)

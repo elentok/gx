@@ -30,7 +30,9 @@ func launchOn(t *testing.T, r agentrunner.Runner) launchResult {
 	t.Helper()
 	var res launchResult
 	res.session, res.err = StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic}, "/gx-implement gx:my-epic/01",
-		func(attempt int, decision string) { res.nudges = append(res.nudges, fmt.Sprintf("%d:%s", attempt, decision)) })
+		func(attempt int, decision string) {
+			res.nudges = append(res.nudges, fmt.Sprintf("%d:%s", attempt, decision))
+		})
 	return res
 }
 

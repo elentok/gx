@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -27,7 +28,7 @@ func runLongTicketWait(t *testing.T, ticketType string, threshold int, counts []
 	p.Agent = AgentClaude
 	p.Model = "sonnet"
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: ticketType}
-	p.ScratchDir = epicScratchDir(t, "epic")
+	p.ScratchDir = fixture.EpicScratchDir(t, "epic")
 	p.EpicName = "epic"
 	p.LongTicketTurns = threshold
 	p.OnLongTicket = func(turns int) { fired = append(fired, turns) }

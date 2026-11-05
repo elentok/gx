@@ -7,13 +7,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
@@ -22,33 +21,6 @@ import (
 const resolvedSharedContent = "shared resolved for D\n"
 
 var firstTimestampRe = regexp.MustCompile(`"timestamp":"([^"]+)"`)
-
-// writeFakeTranscript writes a session transcript under a fake
-// <home>/.claude/projects/<slug>/<sessionID>.jsonl, with one assistant line per
-// (model, inputTokens, cacheReadTokens) entry, one second apart starting at
-// start.
-func writeFakeTranscript(t *testing.T, home, cwd, sessionID string, start time.Time, turns ...[3]any) {
-	t.Helper()
-	if home == "" {
-		t.Fatal("writeFakeTranscript requires a home")
-	}
-	path := transcript.PathIn(home, cwd, sessionID)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-
-	var lines []string
-	for i, turn := range turns {
-		ts := start.Add(time.Duration(i) * time.Second).UTC().Format(time.RFC3339Nano)
-		model := turn[0].(string)
-		input := turn[1].(int)
-		cacheRead := turn[2].(int)
-		lines = append(lines, `{"type":"assistant","timestamp":"`+ts+`","message":{"model":"`+model+`","usage":{"input_tokens":`+strconv.Itoa(input)+`,"cache_read_input_tokens":`+strconv.Itoa(cacheRead)+`,"output_tokens":10}}}`)
-	}
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-}
 
 // recordLaunchPrompt prepends text as the transcript's first user record, the
 // way a live claude records a delivered launch command. Without it the launch
@@ -182,59 +154,6 @@ func (s *compactRecoverySink) SmartZoneFinishingUp(string)    { s.record("finish
 func (s *compactRecoverySink) SmartZoneRecovered(string)      { s.record("recovered") }
 func (s *compactRecoverySink) VerifyCapStopped(string)        { s.record("verify-cap-stopped") }
 
-// codexRolloutTestEpoch anchors synthetic rollout JSONL timestamps for
-// TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve, mirroring
-// herdrfake.RegisterCodexRollout's own fixed epoch.
-var codexRolloutTestEpoch = time.Date(2026, 8, 4, 0, 0, 0, 0, time.UTC)
-
-// appendCodexRolloutLine appends one JSONL record to a synthetic Codex
-// rollout file at path, in the shape codexsession's reader expects (mirroring
-// herdrfake.CodexRollout's private appendLine) — needed here because
-// herdrfake.State.Register claims "agent prompt"/"agent wait" globally by
-// verb+noun with no per-pane scoping, so RegisterCodexRollout can't coexist
-// with a second, differently-behaved Codex pane in the same test.
-func appendCodexRolloutLine(path string, line int, value map[string]any) error {
-	value["timestamp"] = codexRolloutTestEpoch.Add(time.Duration(line) * time.Millisecond).Format(time.RFC3339Nano)
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.Write(append(encoded, '\n'))
-	return err
-}
-
-func writeCodexSessionMeta(path string, line int, sessionID, cwd string) error {
-	return appendCodexRolloutLine(path, line, map[string]any{
-		"type":    "session_meta",
-		"payload": map[string]any{"id": sessionID, "cwd": cwd},
-	})
-}
-
-func writeCodexUsageLine(path string, line, contextTokens, totalTokens int) error {
-	return appendCodexRolloutLine(path, line, map[string]any{
-		"type": "event_msg",
-		"payload": map[string]any{
-			"type": "token_count",
-			"info": map[string]any{
-				"last_token_usage":  map[string]any{"input_tokens": contextTokens},
-				"total_token_usage": map[string]any{"total_tokens": totalTokens},
-			},
-			"rate_limits": map[string]any{
-				"primary":   map[string]any{"used_percent": 0, "resets_at": 0},
-				"secondary": map[string]any{"used_percent": 0, "resets_at": 0},
-			},
-		},
-	})
-}
-
 // contextPromptResponse implements pane01's "agent prompt" behavior for
 // TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve, mirroring
 // herdrfake.CodexRollout.prompt's phase transitions.
@@ -264,14 +183,14 @@ func contextWaitResponse(pane string, phase *string, path string, line *int, ses
 		*phase = "compact-continuation"
 		return agentJSON(pane, "working", sessionID)
 	case "compact-continuation":
-		if err := writeCodexUsageLine(path, *line, compactedContext, compactedTotal); err != nil {
+		if err := fixture.WriteCodexUsageLine(path, *line, compactedContext, compactedTotal); err != nil {
 			return herdrfake.CommandError(err.Error())
 		}
 		*line++
 		*phase = "idle"
 		return agentJSON(pane, "idle", sessionID)
 	case "continuation":
-		if err := writeCodexUsageLine(path, *line, finalContext, finalTotal); err != nil {
+		if err := fixture.WriteCodexUsageLine(path, *line, finalContext, finalTotal); err != nil {
 			return herdrfake.CommandError(err.Error())
 		}
 		*line++

@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/elentok/gx/tickets/schema"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/ralphloop/internal/fixture"
+	"github.com/elentok/gx/tickets/schema"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
@@ -202,7 +204,7 @@ func appliedSessionFixture(t *testing.T, cost string) (lp MergeParams, d MergeDe
 		t.Fatalf("WriteFile: %v", err)
 	}
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "03")
-	writeFakeTranscript(t, home, cwd, "sess-applied", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	fixture.WriteFakeTranscript(t, home, cwd, "sess-applied", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)

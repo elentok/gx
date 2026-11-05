@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -31,7 +32,7 @@ func prepareDepsFixture(t *testing.T) (Deps, *installRecorder, OneIteration) {
 	d.InstallDeps = rec.install
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	d.WorktreeDir = func(string) (string, error) { return wtDir, nil }
-	scratchDir := writeEpic(t, "fix-it", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "fix-it", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	o := OneIteration{

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -25,7 +26,7 @@ func writeSubagentTranscript(t *testing.T, home, cwd, session, name, usage strin
 func TestReadSessionStats_TotalTokensIncludeSubagents(t *testing.T) {
 	const cwd, session = "/work/tree", "sess-1"
 	home := t.TempDir()
-	writeFakeTranscript(t, home, cwd, session, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-4-5", 1000, 200})
+	fixture.WriteFakeTranscript(t, home, cwd, session, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-4-5", 1000, 200})
 	writeSubagentTranscript(t, home, cwd, session, "agent-a.jsonl",
 		`{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":30,"cache_creation_input_tokens":40}`)
 	writeSubagentTranscript(t, home, cwd, session, "agent-b.jsonl",
@@ -51,8 +52,8 @@ func TestSessionsTotals(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	home := t.TempDir()
 	homes := SessionHomes{Claude: home, Codex: filepath.Join(home, ".codex")}
-	writeFakeTranscript(t, home, cwd, "sess-a", start, [3]any{"claude-sonnet-4-5", 1000, 0})
-	writeFakeTranscript(t, home, cwd, "sess-b", start, [3]any{"claude-sonnet-4-5", 2000, 0})
+	fixture.WriteFakeTranscript(t, home, cwd, "sess-a", start, [3]any{"claude-sonnet-4-5", 1000, 0})
+	fixture.WriteFakeTranscript(t, home, cwd, "sess-b", start, [3]any{"claude-sonnet-4-5", 2000, 0})
 	claudeCost := 3000.0/1e6*3 + 20.0/1e6*15
 
 	t.Run("two readable sessions add up", func(t *testing.T) {
@@ -101,10 +102,10 @@ func TestSessionsTotals(t *testing.T) {
 
 	t.Run("codex session adds its total and no cost", func(t *testing.T) {
 		rollout := filepath.Join(home, ".codex", "sessions", "2026", "08", "04", "rollout-2026-08-04T12-00-00-codex-1.jsonl")
-		if err := writeCodexSessionMeta(rollout, 1, "codex-1", cwd); err != nil {
+		if err := fixture.WriteCodexSessionMeta(rollout, 1, "codex-1", cwd); err != nil {
 			t.Fatal(err)
 		}
-		if err := writeCodexUsageLine(rollout, 2, 500, 7777); err != nil {
+		if err := fixture.WriteCodexUsageLine(rollout, 2, 500, 7777); err != nil {
 			t.Fatal(err)
 		}
 		tokens, cost, err := SessionsTotals(homes, []SessionRef{

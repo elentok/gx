@@ -6,15 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestResumeTicket_DemotesPausedSection(t *testing.T) {
 	t.Parallel()
-	scratchDir := writeEpic(t, "my-epic", map[string]string{
+	scratchDir := fixture.WriteEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# A\n\n## Paused\n\nwaiting on a person\n",
 	})
-	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	path := fixture.TicketPath(scratchDir, "my-epic", "01-a.md")
 
 	if err := ResumeTicket(path, time.Now()); err != nil {
 		t.Fatalf("ResumeTicket: %v", err)
@@ -39,13 +40,13 @@ func TestResumeTicket_DemotesPausedSection(t *testing.T) {
 // own unmute audit note.
 func TestUnmuteTicket_Paused_ClearsMutesDemotesReopens(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\n## Needs Repair\n\nnotification storm tripped a mute\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\n## Needs Repair\n\nnotification storm tripped a mute\n")
 
 	if err := UnmuteTicket(path, time.Now()); err != nil {
 		t.Fatalf("UnmuteTicket: %v", err)
 	}
 
-	ticket := mustParse(t, path)
+	ticket := fixture.MustParse(t, path)
 	if ticket.Status != schema.StatusOpen {
 		t.Errorf("Status = %q, want %q", ticket.Status, schema.StatusOpen)
 	}
@@ -53,7 +54,7 @@ func TestUnmuteTicket_Paused_ClearsMutesDemotesReopens(t *testing.T) {
 		t.Errorf("Mutes = %v, want empty", ticket.Mutes)
 	}
 
-	raw := mustRead(t, path)
+	raw := fixture.MustRead(t, path)
 	if strings.Contains(raw, "\n## Needs Repair\n") {
 		t.Errorf("Needs Repair section not demoted:\n%s", raw)
 	}
@@ -71,13 +72,13 @@ func TestUnmuteTicket_Paused_ClearsMutesDemotesReopens(t *testing.T) {
 // Mutes (plus the audit note) is the whole action.
 func TestUnmuteTicket_Resumed_ClearsMutesLeavesStatus(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\nBody text.\n")
+	path := fixture.WriteTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\nBody text.\n")
 
 	if err := UnmuteTicket(path, time.Now()); err != nil {
 		t.Fatalf("UnmuteTicket: %v", err)
 	}
 
-	ticket := mustParse(t, path)
+	ticket := fixture.MustParse(t, path)
 	if ticket.Status != schema.StatusOpen {
 		t.Errorf("Status = %q, want unchanged %q", ticket.Status, schema.StatusOpen)
 	}
@@ -85,7 +86,7 @@ func TestUnmuteTicket_Resumed_ClearsMutesLeavesStatus(t *testing.T) {
 		t.Errorf("Mutes = %v, want empty", ticket.Mutes)
 	}
 
-	raw := mustRead(t, path)
+	raw := fixture.MustRead(t, path)
 	if !strings.Contains(raw, "— unmuted") {
 		t.Errorf("unmute audit note missing:\n%s", raw)
 	}
