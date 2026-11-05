@@ -1,4 +1,4 @@
-package cmd
+package serverctl
 
 import (
 	"fmt"
@@ -12,9 +12,9 @@ import (
 	"github.com/elentok/gx/herdr"
 )
 
-// liveProbe asks the real machine. herdr.Ping has no timeout of its own, so it
+// LiveProbe asks the real machine. herdr.Ping has no timeout of its own, so it
 // is raced against one; a ping that loses keeps running until herdr answers.
-var liveProbe = agentrunner.Probe{
+var LiveProbe = agentrunner.Probe{
 	LookPath: exec.LookPath,
 	PingHerdr: func(timeout time.Duration) error {
 		done := make(chan error, 1)

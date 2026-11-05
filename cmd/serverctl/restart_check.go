@@ -1,4 +1,4 @@
-package cmd
+package serverctl
 
 import (
 	"encoding/json"
@@ -23,7 +23,8 @@ type (
 	restartCheckProject = wire.RestartCheckProject
 )
 
-func newRestartCheckCmd(d deps) *cobra.Command {
+// NewRestartCheck builds the top-level `gx restart-check`.
+func NewRestartCheck(d Deps) *cobra.Command {
 	var configOnly bool
 	cmd := &cobra.Command{
 		Use:    "restart-check",

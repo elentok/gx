@@ -1,4 +1,4 @@
-package cmd
+package serverctl
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/limits"
-	"github.com/elentok/gx/cmd/serverapi"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -31,10 +30,31 @@ import (
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/version"
 	"github.com/spf13/cobra"
 )
 
-func newServerCmd(d deps) *cobra.Command {
+// Deps is the hooks of `gx server` and its lifecycle verbs on top of the shared env.
+type Deps struct {
+	cmdbase.Env
+	// Skills holds the `gx skills` hooks `gx server start` refreshes the bundle
+	// with; its Env is unset, New fills it.
+	Skills skillscmd.Deps
+}
+
+func (d Deps) dirs() config.Dirs { return d.Env.Dirs() }
+
+func (d Deps) skillsDeps() skillscmd.Deps {
+	s := d.Skills
+	s.Env = d.Env
+	return s
+}
+
+func getVersion() string { return version.Get() }
+
+// New builds `gx server` with the lifecycle verbs and adds extra as further
+// subcommands (root passes the API verbs).
+func New(d Deps, extra ...*cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "orchestrator daemon commands",
@@ -115,12 +135,12 @@ stop does not wait for running tickets.`,
 	logs.Flags().StringVar(&logOpts.Level, "level", "", "minimum level to show: debug, info, warn or error")
 	logs.Flags().BoolVar(&logOpts.JSON, "json", false, "print raw JSON lines instead of pretty output")
 	cmd.AddCommand(logs)
-	cmd.AddCommand(serverapi.Commands(d.serverapiDeps())...)
+	cmd.AddCommand(extra...)
 	return cmd
 }
 
 // runServer runs the foreground server until interrupted.
-func runServer(ctx context.Context, d deps) error {
+func runServer(ctx context.Context, d Deps) error {
 	defer projectlock.SetWaitHook(nil)()
 	dirs := d.dirs()
 	stateDir, err := dirs.StateDir()
@@ -131,7 +151,7 @@ func runServer(ctx context.Context, d deps) error {
 	if err != nil {
 		return err
 	}
-	choice, err := preflightAgentRunner(cfg.AgentRunner, cfg.Agents.DefaultHarness, liveProbe, server.LogPath(stateDir))
+	choice, err := preflightAgentRunner(cfg.AgentRunner, cfg.Agents.DefaultHarness, LiveProbe, server.LogPath(stateDir))
 	if err != nil {
 		return err
 	}
@@ -271,7 +291,7 @@ func runServer(ctx context.Context, d deps) error {
 	}
 	srv, err := server.New(server.Config{Migrations: migrationReg, Settings: settings.FromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
-		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
+		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.Env.Env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, RateLimitResetBuffer: rateLimitBuffer,
 		ProcessSource: processSource, DropAskedAgent: dropAskedAgent(os.Getenv)})
 	if err != nil {
@@ -554,7 +574,7 @@ func runServerInstall(dirs config.Dirs, w io.Writer) error {
 
 // runServerStartCmd installs the skill bundle, then starts the server. A
 // skill install problem is a warning, never a failed start.
-func runServerStartCmd(ctx context.Context, d deps, w io.Writer) error {
+func runServerStartCmd(ctx context.Context, d Deps, w io.Writer) error {
 	dirs := d.dirs()
 	if ctx == nil {
 		ctx = context.Background()
@@ -582,8 +602,8 @@ func serverSpawn(dirs config.Dirs, stateDir string) (spawnFunc, func() string) {
 	return spawnDetached(dirs.Environ(), stateDir), nil
 }
 
-// serverStarter is runServerStart without output, for the TUI.
-func serverStarter(dirs config.Dirs, c *apiclient.Client) func(context.Context) error {
+// Starter is runServerStart without output, for the TUI.
+func Starter(dirs config.Dirs, c *apiclient.Client) func(context.Context) error {
 	return func(ctx context.Context) error {
 		stateDir, err := dirs.StateDir()
 		if err != nil {
@@ -594,7 +614,7 @@ func serverStarter(dirs config.Dirs, c *apiclient.Client) func(context.Context) 
 	}
 }
 
-func runServerRestart(ctx context.Context, d deps, w io.Writer) error {
+func runServerRestart(ctx context.Context, d Deps, w io.Writer) error {
 	dirs := d.dirs()
 	return restartSteps(
 		func() error { return runServerStop(ctx, dirs, w) },
@@ -604,7 +624,7 @@ func runServerRestart(ctx context.Context, d deps, w io.Writer) error {
 
 // runServerRestartContinue is the restart the web UI runs. Output goes to w
 // and to the fixed restart log.
-func runServerRestartContinue(ctx context.Context, d deps, w io.Writer) error {
+func runServerRestartContinue(ctx context.Context, d Deps, w io.Writer) error {
 	logf, err := openRestartLog(d.dirs())
 	if err != nil {
 		return err

@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/cmd/limits"
 	"github.com/elentok/gx/cmd/project"
 	"github.com/elentok/gx/cmd/serverapi"
+	"github.com/elentok/gx/cmd/serverctl"
 	skillscmd "github.com/elentok/gx/cmd/skills"
 	"github.com/elentok/gx/cmd/term"
 	"github.com/elentok/gx/config"
@@ -64,7 +65,7 @@ type deps struct {
 	// and OpenTab are unset; agentDeps fills them).
 	agent agentcmd.Deps
 	// skills holds the `gx skills` hooks (its Env is unset; skillsDeps fills
-	// it). `gx server start` also reads them until it moves out of root.
+	// it). `gx server start` reads them too.
 	skills skillscmd.Deps
 	// doctor holds the `gx doctor` hooks (its Env, ConfirmForce and GOOS are
 	// unset; doctorDeps fills them).
@@ -159,6 +160,11 @@ func (d deps) evolveDeps() evolve.Deps {
 // stdinIsTerminal stays in root deps because other commands read it too.
 func (d deps) serverapiDeps() serverapi.Deps {
 	return serverapi.Deps{Env: d.base(), StdinIsTerminal: d.stdinIsTerminal}
+}
+
+// serverctlDeps is the server lifecycle verbs' hooks joined with the shared env.
+func (d deps) serverctlDeps() serverctl.Deps {
+	return serverctl.Deps{Env: d.base(), Skills: d.skills}
 }
 
 // dirs resolves the config, data and state directories from the deps env.
@@ -269,7 +275,7 @@ Run without a command to open the status UI.`,
 		newStashCmd(d),
 		newPRsCmd(d),
 		newTicketsCmd(d),
-		newServerCmd(d),
+		serverctl.New(d.serverctlDeps(), serverapi.Commands(d.serverapiDeps())...),
 		newRecoveryCmd(d),
 		evolve.New(d.evolveDeps()),
 		project.New(d.projectDeps()),
@@ -291,7 +297,7 @@ Run without a command to open the status UI.`,
 		check.New(check.Deps{Env: d.base()}),
 		doctor.New(d.doctorDeps()),
 		newVersionCmd(d),
-		newRestartCheckCmd(d),
+		serverctl.NewRestartCheck(d.serverctlDeps()),
 	)
 
 	root.AddGroup(

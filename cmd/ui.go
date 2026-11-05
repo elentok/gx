@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/serverctl"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/git"
@@ -324,16 +325,16 @@ func serverDeps(dirs config.Dirs) *app.ServerDeps {
 		return nil
 	}
 	tui := c.AsTUI()
-	return &app.ServerDeps{Client: tui, Sessions: tui.Sessions, Admin: tui.Admin, Tickets: tui.Tickets, Queue: tui.Queue, Reads: tui.Reads, Build: getVersion(), Start: serverStarter(dirs, c)}
+	return &app.ServerDeps{Client: tui, Sessions: tui.Sessions, Admin: tui.Admin, Tickets: tui.Tickets, Queue: tui.Queue, Reads: tui.Reads, Build: getVersion(), Start: serverctl.Starter(dirs, c)}
 }
 
 // herdrUnavailable reports herdr missing from PATH or not answering. It is
 // independent of agent_runner: the herdr-only TUI features need herdr itself.
 var herdrUnavailable = func() bool {
-	if _, err := liveProbe.LookPath("herdr"); err != nil {
+	if _, err := serverctl.LiveProbe.LookPath("herdr"); err != nil {
 		return true
 	}
-	return liveProbe.PingHerdr(agentrunner.HerdrPingTimeout) != nil
+	return serverctl.LiveProbe.PingHerdr(agentrunner.HerdrPingTimeout) != nil
 }
 
 func settingsFromConfig(dirs config.Dirs, cfg config.Config) ui.Settings {

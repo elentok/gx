@@ -1,6 +1,6 @@
 //go:build gxfixture
 
-package cmd
+package serverctl
 
 // dropAskedAgent lets gxfixture force the cleanup a herdr-hosted run does when
 // its agent asks, which a fixture's pty runner never takes. Only the gxfixture
