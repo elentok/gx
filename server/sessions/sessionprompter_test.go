@@ -29,7 +29,7 @@ func TestStartContinue_SendsTheActionThroughThePrompter(t *testing.T) {
 	t.Cleanup(mg.Watches.Close)
 
 	action := []string{"/continue"}
-	sessions.NewResumer(mg, nil).StartContinue(t.TempDir(), sessions.Meta{ID: "abcdef"}, "Continue", action)
+	sessions.NewResumer(mg).StartContinue(t.TempDir(), sessions.Meta{ID: "abcdef"}, "Continue", action)
 
 	select {
 	case got := <-fake.sent:

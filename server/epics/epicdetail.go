@@ -2,7 +2,7 @@ package epics
 
 import (
 	"errors"
-	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/fixagent"
 	"net/http"
 	"slices"
 	"time"
@@ -190,8 +190,8 @@ func (s *Epics) rowFor(root queue.RootRef, e tickets.Epic, t tickets.Ticket) wir
 		row.Asking, row.Question = true, open.Summary
 	}
 	if status == tickets.StatusPausedRepair {
-		row.State = sessions.RepairState(evs, t.PausedClass())
-		row.FixPrompt = sessions.FixAgentPrompt(s.Projects.LaunchHarness(root.Project), row.Address, t)
+		row.State = fixagent.RepairState(evs, t.PausedClass())
+		row.FixPrompt = fixagent.FixAgentPrompt(s.Projects.LaunchHarness(root.Project), row.Address, t)
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()

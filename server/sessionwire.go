@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 )
@@ -41,8 +42,20 @@ func newManager(s *Server) *sessions.Manager {
 
 // newResumer needs s.sessions set.
 func newResumer(s *Server) *sessions.Resumer {
-	return sessions.NewResumer(s.sessions, sessionHost{s})
+	return sessions.NewResumer(s.sessions)
 }
+
+// fixAgentHost is the Server as the fix agent sees it.
+// FindTicket and MigrationFailures come from sessionHost and the Server.
+type fixAgentHost struct{ sessionHost }
+
+func (h fixAgentHost) CreateSession(req wire.CreateSessionRequest, remoteControl string) (wire.SessionResult, error) {
+	return h.sessions.CreateSession(req, sessions.SessionCtx{RemoteControl: remoteControl})
+}
+
+func (h fixAgentHost) LaunchHarness(project string) string { return h.projects.LaunchHarness(project) }
+func (h fixAgentHost) TicketStore() string                 { return h.cfg.TicketStore }
+func (h fixAgentHost) Settings() *settings.Settings        { return h.settings.Load() }
 
 // sessionHost is the Server as the sessions package, and the other packages
 // that call into the Manager through their Host interfaces, see it. Its

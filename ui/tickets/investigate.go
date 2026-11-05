@@ -7,7 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/fixagent"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -44,7 +44,7 @@ func fixAgentSession(ctx context.Context, api ServerAPI, address string) string 
 	if err != nil {
 		return ""
 	}
-	name := sessions.FixAgentName(address)
+	name := fixagent.FixAgentName(address)
 	for _, s := range snap.Sessions {
 		if s.Name == name && s.Status.State != wire.SessionExited {
 			return s.ID

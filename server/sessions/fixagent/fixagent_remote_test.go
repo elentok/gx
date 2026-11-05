@@ -1,4 +1,4 @@
-package sessions_test
+package fixagent_test
 
 import (
 	"context"

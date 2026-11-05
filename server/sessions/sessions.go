@@ -134,7 +134,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		LaunchDesign:   sc.LaunchDesign,
 		Design:         sc.design || (req.Ticket != "" && mg.Maps.OnMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
-		RemoteControl:  sc.remoteControl,
+		RemoteControl:  sc.RemoteControl,
 		RebaseNote:     req.RebaseNote,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),

@@ -16,7 +16,6 @@ import (
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -223,19 +222,6 @@ func TestChatNext_NamesTheSessionsHarnessCommand(t *testing.T) {
 		next := chat.ChatNext(msgs, kind, "gx:epic/03", false)
 		if next == nil || !slices.Equal(next.Action.Action, want) {
 			t.Errorf("%s next = %+v, want action %q", kind, next, want)
-		}
-	}
-}
-
-func TestFixAgentPrompt_TypesTheSessionsPrefix(t *testing.T) {
-	t.Parallel()
-	var tk tickets.Ticket
-	for agent, want := range map[string]string{
-		"claude": "/gx-investigate gx:e/01 is in error",
-		"codex":  "$gx-investigate gx:e/01 is in error",
-	} {
-		if got := sessions.FixAgentPrompt(agent, "gx:e/01", tk); got != want {
-			t.Errorf("%s prompt = %q, want %q", agent, got, want)
 		}
 	}
 }

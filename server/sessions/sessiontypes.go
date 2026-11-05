@@ -17,9 +17,9 @@ import (
 type SessionCtx struct {
 	// design marks the session Design although Ticket has no map epic yet.
 	design bool
-	// remoteControl is the --remote-control name, saved in the meta so resumes
+	// RemoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
-	remoteControl string
+	RemoteControl string
 	// LaunchDesign marks a launch by a design path (Start design, New Design):
 	// the tier follows the map's step, and the meta saves LaunchDesign.
 	LaunchDesign bool

@@ -15,7 +15,6 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/sessions/convrecord"
 	"github.com/elentok/gx/server/settings"
-	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 )
 
@@ -35,8 +34,6 @@ type SessionsConfig struct {
 // Host is what the Manager and the Resumer need from the rest of the root.
 type Host interface {
 	WebURL() string
-	FindTicket(address string) (queue.TicketRef, bool, error)
-	MigrationFailures() []wire.MigrationFailure
 }
 
 // Manager creates, stops, removes and watches sessions, and reads and writes
@@ -118,15 +115,14 @@ type convHost struct {
 func (h convHost) OnMapEpic(address string) bool { return h.maps.OnMapEpic(address) }
 
 // Resumer brings sessions back: resume, restore, auto-resume, handoff, link,
-// step and the fix agent.
+// and step.
 type Resumer struct {
-	mg   *Manager
-	host Host
+	mg *Manager
 }
 
 // NewResumer builds the Resumer over mg.
-func NewResumer(mg *Manager, host Host) *Resumer {
-	return &Resumer{mg: mg, host: host}
+func NewResumer(mg *Manager) *Resumer {
+	return &Resumer{mg: mg}
 }
 
 // Prompter is what the session watch loop needs from the prompt, turn and
