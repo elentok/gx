@@ -1,4 +1,4 @@
-package tickets
+package queue
 
 import (
 	"fmt"
@@ -6,13 +6,13 @@ import (
 	"github.com/elentok/gx/ui"
 )
 
-// finishedLines renders the snapshot's Recently finished epics as dim lines,
-// "name project done/total finished 2h ago". They read m.now at draw time, so
+// FinishedLines renders the snapshot's Recently finished epics as dim lines,
+// "name project done/total finished 2h ago". They read h.Now at draw time, so
 // finishedTickMsg only has to trigger a re-render.
-func (h queueHeader) finishedLines() []string {
-	lines := make([]string, 0, len(h.finished))
-	for _, f := range h.finished {
-		ago := ui.DurationCompact(h.now().Sub(f.CompletedAt))
+func (h Header) FinishedLines() []string {
+	lines := make([]string, 0, len(h.Finished))
+	for _, f := range h.Finished {
+		ago := ui.DurationCompact(h.Now().Sub(f.CompletedAt))
 		if ago != "now" {
 			ago += " ago"
 		}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -62,7 +63,7 @@ type queueNode struct {
 	epic   tickets.Epic
 	err    error
 	ticket queueRow
-	layout epicHeaderLayout
+	layout queue.EpicHeaderLayout
 }
 
 // queueEntriesCache memoizes buildQueueEntries' output (see QueueModel.
@@ -122,7 +123,7 @@ func newQueueRows(queueTree tree.Model[queueNode]) queueRows {
 
 // queueRowsEnv is what queueRows reads from the rest of the tab.
 type queueRowsEnv struct {
-	header        queueHeader
+	header        queue.Header
 	maxParallel   int
 	labelWidth    int
 	harnessLabels map[string]string
@@ -150,14 +151,14 @@ func (r queueRows) buildQueueEntriesCached(env queueRowsEnv) []tree.Entry[queueN
 		c.project == r.projectFilter &&
 		c.labelWidth == env.labelWidth &&
 		reflect.DeepEqual(c.epics, r.epics) &&
-		reflect.DeepEqual(c.summaries, env.header.summaries) &&
+		reflect.DeepEqual(c.summaries, env.header.Summaries) &&
 		reflect.DeepEqual(c.checked, r.checked) &&
 		reflect.DeepEqual(c.collapsed, collapsed) {
 		return c.entries
 	}
 	entries := r.buildQueueEntries(env)
 	c.epics = r.epics
-	c.summaries = env.header.summaries
+	c.summaries = env.header.Summaries
 	c.checked = r.checked
 	c.hideComplete = r.hideComplete
 	c.project = r.projectFilter
@@ -232,14 +233,14 @@ func (r queueRows) buildQueueEntries(env queueRowsEnv) []tree.Entry[queueNode] {
 	}
 	// Decided here, not at draw time, because the bar line is a real entry
 	// whose presence changes the tree's height; the cache keys on the width.
-	layout := env.header.epicHeaderLayoutFor(shownEpics, env.labelWidth)
+	layout := env.header.EpicHeaderLayoutFor(shownEpics, env.labelWidth)
 
 	for _, s := range shown {
 		epic, ordered, planErr := s.epic, s.ordered, s.planErr
 
 		roots = append(roots, queueNode{kind: nodeEpicSeparator, epic: epic})
 		roots = append(roots, queueNode{kind: nodeEpicName, epic: epic, layout: layout})
-		if layout != epicLayoutWide && env.header.summaries[epic.Name].Total > 0 {
+		if layout != queue.EpicLayoutWide && env.header.Summaries[epic.Name].Total > 0 {
 			roots = append(roots, queueNode{kind: nodeEpicBar, epic: epic, layout: layout})
 		}
 		roots = append(roots, queueNode{kind: nodeEpicStatusLine, epic: epic})

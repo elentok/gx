@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -182,7 +183,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// The epic header layout depends on the width (see buildQueueEntries).
 			m.rows.queueTree.SetEntries(m.rows.buildQueueEntriesCached(m.rowsEnv()))
 		}
-		m.rows.queueTree.SetVisibleHeight(m.layout().viewportHeight() - queueHeaderReservedLines)
+		m.rows.queueTree.SetVisibleHeight(m.layout().viewportHeight() - queue.HeaderReservedLines)
 		return m, nil
 	case queueSpinnerRestartMsg:
 		// The tick chain dies while the tab is hidden, so a claim that arrived
@@ -341,7 +342,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		}
 		return m, nil
 	}
-	bodyLine := mouse.Y - 1 - queueHeaderReservedLines
+	bodyLine := mouse.Y - 1 - queue.HeaderReservedLines
 	if mouse.Button == tea.MouseRight {
 		idx, ok := m.rows.queueTree.EntryAtBodyLine(bodyLine)
 		if !ok {
@@ -476,7 +477,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, notify.Info(label)
 		case bindingQueueTogglePreview:
 			m.preview.Toggle()
-			m.rows.queueTree.SetVisibleHeight(m.layout().viewportHeight() - queueHeaderReservedLines)
+			m.rows.queueTree.SetVisibleHeight(m.layout().viewportHeight() - queue.HeaderReservedLines)
 		case bindingQueueEditInPlace:
 			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 		case bindingQueueEditHSplit:
@@ -612,25 +613,25 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 }
 
 // header builds the stateless header from the tab's current inputs.
-func (m QueueModel) header() queueHeader {
-	h := queueHeader{
-		icons:        m.icons(),
-		summaries:    m.server.summaries,
-		runningEpics: m.server.runningEpics,
-		live:         m.server.live,
-		paused:       m.server.paused,
-		serverDown:   m.server.down(),
-		hasServer:    m.server.serverAPI != nil,
-		herdrDown:    m.server.herdrDown,
-		herdrText:    m.server.herdrText,
-		budget:       m.server.serverBudget,
-		finished:     m.server.finished,
-		spinner:      m.implementSpinner,
-		now:          m.now,
-		checkedCount: len(m.rows.checked),
+func (m QueueModel) header() queue.Header {
+	h := queue.Header{
+		Icons:        m.icons(),
+		Summaries:    m.server.summaries,
+		RunningEpics: m.server.runningEpics,
+		Live:         m.server.live,
+		Paused:       m.server.paused,
+		ServerDown:   m.server.down(),
+		HasServer:    m.server.serverAPI != nil,
+		HerdrDown:    m.server.herdrDown,
+		HerdrText:    m.server.herdrText,
+		Budget:       m.server.serverBudget,
+		Finished:     m.server.finished,
+		Spinner:      m.implementSpinner,
+		Now:          m.now,
+		CheckedCount: len(m.rows.checked),
 	}
 	if m.server.serverAPI == nil {
-		h.checkedPlans = len(checkedEpicPlansFor(m.rows.epics, m.rows.checked, m.rows.checkOrder))
+		h.CheckedPlans = len(checkedEpicPlansFor(m.rows.epics, m.rows.checked, m.rows.checkOrder))
 	}
 	return h
 }

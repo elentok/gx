@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
@@ -66,7 +67,7 @@ func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 	if !m.server.runningEpics["gx:alpha"] {
 		t.Fatalf("runningEpics = %v, want gx:alpha running", m.server.runningEpics)
 	}
-	if got := m.header().queueRunState(); got != queueRunRunning {
+	if got := m.header().RunState(); got != queue.RunRunning {
 		t.Errorf("queueRunState = %v, want running", got)
 	}
 	live, ok := m.server.live["gx:alpha"]["01"]
@@ -85,7 +86,7 @@ func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
 		{Address: "gx:alpha/03", Title: "Third", Status: "open"},
 	}}, []wire.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}})
 
-	got := m.header().queueHeaderTitle()
+	got := m.header().Title()
 	if !strings.HasPrefix(got, "Queue · 1 of 3 done · ") || !strings.Contains(got, "implementing...") {
 		t.Errorf("queueHeaderTitle() = %q, want \"Queue · 1 of 3 done · <spinner> implementing...\"", got)
 	}
@@ -95,7 +96,7 @@ func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
 	m.server.runningEpics = map[string]bool{"gx:missing": true}
 
-	got := m.header().queueHeaderTitle()
+	got := m.header().Title()
 	if strings.Contains(got, "of 0 done") || !strings.HasPrefix(got, "Queue · ") || !strings.Contains(got, "implementing...") {
 		t.Errorf("queueHeaderTitle() = %q, want a running title with no count", got)
 	}
@@ -104,10 +105,10 @@ func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
 func TestQueueServerMode_NoClaimedTicketStaysIdleWithServerCopy(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
 
-	if got := m.header().queueRunState(); got != queueRunIdle {
+	if got := m.header().RunState(); got != queue.RunIdle {
 		t.Fatalf("queueRunState = %v, want idle", got)
 	}
-	body := strings.Join(m.header().queueHeaderBodyLines(), "\n")
+	body := strings.Join(m.header().BodyLines(), "\n")
 	if strings.Contains(body, "press enter") {
 		t.Errorf("idle banner %q tells the user to press enter in server mode", body)
 	}
@@ -138,7 +139,7 @@ func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {
 func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 	m, _ := loadedServerQueueWith(t, "open", time.Time{}, true)
 
-	body := strings.Join(m.header().queueHeaderBodyLines(), "\n")
+	body := strings.Join(m.header().BodyLines(), "\n")
 	if !strings.Contains(body, "herdr unavailable") {
 		t.Errorf("header body %q does not say herdr is unavailable", body)
 	}
@@ -147,7 +148,7 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 func TestQueueServerMode_HerdrDownBannerNamesWhatWaits(t *testing.T) {
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, HerdrUnavailable: true, HerdrText: "herdr is down; waiting: gx:alpha/01"}, nil)
 
-	body := strings.Join(m.header().queueHeaderBodyLines(), "\n")
+	body := strings.Join(m.header().BodyLines(), "\n")
 	if !strings.Contains(body, "waiting: gx:alpha/01") {
 		t.Errorf("header body %q does not name the waiting ticket", body)
 	}
@@ -209,7 +210,7 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 	if suffix != "(merging...)" {
 		t.Errorf("suffix = %q, want %q", suffix, "(merging...)")
 	}
-	if got := m.header().queueHeaderTitle(); !strings.HasPrefix(got, "Queue · 1 of 2 done · ") {
+	if got := m.header().Title(); !strings.HasPrefix(got, "Queue · 1 of 2 done · ") {
 		t.Errorf("queueHeaderTitle() = %q, want the merge ticket counted: \"Queue · 1 of 2 done · ...\"", got)
 	}
 }
@@ -237,7 +238,7 @@ func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) 
 	if len(m.server.runningEpics) != 0 {
 		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.server.runningEpics)
 	}
-	if got := m.header().queueRunState(); got != queueRunIdle {
+	if got := m.header().RunState(); got != queue.RunIdle {
 		t.Errorf("queueRunState = %v, want idle", got)
 	}
 }

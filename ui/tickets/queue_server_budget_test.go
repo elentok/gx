@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 func loadedServerQueueWithBudget(t *testing.T, budget wire.BudgetStatus) QueueModel {
@@ -18,7 +19,7 @@ func loadedServerQueueWithBudget(t *testing.T, budget wire.BudgetStatus) QueueMo
 func TestQueueServerMode_HeaderShowsTodaysSpendOfLimit(t *testing.T) {
 	m := loadedServerQueueWithBudget(t, wire.BudgetStatus{Total: 12.5, SoftLimit: 50})
 
-	if got, want := m.header().queueHeaderTitle(), "Queue · today $12.50 of $50.00"; got != want {
+	if got, want := m.header().Title(), "Queue · today $12.50 of $50.00"; got != want {
 		t.Errorf("queueHeaderTitle() = %q, want %q", got, want)
 	}
 }
@@ -35,12 +36,12 @@ func TestQueueServerMode_HeaderColourBands(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := budgetTotalStyle(tc.total, 50)
+			got := queue.BudgetTotalStyle(tc.total, 50)
 			var name string
 			switch got.GetForeground() {
-			case epicStatusPausedRepairStyle.GetForeground():
+			case queue.EpicStatusPausedRepairStyle.GetForeground():
 				name = "alarm"
-			case epicStatusProblemStyle.GetForeground():
+			case queue.EpicStatusProblemStyle.GetForeground():
 				name = "warning"
 			default:
 				name = "default"

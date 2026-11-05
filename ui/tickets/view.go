@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -132,7 +133,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	}
 	if dur, ok := epic.CompletionDuration(); ok {
 		text := "took " + rowfmt.FormatDuration(dur)
-		if cost := epicCost(epic); cost > 0 {
+		if cost := queue.EpicCost(epic); cost > 0 {
 			text += " " + tickets.FormatCost(cost)
 		}
 		line = rowfmt.AppendRowMetrics(line, text, rowfmt.MetricsLineStyle)

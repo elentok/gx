@@ -74,7 +74,7 @@ func TestQueueModel_ClickOnTicketIconTogglesIt(t *testing.T) {
 	}
 	parent := m.rows.queueTree.Entries()[parentIdx]
 	iconX := rowfmt.PanelPaddingX + tree.LabelColumn(parent) + 1
-	y := 1 + len(m.header().queueHeaderBodyLines()) + parentIdx
+	y := 1 + len(m.header().BodyLines()) + parentIdx
 	before := len(m.rows.queueTree.Entries())
 
 	updated, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: iconX + 10, Y: y})

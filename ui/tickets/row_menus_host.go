@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
@@ -178,5 +179,5 @@ func (m QueueModel) menuAnchor() contextmenu.Anchor {
 	if !ok {
 		return contextmenu.Anchor{}
 	}
-	return contextmenu.Anchor{X: 1, Y: 1 + queueHeaderReservedLines + line, H: h}
+	return contextmenu.Anchor{X: 1, Y: 1 + queue.HeaderReservedLines + line, H: h}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/preview"
+	"github.com/elentok/gx/ui/tickets/queue"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -34,7 +35,7 @@ func (m QueueModel) View() tea.View {
 	sidebarH, previewH := m.preview.PanelHeights(m.width, m.layout().contentHeight())
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.header().queueHeaderTitle(), "", m.queueBody(m.layout().bodyWidth()), m.preview.Focus == preview.FocusSidebar, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.header().Title(), "", m.queueBody(m.layout().bodyWidth()), m.preview.Focus == preview.FocusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
 		previewW, previewH, "Preview", preview.SearchMatchStatus(m.preview.Search), preview.RenderViewportWithScrollbar(m.preview.VP), m.preview.Focus == preview.FocusPreview, ui.ColorBlue, nil, false,
@@ -90,7 +91,7 @@ func (m QueueModel) queueBody(width int) []string {
 
 	hdr := m.header()
 	var lines []string
-	for _, line := range hdr.queueHeaderBodyLines() {
+	for _, line := range hdr.BodyLines() {
 		if strings.Contains(line, "\x1b") {
 			// Already carries its own ANSI styling (e.g. a rendered key hint
 			// via ui.StatusWithHints) — wrapping it in StyleHint again would
@@ -101,7 +102,7 @@ func (m QueueModel) queueBody(width int) []string {
 		lines = append(lines, "  "+ui.StyleHint.Render(line))
 	}
 
-	finished := hdr.finishedLines()
+	finished := hdr.FinishedLines()
 	treeH := m.layout().viewportHeight() - len(lines) - len(finished)
 	lines = append(lines, m.rows.queueTree.RenderLines(treeH+2, m.rows.queueRenderOpts(m.rowsEnv(), width))...)
 	return append(lines, finished...)
@@ -125,7 +126,7 @@ func (r queueRows) queueRenderOpts(env queueRowsEnv, width int) tree.RenderOpts[
 		AccentColor: ui.ColorBlue,
 		Active:      env.sidebarActive,
 		Width:       width,
-		// EmptyLine is blank: the header banner's queueIdleBodyLine (queue_header.go)
+		// EmptyLine is blank: the header banner's idle line (queue/header.go)
 		// already covers the empty-selection case with "No selected tickets...".
 		EmptyLine: "",
 		Label: func(entry tree.Entry[queueNode]) string {
@@ -133,11 +134,11 @@ func (r queueRows) queueRenderOpts(env queueRowsEnv, width int) tree.RenderOpts[
 			case nodeEpicSeparator:
 				return ""
 			case nodeEpicName:
-				_, _, fill := h.epicStatus(entry.Value.epic)
-				return epicNameLine(entry.Value.epic.Name, h.summaries[entry.Value.epic.Name], fill, entry.Value.layout, env.labelWidth)
+				_, _, fill := h.EpicStatus(entry.Value.epic)
+				return queue.EpicNameLine(entry.Value.epic.Name, h.Summaries[entry.Value.epic.Name], fill, entry.Value.layout, env.labelWidth)
 			case nodeEpicBar:
-				_, _, fill := h.epicStatus(entry.Value.epic)
-				return epicBarLine(h.summaries[entry.Value.epic.Name], fill, entry.Value.layout)
+				_, _, fill := h.EpicStatus(entry.Value.epic)
+				return queue.EpicBarLine(h.Summaries[entry.Value.epic.Name], fill, entry.Value.layout)
 			case nodeEpicSpacer:
 				return ""
 			case nodeEpicStatusLine:
@@ -145,7 +146,7 @@ func (r queueRows) queueRenderOpts(env queueRowsEnv, width int) tree.RenderOpts[
 				// state's color — the configured limits are session-wide, so
 				// coloring one epic's slice against them would misleadingly
 				// suggest that epic alone is over budget.
-				return h.epicStatusRow(entry.Value.epic, env.labelWidth)
+				return h.EpicStatusRow(entry.Value.epic, env.labelWidth)
 			case nodeEpicError:
 				if stuck, ok := entry.Value.err.(*schedule.StuckPlanError); ok {
 					return "    " + rowfmt.MetricsLineStyle.Render(
@@ -182,7 +183,7 @@ func (r queueRows) queueRenderOpts(env queueRowsEnv, width int) tree.RenderOpts[
 func (rs queueRows) renderQueueTicketRow(env queueRowsEnv, r queueRow, rowIdx int) string {
 	epic, t := r.epic, r.ticket
 	h := env.header
-	icons := h.icons
+	icons := h.Icons
 	status := rowfmt.TicketStatus(epic, t)
 	indent := " "
 
@@ -195,9 +196,9 @@ func (rs queueRows) renderQueueTicketRow(env queueRowsEnv, r queueRow, rowIdx in
 		triangle = glyph + " "
 	}
 
-	if h.runningEpics[epic.Name] {
-		if live, ok := h.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := rowfmt.RenderLiveTicketRow(icons, h.spinner, t, live, indent+triangle); ok {
+	if h.RunningEpics[epic.Name] {
+		if live, ok := h.Live[epic.Name][t.Identifier]; ok {
+			if base, suffix, ok := rowfmt.RenderLiveTicketRow(icons, h.Spinner, t, live, indent+triangle); ok {
 				metrics := rowfmt.FormatMetricsLine(rowfmt.LiveElapsedSeconds(live), live.Tokens, 0, env.codexRows[t.Path])
 				return rowfmt.AppendRowMetrics(base, rowfmt.JoinNonEmpty(" ", rowfmt.JoinNonEmpty(" ", suffix, metrics), rowfmt.JoinNonEmpty(" ", env.harnessLabels[t.Path], env.waitingLabels[t.Path])), rowfmt.MetricsLineStyle)
 			}
@@ -280,8 +281,8 @@ func (rs queueRows) renderQueueTicketRow(env queueRowsEnv, r queueRow, rowIdx in
 // listed in the server's Paused tickets for its epic.
 func (rs queueRows) queueTicketReasonLine(env queueRowsEnv, r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
-	icons := env.header.icons
-	paused := env.header.summaries[epic.Name].Paused
+	icons := env.header.Icons
+	paused := env.header.Summaries[epic.Name].Paused
 	status := rowfmt.TicketStatus(epic, t)
 	i := slices.IndexFunc(paused, func(p wire.SummaryTicket) bool { return p.Address == t.Path })
 	if i < 0 || paused[i].Reason == "" {

@@ -4,6 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 // newHoverView is ui.NewMainView in all-motion mode, so the terminal reports
@@ -53,7 +54,7 @@ func (m QueueModel) queueHoverTarget(msg tea.MouseMotionMsg) (int, bool) {
 	if m.ModalOpen() || !rect.Contains(mouse.X, mouse.Y) {
 		return -1, false
 	}
-	return m.rows.queueTree.EntryAtBodyLine(mouse.Y - rect.Y - 1 - queueHeaderReservedLines)
+	return m.rows.queueTree.EntryAtBodyLine(mouse.Y - rect.Y - 1 - queue.HeaderReservedLines)
 }
 
 func (m QueueModel) HoverChanges(msg tea.MouseMotionMsg) bool {

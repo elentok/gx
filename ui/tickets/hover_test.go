@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	"github.com/elentok/gx/ui/tickets/queue"
 )
 
 // hoverFixture drives the Tickets and Queue tabs through the same hover cases.
@@ -74,7 +75,7 @@ func queueHoverFixture(t *testing.T) hoverFixture {
 		selected: m.rows.queueTree.SelectedIndex(),
 		other:    other,
 		outside:  m.layout().previewRect(),
-		rowY:     func(entry int) int { return 1 + queueHeaderReservedLines + entry },
+		rowY:     func(entry int) int { return 1 + queue.HeaderReservedLines + entry },
 		state: func(tm tea.Model) (int, int, bool) {
 			tree := tm.(QueueModel).rows.queueTree
 			hovered, ok := tree.HoveredIndex()
