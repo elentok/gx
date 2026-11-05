@@ -66,13 +66,13 @@ type serverConnMsg struct {
 // and it arms the next tick, which a manual probe must not.
 type serverProbeResultMsg struct{ serverConnMsg }
 
-func (m Model) cmdServerProbe() tea.Cmd {
-	d := m.settings.Server
+func (l serverLink) cmdServerProbe() tea.Cmd {
+	d := l.deps
 	return func() tea.Msg { return serverProbeResultMsg{handshake(d)} }
 }
 
-func (m Model) cmdManualProbe() tea.Cmd {
-	d := m.settings.Server
+func (l serverLink) cmdManualProbe() tea.Cmd {
+	d := l.deps
 	return func() tea.Msg { return handshake(d) }
 }
 
@@ -96,40 +96,40 @@ func handshake(d *ServerDeps) serverConnMsg {
 	return serverConnMsg{conn: conn}
 }
 
-func (m Model) cmdServerProbeLater() tea.Cmd {
+func cmdServerProbeLater() tea.Cmd {
 	return tea.Tick(serverProbeInterval, func(time.Time) tea.Msg { return serverProbeTickMsg{} })
 }
 
 type serverProbeTickMsg struct{}
 
-// updateServerConn handles the probe loop; ok is false for any other msg.
-func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
+// updateConn handles the probe loop; ok is false for any other msg.
+func (l serverLink) updateConn(msg tea.Msg, env linkEnv) (serverLink, tea.Cmd, linkResult, bool) {
 	switch msg := msg.(type) {
 	case serverProbeTickMsg:
-		return m, m.cmdServerProbe(), true
+		return l, l.cmdServerProbe(), linkResult{}, true
 	case serverProbeResultMsg:
-		m, cmd := m.applyServerConn(msg.serverConnMsg)
-		return m, tea.Batch(m.cmdServerProbeLater(), cmd), true
+		l, cmd, res := l.applyServerConn(msg.serverConnMsg, env)
+		return l, tea.Batch(cmdServerProbeLater(), cmd), res, true
 
 	case serverConnMsg:
-		m, cmd := m.applyServerConn(msg)
-		return m, cmd, true
+		l, cmd, res := l.applyServerConn(msg, env)
+		return l, cmd, res, true
 
 	case tabapi.ProbeRequestedMsg:
-		if m.settings.Server == nil {
-			return m, nil, true // permanently down: nothing to ask
+		if l.deps == nil {
+			return l, nil, linkResult{}, true // permanently down: nothing to ask
 		}
-		return m, m.cmdManualProbe(), true
+		return l, l.cmdManualProbe(), linkResult{}, true
 	}
-	return m, nil, false
+	return l, nil, linkResult{}, false
 }
 
 // applyServerConn takes a handshake outcome; a slow one leaves the last state.
-func (m Model) applyServerConn(msg serverConnMsg) (Model, tea.Cmd) {
+func (l serverLink) applyServerConn(msg serverConnMsg, env linkEnv) (serverLink, tea.Cmd, linkResult) {
 	if msg.slow {
-		return m, nil
+		return l, nil, linkResult{}
 	}
-	prev := m.serverConn().link()
-	m.setServerConn(msg.conn)
-	return m.onLinkChange(prev)
+	prev := l.serverConn().link()
+	l.setServerConn(msg.conn)
+	return l.onLinkChange(prev, env)
 }

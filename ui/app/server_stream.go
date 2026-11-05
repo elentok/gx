@@ -101,23 +101,23 @@ const resnapshotDebounce = 100 * time.Millisecond
 // either no stream is live or being set up, or the last snapshot failed. The
 // second case is the retry rule: a re-snapshot that fails while a stream is
 // live is retried on the next probe tick.
-func (m Model) streamWanted() bool {
-	return m.settings.Server != nil &&
-		m.serverConn().State != ServerDown &&
-		!m.stream.snapshotting &&
-		(m.stream.streamCtx == nil || m.stream.snapshotFailing)
+func (l serverLink) streamWanted() bool {
+	return l.deps != nil &&
+		l.serverConn().State != ServerDown &&
+		!l.stream.snapshotting &&
+		(l.stream.streamCtx == nil || l.stream.snapshotFailing)
 }
 
 // startSnapshot requests one snapshot; requests made while one is in flight
 // coalesce into it.
-func (m Model) startSnapshot() (Model, tea.Cmd) {
-	if m.stream.snapshotting || m.settings.Server == nil {
-		return m, nil
+func (l serverLink) startSnapshot() (serverLink, tea.Cmd) {
+	if l.stream.snapshotting || l.deps == nil {
+		return l, nil
 	}
-	m.stream.snapshotting = true
-	m.stream.gen++
-	gen, client := m.stream.gen, m.settings.Server.Client
-	return m, func() tea.Msg {
+	l.stream.snapshotting = true
+	l.stream.gen++
+	gen, client := l.stream.gen, l.deps.Client
+	return l, func() tea.Msg {
 		snap, err := client.Snapshot(context.Background())
 		return streamSnapshotMsg{gen: gen, snap: snap, err: err}
 	}
@@ -125,52 +125,47 @@ func (m Model) startSnapshot() (Model, tea.Cmd) {
 
 // cancelStream drops the live subscription; its pending messages are then
 // ignored because they no longer match streamEvents.
-func (m Model) cancelStream() Model {
-	if m.stream.streamStop != nil {
-		m.stream.streamStop()
+func (l serverLink) cancelStream() serverLink {
+	if l.stream.streamStop != nil {
+		l.stream.streamStop()
 	}
-	m.stream.streamCtx, m.stream.streamStop, m.stream.streamEvents = nil, nil, nil
-	return m
+	l.stream.streamCtx, l.stream.streamStop, l.stream.streamEvents = nil, nil, nil
+	return l
 }
 
 // onLinkChange reacts to a probe result: the store watch runs while down (the
 // shell, not a page, watches it, so it runs whichever tab is on screen), the
 // stream only while not. prev is the link before the result; the active page is
 // told only when it changed, and hidden pages catch up when switched to.
-func (m Model) onLinkChange(prev tabapi.ServerLink) (Model, tea.Cmd) {
+func (l serverLink) onLinkChange(prev tabapi.ServerLink, env linkEnv) (serverLink, tea.Cmd, linkResult) {
 	var cmds []tea.Cmd
-	if m.serverConn().State == ServerDown {
-		cmds = append(cmds, m.store.start(m.storeDir()))
-		m = m.cancelStream()
-		m.stream.snapshotting = false
-		m.stream.resnapshotPending, m.stream.resnapshotDue = false, false
-		m.stream.gen++ // outdate an in-flight snapshot
+	if l.serverConn().State == ServerDown {
+		cmds = append(cmds, env.store.start(env.storeDir))
+		l = l.cancelStream()
+		l.stream.snapshotting = false
+		l.stream.resnapshotPending, l.stream.resnapshotDue = false, false
+		l.stream.gen++ // outdate an in-flight snapshot
 	} else {
-		m.store.halt()
+		env.store.halt()
 		// Startup goes unknown → up without crossing the down line, so the
 		// stream is started from "no stream yet", not from a transition.
-		if m.streamWanted() {
+		if l.streamWanted() {
 			var snapshot tea.Cmd
-			m, snapshot = m.startSnapshot()
+			l, snapshot = l.startSnapshot()
 			cmds = append(cmds, snapshot)
 		}
 	}
-	if m.serverConn().link() != prev {
-		var deliver tea.Cmd
-		m, deliver = m.deliverServerState()
-		cmds = append(cmds, deliver)
-	}
-	return m, tea.Batch(cmds...)
+	return l, tea.Batch(cmds...), linkResult{deliver: l.serverConn().link() != prev}
 }
 
 // subscribe replaces the current stream with one from since; the older one is
 // cancelled so it can never deliver again.
-func (m Model) subscribe(since uint64) (Model, tea.Cmd) {
-	m = m.cancelStream()
+func (l serverLink) subscribe(since uint64) (serverLink, tea.Cmd) {
+	l = l.cancelStream()
 	ctx, stop := context.WithCancel(context.Background())
-	m.stream.streamCtx, m.stream.streamStop = ctx, stop
-	client := m.settings.Server.Client
-	return m, func() tea.Msg {
+	l.stream.streamCtx, l.stream.streamStop = ctx, stop
+	client := l.deps.Client
+	return l, func() tea.Msg {
 		ch, err := client.EventsAs(ctx, since, agentsui.FocusClient)
 		return streamSubscribedMsg{ctx: ctx, events: ch, err: err}
 	}
@@ -186,179 +181,174 @@ func cmdStreamNext(events <-chan wire.Event) tea.Cmd {
 	}
 }
 
-func (m Model) cmdStreamQueue() tea.Cmd {
-	queue := m.settings.Server.Queue
+func (l serverLink) cmdStreamQueue() tea.Cmd {
+	queue := l.deps.Queue
 	return func() tea.Msg {
 		items, err := queue.Items(context.Background())
 		return streamQueueMsg{items: items, err: err}
 	}
 }
 
-func (m Model) streamEffects(e viewmodel.Effect) (Model, tea.Cmd) {
+func (l serverLink) streamEffects(e viewmodel.Effect) (serverLink, tea.Cmd) {
 	var cmds []tea.Cmd
-	if e&viewmodel.EffectResnapshot != 0 && !m.stream.resnapshotPending {
-		m.stream.resnapshotPending = true
+	if e&viewmodel.EffectResnapshot != 0 && !l.stream.resnapshotPending {
+		l.stream.resnapshotPending = true
 		cmds = append(cmds, tea.Tick(resnapshotDebounce, func(time.Time) tea.Msg { return resnapshotTickMsg{} }))
 	}
 	if e&viewmodel.EffectRefetchQueue != 0 {
-		cmds = append(cmds, m.cmdStreamQueue())
+		cmds = append(cmds, l.cmdStreamQueue())
 	}
-	return m, tea.Batch(cmds...)
+	return l, tea.Batch(cmds...)
 }
 
 // onSnapshotErr: the next probe tick retries while the link is still up; only
 // the first failure of a streak toasts.
-func (m Model) onSnapshotErr(err error) (Model, tea.Cmd) {
-	if m.stream.snapshotFailing {
-		return m, nil
+func (l serverLink) onSnapshotErr(err error) (serverLink, tea.Cmd) {
+	if l.stream.snapshotFailing {
+		return l, nil
 	}
-	m.stream.snapshotFailing = true
-	return m, notify.Error("server snapshot: " + err.Error())
+	l.stream.snapshotFailing = true
+	return l, notify.Error("server snapshot: " + err.Error())
 }
 
 // onSnapshot applies a snapshot. It subscribes only when no stream is live,
 // since the stream already carries what follows; a fresh subscription, an
 // explicit R, or a first load is also when the queue order is fetched (otherwise
 // only queue-changed refetches it).
-func (m Model) onSnapshot(snap wire.Snapshot) (Model, tea.Cmd) {
-	m.stream.snapshotFailing = false
-	firstLoad := !m.stream.loaded
-	m.stream.setVM(m.stream.vm.ApplySnapshot(snap))
-	m.stream.loaded = true
+func (l serverLink) onSnapshot(snap wire.Snapshot, env linkEnv) (serverLink, tea.Cmd) {
+	l.stream.snapshotFailing = false
+	firstLoad := !l.stream.loaded
+	l.stream.setVM(l.stream.vm.ApplySnapshot(snap))
+	l.stream.loaded = true
 
 	var cmds []tea.Cmd
-	fetchQueue := firstLoad || m.stream.queueRequested
-	m.stream.queueRequested = false
-	if m.stream.streamCtx == nil {
+	fetchQueue := firstLoad || l.stream.queueRequested
+	l.stream.queueRequested = false
+	if l.stream.streamCtx == nil {
 		var subscribe tea.Cmd
-		m, subscribe = m.subscribe(snap.Seq)
+		l, subscribe = l.subscribe(snap.Seq)
 		cmds = append(cmds, subscribe)
 		fetchQueue = true
 	}
 	if fetchQueue {
-		cmds = append(cmds, m.cmdStreamQueue())
+		cmds = append(cmds, l.cmdStreamQueue())
 	}
-	m, deliver := m.deliverServerState()
-	cmds = append(cmds, deliver)
 	if firstLoad {
-		cmds = append(cmds, m.firstLoadHint())
+		cmds = append(cmds, firstLoadHint(env.cwdProject()))
 	}
-	return m, tea.Batch(cmds...)
+	return l, tea.Batch(cmds...)
 }
 
 // firstLoadHint: reading the snapshot is not news, but not being in a
 // registered project is worth saying once, whichever tab is open.
-func (m Model) firstLoadHint() tea.Cmd {
-	scope := viewmodel.Scope{CwdProject: cwdProjectName(m.settings.TicketStore, m.settings.ActiveWorktreePath)}
+func firstLoadHint(cwdProject string) tea.Cmd {
+	scope := viewmodel.Scope{CwdProject: cwdProject}
 	if hint := scope.UnregisteredHint(); hint != "" {
 		return notify.Info(hint)
 	}
 	return nil
 }
 
-// updateServerStream handles the stream's messages whichever tab is active;
+// updateStream handles the stream's messages whichever tab is active;
 // ok is false for any other msg.
-func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
+func (l serverLink) updateStream(msg tea.Msg, env linkEnv) (serverLink, tea.Cmd, linkResult, bool) {
 	switch msg := msg.(type) {
 	case streamSnapshotMsg:
-		if msg.gen != m.stream.gen {
-			return m, nil, true
+		if msg.gen != l.stream.gen {
+			return l, nil, linkResult{}, true
 		}
-		m.stream.snapshotting = false
-		due := m.stream.resnapshotDue
-		m.stream.resnapshotDue = false
+		l.stream.snapshotting = false
+		due := l.stream.resnapshotDue
+		l.stream.resnapshotDue = false
 		if msg.err != nil {
 			// The probe tick's retry covers whatever was due.
-			m, cmd := m.onSnapshotErr(msg.err)
-			return m, cmd, true
+			l, cmd := l.onSnapshotErr(msg.err)
+			return l, cmd, linkResult{}, true
 		}
-		m, cmd := m.onSnapshot(msg.snap)
+		l, cmd := l.onSnapshot(msg.snap, env)
 		if due {
 			var again tea.Cmd
-			m, again = m.startSnapshot()
+			l, again = l.startSnapshot()
 			cmd = tea.Batch(cmd, again)
 		}
-		return m, cmd, true
+		return l, cmd, linkResult{deliver: true}, true
 
 	case resnapshotTickMsg:
-		m.stream.resnapshotPending = false
+		l.stream.resnapshotPending = false
 		switch {
-		case m.serverConn().State == ServerDown:
-		case m.stream.snapshotting:
-			m.stream.resnapshotDue = true
+		case l.serverConn().State == ServerDown:
+		case l.stream.snapshotting:
+			l.stream.resnapshotDue = true
 		default:
-			m, cmd := m.startSnapshot()
-			return m, cmd, true
+			l, cmd := l.startSnapshot()
+			return l, cmd, linkResult{}, true
 		}
-		return m, nil, true
+		return l, nil, linkResult{}, true
 
 	case streamSubscribedMsg:
-		if msg.ctx != m.stream.streamCtx {
-			return m, nil, true // a newer subscription replaced it
+		if msg.ctx != l.stream.streamCtx {
+			return l, nil, linkResult{}, true // a newer subscription replaced it
 		}
 		if msg.err != nil {
-			m = m.cancelStream() // the next probe tick starts over
-			return m, nil, true
+			l = l.cancelStream() // the next probe tick starts over
+			return l, nil, linkResult{}, true
 		}
-		m.stream.streamEvents = msg.events
-		return m, cmdStreamNext(msg.events), true
+		l.stream.streamEvents = msg.events
+		return l, cmdStreamNext(msg.events), linkResult{}, true
 
 	case streamEventMsg:
-		if msg.events != m.stream.streamEvents {
-			return m, nil, true
+		if msg.events != l.stream.streamEvents {
+			return l, nil, linkResult{}, true
 		}
-		seqBefore := m.stream.vm.Seq
-		vm, effect := m.stream.vm.Reduce(msg.ev)
-		m.stream.setVM(vm)
+		seqBefore := l.stream.vm.Seq
+		vm, effect := l.stream.vm.Reduce(msg.ev)
+		l.stream.setVM(vm)
 		var cmds []tea.Cmd
 		if msg.ev.Seq > seqBefore+1 {
 			// A gap: what was missed is unknowable, so the re-snapshot must
 			// open a new subscription rather than keep this one.
-			m = m.cancelStream()
+			l = l.cancelStream()
 		} else {
 			cmds = append(cmds, cmdStreamNext(msg.events))
 		}
-		m, effects := m.streamEffects(effect)
+		l, effects := l.streamEffects(effect)
 		cmds = append(cmds, effects)
+		res := linkResult{deliver: true}
 		// Only an applied event toasts: a replayed duplicate or a gap is not news.
-		if toast, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
+		if toast, ok := viewmodel.ToastFor(msg.ev); ok && l.stream.vm.Seq > seqBefore {
 			cmds = append(cmds, toastCmd(toast))
 		}
-		if m.stream.vm.Seq > seqBefore && msg.ev.Type == wire.EventSessionFocus && msg.ev.Client == agentsui.FocusClient {
-			var focus tea.Cmd
-			m, focus = m.focusSession(msg.ev.Address)
-			cmds = append(cmds, focus)
+		if l.stream.vm.Seq > seqBefore && msg.ev.Type == wire.EventSessionFocus && msg.ev.Client == agentsui.FocusClient {
+			res.focus, res.focusID = true, msg.ev.Address
 		}
-		m, deliver := m.deliverServerState()
-		return m, tea.Batch(append(cmds, deliver)...), true
+		return l, tea.Batch(cmds...), res, true
 
 	case tabapi.ResnapshotRequestedMsg:
 		// The queue is refetched when the snapshot lands. Down-mode "R" never
 		// reaches here: the tabs reload from disk.
-		if m.serverConn().State == ServerDown {
-			return m, nil, true
+		if l.serverConn().State == ServerDown {
+			return l, nil, linkResult{}, true
 		}
-		m.stream.queueRequested = true
-		m, cmd := m.startSnapshot()
-		return m, cmd, true
+		l.stream.queueRequested = true
+		l, cmd := l.startSnapshot()
+		return l, cmd, linkResult{}, true
 
 	case streamEndedMsg:
-		if msg.events != m.stream.streamEvents {
-			return m, nil, true
+		if msg.events != l.stream.streamEvents {
+			return l, nil, linkResult{}, true
 		}
-		m = m.cancelStream()
-		m, cmd := m.startSnapshot()
-		return m, cmd, true
+		l = l.cancelStream()
+		l, cmd := l.startSnapshot()
+		return l, cmd, linkResult{}, true
 
 	case streamQueueMsg:
 		if msg.err != nil {
-			return m, nil, true
+			return l, nil, linkResult{}, true
 		}
-		m.stream.setVM(m.stream.vm.SetQueue(msg.items))
-		m, deliver := m.deliverServerState()
-		return m, deliver, true
+		l.stream.setVM(l.stream.vm.SetQueue(msg.items))
+		return l, nil, linkResult{deliver: true}, true
 	}
-	return m, nil, false
+	return l, nil, linkResult{}, false
 }
 
 func toastCmd(t viewmodel.Toast) tea.Cmd {
@@ -372,11 +362,11 @@ func toastCmd(t viewmodel.Toast) tea.Cmd {
 }
 
 // serverState is the state to hand a page: nil before the first snapshot.
-func (m Model) serverState() *viewmodel.State {
-	if !m.stream.loaded {
+func (l serverLink) serverState() *viewmodel.State {
+	if !l.stream.loaded {
 		return nil
 	}
-	st := m.stream.vm
+	st := l.stream.vm
 	return &st
 }
 

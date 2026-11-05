@@ -120,7 +120,7 @@ func TestDownMode_ReloadKeyReloadsTicketsAndProbesFromQueue(t *testing.T) {
 func TestDownMode_ProbeRequestIsOneShot(t *testing.T) {
 	h := newDownHarness(t)
 
-	next, cmd, ok := h.m.updateServerConn(tabapi.ProbeRequestedMsg{})
+	next, cmd, ok := h.m.updateServerLink(tabapi.ProbeRequestedMsg{})
 	if !ok || cmd == nil {
 		t.Fatalf("probe request not handled (ok=%v)", ok)
 	}
@@ -128,7 +128,7 @@ func TestDownMode_ProbeRequestIsOneShot(t *testing.T) {
 	if !isConn {
 		t.Fatalf("probe request produced %#v, want a plain handshake result", cmd())
 	}
-	_, cmd, _ = next.updateServerConn(res)
+	_, cmd, _ = next.updateServerLink(res)
 	if cmd != nil {
 		t.Fatal("a manual probe result armed another tick")
 	}
@@ -141,7 +141,7 @@ func TestDownMode_NoClientIgnoresProbeRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := New(*repo, Settings{ActiveWorktreePath: repoDir})
-	if _, cmd, ok := m.updateServerConn(tabapi.ProbeRequestedMsg{}); !ok || cmd != nil {
+	if _, cmd, ok := m.updateServerLink(tabapi.ProbeRequestedMsg{}); !ok || cmd != nil {
 		t.Fatalf("no-client probe request: ok=%v cmd=%v, want handled and no command", ok, cmd)
 	}
 }

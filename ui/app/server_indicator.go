@@ -68,6 +68,6 @@ func (c ServerConn) link() tabapi.ServerLink {
 
 // WithServerConn sets the connection state the server indicator renders.
 func (m Model) WithServerConn(c ServerConn) Model {
-	m.setServerConn(c)
+	m.serverLink.setServerConn(c)
 	return m
 }

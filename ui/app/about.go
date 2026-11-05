@@ -44,10 +44,10 @@ func loadConn(conn *atomic.Pointer[ServerConn]) ServerConn {
 	return ServerConn{}
 }
 
-func (m Model) serverConn() ServerConn { return loadConn(m.conn) }
+func (l serverLink) serverConn() ServerConn { return loadConn(l.conn) }
 
 // setServerConn is the one writer of the connection state.
-func (m *Model) setServerConn(c ServerConn) { m.conn.Store(&c) }
+func (l serverLink) setServerConn(c ServerConn) { l.conn.Store(&c) }
 
 // words reuses the title-row badge's words so the two can't drift; the badge
 // has none for the up and unknown states.

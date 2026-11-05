@@ -2,7 +2,6 @@ package app
 
 import (
 	"strings"
-	"sync/atomic"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -64,11 +63,10 @@ type Model struct {
 	switcher      switcher
 	gate          *reloadgate.ReloadGate
 
-	// conn is shared by Model copies and the About provider; go through
-	// serverConn and setServerConn.
-	conn   *atomic.Pointer[ServerConn]
-	stream serverStream
-	store  storeWatch
+	// serverLink is embedded so the pages-side code reads its state (stream,
+	// serverConn) directly.
+	serverLink
+	store storeWatch
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -81,7 +79,7 @@ func New(repo git.Repo, settings Settings) Model {
 		notifyLog:     notifylog.New(),
 		notifyHistory: notifyhistory.New().WithDirs(settings.Dirs),
 		gate:          reloadgate.New(),
-		conn:          &atomic.Pointer[ServerConn]{},
+		serverLink:    newServerLink(settings.Server),
 	}
 	m.settings.About = aboutLines(m.conn, settings.Terminal)
 	if settings.Server == nil {

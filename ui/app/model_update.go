@@ -73,16 +73,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg = pageMsg
 	}
 
-	if next, cmd, ok := m.updateServerConn(msg); ok {
+	// Before any page routing: the probe loop and the stream are read whichever
+	// tab is open.
+	if next, cmd, ok := m.updateServerLink(msg); ok {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
 	if next, cmd, ok := m.updateStoreWatch(msg); ok {
-		return next, tea.Batch(notifyCmd, cmd)
-	}
-
-	// Before any page routing: the stream is read whichever tab is open.
-	if next, cmd, ok := m.updateServerStream(msg); ok {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
