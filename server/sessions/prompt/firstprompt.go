@@ -1,12 +1,10 @@
-package server
+package prompt
 
 import (
 	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/sessions"
-	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -14,13 +12,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/transcript"
+)
+
+var (
+	_ sessions.Prompter    = (*Prompt)(nil)
+	_ sessions.FirstPrompt = (*firstPrompt)(nil)
 )
 
 // signalFirstIdle names the fallback in the debug line when no ready report
@@ -40,7 +44,7 @@ const clearInputHint = " Clear the input first."
 // decides when to type, types in the background, and cancels the remaining
 // nudges when a person types too.
 type firstPrompt struct {
-	s           *Server
+	p           *Prompt
 	dir         string
 	log         *slog.Logger
 	typed       atomic.Bool
@@ -51,17 +55,29 @@ type firstPrompt struct {
 	id          string
 	run         int
 	timeout     time.Duration
-	clock       *sessprompt.StartClock
+	clock       *StartClock
 }
 
-func (s *Server) newFirstPrompt(dir, id string, run int) *firstPrompt {
+// NewFirstPrompt is sessions.Prompter's first-prompt tracker of one watch.
+func (p *Prompt) NewFirstPrompt(dir, id string, run int) sessions.FirstPrompt {
 	f := &firstPrompt{
-		s: s, dir: dir, id: id, run: run, log: s.log.With("session", id),
+		p: p, dir: dir, id: id, run: run, log: p.log.With("session", id),
 		cancel: make(chan struct{}), turnStarted: make(chan struct{}),
-		timeout: cmp.Or(s.cfg.FirstPromptStartTimeout, DefaultFirstPromptStartTimeout),
+		timeout: cmp.Or(p.cfg.FirstPromptStartTimeout, DefaultFirstPromptStartTimeout),
 	}
-	f.clock = sessprompt.NewStartClock(f.timeout, f.startTimedOut)
+	f.clock = NewStartClock(f.timeout, f.startTimedOut)
 	return f
+}
+
+// DetectDesignActionable is sessions.Prompter's recompute of a Design
+// session's Actionable.
+func (p *Prompt) DetectDesignActionable(dir, id string, design chat.DesignRef) {
+	p.host.DetectDesignActionable(dir, id, design)
+}
+
+// SendAction is sessions.Prompter's send of an Action's prompts.
+func (p *Prompt) SendAction(dir, label string, action []string) {
+	p.host.RunActionSteps(dir, label, action)
 }
 
 // Stop ends the Starting clock when the watch ends.
@@ -71,7 +87,7 @@ func (f *firstPrompt) Stop() { f.clock.Stop() }
 // Starting at the deadline.
 func (f *firstPrompt) startTimedOut() {
 	var prompt string
-	f.s.sessions.UpdateSessionMetaOrWarn(f.dir, f.id, func(m *sessions.Meta) bool {
+	f.p.sessions.UpdateSessionMetaOrWarn(f.dir, f.id, func(m *sessions.Meta) bool {
 		starting := m.Status.State == "" || m.Status.State == wire.SessionStarting
 		if m.Run != f.run || m.FirstPrompt == "" || !starting {
 			return false
@@ -88,7 +104,7 @@ func (f *firstPrompt) startTimedOut() {
 // Action.
 func (f *firstPrompt) raise(prompt, reason string) {
 	f.log.Warn("first prompt failed", "reason", reason)
-	f.s.raiseGxActionable(f.dir, reason, []string{prompt})
+	f.p.host.RaiseGxActionable(f.dir, reason, []string{prompt})
 }
 
 // failed raises the Actionable for a nudge that gave up. Where the input is
@@ -191,15 +207,15 @@ func (f *firstPrompt) markTyped() {
 // Start types the prompt in the background, so the watch keeps reading the
 // person's input.
 func (f *firstPrompt) Start(signal, prompt string) {
-	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", promptHead(prompt))
-	f.s.sessions.Watches.Start(func() {
+	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", PromptHead(prompt))
+	f.p.sessions.Watches.Start(func() {
 		err := f.deliver(prompt)
 		switch {
 		case errors.Is(err, errNudgeCancelled):
 			f.log.Debug(errNudgeCancelled.Error())
-		case errors.Is(err, sessprompt.ErrDraft):
+		case errors.Is(err, ErrDraft):
 			f.log.Info("draft would not clear")
-			f.s.raiseGxActionable(f.dir, sessprompt.DraftReason, []string{prompt})
+			f.p.host.RaiseGxActionable(f.dir, DraftReason, []string{prompt})
 		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
 			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked),
 			errors.Is(err, agentrunner.ErrNotDelivered):
@@ -224,20 +240,20 @@ func (f *firstPrompt) deliver(prompt string) error {
 	}
 	// Before the draft clear: vim NORMAL has to reach INSERT first. The nudge
 	// runs the same step again, which presses nothing once in INSERT.
-	if !f.typing().ReadyToType(f.s.projects.TypingIO(f.dir, c, "first-prompt")) {
+	if !f.typing().ReadyToType(f.p.projects.TypingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
-	if err := f.s.prompt.ClearDraft(f.dir, c); err != nil {
+	if err := f.p.ClearDraft(f.dir, c); err != nil {
 		return err
 	}
 	caps := claudeui.DefaultNudgeCaps
-	caps.Grace = cmp.Or(f.s.cfg.PromptGrace, caps.Grace)
+	caps.Grace = cmp.Or(f.p.cfg.PromptGrace, caps.Grace)
 	p := f.prompter(c, turn)
 	report := func(d claudeui.NudgeDecision) {
 		f.log.Debug("first prompt nudge", "decision", string(d))
 	}
 	err = claudeui.PromptWithNudge(p, prompt, caps, time.Time{}, time.Now, report)
-	if f.s.sessions.Watches.IsStopped() && err != nil {
+	if f.p.sessions.Watches.IsStopped() && err != nil {
 		return nil
 	}
 	return err
@@ -252,18 +268,18 @@ var errSessionBlocked = errors.New("session is blocked")
 // session is still Starting, so only Blocked refuses. A step that fails after
 // typing (blocked, ended) is only logged: the prompt was delivered.
 func (f *firstPrompt) deliverSlash(prompt string) error {
-	run, closeRun, err := f.s.openActionRun(f.dir, actionRunOpts{onTyped: f.markTyped, cancel: f.cancel})
+	run, closeRun, err := f.p.host.OpenActionRun(f.dir, RunOpts{OnTyped: f.markTyped, Cancel: f.cancel})
 	if err != nil {
 		return err
 	}
 	defer closeRun()
-	if err := run.catchUp(); err != nil {
+	if err := run.CatchUp(); err != nil {
 		return err
 	}
-	if run.state == wire.SessionBlocked {
+	if run.State() == wire.SessionBlocked {
 		return errSessionBlocked
 	}
-	if err := run.step(0, prompt); err != nil {
+	if err := run.Step(0, prompt); err != nil {
 		return err
 	}
 	select {
@@ -277,7 +293,7 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 // proveDelivered checks that a claude session's slash prompt reached its
 // transcript, resending while it did not. Other harnesses write no such
 // transcript, so they keep the unchecked send.
-func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
+func (f *firstPrompt) proveDelivered(run ActionRun, prompt string) error {
 	meta, err := sessions.ReadMeta(f.dir)
 	if err != nil || (meta.Harness != "" && meta.Harness != string(harness.Claude)) {
 		return nil
@@ -287,16 +303,16 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	if err != nil {
 		cwd = meta.Dir
 	}
-	path, err := f.s.projects.TranscriptPath(cwd, meta.ConversationID)
+	path, err := f.p.projects.TranscriptPath(cwd, meta.ConversationID)
 	if err != nil {
 		f.log.Warn("first prompt proof skipped", "err", err)
 		return nil
 	}
 	caps := claudeui.DefaultLaunchProofCaps
-	caps.Grace = cmp.Or(f.s.cfg.LaunchProofCaps.Grace, caps.Grace)
-	caps.UnknownGrace = cmp.Or(f.s.cfg.LaunchProofCaps.UnknownGrace, caps.UnknownGrace)
-	caps.Poll = cmp.Or(f.s.cfg.LaunchProofCaps.Poll, caps.Poll)
-	caps.ResendEvery = cmp.Or(f.s.cfg.LaunchProofCaps.ResendEvery, caps.ResendEvery)
+	caps.Grace = cmp.Or(f.p.cfg.LaunchProofCaps.Grace, caps.Grace)
+	caps.UnknownGrace = cmp.Or(f.p.cfg.LaunchProofCaps.UnknownGrace, caps.UnknownGrace)
+	caps.Poll = cmp.Or(f.p.cfg.LaunchProofCaps.Poll, caps.Poll)
+	caps.ResendEvery = cmp.Or(f.p.cfg.LaunchProofCaps.ResendEvery, caps.ResendEvery)
 	p := claudeui.LaunchProof{
 		FirstUser: func() (string, bool, error) {
 			msgs, _, err := transcript.ReadChat(path)
@@ -311,18 +327,18 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 			return "", false, nil
 		},
 		Pane: func() (string, error) {
-			rows, _, err := run.holder.Screen(0)
+			rows, _, err := run.Holder().Screen(0)
 			return strings.Join(rows, "\n"), err
 		},
 		Resend: func() error {
 			select {
 			case <-f.cancel:
 				return errNudgeCancelled
-			case <-f.s.sessions.Watches.Stop:
-				return errServerStopping
+			case <-f.p.sessions.Watches.Stop:
+				return ErrServerStopping
 			default:
 			}
-			return run.typeStep(0, prompt)
+			return run.TypeStep(0, prompt)
 		},
 		Report: func(d claudeui.NudgeDecision) { f.log.Debug("first prompt nudge", "decision", string(d)) },
 		Now:    time.Now,
@@ -333,7 +349,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	go func() {
 		select {
 		case <-f.cancel:
-		case <-f.s.sessions.Watches.Stop:
+		case <-f.p.sessions.Watches.Stop:
 		case <-ctx.Done():
 		}
 		stop()
@@ -344,7 +360,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 		case <-f.cancel:
 			return errNudgeCancelled
 		default:
-			return errServerStopping
+			return ErrServerStopping
 		}
 	}
 	return err
@@ -422,11 +438,11 @@ type firstPrompter struct {
 
 // typing is the typing rules of the session's harness.
 func (f *firstPrompt) typing() harness.Typing {
-	return f.s.projects.SessionTyping(f.dir)
+	return f.p.projects.SessionTyping(f.dir)
 }
 
 func (f *firstPrompt) prompter(c *nativerunner.HolderClient, turn int) *firstPrompter {
-	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.s.projects.TypingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
+	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.p.projects.TypingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
 }
 
 func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {
@@ -444,7 +460,7 @@ func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {
 			return true, nil
 		case <-p.f.cancel:
 			return false, errNudgeCancelled
-		case <-p.f.s.sessions.Watches.Stop:
+		case <-p.f.p.sessions.Watches.Stop:
 			return false, errors.New("server stopping")
 		case <-deadline:
 			return false, nil
@@ -467,7 +483,7 @@ func (p *holderPrompter) ReadyToType() bool {
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.
 func (p *holderPrompter) InputEmpty() (bool, bool, error) {
-	state, err := sessprompt.InputState(p.c)
+	state, err := InputState(p.c)
 	if err != nil {
 		return false, false, err
 	}
@@ -478,4 +494,12 @@ func (p *holderPrompter) InputEmpty() (bool, bool, error) {
 		return false, true, nil
 	}
 	return false, false, nil
+}
+
+// PromptHead is the start of a prompt for a log line.
+func PromptHead(prompt string) string {
+	if r := []rune(prompt); len(r) > 40 {
+		return string(r[:40]) + "…"
+	}
+	return prompt
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
+	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -28,7 +29,7 @@ func newManager(s *Server) *sessions.Manager {
 		AFK:      s.afk,
 		Alerts:   s.chat,
 		Host:     s,
-		Prompter: serverPrompter{s},
+		Prompter: s.prompt,
 		Designs:  s.designs,
 		Rollouts: s,
 	})
@@ -44,33 +45,6 @@ func newResumer(s *Server) *sessions.Resumer {
 	return sessions.NewResumer(s.sessions, s)
 }
 
-// serverPrompter is the root's Prompter.
-type serverPrompter struct{ s *Server }
-
-func (p serverPrompter) NewFirstPrompt(dir, id string, run int) sessions.FirstPrompt {
-	return p.s.newFirstPrompt(dir, id, run)
-}
-
-func (p serverPrompter) MarkTurn(dir, id string) (chat.TurnMark, bool) {
-	return p.s.prompt.MarkTurn(dir, id)
-}
-
-func (p serverPrompter) SettleTurn(dir, id string, mark chat.TurnMark, design chat.DesignRef, cancel <-chan struct{}) {
-	p.s.prompt.SettleTurn(dir, id, mark, design, cancel)
-}
-
-func (p serverPrompter) DetectDesignActionable(dir, id string, design chat.DesignRef) {
-	p.s.detectDesignActionable(dir, id, design)
-}
-
-func (p serverPrompter) SendAction(dir, label string, action []string) {
-	p.s.sendAction(dir, label, action)
-}
-
-func (p serverPrompter) CancelAutoAdvance(id, why string) bool {
-	return p.s.prompt.CancelAutoAdvance(id, why)
-}
-
 // promptHost is the root's sessprompt.Host.
 type promptHost struct{ s *Server }
 
@@ -80,4 +54,20 @@ func (h promptHost) SendAction(req wire.SessionRequest, auto bool) (wire.Session
 
 func (h promptHost) DetectDesignActionable(dir, id string, design chat.DesignRef) {
 	h.s.detectDesignActionable(dir, id, design)
+}
+
+func (h promptHost) RunActionSteps(dir, label string, action []string) {
+	h.s.sendAction(dir, label, action)
+}
+
+func (h promptHost) RaiseGxActionable(dir, reason string, action []string) {
+	h.s.raiseGxActionable(dir, reason, action)
+}
+
+func (h promptHost) OpenActionRun(dir string, opts sessprompt.RunOpts) (sessprompt.ActionRun, func(), error) {
+	run, closeRun, err := h.s.openActionRun(dir, actionRunOpts{onTyped: opts.OnTyped, cancel: opts.Cancel})
+	if err != nil {
+		return nil, nil, err
+	}
+	return runAdapter{run}, closeRun, nil
 }

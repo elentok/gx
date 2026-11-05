@@ -111,8 +111,8 @@ func (s *Server) sendAction(dir, label string, action []string) {
 
 // Errors that end an Action without raising an Actionable.
 var (
-	errServerStopping = errors.New("server stopping")
-	errWentBlocked    = errors.New("session went blocked")
+	errServerStopping = sessprompt.ErrServerStopping
+	errWentBlocked    = sessprompt.ErrWentBlocked
 	errNotIdle        = errors.New("session is not idle")
 )
 
@@ -177,6 +177,22 @@ func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func
 	}, nil
 }
 
+// runAdapter is the prompt package's view of an actionRun. 58d moves
+// actionRun into that package, which ends the adapter.
+type runAdapter struct{ r *actionRun }
+
+func (a runAdapter) CatchUp() error                      { return a.r.catchUp() }
+func (a runAdapter) Step(i int, prompt string) error     { return a.r.step(i, prompt) }
+func (a runAdapter) TypeStep(i int, prompt string) error { return a.r.typeStep(i, prompt) }
+func (a runAdapter) State() string                       { return a.r.state }
+func (a runAdapter) Holder() *nativerunner.HolderClient  { return a.r.holder }
+func (a runAdapter) PersonTyped() bool                   { return a.r.personTyped }
+func (a runAdapter) ClearPersonTyped()                   { a.r.personTyped = false }
+func (a runAdapter) TurnRunning() bool                   { return a.r.turnRunning() }
+func (a runAdapter) NextStatus(timer <-chan time.Time) (bool, string, error) {
+	return a.r.nextStatus(timer)
+}
+
 // typeStep types one prompt and presses its Enter, without waiting.
 func (r *actionRun) typeStep(i int, prompt string) error {
 	if !r.s.projects.Typing().ReadyToType(r.s.projects.TypingIO(r.dir, r.holder, "action-step")) {
@@ -187,7 +203,7 @@ func (r *actionRun) typeStep(i int, prompt string) error {
 	}
 	r.convChanged = false
 	before, _ := sessprompt.InputState(r.holder)
-	r.s.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", promptHead(prompt), "input_before", before)
+	r.s.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", sessprompt.PromptHead(prompt), "input_before", before)
 	if err := sessions.TypeSessionPrompt(r.dir, prompt); err != nil {
 		return err
 	}
@@ -210,14 +226,6 @@ func (r *actionRun) step(i int, prompt string) error {
 		return fmt.Errorf("step %d: %w", i, err)
 	}
 	return nil
-}
-
-// promptHead is the start of a prompt for a log line.
-func promptHead(prompt string) string {
-	if r := []rune(prompt); len(r) > 40 {
-		return string(r[:40]) + "…"
-	}
-	return prompt
 }
 
 // catchUp applies the statuses already sent.

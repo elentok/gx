@@ -165,8 +165,6 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/tickets/merge":      func(s *Server) http.HandlerFunc { return repairWriteWeb(s.mergeInQueue) },
 	"POST /v1/tickets/start-over": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.startOverInQueue) },
 	"POST /v1/agents/answer":      func(s *Server) http.HandlerFunc { return queue.Handler(s.agentAnswerWeb) },
-	"POST /v1/sessions/prompt":    func(s *Server) http.HandlerFunc { return s.sessionPromptWeb() },
-	"POST /v1/sessions/keys":      func(s *Server) http.HandlerFunc { return s.sessionKeysWeb() },
 	"POST /v1/restart":            func(s *Server) http.HandlerFunc { return s.restartWrite },
 	"POST /v1/client-errors":      func(s *Server) http.HandlerFunc { return s.clientErrorReport },
 }

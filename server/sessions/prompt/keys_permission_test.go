@@ -1,4 +1,4 @@
-package server_test
+package prompt_test
 
 import (
 	"path/filepath"
@@ -175,11 +175,11 @@ func TestSessionKeys_PermissionKeepsADesignCountdown(t *testing.T) {
 			t.Parallel()
 			f := startKeysAdvancing(t)
 			rows := agentfake.BashPermissionDialog("ls")
-			if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionDialogBlock, Dialog: rows, Message: "run ls?"}); err != nil {
+			if err := agentfake.SendProgramControl(f.Conv, agentfake.Control{Action: agentfake.ActionDialogBlock, Dialog: rows, Message: "run ls?"}); err != nil {
 				t.Fatal(err)
 			}
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
-			res, err := f.h.Client.KeysSession(f.ctx, wire.SessionKeysRequest{ID: f.id, Permission: decision})
+			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+			res, err := f.H.Client.KeysSession(f.Ctx, wire.SessionKeysRequest{ID: f.ID, Permission: decision})
 			if err != nil || res.Refused {
 				t.Fatalf("%s = %+v, %v", decision, res, err)
 			}

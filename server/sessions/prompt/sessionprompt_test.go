@@ -1,4 +1,4 @@
-package server_test
+package prompt_test
 
 import (
 	"fmt"
@@ -144,11 +144,11 @@ func TestSessionPrompt_DesignSlashCommandStopsTheCountdown(t *testing.T) {
 	for _, text := range []string{"/clear", "/compact"} {
 		t.Run(text, func(t *testing.T) {
 			f := startAdvancing(t, storeWithMapStep(t, "spec"))
-			waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
-			writeAssistantMessage(t, f.path, runEndText)
+			waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+			writeAssistantMessage(t, f.Path, runEndText)
 			endTurn(t, f)
-			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-			res, err := f.h.Client.PromptSession(f.ctx, wire.SessionPromptRequest{ID: f.id, Text: text})
+			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+			res, err := f.H.Client.PromptSession(f.Ctx, wire.SessionPromptRequest{ID: f.ID, Text: text})
 			if err != nil || res.Refused {
 				t.Fatalf("prompt = %+v, %v", res, err)
 			}

@@ -18,12 +18,12 @@ const (
 	grillReason = "Grilling: waiting for your answers"
 )
 
-// designPromptSession is startPromptSession spread into the arguments the
-// helpers here take.
+// designPromptSession is servertest.StartPromptSession spread into the
+// arguments the helpers here take.
 func designPromptSession(t *testing.T) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
 	t.Helper()
-	f := startPromptSession(t)
-	return f.h, f.ctx, f.evs, f.id, f.conv, f.transcript
+	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	return f.H, f.Ctx, f.Evs, f.ID, f.Conv, f.Transcript
 }
 
 // idleWith ends a turn with text: working, then idle.

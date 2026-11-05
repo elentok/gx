@@ -1,4 +1,4 @@
-package server
+package prompt
 
 import (
 	"encoding/json"
@@ -22,26 +22,19 @@ const (
 	promptSourceCLI = "cli"
 )
 
-func (s *Server) sessionPromptWrite(w http.ResponseWriter, r *http.Request) {
-	s.sessionPromptHandler(promptSourceCLI)(w, r)
-}
-
-// sessionPromptWeb is sessionPromptWrite for the web mux.
-func (s *Server) sessionPromptWeb() http.HandlerFunc { return s.sessionPromptHandler(promptSourceWeb) }
-
-func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
+func (p *Prompt) promptHandler(source string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req wire.SessionPromptRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		res, err := s.promptSession(req, source)
+		res, err := p.promptSession(req, source)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, res)
+		wire.WriteJSON(w, res)
 	}
 }
 
@@ -49,17 +42,17 @@ func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 // background so the nudges outlive the request. Continue is for design
 // sessions only: it types /clear and /gx-design. It skips the draft guard:
 // gx.follow-ups/07 tracks that.
-func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wire.SessionResult, error) {
-	s.sessions.Watches.MetaMu.Lock()
-	defer s.sessions.Watches.MetaMu.Unlock()
-	dir, meta, res, err := s.sessions.SessionDir(req.ID)
+func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wire.SessionResult, error) {
+	p.sessions.Watches.MetaMu.Lock()
+	defer p.sessions.Watches.MetaMu.Unlock()
+	dir, meta, res, err := p.sessions.SessionDir(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
 	if req.Continue && !meta.Design {
 		return sessions.Refusal(wire.ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
-	if !s.settings.Load().HasChatReader(meta.Harness) {
+	if !p.settings.Load().HasChatReader(meta.Harness) {
 		return sessions.Refusal(wire.ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
 	text, refusal := wire.ValidatePromptText(req.Text, "text")
@@ -72,7 +65,7 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 		}
 	}
 	if source == promptSourceWeb {
-		last, err := s.lastChatMessageID(req.ID, meta)
+		last, err := p.lastChatMessageID(req.ID, meta)
 		if err != nil {
 			return wire.SessionResult{}, err
 		}
@@ -91,23 +84,23 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 		// The server builds the slash commands, so the prefix rule stays closed
 		// to the page.
 		action := chat.DesignContinueAction(meta.Ticket, meta.Harness)
-		if res, refused := s.resumer.HandoffRefusal(meta, action); refused {
+		if res, refused := p.resumer.HandoffRefusal(meta, action); refused {
 			return res, nil
 		}
-		s.prompt.CancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
+		p.CancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
 		meta.Actionable = wire.SessionActionable{}
 		meta.AutoSends = 0
 		if err := sessions.WriteMeta(dir, meta); err != nil {
 			return wire.SessionResult{}, err
 		}
-		s.events.Publish(wire.EventSessionChanged, req.ID)
-		s.resumer.StartContinue(dir, meta, "Continue", action)
+		p.events.Publish(wire.EventSessionChanged, req.ID)
+		p.resumer.StartContinue(dir, meta, "Continue", action)
 		ev.Action = "continue"
 		for _, a := range action {
 			ev.Bytes += len(a)
 		}
 	} else {
-		s.sessions.Watches.Start(func() { s.sendPrompt(dir, text) })
+		p.sessions.Watches.Start(func() { p.sendPrompt(dir, text) })
 		if name, ok := renameCommandArg(text); ok && name != meta.Name {
 			// The harness renames itself, but a typed name never follows the
 			// terminal title, so the Agents tab would keep the old one.
@@ -115,14 +108,14 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 			if err := sessions.WriteMeta(dir, meta); err != nil {
 				return wire.SessionResult{}, err
 			}
-			s.events.Publish(wire.EventSessionChanged, req.ID)
+			p.events.Publish(wire.EventSessionChanged, req.ID)
 		}
-		if err := s.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
+		if err := p.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
 			return wire.SessionResult{}, err
 		}
 	}
-	if err := ralphloop.AppendServerEvent(s.cfg.TicketStore, ev); err != nil {
-		s.log.Warn("logging session prompt", "session", req.ID, "err", err)
+	if err := ralphloop.AppendServerEvent(p.cfg.TicketStore, ev); err != nil {
+		p.log.Warn("logging session prompt", "session", req.ID, "err", err)
 	}
 	info := meta.Info()
 	return wire.SessionResult{Session: &info}, nil
@@ -131,8 +124,8 @@ func (s *Server) promptSession(req wire.SessionPromptRequest, source string) (wi
 // notePersonTyped records a person's input on a session: it stops a running
 // auto-advance countdown, resets the auto-send count and clears a derived
 // Continue. The caller holds metaMu.
-func (s *Server) notePersonTyped(dir string, meta sessions.Meta, why string) error {
-	stopped := s.prompt.CancelAutoAdvance(meta.ID, why)
+func (p *Prompt) notePersonTyped(dir string, meta sessions.Meta, why string) error {
+	stopped := p.CancelAutoAdvance(meta.ID, why)
 	changed := meta.AutoSends != 0
 	meta.AutoSends = 0
 	if !stopped && !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
@@ -145,18 +138,18 @@ func (s *Server) notePersonTyped(dir string, meta sessions.Meta, why string) err
 	if err := sessions.WriteMeta(dir, meta); err != nil {
 		return err
 	}
-	s.events.Publish(wire.EventSessionChanged, meta.ID)
+	p.events.Publish(wire.EventSessionChanged, meta.ID)
 	return nil
 }
 
 // lastChatMessageID is the id of the newest visible message of the session's
 // chat, or "" with none.
-func (s *Server) lastChatMessageID(id string, meta sessions.Meta) (string, error) {
-	path, kind, ok := s.sessionChat.Transcript(id, meta.ChatMeta())
+func (p *Prompt) lastChatMessageID(id string, meta sessions.Meta) (string, error) {
+	path, kind, ok := p.sessionChat.Transcript(id, meta.ChatMeta())
 	if !ok {
 		return "", nil
 	}
-	snap, err := s.sessionChat.ReadSnapshot(path, kind, meta.Ticket)
+	snap, err := p.sessionChat.ReadSnapshot(path, kind, meta.Ticket)
 	if os.IsNotExist(err) || len(snap.Msgs) == 0 {
 		return "", nil
 	}

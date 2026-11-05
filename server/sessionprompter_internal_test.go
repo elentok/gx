@@ -21,8 +21,6 @@ func (f fakePrompter) DetectDesignActionable(string, string, chat.DesignRef) {}
 func (f fakePrompter) CancelAutoAdvance(string, string) bool                 { return false }
 func (f fakePrompter) SendAction(_, _ string, action []string)               { f.sent <- action }
 
-var _ sessions.FirstPrompt = (*firstPrompt)(nil)
-
 func TestStartContinue_SendsTheActionThroughThePrompter(t *testing.T) {
 	t.Parallel()
 	s := &Server{}

@@ -84,10 +84,6 @@ const (
 	// typing before it counts as done: claude runs some commands locally and
 	// never goes Working.
 	DefaultActionSlashSettle = time.Second
-
-	// DefaultFirstPromptStartTimeout is how long a session may stay Starting,
-	// counted from launch, before its first prompt is handed to a person.
-	DefaultFirstPromptStartTimeout = 30 * time.Second
 )
 
 // DefaultTCPAddr is where the opt-in TCP listener binds.
@@ -437,14 +433,20 @@ func New(cfg Config) (*Server, error) {
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.designs = designs.New(s.designsDeps())
 	s.prompt = sessprompt.New(sessprompt.Deps{
-		Cfg: sessprompt.Config{AutoAdvanceDelay: cfg.AutoAdvanceDelay, TurnSettleTimeout: cfg.TurnSettleTimeout},
-		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings, Host: promptHost{s},
+		Cfg: sessprompt.Config{
+			AutoAdvanceDelay: cfg.AutoAdvanceDelay, TurnSettleTimeout: cfg.TurnSettleTimeout,
+			TicketStore: cfg.TicketStore, FirstPromptStartTimeout: cfg.FirstPromptStartTimeout,
+			PromptGrace: cfg.PromptGrace, LaunchProofCaps: cfg.LaunchProofCaps,
+		},
+		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
+		Projects: s.projects, Host: promptHost{s},
 	})
 	s.sessions = newManager(s)
 	s.designs.GiveSessions(s.sessions)
 	s.prompt.GiveSessions(s.sessions)
 	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
+	s.prompt.GiveResumer(s.resumer)
 	s.epics = epics.New(s.epicsDeps())
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessions.SessionFinished
@@ -509,8 +511,6 @@ var routeTable = []struct {
 	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) {
 		sessions.SessionWrite(s.runSessionAction)(w, r)
 	}},
-	{"POST /v1/sessions/prompt", (*Server).sessionPromptWrite},
-	{"POST /v1/sessions/keys", (*Server).sessionKeysWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

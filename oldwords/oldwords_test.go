@@ -79,6 +79,7 @@ var allowed = map[string]allowance{
 	"ralphloop/claim.go":               allow("demotes the legacy Needs Repair section", "needsrepair"),
 	"ralphloop/pauseticket.go":         allow("names the legacy Needs Repair section", "needsrepair"),
 	"ralphloop/resumeticket.go":        allow("demotes the legacy Needs Answer and Needs Repair sections", "needsanswer", "needsrepair"),
+	"tickets/legacy_headings.go":       allow("names the legacy Needs Answer and Needs Repair headings", "needsanswer", "needsrepair"),
 	"tickets/migrate_question.go":      allow("moves the legacy Needs Answer section into the log", "needsanswer"),
 	"tickets/ticketlog/pausedetail.go": allow("legacy Needs Answer and Needs Repair headings", "needsanswer"),
 	"tickets/ticketlog/startover.go":   allow("demotes the legacy Needs Answer and Needs Repair sections", "needsanswer", "needsrepair"),

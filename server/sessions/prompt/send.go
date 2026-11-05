@@ -1,14 +1,14 @@
-package server
+package prompt
 
 import (
 	"cmp"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/server/sessions"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -20,29 +20,29 @@ const sendFailedPrefix = "Send failed: "
 // turn starts, as the first prompt does: claude can swallow the Enter after a
 // paste. A send that gives up raises a gx Actionable with the text, so the
 // person can send it again.
-func (s *Server) sendPrompt(dir, text string) {
-	log := s.log.With("session", filepath.Base(dir))
-	send := s.nudgePrompt
+func (p *Prompt) sendPrompt(dir, text string) {
+	log := p.log.With("session", filepath.Base(dir))
+	send := p.nudgePrompt
 	if isSingleSendCommand(text) {
-		send = s.typeCommandOnce
+		send = p.typeCommandOnce
 	}
 	err := send(dir, text)
 	switch {
 	case err == nil:
-		s.clearSendFailed(dir)
-	case errors.Is(err, errNudgeCancelled), errors.Is(err, errServerStopping):
+		p.clearSendFailed(dir)
+	case errors.Is(err, errNudgeCancelled), errors.Is(err, ErrServerStopping):
 		log.Info("send stopped", "err", err)
 	default:
 		log.Warn("send failed", "err", err)
-		s.raiseGxActionable(dir, fmt.Sprintf("%s%v", sendFailedPrefix, err), []string{text})
+		p.host.RaiseGxActionable(dir, fmt.Sprintf("%s%v", sendFailedPrefix, err), []string{text})
 	}
 }
 
 // clearSendFailed drops an earlier "Send failed" card once a send gets
 // through, so the person doesn't see a stale stop on a session that runs.
-func (s *Server) clearSendFailed(dir string) {
+func (p *Prompt) clearSendFailed(dir string) {
 	id := filepath.Base(dir)
-	s.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
+	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
 		if !m.Actionable.GxRaised || !strings.HasPrefix(m.Actionable.Reason, sendFailedPrefix) {
 			return false
 		}
@@ -64,58 +64,58 @@ func isSingleSendCommand(text string) bool {
 // typeCommandOnce types a "/" command and presses Enter once: most commands
 // start no turn, so a nudge would run them twice. A swallowed Enter leaves the
 // text in the input box.
-func (s *Server) typeCommandOnce(dir, text string) error {
-	run, closeRun, err := s.openActionRun(dir, actionRunOpts{})
+func (p *Prompt) typeCommandOnce(dir, text string) error {
+	run, closeRun, err := p.host.OpenActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
 	}
 	defer closeRun()
-	if err := run.catchUp(); err != nil {
+	if err := run.CatchUp(); err != nil {
 		return err
 	}
-	return run.typeStep(0, text)
+	return run.TypeStep(0, text)
 }
 
-func (s *Server) nudgePrompt(dir, text string) error {
-	run, closeRun, err := s.openActionRun(dir, actionRunOpts{})
+func (p *Prompt) nudgePrompt(dir, text string) error {
+	run, closeRun, err := p.host.OpenActionRun(dir, RunOpts{})
 	if err != nil {
 		return err
 	}
 	defer closeRun()
-	if err := run.catchUp(); err != nil {
+	if err := run.CatchUp(); err != nil {
 		return err
 	}
 	// Input from before gx typed is not a reason to stop.
-	run.personTyped = false
+	run.ClearPersonTyped()
 	caps := claudeui.DefaultNudgeCaps
-	caps.Grace = cmp.Or(s.cfg.PromptGrace, caps.Grace)
-	p := &runPrompter{holderPrompter: holderPrompter{c: run.holder, typing: s.projects.SessionTyping(dir), io: s.projects.TypingIO(dir, run.holder, "send-nudge")}, run: run}
+	caps.Grace = cmp.Or(p.cfg.PromptGrace, caps.Grace)
+	pr := &runPrompter{holderPrompter: holderPrompter{c: run.Holder(), typing: p.projects.SessionTyping(dir), io: p.projects.TypingIO(dir, run.Holder(), "send-nudge")}, run: run}
 	report := func(d claudeui.NudgeDecision) {
-		s.log.Info("send nudge", "session", filepath.Base(dir), "decision", string(d))
+		p.log.Info("send nudge", "session", filepath.Base(dir), "decision", string(d))
 	}
-	return claudeui.PromptWithNudge(p, text, caps, time.Time{}, time.Now, report)
+	return claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, report)
 }
 
 // runPrompter is a send's Prompter: the run's watch tells when the turn
 // starts, and a person's own input stops the nudges.
 type runPrompter struct {
 	holderPrompter
-	run *actionRun
+	run ActionRun
 }
 
 func (p *runPrompter) WaitStart(timeout time.Duration) (bool, error) {
 	timer := time.After(timeout)
 	for {
-		expired, _, err := p.run.nextStatus(timer)
+		expired, _, err := p.run.NextStatus(timer)
 		switch {
-		case errors.Is(err, errWentBlocked):
+		case errors.Is(err, ErrWentBlocked):
 			// A dialog opened, so the prompt was sent.
 			return true, nil
 		case err != nil:
 			return false, err
-		case p.run.personTyped:
+		case p.run.PersonTyped():
 			return false, errNudgeCancelled
-		case p.run.turnRunning():
+		case p.run.TurnRunning():
 			return true, nil
 		case expired:
 			return false, nil

@@ -9,11 +9,24 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// Routes lists the auto-advance switch and its cancel. Both are web writes;
-// the web variants need the state token of the session the page saw. The getter
-// is called per request, so a route can be listed before its Prompt is built.
+// Routes lists the prompt and key sends, the auto-advance switch and its
+// cancel. All are web writes; the web variants need the state token of the
+// session the page saw. The getter is called per request, so a route can be
+// listed before its Prompt is built.
 func Routes(get func() *Prompt) []wire.Route {
 	return []wire.Route{
+		{
+			Pattern:    "POST /v1/sessions/prompt",
+			Web:        wire.WebWrite,
+			Handler:    func(w http.ResponseWriter, r *http.Request) { get().promptHandler(promptSourceCLI)(w, r) },
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().promptHandler(promptSourceWeb)(w, r) },
+		},
+		{
+			Pattern:    "POST /v1/sessions/keys",
+			Web:        wire.WebWrite,
+			Handler:    func(w http.ResponseWriter, r *http.Request) { get().keysHandler(promptSourceCLI)(w, r) },
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().keysHandler(promptSourceWeb)(w, r) },
+		},
 		{
 			Pattern:    "POST /v1/sessions/auto-advance",
 			Web:        wire.WebWrite,
