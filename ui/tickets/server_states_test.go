@@ -11,6 +11,7 @@ import (
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -80,8 +81,8 @@ func TestNoServer_TicketsShowRawStatus(t *testing.T) {
 	if epic.RenderedStatus(blocked) != gxtickets.StatusBlocked {
 		t.Fatal("the test needs the computed status to differ from the raw one")
 	}
-	if got := ticketStatus(epic, blocked); got != gxtickets.StatusOpen {
-		t.Errorf("ticketStatus = %v, want open", got)
+	if got := rowfmt.TicketStatus(epic, blocked); got != gxtickets.StatusOpen {
+		t.Errorf("rowfmt.TicketStatus = %v, want open", got)
 	}
 
 	m, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), ServerLinkDown)

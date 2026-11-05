@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 func TestTicketStatus_ServerWordWinsOverComputed(t *testing.T) {
@@ -18,8 +19,8 @@ func TestTicketStatus_ServerWordWinsOverComputed(t *testing.T) {
 	if got := epic.RenderedStatus(tk); got != gxtickets.StatusOpen {
 		t.Fatalf("computed status = %v, want open (the test needs the two to differ)", got)
 	}
-	if got := ticketStatus(epic, tk); got != gxtickets.StatusWaitingForChildren {
-		t.Errorf("ticketStatus = %v, want waiting-for-children", got)
+	if got := rowfmt.TicketStatus(epic, tk); got != gxtickets.StatusWaitingForChildren {
+		t.Errorf("TicketStatus = %v, want waiting-for-children", got)
 	}
 	out, _, _ := renderTicketPreview(epic, tk, 80)
 	if !strings.Contains(out, "waiting-for-children") {
@@ -30,7 +31,7 @@ func TestTicketStatus_ServerWordWinsOverComputed(t *testing.T) {
 func TestTicketStatus_FallsBackToComputedWithoutServerWord(t *testing.T) {
 	tk := gxtickets.Ticket{Number: 1, Identifier: "01", Path: "p:e/01", Status: "open"}
 	epic := gxtickets.Epic{Name: "p:e", Tickets: []gxtickets.Ticket{tk}}
-	if got := ticketStatus(epic, tk); got != gxtickets.StatusOpen {
-		t.Errorf("ticketStatus = %v, want open", got)
+	if got := rowfmt.TicketStatus(epic, tk); got != gxtickets.StatusOpen {
+		t.Errorf("TicketStatus = %v, want open", got)
 	}
 }

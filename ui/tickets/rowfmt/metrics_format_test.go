@@ -1,4 +1,4 @@
-package tickets
+package rowfmt
 
 import (
 	"testing"
@@ -7,10 +7,10 @@ import (
 
 func TestFormatMetricsLine_HadCodexPrintsDashForCost(t *testing.T) {
 	t.Parallel()
-	if got, want := formatMetricsLine(5, 100, 0.42, true), formatMetricsLine(5, 100, 0, false)+" · —"; got != want {
+	if got, want := FormatMetricsLine(5, 100, 0.42, true), FormatMetricsLine(5, 100, 0, false)+" · —"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
-	if got := formatMetricsLine(5, 100, 0.42, false); got == formatMetricsLine(5, 100, 0.42, true) {
+	if got := FormatMetricsLine(5, 100, 0.42, false); got == FormatMetricsLine(5, 100, 0.42, true) {
 		t.Fatalf("Claude row must keep its dollars, got %q", got)
 	}
 }
@@ -30,8 +30,8 @@ func TestFormatTokenCount(t *testing.T) {
 		{1_200_000, "1.2M tok"},
 	}
 	for _, c := range cases {
-		if got := formatTokenCount(c.tokens); got != c.want {
-			t.Errorf("formatTokenCount(%d) = %q, want %q", c.tokens, got, c.want)
+		if got := FormatTokenCount(c.tokens); got != c.want {
+			t.Errorf("FormatTokenCount(%d) = %q, want %q", c.tokens, got, c.want)
 		}
 	}
 }
@@ -50,8 +50,8 @@ func TestFormatElapsed(t *testing.T) {
 		{3900, "1h05m"},
 	}
 	for _, c := range cases {
-		if got := formatElapsed(c.seconds); got != c.want {
-			t.Errorf("formatElapsed(%d) = %q, want %q", c.seconds, got, c.want)
+		if got := FormatElapsed(c.seconds); got != c.want {
+			t.Errorf("FormatElapsed(%d) = %q, want %q", c.seconds, got, c.want)
 		}
 	}
 }
@@ -73,8 +73,8 @@ func TestFormatDuration(t *testing.T) {
 		{3*24*time.Hour + 4*time.Hour, "3d 4h"},
 	}
 	for _, c := range cases {
-		if got := formatDuration(c.d); got != c.want {
-			t.Errorf("formatDuration(%v) = %q, want %q", c.d, got, c.want)
+		if got := FormatDuration(c.d); got != c.want {
+			t.Errorf("FormatDuration(%v) = %q, want %q", c.d, got, c.want)
 		}
 	}
 }

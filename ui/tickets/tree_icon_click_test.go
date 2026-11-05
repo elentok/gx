@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -22,7 +23,7 @@ func TestModel_ClickOnEpicIconTogglesIt(t *testing.T) {
 
 	const epicIdx = 1
 	epic := m.sidebarTree.Entries()[epicIdx]
-	iconX := panelPaddingX + tree.LabelColumn(epic)
+	iconX := rowfmt.PanelPaddingX + tree.LabelColumn(epic)
 	before := len(m.sidebarTree.Entries())
 
 	// A click far right of the icon only selects.
@@ -71,7 +72,7 @@ func TestQueueModel_ClickOnTicketIconTogglesIt(t *testing.T) {
 		t.Fatal("no parent ticket entry")
 	}
 	parent := m.queueTree.Entries()[parentIdx]
-	iconX := panelPaddingX + tree.LabelColumn(parent) + 1
+	iconX := rowfmt.PanelPaddingX + tree.LabelColumn(parent) + 1
 	y := 1 + len(m.queueHeaderBodyLines()) + parentIdx
 	before := len(m.queueTree.Entries())
 

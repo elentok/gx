@@ -1,13 +1,15 @@
 package tickets
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"reflect"
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/wire"
+
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -294,7 +296,7 @@ func nextProject(epics []tickets.Epic, current string) string {
 func filterDoneTickets(epic tickets.Epic, ordered []tickets.Ticket) []tickets.Ticket {
 	filtered := make([]tickets.Ticket, 0, len(ordered))
 	for _, t := range ordered {
-		if ticketStatus(epic, t).Terminal() {
+		if rowfmt.TicketStatus(epic, t).Terminal() {
 			continue
 		}
 		filtered = append(filtered, t)

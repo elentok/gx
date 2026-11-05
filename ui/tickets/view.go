@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -25,7 +26,6 @@ var (
 	statusClaimedStyle      = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 	statusBlockedStyle      = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	statusPausedAnswerStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
-	statusPausedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 	// statusWaitingForChildrenStyle uses the same color family as claimed —
 	// this ticket's own work is finished, but the epic still has live work
 	// underneath it, so it reads as active rather than settled/dim like done.
@@ -37,13 +37,6 @@ var (
 	// muted.
 	statusDoneStyle  = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
 	statusErrorStyle = lipgloss.NewStyle().Foreground(ui.ColorRed).Bold(true)
-
-	// statusPausedStyle renders a live orchestrator pause (rate-limit/
-	// smart-zone — see ralph-loop's FlatModel), distinct from every disk-only
-	// status color above.
-	statusPausedStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve)
-
-	blockedBySuffixStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtleLight).Italic(true)
 
 	// suggestedActionBadgeStyle renders the "m"-menu badge (ticketHasSuggestedActions)
 	// distinct from every status color so it reads as an affordance, not a
@@ -138,11 +131,11 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 		line = statusDoneStyle.Render(line)
 	}
 	if dur, ok := epic.CompletionDuration(); ok {
-		text := "took " + formatDuration(dur)
+		text := "took " + rowfmt.FormatDuration(dur)
 		if cost := epicCost(epic); cost > 0 {
 			text += " " + tickets.FormatCost(cost)
 		}
-		line = appendRowMetrics(line, text, metricsLineStyle)
+		line = rowfmt.AppendRowMetrics(line, text, rowfmt.MetricsLineStyle)
 	}
 	return line
 }
@@ -162,7 +155,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 // signature change at every call site.
 func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	t := epic.Tickets[r.ticketIdx]
-	status := ticketStatus(epic, t)
+	status := rowfmt.TicketStatus(epic, t)
 
 	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {
@@ -179,7 +172,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	searchDim := m.search.HasQuery() && !matched
 	doneDim := status.Terminal()
 
-	title := rowTitle(m.icons(), t)
+	title := rowfmt.RowTitle(m.icons(), t)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
@@ -205,7 +198,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	}
 	line += " " + titleStyle.Render(title) + m.sessionMarker(t.Path)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
-		suffixStyle := blockedBySuffixStyle
+		suffixStyle := rowfmt.BlockedBySuffixStyle
 		if searchDim {
 			suffixStyle = ui.StyleDim
 		}
@@ -214,11 +207,11 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	if t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 && t.ActualCost <= 0 {
 		return []string{line}
 	}
-	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost, t.HadCodex)
+	metrics := rowfmt.FormatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost, t.HadCodex)
 	if searchDim {
-		return []string{appendRowMetrics(line, metrics, ui.StyleDim)}
+		return []string{rowfmt.AppendRowMetrics(line, metrics, ui.StyleDim)}
 	}
-	return []string{appendRowMetrics(line, metrics, style)}
+	return []string{rowfmt.AppendRowMetrics(line, metrics, style)}
 }
 
 // sessionMarker is " <glyph>" when a live interactive session's Session
@@ -263,7 +256,7 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 	case tickets.StatusPausedAnswer:
 		return icons.TicketPausedAnswer, statusPausedAnswerStyle
 	case tickets.StatusPausedRepair:
-		return icons.TicketPausedRepair, statusPausedRepairStyle
+		return icons.TicketPausedRepair, rowfmt.StatusPausedRepairStyle
 	case tickets.StatusWaitingForChildren:
 		return icons.TicketWaitingForChildren, statusWaitingForChildrenStyle
 	case tickets.StatusDone, tickets.StatusCancelled:

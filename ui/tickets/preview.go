@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 var previewRuleStyle = lipgloss.NewStyle().Foreground(ui.ColorSurface1)
@@ -100,7 +101,7 @@ func (m Model) previewContent(width int) (string, int, bool) {
 // section's line index within the returned content and whether one was
 // found, for the caller to auto-scroll to.
 func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string, int, bool) {
-	status := ticketStatus(epic, t)
+	status := rowfmt.TicketStatus(epic, t)
 
 	var b strings.Builder
 	b.WriteString(renderFrontmatterBlock(t, status, width))
@@ -176,7 +177,7 @@ func renderPauseRoundsBlock(events []tickets.LogEvent, width int) (block string,
 			}
 			out = append(out, wrapped)
 			if i == 0 {
-				out = append(out, ui.StyleDim.Render(pausedAnswerHint))
+				out = append(out, ui.StyleDim.Render(rowfmt.PausedAnswerHint))
 			}
 		}
 	}
@@ -200,7 +201,7 @@ func highlightPauseSection(rendered string, status tickets.RenderedStatus) (out 
 	if status != tickets.StatusPausedRepair {
 		return rendered, 0, false
 	}
-	heading := pausedRepairHeading
+	heading := rowfmt.PausedRepairHeading
 	style := lipgloss.NewStyle().Foreground(ui.ColorRed)
 
 	lines := strings.Split(rendered, "\n")

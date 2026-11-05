@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -32,8 +33,8 @@ type QueueModel struct {
 	checkOrder   map[string]uint64
 	// live is epicName -> ticket identifier -> running state, derived from the
 	// delivered state (syncServerRunState), so the Queue tab's rows render the
-	// running spinner+phase presentation (renderLiveTicketRow).
-	live map[string]map[string]liveTicketState
+	// running spinner+phase presentation (rowfmt.RenderLiveTicketRow).
+	live map[string]map[string]rowfmt.LiveTicketState
 	// summaries and herdrDown come from the delivered state: the server's
 	// summary of each queued epic by epic name, and whether the server can
 	// launch agents.
@@ -159,7 +160,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		settings:         settings,
 		checked:          map[string]bool{},
 		checkOrder:       map[string]uint64{},
-		live:             map[string]map[string]liveTicketState{},
+		live:             map[string]map[string]rowfmt.LiveTicketState{},
 		implementSpinner: sp,
 		runningEpics:     map[string]bool{},
 		confirm:          confirm.New(),
@@ -437,7 +438,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		entry := m.queueTree.Entries()[idx]
 		// Only ticket rows draw a triangle; the label's leading cell is the
 		// indent renderQueueTicketRow puts before it.
-		if entry.Value.kind == nodeQueueTicket && onTreeIcon(mouse.X, entry, 1, m.icons()) && m.queueTree.ToggleEntry(idx) {
+		if entry.Value.kind == nodeQueueTicket && rowfmt.OnTreeIcon(mouse.X, entry, 1, m.icons()) && m.queueTree.ToggleEntry(idx) {
 			m.clampSelected()
 			if m.search.HasQuery() {
 				m.recomputeQueueSearchMatches()

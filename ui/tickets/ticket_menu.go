@@ -2,8 +2,9 @@ package tickets
 
 import (
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"strings"
+
+	"github.com/elentok/gx/server/wire"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 // ticketTarget is the ticket row a Context menu was opened on. epicName is
@@ -263,7 +265,7 @@ func (msg ticketMenuReadyMsg) toast() tea.Cmd {
 // pressed; liveness is left to cmdTicketMenu.
 func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool, serverReason string) ticketMenuInput {
 	return ticketMenuInput{
-		rendered:     ticketStatus(epic, ticket),
+		rendered:     rowfmt.TicketStatus(epic, ticket),
 		ticket:       ticket,
 		isMap:        epic.IsMap,
 		herdrDown:    herdrDown,

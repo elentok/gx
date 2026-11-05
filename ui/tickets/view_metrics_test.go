@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 func newModelForTicketRowTests(epic tickets.Epic) Model {
@@ -118,7 +119,7 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 	}{
 		{tickets.StatusOpen, statusOpenStyle},
 		{tickets.StatusClaimed, statusClaimedStyle},
-		{tickets.StatusPausedRepair, statusPausedRepairStyle},
+		{tickets.StatusPausedRepair, rowfmt.StatusPausedRepairStyle},
 		{tickets.StatusPausedAnswer, statusPausedAnswerStyle},
 		{tickets.StatusDone, statusDoneStyle},
 		{tickets.StatusBlocked, statusBlockedStyle},
@@ -169,7 +170,7 @@ func TestRenderTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	m := newModelForTicketRowTests(epic)
 
 	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100, 0, false))
+	wantSuffix := " " + statusDoneStyle.Italic(true).Render(rowfmt.FormatMetricsLine(5, 100, 0, false))
 	if !strings.HasSuffix(lines[0], wantSuffix) {
 		t.Fatalf("row line = %q, want it to end with %q", lines[0], wantSuffix)
 	}
@@ -196,7 +197,7 @@ func TestRenderEpicRow_ShowsDurationOnlyWhenBothTimestampsSet(t *testing.T) {
 // TestRenderEpicRow_AppendsCostSummaryDimItalic covers the epic-row cost
 // summary: "took Xm" gains a " $X.XX" suffix summed across the epic's own
 // tickets' ActualCost, and the whole "took Xm $X.XX" segment renders
-// metricsLineStyle (dim italic) rather than inheriting the row's own
+// rowfmt.MetricsLineStyle (dim italic) rather than inheriting the row's own
 // done/status color.
 func TestRenderEpicRow_AppendsCostSummaryDimItalic(t *testing.T) {
 	t.Parallel()
@@ -210,7 +211,7 @@ func TestRenderEpicRow_AppendsCostSummaryDimItalic(t *testing.T) {
 	m := newModelForTicketRowTests(epic)
 
 	line := m.renderEpicRow(epic)
-	wantSuffix := " " + metricsLineStyle.Italic(true).Render("took 2h 15m $43.00")
+	wantSuffix := " " + rowfmt.MetricsLineStyle.Italic(true).Render("took 2h 15m $43.00")
 	if !strings.HasSuffix(line, wantSuffix) {
 		t.Fatalf("epic row line = %q, want it to end with %q", line, wantSuffix)
 	}

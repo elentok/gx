@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -58,7 +59,7 @@ func epicRunning(epic gxtickets.Epic, claimedAt map[string]time.Time) bool {
 // server holds no run for it: a person claimed it (a grilling session, say),
 // so nothing is implementing.
 func serverRunning(epic gxtickets.Epic, t gxtickets.Ticket, claimedAt map[string]time.Time) bool {
-	if ticketStatus(epic, t) != gxtickets.StatusClaimed {
+	if rowfmt.TicketStatus(epic, t) != gxtickets.StatusClaimed {
 		return false
 	}
 	seen, ok := claimedAt[t.Path]

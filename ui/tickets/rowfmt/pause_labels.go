@@ -1,4 +1,4 @@
-package tickets
+package rowfmt
 
 import (
 	"strings"
@@ -20,9 +20,9 @@ func pauseReasonLabel(reason schema.PauseReason) string {
 	return strings.ToUpper(words[:1]) + words[1:]
 }
 
-// isPausedTicket reports whether t is Paused, including a ticket still stored
+// IsPausedTicket reports whether t is Paused, including a ticket still stored
 // under an old needs-answer / needs-repair status.
-func isPausedTicket(t tickets.Ticket) bool {
+func IsPausedTicket(t tickets.Ticket) bool {
 	switch schema.Status(t.Status) {
 	case schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
 		return true
@@ -30,9 +30,9 @@ func isPausedTicket(t tickets.Ticket) bool {
 	return false
 }
 
-// pausedStatusText is the status field of a Paused ticket: "paused" and its
+// PausedStatusText is the status field of a Paused ticket: "paused" and its
 // reason label.
-func pausedStatusText(t tickets.Ticket) string {
+func PausedStatusText(t tickets.Ticket) string {
 	if label := pauseReasonLabel(t.PauseReason); label != "" {
 		return "paused: " + label
 	}

@@ -2,6 +2,7 @@ package tickets
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 func (m QueueModel) handleQueueConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -32,7 +33,7 @@ func (m QueueModel) doneCheckedPaths() []string {
 	var paths []string
 	for _, epic := range m.epics {
 		for _, t := range epic.Tickets {
-			if m.checked[t.Path] && ticketStatus(epic, t).Terminal() {
+			if m.checked[t.Path] && rowfmt.TicketStatus(epic, t).Terminal() {
 				paths = append(paths, t.Path)
 			}
 		}

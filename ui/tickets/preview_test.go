@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
@@ -370,7 +371,7 @@ func TestRenderTicketPreview_PausedAnswerAppendsPauseRounds(t *testing.T) {
 	if !ok || target >= len(lines) || lines[target] != "1. open: Which store?" {
 		t.Fatalf("ok=%v target=%d, want the latest round line in:\n%s", ok, target, strings.Join(lines, "\n"))
 	}
-	if !strings.Contains(strings.Join(lines, "\n"), pausedAnswerHint) {
+	if !strings.Contains(strings.Join(lines, "\n"), rowfmt.PausedAnswerHint) {
 		t.Errorf("preview lacks the answer hint:\n%s", strings.Join(lines, "\n"))
 	}
 }

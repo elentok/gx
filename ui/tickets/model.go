@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -438,7 +439,7 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 	m.focus = focusSidebar
 	if idx, ok := m.sidebarTree.EntryAtBodyLine(bodyLine); ok {
 		entry := m.sidebarTree.Entries()[idx]
-		if onTreeIcon(mouse.X, entry, 0, m.icons()) && m.sidebarTree.ToggleEntry(idx) {
+		if rowfmt.OnTreeIcon(mouse.X, entry, 0, m.icons()) && m.sidebarTree.ToggleEntry(idx) {
 			return m, m.afterSidebarToggle(entry.ID, nil)
 		}
 		m.sidebarTree.SetSelectedIndex(idx)

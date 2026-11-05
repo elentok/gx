@@ -10,6 +10,7 @@ import (
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -116,7 +117,7 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 	if m.runningEpics == nil {
 		m.runningEpics = map[string]bool{}
 	}
-	live := map[string]map[string]liveTicketState{}
+	live := map[string]map[string]rowfmt.LiveTicketState{}
 	running := map[string]bool{}
 	for _, epic := range m.epics {
 		sum := m.summaries[epic.Name]
@@ -133,13 +134,13 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 				continue
 			}
 			if live[epic.Name] == nil {
-				live[epic.Name] = map[string]liveTicketState{}
+				live[epic.Name] = map[string]rowfmt.LiveTicketState{}
 			}
-			phase := livePhaseImplementing
+			phase := rowfmt.LivePhaseImplementing
 			if t.Type == string(schema.TypeMerge) {
-				phase = livePhaseMerging
+				phase = rowfmt.LivePhaseMerging
 			}
-			live[epic.Name][t.Identifier] = liveTicketState{running: true, phase: phase, startedAt: seen}
+			live[epic.Name][t.Identifier] = rowfmt.LiveTicketState{Running: true, Phase: phase, StartedAt: seen}
 			running[epic.Name] = true
 		}
 		markConflictResolution(epic, live[epic.Name])
@@ -157,7 +158,7 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 // parent's merge, so the server holds no run (and no claim time) of its own for
 // it; its timer stays blank rather than borrowing the parent's. The child's raw
 // status is checked: its rendered one reads blocked while the parent is not done.
-func markConflictResolution(epic gxtickets.Epic, live map[string]liveTicketState) {
+func markConflictResolution(epic gxtickets.Epic, live map[string]rowfmt.LiveTicketState) {
 	for _, t := range epic.Tickets {
 		if t.Type != string(schema.TypeConflictResolution) || t.Parent == nil ||
 			t.Status != string(schema.StatusClaimed) {
@@ -167,8 +168,8 @@ func markConflictResolution(epic gxtickets.Epic, live map[string]liveTicketState
 		if !ok {
 			continue
 		}
-		parent.phase, parent.waitingOn = livePhaseResolvingConflicts, t.DisplayNumber()
+		parent.Phase, parent.WaitingOn = rowfmt.LivePhaseResolvingConflicts, t.DisplayNumber()
 		live[*t.Parent] = parent
-		live[t.Identifier] = liveTicketState{running: true, phase: livePhaseResolvingConflicts}
+		live[t.Identifier] = rowfmt.LiveTicketState{Running: true, Phase: rowfmt.LivePhaseResolvingConflicts}
 	}
 }

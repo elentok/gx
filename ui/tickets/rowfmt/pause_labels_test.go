@@ -1,4 +1,4 @@
-package tickets
+package rowfmt
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestPausedStatusText(t *testing.T) {
-	got := pausedStatusText(tickets.Ticket{Status: "paused", PauseReason: schema.PauseMergeConflict})
+	got := PausedStatusText(tickets.Ticket{Status: "paused", PauseReason: schema.PauseMergeConflict})
 	if got != "paused: Merge conflict" {
 		t.Errorf("got %q", got)
 	}

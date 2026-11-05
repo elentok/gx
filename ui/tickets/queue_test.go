@@ -3,12 +3,13 @@ package tickets
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/server/wire"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -20,6 +21,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -891,7 +893,7 @@ func leadingWhitespace(s string) string {
 }
 
 // TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow covers ticket 10:
-// renderLiveTicketRow already prefixes its output with 2 spaces, so the
+// rowfmt.RenderLiveTicketRow already prefixes its output with 2 spaces, so the
 // caller must not add its own on top or a running row ends up indented 4
 // spaces instead of 2.
 func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
@@ -902,8 +904,8 @@ func TestRenderQueueTicketRow_LiveRowIndentMatchesNormalRow(t *testing.T) {
 		{Identifier: "01", Title: "Normal ticket", Status: "open"},
 		{Identifier: "02", Title: "Running ticket", Status: "claimed"},
 	}}
-	m.live = map[string]map[string]liveTicketState{
-		"epic": {"02": {running: true, label: "iter-01"}},
+	m.live = map[string]map[string]rowfmt.LiveTicketState{
+		"epic": {"02": {Running: true, Label: "iter-01"}},
 	}
 
 	normalLine := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
@@ -924,7 +926,7 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	}}
 
 	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
-	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100, 0, false))
+	wantSuffix := " " + statusDoneStyle.Italic(true).Render(rowfmt.FormatMetricsLine(5, 100, 0, false))
 	if !strings.HasSuffix(line, wantSuffix) {
 		t.Fatalf("row line = %q, want it to end with %q", line, wantSuffix)
 	}
@@ -942,8 +944,8 @@ func TestRenderQueueTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
 	}}
 
 	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
-	if !strings.Contains(line, formatMetricsLine(5, 100, 0, false)) {
-		t.Fatalf("row line = %q, want it to contain metrics %q", line, formatMetricsLine(5, 100, 0, false))
+	if !strings.Contains(line, rowfmt.FormatMetricsLine(5, 100, 0, false)) {
+		t.Fatalf("row line = %q, want it to contain metrics %q", line, rowfmt.FormatMetricsLine(5, 100, 0, false))
 	}
 }
 

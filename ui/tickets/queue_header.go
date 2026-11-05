@@ -2,15 +2,17 @@ package tickets
 
 import (
 	"fmt"
-	"github.com/elentok/gx/server/wire"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/server/wire"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -216,7 +218,7 @@ func formatSpan(d time.Duration) string {
 	if d < time.Minute {
 		return "<1m"
 	}
-	return formatDuration(d)
+	return rowfmt.FormatDuration(d)
 }
 
 // epicElapsedPart is the Status line's "<elapsed> elapsed" part, or "" when
@@ -242,11 +244,11 @@ func epicElapsedPart(epic tickets.Epic, now time.Time) string {
 // elapsed time plus the live elapsed of running ones (live is the epic's
 // ticket identifier -> running state; nil when the epic isn't running). ""
 // when zero.
-func epicAgentPart(epic tickets.Epic, now time.Time, live map[string]liveTicketState) string {
+func epicAgentPart(epic tickets.Epic, now time.Time, live map[string]rowfmt.LiveTicketState) string {
 	d := time.Duration(epicElapsedSeconds(epic)) * time.Second
 	for _, t := range epic.Tickets {
-		if l, ok := live[t.Identifier]; ok && l.running && !l.startedAt.IsZero() {
-			d += now.Sub(l.startedAt)
+		if l, ok := live[t.Identifier]; ok && l.Running && !l.StartedAt.IsZero() {
+			d += now.Sub(l.StartedAt)
 		}
 	}
 	if d <= 0 {
@@ -265,7 +267,7 @@ func pluralize(n int, noun string) string {
 
 // epicStatusParts are the Status line's dim metrics after the state, in order:
 // elapsed, agent, cost, compactions; zero parts are left out.
-func epicStatusParts(epic tickets.Epic, now time.Time, live map[string]liveTicketState) []string {
+func epicStatusParts(epic tickets.Epic, now time.Time, live map[string]rowfmt.LiveTicketState) []string {
 	var parts []string
 	for _, p := range []string{epicElapsedPart(epic, now), epicAgentPart(epic, now, live)} {
 		if p != "" {
@@ -285,13 +287,13 @@ func epicStatusParts(epic tickets.Epic, now time.Time, live map[string]liveTicke
 // n compact(s)", all dim except the state, zero parts hidden, cut at labelW.
 func (m QueueModel) epicStatusRow(epic tickets.Epic, labelW int) string {
 	icon, text, style := m.epicStatus(epic)
-	line := " " + metricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
-	var live map[string]liveTicketState
+	line := " " + rowfmt.MetricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
+	var live map[string]rowfmt.LiveTicketState
 	if m.runningEpics[epic.Name] {
 		live = m.live[epic.Name]
 	}
 	if parts := epicStatusParts(epic, m.now(), live); len(parts) > 0 {
-		line += metricsLineStyle.Render(" · " + strings.Join(parts, " · "))
+		line += rowfmt.MetricsLineStyle.Render(" · " + strings.Join(parts, " · "))
 	}
 	if labelW > 0 {
 		line = ansi.Truncate(line, labelW, "…")

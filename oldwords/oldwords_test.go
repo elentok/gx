@@ -81,7 +81,7 @@ var allowed = map[string]allowance{
 	"tickets/ticketmigrate/migrate_question.go":   allow("moves the legacy Needs Answer section into the log", "needsanswer"),
 	"tickets/ticketlog/pausedetail.go":            allow("legacy Needs Answer and Needs Repair headings", "needsanswer"),
 	"tickets/ticketlog/startover.go":              allow("demotes the legacy Needs Answer and Needs Repair sections", "needsanswer", "needsrepair"),
-	"ui/tickets/pause_labels.go":                  allow("documents the legacy statuses it still labels", "needsanswer", "needsrepair"),
+	"ui/tickets/rowfmt/pause_labels.go":           allow("documents the legacy statuses it still labels", "needsanswer", "needsrepair"),
 	"tickets/legacy_headings.go":                  allow("names the legacy Needs Answer and Needs Repair headings", "needsanswer", "needsrepair"),
 	"tickets/ticketmigrate/migrate_pause_test.go": allow("migrate input uses the legacy needs-answer status", "needsanswer"),
 	"ralphloop/ticketops/friction_test.go":        allow("tests the legacy land-conflict kind mapping", "land"),

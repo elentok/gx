@@ -12,6 +12,7 @@ import (
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -209,9 +210,9 @@ func (m Model) pendingSubtext(entry tree.Entry[sidebarNode]) (string, bool) {
 		text += ": " + p.Reason
 	}
 	icons := m.icons()
-	icon, _ := statusIconAndStyle(icons, ticketStatus(m.epicAt(r), t))
+	icon, _ := statusIconAndStyle(icons, rowfmt.TicketStatus(m.epicAt(r), t))
 	width := triangleColumnWidth(icons) + 1 + lipgloss.Width(icon) + 1
-	return strings.Repeat(" ", width) + blockedBySuffixStyle.Render(ellipsize(text, pauseReasonMaxRunes, icons.Ellipsis)), true
+	return strings.Repeat(" ", width) + rowfmt.BlockedBySuffixStyle.Render(rowfmt.Ellipsize(text, rowfmt.PauseReasonMaxRunes, icons.Ellipsis)), true
 }
 
 func (m Model) applyServerRows() Model {

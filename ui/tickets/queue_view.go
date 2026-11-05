@@ -1,9 +1,10 @@
 package tickets
 
 import (
-	"github.com/elentok/gx/server/wire"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/server/wire"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -143,7 +145,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				return m.epicStatusRow(entry.Value.epic, m.queueLabelWidth())
 			case nodeEpicError:
 				if stuck, ok := entry.Value.err.(*schedule.StuckPlanError); ok {
-					return "    " + metricsLineStyle.Render(
+					return "    " + rowfmt.MetricsLineStyle.Render(
 						"no unblocked tickets left: "+strings.Join(stuck.BlockedIDs(), ", ")+
 							" still waiting on a dependency cycle or a blocker outside the selection",
 					)
@@ -176,7 +178,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 // Entry.Body in buildQueueEntries) rather than rendered here.
 func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	epic, t := r.epic, r.ticket
-	status := ticketStatus(epic, t)
+	status := rowfmt.TicketStatus(epic, t)
 	indent := " "
 
 	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
@@ -190,9 +192,9 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 
 	if m.runningEpics[epic.Name] {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle); ok {
-				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens, 0, m.codexRows[t.Path])
-				return appendRowMetrics(base, joinNonEmpty(" ", joinNonEmpty(" ", suffix, metrics), joinNonEmpty(" ", m.harnessLabels[t.Path], m.waitingLabels[t.Path])), metricsLineStyle)
+			if base, suffix, ok := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle); ok {
+				metrics := rowfmt.FormatMetricsLine(rowfmt.LiveElapsedSeconds(live), live.Tokens, 0, m.codexRows[t.Path])
+				return rowfmt.AppendRowMetrics(base, rowfmt.JoinNonEmpty(" ", rowfmt.JoinNonEmpty(" ", suffix, metrics), rowfmt.JoinNonEmpty(" ", m.harnessLabels[t.Path], m.waitingLabels[t.Path])), rowfmt.MetricsLineStyle)
 			}
 		}
 	}
@@ -220,7 +222,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		dimStyle, dimmed = statusDoneStyle, true
 	}
 
-	title := rowTitle(m.icons(), t)
+	title := rowfmt.RowTitle(m.icons(), t)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
@@ -245,23 +247,23 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	}
 	line += " " + titleStyle.Render(title)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
-		suffixStyle := blockedBySuffixStyle
+		suffixStyle := rowfmt.BlockedBySuffixStyle
 		if dimmed {
 			suffixStyle = dimStyle
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	metrics := joinNonEmpty(" ", m.harnessLabels[t.Path], m.waitingLabels[t.Path])
+	metrics := rowfmt.JoinNonEmpty(" ", m.harnessLabels[t.Path], m.waitingLabels[t.Path])
 	if t.ElapsedTime > 0 || t.ActualContextWindow > 0 || t.ActualCost > 0 {
-		metrics = joinNonEmpty(" ", formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost, t.HadCodex), metrics)
+		metrics = rowfmt.JoinNonEmpty(" ", rowfmt.FormatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost, t.HadCodex), metrics)
 	}
 	if metrics == "" {
 		return line
 	}
 	if dimmed {
-		return appendRowMetrics(line, metrics, dimStyle)
+		return rowfmt.AppendRowMetrics(line, metrics, dimStyle)
 	}
-	return appendRowMetrics(line, metrics, style)
+	return rowfmt.AppendRowMetrics(line, metrics, style)
 }
 
 // queueTicketReasonLine renders the pause-reason subtext for a paused (answer)/
@@ -273,12 +275,12 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 // listed in the server's Paused tickets for its epic.
 func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
-	status := ticketStatus(epic, t)
+	status := rowfmt.TicketStatus(epic, t)
 	i := slices.IndexFunc(m.summaries[epic.Name].Paused, func(p wire.SummaryTicket) bool { return p.Address == t.Path })
 	if i < 0 || m.summaries[epic.Name].Paused[i].Reason == "" {
 		return "", false
 	}
-	reason := ellipsize(m.summaries[epic.Name].Paused[i].Reason, pauseReasonMaxRunes, m.icons().Ellipsis)
+	reason := rowfmt.Ellipsize(m.summaries[epic.Name].Paused[i].Reason, rowfmt.PauseReasonMaxRunes, m.icons().Ellipsis)
 
 	triangleWidth := triangleColumnWidth(m.icons()) + 1
 	icon, _ := statusIconAndStyle(m.icons(), status)
@@ -289,7 +291,7 @@ func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 
 	indent := " "
 	prefix := indent + strings.Repeat(" ", triangleWidth+lipgloss.Width(icon)+1+badgeWidth)
-	return prefix + blockedBySuffixStyle.Render(reason), true
+	return prefix + rowfmt.BlockedBySuffixStyle.Render(reason), true
 }
 
 func (m QueueModel) icons() ui.IconSet {

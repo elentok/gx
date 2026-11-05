@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 func TestEpicBarFillFollowsStateColour(t *testing.T) {
@@ -100,7 +101,7 @@ func TestEpicStatusPartsArePureInNowAndLive(t *testing.T) {
 			{Identifier: "02", Status: "claimed"},
 		},
 	}
-	live := map[string]liveTicketState{"02": {running: true, startedAt: now.Add(-30 * time.Minute)}}
+	live := map[string]rowfmt.LiveTicketState{"02": {Running: true, StartedAt: now.Add(-30 * time.Minute)}}
 
 	got := strings.Join(epicStatusParts(epic, now, live), " | ")
 	if want := "2h 0m elapsed | 40m agent | 1 compact"; got != want {
@@ -444,7 +445,7 @@ func TestEpicStatusRowAgentTimeIncludesLiveRunningTicket(t *testing.T) {
 	started := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.Manager{})
 	m.runningEpics = map[string]bool{"alpha": true}
-	m.live = map[string]map[string]liveTicketState{"alpha": {"02": {running: true, startedAt: started.Add(30 * time.Minute)}}}
+	m.live = map[string]map[string]rowfmt.LiveTicketState{"alpha": {"02": {Running: true, StartedAt: started.Add(30 * time.Minute)}}}
 	epic := tickets.Epic{Name: "alpha", StartedAt: started, Tickets: []tickets.Ticket{
 		{Identifier: "01", Status: "done", ElapsedTime: 600}, {Identifier: "02", Status: "claimed"}}}
 

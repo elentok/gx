@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -67,7 +68,7 @@ func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 		t.Errorf("queueRunState = %v, want running", got)
 	}
 	live, ok := m.live["gx:alpha"]["01"]
-	if !ok || !live.running || live.startedAt.IsZero() {
+	if !ok || !live.Running || live.StartedAt.IsZero() {
 		t.Errorf("live[01] = %+v, want running with a start time", live)
 	}
 	if cmd == nil {
@@ -127,7 +128,7 @@ func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {
 	claimed := time.Now().Add(-10 * time.Minute)
 	m, _ := loadedServerQueueWith(t, "claimed", claimed, false)
 
-	if got := m.live["gx:alpha"]["01"].startedAt; !got.Equal(claimed) {
+	if got := m.live["gx:alpha"]["01"].StartedAt; !got.Equal(claimed) {
 		t.Errorf("startedAt = %v, want the server's claim time %v", got, claimed)
 	}
 }
@@ -179,14 +180,14 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 	}}, []wire.QueueItem{{Address: "gx:alpha/01"}})
 
 	child := m.live["gx:alpha"]["01a"]
-	if !child.running || child.phase != livePhaseResolvingConflicts {
+	if !child.Running || child.Phase != rowfmt.LivePhaseResolvingConflicts {
 		t.Errorf("live[01a] = %+v, want running and resolving conflicts", child)
 	}
 	parent := m.live["gx:alpha"]["01"]
-	if !parent.running || parent.waitingOn != "01a" {
+	if !parent.Running || parent.WaitingOn != "01a" {
 		t.Errorf("live[01] = %+v, want running and waiting on 01a", parent)
 	}
-	_, suffix, _ := renderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[0], parent, "")
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[0], parent, "")
 	if suffix != "(waiting on 01a...)" {
 		t.Errorf("parent suffix = %q, want %q", suffix, "(waiting on 01a...)")
 	}
@@ -199,10 +200,10 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 	}}, []wire.QueueItem{{Address: "gx:alpha/02"}})
 
 	live := m.live["gx:alpha"]["02"]
-	if !live.running || live.phase != livePhaseMerging {
+	if !live.Running || live.Phase != rowfmt.LivePhaseMerging {
 		t.Errorf("live[02] = %+v, want running and merging", live)
 	}
-	_, suffix, _ := renderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[1], live, "")
+	_, suffix, _ := rowfmt.RenderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[1], live, "")
 	if suffix != "(merging...)" {
 		t.Errorf("suffix = %q, want %q", suffix, "(merging...)")
 	}
@@ -222,7 +223,7 @@ func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 	epic := m.epics[0]
 	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
 		tk := epic.Tickets[i]
-		if got := blockedBySuffix(epic, tk, ticketStatus(epic, tk)); got != want {
+		if got := blockedBySuffix(epic, tk, rowfmt.TicketStatus(epic, tk)); got != want {
 			t.Errorf("blockedBySuffix(%s) = %q, want %q", tk.Identifier, got, want)
 		}
 	}

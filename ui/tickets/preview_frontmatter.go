@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
 // frontmatterLabelStyle renders a frontmatter field's prettified label at
@@ -64,8 +65,8 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 	}
 
 	add("id", t.Identifier)
-	if isPausedTicket(t) {
-		add("status", pausedStatusText(t))
+	if rowfmt.IsPausedTicket(t) {
+		add("status", rowfmt.PausedStatusText(t))
 	} else {
 		add("status", status.Word())
 	}
@@ -75,12 +76,12 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 		add("parent", *t.Parent)
 	}
 	if t.ActualContextWindow > 0 {
-		add("actual_context_window", formatTokenCount(t.ActualContextWindow))
+		add("actual_context_window", rowfmt.FormatTokenCount(t.ActualContextWindow))
 	} else if t.ExpectedContextWindow > 0 {
-		add("actual_context_window", "Expected: "+formatTokenCount(t.ExpectedContextWindow))
+		add("actual_context_window", "Expected: "+rowfmt.FormatTokenCount(t.ExpectedContextWindow))
 	}
 	if t.ElapsedTime > 0 {
-		add("elapsed_time", formatElapsed(t.ElapsedTime))
+		add("elapsed_time", rowfmt.FormatElapsed(t.ElapsedTime))
 	}
 	if t.Compactions > 0 {
 		add("compactions", strconv.Itoa(t.Compactions))

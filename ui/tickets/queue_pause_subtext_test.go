@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -67,12 +68,12 @@ func TestQueueModel_DraftRowUnaffectedByPauseRendering(t *testing.T) {
 // coloring: the heading is red, and paused (answer) is left to the rounds block.
 func TestHighlightPauseSection_PausedRepairRed(t *testing.T) {
 	t.Parallel()
-	rendered := "intro\n" + pausedRepairHeading + "\nsome reason\n"
+	rendered := "intro\n" + rowfmt.PausedRepairHeading + "\nsome reason\n"
 	out, target, ok := highlightPauseSection(rendered, tickets.StatusPausedRepair)
 	if !ok || target != 1 {
 		t.Fatalf("highlightPauseSection() ok=%v target=%d, want ok=true target=1", ok, target)
 	}
-	wantRed := lipgloss.NewStyle().Foreground(ui.ColorRed).Render(pausedRepairHeading)
+	wantRed := lipgloss.NewStyle().Foreground(ui.ColorRed).Render(rowfmt.PausedRepairHeading)
 	if !strings.Contains(out, wantRed) {
 		t.Fatalf("expected paused (repair) heading styled red in:\n%s", out)
 	}
@@ -104,7 +105,7 @@ func TestRenderPauseRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
 	if strings.Contains(strings.Join(lines[:line], "\n"), orange.Render("1.")) {
 		t.Errorf("earlier rounds must stay plain:\n%q", lines[:line])
 	}
-	if !strings.Contains(lines[1], pausedAnswerHint) {
+	if !strings.Contains(lines[1], rowfmt.PausedAnswerHint) {
 		t.Errorf("hint missing under the heading: %q", lines[1])
 	}
 }
