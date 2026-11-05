@@ -3,6 +3,7 @@ package agentfake
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -23,8 +24,15 @@ func TestMain(m *testing.M) {
 	if os.Getenv(TUIEnv) == "1" {
 		TUIClaude()
 	}
+	// The probe tests run this binary as `codex app-server`; the interactive
+	// Codex fake lives in the codex package and cannot be imported here.
 	if os.Getenv(CodexEnv) == "1" {
-		TUICodex()
+		code, err := RunCodexProbe()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(code)
 	}
 	if os.Getenv(ProgramEnv) == "1" {
 		Program()

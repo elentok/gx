@@ -1,4 +1,4 @@
-package agentfake
+package codex
 
 import (
 	"encoding/json"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // hookArg is the -c argument the Codex harness passes for one hook group.
@@ -32,9 +33,9 @@ func joinArgs(parts ...[]string) []string {
 	return all
 }
 
-func (p *codexProc) send(c Control) {
+func (p *codexProc) send(c agentfake.Control) {
 	p.t.Helper()
-	if err := SendProgramControl(p.id, c); err != nil {
+	if err := agentfake.SendProgramControl(p.id, c); err != nil {
 		p.t.Fatal(err)
 	}
 }
@@ -79,9 +80,9 @@ func TestCodexHooks_EachEventRunsItsCommandWithThePayload(t *testing.T) {
 	)
 	p := startCodex(t, home, "hooks1", args...)
 	p.startTurn("fix it")
-	p.send(Control{Action: ActionToolCall, Tool: "Bash", Command: "rg foo"})
-	p.send(Control{Action: ActionPermission, Command: "rg foo"})
-	p.send(Control{Action: ActionFinish})
+	p.send(agentfake.Control{Action: agentfake.ActionToolCall, Tool: "Bash", Command: "rg foo"})
+	p.send(agentfake.Control{Action: agentfake.ActionPermission, Command: "rg foo"})
+	p.send(agentfake.Control{Action: agentfake.ActionFinish})
 	runs := p.waitHookRuns(4)
 
 	var events []string
@@ -111,9 +112,9 @@ func TestCodexHooks_PreToolUseExit2BlocksTheToolCall(t *testing.T) {
 	args := hookArg("PreToolUse", "Bash", "echo nope >&2; exit 2")
 	p := startCodex(t, t.TempDir(), "hooks2", args...)
 	p.startTurn("fix it")
-	p.send(Control{Action: ActionToolCall, Tool: "Bash", Command: "rg foo"})
+	p.send(agentfake.Control{Action: agentfake.ActionToolCall, Tool: "Bash", Command: "rg foo"})
 	p.waitOut("nope")
-	p.send(Control{Action: ActionToolCall, Tool: "request_user_input", Command: "x"})
+	p.send(agentfake.Control{Action: agentfake.ActionToolCall, Tool: "request_user_input", Command: "x"})
 	p.waitOut("ran: x")
 	if strings.Contains(p.out.String(), "ran: rg foo") {
 		t.Fatalf("a blocked tool call ran:\n%s", p.out.String())
@@ -136,7 +137,7 @@ func builtGx(t *testing.T) string {
 			return
 		}
 		gxPath = filepath.Join(dir, "gx")
-		if out, err := exec.Command("go", "build", "-o", gxPath, "../..").CombinedOutput(); err != nil {
+		if out, err := exec.Command("go", "build", "-o", gxPath, "../../..").CombinedOutput(); err != nil {
 			gxErr = &buildError{err, string(out)}
 		}
 	})
@@ -158,9 +159,9 @@ func TestCodexHooks_RealGuardBashReadsTheFakesPayload(t *testing.T) {
 	args := hookArg("PreToolUse", "Bash", gx+" agent guard-bash --harness codex")
 	p := startCodex(t, t.TempDir(), "hooks3", args...)
 	p.startTurn("fix it")
-	p.send(Control{Action: ActionToolCall, Tool: "Bash", Command: "sed -i s/a/b/ f.txt"})
+	p.send(agentfake.Control{Action: agentfake.ActionToolCall, Tool: "Bash", Command: "sed -i s/a/b/ f.txt"})
 	p.waitOut("sed -i")
-	p.send(Control{Action: ActionToolCall, Tool: "Bash", Command: "rg foo"})
+	p.send(agentfake.Control{Action: agentfake.ActionToolCall, Tool: "Bash", Command: "rg foo"})
 	p.waitOut("ran: rg foo")
 	if strings.Contains(p.out.String(), "ran: sed") {
 		t.Fatalf("guard let sed -i run:\n%s", p.out.String())
@@ -172,7 +173,7 @@ func TestCodexHooks_PermissionRequestHoldsBlockedUntilTheHookReturns(t *testing.
 	wait := "while [ ! -f " + release + " ]; do sleep 0.02; done"
 	p := startCodex(t, t.TempDir(), "hooks4", hookArg("PermissionRequest", "Bash", wait)...)
 	p.startTurn("fix it")
-	p.send(Control{Action: ActionPermission, Command: "rg foo"})
+	p.send(agentfake.Control{Action: agentfake.ActionPermission, Command: "rg foo"})
 	p.waitOut("state=blocked:app=codex:kind=permission")
 	time.Sleep(100 * time.Millisecond)
 	if strings.Contains(p.out.String(), "state=done") {
@@ -181,7 +182,7 @@ func TestCodexHooks_PermissionRequestHoldsBlockedUntilTheHookReturns(t *testing.
 	if err := os.WriteFile(release, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	p.send(Control{Action: ActionFinish})
+	p.send(agentfake.Control{Action: agentfake.ActionFinish})
 	p.waitOut("state=done")
 	if strings.Contains(p.out.String(), "denied") {
 		t.Fatalf("allow was read as deny:\n%s", p.out.String())
@@ -191,7 +192,7 @@ func TestCodexHooks_PermissionRequestHoldsBlockedUntilTheHookReturns(t *testing.
 func TestCodexHooks_PermissionScreenRunsNoHookAndDrawsTheRows(t *testing.T) {
 	p := startCodex(t, t.TempDir(), "hooks6", hookArg("PermissionRequest", "Bash", "echo should-not-run >&2")...)
 	p.startTurn("fix it")
-	p.send(Control{Action: ActionPermissionScreen, Dialog: []string{"unreadable rows"}})
+	p.send(agentfake.Control{Action: agentfake.ActionPermissionScreen, Dialog: []string{"unreadable rows"}})
 	p.waitOut("state=blocked:app=codex:kind=permission")
 	p.waitOut("unreadable rows")
 	if runs := p.hookRuns(); len(runs) != 0 {
@@ -207,7 +208,7 @@ func TestCodexHooks_PermissionRequestDenyEndsTheTurnWithTheReason(t *testing.T) 
 		t.Run(name, func(t *testing.T) {
 			p := startCodex(t, t.TempDir(), "hooks5", hookArg("PermissionRequest", "Bash", command)...)
 			p.startTurn("fix it")
-			p.send(Control{Action: ActionPermission, Command: "rg foo"})
+			p.send(agentfake.Control{Action: agentfake.ActionPermission, Command: "rg foo"})
 			p.waitOut("denied: too risky")
 			p.waitOut("state=done")
 			runs := p.waitHookRuns(1)
@@ -222,11 +223,11 @@ func TestCodexRollout_ExtrasAreReadByTheProductionReader(t *testing.T) {
 	home := t.TempDir()
 	p := startCodex(t, home, "extras1")
 	p.startTurn("fix it")
-	p.send(Control{Action: ActionFinish})
+	p.send(agentfake.Control{Action: agentfake.ActionFinish})
 	p.waitOut("state=done")
-	p.send(Control{Action: ActionCompact})
+	p.send(agentfake.Control{Action: agentfake.ActionCompact})
 	resetsAt := time.Now().Add(time.Hour).Unix()
-	p.send(Control{Action: ActionTokenCount, UsedPercent: 100, ResetsAt: resetsAt})
+	p.send(agentfake.Control{Action: agentfake.ActionTokenCount, UsedPercent: 100, ResetsAt: resetsAt})
 	p.waitFor(func() bool {
 		limit, ok, err := codexsession.LastRateLimitIn(home, p.cwd, "extras1")
 		return err == nil && ok && limit.ResetAt.Unix() == resetsAt
@@ -235,7 +236,7 @@ func TestCodexRollout_ExtrasAreReadByTheProductionReader(t *testing.T) {
 	if err != nil || !ok || tokens != codexTurnTokens {
 		t.Fatalf("tokens after compacted = %d, %v, %v", tokens, ok, err)
 	}
-	p.send(Control{Action: ActionTaskError, Message: "model gone", Error: "model_not_found"})
+	p.send(agentfake.Control{Action: agentfake.ActionTaskError, Message: "model gone", Error: "model_not_found"})
 	p.waitOut("state=error:app=codex")
 	pairs := rolloutPairs(t, rolloutFiles(t, home)[0])
 	if !pairs[[2]string{"compacted", ""}] {
@@ -267,26 +268,24 @@ func TestCodexDialogs_BlockReadyUntilAKeyArrives(t *testing.T) {
 		{CodexModelNudgeEnv, CodexModelNudgeDialog},
 	} {
 		t.Run(d.env, func(t *testing.T) {
-			conv := NewConversationID(t)
-			p := HoldProgram(t, harness.Command{Name: os.Args[0], Args: codexLaunchArgs}, conv,
-				CodexEnv+"=1", CodexIDEnv+"="+conv, "CODEX_HOME="+t.TempDir(), d.env+"=1")
+			conv := agentfake.NewConversationID(t)
+			p := agentfake.HoldProgram(t, harness.Command{Name: os.Args[0], Args: codexLaunchArgs}, conv,
+				agentfake.CodexEnv+"=1", CodexIDEnv+"="+conv, "CODEX_HOME="+t.TempDir(), d.env+"=1")
 			p.WaitScreen(d.text)
 			time.Sleep(100 * time.Millisecond)
 			if p.Watcher.Status().State == harness.Idle {
 				t.Fatal("Ready before the dialog was answered")
 			}
-			if err := p.client.SendKeys("\r"); err != nil {
-				t.Fatal(err)
-			}
+			p.SendKeys("\r")
 			p.WaitStatus(harness.Status{State: harness.Idle})
 		})
 	}
 }
 
 func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSees(t *testing.T) {
-	cfg, _ := WorkerEnv(t)
+	cfg, _ := agentfake.WorkerEnv(t)
 	resetsAt := time.Now().Add(72 * time.Hour).Unix()
-	cfg.CodexUsage = &UsageWindow{UsedPercentage: 99, ResetsAt: resetsAt}
+	cfg.CodexUsage = &agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: resetsAt}
 	repo, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -295,7 +294,7 @@ func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSe
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, WorkerConfigFile), raw, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, agentfake.WorkerConfigFile), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
@@ -309,8 +308,8 @@ func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSe
 }
 
 func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesOnTheNext(t *testing.T) {
-	cfg, gxLog := WorkerEnv(t)
-	cfg.Behaviour = map[string]string{"gx:epic/01": BehaviourError}
+	cfg, gxLog := agentfake.WorkerEnv(t)
+	cfg.Behaviour = map[string]string{"gx:epic/01": agentfake.BehaviourError}
 	repo, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -319,7 +318,7 @@ func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesO
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, WorkerConfigFile), raw, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, agentfake.WorkerConfigFile), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
@@ -330,7 +329,7 @@ func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesO
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `"codex_error_info":"model_not_found"`) || !strings.Contains(string(data), CodexModelError) {
+	if !strings.Contains(string(data), `"codex_error_info":"model_not_found"`) || !strings.Contains(string(data), agentfake.CodexModelError) {
 		t.Errorf("no task_complete model error:\n%s", data)
 	}
 	if strings.Contains(string(data), "rate_limits") {
@@ -351,7 +350,7 @@ func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesO
 }
 
 func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
-	cfg, gxLog := WorkerEnv(t)
+	cfg, gxLog := agentfake.WorkerEnv(t)
 	repo, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -360,10 +359,10 @@ func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, WorkerConfigFile), raw, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, agentfake.WorkerConfigFile), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	before := CommitCount(t)
+	before := agentfake.CommitCount(t)
 	p := startCodexIn(t, repo, t.TempDir(), "worker1")
 	p.startTurn("$gx-implement gx:epic/01")
 	p.waitOut("state=done")
@@ -374,7 +373,7 @@ func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
 	if !strings.Contains(string(log), "tickets set gx:epic/01 --iteration-status finished") {
 		t.Errorf("gx log = %q", log)
 	}
-	if got := CommitCount(t); got != before+1 {
+	if got := agentfake.CommitCount(t); got != before+1 {
 		t.Errorf("commits = %d, want %d", got, before+1)
 	}
 }

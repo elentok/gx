@@ -15,13 +15,14 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 )
 
 // codexPromptSession starts an idle fake Codex with a known conversation id and
 // returns it with its holder.
 func codexPromptSession(t *testing.T, id string) (*nativerunner.Pty, agentrunner.Session, *holder.HolderClient) {
 	t.Helper()
-	p, _ := codexRunner(t, agentfake.CodexIDEnv+"="+id)
+	p, _ := codexRunner(t, codex.CodexIDEnv+"="+id)
 	s := startCodex(t, p, realDir(t))
 	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second); err != nil {
 		t.Fatal(err)

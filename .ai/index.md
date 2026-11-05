@@ -210,7 +210,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `git/pr` — GitHub pull requests via `gh` (list open/closed, comments, facets, PR URLs); imports `git`, never the reverse
 - `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
 - `e2e/` — end-to-end tests (slow, CI only)
-- `testutil/` — fakes and helpers: `testutil/agentfake`, `testutil/herdrfake`,
+- `testutil/` — fakes and helpers: `testutil/agentfake` (fake Claude, shared core),
+  `testutil/agentfake/codex` (fake Codex, imports `agentfake`), `testutil/herdrfake`,
   `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`, `testutil/claudeenv`
 - `testutil/gxfixture` — e2e fixture program: `gxfixture <ready|mixed|finishing|edge>` starts an
   isolated real `gx server` (pty runner, `fakeclaude` as `claude`) and prints JSON with `web_url`,

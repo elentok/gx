@@ -1,4 +1,4 @@
-package agentfake
+package codex
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/codexui"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // The four Codex startup dialogs a launch can show before it is ready. A knob
@@ -302,7 +303,7 @@ func (c *codexFake) toolCall(tool, command string) error {
 // given. The fake stays blocked while the PermissionRequest hooks run; with
 // none configured it stays blocked until a key arrives. A deny ends the turn.
 func (c *codexFake) permission(command string, allowed func()) error {
-	WriteAppReport(c.out, codexAppName, "blocked", "permission", "")
+	agentfake.WriteAppReport(c.out, codexAppName, "blocked", "permission", "")
 	resume := func() {
 		c.report("working")
 		if allowed != nil {
@@ -357,8 +358,8 @@ func (c *codexFake) permissionScreen(command string, rows []string, resume func(
 
 // screenPermission is ActionPermissionScreen: the permission dialog with no
 // PermissionRequest hook run, even where hooks are configured.
-func (c *codexFake) screenPermission(ctl Control) {
-	WriteAppReport(c.out, codexAppName, "blocked", "permission", "")
+func (c *codexFake) screenPermission(ctl agentfake.Control) {
+	agentfake.WriteAppReport(c.out, codexAppName, "blocked", "permission", "")
 	c.permissionScreen(ctl.Command, ctl.Dialog, func() { c.report("working") })
 }
 
@@ -403,20 +404,20 @@ func (c *codexFake) taskError(message, info string) error {
 		return err
 	}
 	c.setTitle(c.title)
-	WriteAppReport(c.out, codexAppName, "error", "", "")
+	agentfake.WriteAppReport(c.out, codexAppName, "error", "", "")
 	return nil
 }
 
 // workerPrompt reports whether text is a skill prompt (`$gx-… <address>`) for a
 // fake that runs in a worktree carrying a worker config.
-func (c *codexFake) workerPrompt(text string) (string, WorkerConfig, bool) {
+func (c *codexFake) workerPrompt(text string) (string, agentfake.WorkerConfig, bool) {
 	fields := strings.Fields(text)
 	if len(fields) < 2 || !strings.HasPrefix(fields[0], "$gx-") || fields[0] == "$gx-investigate" {
-		return "", WorkerConfig{}, false
+		return "", agentfake.WorkerConfig{}, false
 	}
-	cfg, err := LoadWorkerConfig(c.cwd)
+	cfg, err := agentfake.LoadWorkerConfig(c.cwd)
 	if err != nil {
-		return "", WorkerConfig{}, false
+		return "", agentfake.WorkerConfig{}, false
 	}
 	return fields[len(fields)-1], cfg, true
 }
@@ -437,7 +438,7 @@ func (c *codexFake) submit(text string) error {
 		// user message.
 		return c.writeLine("response_item", c.message("user", "input_text", text))
 	}
-	if IsDesignPrompt(text) || (c.design.Active && !strings.HasPrefix(text, "$")) {
+	if agentfake.IsDesignPrompt(text) || (c.design.Active && !strings.HasPrefix(text, "$")) {
 		return c.designTurn(text)
 	}
 	address, cfg, ok := c.workerPrompt(text)
@@ -448,11 +449,11 @@ func (c *codexFake) submit(text string) error {
 		return err
 	}
 	switch cfg.Behaviour[address] {
-	case BehaviourPermission:
-		return c.permission(PermissionCommand, func() { go c.work(cfg, address) })
-	case BehaviourRateLimit:
-		c.resumeWork = &PendingWork{cfg, address}
-		reset := DefaultRateLimitReset
+	case agentfake.BehaviourPermission:
+		return c.permission(agentfake.PermissionCommand, func() { go c.work(cfg, address) })
+	case agentfake.BehaviourRateLimit:
+		c.resumeWork = &agentfake.PendingWork{Cfg: cfg, Address: address}
+		reset := agentfake.DefaultRateLimitReset
 		if d, err := time.ParseDuration(cfg.RateLimitReset); err == nil {
 			reset = d
 		}
@@ -460,9 +461,9 @@ func (c *codexFake) submit(text string) error {
 			return err
 		}
 		return c.taskError("You've hit your usage limit.", "usage_limit_exceeded")
-	case BehaviourError:
-		c.resumeWork = &PendingWork{cfg, address}
-		return c.taskError(CodexModelError, "model_not_found")
+	case agentfake.BehaviourError:
+		c.resumeWork = &agentfake.PendingWork{Cfg: cfg, Address: address}
+		return c.taskError(agentfake.CodexModelError, "model_not_found")
 	}
 	if u := cfg.CodexUsage; u != nil {
 		if err := c.tokenCount(u.UsedPercentage, u.ResetsAt); err != nil {
@@ -477,12 +478,12 @@ func (c *codexFake) submit(text string) error {
 // the turn ends with, a moment after it starts.
 func (c *codexFake) designTurn(text string) error {
 	script := c.design.TurnScript(c.cwd, text)
-	if IsDesignPrompt(text) {
+	if agentfake.IsDesignPrompt(text) {
 		c.design.Active = true
 	}
-	busy := DesignTurnTime
-	if c.design.Turns < len(script) && script[c.design.Turns] == DesignTurnSlow {
-		busy = DesignSlowTime
+	busy := agentfake.DesignTurnTime
+	if c.design.Turns < len(script) && script[c.design.Turns] == agentfake.DesignTurnSlow {
+		busy = agentfake.DesignSlowTime
 	}
 	reply := c.design.Message(text, script)
 	if err := c.startTurn(text); err != nil {
@@ -491,20 +492,20 @@ func (c *codexFake) designTurn(text string) error {
 	c.reply = reply
 	go func() {
 		time.Sleep(busy)
-		_ = SendControl(c.ctlPath, Control{Action: ActionFinish})
+		_ = agentfake.SendControl(c.ctlPath, agentfake.Control{Action: agentfake.ActionFinish})
 	}()
 	return nil
 }
 
 // work does the ticket's work off the input loop, then ends the turn down the
 // control channel like a test would.
-func (c *codexFake) work(cfg WorkerConfig, address string) {
-	if err := WorkTicket(cfg, address); err != nil {
+func (c *codexFake) work(cfg agentfake.WorkerConfig, address string) {
+	if err := agentfake.WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakecodex worker:", err)
 	}
-	if cfg.Behaviour[address] == BehaviourFail {
-		_ = SendControl(c.ctlPath, Control{Action: ActionExit, Code: 1})
+	if cfg.Behaviour[address] == agentfake.BehaviourFail {
+		_ = agentfake.SendControl(c.ctlPath, agentfake.Control{Action: agentfake.ActionExit, Code: 1})
 		return
 	}
-	_ = SendControl(c.ctlPath, Control{Action: ActionFinish})
+	_ = agentfake.SendControl(c.ctlPath, agentfake.Control{Action: agentfake.ActionFinish})
 }

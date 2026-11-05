@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 )
 
 // The test binary doubles as fakecodex, as agentfake's own tests do.
 func TestMain(m *testing.M) {
 	if os.Getenv(agentfake.CodexEnv) == "1" {
-		agentfake.TUICodex()
+		codex.TUICodex()
 	}
 	os.Exit(m.Run())
 }
@@ -142,7 +143,7 @@ func fakecodexEnv(t *testing.T) (env []string, id, dir string) {
 	dir = agentfake.NewProgramDir(t)
 	id = "doctor-" + strings.ReplaceAll(t.Name(), "/", "-")
 	env = fakeEnv(t, "exec '"+exe+"' \"$@\"\n",
-		agentfake.CodexEnv+"=1", agentfake.CodexIDEnv+"="+id, agentfake.ProgramDirEnv+"="+dir)
+		agentfake.CodexEnv+"=1", codex.CodexIDEnv+"="+id, agentfake.ProgramDirEnv+"="+dir)
 	return env, id, dir
 }
 

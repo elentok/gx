@@ -1,4 +1,4 @@
-package agentfake
+package codex
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // assistantTexts are the assistant messages of a rollout, in order.
@@ -40,11 +42,11 @@ func assistantTexts(t *testing.T, path string) []string {
 
 func TestCodexDesign_PlaysTheScriptedTurnsAsAssistantMessages(t *testing.T) {
 	repo := t.TempDir()
-	raw, err := json.Marshal(WorkerConfig{Design: []string{DesignTurnRound, DesignTurnRunEnd}})
+	raw, err := json.Marshal(agentfake.WorkerConfig{Design: []string{agentfake.DesignTurnRound, agentfake.DesignTurnRunEnd}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, WorkerConfigFile), raw, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, agentfake.WorkerConfigFile), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
@@ -63,7 +65,7 @@ func TestCodexDesign_PlaysTheScriptedTurnsAsAssistantMessages(t *testing.T) {
 	if !strings.Contains(texts[0], "Q8") {
 		t.Errorf("first message = %q, want the first round", texts[0])
 	}
-	if !strings.HasSuffix(texts[1], DesignRunEnd) {
+	if !strings.HasSuffix(texts[1], agentfake.DesignRunEnd) {
 		t.Errorf("second message = %q, want the run-end message", texts[1])
 	}
 }

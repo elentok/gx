@@ -2,8 +2,8 @@
 // on PATH. It runs the interactive Codex fake on the shared agentfake core.
 package main
 
-import "github.com/elentok/gx/testutil/agentfake"
+import "github.com/elentok/gx/testutil/agentfake/codex"
 
 func main() {
-	agentfake.TUICodex()
+	codex.TUICodex()
 }

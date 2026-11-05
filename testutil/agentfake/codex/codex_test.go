@@ -1,4 +1,4 @@
-package agentfake
+package codex
 
 import (
 	"bytes"
@@ -17,10 +17,11 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/transcript"
 )
 
-const codexFixtureRollout = "../../docs/specs/codex-support-fixtures/rollouts/plain-turn.jsonl"
+const codexFixtureRollout = "../../../docs/specs/codex-support-fixtures/rollouts/plain-turn.jsonl"
 
 // codexLaunchArgs is the shape the Codex harness launches with.
 var codexLaunchArgs = []string{
@@ -38,7 +39,7 @@ type codexProc struct {
 	cwd   string
 	cmd   *exec.Cmd
 	stdin io.WriteCloser
-	out   *SyncBuffer
+	out   *agentfake.SyncBuffer
 	done  chan error
 }
 
@@ -55,10 +56,10 @@ func startCodexIn(t *testing.T, dir, home, id string, args ...string) *codexProc
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &codexProc{t: t, id: id, home: home, cwd: cwd, out: &SyncBuffer{}, done: make(chan error, 1)}
+	p := &codexProc{t: t, id: id, home: home, cwd: cwd, out: &agentfake.SyncBuffer{}, done: make(chan error, 1)}
 	p.cmd = exec.Command(os.Args[0], args...)
 	p.cmd.Dir = cwd
-	p.cmd.Env = append(os.Environ(), CodexEnv+"=1", CodexIDEnv+"="+id, "CODEX_HOME="+home, ProgramDirEnv+"="+NewProgramDir(t))
+	p.cmd.Env = append(os.Environ(), agentfake.CodexEnv+"=1", CodexIDEnv+"="+id, "CODEX_HOME="+home, agentfake.ProgramDirEnv+"="+agentfake.NewProgramDir(t))
 	p.cmd.Stdout, p.cmd.Stderr = p.out, p.out
 	if p.stdin, err = p.cmd.StdinPipe(); err != nil {
 		t.Fatal(err)
@@ -88,11 +89,11 @@ func (p *codexProc) turnAndExit(prompt string) {
 		p.t.Fatal(err)
 	}
 	p.waitOut("state=working")
-	if err := SendProgramControl(p.id, Control{Action: ActionFinish}); err != nil {
+	if err := agentfake.SendProgramControl(p.id, agentfake.Control{Action: agentfake.ActionFinish}); err != nil {
 		p.t.Fatal(err)
 	}
 	p.waitOut("state=done")
-	if err := SendProgramControl(p.id, Control{Action: ActionExit}); err != nil {
+	if err := agentfake.SendProgramControl(p.id, agentfake.Control{Action: agentfake.ActionExit}); err != nil {
 		p.t.Fatal(err)
 	}
 	if err := <-p.done; err != nil {
@@ -133,17 +134,15 @@ func rolloutPairs(t *testing.T, path string) map[[2]string]bool {
 
 func TestCodex_WatcherFollowsATurnTitleAndExit(t *testing.T) {
 	home := t.TempDir()
-	conv := NewConversationID(t)
+	conv := agentfake.NewConversationID(t)
 	cmd := harness.Command{Name: os.Args[0], Args: codexLaunchArgs}
-	p := HoldProgram(t, cmd, conv, CodexEnv+"=1", CodexIDEnv+"="+conv, "CODEX_HOME="+home)
+	p := agentfake.HoldProgram(t, cmd, conv, agentfake.CodexEnv+"=1", CodexIDEnv+"="+conv, "CODEX_HOME="+home)
 
 	p.WaitStatus(harness.Status{State: harness.Idle})
 	p.WaitFor("the conversation id", func() bool { return p.Watcher.ConversationID() == conv })
-	if err := p.client.SendKeys("fix it\r"); err != nil {
-		t.Fatal(err)
-	}
+	p.SendKeys("fix it\r")
 	p.WaitStatus(harness.Status{State: harness.Working})
-	p.control(Control{Action: ActionFinish})
+	p.Control(agentfake.Control{Action: agentfake.ActionFinish})
 	p.WaitStatus(harness.Status{State: harness.Idle})
 
 	cwd, err := os.Getwd()
@@ -153,15 +152,14 @@ func TestCodex_WatcherFollowsATurnTitleAndExit(t *testing.T) {
 	want := "fix it | " + filepath.Base(cwd)
 	p.WaitFor("the display name", func() bool {
 		raw, err := os.ReadFile(filepath.Join(p.Dir, holder.RawLogFile))
-		name, ok := Harness{}.DisplayName(raw)
+		name, ok := agentfake.Harness{}.DisplayName(raw)
 		return err == nil && ok && name == want
 	})
 
-	p.control(Control{Action: ActionExit, Code: 3})
-	if err := <-p.done; err != nil {
+	p.Control(agentfake.Control{Action: agentfake.ActionExit, Code: 3})
+	if err := p.WaitExit(); err != nil {
 		t.Fatal(err)
 	}
-	p.done <- nil
 	code, err := os.ReadFile(filepath.Join(p.Dir, holder.ExitCodeFile))
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +199,7 @@ func TestCodex_ReportsFollowTheRecordedStreamOrder(t *testing.T) {
 
 func TestCodex_InputRowIsCodexMarkerAndEmptyReadsAsEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	box := NewInputBox(&buf, "")
+	box := agentfake.NewInputBox(&buf, "")
 	box.Marker = codexMarker
 	box.Draw()
 	rows := strings.Split(strings.TrimPrefix(buf.String(), "\x1b[2J\x1b[H"), "\r\n")
@@ -330,7 +328,7 @@ func TestCodex_RolloutShapeMatchesTheRecordedFixture(t *testing.T) {
 
 func TestCodex_VersionIsFixed(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "--version")
-	cmd.Env = append(os.Environ(), CodexEnv+"=1")
+	cmd.Env = append(os.Environ(), agentfake.CodexEnv+"=1")
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatal(err)
@@ -342,7 +340,7 @@ func TestCodex_VersionIsFixed(t *testing.T) {
 
 func TestCodex_UnknownFlagIsRejected(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "--no-such-flag")
-	cmd.Env = append(os.Environ(), CodexEnv+"=1", "CODEX_HOME="+t.TempDir())
+	cmd.Env = append(os.Environ(), agentfake.CodexEnv+"=1", "CODEX_HOME="+t.TempDir())
 	if err := cmd.Run(); err == nil {
 		t.Error("an unknown flag exited 0")
 	}
@@ -366,7 +364,7 @@ func TestCodex_ResumeKeepsTheIDAndAppendsToTheRollout(t *testing.T) {
 	first := startCodex(t, home, "resume-1", codexLaunchArgs...)
 	first.turnAndExit("one")
 	// The ready file outlives its program, and a sender takes the first dir that has one.
-	_ = os.Remove(ProgramReadyPath(TestDir("resume-1"), "resume-1"))
+	_ = os.Remove(agentfake.ProgramReadyPath(agentfake.TestDir("resume-1"), "resume-1"))
 
 	second := startCodex(t, home, "ignored", append([]string{"resume", "resume-1"}, codexLaunchArgs...)...)
 	second.id = "resume-1"

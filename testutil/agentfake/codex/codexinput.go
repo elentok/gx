@@ -1,6 +1,10 @@
-package agentfake
+package codex
 
-import "time"
+import (
+	"time"
+
+	"github.com/elentok/gx/testutil/agentfake"
+)
 
 const (
 	tabKey = 0x09
@@ -39,10 +43,10 @@ func (c *codexFake) key(b byte) error {
 	if in.seq != nil {
 		return c.sequenceKey(b)
 	}
-	if b == EscKey {
+	if b == agentfake.EscKey {
 		in.seq = []byte{b}
 		in.escTimer = time.AfterFunc(codexEscWait, func() {
-			_ = SendControl(c.ctlPath, Control{Action: actionInterrupt})
+			_ = agentfake.SendControl(c.ctlPath, agentfake.Control{Action: actionInterrupt})
 		})
 		return nil
 	}
@@ -51,7 +55,7 @@ func (c *codexFake) key(b byte) error {
 		return nil
 	}
 	switch b {
-	case CtrlC:
+	case agentfake.CtrlC:
 		return c.interrupt()
 	case tabKey:
 		if c.working && c.box.Text() != "" {
@@ -114,7 +118,7 @@ func (c *codexFake) pasteKey(b byte) {
 
 // submitLogged logs a submitted entry as the Claude fake does, then starts it.
 func (c *codexFake) submitLogged(text string) error {
-	if err := LogSubmitted(c.id, text); err != nil {
+	if err := agentfake.LogSubmitted(c.id, text); err != nil {
 		return err
 	}
 	return c.submit(text)
@@ -123,7 +127,7 @@ func (c *codexFake) submitLogged(text string) error {
 // interrupt is Ctrl+C or Esc: it ends a running turn, leaving a background
 // terminal and its Ready title in place.
 func (c *codexFake) interrupt() error {
-	if err := LogSubmitted(c.id, ProgramInterruptEntry); err != nil {
+	if err := agentfake.LogSubmitted(c.id, agentfake.ProgramInterruptEntry); err != nil {
 		return err
 	}
 	if !c.working {

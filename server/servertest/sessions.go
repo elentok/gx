@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 )
 
 // holderArg is the first argument that runs the test binary as a holder. An
@@ -113,7 +114,7 @@ func RunSessionProcesses() {
 		agentfake.TUIClaude()
 	}
 	if os.Getenv(agentfake.CodexEnv) == "1" {
-		agentfake.TUICodex()
+		codex.TUICodex()
 	}
 }
 

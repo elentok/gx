@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -284,7 +285,7 @@ func (f *fixture) controlFiles() []string {
 
 // codexIDs lists the ids of the Codex fakes started so far.
 func (f *fixture) codexIDs() []string {
-	paths, _ := filepath.Glob(agentfake.CodexArgsPath(filepath.Join(f.root, "home", ".codex"), "*"))
+	paths, _ := filepath.Glob(codex.CodexArgsPath(filepath.Join(f.root, "home", ".codex"), "*"))
 	ids := make([]string, len(paths))
 	for i, p := range paths {
 		ids[i] = strings.TrimSuffix(filepath.Base(p), ".args")

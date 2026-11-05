@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 )
 
 // codexApprovalSession starts a Codex fake that can reach `gx agent
@@ -21,7 +22,7 @@ import (
 // so the fake draws the dialog and takes keys.
 func codexApprovalSession(t *testing.T, id string, hook bool) (*nativerunner.Pty, agentrunner.Session, string) {
 	t.Helper()
-	env := []string{agentfake.CodexIDEnv + "=" + id}
+	env := []string{codex.CodexIDEnv + "=" + id}
 	if hook {
 		gxDir := filepath.Dir(builtGx.get(t))
 		env = append(env, "PATH="+gxDir+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -95,7 +96,7 @@ func TestPtyCodexApproval_HookCardAllowContinuesTheAgent(t *testing.T) {
 	if err != nil || st.Pending != nil {
 		t.Fatalf("after allow: %+v, %v", st, err)
 	}
-	runs, err := agentfake.ReadCodexHookLog(home, "perm-allow")
+	runs, err := codex.ReadCodexHookLog(home, "perm-allow")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +119,7 @@ func TestPtyCodexApproval_HookDenyPassesTheReason(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForScreen(t, client, "denied: use fd instead")
-	runs, err := agentfake.ReadCodexHookLog(home, "perm-deny")
+	runs, err := codex.ReadCodexHookLog(home, "perm-deny")
 	if err != nil {
 		t.Fatal(err)
 	}

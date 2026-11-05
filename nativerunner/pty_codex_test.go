@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 )
 
 // codexRunner returns a pty runner whose codex is the built fakecodex binary,
@@ -75,10 +76,10 @@ func TestPtyCodex_StartsIdleWithCodexsOwnSessionID(t *testing.T) {
 func TestPtyCodex_AnswersEveryStartupDialog(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t,
-		agentfake.CodexTrustEnv+"=1",
-		agentfake.CodexHooksReviewEnv+"=1",
-		agentfake.CodexUpdateEnv+"=1",
-		agentfake.CodexModelNudgeEnv+"=1",
+		codex.CodexTrustEnv+"=1",
+		codex.CodexHooksReviewEnv+"=1",
+		codex.CodexUpdateEnv+"=1",
+		codex.CodexModelNudgeEnv+"=1",
 	)
 	// Start returns only once the launch loop saw Ready, which the fake reports
 	// after the last dialog.
@@ -90,7 +91,7 @@ func TestPtyCodex_AnswersEveryStartupDialog(t *testing.T) {
 
 func TestPtyCodex_WorkingWithReadyTitleIsBackground(t *testing.T) {
 	t.Parallel()
-	p, _ := codexRunner(t, agentfake.CodexIDEnv+"=thread-bg")
+	p, _ := codexRunner(t, codex.CodexIDEnv+"=thread-bg")
 	s := startCodex(t, p, realDir(t))
 	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second); err != nil {
 		t.Fatal(err)
@@ -130,7 +131,7 @@ func TestPtyCodex_WorkingWithReadyTitleIsBackground(t *testing.T) {
 // the given message and kind, and returns once the runner sees it blocked.
 func codexAfterError(t *testing.T, id, message, kind string, controls ...agentfake.Control) (*nativerunner.Pty, agentrunner.Session) {
 	t.Helper()
-	p, _ := codexRunner(t, agentfake.CodexIDEnv+"="+id)
+	p, _ := codexRunner(t, codex.CodexIDEnv+"="+id)
 	s := startCodex(t, p, realDir(t))
 	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second); err != nil {
 		t.Fatal(err)

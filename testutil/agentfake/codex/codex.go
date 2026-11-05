@@ -1,4 +1,4 @@
-package agentfake
+package codex
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ import (
 
 	"github.com/charmbracelet/x/term"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // CodexIDEnv, when not empty, is the session id a fresh fake launch takes
@@ -145,7 +146,7 @@ func runCodex() (int, error) {
 		return 0, nil
 	}
 	if len(args) == 1 && args[0] == "app-server" {
-		return RunCodexProbe()
+		return agentfake.RunCodexProbe()
 	}
 	opts, err := parseCodexArgs(args)
 	if err != nil {
@@ -176,17 +177,17 @@ func runCodex() (int, error) {
 		return 0, err
 	}
 
-	dir := ProgramDir()
+	dir := agentfake.ProgramDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, err
 	}
 	// The generic fake Watch finds a program's conversation by pid.
-	convPath := ProgramConversationPath(dir, os.Getpid())
+	convPath := agentfake.ProgramConversationPath(dir, os.Getpid())
 	if err := os.WriteFile(convPath, []byte(id), 0o644); err != nil {
 		return 0, err
 	}
 	defer os.Remove(convPath)
-	ctl, closeCtl, err := OpenProgramChannel(dir, id)
+	ctl, closeCtl, err := agentfake.OpenProgramChannel(dir, id)
 	if err != nil {
 		return 0, err
 	}
@@ -198,7 +199,7 @@ func runCodex() (int, error) {
 		home:    home,
 		cwd:     cwd,
 		title:   filepath.Base(cwd),
-		box:     NewInputBox(os.Stdout, ""),
+		box:     agentfake.NewInputBox(os.Stdout, ""),
 		hooks:   opts.hooks,
 		dialogs: codexDialogs(),
 		ctlPath: filepath.Join(dir, id+".ctl"),
@@ -216,7 +217,7 @@ type codexFake struct {
 	home  string
 	cwd   string
 	title string
-	box   *InputBox
+	box   *agentfake.InputBox
 	hooks map[string][]codexHook
 	// dialogs are the startup dialogs still waiting for a key; ctlPath is this
 	// fake's own control channel, for work that runs off the input loop.
@@ -226,10 +227,10 @@ type codexFake struct {
 	onKey func(key byte) error
 	// resumeWork is a ticket whose first prompt ended in a rate-limit error; the
 	// next prompt does its work.
-	resumeWork *PendingWork
+	resumeWork *agentfake.PendingWork
 	// design plays a gx-design session's scripted turns; reply is the assistant
 	// message the running turn ends with, empty for the default.
-	design DesignState
+	design agentfake.DesignState
 	reply  string
 	// rollout is the session file; ordinal numbers its next line.
 	rollout string
@@ -326,10 +327,12 @@ func (c *codexFake) message(role, contentType, text string) map[string]any {
 
 func (c *codexFake) setTitle(title string) { fmt.Fprint(c.out, "\x1b]0;"+title+"\a") }
 
-func (c *codexFake) report(state string) { WriteAppReport(c.out, codexAppName, state, "", "") }
+func (c *codexFake) report(state string) {
+	agentfake.WriteAppReport(c.out, codexAppName, state, "", "")
+}
 
 func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
-	events := TuiEvents(in, ctl)
+	events := agentfake.TuiEvents(in, ctl)
 	c.setTitle(c.title)
 	// Codex turns bracketed paste on, so a paste keeps its newlines.
 	fmt.Fprint(c.out, "\x1b[?2004h")
@@ -340,7 +343,7 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 	for ev := range events {
 		switch {
 		case ev.Err != nil:
-			if PtyClosed(ev.Err) {
+			if agentfake.PtyClosed(ev.Err) {
 				c.exit()
 				return 0, nil
 			}
@@ -350,7 +353,7 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 				c.box.Draw()
 			}
 		case ev.Control != nil:
-			if ev.Control.Action == ActionExit {
+			if ev.Control.Action == agentfake.ActionExit {
 				c.exit()
 				return ev.Control.Code, nil
 			}
@@ -458,29 +461,29 @@ func (c *codexFake) finishTurn() error {
 	return c.runQueued()
 }
 
-func (c *codexFake) control(ctl Control) error {
+func (c *codexFake) control(ctl agentfake.Control) error {
 	switch ctl.Action {
-	case ActionFinish:
+	case agentfake.ActionFinish:
 		return c.finishTurn()
-	case ActionReport:
-		WriteAppReport(c.out, codexAppName, ctl.State, ctl.Kind, ctl.Message)
-	case ActionTitle:
+	case agentfake.ActionReport:
+		agentfake.WriteAppReport(c.out, codexAppName, ctl.State, ctl.Kind, ctl.Message)
+	case agentfake.ActionTitle:
 		c.setTitle(ctl.Title)
-	case ActionBackground:
+	case agentfake.ActionBackground:
 		c.backgroundControl(ctl.Running)
 	case actionInterrupt:
 		return c.interrupt()
-	case ActionToolCall:
+	case agentfake.ActionToolCall:
 		return c.toolCall(ctl.Tool, ctl.Command)
-	case ActionPermission:
+	case agentfake.ActionPermission:
 		return c.permission(ctl.Command, nil)
-	case ActionPermissionScreen:
+	case agentfake.ActionPermissionScreen:
 		c.screenPermission(ctl)
-	case ActionTokenCount:
+	case agentfake.ActionTokenCount:
 		return c.tokenCount(ctl.UsedPercent, ctl.ResetsAt)
-	case ActionCompact:
+	case agentfake.ActionCompact:
 		return c.compact()
-	case ActionTaskError:
+	case agentfake.ActionTaskError:
 		return c.taskError(ctl.Message, ctl.Error)
 	default:
 		return fmt.Errorf("unknown codex control action %q", ctl.Action)

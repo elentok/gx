@@ -95,6 +95,28 @@ func (p *HeldProgram) control(c Control) {
 	}
 }
 
+// Control is control for tests outside this package.
+func (p *HeldProgram) Control(c Control) {
+	p.t.Helper()
+	p.control(c)
+}
+
+// SendKeys types keys into the held program.
+func (p *HeldProgram) SendKeys(keys string) {
+	p.t.Helper()
+	if err := p.client.SendKeys(keys); err != nil {
+		p.t.Fatal(err)
+	}
+}
+
+// WaitExit waits for the holder to exit. The cleanup waits on the same
+// channel, so the result is put back.
+func (p *HeldProgram) WaitExit() error {
+	err := <-p.done
+	p.done <- nil
+	return err
+}
+
 func (p *HeldProgram) report(state, kind, msg string) {
 	p.t.Helper()
 	p.control(Control{Action: ActionReport, State: state, Kind: kind, Message: msg})
@@ -157,7 +179,9 @@ func WorkerEnv(t *testing.T) (cfg WorkerConfig, gxLog string) {
 
 func CommitCount(t *testing.T) int {
 	t.Helper()
-	out, err := exec.Command("git", "rev-list", "--count", "HEAD").Output()
+	cmd := exec.Command("git", "rev-list", "--count", "HEAD")
+	cmd.Env = os.Environ()
+	out, err := cmd.Output()
 	if err != nil {
 		t.Fatal(err)
 	}

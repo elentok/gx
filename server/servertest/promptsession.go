@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 )
 
 // FirstPromptGrace is the short wait for a typed prompt's turn to start that
@@ -40,7 +41,7 @@ func StartCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEn
 			"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
 			"HOME=" + home,
 			"CODEX_HOME=" + filepath.Join(home, ".codex"),
-			agentfake.CodexIDEnv + "=" + conv,
+			codex.CodexIDEnv + "=" + conv,
 			agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t),
 		}, extraEnv...)...))
 	res, err := f.H.Client.CreateSession(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
@@ -59,11 +60,11 @@ func StartCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEn
 func StartCodexPermissionSession(t *testing.T, withDialog bool) PromptFixture {
 	t.Helper()
 	conv := "thread-perm-" + strings.ReplaceAll(t.Name(), "/", "-")
-	env := []string{agentfake.CodexIDEnv + "=" + conv}
+	env := []string{codex.CodexIDEnv + "=" + conv}
 	grace := FirstPromptGrace
 	if withDialog {
 		// An answer ends the fake's turn, which runs its hooks first.
-		env = append(env, agentfake.CodexNoPermissionHookEnv+"=1")
+		env = append(env, codex.CodexNoPermissionHookEnv+"=1")
 		grace = 10 * time.Second
 	}
 	f := StartCodexPromptSessionWithGrace(t, grace, env...)
