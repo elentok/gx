@@ -50,7 +50,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	// The title row's help click always opens the log's own help, even with the
 	// detail panel focused, where "?" would open the detail's help instead.
 	if nav.IsOpenHelp(msg) {
-		if m.ModalOpen() || m.help.IsOpen || m.rebaseConfirm.isOpen() || m.commitDetail.ModalOpen() {
+		if m.ModalOpen() || m.help.IsOpen || m.rebase.confirm.isOpen() || m.commitDetail.ModalOpen() {
 			return m, nil
 		}
 		m, cmd = nav.EndSearch(m, m.search.InputFocused() || m.commitDetail.InputFocused())
@@ -59,8 +59,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		return m, cmd
 	}
 	// Delegate to rebase confirm modal while it's open.
-	if m.rebaseConfirm.isOpen() {
-		return m.handleRebaseConfirmUpdate(msg)
+	if m.rebase.confirm.isOpen() {
+		return m, m.rebase.handleConfirmUpdate(msg, m.worktreeRoot)
 	}
 	// Delegate all messages to the amend/reword flow while it's open.
 	if m.commitOps.IsOpen() {
@@ -72,9 +72,10 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	}
 	// Delegate key events to the commit-info popup while it's open, so esc/i
 	// close it instead of falling through to list navigation.
-	if m.commitInfoOpen {
+	if m.commitInfo.open {
 		if _, ok := msg.(tea.KeyPressMsg); ok {
-			return m.handleCommitInfoKey(msg)
+			m.commitInfo.key(msg, m.width, m.height)
+			return m, nil
 		}
 	}
 
@@ -116,15 +117,16 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	case rewordDetailsMsg:
 		return m.handleRewordDetails(msg)
 	case commitInfoMsg:
-		return m.handleCommitInfo(msg)
+		m.commitInfo.handle(msg)
+		return m, nil
 	case reword.EditorFinishedMsg:
 		return m.handleCommitOpsUpdate(msg)
 	case rebaseFinishedMsg:
-		return m.handleRebaseFinished(msg)
+		return m, m.rebase.handleFinished(msg, m.worktreeRoot, m.cmdReload())
 	case rebaseStashMsg:
-		return m.handleRebaseStash(msg)
+		return m, m.rebase.handleStash(msg, m.worktreeRoot, m.settings.Terminal)
 	case rebaseStashPopMsg:
-		return m.handleRebaseStashPop(msg)
+		return m, m.rebase.handleStashPop(msg)
 	case flashClearMsg:
 		m.flashSubject = ""
 		m.flashUntil = time.Time{}
@@ -138,9 +140,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		m, splitCmd = m.syncSplitSize()
 		return m, tea.Batch(childCmd, splitCmd)
 	case tea.FocusMsg:
-		if m.rebaseDidStash {
-			m.rebaseDidStash = false
-			m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
+		if m.rebase.didStash {
+			m.rebase.didStash = false
+			m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
 		}
 		return m, tea.Batch(m.cmdReload(), m.cmdLoadStatus())
 	case tea.KeyPressMsg:
@@ -149,9 +151,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		// If focus events aren't working (e.g. tmux without focus-events on),
 		// catch the pending stash pop on the first key press instead.
-		if m.rebaseDidStash {
-			m.rebaseDidStash = false
-			m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
+		if m.rebase.didStash {
+			m.rebase.didStash = false
+			m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
 			return m, nil
 		}
 		if m.help.IsOpen {

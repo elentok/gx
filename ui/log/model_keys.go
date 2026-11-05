@@ -169,7 +169,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 	case bindingReword:
 		return m, m.cmdFetchRewordDetails()
 	case bindingHeaderInfo:
-		return m, m.cmdFetchCommitInfo()
+		return m, m.commitInfo.fetch(m.worktreeRoot, m.listPanel.Rows(), m.listPanel.Selected())
 	case bindingPageDown:
 		prevRef := m.SelectedRef()
 		m.listPanel = m.listPanel.ScrollPage(list.DefaultScroll)
@@ -181,7 +181,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 		m, selCmd := m.handleSelectionChange(prevRef)
 		return m, selCmd
 	case bindingRebaseInteractive:
-		return m.startRebaseInteractive()
+		return m, m.rebase.start(m.worktreeRoot, m.settings.Terminal, m.listPanel.Rows(), m.listPanel.Selected())
 	case bindingClearFilter:
 		if m.filter.IsActive() {
 			m.filter = LogFilter{}

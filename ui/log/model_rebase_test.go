@@ -18,13 +18,17 @@ func newRebaseTestModel(t *testing.T) Model {
 	return newTestModelDefault(repo, "", ui.Settings{})
 }
 
+func startRebase(m *Model) tea.Cmd {
+	return m.rebase.start(m.worktreeRoot, m.settings.Terminal, m.listPanel.Rows(), m.listPanel.Selected())
+}
+
 func TestStartRebaseInteractive_NoRowsBelowCursor(t *testing.T) {
 	m := newTestModel()
 	m.listPanel = m.listPanel.WithRows([]row{
 		{kind: rowCommit, commit: git.LogEntry{FullHash: "abc123", Subject: "only commit"}},
 	}).SetSelected(0)
 
-	_, cmd := m.startRebaseInteractive()
+	cmd := startRebase(&m)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd (warning) when no parent commit below cursor")
 	}
@@ -45,7 +49,7 @@ func TestStartRebaseInteractive_CleanRepo(t *testing.T) {
 	}
 	m.listPanel = m.listPanel.SetSelected(0)
 
-	_, cmd := m.startRebaseInteractive()
+	cmd := startRebase(&m)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd (rebase interactive) for clean repo with parent commit")
 	}
@@ -53,38 +57,36 @@ func TestStartRebaseInteractive_CleanRepo(t *testing.T) {
 
 func TestHandleRebaseConfirmUpdate_NonKeyMsg(t *testing.T) {
 	m := newTestModel()
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc"}
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc"}
 
-	updated, cmd := m.handleRebaseConfirmUpdate(tea.WindowSizeMsg{Width: 80})
+	cmd := m.rebase.handleConfirmUpdate(tea.WindowSizeMsg{Width: 80}, m.worktreeRoot)
 	if cmd != nil {
 		t.Error("expected nil cmd for non-key message")
 	}
-	next := updated.(Model)
-	if !next.rebaseConfirm.isOpen() {
-		t.Error("expected rebaseConfirm to remain open")
+	if !m.rebase.confirm.isOpen() {
+		t.Error("expected rebase.confirm to remain open")
 	}
 }
 
 func TestHandleRebaseConfirmUpdate_EscCancels(t *testing.T) {
 	m := newTestModel()
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc"}
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc"}
 
-	updated, cmd := m.handleRebaseConfirmUpdate(tea.KeyPressMsg{Code: tea.KeyEsc})
+	cmd := m.rebase.handleConfirmUpdate(tea.KeyPressMsg{Code: tea.KeyEsc}, m.worktreeRoot)
 	if cmd != nil {
 		t.Error("expected nil cmd after esc (cancel)")
 	}
-	next := updated.(Model)
-	if next.rebaseConfirm.isOpen() {
-		t.Error("expected rebaseConfirm to be closed after esc")
+	if m.rebase.confirm.isOpen() {
+		t.Error("expected rebase.confirm to be closed after esc")
 	}
 }
 
 func TestHandleRebaseConfirmUpdate_AcceptStash(t *testing.T) {
 	m := newTestModel()
 	m.worktreeRoot = testutil.TempRepo(t)
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc123"}
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc123"}
 
-	_, cmd := m.handleRebaseConfirmUpdate(tea.KeyPressMsg{Code: tea.KeyEnter})
+	cmd := m.rebase.handleConfirmUpdate(tea.KeyPressMsg{Code: tea.KeyEnter}, m.worktreeRoot)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd when accepting stash confirmation")
 	}
@@ -93,9 +95,9 @@ func TestHandleRebaseConfirmUpdate_AcceptStash(t *testing.T) {
 func TestHandleRebaseConfirmUpdate_AcceptStashPop(t *testing.T) {
 	m := newTestModel()
 	m.worktreeRoot = testutil.TempRepo(t)
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
 
-	_, cmd := m.handleRebaseConfirmUpdate(tea.KeyPressMsg{Code: tea.KeyEnter})
+	cmd := m.rebase.handleConfirmUpdate(tea.KeyPressMsg{Code: tea.KeyEnter}, m.worktreeRoot)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd when accepting stash pop confirmation")
 	}
@@ -103,37 +105,36 @@ func TestHandleRebaseConfirmUpdate_AcceptStashPop(t *testing.T) {
 
 func TestHandleRebaseConfirmUpdate_ToggleWithArrow(t *testing.T) {
 	m := newTestModel()
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc"}
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: "abc"}
 
 	// 'h' moves to yes without deciding
-	updated, cmd := m.handleRebaseConfirmUpdate(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	cmd := m.rebase.handleConfirmUpdate(tea.KeyPressMsg{Code: 'h', Text: "h"}, m.worktreeRoot)
 	if cmd != nil {
 		t.Error("expected nil cmd for toggle without deciding")
 	}
-	next := updated.(Model)
-	if !next.rebaseConfirm.yes {
-		t.Error("expected rebaseConfirm.yes=true after h key")
+	if !m.rebase.confirm.yes {
+		t.Error("expected rebase.confirm.yes=true after h key")
 	}
-	if !next.rebaseConfirm.isOpen() {
-		t.Error("expected rebaseConfirm to remain open after toggle")
+	if !m.rebase.confirm.isOpen() {
+		t.Error("expected rebase.confirm to remain open after toggle")
 	}
 }
 
 func TestRebaseConfirmView_Stash(t *testing.T) {
 	m := newTestModel()
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true}
-	view := m.rebaseConfirmView(80)
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true}
+	view := m.rebase.view(80)
 	if view == "" {
-		t.Error("expected non-empty rebaseConfirmView for stash kind")
+		t.Error("expected non-empty rebase view for stash kind")
 	}
 }
 
 func TestRebaseConfirmView_StashPop(t *testing.T) {
 	m := newTestModel()
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: false}
-	view := m.rebaseConfirmView(80)
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: false}
+	view := m.rebase.view(80)
 	if view == "" {
-		t.Error("expected non-empty rebaseConfirmView for stash-pop kind")
+		t.Error("expected non-empty rebase view for stash-pop kind")
 	}
 }
 
@@ -151,20 +152,19 @@ func TestStartRebaseInteractive_DirtyRepo(t *testing.T) {
 	}
 	m.listPanel = m.listPanel.SetSelected(0)
 
-	updated, cmd := m.startRebaseInteractive()
-	// With dirty repo, should set rebaseConfirm and return nil cmd
+	cmd := startRebase(&m)
+	// With dirty repo, should set rebase.confirm and return nil cmd
 	if cmd != nil {
 		t.Error("expected nil cmd for dirty repo (should show confirm modal instead)")
 	}
-	next := updated.(Model)
-	if !next.rebaseConfirm.isOpen() {
-		t.Error("expected rebaseConfirm to be open for dirty repo")
+	if !m.rebase.confirm.isOpen() {
+		t.Error("expected rebase.confirm to be open for dirty repo")
 	}
 }
 
 func TestHandleRebaseStash_Error(t *testing.T) {
 	m := newTestModel()
-	_, cmd := m.handleRebaseStash(rebaseStashMsg{err: errors.New("stash failed")})
+	cmd := m.rebase.handleStash(rebaseStashMsg{err: errors.New("stash failed")}, m.worktreeRoot, m.settings.Terminal)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd on stash error")
 	}
@@ -173,27 +173,27 @@ func TestHandleRebaseStash_Error(t *testing.T) {
 func TestHandleRebaseStash_Success(t *testing.T) {
 	m := newTestModel()
 	m.worktreeRoot = testutil.TempRepo(t)
-	_, cmd := m.handleRebaseStash(rebaseStashMsg{hash: "abc123"})
+	cmd := m.rebase.handleStash(rebaseStashMsg{hash: "abc123"}, m.worktreeRoot, m.settings.Terminal)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd on stash success")
 	}
-	if !m.rebaseDidStash {
-		// rebaseDidStash is set on success
+	if !m.rebase.didStash {
+		// rebase.didStash is set on success
 	}
 }
 
 func TestCmdRunRebaseInteractive_NonNil(t *testing.T) {
 	m := newTestModel()
 	m.worktreeRoot = testutil.TempRepo(t)
-	cmd := m.cmdRunRebaseInteractive("abc123")
+	cmd := m.rebase.cmdRun(m.worktreeRoot, m.settings.Terminal, "abc123")
 	if cmd == nil {
-		t.Fatal("expected non-nil cmd from cmdRunRebaseInteractive")
+		t.Fatal("expected non-nil cmd from cmdRun")
 	}
 }
 
 func TestHandleRebaseFinished_Error(t *testing.T) {
 	m := newRebaseTestModel(t)
-	_, cmd := m.handleRebaseFinished(rebaseFinishedMsg{err: errors.New("rebase failed")})
+	cmd := m.rebase.handleFinished(rebaseFinishedMsg{err: errors.New("rebase failed")}, m.worktreeRoot, m.cmdReload())
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd on rebase error")
 	}
@@ -201,8 +201,8 @@ func TestHandleRebaseFinished_Error(t *testing.T) {
 
 func TestHandleRebaseFinished_SuccessNoStash(t *testing.T) {
 	m := newRebaseTestModel(t)
-	m.rebaseDidStash = false
-	_, cmd := m.handleRebaseFinished(rebaseFinishedMsg{})
+	m.rebase.didStash = false
+	cmd := m.rebase.handleFinished(rebaseFinishedMsg{}, m.worktreeRoot, m.cmdReload())
 	if cmd == nil {
 		t.Fatal("expected reload cmd on rebase success")
 	}
@@ -210,8 +210,8 @@ func TestHandleRebaseFinished_SuccessNoStash(t *testing.T) {
 
 func TestHandleRebaseFinished_SuccessWithStash(t *testing.T) {
 	m := newRebaseTestModel(t)
-	m.rebaseDidStash = true
-	_, cmd := m.handleRebaseFinished(rebaseFinishedMsg{})
+	m.rebase.didStash = true
+	cmd := m.rebase.handleFinished(rebaseFinishedMsg{}, m.worktreeRoot, m.cmdReload())
 	if cmd == nil {
 		t.Fatal("expected cmd on rebase success with stash")
 	}
@@ -219,7 +219,7 @@ func TestHandleRebaseFinished_SuccessWithStash(t *testing.T) {
 
 func TestHandleRebaseStashPop_Error(t *testing.T) {
 	m := newTestModel()
-	_, cmd := m.handleRebaseStashPop(rebaseStashPopMsg{err: errors.New("pop failed")})
+	cmd := m.rebase.handleStashPop(rebaseStashPopMsg{err: errors.New("pop failed")})
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd on stash pop error")
 	}
@@ -227,7 +227,7 @@ func TestHandleRebaseStashPop_Error(t *testing.T) {
 
 func TestHandleRebaseStashPop_Success(t *testing.T) {
 	m := newTestModel()
-	_, cmd := m.handleRebaseStashPop(rebaseStashPopMsg{})
+	cmd := m.rebase.handleStashPop(rebaseStashPopMsg{})
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd on stash pop success")
 	}

@@ -39,55 +39,61 @@ type rebaseStashMsg struct {
 
 type rebaseStashPopMsg struct{ err error }
 
-func (m Model) startRebaseInteractive() (tea.Model, tea.Cmd) {
-	rows := m.listPanel.Rows()
-	cursor := m.listPanel.Selected()
+// rebaseFlow is the rebase -i state: the stash confirm modal and whether a
+// stash was pushed before the rebase. Methods take the worktree root (and
+// terminal where a command runs) from the caller.
+type rebaseFlow struct {
+	confirm rebaseConfirmState // confirm modal for stash-before-rebase and stash-pop-after-rebase
+	// didStash: stash was pushed before rebase; pop prompt fires on FocusMsg
+	// (kitty/tmux) or immediately (exec).
+	didStash bool
+}
 
+func (f *rebaseFlow) start(root string, terminal ui.Terminal, rows []row, cursor int) tea.Cmd {
 	next := cursor + 1
 	for next < len(rows) && rows[next].kind != rowCommit {
 		next++
 	}
 	if next >= len(rows) {
-		return m, notify.Warning("rebase -i: no parent commit below selection")
+		return notify.Warning("rebase -i: no parent commit below selection")
 	}
 
 	hash := rows[next].commit.FullHash
 
-	dirty, err := history.HasUnstagedChanges(m.worktreeRoot)
+	dirty, err := history.HasUnstagedChanges(root)
 	if err != nil {
-		return m, notify.Error("rebase -i: " + err.Error())
+		return notify.Error("rebase -i: " + err.Error())
 	}
 	if dirty {
-		m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: hash}
-		return m, nil
+		f.confirm = rebaseConfirmState{kind: rebaseConfirmStash, yes: true, hash: hash}
+		return nil
 	}
 
-	return m, m.cmdRunRebaseInteractive(hash)
+	return f.cmdRun(root, terminal, hash)
 }
 
-func (m Model) handleRebaseConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (f *rebaseFlow) handleConfirmUpdate(msg tea.Msg, root string) tea.Cmd {
 	kp, ok := msg.(tea.KeyPressMsg)
 	if !ok {
-		return m, nil
+		return nil
 	}
-	nextYes, decided, accepted, handled := components.UpdateConfirm(kp, m.rebaseConfirm.yes)
+	nextYes, decided, accepted, handled := components.UpdateConfirm(kp, f.confirm.yes)
 	if !handled {
-		return m, nil
+		return nil
 	}
 	if !decided {
-		m.rebaseConfirm.yes = nextYes
-		return m, nil
+		f.confirm.yes = nextYes
+		return nil
 	}
-	kind := m.rebaseConfirm.kind
-	hash := m.rebaseConfirm.hash
-	m.rebaseConfirm = rebaseConfirmState{}
+	kind := f.confirm.kind
+	hash := f.confirm.hash
+	f.confirm = rebaseConfirmState{}
 	if !accepted {
-		return m, nil
+		return nil
 	}
 	switch kind {
 	case rebaseConfirmStash:
-		root := m.worktreeRoot
-		return m, tea.Batch(
+		return tea.Batch(
 			notify.Progress("rebase-stash", "stashing..."),
 			func() tea.Msg {
 				_, err := history.StashPushAuto(root)
@@ -95,8 +101,7 @@ func (m Model) handleRebaseConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 	case rebaseConfirmStashPop:
-		root := m.worktreeRoot
-		return m, tea.Batch(
+		return tea.Batch(
 			notify.Progress("rebase-stash-pop", "popping stash..."),
 			func() tea.Msg {
 				_, err := git.StashPop(root)
@@ -104,12 +109,12 @@ func (m Model) handleRebaseConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 	}
-	return m, nil
+	return nil
 }
 
-func (m Model) rebaseConfirmView(width int) string {
+func (f rebaseFlow) view(width int) string {
 	var prompt string
-	switch m.rebaseConfirm.kind {
+	switch f.confirm.kind {
 	case rebaseConfirmStash:
 		prompt = "Stash unstaged changes before running git rebase -i?"
 	case rebaseConfirmStashPop:
@@ -119,34 +124,35 @@ func (m Model) rebaseConfirmView(width int) string {
 	if modalW < 48 {
 		modalW = 48
 	}
-	return components.RenderConfirmModal(prompt, m.rebaseConfirm.yes, ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, modalW)
+	return components.RenderConfirmModal(prompt, f.confirm.yes, ui.ColorYellow, ui.ColorGreen, ui.ColorRed, ui.ColorSubtle, modalW)
 }
 
-func (m Model) handleRebaseStash(msg rebaseStashMsg) (tea.Model, tea.Cmd) {
+func (f *rebaseFlow) handleStash(msg rebaseStashMsg, root string, terminal ui.Terminal) tea.Cmd {
 	if msg.err != nil {
-		return m, tea.Batch(notify.Close("rebase-stash"), notify.Error("stash failed: "+msg.err.Error()))
+		return tea.Batch(notify.Close("rebase-stash"), notify.Error("stash failed: "+msg.err.Error()))
 	}
-	m.rebaseDidStash = true
-	return m, tea.Batch(notify.Close("rebase-stash"), m.cmdRunRebaseInteractive(msg.hash))
+	f.didStash = true
+	return tea.Batch(notify.Close("rebase-stash"), f.cmdRun(root, terminal, msg.hash))
 }
 
-func (m Model) cmdRunRebaseInteractive(hash string) tea.Cmd {
-	return terminalrun.Command(m.worktreeRoot, m.settings.Terminal, "git", []string{"rebase", "-i", hash}, func(err error, splitApp string) tea.Msg {
+func (f rebaseFlow) cmdRun(root string, terminal ui.Terminal, hash string) tea.Cmd {
+	return terminalrun.Command(root, terminal, "git", []string{"rebase", "-i", hash}, func(err error, splitApp string) tea.Msg {
 		return rebaseFinishedMsg{err: err, splitApp: splitApp}
 	})
 }
 
-func (m Model) handleRebaseFinished(msg rebaseFinishedMsg) (tea.Model, tea.Cmd) {
+// handleFinished takes the reload command from the caller because reloading
+// the log needs Model state.
+func (f *rebaseFlow) handleFinished(msg rebaseFinishedMsg, root string, reload tea.Cmd) tea.Cmd {
 	if msg.err != nil && msg.splitApp == "" {
-		return m, tea.Batch(notify.Error("rebase -i: "+msg.err.Error()), m.cmdReload())
+		return tea.Batch(notify.Error("rebase -i: "+msg.err.Error()), reload)
 	}
-	if m.rebaseDidStash && msg.splitApp == "" {
+	if f.didStash && msg.splitApp == "" {
 		// exec mode: rebase done, pop stash now
-		m.rebaseDidStash = false
-		root := m.worktreeRoot
-		return m, tea.Batch(
+		f.didStash = false
+		return tea.Batch(
 			notify.Progress("rebase-stash-pop", "popping stash..."),
-			m.cmdReload(),
+			reload,
 			nav.RepoMutated(),
 			func() tea.Msg {
 				_, err := git.StashPop(root)
@@ -154,18 +160,18 @@ func (m Model) handleRebaseFinished(msg rebaseFinishedMsg) (tea.Model, tea.Cmd) 
 			},
 		)
 	}
-	// kitty/tmux: rebaseDidStash stays true; pop prompt fires on next FocusMsg.
+	// kitty/tmux: didStash stays true; pop prompt fires on next FocusMsg.
 	// Emit RepoMutated only on success; error in split-terminal mode may not have mutated.
 	var mutatedCmd tea.Cmd
 	if msg.err == nil {
 		mutatedCmd = nav.RepoMutated()
 	}
-	return m, tea.Batch(mutatedCmd, m.cmdReload())
+	return tea.Batch(mutatedCmd, reload)
 }
 
-func (m Model) handleRebaseStashPop(msg rebaseStashPopMsg) (tea.Model, tea.Cmd) {
+func (f rebaseFlow) handleStashPop(msg rebaseStashPopMsg) tea.Cmd {
 	if msg.err != nil {
-		return m, tea.Batch(notify.Close("rebase-stash-pop"), notify.Error("stash pop failed: "+msg.err.Error()))
+		return tea.Batch(notify.Close("rebase-stash-pop"), notify.Error("stash pop failed: "+msg.err.Error()))
 	}
-	return m, notify.Close("rebase-stash-pop")
+	return notify.Close("rebase-stash-pop")
 }

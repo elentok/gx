@@ -18,12 +18,18 @@ type commitInfoMsg struct {
 	err     error
 }
 
-// cmdFetchCommitInfo reads the selected list row and fetches full commit
-// details for the popup, mirroring cmdFetchRewordDetails (model_reword.go) -
-// the list row itself doesn't carry the commit body the popup wants to show.
-func (m Model) cmdFetchCommitInfo() tea.Cmd {
-	rows := m.listPanel.Rows()
-	cursor := m.listPanel.Selected()
+// commitInfoPopup is the commit-info popup state. Its methods take the
+// terminal size from the caller instead of reaching into Model.
+type commitInfoPopup struct {
+	open    bool
+	details git.CommitDetails
+	scroll  int
+}
+
+// fetch reads the selected list row and fetches full commit details for the
+// popup, mirroring cmdFetchRewordDetails (model_reword.go) - the list row
+// itself doesn't carry the commit body the popup wants to show.
+func (p commitInfoPopup) fetch(root string, rows []row, cursor int) tea.Cmd {
 	if cursor < 0 || cursor >= len(rows) {
 		return nil
 	}
@@ -32,71 +38,66 @@ func (m Model) cmdFetchCommitInfo() tea.Cmd {
 		return nil
 	}
 	hash := row.commit.FullHash
-	root := m.worktreeRoot
 	return func() tea.Msg {
 		details, err := git.CommitDetailsForRef(root, hash)
 		return commitInfoMsg{details: details, err: err}
 	}
 }
 
-func (m Model) handleCommitInfo(msg commitInfoMsg) (tea.Model, tea.Cmd) {
+func (p *commitInfoPopup) handle(msg commitInfoMsg) {
 	if msg.err != nil {
-		return m, nil
+		return
 	}
-	m.commitInfoDetails = msg.details
-	m.commitInfoOpen = true
-	m.commitInfoScroll = 0
-	return m, nil
+	p.details = msg.details
+	p.open = true
+	p.scroll = 0
 }
 
-// handleCommitInfoKey closes the popup on esc/i, scrolls its body on
-// navigation keys, and swallows every other key so it doesn't leak through
-// to the list underneath.
-func (m Model) handleCommitInfoKey(msg tea.Msg) (tea.Model, tea.Cmd) {
+// key closes the popup on esc/i, scrolls its body on navigation keys, and
+// swallows every other key so it doesn't leak through to the list underneath.
+func (p *commitInfoPopup) key(msg tea.Msg, width, height int) {
 	kp, ok := msg.(tea.KeyPressMsg)
 	if !ok {
-		return m, nil
+		return
 	}
 	switch kp.String() {
 	case "esc", "i":
-		m.commitInfoOpen = false
+		p.open = false
 	case "up", "k":
-		m.commitInfoScroll = m.clampCommitInfoScroll(m.commitInfoScroll - 1)
+		p.scroll = p.clamp(p.scroll-1, width, height)
 	case "down", "j":
-		m.commitInfoScroll = m.clampCommitInfoScroll(m.commitInfoScroll + 1)
+		p.scroll = p.clamp(p.scroll+1, width, height)
 	case "pgup", "ctrl+u":
-		m.commitInfoScroll = m.clampCommitInfoScroll(m.commitInfoScroll - m.commitInfoInnerHeight())
+		p.scroll = p.clamp(p.scroll-p.innerHeight(height), width, height)
 	case "pgdown", "ctrl+d":
-		m.commitInfoScroll = m.clampCommitInfoScroll(m.commitInfoScroll + m.commitInfoInnerHeight())
+		p.scroll = p.clamp(p.scroll+p.innerHeight(height), width, height)
 	}
-	return m, nil
 }
 
-// handleCommitInfoWheel scrolls the popup body in response to a mouse-wheel
-// event while it's open, taking priority over the list scroll behind it.
-func (m Model) handleCommitInfoWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+// wheel scrolls the popup body in response to a mouse-wheel event while it's
+// open, taking priority over the list scroll behind it.
+func (p *commitInfoPopup) wheel(msg tea.MouseWheelMsg, width, height int) {
 	dir, ok := ui.WheelDirection(msg)
 	if !ok {
-		return m, nil
+		return
 	}
-	m.commitInfoScroll = m.clampCommitInfoScroll(m.commitInfoScroll + dir*ui.WheelScrollLines)
-	return m, nil
+	p.scroll = p.clamp(p.scroll+dir*ui.WheelScrollLines, width, height)
 }
 
-func (m Model) commitInfoInnerHeight() int {
-	return maxInt(5, m.height-8) - 2
+func (p commitInfoPopup) innerHeight(height int) int {
+	return maxInt(5, height-8) - 2
 }
 
-func (m Model) clampCommitInfoScroll(offset int) int {
-	lines := commitInfoLines(m.commitInfoDetails, maxInt(20, m.width-20)-2)
-	return ui.ClampScrollOffset(offset, len(lines), m.commitInfoInnerHeight())
+func (p commitInfoPopup) clamp(offset, width, height int) int {
+	lines := commitInfoLines(p.details, maxInt(20, width-20)-2)
+	return ui.ClampScrollOffset(offset, len(lines), p.innerHeight(height))
 }
 
-func (m Model) renderCommitInfoPopup() string {
-	width := maxInt(20, m.width-20)
-	height := maxInt(5, m.height-8)
-	lines := commitInfoLines(m.commitInfoDetails, width-2)
-	scroll := ui.ClampScrollOffset(m.commitInfoScroll, len(lines), height-2)
+func (p commitInfoPopup) render(termWidth, termHeight int) string {
+	width := maxInt(20, termWidth-20)
+	height := maxInt(5, termHeight-8)
+	lines := commitInfoLines(p.details, width-2)
+	scroll := ui.ClampScrollOffset(p.scroll, len(lines), height-2)
 	if scroll < len(lines) {
 		lines = lines[scroll:]
 	} else {
@@ -104,7 +105,7 @@ func (m Model) renderCommitInfoPopup() string {
 	}
 	return ui.RenderPanelFrame(ui.PanelFrameOptions{
 		Width: width, Height: height, Title: "Commit",
-		RightTitle:  commitInfoMetaStyle.Render(m.commitInfoDetails.Date.Format("2006-01-02 15:04")),
+		RightTitle:  commitInfoMetaStyle.Render(p.details.Date.Format("2006-01-02 15:04")),
 		Lines:       lines,
 		BorderColor: ui.ColorOrange, TitleColor: ui.ColorOrange, TitleBold: true,
 	})

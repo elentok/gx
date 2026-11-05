@@ -68,9 +68,7 @@ type Model struct {
 	commitOps commitops.Model
 	git       gitops.Model
 
-	commitInfoOpen    bool
-	commitInfoDetails git.CommitDetails
-	commitInfoScroll  int
+	commitInfo commitInfoPopup
 
 	pendingFocusSubject string
 	pendingFocusRef     string
@@ -81,8 +79,7 @@ type Model struct {
 
 	showGraph bool
 
-	rebaseConfirm  rebaseConfirmState // confirm modal for stash-before-rebase and stash-pop-after-rebase
-	rebaseDidStash bool               // stash was pushed before rebase; pop prompt fires on FocusMsg (kitty/tmux) or immediately (exec)
+	rebase rebaseFlow
 
 	// Split view state.
 	split        splitview.Model
@@ -151,7 +148,7 @@ func (m Model) InputFocused() bool {
 }
 
 func (m Model) ModalOpen() bool {
-	return m.commitOps.IsOpen() || m.git.IsOpen() || m.commitInfoOpen
+	return m.commitOps.IsOpen() || m.git.IsOpen() || m.commitInfo.open
 }
 
 func normalizedRef(ref string) string {

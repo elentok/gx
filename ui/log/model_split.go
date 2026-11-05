@@ -93,7 +93,7 @@ func (m Model) OnPageDeactivated() tea.Cmd {
 // no-ops when nothing changed, so this is cheap to call after every Update.
 func (m Model) withSyncedDetailOrigin() (Model, tea.Cmd) {
 	col, row, visible := m.split.DetailOrigin()
-	visible = visible && !m.ModalOpen() && !m.help.IsOpen && !m.rebaseConfirm.isOpen()
+	visible = visible && !m.ModalOpen() && !m.help.IsOpen && !m.rebase.confirm.isOpen()
 	var cmd tea.Cmd
 	m.commitDetail, cmd = m.commitDetail.WithScreenOrigin(col, ui.ChromeRows+row, visible)
 	return m, cmd

@@ -50,7 +50,7 @@ func TestOpenHelpWithModalOpenDoesNothing(t *testing.T) {
 	}
 
 	m.git = gitops.New()
-	m.rebaseConfirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
+	m.rebase.confirm = rebaseConfirmState{kind: rebaseConfirmStashPop, yes: true}
 	if m = sendOpenHelp(m); m.help.IsOpen {
 		t.Fatal("expected help to stay closed while the rebase confirm is open")
 	}

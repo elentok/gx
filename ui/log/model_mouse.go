@@ -25,8 +25,9 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if m.commitOps.AmendOpen() {
 		return m, nil
 	}
-	if m.commitInfoOpen {
-		return m.handleCommitInfoWheel(msg)
+	if m.commitInfo.open {
+		m.commitInfo.wheel(msg, m.width, m.height)
+		return m, nil
 	}
 	var cmd tea.Cmd
 	m.commitDetail, m.listPanel, cmd = splitview.RouteWheel(m.split, m.commitDetail, m.listPanel, msg)
