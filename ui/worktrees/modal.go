@@ -4,10 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/worktrees/modal"
-
-	"github.com/elentok/gx/git"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -22,24 +19,16 @@ func (m Model) enterLogsMode() Model {
 	return m.openModal(modal.NewLogs(m.lastJobLog, m.lastJobLabel, m.width, m.height))
 }
 
-func (m Model) enterPushDivergedMode(wt git.Worktree, div *git.PushDivergence) Model {
-	return m.openModal(modal.NewPushDiverged(wt, div, m.lastJobLog))
-}
-
-func (m Model) enterCredentialPrompt(prompt components.CredentialPrompt) Model {
-	return m.openModal(modal.NewCredential(prompt, m.jobs.runner))
-}
-
 // credentialOpen reports whether the credential modal is the open modal.
-func (m Model) credentialOpen() bool {
-	_, ok := m.modal.(modal.Credential)
+func credentialOpen(open modal.Modal) bool {
+	_, ok := open.(modal.Credential)
 	return ok
 }
 
 // herdrTerminalDown reports a herdr terminal whose herdr is missing or
 // unreachable: its splits and tabs would fail, so the menu stays hidden.
-func (m Model) herdrTerminalDown() bool {
-	return m.settings.Terminal == ui.TerminalHerdr && m.settings.HerdrUnavailable
+func herdrTerminalDown(s ui.Settings) bool {
+	return s.Terminal == ui.TerminalHerdr && s.HerdrUnavailable
 }
 
 func (m Model) enterTerminalMenuFor(name, path string) Model {
@@ -51,10 +40,6 @@ func (m Model) enterTerminalMenuFor(name, path string) Model {
 		m.settings.Terminal, name, path, title,
 		filepath.Base(m.repo.LinkedWorktreeDir()), m.settings.NameAliases,
 	))
-}
-
-func (m Model) enterHelpMode() Model {
-	return m.openModal(modal.NewHelp(m.helpModel, m.width, m.height))
 }
 
 // applyModalAction runs a modal's action against the page.

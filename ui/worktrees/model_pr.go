@@ -12,7 +12,7 @@ type gotoPRMsg struct {
 	err error
 }
 
-func (m Model) cmdGotoPR(worktreeRoot string) tea.Cmd {
+func cmdGotoPR(worktreeRoot string) tea.Cmd {
 	return func() tea.Msg {
 		url, err := pr.BranchPRURL(worktreeRoot)
 		return gotoPRMsg{url: url, err: err}

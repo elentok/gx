@@ -11,17 +11,9 @@ func (m Model) enterConfirm(opts confirm.Options) Model {
 	return m
 }
 
-func (m Model) handleConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
-	next, cmd, result := m.confirm.Update(msg)
-	return m.applyConfirmResult(next, cmd, result)
-}
-
-func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
-	next, cmd, result := m.confirm.UpdateMouse(msg, 0, m.width, m.height)
-	return m.applyConfirmResult(next, cmd, result)
-}
-
-func (m Model) applyConfirmResult(next confirm.Model, cmd tea.Cmd, result confirm.Result) (tea.Model, tea.Cmd) {
+// applyConfirmResult stores the confirm dialog's next state and, when the
+// user accepted a spinner-backed action, starts the spinner.
+func applyConfirmResult(m Model, next confirm.Model, cmd tea.Cmd, result confirm.Result) (tea.Model, tea.Cmd) {
 	m.confirm = next
 	if result.Done {
 		m.modal = nil
@@ -30,11 +22,6 @@ func (m Model) applyConfirmResult(next confirm.Model, cmd tea.Cmd, result confir
 			m.spinnerLabel = result.SpinnerLabel
 			return m, tea.Batch(cmd, m.spinner.Tick)
 		}
-		return m, cmd
 	}
 	return m, cmd
-}
-
-func (m Model) confirmModalView() string {
-	return m.confirm.View(0)
 }

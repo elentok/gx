@@ -5,31 +5,41 @@ import (
 	"github.com/elentok/gx/ui"
 )
 
+// layout is the screen geometry of the table and details panels: the page's
+// size and how many worktree rows the table must fit when stacked.
+type layout struct {
+	width, height, rows int
+}
+
+func layoutOf(m Model) layout {
+	return layout{width: m.width, height: m.height, rows: len(m.worktrees)}
+}
+
 // seamWidth is the 1-cell gap reserved between the table and details panels;
 // the panels themselves render edge-to-edge, so the layout - not either
 // panel - owns this gap.
-func (m Model) seamWidth() int {
+func (l layout) seamWidth() int {
 	return 1
 }
 
-func (m Model) splitWidth() (tableW, previewW int) {
-	if m.useStackedLayout() {
-		return m.width, m.width
+func (l layout) splitWidth() (tableW, previewW int) {
+	if l.useStackedLayout() {
+		return l.width, l.width
 	}
-	width := m.width - m.seamWidth()
+	width := l.width - l.seamWidth()
 	tableW = int(float64(width) * 0.55)
 	previewW = width - tableW
 	return
 }
 
-func (m Model) splitHeight(total int) (tableH, previewH int) {
-	if !m.useStackedLayout() {
+func (l layout) splitHeight(total int) (tableH, previewH int) {
+	if !l.useStackedLayout() {
 		return total, total
 	}
-	total -= m.seamWidth()
+	total -= l.seamWidth()
 	// Size the table to exactly fit its rows: N rows + 2 (header+border) + 2 (box borders).
 	const minPreviewH = 6
-	tableH = len(m.worktrees) + 4
+	tableH = l.rows + 4
 	if tableH > total-minPreviewH {
 		tableH = total - minPreviewH
 	}
@@ -43,38 +53,39 @@ func (m Model) splitHeight(total int) (tableH, previewH int) {
 	return
 }
 
-func (m Model) useStackedLayout() bool {
-	return m.width <= 100
+func (l layout) useStackedLayout() bool {
+	return l.width <= 100
 }
 
 // tableRect and previewRect give the on-screen bounds of the two panes, for
 // routing a mouse-wheel event to whichever the cursor is over.
-func (m Model) tableRect() ui.Rect {
-	tableW, _ := m.splitWidth()
-	tableH, _ := m.splitHeight(m.contentHeight())
+func (l layout) tableRect() ui.Rect {
+	tableW, _ := l.splitWidth()
+	tableH, _ := l.splitHeight(l.contentHeight())
 	return ui.Rect{X: 0, Y: 0, W: tableW, H: tableH}
 }
 
-func (m Model) previewRect() ui.Rect {
-	tableW, previewW := m.splitWidth()
-	tableH, previewH := m.splitHeight(m.contentHeight())
-	if m.useStackedLayout() {
-		return ui.Rect{X: 0, Y: tableH + m.seamWidth(), W: tableW, H: previewH}
+func (l layout) previewRect() ui.Rect {
+	tableW, previewW := l.splitWidth()
+	tableH, previewH := l.splitHeight(l.contentHeight())
+	if l.useStackedLayout() {
+		return ui.Rect{X: 0, Y: tableH + l.seamWidth(), W: tableW, H: previewH}
 	}
-	return ui.Rect{X: tableW + m.seamWidth(), Y: 0, W: previewW, H: tableH}
+	return ui.Rect{X: tableW + l.seamWidth(), Y: 0, W: previewW, H: tableH}
 }
 
-func (m Model) contentHeight() int {
-	if m.height < 4 {
+func (l layout) contentHeight() int {
+	if l.height < 4 {
 		return 4
 	}
-	return m.height
+	return l.height
 }
 
 func (m Model) resized() Model {
-	tableW, previewW := m.splitWidth()
-	h := m.contentHeight()
-	tableH, previewH := m.splitHeight(h)
+	l := layoutOf(m)
+	tableW, previewW := l.splitWidth()
+	h := l.contentHeight()
+	tableH, previewH := l.splitHeight(h)
 
 	tableInnerW := tableW - 2
 	tableInnerH := tableH - 2

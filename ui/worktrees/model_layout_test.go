@@ -15,7 +15,7 @@ func TestSplitHeight_StackedLayout(t *testing.T) {
 	t.Parallel()
 	m := Model{width: 80, height: 30} // width <= 100 → stacked
 	m.worktrees = make([]git.Worktree, 5)
-	tableH, previewH := m.splitHeight(30)
+	tableH, previewH := layoutOf(m).splitHeight(30)
 	if tableH+previewH != 29 { // 30 minus the 1-cell seam between table and preview
 		t.Errorf("tableH(%d) + previewH(%d) != total(29)", tableH, previewH)
 	}
@@ -30,7 +30,7 @@ func TestSplitHeight_StackedLayout(t *testing.T) {
 func TestSplitHeight_NonStackedLayout(t *testing.T) {
 	t.Parallel()
 	m := Model{width: 200, height: 40} // width > 100 → side-by-side
-	tableH, previewH := m.splitHeight(40)
+	tableH, previewH := layoutOf(m).splitHeight(40)
 	if tableH != 40 || previewH != 40 {
 		t.Errorf("expected both to be 40, got tableH=%d previewH=%d", tableH, previewH)
 	}
@@ -39,7 +39,7 @@ func TestSplitHeight_NonStackedLayout(t *testing.T) {
 func TestContentHeight_MinFour(t *testing.T) {
 	t.Parallel()
 	m := Model{height: 2}
-	if h := m.contentHeight(); h != 4 {
+	if h := layoutOf(m).contentHeight(); h != 4 {
 		t.Errorf("expected min contentHeight=4, got %d", h)
 	}
 }
@@ -47,7 +47,7 @@ func TestContentHeight_MinFour(t *testing.T) {
 func TestContentHeight_Normal(t *testing.T) {
 	t.Parallel()
 	m := Model{height: 30}
-	if h := m.contentHeight(); h != 30 {
+	if h := layoutOf(m).contentHeight(); h != 30 {
 		t.Errorf("expected contentHeight=30 (no footer row), got %d", h)
 	}
 }

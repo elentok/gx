@@ -58,7 +58,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 
 	case tea.MouseClickMsg:
 		if m.confirm.IsOpen {
-			return m.handleConfirmMouseUpdate(msg)
+			next, cmd, result := m.confirm.UpdateMouse(msg, 0, m.width, m.height)
+			return applyConfirmResult(m, next, cmd, result)
 		}
 
 	case tea.MouseWheelMsg:
@@ -72,7 +73,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m, tea.Quit
 		}
 		if m.confirm.IsOpen {
-			return m.handleConfirmUpdate(msg)
+			next, cmd, result := m.confirm.Update(msg)
+			return applyConfirmResult(m, next, cmd, result)
 		}
 		if m.modal != nil {
 			next, cmd, _ := m.updateModal(msg)
@@ -121,7 +123,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		if !m.herdrTerminalDown() {
+		if !herdrTerminalDown(m.settings) {
 			m = m.enterTerminalMenuFor(msg.name, msg.path)
 		}
 		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
@@ -155,8 +157,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 
 	case spinner.TickMsg:
 		if m.jobs.running() {
-			if prompt, ok := m.jobs.runner.Prompt(); ok && !m.credentialOpen() {
-				m = m.enterCredentialPrompt(prompt)
+			if prompt, ok := m.jobs.runner.Prompt(); ok && !credentialOpen(m.modal) {
+				m = m.openModal(modal.NewCredential(prompt, m.jobs.runner))
 			}
 			if err, done := m.jobs.runner.Result(); done {
 				return m.finishPromptableJob(err)
@@ -251,7 +253,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if msg.divergence != nil {
 			wt := m.cursorWorktree()
 			if wt != nil {
-				return m.enterPushDivergedMode(*wt, msg.divergence), nil
+				return m.openModal(modal.NewPushDiverged(*wt, msg.divergence, m.lastJobLog)), nil
 			}
 			return m.showError("cannot resolve selected worktree for diverged push"), nil
 		}
@@ -287,7 +289,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m.showError(err.Error()), nil
 		}
 		if div != nil {
-			return m.enterPushDivergedMode(msg.wt, div), nil
+			return m.openModal(modal.NewPushDiverged(msg.wt, div, m.lastJobLog)), nil
 		}
 		m.spinnerActive = true
 		m.spinnerLabel = promptableJobLabel(promptableJobPush, msg.wt)

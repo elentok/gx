@@ -13,5 +13,5 @@ func (m Model) handleOpenHelp() Model {
 	} else if m.modal != nil {
 		return m
 	}
-	return m.enterHelpMode()
+	return m.openModal(modal.NewHelp(m.helpModel, m.width, m.height))
 }

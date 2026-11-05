@@ -28,7 +28,7 @@ func (m Model) View() tea.View {
 		}
 
 		if m.confirm.IsOpen {
-			content = ui.OverlayCenter(bg, m.confirmModalView(), m.width, m.height)
+			content = ui.OverlayCenter(bg, m.confirm.View(0), m.width, m.height)
 		} else if m.modal != nil {
 			content = m.modalOverlay(bg)
 		} else {
@@ -62,9 +62,10 @@ func (m Model) modalOverlay(bg string) string {
 
 // normalView renders the worktrees table, preview panel, and status bar.
 func (m Model) normalView() string {
-	h := m.contentHeight()
-	tableW, previewW := m.splitWidth()
-	tableH, previewH := m.splitHeight(h)
+	l := layoutOf(m)
+	h := l.contentHeight()
+	tableW, previewW := l.splitWidth()
+	tableH, previewH := l.splitHeight(h)
 
 	// The table is always the focused, selection-driving pane (there's no
 	// standalone-table state and no focus toggle into the details viewport),
@@ -73,7 +74,7 @@ func (m Model) normalView() string {
 	previewView := m.renderWorktreesPanel(previewW, previewH, "Details", strings.Split(m.viewport.View(), "\n"), false, false)
 
 	var content string
-	if m.useStackedLayout() {
+	if l.useStackedLayout() {
 		seam := ui.RenderSeamRow(tableW, ui.SeamColor)
 		content = lipgloss.JoinVertical(lipgloss.Left, tableView, seam, previewView)
 	} else {

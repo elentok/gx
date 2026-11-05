@@ -23,7 +23,7 @@ func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	}
 
 	mouse := msg.Mouse()
-	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, m.tableRect(), m.previewRect())
+	idx, ok := ui.HoverHitTest(mouse.X, mouse.Y, layoutOf(m).tableRect(), layoutOf(m).previewRect())
 	if !ok {
 		return m, nil
 	}

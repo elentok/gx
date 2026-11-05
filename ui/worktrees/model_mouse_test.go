@@ -36,7 +36,7 @@ func newTestModelWithWorktrees(t *testing.T, n int) Model {
 func TestMouseWheelOverTableScrollsTable(t *testing.T) {
 	t.Parallel()
 	m := newTestModelWithWorktrees(t, 20)
-	rect := m.tableRect()
+	rect := layoutOf(m).tableRect()
 	prevCursor := m.table.Cursor()
 	prevOffset := m.viewport.YOffset()
 
@@ -67,7 +67,7 @@ func TestMouseWheelOverPreviewScrollsPreview(t *testing.T) {
 	}
 	m.viewport.SetContent(content)
 
-	rect := m.previewRect()
+	rect := layoutOf(m).previewRect()
 	prevCursor := m.table.Cursor()
 	prevOffset := m.viewport.YOffset()
 
@@ -86,7 +86,7 @@ func TestMouseWheelOverRegionWithNoOverflowNoOps(t *testing.T) {
 	t.Parallel()
 	m := newTestModelWithWorktrees(t, 1)
 
-	tableRect := m.tableRect()
+	tableRect := layoutOf(m).tableRect()
 	prevCursor := m.table.Cursor()
 	updated, _ := m.Update(tea.MouseWheelMsg{X: tableRect.X + 2, Y: tableRect.Y + 2, Button: tea.MouseWheelDown})
 	m = updated.(Model)
@@ -97,7 +97,7 @@ func TestMouseWheelOverRegionWithNoOverflowNoOps(t *testing.T) {
 		t.Fatalf("expected no preview reload when the table has nothing to scroll")
 	}
 
-	previewRect := m.previewRect()
+	previewRect := layoutOf(m).previewRect()
 	prevOffset := m.viewport.YOffset()
 	updated, _ = m.Update(tea.MouseWheelMsg{X: previewRect.X + 2, Y: previewRect.Y + 2, Button: tea.MouseWheelDown})
 	m = updated.(Model)
@@ -121,7 +121,7 @@ func TestMouseWheelWithHelpOpenScrollsHelpNotTableOrPreview(t *testing.T) {
 
 	prevCursor := m.table.Cursor()
 	prevOffset := m.viewport.YOffset()
-	rect := m.tableRect()
+	rect := layoutOf(m).tableRect()
 	updated, _ = m.Update(tea.MouseWheelMsg{X: rect.X + 2, Y: rect.Y + 2, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
@@ -149,7 +149,7 @@ func TestMouseWheelWithLogsOpenScrollsLogsNotTableOrPreview(t *testing.T) {
 
 	prevCursor := m.table.Cursor()
 	prevOffset := m.viewport.YOffset()
-	rect := m.tableRect()
+	rect := layoutOf(m).tableRect()
 	updated, _ := m.Update(tea.MouseWheelMsg{X: rect.X + 2, Y: rect.Y + 2, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 
@@ -172,7 +172,7 @@ func TestMouseWheelWithErrorOpenScrollsErrorNotTableOrPreview(t *testing.T) {
 
 	prevCursor := m.table.Cursor()
 	prevOffset := m.viewport.YOffset()
-	rect := m.tableRect()
+	rect := layoutOf(m).tableRect()
 	updated, _ := m.Update(tea.MouseWheelMsg{X: rect.X + 2, Y: rect.Y + 2, Button: tea.MouseWheelDown})
 	m = updated.(Model)
 

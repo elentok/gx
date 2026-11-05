@@ -103,16 +103,16 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Quit
 	case bindingHelp:
-		m = m.enterHelpMode()
+		m = m.openModal(modal.NewHelp(m.helpModel, m.width, m.height))
 		return m, nil
 	case bindingNew:
 		if !m.spinnerActive {
-			m = m.enterNewMode()
+			m = m.openModal(modal.NewWorktreePrompt(modal.NameNew))
 		}
 		return m, nil
 	case bindingNewAndOpen:
 		if !m.spinnerActive {
-			m = m.enterNewAndOpenMode()
+			m = m.openModal(modal.NewWorktreePrompt(modal.NameNewAndOpen))
 		}
 		return m, nil
 	case bindingDelete:
@@ -222,7 +222,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case bindingOpenTerminal:
-		if m.settings.Terminal == ui.TerminalPlain || m.herdrTerminalDown() {
+		if m.settings.Terminal == ui.TerminalPlain || herdrTerminalDown(m.settings) {
 			return m, notify.Info(modal.MoreOptionsInfo)
 		}
 		wt := m.cursorWorktree()
@@ -246,7 +246,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if wt == nil {
 			return m, nil
 		}
-		return m, m.cmdGotoPR(wt.Path)
+		return m, cmdGotoPR(wt.Path)
 	case bindingCancelChord:
 		return m, nil
 	}

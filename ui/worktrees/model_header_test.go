@@ -27,7 +27,7 @@ func headerTestModel(width int) Model {
 // in both the stacked and the side-by-side layout.
 func worktreesHeader(m Model) string {
 	header := strings.Split(ansi.Strip(m.normalView()), "\n")[0]
-	tableW, _ := m.splitWidth()
+	tableW, _ := layoutOf(m).splitWidth()
 	return ansi.Cut(header, 0, tableW)
 }
 

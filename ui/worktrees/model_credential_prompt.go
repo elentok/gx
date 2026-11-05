@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -35,7 +36,7 @@ func (m Model) finishPromptableJob(err error) (tea.Model, tea.Cmd) {
 			return m.showError(divErr.Error()), nil
 		}
 		if div != nil {
-			return m.enterPushDivergedMode(wt, div), nil
+			return m.openModal(modal.NewPushDiverged(wt, div, m.lastJobLog)), nil
 		}
 		return m, cmdStartPromptableJob(promptableJobPush, wt, log, false)
 	case promptableJobPush:

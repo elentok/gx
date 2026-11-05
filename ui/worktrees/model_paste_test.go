@@ -11,7 +11,7 @@ import (
 
 func TestPasteMsgUpdatesNewWorktreeInput(t *testing.T) {
 	t.Parallel()
-	m := Model{}.enterNewMode()
+	m := Model{}.openModal(modal.NewWorktreePrompt(modal.NameNew))
 
 	updated, _ := m.Update(tea.PasteMsg{Content: "feature-pasted"})
 	m = updated.(Model)
